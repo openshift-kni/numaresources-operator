@@ -1,0 +1,24 @@
+# permissions for end users to edit numaresourcesoperators.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: numaresourcesoperator-editor-role
+rules:
+- apiGroups:
+  - nodetopology.openshift.io
+  resources:
+  - numaresourcesoperators
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - nodetopology.openshift.io
+  resources:
+  - numaresourcesoperators/status
+  verbs:
+  - get

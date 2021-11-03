@@ -1,0 +1,26 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: topology-aware-controller
+  namespace: tas-scheduler
+  labels:
+    app: topology-aware-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: topology-aware-controller
+  template:
+    metadata:
+      labels:
+        app: topology-aware-controller
+    spec:
+      serviceAccount: topology-aware-controller
+      containers:
+      - name: topology-aware-controller
+        image: k8s.gcr.io/scheduler-plugins/controller:v0.19.9
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: '100m'
+

@@ -1,0 +1,19 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+kubeadmConfigPatches:
+- |
+  kind: KubeletConfiguration
+  cpuManagerPolicy: "static"
+  cpuManagerReconcilePeriod: "5s"
+  topologyManagerPolicy: "single-numa-node"
+  reservedSystemCPUs: "0"
+  featureGates:
+    KubeletPodResourcesGetAllocatable: true
+  memoryManagerPolicy: "Static"
+  systemReserved: {"memory" :"512Mi"}
+  kubeReserved: {"memory" :"512Mi"}
+  evictionHard: {"memory.available": "100Mi"}
+  reservedMemory: [{"numaNode": 0, "limits": {"memory": "1124Mi"}}]
+nodes:
+- role: control-plane
+- role: worker

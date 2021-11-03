@@ -1,0 +1,13 @@
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: topology-aware-controller-as-kube-controller
+  namespace: kube-system
+subjects:
+  - kind: ServiceAccount
+    name: topology-aware-controller
+    namespace: tas-scheduler
+roleRef:
+  kind: Role
+  name: extension-apiserver-authentication-reader
+  apiGroup: rbac.authorization.k8s.io

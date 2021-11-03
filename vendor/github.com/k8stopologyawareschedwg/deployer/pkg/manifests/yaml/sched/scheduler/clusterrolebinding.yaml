@@ -1,0 +1,13 @@
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: topology-aware-scheduler
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: topology-aware-scheduler
+subjects:
+- kind: ServiceAccount
+  name: topology-aware-scheduler
+  namespace: tas-scheduler
+

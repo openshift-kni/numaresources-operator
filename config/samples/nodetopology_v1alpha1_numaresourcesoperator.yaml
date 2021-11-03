@@ -1,0 +1,7 @@
+apiVersion: nodetopology.openshift.io/v1alpha1
+kind: NUMAResourcesOperator
+metadata:
+  name: numaresourcesoperator-sample
+spec:
+  # Add fields here
+  foo: bar

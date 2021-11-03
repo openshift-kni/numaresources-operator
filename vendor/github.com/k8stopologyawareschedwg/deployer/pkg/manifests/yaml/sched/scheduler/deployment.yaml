@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    component: scheduler
+  name: topology-aware-scheduler
+  namespace: tas-scheduler
+spec:
+  selector:
+    matchLabels:
+      component: scheduler
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        component: scheduler
+    spec:
+      serviceAccountName: topology-aware-scheduler
+      containers:
+      - command:
+        - /bin/kube-scheduler
+        - --address=0.0.0.0
+        - --leader-elect=false
+        - --config=/etc/kubernetes/scheduler-config.yaml
+        - --scheduler-name=topology-aware-scheduler
+        image: k8s.gcr.io/scheduler-plugins/kube-scheduler:v0.19.9
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 10251
+          initialDelaySeconds: 15
+        name: topology-aware-scheduler
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 10251
+        resources:
+          requests:
+            cpu: '500m'
+        volumeMounts:
+        - name: scheduler-config
+          mountPath: /etc/kubernetes
+          readOnly: true
+      volumes:
+      - name: scheduler-config
+        configMap:
+          name: scheduler-config

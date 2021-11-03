@@ -1,0 +1,20 @@
+# permissions for end users to view numaresourcesoperators.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: numaresourcesoperator-viewer-role
+rules:
+- apiGroups:
+  - nodetopology.openshift.io
+  resources:
+  - numaresourcesoperators
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - nodetopology.openshift.io
+  resources:
+  - numaresourcesoperators/status
+  verbs:
+  - get
