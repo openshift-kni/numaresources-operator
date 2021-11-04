@@ -43,11 +43,19 @@ func (n NamespacedName) String() string {
 
 // NUMAResourcesOperatorSpec defines the desired state of NUMAResourcesOperator
 type NUMAResourcesOperatorSpec struct {
+	NodeGroups []NodeGroup `json:"nodeGroups,omitempty"`
+}
+
+// NodeGroup defines group of nodes that will run resource topology exporter daemon set
+// You can choose the group of node by MachineConfigPoolSelector or by NodeSelector
+type NodeGroup struct {
+	// MachineConfigPoolSelector defines label selector for the machine config pool
+	MachineConfigPoolSelector *metav1.LabelSelector `json:"machineConfigPoolSelector,omitempty"`
 }
 
 // NUMAResourcesOperatorStatus defines the observed state of NUMAResourcesOperator
 type NUMAResourcesOperatorStatus struct {
-	DaemonSet *NamespacedName `json:"daemonset,omitempty"`
+	DaemonSets []NamespacedName `json:"daemonsets,omitempty"`
 
 	// Conditions show the current state of the NUMAResourcesOperator Operator
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
