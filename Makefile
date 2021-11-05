@@ -224,3 +224,9 @@ catalog-push: ## Push a catalog image.
 .PHONY: deps-update
 deps-update:
 	go mod tidy && go mod vendor
+
+.PHONY: olm-deploy
+olm-deploy:
+	hack/olm-deploy.sh
+
+test-on-ci: olm-deploy
