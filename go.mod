@@ -6,7 +6,7 @@ require (
 	github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
 	github.com/go-logr/logr v0.4.0
 	github.com/k8stopologyawareschedwg/deployer v0.0.10
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.2.5
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.2.6-0.20211111145943-88595fb0d865
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.13.0
 	github.com/openshift-kni/resource-topology-exporter v0.2.5

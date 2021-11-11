@@ -23,6 +23,7 @@ package rte
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/labels"
 	"strconv"
 
 	"github.com/onsi/ginkgo"
@@ -35,7 +36,7 @@ import (
 	e2etestenv "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testenv"
 )
 
-var _ = ginkgo.Describe("[RTE] metrics", func() {
+var _ = ginkgo.Describe("[RTE][Monitoring]", func() {
 	var (
 		initialized bool
 		rtePod      *corev1.Pod
@@ -48,16 +49,16 @@ var _ = ginkgo.Describe("[RTE] metrics", func() {
 		if !initialized {
 			var err error
 			var pods *corev1.PodList
-			sel := metav1.LabelSelector{
-				MatchLabels: map[string]string{"name": e2etestenv.RTELabelName},
-			}
-			pods, err = f.ClientSet.CoreV1().Pods(e2etestenv.DefaultNamespace).List(context.TODO(), metav1.ListOptions{LabelSelector: sel.String()})
+			sel, err := labels.Parse(fmt.Sprintf("name=%s", e2etestenv.RTELabelName))
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			gomega.Expect(len(pods.Items)).To(gomega.Equal(1))
-			rtePod := &pods.Items[0]
+			pods, err = f.ClientSet.CoreV1().Pods(e2etestenv.GetNamespaceName()).List(context.TODO(), metav1.ListOptions{LabelSelector: sel.String()})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			gomega.Expect(len(pods.Items)).NotTo(gomega.BeZero())
+			rtePod = &pods.Items[0]
 			metricsPort, err = findMetricsPort(rtePod)
-			gomega.Expect(err).To(gomega.HaveOccurred())
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			initialized = true
 		}
@@ -77,7 +78,7 @@ var _ = ginkgo.Describe("[RTE] metrics", func() {
 			})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "ExecWithOptions failed with %s:\n%s", err, stderr)
 			gomega.Expect(stdout).To(gomega.ContainSubstring("operation_delay"))
-			gomega.Expect(stdout).To(gomega.ContainSubstring("podresource_api_call_failures_total"))
+			gomega.Expect(stdout).To(gomega.ContainSubstring("wakeup_delay"))
 		})
 	})
 })

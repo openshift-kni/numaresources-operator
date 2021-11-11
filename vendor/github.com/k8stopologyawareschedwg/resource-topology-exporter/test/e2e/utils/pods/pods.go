@@ -17,7 +17,9 @@ limitations under the License.
 package pods
 
 import (
+	"os"
 	"sync"
+	"time"
 
 	"github.com/onsi/ginkgo"
 
@@ -37,6 +39,7 @@ func MakeGuaranteedSleeperPod(cpuLimit string) *v1.Pod {
 			Name: "sleeper-gu-pod",
 		},
 		Spec: v1.PodSpec{
+			NodeSelector:  map[string]string{"rte-e2e-test-node": ""},
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
@@ -64,6 +67,7 @@ func MakeBestEffortSleeperPod() *v1.Pod {
 			Name: "sleeper-be-pod",
 		},
 		Spec: v1.PodSpec{
+			NodeSelector:  map[string]string{"rte-e2e-test-node": ""},
 			RestartPolicy: v1.RestartPolicyNever,
 			Containers: []v1.Container{
 				{
@@ -97,4 +101,20 @@ func DeletePodSyncByName(f *framework.Framework, podName string) {
 		GracePeriodSeconds: &gp,
 	}
 	f.PodClient().DeleteSync(podName, delOpts, framework.DefaultPodDeletionTimeout)
+}
+
+func Cooldown(f *framework.Framework) {
+	pollInterval, ok := os.LookupEnv("RTE_POLL_INTERVAL")
+	if !ok {
+		// nothing to do!
+		return
+	}
+	sleepTime, err := time.ParseDuration(pollInterval)
+	if err != nil {
+		framework.Logf("WaitPodToBeGone: cannot parse %q: %v", pollInterval, err)
+		return
+	}
+
+	// wait a little more than a full poll interval to make sure the resourcemonitor catches up
+	time.Sleep(sleepTime + 500*time.Millisecond)
 }

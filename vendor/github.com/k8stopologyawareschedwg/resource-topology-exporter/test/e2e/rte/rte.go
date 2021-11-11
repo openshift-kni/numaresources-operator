@@ -34,22 +34,16 @@ import (
 	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 	topologyclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
+
 	e2enodes "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes"
 	e2enodetopology "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodetopology"
 	e2epods "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods"
 	e2etestenv "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testenv"
 )
 
-const (
-	rteLabelName     = "resource-topology"
-	rteContainerName = "resource-topology-exporter-container"
-	defaultNamespace = "default"
-)
-
 var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func() {
 	var (
 		initialized         bool
-		nodeName            string
 		namespace           string
 		topologyClient      *topologyclientset.Clientset
 		topologyUpdaterNode *v1.Node
@@ -62,17 +56,18 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 		var err error
 
 		if !initialized {
-			nodeName = e2etestenv.GetNodeName()
 			namespace = e2etestenv.GetNamespaceName()
 
 			topologyClient, err = topologyclientset.NewForConfig(f.ClientConfig())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			topologyUpdaterNode, err = f.ClientSet.CoreV1().Nodes().Get(context.TODO(), nodeName, metav1.GetOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
 			workerNodes, err = e2enodes.GetWorkerNodes(f)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			// pick any worker node. The (implicit, TODO: make explicit) assumption is
+			// the daemonset runs on CI on all the worker nodes.
+			topologyUpdaterNode = &workerNodes[0]
+			gomega.Expect(topologyUpdaterNode).NotTo(gomega.BeNil())
 
 			initialized = true
 		}
@@ -89,23 +84,48 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 			initialNodeTopo := e2enodetopology.GetNodeTopology(topologyClient, topologyUpdaterNode.Name, namespace)
 			ginkgo.By("creating a pod consuming the shared pool")
 			sleeperPod := e2epods.MakeGuaranteedSleeperPod("1000m")
+			defer e2epods.Cooldown(f)
 
-			podMap := make(map[string]*v1.Pod)
-			pod := f.PodClient().CreateSync(sleeperPod)
-			podMap[pod.Name] = pod
-			defer e2epods.DeletePodsAsync(f, podMap)
+			stopChan := make(chan struct{})
+			doneChan := make(chan struct{})
+			started := false
+
+			go func() {
+				<-stopChan
+				podMap := make(map[string]*v1.Pod)
+				pod := f.PodClient().CreateSync(sleeperPod)
+				podMap[pod.Name] = pod
+				e2epods.DeletePodsAsync(f, podMap)
+				doneChan <- struct{}{}
+			}()
 
 			ginkgo.By("getting the updated topology")
 			var finalNodeTopo *v1alpha1.NodeResourceTopology
 			gomega.Eventually(func() bool {
+				if !started {
+					stopChan <- struct{}{}
+					started = true
+				}
+
 				finalNodeTopo, err = topologyClient.TopologyV1alpha1().NodeResourceTopologies(namespace).Get(context.TODO(), topologyUpdaterNode.Name, metav1.GetOptions{})
 				if err != nil {
 					framework.Logf("failed to get the node topology resource: %v", err)
 					return false
 				}
-				return finalNodeTopo.ObjectMeta.ResourceVersion != initialNodeTopo.ObjectMeta.ResourceVersion
-			}, 3*time.Second, 1*time.Second).Should(gomega.BeTrue(), "didn't get updated node topology info")
+				if finalNodeTopo.ObjectMeta.ResourceVersion == initialNodeTopo.ObjectMeta.ResourceVersion {
+					framework.Logf("resource %s/%s not yet updated - resource version not bumped", namespace, topologyUpdaterNode.Name)
+					return false
+				}
+				reason, ok := finalNodeTopo.Annotations[nrtupdater.AnnotationRTEUpdate]
+				if !ok {
+					framework.Logf("resource %s/%s missing annotation!", namespace, topologyUpdaterNode.Name)
+					return false
+				}
+				return reason == nrtupdater.RTEUpdateReactive
+			}, 5*time.Second, 1*time.Second).Should(gomega.BeTrue(), "didn't get updated node topology info")
 			ginkgo.By("checking the topology was updated for the right reason")
+
+			<-doneChan
 
 			gomega.Expect(finalNodeTopo.Annotations).ToNot(gomega.BeNil(), "missing annotations entirely")
 			reason := finalNodeTopo.Annotations[nrtupdater.AnnotationRTEUpdate]
