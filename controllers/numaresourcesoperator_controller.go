@@ -53,14 +53,15 @@ const (
 // NUMAResourcesOperatorReconciler reconciles a NUMAResourcesOperator object
 type NUMAResourcesOperatorReconciler struct {
 	client.Client
-	Log          logr.Logger
-	Scheme       *runtime.Scheme
-	Platform     platform.Platform
-	APIManifests apimanifests.Manifests
-	RTEManifests rtemanifests.Manifests
-	Helper       *deployer.Helper
-	Namespace    string
-	ImageSpec    string
+	Log                 logr.Logger
+	Scheme              *runtime.Scheme
+	Platform            platform.Platform
+	APIManifests        apimanifests.Manifests
+	RTEManifests        rtemanifests.Manifests
+	InitialRTEManifests rtemanifests.Manifests
+	Helper              *deployer.Helper
+	Namespace           string
+	ImageSpec           string
 }
 
 // TODO: narrow down
@@ -133,7 +134,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 func (r *NUMAResourcesOperatorReconciler) RenderManifests(namespace string) rtemanifests.Manifests {
 	logger := r.Log.WithValues("rte", namespace)
 	logger.Info("Updating manifests")
-	mf := r.RTEManifests.Update(rtemanifests.UpdateOptions{
+	mf := r.InitialRTEManifests.Update(rtemanifests.UpdateOptions{
 		Namespace: namespace,
 	})
 	rtestate.UpdateDaemonSetImage(mf.DaemonSet, r.ImageSpec)

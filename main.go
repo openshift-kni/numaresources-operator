@@ -124,11 +124,12 @@ func main() {
 
 	if renderManifestsFor != "" {
 		reconciler := &controllers.NUMAResourcesOperatorReconciler{
-			Log:          ctrl.Log.WithName("controllers").WithName("RTE"),
-			APIManifests: apiManifests,
-			RTEManifests: rteManifests,
-			Platform:     clusterPlatform,
-			ImageSpec:    images.ResourceTopologyExporterDefaultImageSHA,
+			Log:                 ctrl.Log.WithName("controllers").WithName("RTE"),
+			APIManifests:        apiManifests,
+			RTEManifests:        rteManifests,
+			InitialRTEManifests: rteManifests.Clone(),
+			Platform:            clusterPlatform,
+			ImageSpec:           images.ResourceTopologyExporterDefaultImageSHA,
 		}
 
 		err := renderObjects(reconciler.RenderManifests(renderManifestsFor).ToObjects())
@@ -160,14 +161,15 @@ func main() {
 	setupLog.Info("using RTE image", "spec", imageSpec)
 
 	if err = (&controllers.NUMAResourcesOperatorReconciler{
-		Client:       mgr.GetClient(),
-		Scheme:       mgr.GetScheme(),
-		Log:          ctrl.Log.WithName("controllers").WithName("RTE"),
-		APIManifests: apiManifests,
-		RTEManifests: rteManifests,
-		Platform:     clusterPlatform,
-		Helper:       deployer.NewHelperWithClient(mgr.GetClient(), "", tlog.NewNullLogAdapter()),
-		ImageSpec:    imageSpec,
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		Log:                 ctrl.Log.WithName("controllers").WithName("RTE"),
+		APIManifests:        apiManifests,
+		RTEManifests:        rteManifests,
+		InitialRTEManifests: rteManifests.Clone(),
+		Platform:            clusterPlatform,
+		Helper:              deployer.NewHelperWithClient(mgr.GetClient(), "", tlog.NewNullLogAdapter()),
+		ImageSpec:           imageSpec,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NUMAResourcesOperator")
 		os.Exit(1)
