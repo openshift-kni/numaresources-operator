@@ -259,9 +259,6 @@ github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.4.0
 ## explicit
 github.com/docker/go-units
-# github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
-## explicit
-github.com/docopt/docopt-go
 # github.com/drone/envsubst v1.0.3
 ## explicit; go 1.13
 github.com/drone/envsubst
@@ -527,6 +524,7 @@ github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopolo
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/sysinfo
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/topologypolicy
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/utils
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/version
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes
