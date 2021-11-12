@@ -14,7 +14,7 @@ defaults:
     shell: bash
 
 jobs:
-  release-build:
+  release:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout sources
@@ -32,8 +32,8 @@ jobs:
         run: |
           echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
 
-      - name: Build Image
-        id: build-image
+      - name: Build Operator Image
+        id: build-image-operator
         uses: redhat-actions/buildah-build@v2
         with:
           image: numaresources-operator
@@ -42,14 +42,38 @@ jobs:
             ./Dockerfile
 
       - name: Push to quay
-        id: push-to-quay
+        id: push-to-quay-operator
         uses: redhat-actions/push-to-registry@v2
         with:
           image: ${{ steps.build-image.outputs.image }}
           tags: ${{ steps.build-image.outputs.tags }}
+          image: ${{ steps.build-image-operator.outputs.image }}
+          tags: ${{ steps.build-image-operator.outputs.tags }}
           registry: quay.io/openshift-kni
           username: ${{ secrets.QUAY_IO_USERNAME }}
           password: ${{ secrets.QUAY_IO_ROBOTOKEN }}
 
-      - name: Print image url
-        run: echo "Image pushed to ${{ steps.push-to-quay.outputs.registry-paths }}"
+      - name: Print operator image URL
+        run: echo "Image pushed to ${{ steps.push-to-quay-operator.outputs.registry-paths }}"
+
+      - name: Build manifest bundle Image
+        id: build-image-bundle
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: numaresources-operator-bundle
+          tags: ${{ env.RELEASE_VERSION}}
+          dockerfiles: |
+            ./bundle.Dockerfile
+
+      - name: Push to quay
+        id: push-to-quay-bundle
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          image: ${{ steps.build-image-bundle.outputs.image }}
+          tags: ${{ steps.build-image-bundle.outputs.tags }}
+          registry: quay.io/openshift-kni
+          username: ${{ secrets.QUAY_IO_USERNAME }}
+          password: ${{ secrets.QUAY_IO_ROBOTOKEN }}
+
+      - name: Print manifest bundle image URL
+        run: echo "Image pushed to ${{ steps.push-to-quay-bundle.outputs.registry-paths }}"
