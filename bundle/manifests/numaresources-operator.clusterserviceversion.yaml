@@ -198,7 +198,7 @@ spec:
                 - --leader-elect
                 command:
                 - /bin/numaresources-operator
-                image: quay.io/fromani/numaresources-operator:4.10-snapshot
+                image: quay.io/openshift-kni/numaresources-operator:4.10-snapshot
                 livenessProbe:
                   httpGet:
                     path: /healthz
