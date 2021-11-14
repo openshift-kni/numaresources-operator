@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package e2e_test
 
 import (
 	"flag"
@@ -23,15 +23,15 @@ import (
 	"testing"
 	"time"
 
-	e2ekube "k8s.io/kubernetes/test/e2e"
+	_ "github.com/onsi/ginkgo"
+	_ "github.com/onsi/gomega"
 
+	e2ekube "k8s.io/kubernetes/test/e2e"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
 
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte"
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater"
-
-	_ "github.com/openshift-kni/numaresources-operator/test/e2e/basic_install"
 )
 
 func TestMain(m *testing.M) {

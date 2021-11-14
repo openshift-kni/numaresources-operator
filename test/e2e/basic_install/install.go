@@ -26,10 +26,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	e2etestenv "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testenv"
+	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	nropclientset "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
-
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 )
 
 var _ = ginkgo.Describe("[BasicInstall] Installation", func() {
@@ -46,7 +46,7 @@ var _ = ginkgo.Describe("[BasicInstall] Installation", func() {
 		var err error
 
 		if !initialized {
-			rteObj = testRTE(f)
+			rteObj = testRTE()
 
 			rteClient, err = nropclientset.NewForConfig(f.ClientConfig())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
@@ -82,7 +82,7 @@ var _ = ginkgo.Describe("[BasicInstall] Installation", func() {
 	})
 })
 
-func testRTE(f *framework.Framework) *nropv1alpha1.NUMAResourcesOperator {
+func testRTE() *nropv1alpha1.NUMAResourcesOperator {
 	return &nropv1alpha1.NUMAResourcesOperator{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NUMAResourcesOperator",
@@ -90,7 +90,7 @@ func testRTE(f *framework.Framework) *nropv1alpha1.NUMAResourcesOperator {
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "numaresourcesoperator",
-			Namespace: f.Namespace.Name,
+			Namespace: e2etestenv.GetNamespaceName(),
 		},
 		Spec: nropv1alpha1.NUMAResourcesOperatorSpec{},
 	}
