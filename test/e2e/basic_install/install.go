@@ -88,7 +88,7 @@ func testRTE() *nropv1alpha1.NUMAResourcesOperator {
 			Kind:       "NUMAResourcesOperator",
 			APIVersion: nropv1alpha1.GroupVersion.String(),
 		},
-		ObjectMeta: metav1.ObjectMeta {
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "numaresourcesoperator",
 			Namespace: e2etestenv.GetNamespaceName(),
 		},
