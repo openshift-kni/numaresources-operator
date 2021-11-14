@@ -224,3 +224,7 @@ catalog-push: ## Push a catalog image.
 .PHONY: deps-update
 deps-update:
 	go mod tidy && go mod vendor
+
+.PHONY: functests
+functests:
+	./hack/functests.sh $(E2E_NAMESPACE_NAME)

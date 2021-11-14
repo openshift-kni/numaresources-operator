@@ -11,8 +11,10 @@ OC_TOOL="${OC_TOOL:-oc}"
 
 "${BASE_DIR}"/functests-setup.sh "$E2E_NAMESPACE_NAME"
 
-E2E_NAMESPACE_NAME=$E2E_NAMESPACE_NAME ginkgo -v \
- --focus='\[BasicInstall\]' \
-  -requireSuite  "${TEST_DIR}"/basic_install "${TEST_DIR}"
+E2E_NAMESPACE_NAME=$E2E_NAMESPACE_NAME go test -v "${TEST_DIR}"/basic_install "${TEST_DIR}" \
+-ginkgo.v -ginkgo.focus='\[BasicInstall\]|\[RTE\]*|\[InfraConsuming\]*'
+
+#E2E_NAMESPACE_NAME=$E2E_NAMESPACE_NAME "${BASE_DIR}"/../bin/e2e-test  \
+#  -ginkgo.v -ginkgo.focus='\[BasicInstall\]|\[RTE\]*|\[InfraConsuming\]*'
 
 "${BASE_DIR}"/functests-teardown.sh "$E2E_NAMESPACE_NAME"

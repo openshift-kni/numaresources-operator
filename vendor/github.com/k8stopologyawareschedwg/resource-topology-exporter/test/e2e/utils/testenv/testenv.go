@@ -22,22 +22,50 @@ import (
 
 const (
 	// we rely on kind for our CI
-	DefaultNodeName  = "kind-worker"
-	DefaultNamespace = "default"
-	RTELabelName     = "resource-topology"
-	RTEContainerName = "resource-topology-exporter-container"
+	DefaultNodeName             = "kind-worker"
+	DefaultNamespace            = "default"
+	DefaultTopologyMangerPolicy = "none"
+	RTELabelName                = "resource-topology"
+	RTEContainerName            = "resource-topology-exporter-container"
 )
+
+var (
+	currentNodeName       string
+	currentNamespace      string
+	currentTopologyPolicy string
+)
+
+func init() {
+	currentNodeName = DefaultNodeName
+	currentNamespace = DefaultNamespace
+	currentTopologyPolicy = DefaultTopologyMangerPolicy
+}
 
 func GetNodeName() string {
 	if nodeName, ok := os.LookupEnv("E2E_WORKER_NODE_NAME"); ok {
 		return nodeName
 	}
-	return DefaultNodeName
+	return currentNodeName
 }
 
 func GetNamespaceName() string {
 	if nsName, ok := os.LookupEnv("E2E_NAMESPACE_NAME"); ok {
 		return nsName
 	}
-	return DefaultNamespace
+	return currentNamespace
+}
+
+func GetTopologyManagerPolicy() string {
+	if tmPolicy, ok := os.LookupEnv("E2E_TOPOLOGY_MANAGER_POLICY"); ok {
+		return tmPolicy
+	}
+	return currentTopologyPolicy
+}
+
+func SetNodeName(nodeName string) {
+	currentNodeName = nodeName
+}
+
+func SetNamespaceName(namespaceName string) {
+	currentNamespace = namespaceName
 }

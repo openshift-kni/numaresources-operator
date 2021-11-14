@@ -31,7 +31,7 @@ func Detect() (platform.Platform, error) {
 	if err != nil {
 		return platform.Unknown, err
 	}
-	sccs, err := ocpCli.SecurityV1.SecurityContextConstraints().List(context.TODO(), metav1.ListOptions{})
+	sccs, err := ocpCli.ConfigV1.ClusterVersions().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return platform.Kubernetes, nil

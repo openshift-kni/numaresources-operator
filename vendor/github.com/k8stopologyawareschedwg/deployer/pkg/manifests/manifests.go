@@ -19,22 +19,28 @@ package manifests
 import (
 	"bytes"
 	"embed"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
+	"text/template"
 
+	igntypes "github.com/coreos/ignition/v2/config/v3_2/types"
+	securityv1 "github.com/openshift/api/security/v1"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sjson "k8s.io/apimachinery/pkg/runtime/serializer/json"
-
+	"k8s.io/client-go/kubernetes/scheme"
 	kubeschedulerconfigv1beta1 "k8s.io/kube-scheduler/config/v1beta1"
+	"k8s.io/utils/pointer"
 	apiconfig "sigs.k8s.io/scheduler-plugins/pkg/apis/config"
 
-	"k8s.io/client-go/kubernetes/scheme"
+	rteassets "github.com/k8stopologyawareschedwg/deployer/pkg/assets/rte"
 )
 
 const (
@@ -55,6 +61,8 @@ func init() {
 	apiextensionv1.AddToScheme(scheme.Scheme)
 	apiconfig.AddToScheme(scheme.Scheme)
 	kubeschedulerconfigv1beta1.AddToScheme(scheme.Scheme)
+	machineconfigv1.Install(scheme.Scheme)
+	securityv1.Install(scheme.Scheme)
 }
 
 func Namespace(component string) (*corev1.Namespace, error) {
@@ -252,6 +260,122 @@ func DaemonSet(component string) (*appsv1.DaemonSet, error) {
 		return nil, fmt.Errorf("unexpected type, got %t", obj)
 	}
 	return ds, nil
+}
+
+func MachineConfig(component string) (*machineconfigv1.MachineConfig, error) {
+	if component != ComponentResourceTopologyExporter {
+		return nil, fmt.Errorf("component %q is not an %q component", component, ComponentResourceTopologyExporter)
+	}
+
+	obj, err := loadObject(filepath.Join("yaml", component, "machineconfig.yaml"))
+	if err != nil {
+		return nil, err
+	}
+
+	mc, ok := obj.(*machineconfigv1.MachineConfig)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type, got %t", obj)
+	}
+
+	ignitionConfig, err := getIgnitionConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	mc.Spec.Config = runtime.RawExtension{Raw: ignitionConfig}
+	return mc, nil
+}
+
+func getIgnitionConfig() ([]byte, error) {
+	// load SELinux policy
+	seLinuxPolicyContent := base64.StdEncoding.EncodeToString(rteassets.SELinuxPolicy)
+
+	// load systemd service to install SELinux policy
+	systemdServiceContent, err := getSELinuxInstallSystemdServiceContent()
+	if err != nil {
+		return nil, err
+	}
+
+	ignitionConfig := &igntypes.Config{
+		Ignition: igntypes.Ignition{
+			Version: defaultIgnitionVersion,
+		},
+		Storage: igntypes.Storage{
+			Files: []igntypes.File{
+				{
+					Node: igntypes.Node{
+						Path: seLinuxRTEPolicyDst,
+					},
+					FileEmbedded1: igntypes.FileEmbedded1{
+						Contents: igntypes.Resource{
+							Source: pointer.StringPtr(fmt.Sprintf("%s,%s", defaultIgnitionContentSource, seLinuxPolicyContent)),
+						},
+						Mode: pointer.IntPtr(644),
+					},
+				},
+			},
+		},
+		Systemd: igntypes.Systemd{
+			Units: []igntypes.Unit{
+				{
+					Contents: systemdServiceContent,
+					Enabled:  pointer.BoolPtr(true),
+					Name:     "rte-selinux-policy-install.service",
+				},
+			},
+		},
+	}
+
+	rawIgnition, err := json.Marshal(ignitionConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	return rawIgnition, nil
+}
+
+// getSELinuxInstallSystemdServiceContent returns the content of the systemd service that installs the SELinux policy.
+// It returns the string pointer, because the ignition config is expecting to get the string pointer.
+func getSELinuxInstallSystemdServiceContent() (*string, error) {
+	// load systemd service to install SELinux policy
+	templateArgs := map[string]string{templateSELinuxPolicyDst: seLinuxRTEPolicyDst}
+	systemdServiceContent := &bytes.Buffer{}
+	systemdServiceTemplate, err := template.New("selinuxinstall.service").Parse(string(rteassets.SELinuxInstallSystemdServiceTemplate))
+	if err != nil {
+		return nil, err
+	}
+
+	if err := systemdServiceTemplate.Execute(systemdServiceContent, templateArgs); err != nil {
+		return nil, err
+	}
+
+	return pointer.StringPtr(systemdServiceContent.String()), nil
+}
+
+func SecurityContextConstraint(component string) (*securityv1.SecurityContextConstraints, error) {
+	if component != ComponentResourceTopologyExporter {
+		return nil, fmt.Errorf("component %q is not an %q component", component, ComponentResourceTopologyExporter)
+	}
+
+	obj, err := loadObject(filepath.Join("yaml", component, "securitycontextconstraint.yaml"))
+	if err != nil {
+		return nil, err
+	}
+
+	scc, ok := obj.(*securityv1.SecurityContextConstraints)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type, got %t", obj)
+	}
+
+	scc.SELinuxContext = securityv1.SELinuxContextStrategyOptions{
+		Type: securityv1.SELinuxStrategyMustRunAs,
+		SELinuxOptions: &corev1.SELinuxOptions{
+			Type:  seLinuxRTEContextType,
+			Level: seLinuxRTEContextLevel,
+		},
+	}
+
+	return scc, nil
 }
 
 func KubeSchedulerConfigurationFromData(data []byte) (*kubeschedulerconfigv1beta1.KubeSchedulerConfiguration, error) {
