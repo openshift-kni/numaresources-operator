@@ -17,11 +17,12 @@
 package rte
 
 import (
+	securityv1 "github.com/openshift/api/security/v1"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
@@ -31,41 +32,54 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/tlog"
 )
 
-const (
-	NamespaceOpenShift      = "openshift-monitoring"
-	ServiceAccountOpenShift = "node-exporter"
-)
-
 type Manifests struct {
 	ServiceAccount *corev1.ServiceAccount
 	Role           *rbacv1.Role
 	RoleBinding    *rbacv1.RoleBinding
 	ConfigMap      *corev1.ConfigMap
 	DaemonSet      *appsv1.DaemonSet
+
+	// OpenShift related components
+	MachineConfig             *machineconfigv1.MachineConfig
+	SecurityContextConstraint *securityv1.SecurityContextConstraints
+
 	// internal fields
-	plat           platform.Platform
-	serviceAccount string
+	plat platform.Platform
 }
 
 func (mf Manifests) Clone() Manifests {
 	ret := Manifests{
-		plat:           mf.plat,
-		serviceAccount: mf.serviceAccount,
+		plat: mf.plat,
 		// objects
-		Role:        mf.Role.DeepCopy(),
-		RoleBinding: mf.RoleBinding.DeepCopy(),
-		DaemonSet:   mf.DaemonSet.DeepCopy(),
+		Role:           mf.Role.DeepCopy(),
+		RoleBinding:    mf.RoleBinding.DeepCopy(),
+		DaemonSet:      mf.DaemonSet.DeepCopy(),
+		ServiceAccount: mf.ServiceAccount.DeepCopy(),
+		ConfigMap:      mf.ConfigMap.DeepCopy(),
 	}
-	if mf.plat == platform.Kubernetes {
-		ret.ServiceAccount = mf.ServiceAccount.DeepCopy()
+
+	if mf.plat == platform.OpenShift {
+		ret.MachineConfig = mf.MachineConfig.DeepCopy()
+		ret.SecurityContextConstraint = mf.SecurityContextConstraint.DeepCopy()
 	}
+
 	return ret
 }
 
 type UpdateOptions struct {
-	ConfigData       string
+	// DaemonSet options
 	PullIfNotPresent bool
-	Namespace        string
+	NodeSelector     *metav1.LabelSelector
+
+	// MachineConfig options
+	MachineConfigPoolSelector *metav1.LabelSelector
+
+	// Config Map options
+	ConfigData string
+
+	// General options
+	Namespace string
+	Name      string
 }
 
 func (mf Manifests) Update(options UpdateOptions) Manifests {
@@ -76,21 +90,43 @@ func (mf Manifests) Update(options UpdateOptions) Manifests {
 		}
 	}
 
-	ret.DaemonSet.Spec.Template.Spec.ServiceAccountName = mf.serviceAccount
+	if options.Name != "" {
+		ret.RoleBinding.Name = options.Name
+		ret.ServiceAccount.Name = options.Name
+		ret.Role.Name = options.Name
+		ret.DaemonSet.Name = options.Name
+	}
+
 	if options.Namespace != "" {
+		ret.RoleBinding.Namespace = options.Namespace
+		ret.ServiceAccount.Namespace = options.Namespace
 		ret.Role.Namespace = options.Namespace
 		ret.DaemonSet.Namespace = options.Namespace
 	}
-	manifests.UpdateRoleBinding(ret.RoleBinding, mf.serviceAccount, ret.Role.Namespace)
+
+	manifests.UpdateRoleBinding(ret.RoleBinding, mf.ServiceAccount.Name, ret.Role.Namespace)
+
+	ret.DaemonSet.Spec.Template.Spec.ServiceAccountName = mf.ServiceAccount.Name
+	manifests.UpdateResourceTopologyExporterDaemonSet(
+		ret.plat,
+		ret.DaemonSet,
+		ret.ConfigMap,
+		options.PullIfNotPresent,
+		options.NodeSelector,
+	)
+
+	if mf.plat == platform.OpenShift {
+		manifests.UpdateMachineConfig(ret.MachineConfig, options.Name, options.MachineConfigPoolSelector)
+		manifests.UpdateSecurityContextConstraint(ret.SecurityContextConstraint, ret.ServiceAccount)
+	}
 
 	if len(options.ConfigData) > 0 {
-		ret.ConfigMap = createConfigMap(ret.DaemonSet.Namespace, options.ConfigData)
+		ret.ConfigMap = createConfigMap(ret.DaemonSet.Name, ret.DaemonSet.Namespace, options.ConfigData)
 	}
-	manifests.UpdateResourceTopologyExporterDaemonSet(ret.plat, ret.DaemonSet, ret.ConfigMap, options.PullIfNotPresent)
 	return ret
 }
 
-func createConfigMap(namespace string, configData string) *corev1.ConfigMap {
+func createConfigMap(name string, namespace string, configData string) *corev1.ConfigMap {
 	cm := &corev1.ConfigMap{
 		// TODO: why is this needed?
 		TypeMeta: metav1.TypeMeta{
@@ -98,7 +134,7 @@ func createConfigMap(namespace string, configData string) *corev1.ConfigMap {
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "rte-config",
+			Name:      name,
 			Namespace: namespace,
 		},
 		Data: map[string]string{
@@ -169,21 +205,29 @@ func New(plat platform.Platform) Manifests {
 	mf := Manifests{
 		plat: plat,
 	}
-	if plat == platform.OpenShift {
-		mf.serviceAccount = ServiceAccountOpenShift
-	}
+
 	return mf
 }
 
 func GetManifests(plat platform.Platform) (Manifests, error) {
 	var err error
 	mf := New(plat)
-	if plat == platform.Kubernetes {
-		mf.ServiceAccount, err = manifests.ServiceAccount(manifests.ComponentResourceTopologyExporter, "")
+
+	if plat == platform.OpenShift {
+		mf.MachineConfig, err = manifests.MachineConfig(manifests.ComponentResourceTopologyExporter)
 		if err != nil {
 			return mf, err
 		}
-		mf.serviceAccount = mf.ServiceAccount.Name
+
+		mf.SecurityContextConstraint, err = manifests.SecurityContextConstraint(manifests.ComponentResourceTopologyExporter)
+		if err != nil {
+			return mf, err
+		}
+	}
+
+	mf.ServiceAccount, err = manifests.ServiceAccount(manifests.ComponentResourceTopologyExporter, "")
+	if err != nil {
+		return mf, err
 	}
 	mf.Role, err = manifests.Role(manifests.ComponentResourceTopologyExporter, "")
 	if err != nil {
