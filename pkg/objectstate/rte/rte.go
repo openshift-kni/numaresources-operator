@@ -18,109 +18,254 @@ package rte
 
 import (
 	"context"
-
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
+	"fmt"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+	securityv1 "github.com/openshift/api/security/v1"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 )
 
-type ExistingManifests struct {
-	Existing            rtemanifests.Manifests
-	ServiceAccountError error
-	RoleError           error
-	RoleBindingError    error
-	ConfigMapError      error
-	DaemonSetError      error
+type daemonSetManifest struct {
+	daemonSet      *appsv1.DaemonSet
+	daemonSetError error
 }
 
-func (em ExistingManifests) State(mf rtemanifests.Manifests) []objectstate.ObjectState {
-	ret := []objectstate.ObjectState{}
-	if mf.ServiceAccount != nil {
-		ret = append(ret,
-			objectstate.ObjectState{
-				Existing: em.Existing.ServiceAccount,
-				Error:    em.ServiceAccountError,
-				Desired:  mf.ServiceAccount.DeepCopy(),
-				Compare:  compare.Object,
-				Merge:    merge.ServiceAccountForUpdate,
-			},
-		)
-	}
-	if mf.ConfigMap != nil {
-		ret = append(ret,
-			objectstate.ObjectState{
-				Existing: em.Existing.ConfigMap,
-				Error:    em.ConfigMapError,
-				Desired:  mf.ConfigMap.DeepCopy(),
-				Compare:  compare.Object,
-				Merge:    merge.ObjectForUpdate,
-			},
-		)
-	}
-	return append(ret,
-		objectstate.ObjectState{
-			Existing: em.Existing.Role,
-			Error:    em.RoleError,
+type machineConfigManifest struct {
+	machineConfig      *machineconfigv1.MachineConfig
+	machineConfigError error
+}
+
+type configMapManifest struct {
+	configMap      *corev1.ConfigMap
+	configMapError error
+}
+
+type ExistingManifests struct {
+	existing            rtemanifests.Manifests
+	daemonSets          map[string]daemonSetManifest
+	machineConfigs      map[string]machineConfigManifest
+	configMaps          map[string]configMapManifest
+	sccError            error
+	serviceAccountError error
+	roleError           error
+	roleBindingError    error
+}
+
+func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []objectstate.ObjectState {
+	ret := []objectstate.ObjectState{
+		// service account
+		{
+			Existing: em.existing.ServiceAccount,
+			Error:    em.serviceAccountError,
+			Desired:  mf.ServiceAccount.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.ServiceAccountForUpdate,
+		},
+		// role
+		{
+			Existing: em.existing.Role,
+			Error:    em.roleError,
 			Desired:  mf.Role.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
 		},
-		objectstate.ObjectState{
-			Existing: em.Existing.RoleBinding,
-			Error:    em.RoleBindingError,
+		// role binding
+		{
+			Existing: em.existing.RoleBinding,
+			Error:    em.roleBindingError,
 			Desired:  mf.RoleBinding.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
 		},
-		objectstate.ObjectState{
-			Existing: em.Existing.DaemonSet,
-			Error:    em.DaemonSetError,
-			Desired:  mf.DaemonSet.DeepCopy(),
+	}
+
+	if mf.SecurityContextConstraint != nil {
+		ret = append(ret, objectstate.ObjectState{
+			Existing: em.existing.SecurityContextConstraint,
+			Error:    em.sccError,
+			Desired:  mf.SecurityContextConstraint.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
-		},
-	)
+		})
+	}
+
+	for _, mcp := range mcps {
+		if mcp.Spec.NodeSelector == nil {
+			klog.Warningf("the machine config pool %q does not have node selector", mcp.Name)
+			continue
+		}
+
+		generatedName := fmt.Sprintf("%s-%s", instance.Name, mcp.Name)
+		desiredDaemonSet := mf.DaemonSet.DeepCopy()
+		desiredDaemonSet.Name = generatedName
+		desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
+
+		existingDaemonSet, ok := em.daemonSets[generatedName]
+		if !ok {
+			klog.Warningf("failed to find daemon set %q under the namespace %q", generatedName, instance.Namespace)
+			continue
+		}
+
+		ret = append(ret,
+			objectstate.ObjectState{
+				Existing: existingDaemonSet.daemonSet,
+				Error:    existingDaemonSet.daemonSetError,
+				Desired:  desiredDaemonSet,
+				Compare:  compare.Object,
+				Merge:    merge.ObjectForUpdate,
+			},
+		)
+
+		if mf.MachineConfig != nil {
+			if mcp.Spec.MachineConfigSelector == nil {
+				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
+				continue
+			}
+			desiredMachineConfig := mf.ConfigMap.DeepCopy()
+			// prefix machine config name to guarantee that we will have an option to override it
+			desiredMachineConfig.Name = fmt.Sprintf("51-%s", generatedName)
+			desiredMachineConfig.Labels = mcp.Spec.MachineConfigSelector.MatchLabels
+
+			existingMachineConfig, ok := em.machineConfigs[generatedName]
+			if !ok {
+				klog.Warningf("failed to find machine config %q under the namespace %q", generatedName, instance.Namespace)
+				continue
+			}
+
+			ret = append(ret,
+				objectstate.ObjectState{
+					Existing: existingMachineConfig.machineConfig,
+					Error:    existingMachineConfig.machineConfigError,
+					Desired:  desiredMachineConfig,
+					Compare:  compare.Object,
+					Merge:    merge.ObjectForUpdate,
+				},
+			)
+		}
+
+		if mf.ConfigMap != nil {
+			desiredConfigMap := mf.ConfigMap.DeepCopy()
+			desiredConfigMap.Name = generatedName
+
+			existingConfigMap, ok := em.configMaps[generatedName]
+			if !ok {
+				klog.Warningf("failed to find config map %q under the namespace %q", generatedName, instance.Namespace)
+				continue
+			}
+
+			ret = append(ret,
+				objectstate.ObjectState{
+					Existing: existingConfigMap.configMap,
+					Error:    existingConfigMap.configMapError,
+					Desired:  desiredConfigMap,
+					Compare:  compare.Object,
+					Merge:    merge.ObjectForUpdate,
+				},
+			)
+		}
+	}
+
+	return ret
 }
 
-func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf rtemanifests.Manifests) ExistingManifests {
+func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) ExistingManifests {
 	ret := ExistingManifests{
-		Existing: rtemanifests.New(plat),
+		existing: rtemanifests.New(plat),
 	}
 
-	ro := rbacv1.Role{}
-	if ret.RoleError = cli.Get(ctx, client.ObjectKeyFromObject(mf.Role), &ro); ret.RoleError == nil {
-		ret.Existing.Role = &ro
+	// objects that should present in the single replica
+	ro := &rbacv1.Role{}
+	if ret.roleError = cli.Get(ctx, client.ObjectKeyFromObject(mf.Role), ro); ret.roleError == nil {
+		ret.existing.Role = ro
 	}
-	rb := rbacv1.RoleBinding{}
-	if ret.RoleBindingError = cli.Get(ctx, client.ObjectKeyFromObject(mf.RoleBinding), &rb); ret.RoleBindingError == nil {
-		ret.Existing.RoleBinding = &rb
+
+	rb := &rbacv1.RoleBinding{}
+	if ret.roleBindingError = cli.Get(ctx, client.ObjectKeyFromObject(mf.RoleBinding), rb); ret.roleBindingError == nil {
+		ret.existing.RoleBinding = rb
 	}
-	ds := appsv1.DaemonSet{}
-	if ret.DaemonSetError = cli.Get(ctx, client.ObjectKeyFromObject(mf.DaemonSet), &ds); ret.DaemonSetError == nil {
-		ret.Existing.DaemonSet = &ds
+
+	sa := &corev1.ServiceAccount{}
+	if ret.serviceAccountError = cli.Get(ctx, client.ObjectKeyFromObject(mf.ServiceAccount), sa); ret.serviceAccountError == nil {
+		ret.existing.ServiceAccount = sa
 	}
-	if mf.ServiceAccount != nil {
-		sa := corev1.ServiceAccount{}
-		if ret.ServiceAccountError = cli.Get(ctx, client.ObjectKeyFromObject(mf.ServiceAccount), &sa); ret.ServiceAccountError == nil {
-			ret.Existing.ServiceAccount = &sa
+
+	if plat == platform.OpenShift {
+		scc := &securityv1.SecurityContextConstraints{}
+		if ret.sccError = cli.Get(ctx, client.ObjectKeyFromObject(mf.SecurityContextConstraint), scc); ret.sccError == nil {
+			ret.existing.SecurityContextConstraint = scc
 		}
 	}
-	if mf.ConfigMap != nil {
-		cm := corev1.ConfigMap{}
-		if ret.ConfigMapError = cli.Get(ctx, client.ObjectKeyFromObject(mf.ConfigMap), &cm); ret.ConfigMapError == nil {
-			ret.Existing.ConfigMap = &cm
+
+	// should have the amount of resources equals to the amount of node groups
+	for _, mcp := range mcps {
+		generatedName := fmt.Sprintf("%s-%s", instance.Name, mcp.Name)
+		key := client.ObjectKey{
+			Name:      generatedName,
+			Namespace: instance.Namespace,
+		}
+
+		if ret.daemonSets == nil {
+			ret.daemonSets = map[string]daemonSetManifest{}
+		}
+
+		ds := &appsv1.DaemonSet{}
+		if err := cli.Get(ctx, key, ds); err == nil {
+			ret.daemonSets[generatedName] = daemonSetManifest{
+				daemonSet: ds,
+			}
+		} else {
+			ret.daemonSets[generatedName] = daemonSetManifest{
+				daemonSetError: err,
+			}
+		}
+
+		// TODO: unclear what should we do with config maps
+		if mf.ConfigMap != nil {
+			if ret.configMaps == nil {
+				ret.configMaps = map[string]configMapManifest{}
+			}
+
+			cm := &corev1.ConfigMap{}
+			if err := cli.Get(ctx, key, cm); err == nil {
+				ret.configMaps[generatedName] = configMapManifest{
+					configMap: cm,
+				}
+			} else {
+				ret.configMaps[generatedName] = configMapManifest{
+					configMapError: err,
+				}
+			}
+		}
+
+		if plat == platform.OpenShift {
+			if ret.machineConfigs == nil {
+				ret.machineConfigs = map[string]machineConfigManifest{}
+			}
+
+			mc := &machineconfigv1.MachineConfig{}
+			if err := cli.Get(ctx, key, mc); err == nil {
+				ret.machineConfigs[generatedName] = machineConfigManifest{
+					machineConfig: mc,
+				}
+			} else {
+				ret.machineConfigs[generatedName] = machineConfigManifest{
+					machineConfigError: err,
+				}
+			}
 		}
 	}
+
 	return ret
 }
 
