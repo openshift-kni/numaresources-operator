@@ -19,26 +19,33 @@ package controllers
 import (
 	"context"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"time"
-
-	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
-
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+	securityv1 "github.com/openshift/api/security/v1"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	"github.com/pkg/errors"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
@@ -53,7 +60,6 @@ const (
 // NUMAResourcesOperatorReconciler reconciles a NUMAResourcesOperator object
 type NUMAResourcesOperatorReconciler struct {
 	client.Client
-	Log          logr.Logger
 	Scheme       *runtime.Scheme
 	Platform     platform.Platform
 	APIManifests apimanifests.Manifests
@@ -71,13 +77,16 @@ type NUMAResourcesOperatorReconciler struct {
 // Cluster Scoped
 //+kubebuilder:rbac:groups=topology.node.k8s.io,resources=noderesourcetopologies,verbs=get;list;create;update
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversionss,verbs=list
-//+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=machineconfigs,verbs=*
+//+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=machineconfigpools,verbs=get;list;watch
+//+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=*
+//+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=*
+//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=*
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=*
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=*
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
+//+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=*
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/finalizers,verbs=update
 
@@ -88,7 +97,6 @@ type NUMAResourcesOperatorReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.9.2/pkg/reconcile
 func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	logger := r.Log.WithValues("rte", req.NamespacedName)
 
 	instance := &nropv1alpha1.NUMAResourcesOperator{}
 	err := r.Get(context.TODO(), req.NamespacedName, instance)
@@ -105,9 +113,9 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	if req.Name != defaultNUMAResourcesOperatorCrName {
 		err := fmt.Errorf("NUMAResourcesOperator resource name must be %q", defaultNUMAResourcesOperatorCrName)
-		logger.Error(err, "Incorrect NUMAResourcesOperator resource name", "name", req.Name)
-		if err := status.Update(context.TODO(), r.Client, instance, status.ConditionDegraded, "IncorrectNUMAResourcesOperatorResourceName", fmt.Sprintf("Incorrect NUMAResourcesOperator resource name: %s", req.Name)); err != nil {
-			logger.Error(err, "Failed to update numaresourcesoperator status", "Desired status", status.ConditionDegraded)
+		klog.ErrorS(err, "Incorrect NUMAResourcesOperator resource name", "name", req.Name)
+		if err := status.Update(ctx, r.Client, instance, status.ConditionDegraded, "IncorrectNUMAResourcesOperatorResourceName", fmt.Sprintf("Incorrect NUMAResourcesOperator resource name: %s", req.Name)); err != nil {
+			klog.ErrorS(err, "Failed to update numaresourcesoperator status", "Desired status", status.ConditionDegraded)
 		}
 		return ctrl.Result{}, nil // Return success to avoid requeue
 	}
@@ -118,12 +126,12 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		r.Namespace = req.NamespacedName.Namespace
 	}
 
-	result, condition, err := r.reconcileResource(ctx, req, instance)
+	result, condition, err := r.reconcileResource(ctx, instance)
 	if condition != "" {
 		// TODO: use proper reason
 		reason, message := condition, messageFromError(err)
 		if err := status.Update(context.TODO(), r.Client, instance, condition, reason, message); err != nil {
-			logger.Info("Failed to update numaresourcesoperator status", "Desired condition", condition, "error", err)
+			klog.InfoS("Failed to update numaresourcesoperator status", "Desired condition", condition, "error", err)
 		}
 	}
 	return result, err
@@ -131,8 +139,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 // RenderManifests renders the reconciler manifests so they can be deployed on the cluster.
 func (r *NUMAResourcesOperatorReconciler) RenderManifests(namespace string) rtemanifests.Manifests {
-	logger := r.Log.WithValues("rte", namespace)
-	logger.Info("Updating manifests")
+	klog.Info("Updating manifests")
 	mf := r.RTEManifests.Update(rtemanifests.UpdateOptions{
 		Namespace: namespace,
 	})
@@ -151,70 +158,142 @@ func messageFromError(err error) string {
 	return unwErr.Error()
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, req ctrl.Request, instance *nropv1alpha1.NUMAResourcesOperator) (ctrl.Result, string, error) {
+func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator) (ctrl.Result, string, error) {
 	var err error
-	err = r.syncNodeResourceTopologyAPI(instance)
+	err = r.syncNodeResourceTopologyAPI()
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedAPISync")
 	}
 
-	dsInfo, err := r.syncNUMAResourcesOperatorResources(instance)
+	daemonSetsInfo, err := r.syncNUMAResourcesOperatorResources(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedRTESync")
 	}
-	ok, err := r.Helper.IsDaemonSetRunning(dsInfo.Namespace, dsInfo.Name)
-	if err != nil {
-		return ctrl.Result{}, status.ConditionDegraded, err
-	}
-	if !ok {
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
+
+	instance.Status.DaemonSets = []nropv1alpha1.NamespacedName{}
+	for _, nname := range daemonSetsInfo {
+		ok, err := r.Helper.IsDaemonSetRunning(nname.Namespace, nname.Name)
+		if err != nil {
+			return ctrl.Result{}, status.ConditionDegraded, err
+		}
+		if !ok {
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
+		}
+
+		instance.Status.DaemonSets = append(instance.Status.DaemonSets, nname)
 	}
 
-	instance.Status.DaemonSet = &dsInfo
 	return ctrl.Result{}, status.ConditionAvailable, nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(instance *nropv1alpha1.NUMAResourcesOperator) error {
-	logger := r.Log.WithName("APISync")
-	logger.Info("Start")
+func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI() error {
+	klog.Info("APISync start")
 
-	Existing := apistate.FromClient(context.TODO(), r.Client, r.Platform, r.APIManifests)
+	existing := apistate.FromClient(context.TODO(), r.Client, r.Platform, r.APIManifests)
 
-	for _, objState := range Existing.State(r.APIManifests) {
-		if _, err := apply.ApplyObject(context.TODO(), logger, r.Client, objState); err != nil {
+	for _, objState := range existing.State(r.APIManifests) {
+		if _, err := apply.ApplyObject(context.TODO(), r.Client, objState); err != nil {
 			return errors.Wrapf(err, "could not create %s", objState.Desired.GetObjectKind().GroupVersionKind().String())
 		}
 	}
 	return nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(instance *nropv1alpha1.NUMAResourcesOperator) (nropv1alpha1.NamespacedName, error) {
-	logger := r.Log.WithName("RTESync")
-	logger.Info("Start")
+func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator) ([]nropv1alpha1.NamespacedName, error) {
+	klog.Info("RTESync start")
 
-	Existing := rtestate.FromClient(context.TODO(), r.Client, r.Platform, r.RTEManifests)
+	mcps, err := r.getNodeGroupsMCPs(ctx, instance)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get machine config pools related to instance node groups")
+	}
 
-	res := nropv1alpha1.NamespacedName{}
-	for _, objState := range Existing.State(r.RTEManifests) {
+	var daemonSetsNName []nropv1alpha1.NamespacedName
+	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, mcps)
+	for _, objState := range existing.State(r.RTEManifests, instance, mcps) {
 		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
-			return res, errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
+			return nil, errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
-		obj, err := apply.ApplyObject(context.TODO(), logger, r.Client, objState)
+		obj, err := apply.ApplyObject(ctx, r.Client, objState)
 		if err != nil {
-			return res, errors.Wrapf(err, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
+			return nil, errors.Wrapf(err, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
 
-		if nname, ok := rte.NamespacedNameFromObject(obj); ok {
-			res = nname
+		if obj.GetObjectKind().GroupVersionKind().Kind == "DaemonSet" {
+			if nname, ok := rte.NamespacedNameFromObject(obj); ok {
+				daemonSetsNName = append(daemonSetsNName, nname)
+			}
 		}
 	}
-	return res, nil
+	return daemonSetsNName, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// note we don't use Owns() to mark the objects we created
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&nropv1alpha1.NUMAResourcesOperator{}).
+	// we want to initate reconcile loop only on change under labels or spec of the object
+	p := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			if !validateUpdateEvent(&e) {
+				return false
+			}
+
+			return e.ObjectNew.GetGeneration() != e.ObjectOld.GetGeneration() ||
+				!apiequality.Semantic.DeepEqual(e.ObjectNew.GetLabels(), e.ObjectOld.GetLabels())
+		},
+	}
+
+	b := ctrl.NewControllerManagedBy(mgr).For(&nropv1alpha1.NUMAResourcesOperator{})
+	if r.Platform == platform.OpenShift {
+		b = b.Owns(&securityv1.SecurityContextConstraints{}).
+			Owns(&machineconfigv1.MachineConfig{}, builder.WithPredicates(p))
+	}
+	return b.Owns(&apiextensionv1.CustomResourceDefinition{}).
+		Owns(&corev1.ConfigMap{}).
+		Owns(&corev1.ServiceAccount{}).
+		Owns(&rbacv1.RoleBinding{}).
+		Owns(&rbacv1.Role{}).
+		Owns(&appsv1.DaemonSet{}, builder.WithPredicates(p)).
 		Complete(r)
+}
+
+func validateUpdateEvent(e *event.UpdateEvent) bool {
+	if e.ObjectOld == nil {
+		klog.Error("Update event has no old runtime object to update")
+		return false
+	}
+	if e.ObjectNew == nil {
+		klog.Error("Update event has no new runtime object for update")
+		return false
+	}
+
+	return true
+}
+
+func (r *NUMAResourcesOperatorReconciler) getNodeGroupsMCPs(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator) ([]*machineconfigv1.MachineConfigPool, error) {
+	mcps := &machineconfigv1.MachineConfigPoolList{}
+	if err := r.Client.List(ctx, mcps); err != nil {
+		return nil, err
+	}
+
+	var result []*machineconfigv1.MachineConfigPool
+	for i := range mcps.Items {
+		mcp := &mcps.Items[i]
+
+		for _, nodeGroup := range instance.Spec.NodeGroups {
+			if nodeGroup.MachineConfigPoolSelector == nil {
+				continue
+			}
+
+			selector, err := metav1.LabelSelectorAsSelector(nodeGroup.MachineConfigPoolSelector)
+			if err != nil {
+				return nil, err
+			}
+
+			mcpLabels := labels.Set(mcp.Labels)
+			if selector.Matches(mcpLabels) {
+				result = append(result, mcp)
+			}
+		}
+	}
+
+	return result, nil
 }
