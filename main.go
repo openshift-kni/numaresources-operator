@@ -27,27 +27,29 @@ import (
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
+	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/tlog"
+	securityv1 "github.com/openshift/api/security/v1"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	"github.com/go-logr/logr"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/tlog"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -61,6 +63,8 @@ func init() {
 
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 	utilruntime.Must(nropv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(machineconfigv1.Install(scheme))
+	utilruntime.Must(securityv1.Install(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -87,7 +91,7 @@ func main() {
 
 	// if it is unknown, it's fine
 	userPlatform, _ := platform.FromString(platformName)
-	plat, err := detectPlatform(setupLog, userPlatform)
+	plat, err := detectPlatform(userPlatform)
 	if err != nil {
 		setupLog.Error(err, "unable to detect")
 		os.Exit(1)
@@ -124,7 +128,6 @@ func main() {
 
 	if renderManifestsFor != "" {
 		reconciler := &controllers.NUMAResourcesOperatorReconciler{
-			Log:          ctrl.Log.WithName("controllers").WithName("RTE"),
 			APIManifests: apiManifests,
 			RTEManifests: rteManifests,
 			Platform:     clusterPlatform,
@@ -162,7 +165,6 @@ func main() {
 	if err = (&controllers.NUMAResourcesOperatorReconciler{
 		Client:       mgr.GetClient(),
 		Scheme:       mgr.GetScheme(),
-		Log:          ctrl.Log.WithName("controllers").WithName("RTE"),
 		APIManifests: apiManifests,
 		RTEManifests: rteManifests,
 		Platform:     clusterPlatform,
@@ -196,7 +198,7 @@ type detectionOutput struct {
 	Discovered   platform.Platform `json:"discovered"`
 }
 
-func detectPlatform(debugLog logr.Logger, userSupplied platform.Platform) (detectionOutput, error) {
+func detectPlatform(userSupplied platform.Platform) (detectionOutput, error) {
 	do := detectionOutput{
 		AutoDetected: platform.Unknown,
 		UserSupplied: userSupplied,
@@ -204,18 +206,18 @@ func detectPlatform(debugLog logr.Logger, userSupplied platform.Platform) (detec
 	}
 
 	if do.UserSupplied != platform.Unknown {
-		debugLog.Info("user-supplied", "platform", do.UserSupplied)
+		klog.InfoS("user-supplied", "platform", do.UserSupplied)
 		do.Discovered = do.UserSupplied
 		return do, nil
 	}
 
 	dp, err := detect.Detect()
 	if err != nil {
-		debugLog.Error(err, "failed to detect the platform")
+		klog.ErrorS(err, "failed to detect the platform")
 		return do, err
 	}
 
-	debugLog.Info("auto-detected", "platform", dp)
+	klog.InfoS("auto-detected", "platform", dp)
 	do.AutoDetected = dp
 	do.Discovered = do.AutoDetected
 	return do, nil
