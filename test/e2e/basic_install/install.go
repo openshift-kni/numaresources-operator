@@ -22,22 +22,25 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	machineconfigclientset "github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/typed/machineconfiguration.openshift.io/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	nropclientset "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
-
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 )
 
 var _ = ginkgo.Describe("[BasicInstall] Installation", func() {
 
 	var (
-		initialized bool
-		rteClient   *nropclientset.NumaresourcesoperatorV1alpha1Client
-		rteObj      *nropv1alpha1.NUMAResourcesOperator
+		initialized         bool
+		rteClient           *nropclientset.NumaresourcesoperatorV1alpha1Client
+		machineConfigClient *machineconfigclientset.MachineconfigurationV1Client
+		rteObj              *nropv1alpha1.NUMAResourcesOperator
+		mcpObj              *machineconfigv1.MachineConfigPool
 	)
 
 	f := framework.NewDefaultFramework("rte")
@@ -47,14 +50,30 @@ var _ = ginkgo.Describe("[BasicInstall] Installation", func() {
 
 		if !initialized {
 			rteObj = testRTE(f)
+			mcpObj = testMCP()
 
 			rteClient, err = nropclientset.NewForConfig(f.ClientConfig())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			machineConfigClient, err = machineconfigclientset.NewForConfig(f.ClientConfig())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 			initialized = true
 		}
 	})
 
 	ginkgo.Context("with a running cluster without any components", func() {
+		ginkgo.BeforeEach(func() {
+			_, err := machineConfigClient.MachineConfigPools().Create(context.TODO(), mcpObj, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		})
+
+		ginkgo.AfterEach(func() {
+			if err := machineConfigClient.MachineConfigPools().Delete(context.TODO(), mcpObj.Name, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+				framework.Logf("failed to delete the machine config pool %q", mcpObj.Name)
+			}
+		})
+
 		ginkgo.It("should perform overall deployment and verify the condition is reported as available", func() {
 			ginkgo.By("creating the RTE object")
 			_, err := rteClient.NUMAResourcesOperators(rteObj.Namespace).Create(context.TODO(), rteObj, metav1.CreateOptions{})
@@ -92,6 +111,35 @@ func testRTE(f *framework.Framework) *nropv1alpha1.NUMAResourcesOperator {
 			Name:      "numaresourcesoperator",
 			Namespace: f.Namespace.Name,
 		},
-		Spec: nropv1alpha1.NUMAResourcesOperatorSpec{},
+		Spec: nropv1alpha1.NUMAResourcesOperatorSpec{
+			NodeGroups: []nropv1alpha1.NodeGroup{
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"test": "test"},
+					},
+				},
+			},
+		},
+	}
+}
+
+func testMCP() *machineconfigv1.MachineConfigPool {
+	return &machineconfigv1.MachineConfigPool{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "MachineConfigPool",
+			APIVersion: machineconfigv1.GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   "mcp-test",
+			Labels: map[string]string{"test": "test"},
+		},
+		Spec: machineconfigv1.MachineConfigPoolSpec{
+			MachineConfigSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"test": "test"},
+			},
+			NodeSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"node-role.kubernetes.io/worker": ""},
+			},
+		},
 	}
 }
