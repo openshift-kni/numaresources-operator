@@ -219,10 +219,8 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 			return nil, errors.Wrapf(err, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
 
-		if obj.GetObjectKind().GroupVersionKind().Kind == "DaemonSet" {
-			if nname, ok := rte.NamespacedNameFromObject(obj); ok {
-				daemonSetsNName = append(daemonSetsNName, nname)
-			}
+		if nname, ok := rte.DaemonSetNamespacedNameFromObject(obj); ok {
+			daemonSetsNName = append(daemonSetsNName, nname)
 		}
 	}
 	return daemonSetsNName, nil

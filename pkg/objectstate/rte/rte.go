@@ -269,7 +269,7 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 	return ret
 }
 
-func NamespacedNameFromObject(obj client.Object) (nropv1alpha1.NamespacedName, bool) {
+func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1alpha1.NamespacedName, bool) {
 	res := nropv1alpha1.NamespacedName{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
