@@ -7,4 +7,3 @@ rules:
 - apiGroups: ["topology.node.k8s.io"]
   resources: ["noderesourcetopologies"]
   verbs: ["create", "update", "get", "list"]
-

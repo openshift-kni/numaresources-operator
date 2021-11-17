@@ -11,6 +11,6 @@ configMapGenerator:
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
-- name: controller
-  newName: quay.io/fromani/numaresource-operator
-  newTag: latest
+- digest: sha256:9286d73cdb1bbb4ffcfa8cf44d19d21d1a4b910c6467f64b465ed4e700721f57
+  name: controller
+  newName: quay.io/alukiano/numaresources-operator

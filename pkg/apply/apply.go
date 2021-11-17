@@ -20,9 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
-
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -40,16 +39,16 @@ func describeObject(obj client.Object) (string, error) {
 	return fmt.Sprintf("(%s) %s/%s", gvk.String(), namespace, name), nil
 }
 
-func ApplyObject(ctx context.Context, log logr.Logger, client k8sclient.Client, objState objectstate.ObjectState) (client.Object, error) {
+func ApplyObject(ctx context.Context, client k8sclient.Client, objState objectstate.ObjectState) (client.Object, error) {
 	objDesc, _ := describeObject(objState.Desired)
 
 	if objState.IsNotFoundError() {
-		log.Info("creating", "object", objDesc)
+		klog.InfoS("creating", "object", objDesc)
 		err := client.Create(ctx, objState.Desired)
 		if err != nil {
 			return nil, err
 		}
-		log.Info("created", "object", objDesc)
+		klog.InfoS("created", "object", objDesc)
 		return objState.Desired, nil
 	}
 
@@ -63,11 +62,11 @@ func ApplyObject(ctx context.Context, log logr.Logger, client k8sclient.Client, 
 		return nil, errors.Wrapf(err, "could not compare object %s with existing", objDesc)
 	}
 	if !ok {
-		log.Info("updating", "object", objDesc)
+		klog.InfoS("updating", "object", objDesc)
 		if err := client.Update(ctx, updated); err != nil {
 			return nil, errors.Wrapf(err, "could not update object %s", objDesc)
 		}
-		log.Info("updated", "object", objDesc)
+		klog.InfoS("updated", "object", objDesc)
 	}
 	return updated, nil
 }
