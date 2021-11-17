@@ -19,9 +19,10 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"time"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
@@ -202,7 +203,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI() error {
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator) ([]nropv1alpha1.NamespacedName, error) {
 	klog.Info("RTESync start")
 
-	mcps, err := r.getNodeGroupsMCPs(ctx, instance)
+	mcps, err := getNodeGroupsMCPs(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to get machine config pools related to instance node groups")
 	}
@@ -218,10 +219,8 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 			return nil, errors.Wrapf(err, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
 
-		if obj.GetObjectKind().GroupVersionKind().Kind == "DaemonSet" {
-			if nname, ok := rte.NamespacedNameFromObject(obj); ok {
-				daemonSetsNName = append(daemonSetsNName, nname)
-			}
+		if nname, ok := rte.DaemonSetNamespacedNameFromObject(obj); ok {
+			daemonSetsNName = append(daemonSetsNName, nname)
 		}
 	}
 	return daemonSetsNName, nil
@@ -268,9 +267,9 @@ func validateUpdateEvent(e *event.UpdateEvent) bool {
 	return true
 }
 
-func (r *NUMAResourcesOperatorReconciler) getNodeGroupsMCPs(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator) ([]*machineconfigv1.MachineConfigPool, error) {
+func getNodeGroupsMCPs(ctx context.Context, cli client.Client, nodeGroups []nropv1alpha1.NodeGroup) ([]*machineconfigv1.MachineConfigPool, error) {
 	mcps := &machineconfigv1.MachineConfigPoolList{}
-	if err := r.Client.List(ctx, mcps); err != nil {
+	if err := cli.List(ctx, mcps); err != nil {
 		return nil, err
 	}
 
@@ -278,7 +277,7 @@ func (r *NUMAResourcesOperatorReconciler) getNodeGroupsMCPs(ctx context.Context,
 	for i := range mcps.Items {
 		mcp := &mcps.Items[i]
 
-		for _, nodeGroup := range instance.Spec.NodeGroups {
+		for _, nodeGroup := range nodeGroups {
 			if nodeGroup.MachineConfigPoolSelector == nil {
 				continue
 			}
