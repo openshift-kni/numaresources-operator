@@ -27,8 +27,8 @@ type FakeNumaresourcesoperatorV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeNumaresourcesoperatorV1alpha1) NUMAResourcesOperators(namespace string) v1alpha1.NUMAResourcesOperatorInterface {
-	return &FakeNUMAResourcesOperators{c, namespace}
+func (c *FakeNumaresourcesoperatorV1alpha1) NUMAResourcesOperators() v1alpha1.NUMAResourcesOperatorInterface {
+	return &FakeNUMAResourcesOperators{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate

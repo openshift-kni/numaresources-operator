@@ -32,7 +32,7 @@ import (
 // NUMAResourcesOperatorsGetter has a method to return a NUMAResourcesOperatorInterface.
 // A group's client should implement this interface.
 type NUMAResourcesOperatorsGetter interface {
-	NUMAResourcesOperators(namespace string) NUMAResourcesOperatorInterface
+	NUMAResourcesOperators() NUMAResourcesOperatorInterface
 }
 
 // NUMAResourcesOperatorInterface has methods to work with NUMAResourcesOperator resources.
@@ -52,14 +52,12 @@ type NUMAResourcesOperatorInterface interface {
 // nUMAResourcesOperators implements NUMAResourcesOperatorInterface
 type nUMAResourcesOperators struct {
 	client rest.Interface
-	ns     string
 }
 
 // newNUMAResourcesOperators returns a NUMAResourcesOperators
-func newNUMAResourcesOperators(c *NumaresourcesoperatorV1alpha1Client, namespace string) *nUMAResourcesOperators {
+func newNUMAResourcesOperators(c *NumaresourcesoperatorV1alpha1Client) *nUMAResourcesOperators {
 	return &nUMAResourcesOperators{
 		client: c.RESTClient(),
-		ns:     namespace,
 	}
 }
 
@@ -67,7 +65,6 @@ func newNUMAResourcesOperators(c *NumaresourcesoperatorV1alpha1Client, namespace
 func (c *nUMAResourcesOperators) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NUMAResourcesOperator, err error) {
 	result = &v1alpha1.NUMAResourcesOperator{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("numaresourcesoperators").
 		Name(name).
 		VersionedParams(&options, scheme.ParameterCodec).
@@ -84,7 +81,6 @@ func (c *nUMAResourcesOperators) List(ctx context.Context, opts v1.ListOptions) 
 	}
 	result = &v1alpha1.NUMAResourcesOperatorList{}
 	err = c.client.Get().
-		Namespace(c.ns).
 		Resource("numaresourcesoperators").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -101,7 +97,6 @@ func (c *nUMAResourcesOperators) Watch(ctx context.Context, opts v1.ListOptions)
 	}
 	opts.Watch = true
 	return c.client.Get().
-		Namespace(c.ns).
 		Resource("numaresourcesoperators").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -112,7 +107,6 @@ func (c *nUMAResourcesOperators) Watch(ctx context.Context, opts v1.ListOptions)
 func (c *nUMAResourcesOperators) Create(ctx context.Context, nUMAResourcesOperator *v1alpha1.NUMAResourcesOperator, opts v1.CreateOptions) (result *v1alpha1.NUMAResourcesOperator, err error) {
 	result = &v1alpha1.NUMAResourcesOperator{}
 	err = c.client.Post().
-		Namespace(c.ns).
 		Resource("numaresourcesoperators").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(nUMAResourcesOperator).
@@ -125,7 +119,6 @@ func (c *nUMAResourcesOperators) Create(ctx context.Context, nUMAResourcesOperat
 func (c *nUMAResourcesOperators) Update(ctx context.Context, nUMAResourcesOperator *v1alpha1.NUMAResourcesOperator, opts v1.UpdateOptions) (result *v1alpha1.NUMAResourcesOperator, err error) {
 	result = &v1alpha1.NUMAResourcesOperator{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("numaresourcesoperators").
 		Name(nUMAResourcesOperator.Name).
 		VersionedParams(&opts, scheme.ParameterCodec).
@@ -140,7 +133,6 @@ func (c *nUMAResourcesOperators) Update(ctx context.Context, nUMAResourcesOperat
 func (c *nUMAResourcesOperators) UpdateStatus(ctx context.Context, nUMAResourcesOperator *v1alpha1.NUMAResourcesOperator, opts v1.UpdateOptions) (result *v1alpha1.NUMAResourcesOperator, err error) {
 	result = &v1alpha1.NUMAResourcesOperator{}
 	err = c.client.Put().
-		Namespace(c.ns).
 		Resource("numaresourcesoperators").
 		Name(nUMAResourcesOperator.Name).
 		SubResource("status").
@@ -154,7 +146,6 @@ func (c *nUMAResourcesOperators) UpdateStatus(ctx context.Context, nUMAResources
 // Delete takes name of the nUMAResourcesOperator and deletes it. Returns an error if one occurs.
 func (c *nUMAResourcesOperators) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("numaresourcesoperators").
 		Name(name).
 		Body(&opts).
@@ -169,7 +160,6 @@ func (c *nUMAResourcesOperators) DeleteCollection(ctx context.Context, opts v1.D
 		timeout = time.Duration(*listOpts.TimeoutSeconds) * time.Second
 	}
 	return c.client.Delete().
-		Namespace(c.ns).
 		Resource("numaresourcesoperators").
 		VersionedParams(&listOpts, scheme.ParameterCodec).
 		Timeout(timeout).
@@ -182,7 +172,6 @@ func (c *nUMAResourcesOperators) DeleteCollection(ctx context.Context, opts v1.D
 func (c *nUMAResourcesOperators) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NUMAResourcesOperator, err error) {
 	result = &v1alpha1.NUMAResourcesOperator{}
 	err = c.client.Patch(pt).
-		Namespace(c.ns).
 		Resource("numaresourcesoperators").
 		Name(name).
 		SubResource(subresources...).
