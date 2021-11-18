@@ -76,12 +76,12 @@ var _ = ginkgo.Describe("[BasicInstall] Installation", func() {
 
 		ginkgo.It("should perform overall deployment and verify the condition is reported as available", func() {
 			ginkgo.By("creating the RTE object")
-			_, err := rteClient.NUMAResourcesOperators(rteObj.Namespace).Create(context.TODO(), rteObj, metav1.CreateOptions{})
+			_, err := rteClient.NUMAResourcesOperators().Create(context.TODO(), rteObj, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			ginkgo.By("checking that the condition Available=true")
 			gomega.Eventually(func() bool {
-				rteUpdated, err := rteClient.NUMAResourcesOperators(rteObj.Namespace).Get(context.TODO(), rteObj.Name, metav1.GetOptions{})
+				rteUpdated, err := rteClient.NUMAResourcesOperators().Get(context.TODO(), rteObj.Name, metav1.GetOptions{})
 				if err != nil {
 					framework.Logf("failed to get the RTE resource: %v", err)
 					return false
