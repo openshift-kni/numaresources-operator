@@ -161,7 +161,7 @@ func messageFromError(err error) string {
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator) (ctrl.Result, string, error) {
 	var err error
-	err = r.syncNodeResourceTopologyAPI()
+	err = r.syncNodeResourceTopologyAPI(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedAPISync")
 	}
@@ -187,13 +187,16 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	return ctrl.Result{}, status.ConditionAvailable, nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI() error {
+func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator) error {
 	klog.Info("APISync start")
 
-	existing := apistate.FromClient(context.TODO(), r.Client, r.Platform, r.APIManifests)
+	existing := apistate.FromClient(ctx, r.Client, r.Platform, r.APIManifests)
 
 	for _, objState := range existing.State(r.APIManifests) {
-		if _, err := apply.ApplyObject(context.TODO(), r.Client, objState); err != nil {
+		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
+			return errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
+		}
+		if _, err := apply.ApplyObject(ctx, r.Client, objState); err != nil {
 			return errors.Wrapf(err, "could not create %s", objState.Desired.GetObjectKind().GroupVersionKind().String())
 		}
 	}
