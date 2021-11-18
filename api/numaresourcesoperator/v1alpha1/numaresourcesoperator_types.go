@@ -62,9 +62,10 @@ type NUMAResourcesOperatorStatus struct {
 }
 
 //+genclient
+//+genclient:nonNamespaced
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-//+kubebuilder:resource:shortName=numaresop,path=numaresourcesoperators
+//+kubebuilder:resource:shortName=numaresop,path=numaresourcesoperators,scope=Cluster
 
 // NUMAResourcesOperator is the Schema for the numaresourcesoperators API
 type NUMAResourcesOperator struct {
