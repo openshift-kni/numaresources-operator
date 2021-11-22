@@ -121,12 +121,6 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, nil // Return success to avoid requeue
 	}
 
-	// note we intentionally NOT update the APIManifests - it is expected to be a NOP anyway
-	if r.Namespace != req.NamespacedName.Namespace {
-		r.RTEManifests = r.RenderManifests(req.NamespacedName.Namespace)
-		r.Namespace = req.NamespacedName.Namespace
-	}
-
 	result, condition, err := r.reconcileResource(ctx, instance)
 	if condition != "" {
 		// TODO: use proper reason
@@ -136,16 +130,6 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		}
 	}
 	return result, err
-}
-
-// RenderManifests renders the reconciler manifests so they can be deployed on the cluster.
-func (r *NUMAResourcesOperatorReconciler) RenderManifests(namespace string) rtemanifests.Manifests {
-	klog.Info("Updating manifests")
-	mf := r.RTEManifests.Update(rtemanifests.UpdateOptions{
-		Namespace: namespace,
-	})
-	rtestate.UpdateDaemonSetImage(mf.DaemonSet, r.ImageSpec)
-	return mf
 }
 
 func messageFromError(err error) string {
@@ -209,7 +193,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	}
 
 	var daemonSetsNName []nropv1alpha1.NamespacedName
-	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, mcps)
+	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, mcps, r.Namespace)
 	for _, objState := range existing.State(r.RTEManifests, instance, mcps) {
 		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
 			return nil, errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())

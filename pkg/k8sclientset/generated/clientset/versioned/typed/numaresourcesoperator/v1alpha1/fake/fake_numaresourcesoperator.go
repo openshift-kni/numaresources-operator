@@ -32,7 +32,6 @@ import (
 // FakeNUMAResourcesOperators implements NUMAResourcesOperatorInterface
 type FakeNUMAResourcesOperators struct {
 	Fake *FakeNumaresourcesoperatorV1alpha1
-	ns   string
 }
 
 var numaresourcesoperatorsResource = schema.GroupVersionResource{Group: "numaresourcesoperator", Version: "v1alpha1", Resource: "numaresourcesoperators"}
@@ -42,8 +41,7 @@ var numaresourcesoperatorsKind = schema.GroupVersionKind{Group: "numaresourcesop
 // Get takes name of the nUMAResourcesOperator, and returns the corresponding nUMAResourcesOperator object, and an error if there is any.
 func (c *FakeNUMAResourcesOperators) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.NUMAResourcesOperator, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewGetAction(numaresourcesoperatorsResource, c.ns, name), &v1alpha1.NUMAResourcesOperator{})
-
+		Invokes(testing.NewRootGetAction(numaresourcesoperatorsResource, name), &v1alpha1.NUMAResourcesOperator{})
 	if obj == nil {
 		return nil, err
 	}
@@ -53,8 +51,7 @@ func (c *FakeNUMAResourcesOperators) Get(ctx context.Context, name string, optio
 // List takes label and field selectors, and returns the list of NUMAResourcesOperators that match those selectors.
 func (c *FakeNUMAResourcesOperators) List(ctx context.Context, opts v1.ListOptions) (result *v1alpha1.NUMAResourcesOperatorList, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewListAction(numaresourcesoperatorsResource, numaresourcesoperatorsKind, c.ns, opts), &v1alpha1.NUMAResourcesOperatorList{})
-
+		Invokes(testing.NewRootListAction(numaresourcesoperatorsResource, numaresourcesoperatorsKind, opts), &v1alpha1.NUMAResourcesOperatorList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -75,15 +72,13 @@ func (c *FakeNUMAResourcesOperators) List(ctx context.Context, opts v1.ListOptio
 // Watch returns a watch.Interface that watches the requested nUMAResourcesOperators.
 func (c *FakeNUMAResourcesOperators) Watch(ctx context.Context, opts v1.ListOptions) (watch.Interface, error) {
 	return c.Fake.
-		InvokesWatch(testing.NewWatchAction(numaresourcesoperatorsResource, c.ns, opts))
-
+		InvokesWatch(testing.NewRootWatchAction(numaresourcesoperatorsResource, opts))
 }
 
 // Create takes the representation of a nUMAResourcesOperator and creates it.  Returns the server's representation of the nUMAResourcesOperator, and an error, if there is any.
 func (c *FakeNUMAResourcesOperators) Create(ctx context.Context, nUMAResourcesOperator *v1alpha1.NUMAResourcesOperator, opts v1.CreateOptions) (result *v1alpha1.NUMAResourcesOperator, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewCreateAction(numaresourcesoperatorsResource, c.ns, nUMAResourcesOperator), &v1alpha1.NUMAResourcesOperator{})
-
+		Invokes(testing.NewRootCreateAction(numaresourcesoperatorsResource, nUMAResourcesOperator), &v1alpha1.NUMAResourcesOperator{})
 	if obj == nil {
 		return nil, err
 	}
@@ -93,8 +88,7 @@ func (c *FakeNUMAResourcesOperators) Create(ctx context.Context, nUMAResourcesOp
 // Update takes the representation of a nUMAResourcesOperator and updates it. Returns the server's representation of the nUMAResourcesOperator, and an error, if there is any.
 func (c *FakeNUMAResourcesOperators) Update(ctx context.Context, nUMAResourcesOperator *v1alpha1.NUMAResourcesOperator, opts v1.UpdateOptions) (result *v1alpha1.NUMAResourcesOperator, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateAction(numaresourcesoperatorsResource, c.ns, nUMAResourcesOperator), &v1alpha1.NUMAResourcesOperator{})
-
+		Invokes(testing.NewRootUpdateAction(numaresourcesoperatorsResource, nUMAResourcesOperator), &v1alpha1.NUMAResourcesOperator{})
 	if obj == nil {
 		return nil, err
 	}
@@ -105,8 +99,7 @@ func (c *FakeNUMAResourcesOperators) Update(ctx context.Context, nUMAResourcesOp
 // Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
 func (c *FakeNUMAResourcesOperators) UpdateStatus(ctx context.Context, nUMAResourcesOperator *v1alpha1.NUMAResourcesOperator, opts v1.UpdateOptions) (*v1alpha1.NUMAResourcesOperator, error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewUpdateSubresourceAction(numaresourcesoperatorsResource, "status", c.ns, nUMAResourcesOperator), &v1alpha1.NUMAResourcesOperator{})
-
+		Invokes(testing.NewRootUpdateSubresourceAction(numaresourcesoperatorsResource, "status", nUMAResourcesOperator), &v1alpha1.NUMAResourcesOperator{})
 	if obj == nil {
 		return nil, err
 	}
@@ -116,14 +109,13 @@ func (c *FakeNUMAResourcesOperators) UpdateStatus(ctx context.Context, nUMAResou
 // Delete takes name of the nUMAResourcesOperator and deletes it. Returns an error if one occurs.
 func (c *FakeNUMAResourcesOperators) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(numaresourcesoperatorsResource, c.ns, name), &v1alpha1.NUMAResourcesOperator{})
-
+		Invokes(testing.NewRootDeleteAction(numaresourcesoperatorsResource, name), &v1alpha1.NUMAResourcesOperator{})
 	return err
 }
 
 // DeleteCollection deletes a collection of objects.
 func (c *FakeNUMAResourcesOperators) DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error {
-	action := testing.NewDeleteCollectionAction(numaresourcesoperatorsResource, c.ns, listOpts)
+	action := testing.NewRootDeleteCollectionAction(numaresourcesoperatorsResource, listOpts)
 
 	_, err := c.Fake.Invokes(action, &v1alpha1.NUMAResourcesOperatorList{})
 	return err
@@ -132,8 +124,7 @@ func (c *FakeNUMAResourcesOperators) DeleteCollection(ctx context.Context, opts 
 // Patch applies the patch and returns the patched nUMAResourcesOperator.
 func (c *FakeNUMAResourcesOperators) Patch(ctx context.Context, name string, pt types.PatchType, data []byte, opts v1.PatchOptions, subresources ...string) (result *v1alpha1.NUMAResourcesOperator, err error) {
 	obj, err := c.Fake.
-		Invokes(testing.NewPatchSubresourceAction(numaresourcesoperatorsResource, c.ns, name, pt, data, subresources...), &v1alpha1.NUMAResourcesOperator{})
-
+		Invokes(testing.NewRootPatchSubresourceAction(numaresourcesoperatorsResource, name, pt, data, subresources...), &v1alpha1.NUMAResourcesOperator{})
 	if obj == nil {
 		return nil, err
 	}
