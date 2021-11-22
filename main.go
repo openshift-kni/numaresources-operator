@@ -77,7 +77,8 @@ func main() {
 	var probeAddr string
 	var platformName string
 	var detectPlatformOnly bool
-	var renderManifestsFor string
+	var renderMode bool
+	var renderNamespace string
 	var renderImage string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -86,8 +87,10 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&platformName, "platform", "", "platform to deploy on - leave empty to autodetect")
 	flag.BoolVar(&detectPlatformOnly, "detect-platform-only", false, "detect and report the platform, then exits")
-	flag.StringVar(&renderManifestsFor, "render-manifests-for", defaultNamespace, "outputs the manifests rendered for given namespace, then exits")
+	flag.BoolVar(&renderMode, "render", false, "outputs the rendered manifests, then exits")
+	flag.StringVar(&renderNamespace, "render-namespace", defaultNamespace, "outputs the manifests rendered using the given namespace")
 	flag.StringVar(&renderImage, "render-image", defaultImage, "outputs the manifests rendered using the given image")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -131,11 +134,11 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	if renderManifestsFor != "" {
+	if renderMode {
 		if err := renderObjects(
 			renderManifests(
 				rteManifests,
-				renderManifestsFor,
+				renderNamespace,
 				renderImage,
 			).ToObjects()); err != nil {
 			setupLog.Error(err, "unable to render manifests")
