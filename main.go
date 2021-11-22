@@ -49,7 +49,7 @@ import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
-
+	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -127,28 +127,34 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	if renderManifestsFor != "" {
-		reconciler := &controllers.NUMAResourcesOperatorReconciler{
-			APIManifests: apiManifests,
-			RTEManifests: rteManifests,
-			Platform:     clusterPlatform,
-			ImageSpec:    images.ResourceTopologyExporterDefaultImageSHA,
-		}
-
-		err := renderObjects(reconciler.RenderManifests(renderManifestsFor).ToObjects())
-		if err != nil {
+		if err := renderObjects(
+			renderManifests(
+				rteManifests,
+				renderManifestsFor,
+				images.ResourceTopologyExporterDefaultImageSHA,
+			).ToObjects()); err != nil {
 			setupLog.Error(err, "unable to render manifests")
 			os.Exit(1)
 		}
 		os.Exit(0)
 	}
 
+	// TODO: we should align image fetch and namespace ENV variables names
+	// get the namespace where the operator should install components
+	namespace, ok := os.LookupEnv("NAMESPACE")
+	if !ok {
+		namespace = "numaresources-operator"
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
-		HealthProbeBindAddress: probeAddr,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "0e2a6bd3.openshift-kni.io",
+		Namespace:               namespace,
+		Scheme:                  scheme,
+		MetricsBindAddress:      metricsAddr,
+		Port:                    9443,
+		HealthProbeBindAddress:  probeAddr,
+		LeaderElection:          enableLeaderElection,
+		LeaderElectionNamespace: namespace,
+		LeaderElectionID:        "0e2a6bd3.openshift-kni.io",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -166,10 +172,11 @@ func main() {
 		Client:       mgr.GetClient(),
 		Scheme:       mgr.GetScheme(),
 		APIManifests: apiManifests,
-		RTEManifests: rteManifests,
+		RTEManifests: renderManifests(rteManifests, namespace, imageSpec),
 		Platform:     clusterPlatform,
 		Helper:       deployer.NewHelperWithClient(mgr.GetClient(), "", tlog.NewNullLogAdapter()),
 		ImageSpec:    imageSpec,
+		Namespace:    namespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "NUMAResourcesOperator")
 		os.Exit(1)
@@ -232,4 +239,14 @@ func renderObjects(objs []client.Object) error {
 	}
 
 	return nil
+}
+
+// RenderManifests renders the reconciler manifests so they can be deployed on the cluster.
+func renderManifests(rteManifests rtemanifests.Manifests, namespace string, imageSpec string) rtemanifests.Manifests {
+	klog.Info("Updating manifests")
+	mf := rteManifests.Update(rtemanifests.UpdateOptions{
+		Namespace: namespace,
+	})
+	rtestate.UpdateDaemonSetImage(mf.DaemonSet, imageSpec)
+	return mf
 }

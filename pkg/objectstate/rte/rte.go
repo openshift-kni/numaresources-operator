@@ -113,7 +113,7 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1al
 
 		existingDaemonSet, ok := em.daemonSets[generatedName]
 		if !ok {
-			klog.Warningf("failed to find daemon set %q under the namespace %q", generatedName, instance.Namespace)
+			klog.Warningf("failed to find daemon set %q under the namespace %q", generatedName, desiredDaemonSet.Namespace)
 			continue
 		}
 
@@ -139,7 +139,7 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1al
 
 			existingMachineConfig, ok := em.machineConfigs[generatedName]
 			if !ok {
-				klog.Warningf("failed to find machine config %q under the namespace %q", generatedName, instance.Namespace)
+				klog.Warningf("failed to find machine config %q under the namespace %q", generatedName, desiredMachineConfig.Namespace)
 				continue
 			}
 
@@ -160,7 +160,7 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1al
 
 			existingConfigMap, ok := em.configMaps[generatedName]
 			if !ok {
-				klog.Warningf("failed to find config map %q under the namespace %q", generatedName, instance.Namespace)
+				klog.Warningf("failed to find config map %q under the namespace %q", generatedName, desiredConfigMap.Namespace)
 				continue
 			}
 
@@ -179,7 +179,15 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1al
 	return ret
 }
 
-func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) ExistingManifests {
+func FromClient(
+	ctx context.Context,
+	cli client.Client,
+	plat platform.Platform,
+	mf rtemanifests.Manifests,
+	instance *nropv1alpha1.NUMAResourcesOperator,
+	mcps []*machineconfigv1.MachineConfigPool,
+	namespace string,
+) ExistingManifests {
 	ret := ExistingManifests{
 		existing: rtemanifests.New(plat),
 	}
@@ -212,7 +220,7 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		generatedName := fmt.Sprintf("%s-%s", instance.Name, mcp.Name)
 		key := client.ObjectKey{
 			Name:      generatedName,
-			Namespace: instance.Namespace,
+			Namespace: namespace,
 		}
 
 		if ret.daemonSets == nil {
