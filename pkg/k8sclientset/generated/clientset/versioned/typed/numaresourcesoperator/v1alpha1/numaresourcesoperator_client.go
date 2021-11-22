@@ -33,8 +33,8 @@ type NumaresourcesoperatorV1alpha1Client struct {
 	restClient rest.Interface
 }
 
-func (c *NumaresourcesoperatorV1alpha1Client) NUMAResourcesOperators(namespace string) NUMAResourcesOperatorInterface {
-	return newNUMAResourcesOperators(c, namespace)
+func (c *NumaresourcesoperatorV1alpha1Client) NUMAResourcesOperators() NUMAResourcesOperatorInterface {
+	return newNUMAResourcesOperators(c)
 }
 
 // NewForConfig creates a new NumaresourcesoperatorV1alpha1Client for the given config.
