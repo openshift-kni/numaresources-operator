@@ -66,22 +66,26 @@ var _ = ginkgo.Describe("[BasicInstall] Installation", func() {
 		ginkgo.BeforeEach(func() {
 			_, err := machineConfigClient.MachineConfigPools().Create(context.TODO(), mcpObj, metav1.CreateOptions{})
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+			ginkgo.By("creating the RTE object")
+			_, err = rteClient.NUMAResourcesOperators().Create(context.TODO(), rteObj, metav1.CreateOptions{})
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 		})
 
 		ginkgo.AfterEach(func() {
 			if err := machineConfigClient.MachineConfigPools().Delete(context.TODO(), mcpObj.Name, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
 				framework.Logf("failed to delete the machine config pool %q", mcpObj.Name)
 			}
+
+			if err := rteClient.NUMAResourcesOperators().Delete(context.TODO(), rteObj.Name, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
+				framework.Logf("failed to delete the numaresourcesoperators %q", rteObj.Name)
+			}
 		})
 
 		ginkgo.It("should perform overall deployment and verify the condition is reported as available", func() {
-			ginkgo.By("creating the RTE object")
-			_, err := rteClient.NUMAResourcesOperators(rteObj.Namespace).Create(context.TODO(), rteObj, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
 			ginkgo.By("checking that the condition Available=true")
 			gomega.Eventually(func() bool {
-				rteUpdated, err := rteClient.NUMAResourcesOperators(rteObj.Namespace).Get(context.TODO(), rteObj.Name, metav1.GetOptions{})
+				rteUpdated, err := rteClient.NUMAResourcesOperators().Get(context.TODO(), rteObj.Name, metav1.GetOptions{})
 				if err != nil {
 					framework.Logf("failed to get the RTE resource: %v", err)
 					return false
