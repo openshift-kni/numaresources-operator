@@ -286,8 +286,7 @@ func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1alpha1.Namespac
 	return res, ok
 }
 
-func UpdateDaemonSetImage(ds *appsv1.DaemonSet, pullSpec string) *appsv1.DaemonSet {
+func UpdateDaemonSetImage(ds *appsv1.DaemonSet, pullSpec string) {
 	// TODO: better match by name than assume container#0 is RTE proper (not minion)
 	ds.Spec.Template.Spec.Containers[0].Image = pullSpec
-	return ds
 }
