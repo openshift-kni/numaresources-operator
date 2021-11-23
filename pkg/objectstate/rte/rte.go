@@ -20,20 +20,22 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	securityv1 "github.com/openshift/api/security/v1"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+	securityv1 "github.com/openshift/api/security/v1"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
+	"github.com/openshift-kni/numaresources-operator/pkg/tmpolicy"
 )
 
 type daemonSetManifest struct {
@@ -271,6 +273,13 @@ func FromClient(
 					machineConfigError: err,
 				}
 			}
+
+			if policy, err := tmpolicy.AutoDetectPolicy(ctx, cli, mcp.Labels); err == nil {
+				UpdateDaemonSetTopologyPolicy(&ret.daemonSets[generatedName].daemonSet.Spec.Template.Spec.Containers[0].Env, policy)
+			}
+			if scope, err := tmpolicy.AutoDetectScope(ctx, cli, mcp.Labels); err == nil {
+				UpdateDaemonSetTopologyScope(&ret.daemonSets[generatedName].daemonSet.Spec.Template.Spec.Containers[0].Env, scope)
+			}
 		}
 	}
 
@@ -290,4 +299,44 @@ func UpdateDaemonSetImage(ds *appsv1.DaemonSet, pullSpec string) *appsv1.DaemonS
 	// TODO: better match by name than assume container#0 is RTE proper (not minion)
 	ds.Spec.Template.Spec.Containers[0].Image = pullSpec
 	return ds
+}
+
+func UpdateDaemonSetTopologyPolicy(envVars *[]corev1.EnvVar, policy string) {
+	// TODO: better match by name than assume container#0 is RTE proper (not minion)
+	var envExist bool
+
+	for idx, env := range *envVars {
+		if env.Name == tmpolicy.PolicyEnv {
+			(*envVars)[idx].Value = policy
+			envExist = true
+		}
+	}
+
+	if !envExist {
+		envVar := corev1.EnvVar{
+			Name:  tmpolicy.PolicyEnv,
+			Value: policy,
+		}
+		*envVars = append(*envVars, envVar)
+	}
+}
+
+func UpdateDaemonSetTopologyScope(envVars *[]corev1.EnvVar, scope string) {
+	// TODO: better match by name than assume container#0 is RTE proper (not minion)
+	var envExist bool
+
+	for idx, env := range *envVars {
+		if env.Name == tmpolicy.ScopeEnv {
+			(*envVars)[idx].Value = scope
+			envExist = true
+		}
+	}
+
+	if !envExist {
+		envVar := corev1.EnvVar{
+			Name:  tmpolicy.ScopeEnv,
+			Value: scope,
+		}
+		*envVars = append(*envVars, envVar)
+	}
 }
