@@ -132,7 +132,7 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1al
 				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
 				continue
 			}
-			desiredMachineConfig := mf.ConfigMap.DeepCopy()
+			desiredMachineConfig := mf.MachineConfig.DeepCopy()
 			// prefix machine config name to guarantee that we will have an option to override it
 			desiredMachineConfig.Name = fmt.Sprintf("51-%s", generatedName)
 			desiredMachineConfig.Labels = mcp.Spec.MachineConfigSelector.MatchLabels
