@@ -21,5 +21,5 @@ const (
 )
 
 const (
-	ResourceTopologyExporterDefaultImageSHA = "quay.io/openshift-kni/resource-topology-exporter@sha256:728f9cdf21a2ac2b7097f7b187fa091bad384582af6e93c017c8d3c39ddb360c"
+	ResourceTopologyExporterDefaultImageSHA = "quay.io/openshift-kni/resource-topology-exporter@sha256:30f7857b06c41b8b4ad13e6ac5201f602cf61b8bbfd1f96c5b3393b046a6a37d"
 )
