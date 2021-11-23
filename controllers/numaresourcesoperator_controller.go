@@ -192,6 +192,8 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		return nil, errors.Wrapf(err, "failed to get machine config pools related to instance node groups")
 	}
 
+	rtestate.UpdateDaemonSetImage(r.RTEManifests.DaemonSet, r.getExporterImage(instance.Spec.ExporterImage))
+
 	var daemonSetsNName []nropv1alpha1.NamespacedName
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, mcps, r.Namespace)
 	for _, objState := range existing.State(r.RTEManifests, instance, mcps) {
@@ -208,6 +210,17 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		}
 	}
 	return daemonSetsNName, nil
+}
+
+func (r *NUMAResourcesOperatorReconciler) getExporterImage(imgSpec string) string {
+	reason := "user-provided"
+	imageSpec := imgSpec
+	if imageSpec == "" {
+		reason = "builtin"
+		imageSpec = r.ImageSpec
+	}
+	klog.V(3).InfoS("Exporter image", "reason", reason, "pullSpec", imageSpec)
+	return imageSpec
 }
 
 // SetupWithManager sets up the controller with the Manager.

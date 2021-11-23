@@ -56,6 +56,9 @@ import (
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+
+	defaultImage     = images.ResourceTopologyExporterDefaultImageSHA
+	defaultNamespace = "numaresources-operator"
 )
 
 func init() {
@@ -74,7 +77,9 @@ func main() {
 	var probeAddr string
 	var platformName string
 	var detectPlatformOnly bool
-	var renderManifestsFor string
+	var renderMode bool
+	var renderNamespace string
+	var renderImage string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -82,7 +87,10 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&platformName, "platform", "", "platform to deploy on - leave empty to autodetect")
 	flag.BoolVar(&detectPlatformOnly, "detect-platform-only", false, "detect and report the platform, then exits")
-	flag.StringVar(&renderManifestsFor, "render-manifests-for", "", "outputs the manifests rendered for given namespace, then exits")
+	flag.BoolVar(&renderMode, "render", false, "outputs the rendered manifests, then exits")
+	flag.StringVar(&renderNamespace, "render-namespace", defaultNamespace, "outputs the manifests rendered using the given namespace")
+	flag.StringVar(&renderImage, "render-image", defaultImage, "outputs the manifests rendered using the given image")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -126,12 +134,12 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	if renderManifestsFor != "" {
+	if renderMode {
 		if err := renderObjects(
 			renderManifests(
 				rteManifests,
-				renderManifestsFor,
-				images.ResourceTopologyExporterDefaultImageSHA,
+				renderNamespace,
+				renderImage,
 			).ToObjects()); err != nil {
 			setupLog.Error(err, "unable to render manifests")
 			os.Exit(1)
@@ -143,7 +151,7 @@ func main() {
 	// get the namespace where the operator should install components
 	namespace, ok := os.LookupEnv("NAMESPACE")
 	if !ok {
-		namespace = "numaresources-operator"
+		namespace = defaultNamespace
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -241,7 +249,7 @@ func renderObjects(objs []client.Object) error {
 	return nil
 }
 
-// RenderManifests renders the reconciler manifests so they can be deployed on the cluster.
+// renderManifests renders the reconciler manifests so they can be deployed on the cluster.
 func renderManifests(rteManifests rtemanifests.Manifests, namespace string, imageSpec string) rtemanifests.Manifests {
 	klog.Info("Updating manifests")
 	mf := rteManifests.Update(rtemanifests.UpdateOptions{

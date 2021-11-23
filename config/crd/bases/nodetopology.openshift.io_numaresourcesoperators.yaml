@@ -39,6 +39,8 @@ spec:
           spec:
             description: NUMAResourcesOperatorSpec defines the desired state of NUMAResourcesOperator
             properties:
+              imageSpec:
+                type: string
               nodeGroups:
                 items:
                   description: NodeGroup defines group of nodes that will run resource

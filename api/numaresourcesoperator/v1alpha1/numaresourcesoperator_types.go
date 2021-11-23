@@ -44,6 +44,8 @@ func (n NamespacedName) String() string {
 // NUMAResourcesOperatorSpec defines the desired state of NUMAResourcesOperator
 type NUMAResourcesOperatorSpec struct {
 	NodeGroups []NodeGroup `json:"nodeGroups,omitempty"`
+
+	ExporterImage string `json:"imageSpec,omitempty"`
 }
 
 // NodeGroup defines group of nodes that will run resource topology exporter daemon set
