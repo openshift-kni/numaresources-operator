@@ -90,7 +90,7 @@ spec:
         - apiGroups:
           - config.openshift.io
           resources:
-          - clusterversionss
+          - clusterversions
           verbs:
           - list
         - apiGroups:
