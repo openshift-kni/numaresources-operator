@@ -52,6 +52,8 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+CONTAINER_ENGINE ?= docker
+
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -128,11 +130,16 @@ build-all: generate fmt vet binary binary-rte
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
-docker-build: #test ## Build docker image with the manager.
-	docker build -t ${IMG} .
+# backward compatibility
+docker-build: container-build
 
-docker-push: ## Push docker image with the manager.
-	docker push ${IMG}
+docker-push: container-push
+
+container-build: #test ## Build container image with the manager.
+	$(CONTAINER_ENGINE) build -t ${IMG} .
+
+container-push: ## Push container image with the manager.
+	$(CONTAINER_ENGINE) push ${IMG}
 
 ##@ Deployment
 
@@ -186,11 +193,11 @@ bundle: manifests kustomize ## Generate bundle manifests and metadata, then vali
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(CONTAINER_ENGINE) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
-	$(MAKE) docker-push IMG=$(BUNDLE_IMG)
+	$(MAKE) container-push IMG=$(BUNDLE_IMG)
 
 .PHONY: opm
 OPM = ./bin/opm
@@ -226,12 +233,12 @@ endif
 # https://github.com/operator-framework/community-operators/blob/7f1438c/docs/packaging-operator.md#updating-your-existing-operator
 .PHONY: catalog-build
 catalog-build: opm ## Build a catalog image.
-	$(OPM) index add --container-tool docker --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
+	$(OPM) index add --container-tool $(CONTAINER_ENGINE) --mode semver --tag $(CATALOG_IMG) --bundles $(BUNDLE_IMGS) $(FROM_INDEX_OPT)
 
 # Push the catalog image.
 .PHONY: catalog-push
 catalog-push: ## Push a catalog image.
-	$(MAKE) docker-push IMG=$(CATALOG_IMG)
+	$(MAKE) container-push IMG=$(CATALOG_IMG)
 
 .PHONY: deps-update
 deps-update:
