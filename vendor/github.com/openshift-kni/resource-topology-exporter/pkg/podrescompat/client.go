@@ -74,7 +74,7 @@ func MakeAllocatableResourcesResponseFromSysInfo(sysInfo sysinfo.SysInfo) *podre
 				DeviceIds:    numaDevices,
 				Topology: &podresourcesapi.TopologyInfo{
 					Nodes: []*podresourcesapi.NUMANode{
-						&podresourcesapi.NUMANode{ID: int64(numaCellID)},
+						{ID: int64(numaCellID)},
 					},
 				},
 			}

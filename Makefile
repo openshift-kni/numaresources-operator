@@ -104,6 +104,9 @@ binary:
 binary-rte:
 	go build -o bin/exporter rte/main.go
 
+binary-rte-e2e:
+	go test -c -v -o bin/rte-e2e.test ./test/rte-e2e
+
 binary-e2e:
 	go test -v -c -o bin/e2e.test ./test/e2e
 
@@ -112,6 +115,8 @@ binary-all: binary binary-rte
 build: generate fmt vet binary
 
 build-rte: fmt vet binary-rte
+
+build-rte-e2e: fmt vet binary-rte-e2e
 
 build-e2e: fmt vet binary-e2e
 

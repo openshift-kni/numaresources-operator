@@ -513,7 +513,7 @@ github.com/josharian/intern
 # github.com/json-iterator/go v1.1.11
 ## explicit; go 1.12
 github.com/json-iterator/go
-# github.com/k8stopologyawareschedwg/deployer v0.0.11-0.20211115070348-cba310bd69ae
+# github.com/k8stopologyawareschedwg/deployer v0.0.12
 ## explicit; go 1.16
 github.com/k8stopologyawareschedwg/deployer/pkg/assets/rte
 github.com/k8stopologyawareschedwg/deployer/pkg/clientutil
@@ -533,7 +533,7 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/scheme
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/typed/topology/v1alpha1
-# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.2.5
+# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.2.7
 ## explicit; go 1.16
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/kubeconf
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater
@@ -542,12 +542,14 @@ github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/prometheus
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/sysinfo
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/topologypolicy
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/utils
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodetopology
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods
+github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testconsts
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testenv
 # github.com/karrick/godirwalk v1.16.1
 ## explicit; go 1.13
@@ -703,7 +705,7 @@ github.com/opencontainers/runtime-spec/specs-go
 github.com/opencontainers/selinux/go-selinux
 github.com/opencontainers/selinux/go-selinux/label
 github.com/opencontainers/selinux/pkg/pwalk
-# github.com/openshift-kni/resource-topology-exporter v0.2.5
+# github.com/openshift-kni/resource-topology-exporter v0.2.7
 ## explicit; go 1.16
 github.com/openshift-kni/resource-topology-exporter/pkg/config
 github.com/openshift-kni/resource-topology-exporter/pkg/podrescompat
@@ -716,11 +718,9 @@ github.com/openshift/api/security/v1
 ## explicit; go 1.16
 github.com/openshift/client-go/config/clientset/versioned/scheme
 github.com/openshift/client-go/config/clientset/versioned/typed/config/v1
-# github.com/openshift/machine-config-operator v0.0.0-00010101000000-000000000000 => github.com/openshift/machine-config-operator v0.0.1-0.20211110032239-0abf68a0c320
+# github.com/openshift/machine-config-operator v0.0.1-0.20211105081319-76d6155c1dab => github.com/openshift/machine-config-operator v0.0.1-0.20211110032239-0abf68a0c320
 ## explicit; go 1.16
 github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1
-github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/scheme
-github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/typed/machineconfiguration.openshift.io/v1
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
@@ -2150,7 +2150,6 @@ k8s.io/kubernetes/test/e2e/framework/config
 k8s.io/kubernetes/test/e2e/framework/events
 k8s.io/kubernetes/test/e2e/framework/ginkgowrapper
 k8s.io/kubernetes/test/e2e/framework/kubectl
-k8s.io/kubernetes/test/e2e/framework/kubelet
 k8s.io/kubernetes/test/e2e/framework/log
 k8s.io/kubernetes/test/e2e/framework/manifest
 k8s.io/kubernetes/test/e2e/framework/metrics

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package rte_e2e
 
 import (
 	"flag"
@@ -23,15 +23,14 @@ import (
 	"testing"
 	"time"
 
-	e2ekube "k8s.io/kubernetes/test/e2e"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
 
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte"
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater"
-
-	_ "github.com/openshift-kni/numaresources-operator/test/e2e/basic_install"
 )
 
 func TestMain(m *testing.M) {
@@ -46,6 +45,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func TestE2E(t *testing.T) {
-	e2ekube.RunE2ETests(t)
+func TestRTE(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "RTE Test Suite")
 }
