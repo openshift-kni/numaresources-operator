@@ -75,9 +75,7 @@ func main() {
 	}
 
 	err = resourcetopologyexporter.Execute(cli, nrtupdaterArgs, resourcemonitorArgs, rteArgs)
-	if err != nil {
-		log.Fatalf("failed to execute: %v", err)
-	}
+	log.Fatalf("failed to execute: %v", err)
 }
 
 const helpTemplate string = `{{.ProgramName}}
