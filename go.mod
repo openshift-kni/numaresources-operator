@@ -4,13 +4,13 @@ go 1.17
 
 require (
 	github.com/docopt/docopt-go v0.0.0-20180111231733-ee0de3bc6815
-	github.com/k8stopologyawareschedwg/deployer v0.0.11-0.20211115070348-cba310bd69ae
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.2.5
+	github.com/k8stopologyawareschedwg/deployer v0.0.12
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.2.7
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.14.0
-	github.com/openshift-kni/resource-topology-exporter v0.2.5
+	github.com/openshift-kni/resource-topology-exporter v0.2.7
 	github.com/openshift/api v0.0.0-20210924154557-a4f696157341
-	github.com/openshift/machine-config-operator v0.0.0-00010101000000-000000000000
+	github.com/openshift/machine-config-operator v0.0.1-0.20211105081319-76d6155c1dab
 	github.com/pkg/errors v0.9.1
 	k8s.io/api v0.22.3
 	k8s.io/apiextensions-apiserver v0.22.3

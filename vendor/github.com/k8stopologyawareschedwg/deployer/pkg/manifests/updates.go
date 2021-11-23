@@ -2,6 +2,7 @@ package manifests
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/drone/envsubst"
 	securityv1 "github.com/openshift/api/security/v1"
@@ -26,6 +27,8 @@ const (
 	seLinuxRTEContextLevel = "s0"
 
 	templateSELinuxPolicyDst = "selinuxPolicyDst"
+
+	metricsPort = 2112
 )
 
 func UpdateRoleBinding(rb *rbacv1.RoleBinding, serviceAccount, namespace string) *rbacv1.RoleBinding {
@@ -153,6 +156,8 @@ func UpdateResourceTopologyExporterDaemonSet(plat platform.Platform, ds *appsv1.
 		ds.Spec.Template.Spec.NodeSelector = nodeSelector.MatchLabels
 	}
 
+	UpdateMetricsPort(ds, metricsPort)
+
 	return ds
 }
 
@@ -195,6 +200,23 @@ func UpdateSecurityContextConstraint(scc *securityv1.SecurityContextConstraints,
 		}
 	}
 	scc.Users = append(scc.Users, serviceAccountName)
+}
+
+func UpdateMetricsPort(ds *appsv1.DaemonSet, pNum int) {
+	pNumAsStr := strconv.Itoa(pNum)
+
+	for idx, env := range ds.Spec.Template.Spec.Containers[0].Env {
+		if env.Name == "METRICS_PORT" {
+			ds.Spec.Template.Spec.Containers[0].Env[idx].Value = pNumAsStr
+		}
+	}
+
+	cp := []corev1.ContainerPort{{
+		Name:          "metrics-port",
+		ContainerPort: int32(pNum),
+	},
+	}
+	ds.Spec.Template.Spec.Containers[0].Ports = cp
 }
 
 func pullPolicy(pullIfNotPresent bool) corev1.PullPolicy {

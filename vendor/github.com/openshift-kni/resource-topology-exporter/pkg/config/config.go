@@ -29,6 +29,7 @@ type Config struct {
 	ExcludeList           map[string][]string
 	Resources             sysinfo.Config
 	TopologyManagerPolicy string
+	TopologyManagerScope  string
 }
 
 func ReadConfig(configPath string) (Config, error) {

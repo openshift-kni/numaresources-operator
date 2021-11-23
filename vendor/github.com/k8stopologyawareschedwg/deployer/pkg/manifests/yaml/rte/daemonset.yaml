@@ -37,6 +37,8 @@ spec:
               fieldPath: metadata.name
         - name: REFERENCE_CONTAINER_NAME
           value: shared-pool-container
+        - name: METRICS_PORT
+          value: "${METRICS_PORT}"
         volumeMounts:
           - name: host-sys
             mountPath: "/host-sys"
