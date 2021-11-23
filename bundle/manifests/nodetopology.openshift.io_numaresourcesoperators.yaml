@@ -14,7 +14,7 @@ spec:
     shortNames:
     - numaresop
     singular: numaresourcesoperator
-  scope: Namespaced
+  scope: Cluster
   versions:
   - name: v1alpha1
     schema:
@@ -36,6 +36,60 @@ spec:
             type: object
           spec:
             description: NUMAResourcesOperatorSpec defines the desired state of NUMAResourcesOperator
+            properties:
+              nodeGroups:
+                items:
+                  description: NodeGroup defines group of nodes that will run resource
+                    topology exporter daemon set You can choose the group of node
+                    by MachineConfigPoolSelector or by NodeSelector
+                  properties:
+                    machineConfigPoolSelector:
+                      description: MachineConfigPoolSelector defines label selector
+                        for the machine config pool
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: A label selector requirement is a selector
+                              that contains values, a key, and an operator that relates
+                              the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: operator represents a key's relationship
+                                  to a set of values. Valid operators are In, NotIn,
+                                  Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: values is an array of string values.
+                                  If the operator is In or NotIn, the values array
+                                  must be non-empty. If the operator is Exists or
+                                  DoesNotExist, the values array must be empty. This
+                                  array is replaced during a strategic merge patch.
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: matchLabels is a map of {key,value} pairs.
+                            A single {key,value} in the matchLabels map is equivalent
+                            to an element of matchExpressions, whose key field is
+                            "key", the operator is "In", and the values array contains
+                            only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                  type: object
+                type: array
             type: object
           status:
             description: NUMAResourcesOperatorStatus defines the observed state of
@@ -112,15 +166,17 @@ spec:
                   - type
                   type: object
                 type: array
-              daemonset:
-                description: NamespacedName comprises a resource name, with a mandatory
-                  namespace, rendered as "<namespace>/<name>".
-                properties:
-                  name:
-                    type: string
-                  namespace:
-                    type: string
-                type: object
+              daemonsets:
+                items:
+                  description: NamespacedName comprises a resource name, with a mandatory
+                    namespace, rendered as "<namespace>/<name>".
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                  type: object
+                type: array
             type: object
         type: object
     served: true
