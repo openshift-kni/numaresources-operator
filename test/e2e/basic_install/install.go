@@ -18,132 +18,61 @@ package basic_install
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-	machineconfigclientset "github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/typed/machineconfiguration.openshift.io/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	nropclientset "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/e2e/utils/clients"
+	"github.com/openshift-kni/numaresources-operator/test/e2e/utils/objects"
 )
 
 var _ = ginkgo.Describe("[BasicInstall] Installation", func() {
 
 	var (
-		initialized         bool
-		rteClient           *nropclientset.NumaresourcesoperatorV1alpha1Client
-		machineConfigClient *machineconfigclientset.MachineconfigurationV1Client
-		rteObj              *nropv1alpha1.NUMAResourcesOperator
-		mcpObj              *machineconfigv1.MachineConfigPool
+		initialized bool
+		nroObj      *nropv1alpha1.NUMAResourcesOperator
 	)
 
-	f := framework.NewDefaultFramework("rte")
-
 	ginkgo.BeforeEach(func() {
-		var err error
-
 		if !initialized {
-			rteObj = testRTE(f)
-			mcpObj = testMCP()
+			gomega.Expect(e2eclient.ClientsEnabled).To(gomega.BeTrue(), "failed to create runtime-controller client")
+			nroObj = objects.TestNRO()
 
-			rteClient, err = nropclientset.NewForConfig(f.ClientConfig())
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			machineConfigClient, err = machineconfigclientset.NewForConfig(f.ClientConfig())
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			initialized = true
 		}
+		initialized = true
 	})
 
-	ginkgo.Context("with a running cluster without any components", func() {
-		ginkgo.BeforeEach(func() {
-			_, err := machineConfigClient.MachineConfigPools().Create(context.TODO(), mcpObj, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			ginkgo.By("creating the RTE object")
-			_, err = rteClient.NUMAResourcesOperators().Create(context.TODO(), rteObj, metav1.CreateOptions{})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		})
-
-		ginkgo.AfterEach(func() {
-			if err := machineConfigClient.MachineConfigPools().Delete(context.TODO(), mcpObj.Name, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-				framework.Logf("failed to delete the machine config pool %q", mcpObj.Name)
-			}
-
-			if err := rteClient.NUMAResourcesOperators().Delete(context.TODO(), rteObj.Name, metav1.DeleteOptions{}); err != nil && !errors.IsNotFound(err) {
-				framework.Logf("failed to delete the numaresourcesoperators %q", rteObj.Name)
-			}
-		})
-
+	ginkgo.Context("with a running cluster with all the components", func() {
 		ginkgo.It("should perform overall deployment and verify the condition is reported as available", func() {
 			ginkgo.By("checking that the condition Available=true")
 			gomega.Eventually(func() bool {
-				rteUpdated, err := rteClient.NUMAResourcesOperators().Get(context.TODO(), rteObj.Name, metav1.GetOptions{})
+				updatedNROObj := &nropv1alpha1.NUMAResourcesOperator{}
+				key := client.ObjectKey{
+					Name: nroObj.Name,
+				}
+				err := e2eclient.Client.Get(context.TODO(), key, updatedNROObj)
 				if err != nil {
-					framework.Logf("failed to get the RTE resource: %v", err)
+					log.Printf("failed to get the RTE resource: %v", err)
 					return false
 				}
 
-				cond := status.FindCondition(rteUpdated.Status.Conditions, status.ConditionAvailable)
+				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
 				if cond == nil {
-					framework.Logf("missing conditions in %v", rteUpdated)
+					log.Printf("missing conditions in %v", updatedNROObj)
 					return false
 				}
 
-				framework.Logf("condition: %v", cond)
+				log.Printf("condition: %v", cond)
 
 				return cond.Status == metav1.ConditionTrue
-			}, 5*time.Minute, 10*time.Second).Should(gomega.BeTrue(), "RTE condition did not become avaialble")
+			}, 5*time.Minute, 10*time.Second).Should(gomega.BeTrue(), "RTE condition did not become available")
 		})
 	})
 })
-
-func testRTE(f *framework.Framework) *nropv1alpha1.NUMAResourcesOperator {
-	return &nropv1alpha1.NUMAResourcesOperator{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "NUMAResourcesOperator",
-			APIVersion: nropv1alpha1.GroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "numaresourcesoperator",
-			Namespace: f.Namespace.Name,
-		},
-		Spec: nropv1alpha1.NUMAResourcesOperatorSpec{
-			NodeGroups: []nropv1alpha1.NodeGroup{
-				{
-					MachineConfigPoolSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"test": "test"},
-					},
-				},
-			},
-		},
-	}
-}
-
-func testMCP() *machineconfigv1.MachineConfigPool {
-	return &machineconfigv1.MachineConfigPool{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "MachineConfigPool",
-			APIVersion: machineconfigv1.GroupVersion.String(),
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   "mcp-test",
-			Labels: map[string]string{"test": "test"},
-		},
-		Spec: machineconfigv1.MachineConfigPoolSpec{
-			MachineConfigSelector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"test": "test"},
-			},
-			NodeSelector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"node-role.kubernetes.io/worker": ""},
-			},
-		},
-	}
-}
