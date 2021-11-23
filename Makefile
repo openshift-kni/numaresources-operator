@@ -96,7 +96,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 test-unit: envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/... ./pkg/...
 
-test-e2e: binary-e2e binary-e2e-rte
+test-e2e: binary-e2e binary-rte-e2e
 	./bin/e2e.test -ginkgo.v
 
 ##@ Build
