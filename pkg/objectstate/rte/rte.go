@@ -52,14 +52,16 @@ type configMapManifest struct {
 }
 
 type ExistingManifests struct {
-	existing            rtemanifests.Manifests
-	daemonSets          map[string]daemonSetManifest
-	machineConfigs      map[string]machineConfigManifest
-	configMaps          map[string]configMapManifest
-	sccError            error
-	serviceAccountError error
-	roleError           error
-	roleBindingError    error
+	existing                rtemanifests.Manifests
+	daemonSets              map[string]daemonSetManifest
+	machineConfigs          map[string]machineConfigManifest
+	configMaps              map[string]configMapManifest
+	sccError                error
+	serviceAccountError     error
+	roleError               error
+	roleBindingError        error
+	clusterRoleError        error
+	clusterRoleBindingError error
 }
 
 func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []objectstate.ObjectState {
@@ -85,6 +87,22 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1al
 			Existing: em.existing.RoleBinding,
 			Error:    em.roleBindingError,
 			Desired:  mf.RoleBinding.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.ObjectForUpdate,
+		},
+		// cluster role
+		{
+			Existing: em.existing.ClusterRole,
+			Error:    em.clusterRoleError,
+			Desired:  mf.ClusterRole.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.ObjectForUpdate,
+		},
+		// cluster role binding
+		{
+			Existing: em.existing.ClusterRoleBinding,
+			Error:    em.clusterRoleBindingError,
+			Desired:  mf.ClusterRoleBinding.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
 		},
@@ -203,6 +221,16 @@ func FromClient(
 		ret.existing.RoleBinding = rb
 	}
 
+	cro := &rbacv1.ClusterRole{}
+	if ret.clusterRoleError = cli.Get(ctx, client.ObjectKeyFromObject(mf.ClusterRole), cro); ret.clusterRoleError == nil {
+		ret.existing.ClusterRole = cro
+	}
+
+	crb := &rbacv1.ClusterRoleBinding{}
+	if ret.clusterRoleBindingError = cli.Get(ctx, client.ObjectKeyFromObject(mf.ClusterRoleBinding), crb); ret.clusterRoleBindingError == nil {
+		ret.existing.ClusterRoleBinding = crb
+	}
+
 	sa := &corev1.ServiceAccount{}
 	if ret.serviceAccountError = cli.Get(ctx, client.ObjectKeyFromObject(mf.ServiceAccount), sa); ret.serviceAccountError == nil {
 		ret.existing.ServiceAccount = sa
@@ -261,6 +289,10 @@ func FromClient(
 				ret.machineConfigs = map[string]machineConfigManifest{}
 			}
 
+			key := client.ObjectKey{
+				Name:      fmt.Sprintf("51-%s", generatedName),
+				Namespace: namespace,
+			}
 			mc := &machineconfigv1.MachineConfig{}
 			if err := cli.Get(ctx, key, mc); err == nil {
 				ret.machineConfigs[generatedName] = machineConfigManifest{
