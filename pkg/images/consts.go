@@ -17,9 +17,9 @@
 package images
 
 const (
-	ResourceTopologyExporterDefaultImageTag = "quay.io/k8stopologyawareschedwg/resource-topology-exporter:v0.2.5"
+	ResourceTopologyExporterDefaultImageTag = "quay.io/openshift-kni/resource-topology-exporter:v0.3.1"
 )
 
 const (
-	ResourceTopologyExporterDefaultImageSHA = "quay.io/openshift-kni/resource-topology-exporter@sha256:30f7857b06c41b8b4ad13e6ac5201f602cf61b8bbfd1f96c5b3393b046a6a37d"
+	ResourceTopologyExporterDefaultImageSHA = "quay.io/openshift-kni/resource-topology-exporter@sha256:aee158fc32be31fa958aa1ae7027d401639a924772f6685405eed4e39c64d32f"
 )

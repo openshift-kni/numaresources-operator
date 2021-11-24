@@ -162,9 +162,6 @@ func argsParse(argv []string) (nrtupdater.Args, resourcemonitor.Args, resourceto
 	// Parse argument values as usable types.
 	nrtupdaterArgs.NoPublish = arguments["--no-publish"].(bool)
 	nrtupdaterArgs.Oneshot = arguments["--oneshot"].(bool)
-	if ns, ok := arguments["--export-namespace"].(string); ok {
-		nrtupdaterArgs.Namespace = ns
-	}
 	if hostname, ok := arguments["--hostname"].(string); ok {
 		nrtupdaterArgs.Hostname = hostname
 	}

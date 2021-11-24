@@ -85,6 +85,8 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=*
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=*
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=*
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
 //+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=*
