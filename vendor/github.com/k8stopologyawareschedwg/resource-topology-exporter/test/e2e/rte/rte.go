@@ -45,7 +45,6 @@ import (
 var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func() {
 	var (
 		initialized         bool
-		namespace           string
 		topologyClient      *topologyclientset.Clientset
 		topologyUpdaterNode *v1.Node
 		workerNodes         []v1.Node
@@ -57,8 +56,6 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 		var err error
 
 		if !initialized {
-			namespace = e2etestenv.GetNamespaceName()
-
 			topologyClient, err = topologyclientset.NewForConfig(f.ClientConfig())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -82,14 +79,14 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 	})
 
 	ginkgo.Context("with cluster configured", func() {
-		ginkgo.It("it should react to pod changes using the smart poller", func() {
+		ginkgo.It("[StateDirectories] it should react to pod changes using the smart poller", func() {
 			nodes, err := e2enodes.FilterNodesWithEnoughCores(workerNodes, "1000m")
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			if len(nodes) < 1 {
 				ginkgo.Skip("not enough allocatable cores for this test")
 			}
 
-			initialNodeTopo := e2enodetopology.GetNodeTopology(topologyClient, topologyUpdaterNode.Name, namespace)
+			initialNodeTopo := e2enodetopology.GetNodeTopology(topologyClient, topologyUpdaterNode.Name)
 			ginkgo.By("creating a pod consuming the shared pool")
 			sleeperPod := e2epods.MakeGuaranteedSleeperPod("1000m")
 			defer e2epods.Cooldown(f)
@@ -99,6 +96,8 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 			started := false
 
 			go func() {
+				defer ginkgo.GinkgoRecover()
+
 				<-stopChan
 				podMap := make(map[string]*v1.Pod)
 				pod := f.PodClient().CreateSync(sleeperPod)
@@ -115,18 +114,18 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 					started = true
 				}
 
-				finalNodeTopo, err = topologyClient.TopologyV1alpha1().NodeResourceTopologies(namespace).Get(context.TODO(), topologyUpdaterNode.Name, metav1.GetOptions{})
+				finalNodeTopo, err = topologyClient.TopologyV1alpha1().NodeResourceTopologies().Get(context.TODO(), topologyUpdaterNode.Name, metav1.GetOptions{})
 				if err != nil {
 					framework.Logf("failed to get the node topology resource: %v", err)
 					return false
 				}
 				if finalNodeTopo.ObjectMeta.ResourceVersion == initialNodeTopo.ObjectMeta.ResourceVersion {
-					framework.Logf("resource %s/%s not yet updated - resource version not bumped", namespace, topologyUpdaterNode.Name)
+					framework.Logf("resource %s not yet updated - resource version not bumped", topologyUpdaterNode.Name)
 					return false
 				}
 				reason, ok := finalNodeTopo.Annotations[nrtupdater.AnnotationRTEUpdate]
 				if !ok {
-					framework.Logf("resource %s/%s missing annotation!", namespace, topologyUpdaterNode.Name)
+					framework.Logf("resource %s missing annotation!", topologyUpdaterNode.Name)
 					return false
 				}
 				return reason == nrtupdater.RTEUpdateReactive
@@ -139,5 +138,73 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 			reason := finalNodeTopo.Annotations[nrtupdater.AnnotationRTEUpdate]
 			gomega.Expect(reason).To(gomega.Equal(nrtupdater.RTEUpdateReactive), "update reason error: expected %q got %q", nrtupdater.RTEUpdateReactive, reason)
 		})
+
+		ginkgo.It("[NotificationFile] it should react to pod changes using the smart poller with notification file", func() {
+			initialNodeTopo := e2enodetopology.GetNodeTopology(topologyClient, topologyUpdaterNode.Name)
+
+			stopChan := make(chan struct{})
+			doneChan := make(chan struct{})
+			started := false
+
+			go func() {
+				defer ginkgo.GinkgoRecover()
+
+				<-stopChan
+				rtePod, err := e2epods.GetPodOnNode(f, topologyUpdaterNode.Name, e2etestenv.GetNamespaceName(), e2etestenv.RTELabelName)
+				framework.ExpectNoError(err)
+				execCommandInContainer(f, rtePod.Namespace, rtePod.Name, rtePod.Spec.Containers[0].Name, "/bin/touch", "/host-run/rte/notify")
+				doneChan <- struct{}{}
+			}()
+
+			ginkgo.By("getting the updated topology")
+			var err error
+			var finalNodeTopo *v1alpha1.NodeResourceTopology
+			gomega.Eventually(func() bool {
+				if !started {
+					stopChan <- struct{}{}
+					started = true
+				}
+
+				finalNodeTopo, err = topologyClient.TopologyV1alpha1().NodeResourceTopologies().Get(context.TODO(), topologyUpdaterNode.Name, metav1.GetOptions{})
+				if err != nil {
+					framework.Logf("failed to get the node topology resource: %v", err)
+					return false
+				}
+				if finalNodeTopo.ObjectMeta.ResourceVersion == initialNodeTopo.ObjectMeta.ResourceVersion {
+					framework.Logf("resource %s not yet updated - resource version not bumped", topologyUpdaterNode.Name)
+					return false
+				}
+				reason, ok := finalNodeTopo.Annotations[nrtupdater.AnnotationRTEUpdate]
+				if !ok {
+					framework.Logf("resource %s missing annotation!", topologyUpdaterNode.Name)
+					return false
+				}
+				return reason == nrtupdater.RTEUpdateReactive
+			}, 5*time.Second, 1*time.Second).Should(gomega.BeTrue(), "didn't get updated node topology info")
+			ginkgo.By("checking the topology was updated for the right reason")
+
+			<-doneChan
+
+			gomega.Expect(finalNodeTopo.Annotations).ToNot(gomega.BeNil(), "missing annotations entirely")
+			reason := finalNodeTopo.Annotations[nrtupdater.AnnotationRTEUpdate]
+			gomega.Expect(reason).To(gomega.Equal(nrtupdater.RTEUpdateReactive), "update reason error: expected %q got %q", nrtupdater.RTEUpdateReactive, reason)
+		})
+
 	})
 })
+
+func execCommandInContainer(f *framework.Framework, namespace, podName, containerName string, cmd ...string) string {
+	stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+		Command:            cmd,
+		Namespace:          namespace,
+		PodName:            podName,
+		ContainerName:      containerName,
+		Stdin:              nil,
+		CaptureStdout:      true,
+		CaptureStderr:      true,
+		PreserveWhitespace: false,
+	})
+	framework.Logf("Exec stderr: %q", stderr)
+	framework.ExpectNoError(err, "failed to execute command in namespace %v pod %v, container %v: %v", namespace, podName, containerName, err)
+	return stdout
+}

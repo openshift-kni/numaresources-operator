@@ -17,9 +17,13 @@ limitations under the License.
 package pods
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"sync"
 	"time"
+
+	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/onsi/ginkgo"
 
@@ -32,7 +36,8 @@ import (
 )
 
 const (
-	CentosImage = "quay.io/centos/centos:8"
+	CentosImage  = "quay.io/centos/centos:8"
+	RTELabelName = "resource-topology"
 )
 
 func MakeGuaranteedSleeperPod(cpuLimit string) *v1.Pod {
@@ -119,4 +124,35 @@ func Cooldown(f *framework.Framework) {
 
 	// wait a little more than a full poll interval to make sure the resourcemonitor catches up
 	time.Sleep(sleepTime + 500*time.Millisecond)
+}
+
+func GetPodsByLabel(f *framework.Framework, ns, label string) ([]v1.Pod, error) {
+	sel, err := labels.Parse(label)
+	if err != nil {
+		return nil, err
+	}
+
+	pods, err := f.ClientSet.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: sel.String()})
+	if err != nil {
+		return nil, err
+	}
+	return pods.Items, nil
+}
+
+func GetPodOnNode(f *framework.Framework, nodeName, namespace, labelName string) (*v1.Pod, error) {
+	framework.Logf("searching for RTE pod in namespace %q with label %q", namespace, labelName)
+	pods, err := GetPodsByLabel(f, namespace, fmt.Sprintf("name=%s", labelName))
+	if err != nil {
+		return nil, err
+	}
+	if len(pods) == 0 {
+		return nil, fmt.Errorf("found no node in %q matching label %q", namespace, labelName)
+	}
+	for idx := 0; idx < len(pods); idx++ {
+		framework.Logf("checking pod %s/%s - is it running on %q?", pods[idx].Namespace, pods[idx].Name, nodeName)
+		if pods[idx].Spec.NodeName == nodeName {
+			return &pods[idx], nil
+		}
+	}
+	return nil, fmt.Errorf("no pod found running on %q", nodeName)
 }

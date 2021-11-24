@@ -5,11 +5,14 @@ import (
 	"fmt"
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
-	v1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8shelpers"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podreadiness"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/prometheus"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/utils"
 )
@@ -28,7 +31,6 @@ type Args struct {
 	NoPublish bool
 	Oneshot   bool
 	Hostname  string
-	Namespace string
 }
 
 type NRTUpdater struct {
@@ -63,12 +65,12 @@ func (te *NRTUpdater) Update(info MonitorInfo) error {
 		return nil
 	}
 
-	cli, err := GetTopologyClient("")
+	cli, err := k8shelpers.GetTopologyClient("")
 	if err != nil {
 		return err
 	}
 
-	nrt, err := cli.TopologyV1alpha1().NodeResourceTopologies(te.args.Namespace).Get(context.TODO(), te.args.Hostname, metav1.GetOptions{})
+	nrt, err := cli.TopologyV1alpha1().NodeResourceTopologies().Get(context.TODO(), te.args.Hostname, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		nrtNew := v1alpha1.NodeResourceTopology{
 			ObjectMeta: metav1.ObjectMeta{
@@ -81,7 +83,7 @@ func (te *NRTUpdater) Update(info MonitorInfo) error {
 			TopologyPolicies: []string{te.tmPolicy},
 		}
 
-		nrtCreated, err := cli.TopologyV1alpha1().NodeResourceTopologies(te.args.Namespace).Create(context.TODO(), &nrtNew, metav1.CreateOptions{})
+		nrtCreated, err := cli.TopologyV1alpha1().NodeResourceTopologies().Create(context.TODO(), &nrtNew, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("update failed to create v1alpha1.NodeResourceTopology!:%v", err)
 		}
@@ -100,23 +102,26 @@ func (te *NRTUpdater) Update(info MonitorInfo) error {
 	nrtMutated.Annotations[AnnotationRTEUpdate] = info.UpdateReason()
 	nrtMutated.Zones = info.Zones
 
-	nrtUpdated, err := cli.TopologyV1alpha1().NodeResourceTopologies(te.args.Namespace).Update(context.TODO(), nrtMutated, metav1.UpdateOptions{})
+	nrtUpdated, err := cli.TopologyV1alpha1().NodeResourceTopologies().Update(context.TODO(), nrtMutated, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("update failed to update v1alpha1.NodeResourceTopology!:%v", err)
 	}
-	klog.V(3).Infof("update changed CRD instance: %v", nrtUpdated)
+	klog.V(5).Infof("update changed CRD instance: %v", utils.Dump(nrtUpdated))
 	return nil
 }
 
-func (te *NRTUpdater) Run(infoChannel <-chan MonitorInfo) chan<- struct{} {
+func (te *NRTUpdater) Run(infoChannel <-chan MonitorInfo, condChan chan v1.PodCondition) chan<- struct{} {
 	done := make(chan struct{})
+	var condStatus v1.ConditionStatus
 	go func() {
 		for {
 			select {
 			case info := <-infoChannel:
 				tsBegin := time.Now()
+				condStatus = v1.ConditionTrue
 				if err := te.Update(info); err != nil {
 					klog.Warning("failed to update: %v", err)
+					condStatus = v1.ConditionFalse
 				}
 				tsEnd := time.Now()
 
@@ -125,6 +130,7 @@ func (te *NRTUpdater) Run(infoChannel <-chan MonitorInfo) chan<- struct{} {
 				if te.args.Oneshot {
 					break
 				}
+				podreadiness.SetCondition(condChan, podreadiness.NodeTopologyUpdated, condStatus)
 			case <-done:
 				klog.Infof("update stop at %v", time.Now())
 				break
