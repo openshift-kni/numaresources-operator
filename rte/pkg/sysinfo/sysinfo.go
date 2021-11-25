@@ -17,11 +17,11 @@ package sysinfo
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"strings"
 
 	"github.com/jaypipes/ghw/pkg/pci"
 
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
 
@@ -84,13 +84,13 @@ func GetCPUResources(resCPUs string, getCPUs func() (cpuset.CPUSet, error)) (cpu
 	if err != nil {
 		return cpuset.CPUSet{}, err
 	}
-	log.Printf("cpus: reserved %q", reservedCPUs.String())
+	klog.Infof("cpus: reserved %q", reservedCPUs.String())
 
 	cpus, err := getCPUs()
 	if err != nil {
 		return cpuset.CPUSet{}, err
 	}
-	log.Printf("cpus: online %q", cpus.String())
+	klog.Infof("cpus: online %q", cpus.String())
 
 	return cpus.Difference(reservedCPUs), nil
 }
@@ -127,11 +127,11 @@ func GetPCIResources(resourceMap map[string]string, getPCIs func() ([]*pci.Devic
 func ResourceNameForDevice(dev *pci.Device, resourceMap map[string]string) (string, bool) {
 	devID := fmt.Sprintf("%s:%s", dev.Vendor.ID, dev.Product.ID)
 	if resourceName, ok := resourceMap[devID]; ok {
-		log.Printf("devs: resource for %s is %q", devID, resourceName)
+		klog.Infof("devs: resource for %s is %q", devID, resourceName)
 		return resourceName, true
 	}
 	if resourceName, ok := resourceMap[dev.Vendor.ID]; ok {
-		log.Printf("devs: resource for %s is %q", dev.Vendor.ID, resourceName)
+		klog.Infof("devs: resource for %s is %q", dev.Vendor.ID, resourceName)
 		return resourceName, true
 	}
 	return "", false

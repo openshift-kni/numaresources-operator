@@ -18,13 +18,13 @@ package basic_install
 
 import (
 	"context"
-	"log"
 	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
@@ -59,17 +59,17 @@ var _ = ginkgo.Describe("[BasicInstall] Installation", func() {
 				}
 				err := e2eclient.Client.Get(context.TODO(), key, updatedNROObj)
 				if err != nil {
-					log.Printf("failed to get the RTE resource: %v", err)
+					klog.Warningf("failed to get the RTE resource: %v", err)
 					return false
 				}
 
 				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
 				if cond == nil {
-					log.Printf("missing conditions in %v", updatedNROObj)
+					klog.Warningf("missing conditions in %v", updatedNROObj)
 					return false
 				}
 
-				log.Printf("condition: %v", cond)
+				klog.Infof("condition: %v", cond)
 
 				return cond.Status == metav1.ConditionTrue
 			}, 5*time.Minute, 10*time.Second).Should(gomega.BeTrue(), "RTE condition did not become available")
