@@ -14,31 +14,12 @@ data:
       plugins:
         filter:
           enabled:
-          - name: NodeResourceTopologyMatch
-        queueSort:
+            - name: NodeResourceTopologyMatch
+        score:
           enabled:
-          - name: Coscheduling
-          disabled:
-          - name: "*"
-        preFilter:
-          enabled:
-          - name: Coscheduling
-        permit:
-          enabled:
-          - name: Coscheduling
-        reserve:
-          enabled:
-          - name: Coscheduling
-        postBind:
-          enabled:
-          - name: Coscheduling
+            - name: NodeResourceTopologyMatch
+      # optional plugin configs
       pluginConfig:
-      - name: Coscheduling
-        args:
-          permitWaitingTimeSeconds: 10
-          deniedPGExpirationTimeSeconds: 3
       - name: NodeResourceTopologyMatch
         args:
           kubeconfigpath: "" # needs to be empty string
-          namespaces:
-          - openshift-topology-aware-scheduler

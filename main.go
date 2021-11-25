@@ -125,7 +125,14 @@ func main() {
 	}
 	setupLog.Info("API manifests loaded")
 
-	rteManifests, err := rtemanifests.GetManifests(clusterPlatform)
+	// TODO: we should align image fetch and namespace ENV variables names
+	// get the namespace where the operator should install components
+	namespace, ok := os.LookupEnv("NAMESPACE")
+	if !ok {
+		namespace = defaultNamespace
+	}
+
+	rteManifests, err := rtemanifests.GetManifests(clusterPlatform, namespace)
 	if err != nil {
 		setupLog.Error(err, "unable to load the RTE manifests")
 		os.Exit(1)
@@ -145,13 +152,6 @@ func main() {
 			os.Exit(1)
 		}
 		os.Exit(0)
-	}
-
-	// TODO: we should align image fetch and namespace ENV variables names
-	// get the namespace where the operator should install components
-	namespace, ok := os.LookupEnv("NAMESPACE")
-	if !ok {
-		namespace = defaultNamespace
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{

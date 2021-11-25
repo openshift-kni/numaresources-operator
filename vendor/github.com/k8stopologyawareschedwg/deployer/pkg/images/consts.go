@@ -17,13 +17,13 @@
 package images
 
 const (
-	SchedulerPluginSchedulerDefaultImageTag  = "quay.io/k8stopologyawareschedwg/scheduler-plugins-kube-scheduler:v0.0.2021111701"
-	SchedulerPluginControllerDefaultImageTag = "quay.io/k8stopologyawareschedwg/scheduler-plugins-controller:v0.0.2021111701"
-	ResourceTopologyExporterDefaultImageTag  = "quay.io/k8stopologyawareschedwg/resource-topology-exporter:v0.2.3"
+	SchedulerPluginSchedulerDefaultImageTag  = "quay.io/k8stopologyawareschedwg/scheduler-plugins-kube-scheduler:v0.0.2021112403"
+	SchedulerPluginControllerDefaultImageTag = "quay.io/k8stopologyawareschedwg/scheduler-plugins-controller:v0.0.2021112403"
+	ResourceTopologyExporterDefaultImageTag  = "quay.io/k8stopologyawareschedwg/resource-topology-exporter:v0.3.1"
 )
 
 const (
-	SchedulerPluginSchedulerDefaultImageSHA  = "quay.io/k8stopologyawareschedwg/scheduler-plugins-kube-scheduler@sha256:647562ace80a790d87af2e4a2723dee056acc750cfd96189d007b619e46a7b0f"
-	SchedulerPluginControllerDefaultImageSHA = "quay.io/k8stopologyawareschedwg/scheduler-plugins-controller@sha256:a0db49bb6af80911c870dc631303f3d5675b60336428ef39d032ae1341fa24b3"
-	ResourceTopologyExporterDefaultImageSHA  = "quay.io/k8stopologyawareschedwg/resource-topology-exporter@sha256:7d26e37c6456f4ba0689f5d1382b62637b072eb071b87777f115862d302af2b4"
+	SchedulerPluginSchedulerDefaultImageSHA  = "quay.io/k8stopologyawareschedwg/scheduler-plugins-kube-scheduler@sha256:c885039e4cceb19ba3acbc12a7a56846cd0a0c8a69bbe185abcd6124df51b056"
+	SchedulerPluginControllerDefaultImageSHA = "quay.io/k8stopologyawareschedwg/scheduler-plugins-controller@sha256:4d0111cafb1320e260f5ebe7531c742e4b3617fbdb9d30510321237615cf3e1c"
+	ResourceTopologyExporterDefaultImageSHA  = "quay.io/k8stopologyawareschedwg/resource-topology-exporter@sha256:93c4a41ce90dc7c4e286f8d1ba262405f20582f970992e7daee702ece1b6f3ad"
 )

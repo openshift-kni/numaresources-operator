@@ -10,8 +10,9 @@
 	(typeattributeset sandbox_net_domain (process))
 
 	;
-	; Allow to RTE pod read access to /var/lib/kubelet directory
-	(allow process var_lib_t (dir (read)))
+	; Allow to RTE pod access to /run/rte directory
+	(allow process container_var_run_t (dir (add_name write)))
+	(allow process container_var_run_t (file (create read write open)))
 
 	;
 	; Allow to RTE pod connect, read and write permissions to /var/lib/kubelet/pod-resource/kubelet.sock

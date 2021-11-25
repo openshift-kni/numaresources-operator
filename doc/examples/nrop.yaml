@@ -6,4 +6,4 @@ spec:
   nodeGroups:
   - machineConfigPoolSelector:
       matchLabels:
-        test: test
+        pools.operator.machineconfiguration.openshift.io/worker: ""

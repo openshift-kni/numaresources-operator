@@ -4,6 +4,9 @@ metadata:
   name: rte
   namespace: default
 rules:
-- apiGroups: ["topology.node.k8s.io"]
-  resources: ["noderesourcetopologies"]
-  verbs: ["create", "update", "get", "list"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["pods/status"]
+  verbs: ["update"]
