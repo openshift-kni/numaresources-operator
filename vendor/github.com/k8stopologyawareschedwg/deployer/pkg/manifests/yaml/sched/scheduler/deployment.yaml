@@ -17,12 +17,9 @@ spec:
     spec:
       serviceAccountName: topology-aware-scheduler
       containers:
-      - command:
+      - args:
         - /bin/kube-scheduler
-        - --address=0.0.0.0
-        - --leader-elect=false
         - --config=/etc/kubernetes/scheduler-config.yaml
-        - --scheduler-name=topology-aware-scheduler
         image: k8s.gcr.io/scheduler-plugins/kube-scheduler:v0.19.9
         livenessProbe:
           httpGet:
@@ -36,7 +33,11 @@ spec:
             port: 10251
         resources:
           requests:
-            cpu: '500m'
+            cpu: '200m'
+            memory: '500Mi'
+          limits:
+            cpu: '200m'
+            memory: '500Mi'
         volumeMounts:
         - name: scheduler-config
           mountPath: /etc/kubernetes

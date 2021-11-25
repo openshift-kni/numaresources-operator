@@ -5,8 +5,8 @@ go 1.17
 require (
 	github.com/jaypipes/ghw v0.8.1-0.20210609141030-acb1a36eaf89
 	github.com/jaypipes/pcidb v0.6.0
-	github.com/k8stopologyawareschedwg/deployer v0.0.12
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.3.1
+	github.com/k8stopologyawareschedwg/deployer v0.1.1-0.20211125100117-0db4e7348151
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.3.2-0.20211125091854-91f2c3309819
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.14.0
 	github.com/openshift/api v0.0.0-20210924154557-a4f696157341
@@ -47,7 +47,6 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
-	github.com/drone/envsubst v1.0.3 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
 	github.com/evanphx/json-patch v4.11.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect

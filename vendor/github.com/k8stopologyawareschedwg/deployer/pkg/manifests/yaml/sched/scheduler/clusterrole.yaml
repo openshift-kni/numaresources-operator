@@ -33,7 +33,7 @@ rules:
   resources: ["pods/status"]
   verbs: ["patch", "update"]
 - apiGroups: [""]
-  resources: ["replicationcontrollers", "services"]
+  resources: ["replicationcontrollers", "services", "namespaces"]
   verbs: ["get", "list", "watch"]
 - apiGroups: ["apps", "extensions"]
   resources: ["replicasets"]
