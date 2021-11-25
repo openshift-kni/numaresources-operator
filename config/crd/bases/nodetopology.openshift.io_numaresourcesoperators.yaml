@@ -181,6 +181,55 @@ spec:
                       type: string
                   type: object
                 type: array
+              machineconfigpools:
+                items:
+                  description: MachineConfigPool defines the observed state of each
+                    MachineConfigPool selected by node groups
+                  properties:
+                    conditions:
+                      description: Conditions represents the latest available observations
+                        of MachineConfigPool current state.
+                      items:
+                        description: MachineConfigPoolCondition contains condition
+                          information for an MachineConfigPool.
+                        properties:
+                          lastTransitionTime:
+                            description: lastTransitionTime is the timestamp corresponding
+                              to the last status change of this condition.
+                            format: date-time
+                            nullable: true
+                            type: string
+                          message:
+                            description: message is a human readable description of
+                              the details of the last transition, complementing reason.
+                            type: string
+                          reason:
+                            description: reason is a brief machine readable explanation
+                              for the condition's last transition.
+                            type: string
+                          status:
+                            description: status of the condition, one of ('True',
+                              'False', 'Unknown').
+                            type: string
+                          type:
+                            description: type of the condition, currently ('Done',
+                              'Updating', 'Failed').
+                            type: string
+                        required:
+                        - lastTransitionTime
+                        - message
+                        - reason
+                        - status
+                        - type
+                        type: object
+                      type: array
+                    name:
+                      description: Name the name of the machine config pool
+                      type: string
+                  required:
+                  - name
+                  type: object
+                type: array
             type: object
         type: object
     served: true
