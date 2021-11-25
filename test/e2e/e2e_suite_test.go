@@ -19,13 +19,13 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"log"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/klog/v2"
 
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/e2e/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/utils/objects"
@@ -62,10 +62,10 @@ var _ = AfterSuite(func() {
 	mcpObj := objects.TestMCP()
 
 	if err := e2eclient.Client.Delete(context.TODO(), mcpObj); err != nil && !errors.IsNotFound(err) {
-		log.Printf("failed to delete the machine config pool %q", mcpObj.Name)
+		klog.Warningf("failed to delete the machine config pool %q", mcpObj.Name)
 	}
 
 	if err := e2eclient.Client.Delete(context.TODO(), nroObj); err != nil && !errors.IsNotFound(err) {
-		log.Printf("failed to delete the numaresourcesoperators %q", nroObj.Name)
+		klog.Warningf("failed to delete the numaresourcesoperators %q", nroObj.Name)
 	}
 })

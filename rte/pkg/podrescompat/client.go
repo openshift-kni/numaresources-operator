@@ -16,10 +16,10 @@ package podrescompat
 
 import (
 	"context"
-	"log"
 
 	"google.golang.org/grpc"
 
+	"k8s.io/klog/v2"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/sysinfo"
@@ -44,10 +44,10 @@ func (sc *sysinfoClient) List(ctx context.Context, in *podresourcesapi.ListPodRe
 func (sc *sysinfoClient) GetAllocatableResources(ctx context.Context, in *podresourcesapi.AllocatableResourcesRequest, opts ...grpc.CallOption) (*podresourcesapi.AllocatableResourcesResponse, error) {
 	resp, err := sc.cli.GetAllocatableResources(ctx, in, opts...)
 	if err != nil {
-		log.Printf("podresourcesapi GetAllocatableResources() failed with %v - using sysinfo", err)
+		klog.Warningf("podresourcesapi GetAllocatableResources() failed with %v - using sysinfo", err)
 		sysResp, sysErr := sc.makeAllocatableResourcesResponse()
 		if sysErr != nil {
-			log.Printf("sysinfo makeAllocatableResourcesResponse failed with %v", sysErr)
+			klog.Warningf("sysinfo makeAllocatableResourcesResponse failed with %v", sysErr)
 			return resp, err
 		}
 		return sysResp, nil

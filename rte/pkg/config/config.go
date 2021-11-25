@@ -17,9 +17,9 @@ package config
 import (
 	"errors"
 	"io/ioutil"
-	"log"
 	"os"
 
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/sysinfo"
@@ -39,7 +39,7 @@ func ReadConfig(configPath string) (Config, error) {
 	if err != nil {
 		// config is optional
 		if errors.Is(err, os.ErrNotExist) {
-			log.Printf("Info: couldn't find configuration in %q", configPath)
+			klog.Warningf("Info: couldn't find configuration in %q", configPath)
 			return conf, nil
 		}
 		return conf, err
