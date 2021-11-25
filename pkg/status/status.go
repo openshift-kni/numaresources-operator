@@ -38,6 +38,10 @@ const (
 	ConditionUpgradeable = "Upgradeable"
 )
 
+const (
+	ConditionTypeIncorrectNUMAResourcesOperatorResourceName = "IncorrectNUMAResourcesOperatorResourceName"
+)
+
 func Update(ctx context.Context, client k8sclient.Client, rte *nropv1alpha1.NUMAResourcesOperator, condition string, reason string, message string) error {
 	conditions := getConditions(condition, reason, message)
 	if equality.Semantic.DeepEqual(conditions, rte.Status.Conditions) {
