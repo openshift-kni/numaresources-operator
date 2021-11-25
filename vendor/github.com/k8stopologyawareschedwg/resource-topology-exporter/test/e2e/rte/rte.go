@@ -22,7 +22,6 @@ package rte
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -30,7 +29,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
@@ -40,12 +38,15 @@ import (
 	e2enodes "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes"
 	e2enodetopology "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodetopology"
 	e2epods "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods"
+	e2ertepod "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods/rtepod"
 	e2etestconsts "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testconsts"
+	e2etestenv "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testenv"
 )
 
 var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func() {
 	var (
 		initialized         bool
+		timeout             time.Duration
 		topologyClient      *topologyclientset.Clientset
 		topologyUpdaterNode *v1.Node
 		workerNodes         []v1.Node
@@ -57,6 +58,13 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 		var err error
 
 		if !initialized {
+			timeout, err = time.ParseDuration(e2etestenv.GetPollInterval())
+			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			// wait interval exactly multiple of the poll interval makes the test racier and less robust, so
+			// add a little skew. We pick 1 second randomly, but the idea is that small (2, 3, 5) multipliers
+			// should again not cause a total multiple of the poll interval.
+			timeout += 1 * time.Second
+
 			topologyClient, err = topologyclientset.NewForConfig(f.ClientConfig())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
@@ -151,10 +159,16 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 				defer ginkgo.GinkgoRecover()
 
 				<-stopChan
-				// TOOD: pick values from the DS
-				rtePod, err := getRTEPod(f, "default", "resource-topology")
+				rtePod, err := e2epods.GetPodOnNode(f, topologyUpdaterNode.Name, e2etestenv.GetNamespaceName(), e2etestenv.RTELabelName)
 				framework.ExpectNoError(err)
-				execCommandInContainer(f, rtePod.Namespace, rtePod.Name, rtePod.Spec.Containers[0].Name, "/bin/touch", "/host-run/rte/notify")
+
+				rteContainerName, err := e2ertepod.FindRTEContainerName(rtePod)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				rteNotifyFilePath, err := e2ertepod.FindNotificationFilePath(rtePod)
+
+				execCommandInContainer(f, rtePod.Namespace, rtePod.Name, rteContainerName, "/bin/touch", rteNotifyFilePath)
 				doneChan <- struct{}{}
 			}()
 
@@ -194,18 +208,6 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 
 	})
 })
-
-func getRTEPod(f *framework.Framework, namespace, labelName string) (*v1.Pod, error) {
-	labSel := labels.SelectorFromSet(labels.Set{"name": labelName}).String()
-	pods, err := f.ClientSet.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labSel})
-	if err != nil {
-		return nil, err
-	}
-	if len(pods.Items) != 1 {
-		return nil, fmt.Errorf("found %d pods, expected 1", len(pods.Items))
-	}
-	return &pods.Items[0], nil
-}
 
 func execCommandInContainer(f *framework.Framework, namespace, podName, containerName string, cmd ...string) string {
 	stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{

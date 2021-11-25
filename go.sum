@@ -761,6 +761,8 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12 h1:NhXbOjO1s
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12/go.mod h1:AkACMQGiTgCt0lQw3m7TTU8PLH9lYKNK5e9DqFf5VuM=
 github.com/k8stopologyawareschedwg/resource-topology-exporter v0.3.1 h1:iZjxH6yaLImVcckRRu07EGvg7YPyWejhItXiMpBAAM8=
 github.com/k8stopologyawareschedwg/resource-topology-exporter v0.3.1/go.mod h1:BRdSUPFy6iHrSkBJ5GcJRSjiMcQazXeIdmnva6dKj6A=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.3.2-0.20211125091854-91f2c3309819 h1:W/hj5uZvy2eOhbdcl4gspYxeqXbhQyzy2oiw3m4GLUM=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.3.2-0.20211125091854-91f2c3309819/go.mod h1:BRdSUPFy6iHrSkBJ5GcJRSjiMcQazXeIdmnva6dKj6A=
 github.com/karrick/godirwalk v1.7.5/go.mod h1:2c9FRhkDxdIbgkOnCEvnSWs71Bhugbl46shStcFDJ34=
 github.com/karrick/godirwalk v1.16.1/go.mod h1:j4mkqPuvaLI8mp1DroR3P6ad7cyYd4c1qeJ3RV7ULlk=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
