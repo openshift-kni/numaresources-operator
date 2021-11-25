@@ -94,9 +94,8 @@ func main() {
 	}
 
 	err = resourcetopologyexporter.Execute(cli, parsedArgs.NRTupdater, parsedArgs.Resourcemonitor, parsedArgs.RTE)
-	if err != nil {
-		klog.Fatalf("failed to execute: %v", err)
-	}
+	// must never execute; if it does, we want to know
+	klog.Fatalf("failed to execute: %v", err)
 }
 
 // The args is passed only for testing purposes.
@@ -208,11 +207,7 @@ func defaultTopologyManagerScope() string {
 }
 
 func setKubeletStateDirs(value string) ([]string, error) {
-	ksd := make([]string, 0)
-	for _, s := range strings.Split(value, " ") {
-		ksd = append(ksd, s)
-	}
-	return ksd, nil
+	return append([]string{}, strings.Split(value, " ")...), nil
 }
 
 func setContainerIdent(value string) (*podrescli.ContainerIdent, error) {

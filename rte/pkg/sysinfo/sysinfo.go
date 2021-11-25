@@ -65,6 +65,9 @@ func NewSysinfo(conf Config) (SysInfo, error) {
 	var sysinfo SysInfo
 
 	sysinfo.CPUs, err = GetCPUResources(conf.ReservedCPUs, GetOnlineCPUs)
+	if err != nil {
+		return sysinfo, err
+	}
 	if sysinfo.CPUs.Size() == 0 {
 		return sysinfo, fmt.Errorf("no allocatable cpus")
 	}
