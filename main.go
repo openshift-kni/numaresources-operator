@@ -54,8 +54,7 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme = runtime.NewScheme()
 
 	defaultImage     = images.ResourceTopologyExporterDefaultImageSHA
 	defaultNamespace = "numaresources-operator"
@@ -101,17 +100,16 @@ func main() {
 	userPlatform, _ := platform.FromString(platformName)
 	plat, err := detectPlatform(userPlatform)
 	if err != nil {
-		setupLog.Error(err, "unable to detect")
+		klog.ErrorS(err, "unable to detect the cluster platform")
 		os.Exit(1)
 	}
 
 	clusterPlatform := plat.Discovered
 	if clusterPlatform == platform.Unknown {
-		err := fmt.Errorf("cannot autodetect the platform, and no platform given")
-		setupLog.Error(err, "unable to setup")
+		klog.ErrorS(fmt.Errorf("unknown platform"), "cannot autodetect the platform, and no platform given")
 		os.Exit(1)
 	}
-	setupLog.Info("detected cluster", "platform", clusterPlatform)
+	klog.InfoS("detected cluster", "platform", clusterPlatform)
 
 	if detectPlatformOnly {
 		fmt.Printf("platform=%s\n", clusterPlatform)
@@ -120,10 +118,10 @@ func main() {
 
 	apiManifests, err := apimanifests.GetManifests(clusterPlatform)
 	if err != nil {
-		setupLog.Error(err, "unable to load the API manifests")
+		klog.ErrorS(err, "unable to load the API manifests")
 		os.Exit(1)
 	}
-	setupLog.Info("API manifests loaded")
+	klog.InfoS("manifests loaded", "component", "API")
 
 	// TODO: we should align image fetch and namespace ENV variables names
 	// get the namespace where the operator should install components
@@ -134,10 +132,10 @@ func main() {
 
 	rteManifests, err := rtemanifests.GetManifests(clusterPlatform, namespace)
 	if err != nil {
-		setupLog.Error(err, "unable to load the RTE manifests")
+		klog.ErrorS(err, "unable to load the RTE manifests")
 		os.Exit(1)
 	}
-	setupLog.Info("RTE manifests loaded")
+	klog.InfoS("manifests loaded", "component", "RTE")
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
@@ -148,7 +146,7 @@ func main() {
 				renderNamespace,
 				renderImage,
 			).ToObjects()); err != nil {
-			setupLog.Error(err, "unable to render manifests")
+			klog.ErrorS(err, "unable to render manifests")
 			os.Exit(1)
 		}
 		os.Exit(0)
@@ -165,16 +163,16 @@ func main() {
 		LeaderElectionID:        "0e2a6bd3.openshift-kni.io",
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		klog.ErrorS(err, "unable to start manager")
 		os.Exit(1)
 	}
 
 	imageSpec, err := images.GetCurrentImage(mgr.GetClient(), context.Background())
 	if err != nil {
 		// intentionally continue
-		setupLog.Info("unable to find current image, using hardcoded", "error", err)
+		klog.ErrorS(err, "unable to find current image, using hardcoded")
 	}
-	setupLog.Info("using RTE image", "spec", imageSpec)
+	klog.InfoS("using RTE image", "spec", imageSpec)
 
 	if err = (&controllers.NUMAResourcesOperatorReconciler{
 		Client:       mgr.GetClient(),
@@ -186,23 +184,23 @@ func main() {
 		ImageSpec:    imageSpec,
 		Namespace:    namespace,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NUMAResourcesOperator")
+		klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesOperator")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up health check")
+		klog.ErrorS(err, "unable to set up health check")
 		os.Exit(1)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
-		setupLog.Error(err, "unable to set up ready check")
+		klog.ErrorS(err, "unable to set up ready check")
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager")
+	klog.InfoS("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		klog.ErrorS(err, "problem running manager")
 		os.Exit(1)
 	}
 }
@@ -251,7 +249,7 @@ func renderObjects(objs []client.Object) error {
 
 // renderManifests renders the reconciler manifests so they can be deployed on the cluster.
 func renderManifests(rteManifests rtemanifests.Manifests, namespace string, imageSpec string) rtemanifests.Manifests {
-	klog.Info("Updating manifests")
+	klog.InfoS("Updating manifests")
 	mf := rteManifests.Update(rtemanifests.UpdateOptions{
 		Namespace: namespace,
 	})
