@@ -15,7 +15,6 @@ limitations under the License.
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -46,10 +45,6 @@ type ProgArgs struct {
 	RTE             resourcetopologyexporter.Args
 	Version         bool
 	LocalArgs       localArgs
-}
-
-func (pa *ProgArgs) ToJson() ([]byte, error) {
-	return json.Marshal(pa)
 }
 
 func main() {
@@ -108,6 +103,9 @@ func parseArgs(args ...string) (ProgArgs, error) {
 		localArgs{},
 	}
 
+	var sysReservedCPUs string
+	var sysResourceMapping string
+
 	var configPath string
 	flags := flag.NewFlagSet(version.ProgramName, flag.ExitOnError)
 
@@ -134,6 +132,9 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	refCnt := flags.String("reference-container", "", "Reference container, used to learn about the shared cpu pool\n See: https://github.com/kubernetes/kubernetes/issues/102190\n format of spec is namespace/podname/containername.\n Alternatively, you can use the env vars REFERENCE_NAMESPACE, REFERENCE_POD_NAME, REFERENCE_CONTAINER_NAME.")
 
 	flags.StringVar(&pArgs.RTE.NotifyFilePath, "notify-file", "", "Notification file path.")
+
+	flags.StringVar(&sysReservedCPUs, "system-info-reserved-cpus", "", "kubelet reserved CPUs (cpuset format: 0,1 or 0,1-3 ...)")
+	flags.StringVar(&sysResourceMapping, "system-info-resource-mapping", "", "kubelet resource mapping: comma-separated 'vendor:device=resourcename'")
 
 	flags.BoolVar(&pArgs.Version, "version", false, "Output version and exit")
 
@@ -168,6 +169,16 @@ func parseArgs(args ...string) (ProgArgs, error) {
 		klog.V(2).Infof("using exclude list:\n%s", pArgs.Resourcemonitor.ExcludeList.String())
 	}
 	pArgs.LocalArgs.SysConf = conf.Resources
+
+	// override from the command line
+	if sysReservedCPUs != "" {
+		pArgs.LocalArgs.SysConf.ReservedCPUs = sysReservedCPUs
+	}
+	if rmap := sysinfo.ResourceMappingFromString(sysResourceMapping); len(rmap) > 0 {
+		pArgs.LocalArgs.SysConf.ResourceMapping = rmap
+	}
+
+	klog.Infof("using sysinfo:\n%s", pArgs.LocalArgs.SysConf.ToYAMLString())
 
 	// do not overwrite with empty an existing value (e.g. from opts)
 	if pArgs.RTE.TopologyManagerPolicy == "" {

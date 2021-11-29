@@ -17,8 +17,10 @@ package sysinfo
 import (
 	"fmt"
 	"io/ioutil"
+	"sort"
 	"strings"
 
+	"github.com/ghodss/yaml"
 	"github.com/jaypipes/ghw/pkg/pci"
 
 	"k8s.io/klog/v2"
@@ -30,13 +32,55 @@ const (
 )
 
 type Config struct {
-	ReservedCPUs string
+	ReservedCPUs string `json:"reservedCpus,omitempty"`
 	// vendor:device -> resourcename
-	ResourceMapping map[string]string
+	ResourceMapping map[string]string `json:"resourceMapping,omitempty"`
+}
+
+func (cfg Config) ToYAML() ([]byte, error) {
+	return yaml.Marshal(cfg)
+}
+
+func ResourceMappingFromString(s string) map[string]string {
+	// comma-separated 'vendor:device=resourcename'
+	rmap := make(map[string]string)
+	for _, keyvalue := range strings.Split(strings.TrimSpace(s), ",") {
+		if len(keyvalue) == 0 {
+			continue
+		}
+		items := strings.SplitN(keyvalue, "=", 2)
+		if len(items) != 2 {
+			klog.Infof("malformed resource mapping item %q, skipped", keyvalue)
+			continue
+		}
+		rmap[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
+	}
+	return rmap
+}
+
+func ResourceMappingToString(rmap map[string]string) string {
+	var keys []string
+	for key := range rmap {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var items []string
+	for _, key := range keys {
+		items = append(items, "%s=%s", key, rmap[key])
+	}
+	return strings.Join(items, ",")
 }
 
 func (cfg Config) IsEmpty() bool {
 	return cfg.ReservedCPUs == "" && len(cfg.ResourceMapping) == 0
+}
+
+func (cfg Config) ToYAMLString() string {
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return "<MALFORMED>"
+	}
+	return string(data)
 }
 
 // NUMA Cell -> deviceIDs
