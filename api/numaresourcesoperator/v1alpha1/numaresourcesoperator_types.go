@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -57,10 +59,20 @@ type NodeGroup struct {
 
 // NUMAResourcesOperatorStatus defines the observed state of NUMAResourcesOperator
 type NUMAResourcesOperatorStatus struct {
-	DaemonSets []NamespacedName `json:"daemonsets,omitempty"`
-
+	DaemonSets         []NamespacedName    `json:"daemonsets,omitempty"`
+	MachineConfigPools []MachineConfigPool `json:"machineconfigpools,omitempty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+// MachineConfigPool defines the observed state of each MachineConfigPool selected by node groups
+type MachineConfigPool struct {
+	// Name the name of the machine config pool
+	Name string `json:"name"`
+
+	// Conditions represents the latest available observations of MachineConfigPool current state.
+	// +optional
+	Conditions []mcov1.MachineConfigPoolCondition `json:"conditions,omitempty"`
 }
 
 //+genclient

@@ -64,6 +64,41 @@ type ExistingManifests struct {
 	clusterRoleBindingError error
 }
 
+func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []objectstate.ObjectState {
+	var ret []objectstate.ObjectState
+	for _, mcp := range mcps {
+		if mf.MachineConfig != nil {
+			mcName := GetMachineConfigName(instance.Name, mcp.Name)
+			if mcp.Spec.MachineConfigSelector == nil {
+				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
+				continue
+			}
+			desiredMachineConfig := mf.MachineConfig.DeepCopy()
+			// prefix machine config name to guarantee that we will have an option to override it
+			desiredMachineConfig.Name = mcName
+			desiredMachineConfig.Labels = mcp.Spec.MachineConfigSelector.MatchLabels
+
+			existingMachineConfig, ok := em.machineConfigs[mcName]
+			if !ok {
+				klog.Warningf("failed to find machine config %q under the namespace %q", mcName, desiredMachineConfig.Namespace)
+				continue
+			}
+
+			ret = append(ret,
+				objectstate.ObjectState{
+					Existing: existingMachineConfig.machineConfig,
+					Error:    existingMachineConfig.machineConfigError,
+					Desired:  desiredMachineConfig,
+					Compare:  compare.Object,
+					Merge:    merge.ObjectForUpdate,
+				},
+			)
+		}
+	}
+
+	return ret
+}
+
 func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []objectstate.ObjectState {
 	ret := []objectstate.ObjectState{
 		// service account
@@ -124,7 +159,7 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1al
 			continue
 		}
 
-		generatedName := fmt.Sprintf("%s-%s", instance.Name, mcp.Name)
+		generatedName := GetComponentName(instance.Name, mcp.Name)
 		desiredDaemonSet := mf.DaemonSet.DeepCopy()
 		desiredDaemonSet.Name = generatedName
 		desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
@@ -144,33 +179,6 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1al
 				Merge:    merge.ObjectForUpdate,
 			},
 		)
-
-		if mf.MachineConfig != nil {
-			if mcp.Spec.MachineConfigSelector == nil {
-				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
-				continue
-			}
-			desiredMachineConfig := mf.MachineConfig.DeepCopy()
-			// prefix machine config name to guarantee that we will have an option to override it
-			desiredMachineConfig.Name = fmt.Sprintf("51-%s", generatedName)
-			desiredMachineConfig.Labels = mcp.Spec.MachineConfigSelector.MatchLabels
-
-			existingMachineConfig, ok := em.machineConfigs[generatedName]
-			if !ok {
-				klog.Warningf("failed to find machine config %q under the namespace %q", generatedName, desiredMachineConfig.Namespace)
-				continue
-			}
-
-			ret = append(ret,
-				objectstate.ObjectState{
-					Existing: existingMachineConfig.machineConfig,
-					Error:    existingMachineConfig.machineConfigError,
-					Desired:  desiredMachineConfig,
-					Compare:  compare.Object,
-					Merge:    merge.ObjectForUpdate,
-				},
-			)
-		}
 
 		if mf.ConfigMap != nil {
 			desiredConfigMap := mf.ConfigMap.DeepCopy()
@@ -245,7 +253,7 @@ func FromClient(
 
 	// should have the amount of resources equals to the amount of node groups
 	for _, mcp := range mcps {
-		generatedName := fmt.Sprintf("%s-%s", instance.Name, mcp.Name)
+		generatedName := GetComponentName(instance.Name, mcp.Name)
 		key := client.ObjectKey{
 			Name:      generatedName,
 			Namespace: namespace,
@@ -289,17 +297,17 @@ func FromClient(
 				ret.machineConfigs = map[string]machineConfigManifest{}
 			}
 
+			mcName := GetMachineConfigName(instance.Name, mcp.Name)
 			key := client.ObjectKey{
-				Name:      fmt.Sprintf("51-%s", generatedName),
-				Namespace: namespace,
+				Name: mcName,
 			}
 			mc := &machineconfigv1.MachineConfig{}
 			if err := cli.Get(ctx, key, mc); err == nil {
-				ret.machineConfigs[generatedName] = machineConfigManifest{
+				ret.machineConfigs[mcName] = machineConfigManifest{
 					machineConfig: mc,
 				}
 			} else {
-				ret.machineConfigs[generatedName] = machineConfigManifest{
+				ret.machineConfigs[mcName] = machineConfigManifest{
 					machineConfigError: err,
 				}
 			}
@@ -321,4 +329,12 @@ func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1alpha1.Namespac
 func UpdateDaemonSetImage(ds *appsv1.DaemonSet, pullSpec string) {
 	// TODO: better match by name than assume container#0 is RTE proper (not minion)
 	ds.Spec.Template.Spec.Containers[0].Image = pullSpec
+}
+
+func GetMachineConfigName(instanceName, mcpName string) string {
+	return fmt.Sprintf("51-%s-%s", instanceName, mcpName)
+}
+
+func GetComponentName(instanceName, mcpName string) string {
+	return fmt.Sprintf("%s-%s", instanceName, mcpName)
 }
