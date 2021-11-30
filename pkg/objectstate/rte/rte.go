@@ -46,16 +46,10 @@ type machineConfigManifest struct {
 	machineConfigError error
 }
 
-type configMapManifest struct {
-	configMap      *corev1.ConfigMap
-	configMapError error
-}
-
 type ExistingManifests struct {
 	existing                rtemanifests.Manifests
 	daemonSets              map[string]daemonSetManifest
 	machineConfigs          map[string]machineConfigManifest
-	configMaps              map[string]configMapManifest
 	sccError                error
 	serviceAccountError     error
 	roleError               error
@@ -179,27 +173,6 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1al
 				Merge:    merge.ObjectForUpdate,
 			},
 		)
-
-		if mf.ConfigMap != nil {
-			desiredConfigMap := mf.ConfigMap.DeepCopy()
-			desiredConfigMap.Name = generatedName
-
-			existingConfigMap, ok := em.configMaps[generatedName]
-			if !ok {
-				klog.Warningf("failed to find config map %q under the namespace %q", generatedName, desiredConfigMap.Namespace)
-				continue
-			}
-
-			ret = append(ret,
-				objectstate.ObjectState{
-					Existing: existingConfigMap.configMap,
-					Error:    existingConfigMap.configMapError,
-					Desired:  desiredConfigMap,
-					Compare:  compare.Object,
-					Merge:    merge.ObjectForUpdate,
-				},
-			)
-		}
 	}
 
 	return ret
@@ -271,24 +244,6 @@ func FromClient(
 		} else {
 			ret.daemonSets[generatedName] = daemonSetManifest{
 				daemonSetError: err,
-			}
-		}
-
-		// TODO: unclear what should we do with config maps
-		if mf.ConfigMap != nil {
-			if ret.configMaps == nil {
-				ret.configMaps = map[string]configMapManifest{}
-			}
-
-			cm := &corev1.ConfigMap{}
-			if err := cli.Get(ctx, key, cm); err == nil {
-				ret.configMaps[generatedName] = configMapManifest{
-					configMap: cm,
-				}
-			} else {
-				ret.configMaps[generatedName] = configMapManifest{
-					configMapError: err,
-				}
 			}
 		}
 
