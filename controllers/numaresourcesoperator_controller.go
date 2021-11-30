@@ -60,6 +60,7 @@ import (
 
 const (
 	defaultNUMAResourcesOperatorCrName = "numaresourcesoperator"
+	RetryPeriod                        = 30 * time.Second
 )
 
 // NUMAResourcesOperatorReconciler reconciles a NUMAResourcesOperator object
@@ -92,7 +93,6 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
 //+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
-//+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=*
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/finalizers,verbs=update
@@ -188,8 +188,8 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 		}
 
 		if !isMachineConfigPoolsUpdated(instance, mcps) {
-			// the Machine Config Pool still did not apply the machine config, wait for one minute
-			return ctrl.Result{RequeueAfter: time.Minute}, status.ConditionProgressing, nil
+			// the Machine Config Pool still did not apply the machine config, wait longer bedore retry
+			return ctrl.Result{RequeueAfter: 2 * RetryPeriod}, status.ConditionProgressing, nil
 		}
 	}
 
@@ -317,7 +317,6 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 			Owns(&machineconfigv1.MachineConfig{}, builder.WithPredicates(p))
 	}
 	return b.Owns(&apiextensionv1.CustomResourceDefinition{}).
-		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.ServiceAccount{}).
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&rbacv1.Role{}).

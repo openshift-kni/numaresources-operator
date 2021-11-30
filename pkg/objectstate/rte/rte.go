@@ -20,15 +20,17 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	securityv1 "github.com/openshift/api/security/v1"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+	securityv1 "github.com/openshift/api/security/v1"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
@@ -158,6 +160,13 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1al
 		desiredDaemonSet.Name = generatedName
 		desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
 
+		// note the configMap mount is marked optional. This allows us to run the update
+		// irrespective of the platform we run on.
+		cnt := &desiredDaemonSet.Spec.Template.Spec.Containers[0] // shortcut
+		manifests.UpdateResourceTopologyExporterContainerConfig(
+			&desiredDaemonSet.Spec.Template.Spec, cnt, generatedName)
+		UpdateDaemonSetVolumeMounts(desiredDaemonSet)
+
 		existingDaemonSet, ok := em.daemonSets[generatedName]
 		if !ok {
 			klog.Warningf("failed to find daemon set %q under the namespace %q", generatedName, desiredDaemonSet.Namespace)
@@ -284,6 +293,17 @@ func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1alpha1.Namespac
 func UpdateDaemonSetImage(ds *appsv1.DaemonSet, pullSpec string) {
 	// TODO: better match by name than assume container#0 is RTE proper (not minion)
 	ds.Spec.Template.Spec.Containers[0].Image = pullSpec
+}
+
+func UpdateDaemonSetVolumeMounts(ds *appsv1.DaemonSet) {
+	for idx := 0; idx < len(ds.Spec.Template.Spec.Volumes); idx++ {
+		vol := &ds.Spec.Template.Spec.Volumes[idx] // shortcut
+
+		// TODO: use smarter match
+		if vol.ConfigMap != nil {
+			vol.ConfigMap.Optional = nil
+		}
+	}
 }
 
 func GetMachineConfigName(instanceName, mcpName string) string {
