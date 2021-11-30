@@ -20,15 +20,17 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	securityv1 "github.com/openshift/api/security/v1"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+	securityv1 "github.com/openshift/api/security/v1"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
@@ -93,7 +95,7 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests, inst
 	return ret
 }
 
-func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []objectstate.ObjectState {
+func (em *ExistingManifests) State(mf rtemanifests.Manifests, plat platform.Platform, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []objectstate.ObjectState {
 	ret := []objectstate.ObjectState{
 		// service account
 		{
@@ -157,6 +159,19 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, instance *nropv1al
 		desiredDaemonSet := mf.DaemonSet.DeepCopy()
 		desiredDaemonSet.Name = generatedName
 		desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
+
+		// on kubernetes we can just mount the kubeletconfig (no SCC/Selinux),
+		// so handling the kubeletconfig configmap is not needed at all.
+		// We cannot do this at GetManifests time because we need to mount
+		// a specific configmap for each daemonset, whose nome we know only
+		// when we instantiate the daemonset from the MCP.
+		if plat == platform.OpenShift {
+			// TODO: actually check for the right container, don't just use "0"
+			manifests.UpdateResourceTopologyExporterContainerConfig(
+				&desiredDaemonSet.Spec.Template.Spec,
+				&desiredDaemonSet.Spec.Template.Spec.Containers[0],
+				generatedName)
+		}
 
 		existingDaemonSet, ok := em.daemonSets[generatedName]
 		if !ok {

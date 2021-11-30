@@ -60,6 +60,7 @@ import (
 
 const (
 	defaultNUMAResourcesOperatorCrName = "numaresourcesoperator"
+	numaResourcesRetryPeriod           = 1 * time.Minute
 )
 
 // NUMAResourcesOperatorReconciler reconciles a NUMAResourcesOperator object
@@ -92,7 +93,6 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
 //+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
-//+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=*
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/finalizers,verbs=update
@@ -189,7 +189,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 
 		if !isMachineConfigPoolsUpdated(instance, mcps) {
 			// the Machine Config Pool still did not apply the machine config, wait for one minute
-			return ctrl.Result{RequeueAfter: time.Minute}, status.ConditionProgressing, nil
+			return ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, status.ConditionProgressing, nil
 		}
 	}
 
@@ -253,7 +253,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 
 	var daemonSetsNName []nropv1alpha1.NamespacedName
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, mcps, r.Namespace)
-	for _, objState := range existing.State(r.RTEManifests, instance, mcps) {
+	for _, objState := range existing.State(r.RTEManifests, r.Platform, instance, mcps) {
 		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
 			return nil, errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
@@ -317,7 +317,6 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 			Owns(&machineconfigv1.MachineConfig{}, builder.WithPredicates(p))
 	}
 	return b.Owns(&apiextensionv1.CustomResourceDefinition{}).
-		Owns(&corev1.ConfigMap{}).
 		Owns(&corev1.ServiceAccount{}).
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&rbacv1.Role{}).
