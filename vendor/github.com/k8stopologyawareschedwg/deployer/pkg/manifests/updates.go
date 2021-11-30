@@ -15,7 +15,9 @@ import (
 )
 
 const (
-	metricsPort = 2112
+	metricsPort        = 2112
+	rteConfigMountName = "rte-config"
+	RTEConfigMapName   = "rte-config"
 )
 
 func UpdateRoleBinding(rb *rbacv1.RoleBinding, serviceAccount, namespace string) *rbacv1.RoleBinding {
@@ -50,34 +52,39 @@ func UpdateSchedulerPluginControllerDeployment(dp *appsv1.Deployment, pullIfNotP
 	return dp
 }
 
-func UpdateResourceTopologyExporterDaemonSet(ds *appsv1.DaemonSet, cm *corev1.ConfigMap, pullIfNotPresent bool, nodeSelector *metav1.LabelSelector) {
+func UpdateResourceTopologyExporterContainerConfig(podSpec *corev1.PodSpec, cnt *corev1.Container, configMapName string) {
+	cnt.VolumeMounts = append(cnt.VolumeMounts,
+		corev1.VolumeMount{
+			Name:      rteConfigMountName,
+			MountPath: "/etc/resource-topology-exporter/",
+		},
+	)
+	podSpec.Volumes = append(podSpec.Volumes,
+		corev1.Volume{
+			Name: rteConfigMountName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: configMapName,
+					},
+					Optional: newBool(true),
+				},
+			},
+		},
+	)
+}
+
+func UpdateResourceTopologyExporterDaemonSet(ds *appsv1.DaemonSet, configMapName string, pullIfNotPresent bool, nodeSelector *metav1.LabelSelector) {
 	for i := range ds.Spec.Template.Spec.Containers {
 		c := &ds.Spec.Template.Spec.Containers[i]
-		if c.Name == containerNameRTE {
-			if cm != nil {
-				c.VolumeMounts = append(c.VolumeMounts,
-					corev1.VolumeMount{
-						Name:      "rte-config",
-						MountPath: "/etc/resource-topology-exporter/",
-					},
-				)
-				ds.Spec.Template.Spec.Volumes = append(ds.Spec.Template.Spec.Volumes,
-					corev1.Volume{
-						Name: "rte-config",
-						VolumeSource: corev1.VolumeSource{
-							ConfigMap: &corev1.ConfigMapVolumeSource{
-								LocalObjectReference: corev1.LocalObjectReference{
-									Name: "rte-config",
-								},
-								Optional: newBool(true),
-							},
-						},
-					},
-				)
-			}
+		if c.Name != containerNameRTE {
+			continue
 		}
-
 		c.ImagePullPolicy = pullPolicy(pullIfNotPresent)
+
+		if configMapName != "" {
+			UpdateResourceTopologyExporterContainerConfig(&ds.Spec.Template.Spec, c, configMapName)
+		}
 	}
 
 	if nodeSelector != nil {
