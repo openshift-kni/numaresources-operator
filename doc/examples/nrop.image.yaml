@@ -1,0 +1,10 @@
+apiVersion: nodetopology.openshift.io/v1alpha1
+kind: NUMAResourcesOperator
+metadata:
+  name: numaresourcesoperator
+spec:
+  imageSpec: "quay.io/openshift-kni/resource-topology-exporter:v0.3.1"
+  nodeGroups:
+  - machineConfigPoolSelector:
+      matchLabels:
+        pools.operator.machineconfiguration.openshift.io/worker: ""
