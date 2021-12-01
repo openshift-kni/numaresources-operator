@@ -296,9 +296,19 @@ func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1alpha1.Namespac
 	return res, ok
 }
 
-func UpdateDaemonSetImage(ds *appsv1.DaemonSet, pullSpec string) {
+func UpdateDaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImageSpec string, builtinPullPolicy corev1.PullPolicy) {
 	// TODO: better match by name than assume container#0 is RTE proper (not minion)
-	ds.Spec.Template.Spec.Containers[0].Image = pullSpec
+	cnt := &ds.Spec.Template.Spec.Containers[0]
+	if userImageSpec != "" {
+		// we don't really know what's out there, so we minimize the changes.
+		cnt.Image = userImageSpec
+		klog.V(3).InfoS("Exporter image", "reason", "user-provided", "pullSpec", userImageSpec)
+		return
+	}
+
+	cnt.Image = builtinImageSpec
+	cnt.ImagePullPolicy = builtinPullPolicy
+	klog.V(3).InfoS("Exporter image", "reason", "builtin", "pullSpec", builtinImageSpec, "pullPolicy", builtinPullPolicy)
 }
 
 func GetMachineConfigName(instanceName, mcpName string) string {

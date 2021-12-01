@@ -66,13 +66,14 @@ const (
 // NUMAResourcesOperatorReconciler reconciles a NUMAResourcesOperator object
 type NUMAResourcesOperatorReconciler struct {
 	client.Client
-	Scheme       *runtime.Scheme
-	Platform     platform.Platform
-	APIManifests apimanifests.Manifests
-	RTEManifests rtemanifests.Manifests
-	Helper       *deployer.Helper
-	Namespace    string
-	ImageSpec    string
+	Scheme          *runtime.Scheme
+	Platform        platform.Platform
+	APIManifests    apimanifests.Manifests
+	RTEManifests    rtemanifests.Manifests
+	Helper          *deployer.Helper
+	Namespace       string
+	ImageSpec       string
+	ImagePullPolicy corev1.PullPolicy
 }
 
 // TODO: narrow down
@@ -93,6 +94,7 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
 //+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
+//+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=*
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/finalizers,verbs=update
@@ -249,7 +251,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) ([]nropv1alpha1.NamespacedName, error) {
 	klog.Info("RTESync start")
 
-	rtestate.UpdateDaemonSetImage(r.RTEManifests.DaemonSet, r.getExporterImage(instance.Spec.ExporterImage))
+	rtestate.UpdateDaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.ImageSpec, r.ImagePullPolicy)
 
 	var daemonSetsNName []nropv1alpha1.NamespacedName
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, mcps, r.Namespace)
@@ -267,17 +269,6 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		}
 	}
 	return daemonSetsNName, nil
-}
-
-func (r *NUMAResourcesOperatorReconciler) getExporterImage(imgSpec string) string {
-	reason := "user-provided"
-	imageSpec := imgSpec
-	if imageSpec == "" {
-		reason = "builtin"
-		imageSpec = r.ImageSpec
-	}
-	klog.V(3).InfoS("Exporter image", "reason", reason, "pullSpec", imageSpec)
-	return imageSpec
 }
 
 // SetupWithManager sets up the controller with the Manager.

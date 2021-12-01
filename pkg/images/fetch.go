@@ -22,46 +22,50 @@ import (
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
 )
 
 const (
-	envVarPodNamespace = "MY_POD_NAMESPACE"
-	envVarPodName      = "MY_POD_NAME"
+	envVarPodNamespace = "NAMESPACE"
+	envVarPodName      = "PODNAME"
+	NullPolicy         = corev1.PullPolicy("")
 )
 
-func GetCurrentImage(cli client.Client, ctx context.Context) (string, error) {
+func GetCurrentImage(ctx context.Context) (string, corev1.PullPolicy, error) {
 	podNamespace, ok := os.LookupEnv(envVarPodNamespace)
 	if !ok {
 		// TODO log
-		return ResourceTopologyExporterDefaultImageSHA, fmt.Errorf("environment variable not set: %q", envVarPodNamespace)
+		return ResourceTopologyExporterDefaultImageSHA, NullPolicy, fmt.Errorf("environment variable not set: %q", envVarPodNamespace)
 	}
 	podName, ok := os.LookupEnv(envVarPodName)
 	if !ok {
 		// TODO log
-		return ResourceTopologyExporterDefaultImageSHA, fmt.Errorf("environment variable not set: %q", envVarPodName)
+		return ResourceTopologyExporterDefaultImageSHA, NullPolicy, fmt.Errorf("environment variable not set: %q", envVarPodName)
 	}
-	return GetImageFromPod(cli, ctx, podNamespace, podName, "")
+	return GetImageFromPod(ctx, podNamespace, podName, "")
 }
 
-func GetImageFromPod(cli client.Client, ctx context.Context, namespace, podName, containerName string) (string, error) {
-	key := client.ObjectKey{
-		Namespace: namespace,
-		Name:      podName,
-	}
-	pod := corev1.Pod{}
-	err := cli.Get(ctx, key, &pod)
+func GetImageFromPod(ctx context.Context, namespace, podName, containerName string) (string, corev1.PullPolicy, error) {
+	k8sCli, err := clientutil.NewK8s()
 	if err != nil {
-		return "", err
+		return "", NullPolicy, err
+	}
+	pod, err := k8sCli.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		return "", NullPolicy, err
+	}
+	if pod == nil {
+		return "", NullPolicy, fmt.Errorf("found nil pod for %s/%s", namespace, podName)
 	}
 
-	cnt, err := findContainerByName(&pod, containerName)
+	cnt, err := findContainerByName(pod, containerName)
 	if err != nil {
-		return "", err
+		return "", NullPolicy, err
 	}
 
-	return cnt.Image, nil
+	return cnt.Image, cnt.ImagePullPolicy, nil
 }
 
 func findContainerByName(pod *corev1.Pod, containerName string) (*corev1.Container, error) {

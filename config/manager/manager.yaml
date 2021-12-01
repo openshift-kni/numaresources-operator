@@ -34,6 +34,10 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
         env:
+        - name: PODNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         - name: NAMESPACE
           valueFrom:
             fieldRef:

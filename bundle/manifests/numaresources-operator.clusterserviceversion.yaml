@@ -55,6 +55,14 @@ spec:
         - apiGroups:
           - ""
           resources:
+          - pods
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
           - serviceaccounts
           verbs:
           - '*'
@@ -177,6 +185,10 @@ spec:
                 command:
                 - /bin/numaresources-operator
                 env:
+                - name: PODNAME
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.name
                 - name: NAMESPACE
                   valueFrom:
                     fieldRef:
