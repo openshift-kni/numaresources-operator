@@ -21,8 +21,63 @@ import (
 	"github.com/jaypipes/ghw/pkg/pci"
 	"github.com/jaypipes/ghw/pkg/topology"
 	"github.com/jaypipes/pcidb"
+
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
+
+func TestResourceMappingFromString(t *testing.T) {
+	var testCases = []struct {
+		data     string
+		expected map[string]string
+	}{
+		{
+			data:     "",
+			expected: nil,
+		},
+		{
+			data: "8086:1520=sriovnic",
+			expected: map[string]string{
+				"8086:1520": "sriovnic",
+			},
+		},
+		{
+			data: "8086:1520=sriovnic,,,",
+			expected: map[string]string{
+				"8086:1520": "sriovnic",
+			},
+		},
+		{
+			data: "  8086:1520 =  sriovnic   ",
+			expected: map[string]string{
+				"8086:1520": "sriovnic",
+			},
+		},
+		{
+			data: "8086:24fd=wlan,8086:1520=sriovnic",
+			expected: map[string]string{
+				"8086:1520": "sriovnic",
+				"8086:24fd": "wlan",
+			},
+		},
+		{
+			data: " , 8086:24fd=wlan, ,, 8086:1520 =sriovnic",
+			expected: map[string]string{
+				"8086:1520": "sriovnic",
+				"8086:24fd": "wlan",
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.data, func(t *testing.T) {
+			got := ResourceMappingFromString(testCase.data)
+			gotStr := ResourceMappingToString(got)
+			expStr := ResourceMappingToString(testCase.expected)
+			if gotStr != expStr {
+				t.Errorf("expected %s (%v) got %s (%v)", expStr, testCase.expected, gotStr, got)
+			}
+		})
+	}
+}
 
 func TestGetCPUResources(t *testing.T) {
 	var testCases = []struct {

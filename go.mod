@@ -3,9 +3,10 @@ module github.com/openshift-kni/numaresources-operator
 go 1.17
 
 require (
+	github.com/ghodss/yaml v1.0.0
 	github.com/jaypipes/ghw v0.8.1-0.20210609141030-acb1a36eaf89
 	github.com/jaypipes/pcidb v0.6.0
-	github.com/k8stopologyawareschedwg/deployer v0.1.1-0.20211125100117-0db4e7348151
+	github.com/k8stopologyawareschedwg/deployer v0.1.1-0.20211130112610-10523aefd5ab
 	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.3.2-0.20211125091854-91f2c3309819
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.14.0
@@ -52,7 +53,6 @@ require (
 	github.com/felixge/httpsnoop v1.0.1 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
-	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-logr/logr v0.4.0 // indirect
 	github.com/go-logr/zapr v0.4.0 // indirect
 	github.com/go-ole/go-ole v1.2.5 // indirect

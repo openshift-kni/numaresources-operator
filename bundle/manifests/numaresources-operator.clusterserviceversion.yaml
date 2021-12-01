@@ -48,6 +48,13 @@ spec:
         - apiGroups:
           - ""
           resources:
+          - events
+          verbs:
+          - create
+          - patch
+        - apiGroups:
+          - ""
+          resources:
           - serviceaccounts
           verbs:
           - '*'
@@ -69,6 +76,14 @@ spec:
           - clusterversions
           verbs:
           - list
+        - apiGroups:
+          - machineconfiguration.openshift.io
+          resources:
+          - kubeletconfigs
+          verbs:
+          - get
+          - list
+          - watch
         - apiGroups:
           - machineconfiguration.openshift.io
           resources:

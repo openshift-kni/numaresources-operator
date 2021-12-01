@@ -26,10 +26,10 @@ import (
 )
 
 type Config struct {
-	ExcludeList           map[string][]string
-	Resources             sysinfo.Config
-	TopologyManagerPolicy string
-	TopologyManagerScope  string
+	ExcludeList           map[string][]string `json:"excludeList,omitempty"`
+	Resources             sysinfo.Config      `json:"resources,omitempty"`
+	TopologyManagerPolicy string              `json:"topologyManagerPolicy,omitempty"`
+	TopologyManagerScope  string              `json:"topologyManagerScope,omitempty"`
 }
 
 func ReadConfig(configPath string) (Config, error) {
