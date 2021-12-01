@@ -42,6 +42,8 @@ IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 # Specify the URL link to the machine config pool CRD
 CRD_MACHINE_CONFIG_POOL_URL ?= "https://raw.githubusercontent.com/openshift/machine-config-operator/master/install/0000_80_machine-config-operator_01_machineconfigpool.crd.yaml"
+# Specify the URL link to the kubeletconfig CRD
+CRD_KUBELET_CONFIG_URL ?= https://raw.githubusercontent.com/openshift/machine-config-operator/master/install/0000_80_machine-config-operator_01_kubeletconfig.crd.yaml
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.21
 
@@ -151,12 +153,14 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	kubectl apply -f $(CRD_MACHINE_CONFIG_POOL_URL)
+	kubectl apply -f $(CRD_KUBELET_CONFIG_URL)
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/default | kubectl delete -f -
 	# do not remove machine config pool CRD here, because the deployment can run on top of the OpenShift environment
+	# do not remove kubeletconfig CRD here, because the deployment can run on top of the OpenShift environment
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
