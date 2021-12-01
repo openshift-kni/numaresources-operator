@@ -1,8 +1,12 @@
 package testutils
 
 import (
+	"encoding/json"
+
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	nrov1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 )
@@ -42,6 +46,26 @@ func NewMachineConfigPool(name string, labels map[string]string, machineConfigSe
 		Spec: machineconfigv1.MachineConfigPoolSpec{
 			MachineConfigSelector: machineConfigSelector,
 			NodeSelector:          nodeSelector,
+		},
+	}
+}
+
+func NewKubeletConfig(name string, labels map[string]string, machineConfigSelector *metav1.LabelSelector, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration) *machineconfigv1.KubeletConfig {
+	data, _ := json.Marshal(kubeletConfig)
+	return &machineconfigv1.KubeletConfig{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "KubeletConfig",
+			APIVersion: machineconfigv1.GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: machineconfigv1.KubeletConfigSpec{
+			MachineConfigPoolSelector: machineConfigSelector,
+			KubeletConfig: &runtime.RawExtension{
+				Raw: data,
+			},
 		},
 	}
 }
