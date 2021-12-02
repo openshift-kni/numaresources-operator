@@ -167,7 +167,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	imageSpec, err := images.GetCurrentImage(mgr.GetClient(), context.Background())
+	imageSpec, pullPolicy, err := images.GetCurrentImage(context.Background())
 	if err != nil {
 		// intentionally continue
 		klog.ErrorS(err, "unable to find current image, using hardcoded")
@@ -175,14 +175,15 @@ func main() {
 	klog.InfoS("using RTE image", "spec", imageSpec)
 
 	if err = (&controllers.NUMAResourcesOperatorReconciler{
-		Client:       mgr.GetClient(),
-		Scheme:       mgr.GetScheme(),
-		APIManifests: apiManifests,
-		RTEManifests: renderManifests(rteManifests, namespace, imageSpec),
-		Platform:     clusterPlatform,
-		Helper:       deployer.NewHelperWithClient(mgr.GetClient(), "", tlog.NewNullLogAdapter()),
-		ImageSpec:    imageSpec,
-		Namespace:    namespace,
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		APIManifests:    apiManifests,
+		RTEManifests:    renderManifests(rteManifests, namespace, imageSpec),
+		Platform:        clusterPlatform,
+		Helper:          deployer.NewHelperWithClient(mgr.GetClient(), "", tlog.NewNullLogAdapter()),
+		ImageSpec:       imageSpec,
+		ImagePullPolicy: pullPolicy,
+		Namespace:       namespace,
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesOperator")
 		os.Exit(1)
@@ -263,6 +264,6 @@ func renderManifests(rteManifests rtemanifests.Manifests, namespace string, imag
 	mf := rteManifests.Update(rtemanifests.UpdateOptions{
 		Namespace: namespace,
 	})
-	rtestate.UpdateDaemonSetImage(mf.DaemonSet, imageSpec)
+	rtestate.UpdateDaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
 	return mf
 }

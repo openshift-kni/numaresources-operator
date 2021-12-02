@@ -296,9 +296,39 @@ func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1alpha1.Namespac
 	return res, ok
 }
 
-func UpdateDaemonSetImage(ds *appsv1.DaemonSet, pullSpec string) {
+func UpdateDaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImageSpec string, builtinPullPolicy corev1.PullPolicy) {
 	// TODO: better match by name than assume container#0 is RTE proper (not minion)
-	ds.Spec.Template.Spec.Containers[0].Image = pullSpec
+	cnt := &ds.Spec.Template.Spec.Containers[0]
+	if userImageSpec != "" {
+		// we don't really know what's out there, so we minimize the changes.
+		cnt.Image = userImageSpec
+		klog.V(3).InfoS("Exporter image", "reason", "user-provided", "pullSpec", userImageSpec)
+		return
+	}
+
+	cnt.Image = builtinImageSpec
+	cnt.ImagePullPolicy = builtinPullPolicy
+	klog.V(3).InfoS("Exporter image", "reason", "builtin", "pullSpec", builtinImageSpec, "pullPolicy", builtinPullPolicy)
+	// if we run with operator-as-operand, we know we NEED this.
+	UpdateDaemonSetRunAsIDs(ds)
+}
+
+// UpdateDaemonSetRunAsIDs bump the ds container privileges to 0/0.
+// We need this in the operator-as-operand flow because the operator image itself
+// is built to run with non-root user/group, and we should keep it like this.
+// OTOH, the rte image needs to have access to the files using *both* DAC and MAC;
+// the SCC/SELinux context take cares of the MAC (when needed, e.g. on OCP), while
+// we take care of DAC here.
+func UpdateDaemonSetRunAsIDs(ds *appsv1.DaemonSet) {
+	// TODO: better match by name than assume container#0 is RTE proper (not minion)
+	cnt := &ds.Spec.Template.Spec.Containers[0]
+	if cnt.SecurityContext == nil {
+		cnt.SecurityContext = &corev1.SecurityContext{}
+	}
+	var rootID int64 = 0
+	cnt.SecurityContext.RunAsUser = &rootID
+	cnt.SecurityContext.RunAsGroup = &rootID
+	klog.InfoS("RTE container elevated privileges", "container", cnt.Name, "user", rootID, "group", rootID)
 }
 
 func GetMachineConfigName(instanceName, mcpName string) string {
