@@ -19,8 +19,8 @@ spec:
   description: NUMA resources exporter operator
   displayName: numaresources-operator
   icon:
-  - base64data: ""
-    mediatype: ""
+  - base64data: iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAYNJREFUWIXt1T9rlEEQx/HPnecJGoKJhY+NEgW5VrCxSZpr0oWUKcRgYSoLGwv1RfgWfAnWFlZWKQIRJE00V6XwTxQsdSwygWV5DEeaS/EMLDPP/Gaf/e7swz49hBlaf5aLdwAdQAfQAZwfgLa7OP4TT6tPMw/6TQaPK+EAcxhlXNs3NDngaaUvpx8XuRv4g+clAOzjBRZaFprGPuN1ldtoqXuEXWzWAEdYwvczAiylH6W/iCctdZt4hit4UAJcwDAT984IsYVPGa+26CsY4D3e4MOJ0BA7x99GjIkgesQXYo4YZawaX4nrRJNzFoi9nBvE/fTjrI8ciDvEEXGZGJSU79I/xN+Mf2Gx2s0lzOMnrmbuB+4Wu98u6ufxGxPsZG6A9boDiJtJOskOILYL+n7Gb/O5KbQ14iPxqtj1mNgqaqg6UgMgXqZ4AnArn/fzOIK41gIwzKO5XQEEsVqtMSQOj49MBHpVm+tcfYHUWu+UuO39tT4zOx//gg6gA+gAOoBZ2j82IbSJZWt9tAAAAABJRU5ErkJggg==
+    mediatype: image/png
   install:
     spec:
       deployments: null
