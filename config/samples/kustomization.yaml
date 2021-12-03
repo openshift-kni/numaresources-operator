@@ -1,4 +1,5 @@
 ## Append samples you want in your CSV to this file as resources ##
 resources:
 - nodetopology_v1alpha1_numaresourcesoperator.yaml
+- nodetopology_v1alpha1_numaresourcesscheduler.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

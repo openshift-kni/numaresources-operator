@@ -94,6 +94,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - nodetopology.openshift.io
+  resources:
+  - numaresourcesschedulers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - nodetopology.openshift.io
+  resources:
+  - numaresourcesschedulers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - nodetopology.openshift.io
+  resources:
+  - numaresourcesschedulers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - clusterrolebindings

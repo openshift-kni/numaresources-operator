@@ -13,6 +13,16 @@ metadata:
           "spec": {
             "foo": "bar"
           }
+        },
+        {
+          "apiVersion": "nodetopology.openshift.io/v1alpha1",
+          "kind": "NUMAResourcesScheduler",
+          "metadata": {
+            "name": "numaresourcesscheduler-sample"
+          },
+          "spec": {
+            "foo": "bar"
+          }
         }
       ]
     capabilities: Basic Install
@@ -29,6 +39,12 @@ spec:
       displayName: NUMAResources Operator
       kind: NUMAResourcesOperator
       name: numaresourcesoperators.nodetopology.openshift.io
+      version: v1alpha1
+    - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
+        API
+      displayName: NUMAResources Scheduler
+      kind: NUMAResourcesScheduler
+      name: numaresourcesschedulers.nodetopology.openshift.io
       version: v1alpha1
   description: NUMA resources exporter operator
   displayName: numaresources-operator
@@ -122,6 +138,32 @@ spec:
           - nodetopology.openshift.io
           resources:
           - numaresourcesoperators/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - nodetopology.openshift.io
+          resources:
+          - numaresourcesschedulers
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - nodetopology.openshift.io
+          resources:
+          - numaresourcesschedulers/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - nodetopology.openshift.io
+          resources:
+          - numaresourcesschedulers/status
           verbs:
           - get
           - patch
