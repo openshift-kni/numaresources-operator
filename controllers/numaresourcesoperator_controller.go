@@ -189,7 +189,9 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 			return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "failed to sync machine configs")
 		}
 
-		if !isMachineConfigPoolsUpdated(instance, mcps) {
+		// MCO need to update SELinux context and other stuff, and need to trigger a reboot.
+		// It can take a while.
+		if allMCPsUpdated := r.syncMachineConfigPoolsStatuses(instance, mcps); !allMCPsUpdated {
 			// the Machine Config Pool still did not apply the machine config, wait for one minute
 			return ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, status.ConditionProgressing, nil
 		}
@@ -246,6 +248,24 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	}
 
 	return nil
+}
+
+func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) bool {
+	allMCPsUpdated := true
+	instance.Status.MachineConfigPools = []nropv1alpha1.MachineConfigPool{}
+	for _, mcp := range mcps {
+		// update MCP conditions under the NRO
+		instance.Status.MachineConfigPools = append(instance.Status.MachineConfigPools, nropv1alpha1.MachineConfigPool{
+			Name:       mcp.Name,
+			Conditions: mcp.Status.Conditions,
+		})
+
+		if !isMachineConfigPoolUpdated(instance.Name, mcp) {
+			allMCPsUpdated = false
+			break
+		}
+	}
+	return allMCPsUpdated
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) ([]nropv1alpha1.NamespacedName, error) {
@@ -418,28 +438,19 @@ func getNodeGroupsMCPs(ctx context.Context, cli client.Client, nodeGroups []nrop
 	return result, nil
 }
 
-func isMachineConfigPoolsUpdated(instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) bool {
-	instance.Status.MachineConfigPools = []nropv1alpha1.MachineConfigPool{}
-	for _, mcp := range mcps {
-		// update MCP conditions under the NRO
-		instance.Status.MachineConfigPools = append(instance.Status.MachineConfigPools, nropv1alpha1.MachineConfigPool{
-			Name:       mcp.Name,
-			Conditions: mcp.Status.Conditions,
-		})
-
-		mcName := rte.GetMachineConfigName(instance.Name, mcp.Name)
-		existing := false
-		for _, s := range mcp.Status.Configuration.Source {
-			if s.Name == mcName {
-				existing = true
-				break
-			}
+func isMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
+	mcName := rte.GetMachineConfigName(instanceName, mcp.Name)
+	existing := false
+	for _, s := range mcp.Status.Configuration.Source {
+		if s.Name == mcName {
+			existing = true
+			break
 		}
+	}
 
-		// the Machine Config Pool still did not apply the machine config wait for one minute
-		if !existing || machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
-			return false
-		}
+	// the Machine Config Pool still did not apply the machine config wait for one minute
+	if !existing || machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
+		return false
 	}
 
 	return true
