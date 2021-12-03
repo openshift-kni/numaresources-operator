@@ -16,6 +16,12 @@ spec:
       kind: NUMAResourcesOperator
       name: numaresourcesoperators.nodetopology.openshift.io
       version: v1alpha1
+    - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
+        API
+      displayName: NUMAResources Scheduler
+      kind: NUMAResourcesScheduler
+      name: numaresourcesschedulers.nodetopology.openshift.io
+      version: v1alpha1
   description: NUMA resources exporter operator
   displayName: numaresources-operator
   icon:

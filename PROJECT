@@ -16,4 +16,13 @@ resources:
   kind: NUMAResourcesOperator
   path: github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: openshift.io
+  group: nodetopology
+  kind: NUMAResourcesScheduler
+  path: github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1
+  version: v1alpha1
 version: "3"

@@ -81,6 +81,7 @@ func main() {
 	var renderNamespace string
 	var renderImage string
 	var showVersion bool
+	var enableScheduler bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -92,6 +93,7 @@ func main() {
 	flag.StringVar(&renderNamespace, "render-namespace", defaultNamespace, "outputs the manifests rendered using the given namespace")
 	flag.StringVar(&renderImage, "render-image", defaultImage, "outputs the manifests rendered using the given image")
 	flag.BoolVar(&showVersion, "version", false, "outputs the version and exit")
+	flag.BoolVar(&enableScheduler, "enable-scheduler", false, "enable support for the NUMAResourcesScheduler object")
 
 	opts := zap.Options{
 		Development: true,
@@ -207,6 +209,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	if enableScheduler {
+		if err = (&controllers.NUMAResourcesSchedulerReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
+			os.Exit(1)
+		}
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

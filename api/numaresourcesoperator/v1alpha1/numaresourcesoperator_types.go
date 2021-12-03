@@ -22,27 +22,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// This is borrowed from the kubernetes source, because controller-gen
-// complains about the kube native type:
-// encountered struct field "Namespace" without JSON tag in type "NamespacedName"
-// at least until kube catches up, we just inline this simple struct here.
-
-// NamespacedName comprises a resource name, with a mandatory namespace,
-// rendered as "<namespace>/<name>".
-type NamespacedName struct {
-	Namespace string `json:"namespace,omitempty"`
-	Name      string `json:"name,omitempty"`
-}
-
-const (
-	Separator = '/'
-)
-
-// String returns the general purpose string representation
-func (n NamespacedName) String() string {
-	return n.Namespace + string(Separator) + n.Name
-}
-
 // NUMAResourcesOperatorSpec defines the desired state of NUMAResourcesOperator
 type NUMAResourcesOperatorSpec struct {
 	NodeGroups []NodeGroup `json:"nodeGroups,omitempty"`
