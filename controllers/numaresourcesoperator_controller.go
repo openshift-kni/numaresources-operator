@@ -131,7 +131,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}
 
-	mcps, err := getNodeGroupsMCPs(ctx, r.Client, instance.Spec.NodeGroups)
+	mcps, err := GetNodeGroupsMCPs(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}
@@ -260,7 +260,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instanc
 			Conditions: mcp.Status.Conditions,
 		})
 
-		if !isMachineConfigPoolUpdated(instance.Name, mcp) {
+		if !IsMachineConfigPoolUpdated(instance.Name, mcp) {
 			allMCPsUpdated = false
 			break
 		}
@@ -398,47 +398,7 @@ func validateUpdateEvent(e *event.UpdateEvent) bool {
 	return true
 }
 
-func getNodeGroupsMCPs(ctx context.Context, cli client.Client, nodeGroups []nropv1alpha1.NodeGroup) ([]*machineconfigv1.MachineConfigPool, error) {
-	mcps := &machineconfigv1.MachineConfigPoolList{}
-	if err := cli.List(ctx, mcps); err != nil {
-		return nil, err
-	}
-
-	var result []*machineconfigv1.MachineConfigPool
-	for _, nodeGroup := range nodeGroups {
-		found := false
-
-		// handled by validation
-		if nodeGroup.MachineConfigPoolSelector == nil {
-			continue
-		}
-
-		for i := range mcps.Items {
-			mcp := &mcps.Items[i]
-
-			selector, err := metav1.LabelSelectorAsSelector(nodeGroup.MachineConfigPoolSelector)
-			// handled by validation
-			if err != nil {
-				klog.Errorf("bad node group machine config pool selector %q", nodeGroup.MachineConfigPoolSelector.String())
-				continue
-			}
-
-			mcpLabels := labels.Set(mcp.Labels)
-			if selector.Matches(mcpLabels) {
-				found = true
-				result = append(result, mcp)
-			}
-		}
-
-		if !found {
-			return nil, fmt.Errorf("failed to find MachineConfigPool for the node group with the selector %q", nodeGroup.MachineConfigPoolSelector.String())
-		}
-	}
-
-	return result, nil
-}
-
-func isMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
+func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
 	mcName := rte.GetMachineConfigName(instanceName, mcp.Name)
 	existing := false
 	for _, s := range mcp.Status.Configuration.Source {
