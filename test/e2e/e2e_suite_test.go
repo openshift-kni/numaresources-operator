@@ -31,6 +31,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
@@ -60,12 +61,24 @@ var _ = BeforeSuite(func() {
 	By("Creating all test resources")
 	Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
 
-	mcpObj := objects.TestMCP()
-	nroObj := objects.TestNRO()
-
-	By(fmt.Sprintf("creating the machine config pool object: %s", mcpObj.Name))
-	err := e2eclient.Client.Create(context.TODO(), mcpObj)
+	clusterPlatform, err := detect.Detect()
 	Expect(err).NotTo(HaveOccurred())
+
+	var matchLabels map[string]string
+
+	if clusterPlatform == platform.Kubernetes {
+		mcpObj := objects.TestMCP()
+		By(fmt.Sprintf("creating the machine config pool object: %s", mcpObj.Name))
+		err := e2eclient.Client.Create(context.TODO(), mcpObj)
+		Expect(err).NotTo(HaveOccurred())
+		matchLabels = map[string]string{"test": "test"}
+	}
+	if clusterPlatform == platform.OpenShift {
+		// TODO: should this be configurable?
+		matchLabels = map[string]string{"pools.operator.machineconfiguration.openshift.io/worker": ""}
+	}
+
+	nroObj := objects.TestNRO(matchLabels)
 
 	By(fmt.Sprintf("creating the NRO object: %s", nroObj.Name))
 	err = e2eclient.Client.Create(context.TODO(), nroObj)
@@ -81,11 +94,22 @@ var _ = BeforeSuite(func() {
 var _ = AfterSuite(func() {
 	By("Deleting all test resources")
 
-	nroObj := objects.TestNRO()
-	mcpObj := objects.TestMCP()
+	clusterPlatform, err := detect.Detect()
+	Expect(err).NotTo(HaveOccurred())
 
-	if err := e2eclient.Client.Delete(context.TODO(), mcpObj); err != nil && !errors.IsNotFound(err) {
-		klog.Warningf("failed to delete the machine config pool %q", mcpObj.Name)
+	if clusterPlatform == platform.Kubernetes {
+		mcpObj := objects.TestMCP()
+		if err := e2eclient.Client.Delete(context.TODO(), mcpObj); err != nil && !errors.IsNotFound(err) {
+			klog.Warningf("failed to delete the machine config pool %q", mcpObj.Name)
+		}
+	}
+
+	// since we are getting an existing object, we don't need the real labels here
+	nroObj := objects.TestNRO(map[string]string{})
+
+	var nodeGroups []nropv1alpha1.NodeGroup
+	if clusterPlatform == platform.OpenShift {
+		nodeGroups = getNodeGroupsFromNRO(nroObj.Name)
 	}
 
 	if err := e2eclient.Client.Delete(context.TODO(), nroObj); err != nil && !errors.IsNotFound(err) {

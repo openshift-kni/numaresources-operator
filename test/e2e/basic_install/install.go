@@ -43,7 +43,8 @@ var _ = ginkgo.Describe("[BasicInstall] Installation", func() {
 	ginkgo.BeforeEach(func() {
 		if !initialized {
 			gomega.Expect(e2eclient.ClientsEnabled).To(gomega.BeTrue(), "failed to create runtime-controller client")
-			nroObj = objects.TestNRO()
+			// since we are getting an existing object, we don't need the real labels here
+			nroObj = objects.TestNRO(map[string]string{})
 
 		}
 		initialized = true
