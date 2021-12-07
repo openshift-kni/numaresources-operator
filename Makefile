@@ -103,6 +103,12 @@ test-unit: envtest
 test-e2e: binary-e2e binary-rte-e2e
 	./bin/e2e.test -ginkgo.v
 
+# a specific target for running e2e tests under the KNI's CI
+# this assumes to be running on a vanilla OCP cluster
+.PHONY: test-e2e-kni
+test-e2e-kni: build-e2e
+	hack/run-e2e-kni.sh
+
 ##@ Build
 
 binary:
@@ -247,3 +253,15 @@ catalog-push: ## Push a catalog image.
 .PHONY: deps-update
 deps-update:
 	go mod tidy && go mod vendor
+
+.PHONY: label-custom-kubelet
+label-custom-kubelet:
+	hack/label-custom-kubelet.sh
+
+.PHONY: kube-update
+kube-update: label-custom-kubelet
+	hack/kube-update.sh
+
+.PHONY: wait-for-mcp
+wait-for-mcp:
+	hack/wait-for-mcp.sh
