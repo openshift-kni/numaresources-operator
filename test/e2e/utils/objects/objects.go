@@ -24,7 +24,7 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
-func TestNRO() *nropv1alpha1.NUMAResourcesOperator {
+func TestNRO(matchLabels map[string]string) *nropv1alpha1.NUMAResourcesOperator {
 	return &nropv1alpha1.NUMAResourcesOperator{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NUMAResourcesOperator",
@@ -38,7 +38,7 @@ func TestNRO() *nropv1alpha1.NUMAResourcesOperator {
 			NodeGroups: []nropv1alpha1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"test": "test"},
+						MatchLabels: matchLabels,
 					},
 				},
 			},
