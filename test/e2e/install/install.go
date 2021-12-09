@@ -21,13 +21,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
@@ -65,9 +66,21 @@ var _ = Describe("[Install]", func() {
 			}
 
 			nroObj := objects.TestNRO(matchLabels)
+			kcObj, err := objects.TestKC(matchLabels)
+			Expect(err).To(Not(HaveOccurred()))
 
-			By(fmt.Sprintf("Creating the NRO object: %s", nroObj.Name))
-			err := e2eclient.Client.Create(context.TODO(), nroObj)
+			unpause, err := machineconfigpools.PauseMCPs(nroObj.Spec.NodeGroups)
+			Expect(err).NotTo(HaveOccurred())
+
+			By(fmt.Sprintf("creating the KC object: %s", kcObj.Name))
+			err = e2eclient.Client.Create(context.TODO(), kcObj)
+			Expect(err).NotTo(HaveOccurred())
+
+			By(fmt.Sprintf("creating the NRO object: %s", nroObj.Name))
+			err = e2eclient.Client.Create(context.TODO(), nroObj)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = unpause()
 			Expect(err).NotTo(HaveOccurred())
 
 			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
