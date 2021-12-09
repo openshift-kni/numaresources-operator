@@ -54,7 +54,20 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+GOOS=$(shell go env GOOS)
+GOARCH=$(shell go env GOARCH)
+
 CONTAINER_ENGINE ?= docker
+
+BIN_DIR="bin"
+
+OPERATOR_SDK_VERSION="v1.13.0"
+OPERATOR_SDK_BIN="operator-sdk_$(GOOS)_$(GOARCH)"
+OPERATOR_SDK="$(BIN_DIR)/$(OPERATOR_SDK_BIN)"
+
+OPM_VERSION="v1.15.1"
+OPM_BIN="$(GOOS)-$(GOARCH)-opm"
+OPM="$(BIN_DIR)/$(OPM_BIN)"
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -194,11 +207,11 @@ rm -rf $$TMP_DIR ;\
 endef
 
 .PHONY: bundle
-bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
-	operator-sdk generate kustomize manifests -q
+bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
+	$(OPERATOR_SDK) generate kustomize manifests -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
-	operator-sdk bundle validate ./bundle
+	$(KUSTOMIZE) build config/manifests | $(OPERATOR_SDK) generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(OPERATOR_SDK) bundle validate ./bundle
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
@@ -208,22 +221,25 @@ bundle-build: ## Build the bundle image.
 bundle-push: ## Push the bundle image.
 	$(MAKE) container-push IMG=$(BUNDLE_IMG)
 
+.PHONY: operator-sdk
+operator-sdk:
+	@if [ ! -x "$(OPERATOR_SDK)" ]; then\
+		echo "Downloading operator-sdk $(OPERATOR_SDK_VERSION)";\
+		curl -JL https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/$(OPERATOR_SDK_BIN) -o $(OPERATOR_SDK);\
+		chmod +x $(OPERATOR_SDK);\
+	else\
+		echo "Using operator-sdk cached at $(OPERATOR_SDK)";\
+	fi
+
 .PHONY: opm
-OPM = ./bin/opm
 opm: ## Download opm locally if necessary.
-ifeq (,$(wildcard $(OPM)))
-ifeq (,$(shell which opm 2>/dev/null))
-	@{ \
-	set -e ;\
-	mkdir -p $(dir $(OPM)) ;\
-	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.15.1/$${OS}-$${ARCH}-opm ;\
-	chmod +x $(OPM) ;\
-	}
-else
-OPM = $(shell which opm)
-endif
-endif
+	@if [ ! -x "$(OPM)" ]; then\
+		echo "Downloading opm $(OPM_VERSION)";\
+		curl -JL https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$(OPM_BIN) -o $(OPM);\
+		chmod +x $(OPM);\
+	else\
+		echo "Using OPM cached at $(OPM_BIN)";\
+	fi
 
 # A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
 # These images MUST exist in a registry and be pull-able.
