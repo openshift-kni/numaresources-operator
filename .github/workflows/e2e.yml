@@ -36,7 +36,7 @@ jobs:
 
     - name: build test binary
       run: |
-        make binary-e2e binary-rte-e2e
+        make binary-e2e-rte binary-e2e-install binary-e2e-uninstall
 
     - name: Build image
       run: |
@@ -56,7 +56,7 @@ jobs:
     - name: E2E Tests
       run: |
         export KUBECONFIG=${HOME}/.kube/config
-        ./bin/e2e.test -ginkgo.v
+        make test-e2e
 
     - name: Archive E2E Tests logs
       if: ${{ failure() }}

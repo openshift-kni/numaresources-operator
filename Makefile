@@ -100,8 +100,8 @@ test: manifests generate fmt vet envtest ## Run tests.
 test-unit: envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/... ./pkg/...
 
-test-e2e: binary-e2e binary-rte-e2e
-	./bin/e2e.test -ginkgo.v
+test-e2e: binary-e2e-install binary-e2e-rte binary-e2e-uninstall
+	hack/run-test-e2e.sh
 
 ##@ Build
 
@@ -111,11 +111,14 @@ binary:
 binary-rte:
 	go build -o bin/exporter rte/main.go
 
-binary-rte-e2e:
-	go test -c -v -o bin/rte-e2e.test ./test/rte-e2e
+binary-e2e-rte:
+	go test -c -v -o bin/e2e-rte.test ./test/e2e/rte
 
-binary-e2e:
-	go test -v -c -o bin/e2e.test ./test/e2e
+binary-e2e-install:
+	go test -v -c -o bin/e2e-install.test ./test/e2e/install
+
+binary-e2e-uninstall:
+	go test -v -c -o bin/e2e-uninstall.test ./test/e2e/uninstall
 
 binary-all: binary binary-rte
 
@@ -123,9 +126,11 @@ build: generate fmt vet binary
 
 build-rte: fmt vet binary-rte
 
-build-rte-e2e: fmt vet binary-rte-e2e
+build-e2e-rte: fmt vet binary-e2e-rte
 
-build-e2e: fmt vet binary-e2e
+build-e2e-install: fmt vet binary-e2e-install
+
+build-e2e-uninstall: fmt vet binary-e2e-uninstall
 
 build-all: generate fmt vet binary binary-rte
 
