@@ -113,7 +113,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 test-unit: envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/... ./pkg/...
 
-test-e2e: binary-e2e-install binary-e2e-rte binary-e2e-uninstall
+test-e2e: build-e2e-all
 	hack/run-test-e2e.sh
 
 ##@ Build
@@ -144,6 +144,8 @@ build-e2e-rte: fmt vet binary-e2e-rte
 build-e2e-install: fmt vet binary-e2e-install
 
 build-e2e-uninstall: fmt vet binary-e2e-uninstall
+
+build-e2e-all: fmt vet binary-e2e-install binary-e2e-rte binary-e2e-uninstall
 
 build-all: generate fmt vet binary binary-rte
 

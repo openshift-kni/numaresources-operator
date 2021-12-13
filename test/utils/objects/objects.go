@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
-	e2etestenv "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testenv"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
@@ -38,8 +37,7 @@ func TestNRO(matchLabels map[string]string) *nropv1alpha1.NUMAResourcesOperator 
 			APIVersion: nropv1alpha1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "numaresourcesoperator",
-			Namespace: e2etestenv.GetNamespaceName(),
+			Name: "numaresourcesoperator",
 		},
 		Spec: nropv1alpha1.NUMAResourcesOperatorSpec{
 			NodeGroups: []nropv1alpha1.NodeGroup{

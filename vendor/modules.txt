@@ -190,7 +190,7 @@ github.com/josharian/intern
 # github.com/json-iterator/go v1.1.11
 ## explicit; go 1.12
 github.com/json-iterator/go
-# github.com/k8stopologyawareschedwg/deployer v0.1.1-0.20211130112610-10523aefd5ab
+# github.com/k8stopologyawareschedwg/deployer v0.1.1-0.20211213080518-881e130aa39a
 ## explicit; go 1.16
 github.com/k8stopologyawareschedwg/deployer/pkg/assets/rte
 github.com/k8stopologyawareschedwg/deployer/pkg/clientutil
@@ -210,7 +210,7 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/scheme
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/typed/topology/v1alpha1
-# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.3.2-0.20211125091854-91f2c3309819
+# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.3.3-0.20211213120214-84b219b93f5b
 ## explicit; go 1.16
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8shelpers
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/kubeconf

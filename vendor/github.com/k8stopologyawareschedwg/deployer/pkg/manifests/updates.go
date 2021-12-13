@@ -16,7 +16,7 @@ import (
 
 const (
 	metricsPort        = 2112
-	rteConfigMountName = "rte-config"
+	rteConfigMountName = "rte-config-volume"
 	RTEConfigMapName   = "rte-config"
 )
 
