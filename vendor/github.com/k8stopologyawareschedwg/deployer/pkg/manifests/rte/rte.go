@@ -113,8 +113,12 @@ func (mf Manifests) Update(options UpdateOptions) Manifests {
 	ret.DaemonSet.Spec.Template.Spec.ServiceAccountName = mf.ServiceAccount.Name
 
 	rteConfigMapName := ""
+	if len(options.ConfigData) > 0 {
+		ret.ConfigMap = CreateConfigMap(ret.DaemonSet.Namespace, manifests.RTEConfigMapName, options.ConfigData)
+	}
+
 	if ret.ConfigMap != nil {
-		rteConfigMapName = manifests.RTEConfigMapName
+		rteConfigMapName = ret.ConfigMap.Name
 	}
 	manifests.UpdateResourceTopologyExporterDaemonSet(
 		ret.DaemonSet, rteConfigMapName, options.PullIfNotPresent, options.NodeSelector)
@@ -124,9 +128,6 @@ func (mf Manifests) Update(options UpdateOptions) Manifests {
 		manifests.UpdateSecurityContextConstraint(ret.SecurityContextConstraint, ret.ServiceAccount)
 	}
 
-	if len(options.ConfigData) > 0 {
-		ret.ConfigMap = CreateConfigMap(ret.DaemonSet.Namespace, ret.DaemonSet.Name, options.ConfigData)
-	}
 	return ret
 }
 
