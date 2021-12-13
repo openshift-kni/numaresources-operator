@@ -22,13 +22,12 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 )
 
-func describeObject(obj client.Object) (string, error) {
+func describeObject(obj k8sclient.Object) (string, error) {
 	name := obj.GetName()
 	namespace := obj.GetNamespace()
 	if name == "" {
@@ -39,12 +38,12 @@ func describeObject(obj client.Object) (string, error) {
 	return fmt.Sprintf("(%s) %s/%s", gvk.String(), namespace, name), nil
 }
 
-func ApplyObject(ctx context.Context, client k8sclient.Client, objState objectstate.ObjectState) (client.Object, error) {
+func ApplyObject(ctx context.Context, cli k8sclient.Client, objState objectstate.ObjectState) (k8sclient.Object, error) {
 	objDesc, _ := describeObject(objState.Desired)
 
 	if objState.IsNotFoundError() {
 		klog.InfoS("creating", "object", objDesc)
-		err := client.Create(ctx, objState.Desired)
+		err := cli.Create(ctx, objState.Desired)
 		if err != nil {
 			return nil, err
 		}
@@ -63,7 +62,7 @@ func ApplyObject(ctx context.Context, client k8sclient.Client, objState objectst
 	}
 	if !ok {
 		klog.InfoS("updating", "object", objDesc)
-		if err := client.Update(ctx, updated); err != nil {
+		if err := cli.Update(ctx, updated); err != nil {
 			return nil, errors.Wrapf(err, "could not update object %s", objDesc)
 		}
 		klog.InfoS("updated", "object", objDesc)
