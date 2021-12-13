@@ -19,19 +19,21 @@ package uninstall
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
+	"github.com/openshift-kni/numaresources-operator/test/utils/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/klog/v2"
 )
 
 var _ = Describe("[Uninstall]", func() {
@@ -49,9 +51,12 @@ var _ = Describe("[Uninstall]", func() {
 
 	Context("with a running cluster with all the components", func() {
 		It("should delete all components after NRO deletion", func() {
-			By("Deleting the NRO object")
+			By("deleting the NRO object")
 			// since we are getting an existing object, we don't need the real labels here
 			nroObj := objects.TestNRO(map[string]string{})
+			By("deleting the KC object")
+			kcObj, err := objects.TestKC(map[string]string{})
+			Expect(err).To(Not(HaveOccurred()))
 
 			if configuration.Platform == platform.Kubernetes {
 				mcpObj := objects.TestMCP()
@@ -69,10 +74,20 @@ var _ = Describe("[Uninstall]", func() {
 				return
 			}
 
+			unpause, err := machineconfigpools.PauseMCPs(nroObj.Spec.NodeGroups)
+			Expect(err).NotTo(HaveOccurred())
+
 			if err := e2eclient.Client.Delete(context.TODO(), nroObj); err != nil {
 				klog.Warningf("failed to delete the numaresourcesoperators %q", nroObj.Name)
 				return
 			}
+
+			if err := e2eclient.Client.Delete(context.TODO(), kcObj); err != nil && !errors.IsNotFound(err) {
+				klog.Warningf("failed to delete the kubeletconfigs %q", kcObj.Name)
+			}
+
+			err = unpause()
+			Expect(err).NotTo(HaveOccurred())
 
 			if configuration.Platform == platform.OpenShift {
 				Eventually(func() bool {

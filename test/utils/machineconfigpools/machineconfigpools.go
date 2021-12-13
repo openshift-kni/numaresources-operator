@@ -18,6 +18,7 @@ package machineconfigpools
 
 import (
 	"context"
+	"fmt"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
@@ -38,4 +39,32 @@ func IsMachineConfigPoolsUpdated(nro *nropv1alpha1.NUMAResourcesOperator) (bool,
 	}
 
 	return true, nil
+}
+
+func PauseMCPs(nodeGroups []nropv1alpha1.NodeGroup) (func() error, error) {
+	mcps, err := controllers.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nodeGroups)
+	if err != nil {
+		return nil, err
+	}
+	if len(mcps) == 0 {
+		return nil, fmt.Errorf("expected at least one MCP to be found")
+	}
+
+	for i := range mcps {
+		mcps[i].Spec.Paused = true
+		if err = e2eclient.Client.Update(context.TODO(), mcps[i]); err != nil {
+			return nil, err
+		}
+	}
+
+	unpause := func() error {
+		for i := range mcps {
+			mcps[i].Spec.Paused = false
+			err = e2eclient.Client.Update(context.TODO(), mcps[i])
+			return err
+		}
+		return nil
+	}
+
+	return unpause, nil
 }
