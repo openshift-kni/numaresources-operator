@@ -33,6 +33,7 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
@@ -311,6 +312,15 @@ func UpdateDaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, built
 	klog.V(3).InfoS("Exporter image", "reason", "builtin", "pullSpec", builtinImageSpec, "pullPolicy", builtinPullPolicy)
 	// if we run with operator-as-operand, we know we NEED this.
 	UpdateDaemonSetRunAsIDs(ds)
+
+	// TODO: we know this is in `Command`, but we should actually check
+	fl := flagcodec.ParseArgvKeyValue(cnt.Command)
+	if fl == nil {
+		klog.Warningf("Cannot modify the command line %v", cnt.Command)
+		return
+	}
+	fl.SetToggle("--exit-on-conf-change")
+	cnt.Command = fl.Argv()
 }
 
 // UpdateDaemonSetRunAsIDs bump the ds container privileges to 0/0.
