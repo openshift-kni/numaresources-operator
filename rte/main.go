@@ -28,7 +28,8 @@ import (
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/prometheus"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter"
-	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/version"
+
+	"github.com/openshift-kni/numaresources-operator/pkg/version"
 
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/podrescompat"
@@ -54,7 +55,7 @@ func main() {
 	}
 
 	if parsedArgs.Version {
-		fmt.Println(version.ProgramName, version.Get())
+		fmt.Println(version.ProgramName(), version.Get())
 		os.Exit(0)
 	}
 
@@ -107,7 +108,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	var sysResourceMapping string
 
 	var configPath string
-	flags := flag.NewFlagSet(version.ProgramName, flag.ExitOnError)
+	flags := flag.NewFlagSet(version.ProgramName(), flag.ExitOnError)
 
 	klog.InitFlags(flags)
 

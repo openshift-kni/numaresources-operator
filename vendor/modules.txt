@@ -224,7 +224,6 @@ github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopolo
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/sysinfo
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/topologypolicy
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/utils
-github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/version
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/client
@@ -242,6 +241,10 @@ github.com/mailru/easyjson/jwriter
 # github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369
 ## explicit; go 1.9
 github.com/matttproud/golang_protobuf_extensions/pbutil
+# github.com/mdomke/git-semver v1.0.0
+## explicit
+github.com/mdomke/git-semver
+github.com/mdomke/git-semver/version
 # github.com/mitchellh/go-homedir v1.1.0
 ## explicit
 github.com/mitchellh/go-homedir

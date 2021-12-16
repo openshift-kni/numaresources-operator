@@ -50,6 +50,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
+	"github.com/openshift-kni/numaresources-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -79,6 +80,7 @@ func main() {
 	var renderMode bool
 	var renderNamespace string
 	var renderImage string
+	var showVersion bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -89,12 +91,18 @@ func main() {
 	flag.BoolVar(&renderMode, "render", false, "outputs the rendered manifests, then exits")
 	flag.StringVar(&renderNamespace, "render-namespace", defaultNamespace, "outputs the manifests rendered using the given namespace")
 	flag.StringVar(&renderImage, "render-image", defaultImage, "outputs the manifests rendered using the given image")
+	flag.BoolVar(&showVersion, "version", false, "outputs the version and exit")
 
 	opts := zap.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
+
+	if showVersion {
+		fmt.Println(version.ProgramName(), version.Get())
+		os.Exit(0)
+	}
 
 	// if it is unknown, it's fine
 	userPlatform, _ := platform.FromString(platformName)
