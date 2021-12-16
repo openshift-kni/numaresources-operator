@@ -852,6 +852,8 @@ github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5
 github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 h1:I0XW9+e1XWDxdcEniV4rQAIOPUGDq67JSCiRCgGCZLI=
 github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369/go.mod h1:BSXmuO+STAnVfrANrmjBb36TMTDstsz7MSK+HVaYKv4=
 github.com/mbilski/exhaustivestruct v1.2.0/go.mod h1:OeTBVxQWoEmB2J2JCHmXWPJ0aksxSUOUy+nvtVEfzXc=
+github.com/mdomke/git-semver v1.0.0 h1:cg/a+bI/D2EtPWlx4pKSUKz9G9bTOHEBdF2EjbV0b4s=
+github.com/mdomke/git-semver v1.0.0/go.mod h1:fNw8giSaJDzhF/Gvxe7JSZJVDlkRR+/a8y1b3g6SGZ8=
 github.com/mgechev/dots v0.0.0-20190921121421-c36f7dcfbb81/go.mod h1:KQ7+USdGKfpPjXk4Ga+5XxQM4Lm4e3gAogrreFAYpOg=
 github.com/mgechev/revive v1.1.1/go.mod h1:PKqk4L74K6wVNwY2b6fr+9Qqr/3hIsHVfZCJdbvozrY=
 github.com/mholt/certmagic v0.6.2-0.20190624175158-6a42ef9fe8c2/go.mod h1:g4cOPxcjV0oFq3qwpjSA30LReKD8AoIfwAY9VvG35NY=

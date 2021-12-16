@@ -118,11 +118,17 @@ test-e2e: build-e2e-all
 
 ##@ Build
 
-binary:
-	go build -o bin/manager main.go
+binary: build-tools
+	go build \
+		-o bin/manager \
+		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/git-semver)" \
+		main.go
 
-binary-rte:
-	go build -o bin/exporter rte/main.go
+binary-rte: build-tools
+	go build \
+		-o bin/exporter \
+		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/git-semver)" \
+		rte/main.go
 
 binary-e2e-rte:
 	go test -c -v -o bin/e2e-rte.test ./test/e2e/rte
@@ -270,3 +276,13 @@ catalog-push: ## Push a catalog image.
 .PHONY: deps-update
 deps-update:
 	go mod tidy && go mod vendor
+
+
+# Build tools:
+#
+#
+.PHONY: build-tools
+build-tools: bin/git-semver
+
+bin/git-semver:
+	@go build -o bin/git-semver vendor/github.com/mdomke/git-semver/main.go
