@@ -224,7 +224,6 @@ github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopolo
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/sysinfo
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/topologypolicy
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/utils
-github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/version
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/client
