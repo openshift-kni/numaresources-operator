@@ -14,7 +14,7 @@ defaults:
     shell: bash
 
 jobs:
-  e2e-basic-install:
+  e2e:
     runs-on: ubuntu-20.04
     env:
       built_image: "numaresources-operator:ci" # Arbitrary name
