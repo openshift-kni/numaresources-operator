@@ -37,7 +37,9 @@ import (
 )
 
 type localArgs struct {
-	SysConf sysinfo.Config
+	SysConf             sysinfo.Config
+	ConfigPath          string
+	ExitOnConfigChanges bool
 }
 
 type ProgArgs struct {
@@ -89,6 +91,18 @@ func main() {
 		klog.Fatalf("failed to start prometheus server: %v", err)
 	}
 
+	if parsedArgs.LocalArgs.ExitOnConfigChanges {
+		cw, err := config.NewWatcher(parsedArgs.LocalArgs.ConfigPath, func() error {
+			klog.Infof("configuration file %q changed: exit", parsedArgs.LocalArgs.ConfigPath)
+			os.Exit(0)
+			return nil
+		})
+		if err != nil {
+			klog.Fatalf("cannot watch the configuration file %q: %v", parsedArgs.LocalArgs.ConfigPath, err)
+		}
+		go cw.WaitUntilChanges()
+	}
+
 	err = resourcetopologyexporter.Execute(cli, parsedArgs.NRTupdater, parsedArgs.Resourcemonitor, parsedArgs.RTE)
 	// must never execute; if it does, we want to know
 	klog.Fatalf("failed to execute: %v", err)
@@ -107,7 +121,6 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	var sysReservedCPUs string
 	var sysResourceMapping string
 
-	var configPath string
 	flags := flag.NewFlagSet(version.ProgramName(), flag.ExitOnError)
 
 	klog.InitFlags(flags)
@@ -119,7 +132,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.StringVar(&pArgs.Resourcemonitor.Namespace, "watch-namespace", "", "Namespace to watch pods for. Use \"\" for all namespaces.")
 	flags.StringVar(&pArgs.Resourcemonitor.SysfsRoot, "sysfs", "/sys", "Top-level component path of sysfs.")
 
-	flags.StringVar(&configPath, "config", "/etc/resource-topology-exporter/config.yaml", "Configuration file path. Use this to set the exclude list.")
+	flags.StringVar(&pArgs.LocalArgs.ConfigPath, "config", "/etc/resource-topology-exporter/config.yaml", "Configuration file path. Use this to set the exclude list.")
 
 	flags.BoolVar(&pArgs.RTE.Debug, "debug", false, " Enable debug output.")
 	flags.StringVar(&pArgs.RTE.TopologyManagerPolicy, "topology-manager-policy", defaultTopologyManagerPolicy(), "Explicitly set the topology manager policy instead of reading from the kubelet.")
@@ -138,6 +151,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.StringVar(&sysResourceMapping, "system-info-resource-mapping", "", "kubelet resource mapping: comma-separated 'vendor:device=resourcename'")
 
 	flags.BoolVar(&pArgs.Version, "version", false, "Output version and exit")
+	flags.BoolVar(&pArgs.LocalArgs.ExitOnConfigChanges, "exit-on-conf-change", false, "Exits when configuration file changes - so the supervisor can restart")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -161,7 +175,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 		pArgs.RTE.ReferenceContainer = podrescli.ContainerIdentFromEnv()
 	}
 
-	conf, err := config.ReadConfig(configPath)
+	conf, err := config.ReadConfig(pArgs.LocalArgs.ConfigPath)
 	if err != nil {
 		return pArgs, fmt.Errorf("error getting exclude list from the configuration: %v", err)
 	}
