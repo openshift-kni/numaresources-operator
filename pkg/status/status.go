@@ -43,11 +43,11 @@ const (
 )
 
 func Update(ctx context.Context, client k8sclient.Client, rte *nropv1alpha1.NUMAResourcesOperator, condition string, reason string, message string) error {
-	conditions := getConditions(condition, reason, message)
+	conditions := NewConditions(condition, reason, message)
 	if equality.Semantic.DeepEqual(conditions, rte.Status.Conditions) {
 		return nil
 	}
-	rte.Status.Conditions = getConditions(condition, reason, message)
+	rte.Status.Conditions = NewConditions(condition, reason, message)
 
 	if err := client.Status().Update(ctx, rte); err != nil {
 		return errors.Wrapf(err, "could not update status for object %s", k8sclient.ObjectKeyFromObject(rte))
@@ -65,8 +65,8 @@ func FindCondition(conditions []metav1.Condition, condition string) *metav1.Cond
 	return nil
 }
 
-func getConditions(condition string, reason string, message string) []metav1.Condition {
-	conditions := getBaseConditions()
+func NewConditions(condition string, reason string, message string) []metav1.Condition {
+	conditions := newBaseConditions()
 	switch condition {
 	case ConditionAvailable:
 		conditions[0].Status = metav1.ConditionTrue
@@ -83,7 +83,7 @@ func getConditions(condition string, reason string, message string) []metav1.Con
 	return conditions
 }
 
-func getBaseConditions() []metav1.Condition {
+func newBaseConditions() []metav1.Condition {
 	now := time.Now()
 	return []metav1.Condition{
 		{
