@@ -95,6 +95,12 @@ spec:
           verbs:
           - '*'
         - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - '*'
+        - apiGroups:
           - config.openshift.io
           resources:
           - clusterversions
