@@ -22,7 +22,7 @@ import (
 
 // NUMAResourcesSchedulerSpec defines the desired state of NUMAResourcesScheduler
 type NUMAResourcesSchedulerSpec struct {
-	SchedulerImage string `json:"imageSpec,omitempty"`
+	SchedulerImage string `json:"imageSpec"`
 }
 
 // NUMAResourcesSchedulerStatus defines the observed state of NUMAResourcesScheduler
