@@ -34,6 +34,7 @@ import (
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/tlog"
+	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -49,6 +50,7 @@ import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
+	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
@@ -151,12 +153,23 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	if renderMode {
-		if err := renderObjects(
-			renderManifests(
-				rteManifests,
-				renderNamespace,
-				renderImage,
-			).ToObjects()); err != nil {
+		var objs []client.Object
+		if enableScheduler {
+			schedManifests, err := schedmanifests.GetManifests(namespace)
+			if err != nil {
+				klog.ErrorS(err, "unable to load the Scheduler manifests")
+				os.Exit(1)
+			}
+			klog.InfoS("manifests loaded", "component", "Scheduler")
+
+			mf := renderSchedulerManifests(schedManifests, renderImage)
+			objs = mf.ToObjects()
+		} else {
+			mf := renderRTEManifests(rteManifests, renderNamespace, renderImage)
+			objs = mf.ToObjects()
+		}
+
+		if err := renderObjects(objs); err != nil {
 			klog.ErrorS(err, "unable to render manifests")
 			os.Exit(1)
 		}
@@ -185,13 +198,15 @@ func main() {
 	}
 	klog.InfoS("using RTE image", "spec", imageSpec)
 
+	helper := deployer.NewHelperWithClient(mgr.GetClient(), "", tlog.NewNullLogAdapter())
+
 	if err = (&controllers.NUMAResourcesOperatorReconciler{
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
 		APIManifests:    apiManifests,
-		RTEManifests:    renderManifests(rteManifests, namespace, imageSpec),
+		RTEManifests:    renderRTEManifests(rteManifests, namespace, imageSpec),
 		Platform:        clusterPlatform,
-		Helper:          deployer.NewHelperWithClient(mgr.GetClient(), "", tlog.NewNullLogAdapter()),
+		Helper:          helper,
 		ImageSpec:       imageSpec,
 		ImagePullPolicy: pullPolicy,
 		Namespace:       namespace,
@@ -210,9 +225,19 @@ func main() {
 	}
 
 	if enableScheduler {
+		schedManifests, err := schedmanifests.GetManifests(namespace)
+		if err != nil {
+			klog.ErrorS(err, "unable to load the Scheduler manifests")
+			os.Exit(1)
+		}
+		klog.InfoS("manifests loaded", "component", "Scheduler")
+
 		if err = (&controllers.NUMAResourcesSchedulerReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
+			Client:         mgr.GetClient(),
+			Scheme:         mgr.GetScheme(),
+			SchedManifests: schedManifests,
+			Helper:         helper,
+			Namespace:      namespace,
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
 			os.Exit(1)
@@ -278,12 +303,20 @@ func renderObjects(objs []client.Object) error {
 	return nil
 }
 
-// renderManifests renders the reconciler manifests so they can be deployed on the cluster.
-func renderManifests(rteManifests rtemanifests.Manifests, namespace string, imageSpec string) rtemanifests.Manifests {
-	klog.InfoS("Updating manifests")
+// renderRTEManifests renders the reconciler manifests so they can be deployed on the cluster.
+func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, imageSpec string) rtemanifests.Manifests {
+	klog.InfoS("Updating RTE manifests")
 	mf := rteManifests.Update(rtemanifests.UpdateOptions{
 		Namespace: namespace,
 	})
 	rtestate.UpdateDaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
+	return mf
+}
+
+func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec string) schedmanifests.Manifests {
+	klog.InfoS("Updating scheduler manifests")
+	mf := schedManifests.Clone()
+	schedstate.UpdateDeploymentImage(mf.Deployment, imageSpec)
+	schedstate.UpdateDeploymentConfigMap(mf.Deployment, schedManifests.ConfigMap.Name)
 	return mf
 }

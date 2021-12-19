@@ -22,12 +22,18 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
+)
+
+const (
+	schedVolumeConfigName = "etckubernetes"
 )
 
 type ExistingManifests struct {
@@ -121,4 +127,56 @@ func FromClient(ctx context.Context, cli client.Client, mf schedmanifests.Manife
 		ret.Existing.Deployment = dp
 	}
 	return ret
+}
+
+func UpdateDeploymentImage(dp *appsv1.Deployment, userImageSpec string) {
+	// TODO: better match by name than assume container#0 is scheduler proper
+	cnt := &dp.Spec.Template.Spec.Containers[0]
+	cnt.Image = userImageSpec
+	klog.V(3).InfoS("Scheduler image", "reason", "user-provided", "pullSpec", userImageSpec)
+}
+
+func UpdateDeploymentArgs(dp *appsv1.Deployment) {
+	// TODO: better match by name than assume container#0 is scheduler proper
+	cnt := &dp.Spec.Template.Spec.Containers[0]
+
+	// TODO: we know this is in `Args`, but we should actually check
+	fl := flagcodec.ParseArgvKeyValue(cnt.Args)
+	if fl == nil {
+		klog.Warningf("Cannot modify the command line %v", cnt.Args)
+		return
+	}
+	fl.SetOption("-v", "3")
+	cnt.Args = fl.Argv()
+}
+
+func UpdateDeploymentConfigMap(dp *appsv1.Deployment, configMapName string) {
+	spec := &dp.Spec.Template.Spec // shortcut
+	if len(spec.Volumes) != 1 {
+		klog.Warningf("Unexpected volume count, found %d", len(spec.Volumes))
+		spec.Volumes = append(spec.Volumes, newSchedConfigVolume(schedVolumeConfigName, configMapName))
+		return
+	}
+	if spec.Volumes[0].Name != schedVolumeConfigName {
+		klog.Warningf("Unexpected volumes %q", spec.Volumes[0].Name)
+		spec.Volumes = append(spec.Volumes, newSchedConfigVolume(schedVolumeConfigName, configMapName))
+		return
+	}
+	// we have what we expect, we can just fix the configMap Reference,
+	// but we replace the whole volume to make sure we have exactly what
+	// we do expect
+	spec.Volumes[0] = newSchedConfigVolume(schedVolumeConfigName, configMapName)
+}
+
+func newSchedConfigVolume(schedVolumeConfigName, configMapName string) corev1.Volume {
+	return corev1.Volume{
+		Name: schedVolumeConfigName,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: configMapName,
+				},
+			},
+		},
+	}
 }
