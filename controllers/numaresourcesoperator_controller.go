@@ -327,9 +327,9 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 			Owns(&machineconfigv1.MachineConfig{}, builder.WithPredicates(p))
 	}
 	return b.Owns(&apiextensionv1.CustomResourceDefinition{}).
-		Owns(&corev1.ServiceAccount{}).
-		Owns(&rbacv1.RoleBinding{}).
-		Owns(&rbacv1.Role{}).
+		Owns(&corev1.ServiceAccount{}, builder.WithPredicates(p)).
+		Owns(&rbacv1.RoleBinding{}, builder.WithPredicates(p)).
+		Owns(&rbacv1.Role{}, builder.WithPredicates(p)).
 		Owns(&appsv1.DaemonSet{}, builder.WithPredicates(p)).
 		Watches(
 			&source.Kind{Type: &machineconfigv1.MachineConfigPool{}},
