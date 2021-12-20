@@ -1,0 +1,6 @@
+apiVersion: nodetopology.openshift.io/v1alpha1
+kind: NUMAResourcesScheduler
+metadata:
+  name: topo-aware-scheduler
+spec:
+  imageSpec: "quay.io/openshift-kni/scheduler-plugins:4.10-snapshot"
