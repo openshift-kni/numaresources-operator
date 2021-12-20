@@ -226,8 +226,8 @@ func main() {
 }
 
 type detectionOutput struct {
-	AutoDetected platform.Platform `json:"auto_detected"`
-	UserSupplied platform.Platform `json:"user_supplied"`
+	AutoDetected platform.Platform `json:"autoDetected"`
+	UserSupplied platform.Platform `json:"userSupplied"`
 	Discovered   platform.Platform `json:"discovered"`
 }
 

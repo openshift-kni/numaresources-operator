@@ -52,7 +52,6 @@ import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
@@ -284,7 +283,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 			return nil, errors.Wrapf(err, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
 
-		if nname, ok := rte.DaemonSetNamespacedNameFromObject(obj); ok {
+		if nname, ok := rtestate.DaemonSetNamespacedNameFromObject(obj); ok {
 			daemonSetsNName = append(daemonSetsNName, nname)
 		}
 	}
@@ -399,7 +398,7 @@ func validateUpdateEvent(e *event.UpdateEvent) bool {
 }
 
 func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	mcName := rte.GetMachineConfigName(instanceName, mcp.Name)
+	mcName := rtestate.GetMachineConfigName(instanceName, mcp.Name)
 	existing := false
 	for _, s := range mcp.Status.Configuration.Source {
 		if s.Name == mcName {
