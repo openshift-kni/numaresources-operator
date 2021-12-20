@@ -30,6 +30,21 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
+func TestNROScheduler() *nropv1alpha1.NUMAResourcesScheduler {
+	return &nropv1alpha1.NUMAResourcesScheduler{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "NUMAResourcesScheduler",
+			APIVersion: nropv1alpha1.GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-topo-aware-scheduler",
+		},
+		Spec: nropv1alpha1.NUMAResourcesSchedulerSpec{
+			SchedulerImage: "quay.io/openshift-kni/scheduler-plugins:4.10-snapshot",
+		},
+	}
+}
+
 func TestNRO(matchLabels map[string]string) *nropv1alpha1.NUMAResourcesOperator {
 	return &nropv1alpha1.NUMAResourcesOperator{
 		TypeMeta: metav1.TypeMeta{
