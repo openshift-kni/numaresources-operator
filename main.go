@@ -34,6 +34,7 @@ import (
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/tlog"
+	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -210,9 +211,17 @@ func main() {
 	}
 
 	if enableScheduler {
+		schedMf, err := schedmanifests.GetManifests(namespace)
+		if err != nil {
+			klog.ErrorS(err, "unable to load the Scheduler manifests")
+			os.Exit(1)
+		}
+		klog.InfoS("manifests loaded", "component", "Scheduler")
+
 		if err = (&controllers.NUMAResourcesSchedulerReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
+			Client:             mgr.GetClient(),
+			Scheme:             mgr.GetScheme(),
+			SchedulerManifests: schedMf,
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
 			os.Exit(1)
@@ -280,7 +289,7 @@ func renderObjects(objs []client.Object) error {
 
 // renderManifests renders the reconciler manifests so they can be deployed on the cluster.
 func renderManifests(rteManifests rtemanifests.Manifests, namespace string, imageSpec string) rtemanifests.Manifests {
-	klog.InfoS("Updating manifests")
+	klog.InfoS("Updating RTE manifests")
 	mf := rteManifests.Update(rtemanifests.UpdateOptions{
 		Namespace: namespace,
 	})
