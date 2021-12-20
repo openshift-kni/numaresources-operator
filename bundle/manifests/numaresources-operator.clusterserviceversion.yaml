@@ -230,6 +230,7 @@ spec:
               containers:
               - args:
                 - --leader-elect
+                - --enable-scheduler
                 command:
                 - /bin/numaresources-operator
                 env:
