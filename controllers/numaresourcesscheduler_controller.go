@@ -87,7 +87,7 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	if condition != "" {
 		// TODO: use proper reason
 		reason, message := condition, messageFromError(err)
-		if err := r.updateStatus(ctx, r.Client, instance, condition, reason, message); err != nil {
+		if err := r.updateStatus(ctx, instance, condition, reason, message); err != nil {
 			klog.InfoS("Failed to update numaresourcesscheduler status", "Desired condition", condition, "error", err)
 		}
 	}
@@ -161,14 +161,14 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	return deploymentNName, nil
 }
 
-func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, cli client.Client, sched *nrsv1alpha1.NUMAResourcesScheduler, condition string, reason string, message string) error {
+func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nrsv1alpha1.NUMAResourcesScheduler, condition string, reason string, message string) error {
 	conditions := status.NewConditions(condition, reason, message)
 	if apiequality.Semantic.DeepEqual(conditions, sched.Status.Conditions) {
 		return nil
 	}
 	sched.Status.Conditions = status.NewConditions(condition, reason, message)
 
-	if err := cli.Status().Update(ctx, sched); err != nil {
+	if err := r.Client.Status().Update(ctx, sched); err != nil {
 		return errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(sched))
 	}
 	return nil
