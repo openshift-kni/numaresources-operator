@@ -22,8 +22,10 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	nrsv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -121,4 +123,40 @@ func FromClient(ctx context.Context, cli client.Client, mf schedmanifests.Manife
 		ret.Existing.Deployment = dp
 	}
 	return ret
+}
+
+const SchedulerConfigMapVolumeName = "etckubernetes"
+
+func UpdateDeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) {
+	// There is only a single container
+	cnt := &dp.Spec.Template.Spec.Containers[0]
+	cnt.Image = userImageSpec
+	klog.V(3).InfoS("Exporter image", "reason", "user-provided", "pullSpec", userImageSpec)
+}
+
+func UpdateDeploymentConfigMapSettings(dp *appsv1.Deployment, cmName string) {
+	spec := &dp.Spec.Template.Spec // shortcut
+	spec.Volumes[0] = newSchedConfigVolume(SchedulerConfigMapVolumeName, cmName)
+}
+
+func DeploymentNamespacedNameFromObject(obj client.Object) (nrsv1alpha1.NamespacedName, bool) {
+	res := nrsv1alpha1.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}
+	_, ok := obj.(*appsv1.Deployment)
+	return res, ok
+}
+
+func newSchedConfigVolume(schedVolumeConfigName, configMapName string) corev1.Volume {
+	return corev1.Volume{
+		Name: schedVolumeConfigName,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: configMapName,
+				},
+			},
+		},
+	}
 }

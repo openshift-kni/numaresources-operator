@@ -37,7 +37,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 )
 
@@ -143,8 +142,8 @@ func isDeploymentRunning(ctx context.Context, c client.Client, key nrsv1alpha1.N
 }
 
 func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nrsv1alpha1.NUMAResourcesScheduler) (nrsv1alpha1.NamespacedName, error) {
-	sched.UpdateDeploymentImageSettings(r.SchedulerManifests.Deployment, instance.Spec.SchedulerImage)
-	sched.UpdateDeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name)
+	schedstate.UpdateDeploymentImageSettings(r.SchedulerManifests.Deployment, instance.Spec.SchedulerImage)
+	schedstate.UpdateDeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name)
 
 	var deploymentNName nrsv1alpha1.NamespacedName
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
@@ -157,7 +156,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 			return deploymentNName, errors.Wrapf(err, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
 
-		if nname, ok := sched.DeploymentNamespacedNameFromObject(obj); ok {
+		if nname, ok := schedstate.DeploymentNamespacedNameFromObject(obj); ok {
 			deploymentNName = nname
 		}
 	}
