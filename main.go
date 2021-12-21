@@ -50,6 +50,7 @@ import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
+	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
@@ -81,6 +82,7 @@ func main() {
 	var renderMode bool
 	var renderNamespace string
 	var renderImage string
+	var renderImageScheduler string
 	var showVersion bool
 	var enableScheduler bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -93,6 +95,7 @@ func main() {
 	flag.BoolVar(&renderMode, "render", false, "outputs the rendered manifests, then exits")
 	flag.StringVar(&renderNamespace, "render-namespace", defaultNamespace, "outputs the manifests rendered using the given namespace")
 	flag.StringVar(&renderImage, "render-image", defaultImage, "outputs the manifests rendered using the given image")
+	flag.StringVar(&renderImageScheduler, "render-image-scheduler", "", "outputs the manifests rendered using the given image for the scheduler")
 	flag.BoolVar(&showVersion, "version", false, "outputs the version and exit")
 	flag.BoolVar(&enableScheduler, "enable-scheduler", false, "enable support for the NUMAResourcesScheduler object")
 
@@ -152,12 +155,28 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	if renderMode {
-		if err := renderObjects(
-			renderManifests(
-				rteManifests,
-				renderNamespace,
-				renderImage,
-			).ToObjects()); err != nil {
+		var objs []client.Object
+		if enableScheduler {
+			if renderImageScheduler == "" {
+				klog.Errorf("missing scheduler image")
+				os.Exit(1)
+			}
+
+			schedManifests, err := schedmanifests.GetManifests(namespace)
+			if err != nil {
+				klog.ErrorS(err, "unable to load the Scheduler manifests")
+				os.Exit(1)
+			}
+			klog.InfoS("manifests loaded", "component", "Scheduler")
+
+			mf := renderSchedulerManifests(schedManifests, renderImageScheduler)
+			objs = append(objs, mf.ToObjects()...)
+		}
+
+		mf := renderRTEManifests(rteManifests, renderNamespace, renderImage)
+		objs = append(objs, mf.ToObjects()...)
+
+		if err := renderObjects(objs); err != nil {
 			klog.ErrorS(err, "unable to render manifests")
 			os.Exit(1)
 		}
@@ -190,7 +209,7 @@ func main() {
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
 		APIManifests:    apiManifests,
-		RTEManifests:    renderManifests(rteManifests, namespace, imageSpec),
+		RTEManifests:    renderRTEManifests(rteManifests, namespace, imageSpec),
 		Platform:        clusterPlatform,
 		Helper:          deployer.NewHelperWithClient(mgr.GetClient(), "", tlog.NewNullLogAdapter()),
 		ImageSpec:       imageSpec,
@@ -287,12 +306,20 @@ func renderObjects(objs []client.Object) error {
 	return nil
 }
 
-// renderManifests renders the reconciler manifests so they can be deployed on the cluster.
-func renderManifests(rteManifests rtemanifests.Manifests, namespace string, imageSpec string) rtemanifests.Manifests {
+// renderRTEManifests renders the reconciler manifests so they can be deployed on the cluster.
+func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, imageSpec string) rtemanifests.Manifests {
 	klog.InfoS("Updating RTE manifests")
 	mf := rteManifests.Update(rtemanifests.UpdateOptions{
 		Namespace: namespace,
 	})
 	rtestate.UpdateDaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
+	return mf
+}
+
+func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec string) schedmanifests.Manifests {
+	klog.InfoS("Updating scheduler manifests")
+	mf := schedManifests.Clone()
+	schedstate.UpdateDeploymentImageSettings(mf.Deployment, imageSpec)
+	schedstate.UpdateDeploymentConfigMapSettings(mf.Deployment, schedManifests.ConfigMap.Name)
 	return mf
 }
