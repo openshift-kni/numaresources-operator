@@ -37,7 +37,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 )
 
@@ -47,7 +46,6 @@ type NUMAResourcesSchedulerReconciler struct {
 	Scheme             *runtime.Scheme
 	SchedulerManifests schedmanifests.Manifests
 	Namespace          string
-	ImageSpec          string
 }
 
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
@@ -69,7 +67,6 @@ type NUMAResourcesSchedulerReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.9.2/pkg/reconcile
 func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
 	klog.V(3).InfoS("Starting NUMAResourcesScheduler reconcile loop", "object", req.NamespacedName)
 	defer klog.V(3).InfoS("Finish NUMAResourcesScheduler reconcile loop", "object", req.NamespacedName)
 
@@ -90,7 +87,7 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	if condition != "" {
 		// TODO: use proper reason
 		reason, message := condition, messageFromError(err)
-		if err := r.updateStatus(ctx, r.Client, instance, condition, reason, message); err != nil {
+		if err := r.updateStatus(ctx, instance, condition, reason, message); err != nil {
 			klog.InfoS("Failed to update numaresourcesscheduler status", "Desired condition", condition, "error", err)
 		}
 	}
@@ -143,8 +140,8 @@ func isDeploymentRunning(ctx context.Context, c client.Client, key nrsv1alpha1.N
 }
 
 func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nrsv1alpha1.NUMAResourcesScheduler) (nrsv1alpha1.NamespacedName, error) {
-	sched.UpdateDeploymentImageSettings(r.SchedulerManifests.Deployment, instance.Spec.SchedulerImage)
-	sched.UpdateDeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name)
+	schedstate.UpdateDeploymentImageSettings(r.SchedulerManifests.Deployment, instance.Spec.SchedulerImage)
+	schedstate.UpdateDeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name)
 
 	var deploymentNName nrsv1alpha1.NamespacedName
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
@@ -157,21 +154,21 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 			return deploymentNName, errors.Wrapf(err, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
 
-		if nname, ok := sched.DeploymentNamespacedNameFromObject(obj); ok {
+		if nname, ok := schedstate.DeploymentNamespacedNameFromObject(obj); ok {
 			deploymentNName = nname
 		}
 	}
 	return deploymentNName, nil
 }
 
-func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, cli client.Client, sched *nrsv1alpha1.NUMAResourcesScheduler, condition string, reason string, message string) error {
+func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nrsv1alpha1.NUMAResourcesScheduler, condition string, reason string, message string) error {
 	conditions := status.NewConditions(condition, reason, message)
 	if apiequality.Semantic.DeepEqual(conditions, sched.Status.Conditions) {
 		return nil
 	}
 	sched.Status.Conditions = status.NewConditions(condition, reason, message)
 
-	if err := cli.Status().Update(ctx, sched); err != nil {
+	if err := r.Client.Status().Update(ctx, sched); err != nil {
 		return errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(sched))
 	}
 	return nil
