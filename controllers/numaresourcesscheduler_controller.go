@@ -50,6 +50,11 @@ type NUMAResourcesSchedulerReconciler struct {
 	ImageSpec          string
 }
 
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=*
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers/finalizers,verbs=update
