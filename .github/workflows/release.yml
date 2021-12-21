@@ -55,10 +55,10 @@ jobs:
         run: echo "Image pushed to ${{ steps.push-to-quay.outputs.registry-paths }}"
 
       - name: Build Image
-        id: bundle-build-image
+        id: build-image-bundle
         uses: redhat-actions/buildah-build@v2
         with:
-          image: rte-operator-bundle
+          image: numaresources-operator-bundle
           tags: ${{ env.RELEASE_VERSION}}
           dockerfiles: |
             ./bundle.Dockerfile
@@ -67,8 +67,8 @@ jobs:
         id: bundle-push-to-quay
         uses: redhat-actions/push-to-registry@v2
         with:
-          image: ${{ steps.bundle-build-image.outputs.image }}
-          tags: ${{ steps.bundle-build-image.outputs.tags }}
+          image: ${{ steps.build-image-bundle.outputs.image }}
+          tags: ${{ steps.build-image-bundle.outputs.tags }}
           registry: quay.io/openshift-kni
           username: ${{ secrets.QUAY_IO_USERNAME }}
           password: ${{ secrets.QUAY_IO_ROBOTOKEN }}
