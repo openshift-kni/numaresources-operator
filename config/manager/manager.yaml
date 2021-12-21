@@ -29,6 +29,7 @@ spec:
         - /bin/numaresources-operator
         args:
         - --leader-elect
+        - --enable-scheduler
         image: controller:latest
         name: manager
         securityContext:
