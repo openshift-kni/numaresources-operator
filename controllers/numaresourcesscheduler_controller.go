@@ -46,7 +46,6 @@ type NUMAResourcesSchedulerReconciler struct {
 	Scheme             *runtime.Scheme
 	SchedulerManifests schedmanifests.Manifests
 	Namespace          string
-	ImageSpec          string
 }
 
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
@@ -68,7 +67,6 @@ type NUMAResourcesSchedulerReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.9.2/pkg/reconcile
 func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
 	klog.V(3).InfoS("Starting NUMAResourcesScheduler reconcile loop", "object", req.NamespacedName)
 	defer klog.V(3).InfoS("Finish NUMAResourcesScheduler reconcile loop", "object", req.NamespacedName)
 
