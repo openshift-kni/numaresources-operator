@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -38,6 +39,11 @@ import (
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
+)
+
+const (
+	defaultNUMAResourcesSchedulerCrName                      = "numaresourcesscheduler"
+	conditionTypeIncorrectNUMAResourcesSchedulerResourceName = "IncorrectNUMAResourcesSchedulerResourceName"
 )
 
 // NUMAResourcesSchedulerReconciler reconciles a NUMAResourcesScheduler object
@@ -81,6 +87,11 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 		}
 		// Error reading the object - requeue the request.
 		return ctrl.Result{}, err
+	}
+
+	if req.Name != defaultNUMAResourcesSchedulerCrName {
+		message := fmt.Sprintf("incorrect NUMAResourcesScheduler resource name: %s", instance.Name)
+		return ctrl.Result{}, r.updateStatus(ctx, instance, status.ConditionDegraded, conditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
 	}
 
 	result, condition, err := r.reconcileResource(ctx, instance)
