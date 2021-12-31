@@ -200,6 +200,11 @@ func parseArgs(args ...string) (ProgArgs, error) {
 		pArgs.RTE.TopologyManagerPolicy = conf.TopologyManagerPolicy
 	}
 
+	// overwrite if explicitly mentioned in conf
+	if conf.TopologyManagerScope != "" {
+		pArgs.RTE.TopologyManagerScope = conf.TopologyManagerScope
+	}
+
 	return pArgs, nil
 }
 
