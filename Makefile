@@ -138,10 +138,13 @@ binary-e2e-rte:
 	go test -c -v -o bin/e2e-rte.test ./test/e2e/rte
 
 binary-e2e-install:
-	go test -v -c -o bin/e2e-install.test ./test/e2e/install
+	go test -v -c -o bin/e2e-install.test ./test/e2e/install && go test -v -c -o bin/e2e-sched-install.test ./test/e2e/sched/install
 
 binary-e2e-uninstall:
-	go test -v -c -o bin/e2e-uninstall.test ./test/e2e/uninstall
+	go test -v -c -o bin/e2e-uninstall.test ./test/e2e/uninstall && go test -v -c -o bin/e2e-sched-uninstall.test ./test/e2e/sched/uninstall
+
+binary-e2e-sched:
+	go test -c -v -o bin/e2e-sched.test ./test/e2e/sched
 
 binary-all: binary binary-rte
 
@@ -155,7 +158,7 @@ build-e2e-install: fmt vet binary-e2e-install
 
 build-e2e-uninstall: fmt vet binary-e2e-uninstall
 
-build-e2e-all: fmt vet binary-e2e-install binary-e2e-rte binary-e2e-uninstall
+build-e2e-all: fmt vet binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall
 
 build-all: generate fmt vet binary binary-rte
 
