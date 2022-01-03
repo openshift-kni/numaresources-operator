@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +37,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
+
+const crdName = "noderesourcetopologies.topology.node.k8s.io"
 
 var _ = Describe("[Install]", func() {
 	var initialized bool
@@ -117,6 +120,14 @@ var _ = Describe("[Install]", func() {
 
 				return cond.Status == metav1.ConditionTrue
 			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "RTE condition did not become available")
+
+			By("checking the NumaResourceTopology CRD is deployed")
+			crd := &apiextensionv1.CustomResourceDefinition{}
+			key := client.ObjectKey{
+				Name: crdName,
+			}
+			err = e2eclient.Client.Get(context.TODO(), key, crd)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })
