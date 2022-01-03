@@ -224,6 +224,8 @@ spec:
           strategy: {}
           template:
             metadata:
+              annotations:
+                target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
               labels:
                 control-plane: controller-manager
             spec:
@@ -257,9 +259,6 @@ spec:
                   initialDelaySeconds: 5
                   periodSeconds: 10
                 resources:
-                  limits:
-                    cpu: 200m
-                    memory: 100Mi
                   requests:
                     cpu: 100m
                     memory: 20Mi
@@ -269,6 +268,9 @@ spec:
                 runAsNonRoot: true
               serviceAccountName: numaresources-controller-manager
               terminationGracePeriodSeconds: 10
+              tolerations:
+              - effect: NoSchedule
+                key: node-role.kubernetes.io/master
       permissions:
       - rules:
         - apiGroups:
