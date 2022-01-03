@@ -31,18 +31,17 @@ const (
 	envVarPodNamespace = "NAMESPACE"
 	envVarPodName      = "PODNAME"
 	NullPolicy         = corev1.PullPolicy("")
+	NullImage          = ""
 )
 
 func GetCurrentImage(ctx context.Context) (string, corev1.PullPolicy, error) {
 	podNamespace, ok := os.LookupEnv(envVarPodNamespace)
 	if !ok {
-		// TODO log
-		return ResourceTopologyExporterDefaultImageSHA, NullPolicy, fmt.Errorf("environment variable not set: %q", envVarPodNamespace)
+		return NullImage, NullPolicy, fmt.Errorf("environment variable not set: %q", envVarPodNamespace)
 	}
 	podName, ok := os.LookupEnv(envVarPodName)
 	if !ok {
-		// TODO log
-		return ResourceTopologyExporterDefaultImageSHA, NullPolicy, fmt.Errorf("environment variable not set: %q", envVarPodName)
+		return NullImage, NullPolicy, fmt.Errorf("environment variable not set: %q", envVarPodName)
 	}
 	return GetImageFromPod(ctx, podNamespace, podName, "")
 }

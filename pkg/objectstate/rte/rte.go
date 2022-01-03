@@ -297,14 +297,18 @@ func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1alpha1.Namespac
 	return res, ok
 }
 
-func UpdateDaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImageSpec string, builtinPullPolicy corev1.PullPolicy) {
+func UpdateDaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImageSpec string, builtinPullPolicy corev1.PullPolicy) error {
 	// TODO: better match by name than assume container#0 is RTE proper (not minion)
 	cnt := &ds.Spec.Template.Spec.Containers[0]
 	if userImageSpec != "" {
 		// we don't really know what's out there, so we minimize the changes.
 		cnt.Image = userImageSpec
 		klog.V(3).InfoS("Exporter image", "reason", "user-provided", "pullSpec", userImageSpec)
-		return
+		return nil
+	}
+
+	if builtinImageSpec == "" {
+		return fmt.Errorf("missing built-in image spec, no user image provided")
 	}
 
 	cnt.Image = builtinImageSpec
@@ -317,10 +321,11 @@ func UpdateDaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, built
 	fl := flagcodec.ParseArgvKeyValue(cnt.Command)
 	if fl == nil {
 		klog.Warningf("Cannot modify the command line %v", cnt.Command)
-		return
+		return nil
 	}
 	fl.SetToggle("--exit-on-conf-change")
 	cnt.Command = fl.Argv()
+	return nil
 }
 
 // UpdateDaemonSetRunAsIDs bump the ds container privileges to 0/0.

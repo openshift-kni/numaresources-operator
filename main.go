@@ -59,7 +59,7 @@ import (
 var (
 	scheme = runtime.NewScheme()
 
-	defaultImage     = images.ResourceTopologyExporterDefaultImageSHA
+	defaultImage     = ""
 	defaultNamespace = "numaresources-operator"
 )
 
@@ -312,7 +312,7 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 	mf := rteManifests.Update(rtemanifests.UpdateOptions{
 		Namespace: namespace,
 	})
-	rtestate.UpdateDaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
+	_ = rtestate.UpdateDaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
 	return mf
 }
 
