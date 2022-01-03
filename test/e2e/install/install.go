@@ -40,66 +40,19 @@ import (
 
 const crdName = "noderesourcetopologies.topology.node.k8s.io"
 
-var _ = Describe("[Install]", func() {
+var _ = Describe("[Install] continuousIntegration", func() {
 	var initialized bool
 
 	BeforeEach(func() {
 		if !initialized {
 			Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
-
 		}
 		initialized = true
 	})
 
 	Context("with a running cluster with all the components", func() {
 		It("should perform overall deployment and verify the condition is reported as available", func() {
-			var matchLabels map[string]string
-
-			if configuration.Platform == platform.Kubernetes {
-				mcpObj := objects.TestMCP()
-				By(fmt.Sprintf("creating the machine config pool object: %s", mcpObj.Name))
-				err := e2eclient.Client.Create(context.TODO(), mcpObj)
-				Expect(err).NotTo(HaveOccurred())
-				matchLabels = map[string]string{"test": "test"}
-			}
-
-			if configuration.Platform == platform.OpenShift {
-				// TODO: should this be configurable?
-				matchLabels = map[string]string{"pools.operator.machineconfiguration.openshift.io/worker": ""}
-			}
-
-			nroObj := objects.TestNRO(matchLabels)
-			kcObj, err := objects.TestKC(matchLabels)
-			Expect(err).To(Not(HaveOccurred()))
-
-			unpause, err := machineconfigpools.PauseMCPs(nroObj.Spec.NodeGroups)
-			Expect(err).NotTo(HaveOccurred())
-
-			By(fmt.Sprintf("creating the KC object: %s", kcObj.Name))
-			err = e2eclient.Client.Create(context.TODO(), kcObj)
-			Expect(err).NotTo(HaveOccurred())
-
-			By(fmt.Sprintf("creating the NRO object: %s", nroObj.Name))
-			err = e2eclient.Client.Create(context.TODO(), nroObj)
-			Expect(err).NotTo(HaveOccurred())
-
-			err = unpause()
-			Expect(err).NotTo(HaveOccurred())
-
-			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
-			Expect(err).NotTo(HaveOccurred())
-
-			if configuration.Platform == platform.OpenShift {
-				Eventually(func() bool {
-					updated, err := machineconfigpools.IsMachineConfigPoolsUpdated(nroObj)
-					if err != nil {
-						klog.Errorf("failed to information about machine config pools: %w", err)
-						return false
-					}
-
-					return updated
-				}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
-			}
+			nroObj := overallDeployment()
 
 			By("checking that the condition Available=true")
 			Eventually(func() bool {
@@ -121,13 +74,64 @@ var _ = Describe("[Install]", func() {
 				return cond.Status == metav1.ConditionTrue
 			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "RTE condition did not become available")
 
-			By("checking the NumaResourceTopology CRD is deployed")
+			By("checking the NRT CRD is deployed")
 			crd := &apiextensionv1.CustomResourceDefinition{}
 			key := client.ObjectKey{
 				Name: crdName,
 			}
-			err = e2eclient.Client.Get(context.TODO(), key, crd)
+			err := e2eclient.Client.Get(context.TODO(), key, crd)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })
+
+func overallDeployment() *nropv1alpha1.NUMAResourcesOperator {
+	var matchLabels map[string]string
+
+	if configuration.Platform == platform.Kubernetes {
+		mcpObj := objects.TestMCP()
+		By(fmt.Sprintf("creating the machine config pool object: %s", mcpObj.Name))
+		err := e2eclient.Client.Create(context.TODO(), mcpObj)
+		Expect(err).NotTo(HaveOccurred())
+		matchLabels = map[string]string{"test": "test"}
+	}
+
+	if configuration.Platform == platform.OpenShift {
+		// TODO: should this be configurable?
+		matchLabels = map[string]string{"pools.operator.machineconfiguration.openshift.io/worker": ""}
+	}
+
+	nroObj := objects.TestNRO(matchLabels)
+	kcObj, err := objects.TestKC(matchLabels)
+	Expect(err).To(Not(HaveOccurred()))
+
+	unpause, err := machineconfigpools.PauseMCPs(nroObj.Spec.NodeGroups)
+	Expect(err).NotTo(HaveOccurred())
+
+	By(fmt.Sprintf("creating the KC object: %s", kcObj.Name))
+	err = e2eclient.Client.Create(context.TODO(), kcObj)
+	Expect(err).NotTo(HaveOccurred())
+
+	By(fmt.Sprintf("creating the NRO object: %s", nroObj.Name))
+	err = e2eclient.Client.Create(context.TODO(), nroObj)
+	Expect(err).NotTo(HaveOccurred())
+
+	err = unpause()
+	Expect(err).NotTo(HaveOccurred())
+
+	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
+	Expect(err).NotTo(HaveOccurred())
+
+	if configuration.Platform == platform.OpenShift {
+		Eventually(func() bool {
+			updated, err := machineconfigpools.IsMachineConfigPoolsUpdated(nroObj)
+			if err != nil {
+				klog.Errorf("failed to information about machine config pools: %w", err)
+				return false
+			}
+
+			return updated
+		}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
+	}
+	return nroObj
+}
