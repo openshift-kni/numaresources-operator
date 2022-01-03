@@ -85,6 +85,52 @@ var _ = Describe("[Install] continuousIntegration", func() {
 	})
 })
 
+var _ = Describe("[Install] durability", func() {
+	var initialized bool
+	var objForDeletion []client.Object
+
+	BeforeEach(func() {
+		if !initialized {
+			Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
+		}
+		initialized = true
+	})
+
+	Context("with deploying NUMAResourcesOperator with wrong name", func() {
+		It("should do nothing", func() {
+			nroObj := objects.TestNRO(nil)
+			nroObj.Name = "wrong-name"
+			objForDeletion = append(objForDeletion, nroObj)
+
+			err := e2eclient.Client.Create(context.TODO(), nroObj)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("checking that the condition Degraded=true")
+			Eventually(func() bool {
+				updatedNROObj := &nropv1alpha1.NUMAResourcesOperator{}
+				err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), updatedNROObj)
+				if err != nil {
+					klog.Warningf("failed to get the  NUMAResourcesOperator CR: %v", err)
+					return false
+				}
+
+				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionDegraded)
+				if cond == nil {
+					klog.Warningf("missing conditions in %v", updatedNROObj)
+					return false
+				}
+
+				klog.Infof("condition: %v", cond)
+
+				return cond.Status == metav1.ConditionTrue
+			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "NUMAResourcesOperator condition did not become degraded")
+
+			err = e2eclient.Client.Delete(context.TODO(), nroObj)
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+})
+
 func overallDeployment() *nropv1alpha1.NUMAResourcesOperator {
 	var matchLabels map[string]string
 
