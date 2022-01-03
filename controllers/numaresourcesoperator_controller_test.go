@@ -49,6 +49,10 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 )
 
+const (
+	testImageSpec = "quay.io/openshift-kni/numaresources-operator:ci-test"
+)
+
 func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, initObjects ...runtime.Object) (*NUMAResourcesOperatorReconciler, error) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(initObjects...).Build()
 	helper := deployer.NewHelperWithClient(fakeClient, "", tlog.NewNullLogAdapter())
@@ -70,7 +74,7 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, initObjects 
 		RTEManifests: rteManifests,
 		Helper:       helper,
 		Namespace:    testNamespace,
-		ImageSpec:    "",
+		ImageSpec:    testImageSpec,
 	}, nil
 }
 

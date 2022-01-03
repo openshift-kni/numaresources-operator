@@ -270,9 +270,13 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instanc
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) ([]nropv1alpha1.NamespacedName, error) {
 	klog.Info("RTESync start")
 
-	rtestate.UpdateDaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.ImageSpec, r.ImagePullPolicy)
-
 	var daemonSetsNName []nropv1alpha1.NamespacedName
+
+	err := rtestate.UpdateDaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.ImageSpec, r.ImagePullPolicy)
+	if err != nil {
+		return daemonSetsNName, err
+	}
+
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, mcps, r.Namespace)
 	for _, objState := range existing.State(r.RTEManifests, r.Platform, instance, mcps) {
 		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
