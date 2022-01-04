@@ -10,6 +10,7 @@ spec:
     cpuManagerPolicy: "static"
     cpuManagerReconcilePeriod: "5s"
     reservedSystemCPUs: "0,1"
+    memoryManagerPolicy: "Static"
     evictionHard:
       memory.available: "100Mi"
     kubeReserved: 
