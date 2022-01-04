@@ -39,6 +39,9 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 )
 
+// MachineConfigLabelKey contains the key of generated label for machine config
+const MachineConfigLabelKey = "machineconfiguration.openshift.io/role"
+
 type daemonSetManifest struct {
 	daemonSet      *appsv1.DaemonSet
 	daemonSetError error
@@ -73,7 +76,7 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests, inst
 			desiredMachineConfig := mf.MachineConfig.DeepCopy()
 			// prefix machine config name to guarantee that we will have an option to override it
 			desiredMachineConfig.Name = mcName
-			desiredMachineConfig.Labels = mcp.Spec.MachineConfigSelector.MatchLabels
+			desiredMachineConfig.Labels = GetMachineConfigLabel(mcp)
 
 			existingMachineConfig, ok := em.machineConfigs[mcName]
 			if !ok {
@@ -94,6 +97,22 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests, inst
 	}
 
 	return ret
+}
+
+// GetMachineConfigLabel returns machine config labels that should be used under the machine config pool
+// machine config selector
+func GetMachineConfigLabel(mcp *machineconfigv1.MachineConfigPool) map[string]string {
+	if len(mcp.Spec.MachineConfigSelector.MatchLabels) > 0 {
+		return mcp.Spec.MachineConfigSelector.MatchLabels
+	}
+
+	// true only for custom machine config pools
+	klog.Warningf("no match labels was found under the machine config pool %q machine config selector", mcp.Name)
+	labels := map[string]string{
+		"machineconfiguration.openshift.io/role": mcp.Name,
+	}
+	klog.Warningf("generated labels %v, make sure the label is selected by the machine config pool %q", labels, mcp.Name)
+	return labels
 }
 
 func (em *ExistingManifests) State(mf rtemanifests.Manifests, plat platform.Platform, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []objectstate.ObjectState {

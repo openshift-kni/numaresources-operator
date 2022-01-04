@@ -238,8 +238,13 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	// create MC objects first
 	for _, objState := range existing.MachineConfigsState(r.RTEManifests, instance, mcps) {
 		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
-			return errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
+			return errors.Wrapf(err, "failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
+
+		if err := validateMachineConfigLabels(objState.Desired, mcps); err != nil {
+			return errors.Wrapf(err, "machine conig %q labels validation failed", objState.Desired.GetName())
+		}
+
 		_, err := apply.ApplyObject(ctx, r.Client, objState)
 		if err != nil {
 			return errors.Wrapf(err, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
@@ -417,4 +422,32 @@ func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.Machin
 	}
 
 	return true
+}
+
+func validateMachineConfigLabels(mc client.Object, mcps []*machineconfigv1.MachineConfigPool) error {
+	mcLabels := mc.GetLabels()
+	v, ok := mcLabels[rtestate.MachineConfigLabelKey]
+	// the machine config does not have generated label, meaning the machine config pool has the matchLabels under
+	// the machine config selector, no need to validate
+	if !ok {
+		return nil
+	}
+
+	for _, mcp := range mcps {
+		if v != mcp.Name {
+			continue
+		}
+
+		mcLabels := labels.Set(mcLabels)
+		mcSelector, err := metav1.LabelSelectorAsSelector(mcp.Spec.MachineConfigSelector)
+		if err != nil {
+			return fmt.Errorf("failed to represent machine config pool %q machine config selector as selector: %w", mcp.Name, err)
+		}
+
+		if !mcSelector.Matches(mcLabels) {
+			return fmt.Errorf("machine config %q labels does not match the machine config pool %q machine config selector", mc.GetName(), mcp.Name)
+		}
+	}
+
+	return nil
 }
