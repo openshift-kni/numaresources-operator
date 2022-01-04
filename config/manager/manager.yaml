@@ -19,11 +19,16 @@ spec:
   replicas: 1
   template:
     metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         control-plane: controller-manager
     spec:
       securityContext:
         runAsNonRoot: true
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
       containers:
       - command:
         - /bin/numaresources-operator
