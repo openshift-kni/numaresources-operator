@@ -18,7 +18,7 @@ spec:
     reservedMemory:
       - numaNode: 0
         limits:
-          memory: "100Mi"
+          memory: "1124Mi"
     systemReserved: 
       memory: "512Mi"
     topologyManagerPolicy: "single-numa-node"
