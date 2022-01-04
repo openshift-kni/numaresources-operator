@@ -13,7 +13,7 @@ trap '{ echo "Running NRO uninstall test suite"; ${BIN_DIR}/e2e-uninstall.test $
 
 # Run install test suite
 echo "Running NRO install test suite"
-${BIN_DIR}/e2e-install.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.reportFile=/tmp/artifacts/install
+${BIN_DIR}/e2e-install.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.reportFile=/tmp/artifacts/install --ginkgo.focus='\[Install\] continuousIntegration'
 
 # The install failed, no taste to continue
 if [ $? -ne 0 ]; then
