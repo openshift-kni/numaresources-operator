@@ -296,5 +296,5 @@ verify-generated: bundle generate
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
 	hack/verify-generated.sh
 
-install-commit-hooks:
+install-git-hooks:
 	git config core.hooksPath .githooks	
