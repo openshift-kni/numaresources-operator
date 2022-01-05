@@ -237,6 +237,7 @@ bundle-push: ## Push the bundle image.
 operator-sdk:
 	@if [ ! -x "$(OPERATOR_SDK)" ]; then\
 		echo "Downloading operator-sdk $(OPERATOR_SDK_VERSION)";\
+		mkdir -p $(BIN_DIR);\
 		curl -JL https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/$(OPERATOR_SDK_BIN) -o $(OPERATOR_SDK);\
 		chmod +x $(OPERATOR_SDK);\
 	else\
@@ -290,3 +291,10 @@ build-tools: bin/git-semver
 
 bin/git-semver:
 	@go build -o bin/git-semver vendor/github.com/mdomke/git-semver/main.go
+
+verify-generated: bundle generate
+	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
+	hack/verify-generated.sh
+
+install-git-hooks:
+	git config core.hooksPath .githooks	
