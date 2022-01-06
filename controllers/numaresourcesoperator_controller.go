@@ -38,6 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -73,6 +74,7 @@ type NUMAResourcesOperatorReconciler struct {
 	Namespace       string
 	ImageSpec       string
 	ImagePullPolicy corev1.PullPolicy
+	Recorder        record.EventRecorder
 }
 
 // TODO: narrow down
@@ -143,9 +145,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	if condition != "" {
 		// TODO: use proper reason
 		reason, message := condition, messageFromError(err)
-		if err := status.Update(ctx, r.Client, instance, condition, reason, message); err != nil {
-			klog.InfoS("Failed to update numaresourcesoperator status", "Desired condition", condition, "error", err)
-		}
+		_, _ = r.updateStatus(ctx, instance, condition, reason, message)
 	}
 	return result, err
 }
@@ -178,15 +178,19 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	var err error
 	err = r.syncNodeResourceTopologyAPI()
 	if err != nil {
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedCRDInstall", "Failed to install Node Resource Topology CRD: %v", err)
 		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedAPISync")
 	}
+	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulCRDInstall", "Node Resource Topology CRD installed")
 
 	if r.Platform == platform.OpenShift {
 		// we need to create machine configs first and wait for the MachineConfigPool updates
 		// before creating additional components
 		if err := r.syncMachineConfigs(ctx, instance, mcps); err != nil {
+			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
 			return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "failed to sync machine configs")
 		}
+		r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulMCSync", "Enabled machine configuration for worker nodes")
 
 		// MCO need to update SELinux context and other stuff, and need to trigger a reboot.
 		// It can take a while.
@@ -198,8 +202,10 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 
 	daemonSetsInfo, err := r.syncNUMAResourcesOperatorResources(ctx, instance, mcps)
 	if err != nil {
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECreate", "Failed to create Resource-Topology-Exporter DaemonSets: %v", err)
 		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedRTESync")
 	}
+	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
 
 	instance.Status.DaemonSets = []nropv1alpha1.NamespacedName{}
 	for _, nname := range daemonSetsInfo {
