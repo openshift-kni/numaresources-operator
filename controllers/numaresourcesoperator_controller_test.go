@@ -35,11 +35,13 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -68,6 +70,8 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, initObjects 
 		return nil, err
 	}
 
+	recorder := record.NewFakeRecorder(bufferSize)
+
 	return &NUMAResourcesOperatorReconciler{
 		Client:       fakeClient,
 		Scheme:       scheme.Scheme,
@@ -77,6 +81,7 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, initObjects 
 		Helper:       helper,
 		Namespace:    testNamespace,
 		ImageSpec:    testImageSpec,
+		Recorder:     recorder,
 	}, nil
 }
 
