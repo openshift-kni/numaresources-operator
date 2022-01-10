@@ -3,6 +3,7 @@ module github.com/openshift-kni/numaresources-operator
 go 1.17
 
 require (
+	github.com/fsnotify/fsnotify v1.4.9
 	github.com/ghodss/yaml v1.0.0
 	github.com/jaypipes/ghw v0.8.1-0.20210609141030-acb1a36eaf89
 	github.com/jaypipes/pcidb v0.6.0
@@ -53,7 +54,6 @@ require (
 	github.com/evanphx/json-patch v4.11.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
-	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/go-logr/logr v0.4.0 // indirect
 	github.com/go-logr/zapr v0.4.0 // indirect
 	github.com/go-ole/go-ole v1.2.5 // indirect
