@@ -208,6 +208,7 @@ func main() {
 	if err = (&controllers.NUMAResourcesOperatorReconciler{
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
+		Recorder:        mgr.GetEventRecorderFor("numaresources-controller"),
 		APIManifests:    apiManifests,
 		RTEManifests:    renderRTEManifests(rteManifests, namespace, imageSpec),
 		Platform:        clusterPlatform,
