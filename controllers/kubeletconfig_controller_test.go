@@ -56,9 +56,10 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 		var nro *nrov1alpha1.NUMAResourcesOperator
 		var mcp1 *machineconfigv1.MachineConfigPool
 		var mcoKc1 *machineconfigv1.KubeletConfig
+		var label1 map[string]string
 
 		BeforeEach(func() {
-			label1 := map[string]string{
+			label1 = map[string]string{
 				"test1": "test1",
 			}
 			mcp1 = testutils.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
@@ -95,6 +96,37 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 				}
 				Expect(reconciler.Client.Get(context.TODO(), key, cm)).ToNot(HaveOccurred())
 
+			})
+			It("should send events when NRO present and operation succesfull", func() {
+				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, mcoKc1)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(mcoKc1)
+				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				// verify creation event
+				fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
+				Expect(ok).To(BeTrue())
+				event := <-fakeRecorder.Events
+				Expect(event).To(ContainSubstring("ProcessOK"))
+			})
+
+			It("should send events when NRO present and operation failure", func() {
+				brokenMcoKc := testutils.NewKubeletConfigWithData("test1", label1, mcp1.Spec.MachineConfigSelector, []byte(""))
+				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, brokenMcoKc)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(mcoKc1)
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).To(HaveOccurred())
+
+				// verify creation event
+				fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
+				Expect(ok).To(BeTrue())
+				event := <-fakeRecorder.Events
+				Expect(event).To(ContainSubstring("ProcessFailed"))
 			})
 		})
 	})
