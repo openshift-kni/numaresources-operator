@@ -154,51 +154,51 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 			Context("on the first iteration", func() {
-				var result reconcile.Result
+				var firstLoopResult reconcile.Result
 				BeforeEach(func() {
 					var err error
 
 					key := client.ObjectKeyFromObject(nro)
-					result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+					firstLoopResult, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 					Expect(err).ToNot(HaveOccurred())
 				})
 				It("should create CRD, machine configs and wait for MCPs updates", func() {
 					// check reconcile loop result
-					Expect(result).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+					Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
 
 					// check CRD is created
 					crd := &apiextensionsv1.CustomResourceDefinition{}
-					key := client.ObjectKey{
+					crdKey := client.ObjectKey{
 						Name: "noderesourcetopologies.topology.node.k8s.io",
 					}
-					Expect(reconciler.Client.Get(context.TODO(), key, crd)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), crdKey, crd)).ToNot(HaveOccurred())
 
 					// check MachineConfigs are created
 					mc := &machineconfigv1.MachineConfig{}
-					key = client.ObjectKey{
+					mc1Key := client.ObjectKey{
 						Name: rte.GetMachineConfigName(nro.Name, mcp1.Name),
 					}
-					Expect(reconciler.Client.Get(context.TODO(), key, mc)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), mc1Key, mc)).ToNot(HaveOccurred())
 
-					key = client.ObjectKey{
+					mc2Key := client.ObjectKey{
 						Name: rte.GetMachineConfigName(nro.Name, mcp2.Name),
 					}
-					Expect(reconciler.Client.Get(context.TODO(), key, mc)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), mc2Key, mc)).ToNot(HaveOccurred())
 				})
 			})
 			Context("on the second iteration", func() {
-				var result reconcile.Result
+				var secondLoopResult reconcile.Result
 				When("machine config pools still are not ready", func() {
 					BeforeEach(func() {
 						var err error
 
 						key := client.ObjectKeyFromObject(nro)
-						result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+						secondLoopResult, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 						Expect(err).ToNot(HaveOccurred())
 					})
 					It("should wait", func() {
 						//check reconcile second loop result
-						Expect(result).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+						Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
 
 						key := client.ObjectKeyFromObject(nro)
 						Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
@@ -242,54 +242,54 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						Expect(reconciler.Client.Status().Update(context.TODO(), mcp2))
 
 						key := client.ObjectKeyFromObject(nro)
-						result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+						secondLoopResult, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 						Expect(err).ToNot(HaveOccurred())
 					})
 					It("should continue with creation of additional components", func() {
 						// check reconcile second loop result
-						Expect(result).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+						Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
 
 						// Check All the additional components are created
-						key := client.ObjectKey{
+						rteKey := client.ObjectKey{
 							Name:      "rte",
 							Namespace: testNamespace,
 						}
 						role := &rbacv1.Role{}
-						Expect(reconciler.Client.Get(context.TODO(), key, role)).ToNot(HaveOccurred())
+						Expect(reconciler.Client.Get(context.TODO(), rteKey, role)).ToNot(HaveOccurred())
 
 						rb := &rbacv1.RoleBinding{}
-						Expect(reconciler.Client.Get(context.TODO(), key, rb)).ToNot(HaveOccurred())
+						Expect(reconciler.Client.Get(context.TODO(), rteKey, rb)).ToNot(HaveOccurred())
 
 						sa := &corev1.ServiceAccount{}
-						Expect(reconciler.Client.Get(context.TODO(), key, sa)).ToNot(HaveOccurred())
+						Expect(reconciler.Client.Get(context.TODO(), rteKey, sa)).ToNot(HaveOccurred())
 
-						key = client.ObjectKey{
+						crKey := client.ObjectKey{
 							Name: "rte",
 						}
 						cr := &rbacv1.ClusterRole{}
-						Expect(reconciler.Client.Get(context.TODO(), key, cr)).ToNot(HaveOccurred())
+						Expect(reconciler.Client.Get(context.TODO(), crKey, cr)).ToNot(HaveOccurred())
 
 						crb := &rbacv1.ClusterRoleBinding{}
-						Expect(reconciler.Client.Get(context.TODO(), key, crb)).ToNot(HaveOccurred())
+						Expect(reconciler.Client.Get(context.TODO(), crKey, crb)).ToNot(HaveOccurred())
 
-						key = client.ObjectKey{
+						resourceTopologyExporterKey := client.ObjectKey{
 							Name: "resource-topology-exporter",
 						}
 						scc := &securityv1.SecurityContextConstraints{}
-						Expect(reconciler.Client.Get(context.TODO(), key, scc)).ToNot(HaveOccurred())
+						Expect(reconciler.Client.Get(context.TODO(), resourceTopologyExporterKey, scc)).ToNot(HaveOccurred())
 
-						key = client.ObjectKey{
+						mcp1DSKey := client.ObjectKey{
 							Name:      rte.GetComponentName(nro.Name, mcp1.Name),
 							Namespace: testNamespace,
 						}
 						ds := &appsv1.DaemonSet{}
-						Expect(reconciler.Client.Get(context.TODO(), key, ds)).ToNot(HaveOccurred())
+						Expect(reconciler.Client.Get(context.TODO(), mcp1DSKey, ds)).ToNot(HaveOccurred())
 
-						key = client.ObjectKey{
+						mcp2DSKey := client.ObjectKey{
 							Name:      rte.GetComponentName(nro.Name, mcp2.Name),
 							Namespace: testNamespace,
 						}
-						Expect(reconciler.Client.Get(context.TODO(), key, ds)).ToNot(HaveOccurred())
+						Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).ToNot(HaveOccurred())
 					})
 				})
 			})
@@ -334,9 +334,9 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 				It("should create the machine config", func() {
 					key := client.ObjectKeyFromObject(nro)
-					result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+					firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 					Expect(err).ToNot(HaveOccurred())
-					Expect(result).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+					Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
 
 					mc := &machineconfigv1.MachineConfig{}
 					key = client.ObjectKey{
@@ -365,15 +365,15 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 				It("should not create the machine config and set the degraded condition", func() {
 					key := client.ObjectKeyFromObject(nro)
-					result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+					firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 					Expect(err).To(HaveOccurred())
-					Expect(result).To(Equal(reconcile.Result{}))
+					Expect(firstLoopResult).To(Equal(reconcile.Result{}))
 
 					mc := &machineconfigv1.MachineConfig{}
-					key = client.ObjectKey{
+					mcKey := client.ObjectKey{
 						Name: rte.GetMachineConfigName(nro.Name, mcpWithComplexMachineConfigSelector.Name),
 					}
-					err = reconciler.Client.Get(context.TODO(), key, mc)
+					err = reconciler.Client.Get(context.TODO(), mcKey, mc)
 					Expect(apierrors.IsNotFound(err)).To(BeTrue())
 
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nro)).ToNot(HaveOccurred())
