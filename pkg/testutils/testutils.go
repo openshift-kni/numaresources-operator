@@ -52,6 +52,10 @@ func NewMachineConfigPool(name string, labels map[string]string, machineConfigSe
 
 func NewKubeletConfig(name string, labels map[string]string, machineConfigSelector *metav1.LabelSelector, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration) *machineconfigv1.KubeletConfig {
 	data, _ := json.Marshal(kubeletConfig)
+	return NewKubeletConfigWithData(name, labels, machineConfigSelector, data)
+}
+
+func NewKubeletConfigWithData(name string, labels map[string]string, machineConfigSelector *metav1.LabelSelector, data []byte) *machineconfigv1.KubeletConfig {
 	return &machineconfigv1.KubeletConfig{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "KubeletConfig",
