@@ -18,12 +18,19 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
 // NUMAResourcesSchedulerSpec defines the desired state of NUMAResourcesScheduler
 type NUMAResourcesSchedulerSpec struct {
 	SchedulerImage string `json:"imageSpec"`
 	SchedulerName  string `json:"schedulerName,omitempty"`
+	// Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+	// Defaults to "Normal".
+	// +optional
+	// +kubebuilder:default=Normal
+	LogLevel operatorv1.LogLevel `json:"logLevel,omitempty"`
 }
 
 // NUMAResourcesSchedulerStatus defines the observed state of NUMAResourcesScheduler
