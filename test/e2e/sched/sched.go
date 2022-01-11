@@ -18,64 +18,57 @@ package sched
 
 import (
 	"context"
-	"fmt"
 	"time"
+
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	"github.com/openshift-kni/numaresources-operator/pkg/status"
+	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
-var _ = Describe("[Scheduler] install", func() {
-	var initialized bool
+const newTestImage = "quay.io/openshift-kni/scheduler-plugins:test-ci"
 
+var _ = Describe("[Scheduler] imageReplacement", func() {
+	var initialized bool
 	BeforeEach(func() {
 		if !initialized {
 			Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
-
 		}
 		initialized = true
 	})
-
 	Context("with a running cluster with all the components", func() {
-		It("should perform the scheduler deployment and verify the condition is reported as available", func() {
+		It("should be able to handle plugin image change without remove/rename", func() {
 			var err error
 			nroSchedObj := objects.TestNROScheduler()
 
-			By(fmt.Sprintf("creating the NRO Scheduler object: %s", nroSchedObj.Name))
-			err = e2eclient.Client.Create(context.TODO(), nroSchedObj)
-			Expect(err).NotTo(HaveOccurred())
+			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
+			Expect(err).ToNot(HaveOccurred())
+
+			uid := nroSchedObj.GetUID()
+			nroSchedObj.Spec.SchedulerImage = newTestImage
+
+			err = e2eclient.Client.Update(context.TODO(), nroSchedObj)
+			Expect(err).ToNot(HaveOccurred())
 
 			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(nroSchedObj.GetUID()).To(BeEquivalentTo(uid))
 
-			By("checking that the condition Available=true")
 			Eventually(func() bool {
-				updatedNROObj := &nropv1alpha1.NUMAResourcesScheduler{}
-				err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), updatedNROObj)
+				// find deployment by the ownerReference
+				deploy, err := schedutils.GetDeploymentByOwnerReference(uid)
 				if err != nil {
-					klog.Warningf("failed to get the RTE resource: %v", err)
+					klog.Warningf("%w", err)
 					return false
 				}
 
-				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
-				if cond == nil {
-					klog.Warningf("missing conditions in %v", updatedNROObj)
-					return false
-				}
-
-				klog.Infof("condition: %v", cond)
-
-				return cond.Status == metav1.ConditionTrue
-			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "RTE condition did not become available")
+				return deploy.Spec.Template.Spec.Containers[0].Image == newTestImage
+			}, time.Minute, time.Second*10).Should(BeTrue())
 		})
 	})
 })
