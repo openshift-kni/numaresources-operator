@@ -17,16 +17,21 @@ limitations under the License.
 package v1alpha1
 
 import (
-	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	operatorv1 "github.com/openshift/api/operator/v1"
+	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 // NUMAResourcesOperatorSpec defines the desired state of NUMAResourcesOperator
 type NUMAResourcesOperatorSpec struct {
-	NodeGroups []NodeGroup `json:"nodeGroups,omitempty"`
-
-	ExporterImage string `json:"imageSpec,omitempty"`
+	NodeGroups    []NodeGroup `json:"nodeGroups,omitempty"`
+	ExporterImage string      `json:"imageSpec,omitempty"`
+	// Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+	// Defaults to "Normal".
+	// +optional
+	// +kubebuilder:default=Normal
+	LogLevel operatorv1.LogLevel `json:"logLevel,omitempty"`
 }
 
 // NodeGroup defines group of nodes that will run resource topology exporter daemon set

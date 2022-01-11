@@ -41,6 +41,17 @@ spec:
             properties:
               imageSpec:
                 type: string
+              logLevel:
+                default: Normal
+                description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+                  Defaults to "Normal".'
+                enum:
+                - ""
+                - Normal
+                - Debug
+                - Trace
+                - TraceAll
+                type: string
               nodeGroups:
                 items:
                   description: NodeGroup defines group of nodes that will run resource
