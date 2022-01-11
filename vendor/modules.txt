@@ -33,6 +33,9 @@ github.com/PuerkitoBio/urlesc
 # github.com/StackExchange/wmi v1.2.1
 ## explicit; go 1.13
 github.com/StackExchange/wmi
+# github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129
+## explicit
+github.com/andres-erbsen/clock
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -210,7 +213,7 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/scheme
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/typed/topology/v1alpha1
-# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.3.3-0.20211213120214-84b219b93f5b
+# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.4.1
 ## explicit; go 1.16
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8shelpers
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/kubeconf
@@ -219,6 +222,7 @@ github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podreadiness
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podrescli
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/prometheus
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/ratelimiter
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/sysinfo
@@ -423,6 +427,9 @@ go.uber.org/atomic
 # go.uber.org/multierr v1.6.0
 ## explicit; go 1.12
 go.uber.org/multierr
+# go.uber.org/ratelimit v0.2.0
+## explicit; go 1.14
+go.uber.org/ratelimit
 # go.uber.org/zap v1.18.1
 ## explicit; go 1.13
 go.uber.org/zap
