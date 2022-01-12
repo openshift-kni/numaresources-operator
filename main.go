@@ -56,6 +56,8 @@ import (
 	//+kubebuilder:scaffold:imports
 )
 
+// silly comment to trigger a change
+
 var (
 	scheme = runtime.NewScheme()
 
