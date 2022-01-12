@@ -58,13 +58,6 @@ var _ = Describe("[Uninstall]", func() {
 			kcObj, err := objects.TestKC(map[string]string{})
 			Expect(err).To(Not(HaveOccurred()))
 
-			if configuration.Platform == platform.Kubernetes {
-				mcpObj := objects.TestMCP()
-				if err := e2eclient.Client.Delete(context.TODO(), mcpObj); err != nil && !errors.IsNotFound(err) {
-					klog.Warningf("failed to delete the machine config pool %q", mcpObj.Name)
-				}
-			}
-
 			// failed to get the NRO object, nothing else we can do
 			if err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj); err != nil {
 				if !errors.IsNotFound(err) {
@@ -88,6 +81,13 @@ var _ = Describe("[Uninstall]", func() {
 
 			err = unpause()
 			Expect(err).NotTo(HaveOccurred())
+
+			if configuration.Platform == platform.Kubernetes {
+				mcpObj := objects.TestMCP()
+				if err := e2eclient.Client.Delete(context.TODO(), mcpObj); err != nil {
+					klog.Warningf("failed to delete the machine config pool %q", mcpObj.Name)
+				}
+			}
 
 			if configuration.Platform == platform.OpenShift {
 				Eventually(func() bool {
