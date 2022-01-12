@@ -20,36 +20,32 @@ const (
 	RTEConfigMapName   = "rte-config"
 )
 
-func UpdateRoleBinding(rb *rbacv1.RoleBinding, serviceAccount, namespace string) *rbacv1.RoleBinding {
+func UpdateRoleBinding(rb *rbacv1.RoleBinding, serviceAccount, namespace string) {
 	for idx := 0; idx < len(rb.Subjects); idx++ {
 		if serviceAccount != "" {
 			rb.Subjects[idx].Name = serviceAccount
 		}
 		rb.Subjects[idx].Namespace = namespace
 	}
-	return rb
 }
 
-func UpdateClusterRoleBinding(crb *rbacv1.ClusterRoleBinding, serviceAccount, namespace string) *rbacv1.ClusterRoleBinding {
+func UpdateClusterRoleBinding(crb *rbacv1.ClusterRoleBinding, serviceAccount, namespace string) {
 	for idx := 0; idx < len(crb.Subjects); idx++ {
 		if serviceAccount != "" {
 			crb.Subjects[idx].Name = serviceAccount
 		}
 		crb.Subjects[idx].Namespace = namespace
 	}
-	return crb
 }
 
-func UpdateSchedulerPluginSchedulerDeployment(dp *appsv1.Deployment, pullIfNotPresent bool) *appsv1.Deployment {
+func UpdateSchedulerPluginSchedulerDeployment(dp *appsv1.Deployment, pullIfNotPresent bool) {
 	dp.Spec.Template.Spec.Containers[0].Image = images.SchedulerPluginSchedulerImage
 	dp.Spec.Template.Spec.Containers[0].ImagePullPolicy = pullPolicy(pullIfNotPresent)
-	return dp
 }
 
-func UpdateSchedulerPluginControllerDeployment(dp *appsv1.Deployment, pullIfNotPresent bool) *appsv1.Deployment {
+func UpdateSchedulerPluginControllerDeployment(dp *appsv1.Deployment, pullIfNotPresent bool) {
 	dp.Spec.Template.Spec.Containers[0].Image = images.SchedulerPluginControllerImage
 	dp.Spec.Template.Spec.Containers[0].ImagePullPolicy = pullPolicy(pullIfNotPresent)
-	return dp
 }
 
 func UpdateResourceTopologyExporterContainerConfig(podSpec *corev1.PodSpec, cnt *corev1.Container, configMapName string) {

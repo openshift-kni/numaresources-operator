@@ -8,7 +8,7 @@ require (
 	github.com/google/go-cmp v0.5.6
 	github.com/jaypipes/ghw v0.8.1-0.20210609141030-acb1a36eaf89
 	github.com/jaypipes/pcidb v0.6.0
-	github.com/k8stopologyawareschedwg/deployer v0.1.1-0.20211213080518-881e130aa39a
+	github.com/k8stopologyawareschedwg/deployer v0.3.0
 	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.4.1
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo v1.16.4

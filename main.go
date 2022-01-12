@@ -310,7 +310,7 @@ func renderObjects(objs []client.Object) error {
 // renderRTEManifests renders the reconciler manifests so they can be deployed on the cluster.
 func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, imageSpec string) rtemanifests.Manifests {
 	klog.InfoS("Updating RTE manifests")
-	mf := rteManifests.Update(rtemanifests.UpdateOptions{
+	mf := rteManifests.Render(rtemanifests.RenderOptions{
 		Namespace: namespace,
 	})
 	_ = rtestate.UpdateDaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
