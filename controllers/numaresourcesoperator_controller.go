@@ -38,6 +38,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -281,6 +282,11 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instanc
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) ([]nropv1alpha1.NamespacedName, error) {
 	klog.Info("RTESync start")
 
+	errorList := r.deleteUnusedDaemonSets(ctx, instance, mcps)
+	if len(errorList) > 0 {
+		klog.ErrorS(fmt.Errorf("failed to delete unused daemonsets"), "errors", errorList)
+	}
+
 	var daemonSetsNName []nropv1alpha1.NamespacedName
 
 	err := rtestate.UpdateDaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.ImageSpec, r.ImagePullPolicy)
@@ -303,6 +309,46 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		}
 	}
 	return daemonSetsNName, nil
+}
+
+func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []error {
+	klog.V(3).Info("Delete DS start")
+	var errors []error
+	var daemonSetList appsv1.DaemonSetList
+	if err := r.List(ctx, &daemonSetList, &client.ListOptions{Namespace: instance.Namespace}); err != nil {
+		klog.ErrorS(err, "error while getting DS list")
+		return append(errors, err)
+	}
+
+	// Generate the names of the DaemonSets that should be running,
+	// one for each MachineConfigPool
+	expectedDaemonSetNames := sets.NewString()
+	for _, mcp := range mcps {
+		expectedDaemonSetNames = expectedDaemonSetNames.Insert(rtestate.GetComponentName(instance.Name, mcp.Name))
+	}
+
+	for _, ds := range daemonSetList.Items {
+		if !expectedDaemonSetNames.Has(ds.Name) {
+			if isOwnedBy(ds.GetObjectMeta(), instance) {
+
+				if err := r.Client.Delete(ctx, &ds); err != nil {
+					klog.ErrorS(err, "error while deleting daemonset", "DaemonSet", ds.Name)
+					errors = append(errors, err)
+				}
+				klog.V(3).Infof("DS[%s] deleted", ds.Name)
+			}
+		}
+	}
+	return errors
+}
+
+func isOwnedBy(element metav1.Object, owner metav1.Object) bool {
+	for _, ref := range element.GetOwnerReferences() {
+		if ref.UID == owner.GetUID() {
+			return true
+		}
+	}
+	return false
 }
 
 // SetupWithManager sets up the controller with the Manager.

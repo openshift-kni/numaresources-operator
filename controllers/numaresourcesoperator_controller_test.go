@@ -126,15 +126,170 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		})
 	})
 
+	Context("with correct NRO and more than one NodeGroup", func() {
+		var nro *nrov1alpha1.NUMAResourcesOperator
+		var mcp1 *machineconfigv1.MachineConfigPool
+		var mcp2 *machineconfigv1.MachineConfigPool
+
+		var reconciler *NUMAResourcesOperatorReconciler
+		var label1, label2 map[string]string
+
+		BeforeEach(func() {
+			label1 = map[string]string{
+				"test1": "test1",
+			}
+			label2 = map[string]string{
+				"test2": "test2",
+			}
+
+			nro = testutils.NewNUMAResourcesOperator(defaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
+				{MatchLabels: label1},
+				{MatchLabels: label2},
+			})
+
+			mcp1 = testutils.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
+			mcp2 = testutils.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
+
+			var err error
+			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, nro, mcp1, mcp2)
+			Expect(err).ToNot(HaveOccurred())
+
+			key := client.ObjectKeyFromObject(nro)
+			firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+
+			// Ensure mcp1 is ready
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).ToNot(HaveOccurred())
+			mcp1.Status.Configuration.Source = []corev1.ObjectReference{
+				{
+					Name: rte.GetMachineConfigName(nro.Name, mcp1.Name),
+				},
+			}
+			mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+				{
+					Type:   machineconfigv1.MachineConfigPoolUpdated,
+					Status: corev1.ConditionTrue,
+				},
+			}
+			Expect(reconciler.Client.Status().Update(context.TODO(), mcp1))
+
+			// ensure mcp2 is ready
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).ToNot(HaveOccurred())
+			mcp2.Status.Configuration.Source = []corev1.ObjectReference{
+				{
+					Name: rte.GetMachineConfigName(nro.Name, mcp2.Name),
+				},
+			}
+			mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+				{
+					Type:   machineconfigv1.MachineConfigPoolUpdated,
+					Status: corev1.ConditionTrue,
+				},
+			}
+			Expect(reconciler.Client.Status().Update(context.TODO(), mcp2))
+
+			secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+
+			By("Check DaemonSets are created")
+			mcp1DSKey := client.ObjectKey{
+				Name:      rte.GetComponentName(nro.Name, mcp1.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcp1DSKey, ds)).ToNot(HaveOccurred())
+
+			mcp2DSKey := client.ObjectKey{
+				Name:      rte.GetComponentName(nro.Name, mcp2.Name),
+				Namespace: testNamespace,
+			}
+			Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).ToNot(HaveOccurred())
+		})
+		When("a NodeGroup is deleted", func() {
+			BeforeEach(func() {
+				// check we have at least two NodeGroups
+				Expect(len(nro.Spec.NodeGroups)).To(BeNumerically(">", 1))
+
+				By("Update NRO to have just one NodeGroup")
+				key := client.ObjectKeyFromObject(nro)
+				nro := &nrov1alpha1.NUMAResourcesOperator{}
+				Expect(reconciler.Client.Get(context.TODO(), key, nro)).NotTo(HaveOccurred())
+
+				nro.Spec.NodeGroups = []nrov1alpha1.NodeGroup{{
+					MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: label1},
+				}}
+				Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
+
+				thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+			})
+			It("should delete also the corresponding DaemonSet", func() {
+
+				ds := &appsv1.DaemonSet{}
+
+				// Check ds1 still exist
+				ds1Key := client.ObjectKey{
+					Name:      rte.GetComponentName(nro.Name, mcp1.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(context.TODO(), ds1Key, ds)).NotTo(HaveOccurred())
+
+				// check ds2 has been deleted
+				ds2Key := client.ObjectKey{
+					Name:      rte.GetComponentName(nro.Name, mcp2.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(context.TODO(), ds2Key, ds)).To(HaveOccurred(), "error: ds %v should have been deleted", ds2Key)
+			})
+			When("a NOT owned Daemonset exists", func() {
+				BeforeEach(func() {
+					By("Create a new DS with correct name but not owner reference")
+
+					ds := reconciler.RTEManifests.DaemonSet.DeepCopy()
+					ds.Name = rte.GetComponentName(nro.Name, mcp2.Name)
+					ds.Namespace = testNamespace
+
+					Expect(reconciler.Client.Create(context.TODO(), ds)).ToNot(HaveOccurred())
+
+					key := client.ObjectKeyFromObject(nro)
+					var err error
+					_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				It("should NOT delete not Owned DaemonSets", func() {
+					ds := &appsv1.DaemonSet{}
+
+					// Check ds1 still exist
+					ds1Key := client.ObjectKey{
+						Name:      rte.GetComponentName(nro.Name, mcp1.Name),
+						Namespace: testNamespace,
+					}
+					Expect(reconciler.Client.Get(context.TODO(), ds1Key, ds)).NotTo(HaveOccurred())
+
+					// Check not owned DS is NOT deleted even if the name corresponds to mcp2
+					dsKey := client.ObjectKey{
+						Name:      rte.GetComponentName(nro.Name, mcp2.Name),
+						Namespace: testNamespace,
+					}
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).NotTo(HaveOccurred(), "error: ds %v should NOT have been deleted", dsKey)
+				})
+			})
+		})
+	})
 	Context("with correct NRO CR", func() {
 		var nro *nrov1alpha1.NUMAResourcesOperator
 		var mcp1 *machineconfigv1.MachineConfigPool
 		var mcp2 *machineconfigv1.MachineConfigPool
 
 		var reconciler *NUMAResourcesOperatorReconciler
+		var label1 map[string]string
 
 		BeforeEach(func() {
-			label1 := map[string]string{
+			label1 = map[string]string{
 				"test1": "test1",
 			}
 			label2 := map[string]string{
@@ -216,6 +371,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					BeforeEach(func() {
 						var err error
 
+						By("Ensure both MachineConfigPools are ready")
 						// Ensure mcp1 is ready
 						Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).ToNot(HaveOccurred())
 						mcp1.Status.Configuration.Source = []corev1.ObjectReference{
@@ -254,7 +410,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						// check reconcile second loop result
 						Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
 
-						// Check All the additional components are created
+						By("Check All the additional components are created")
 						rteKey := client.ObjectKey{
 							Name:      "rte",
 							Namespace: testNamespace,
@@ -296,6 +452,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						}
 						Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).ToNot(HaveOccurred())
 					})
+
 				})
 			})
 		})

@@ -25,6 +25,7 @@ require (
 	k8s.io/klog/v2 v2.10.0
 	k8s.io/kubelet v0.22.3
 	k8s.io/kubernetes v1.22.3
+	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a
 	sigs.k8s.io/controller-runtime v0.9.6
 	sigs.k8s.io/yaml v1.2.0
 )
@@ -131,7 +132,6 @@ require (
 	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e // indirect
 	k8s.io/kube-scheduler v0.22.3 // indirect
 	k8s.io/kubectl v0.22.1 // indirect
-	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.22 // indirect
 	sigs.k8s.io/scheduler-plugins v0.19.9 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect
