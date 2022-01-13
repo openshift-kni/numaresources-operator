@@ -120,6 +120,9 @@ test-unit: envtest
 test-e2e: build-e2e-all
 	hack/run-test-e2e.sh
 
+test-install-e2e: build-e2e-all
+	hack/run-test-install-e2e.sh
+
 ##@ Build
 
 binary: build-tools
