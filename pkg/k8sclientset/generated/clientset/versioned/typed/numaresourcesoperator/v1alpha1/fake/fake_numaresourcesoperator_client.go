@@ -31,6 +31,10 @@ func (c *FakeNumaresourcesoperatorV1alpha1) NUMAResourcesOperators() v1alpha1.NU
 	return &FakeNUMAResourcesOperators{c}
 }
 
+func (c *FakeNumaresourcesoperatorV1alpha1) NUMAResourcesSchedulers() v1alpha1.NUMAResourcesSchedulerInterface {
+	return &FakeNUMAResourcesSchedulers{c}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeNumaresourcesoperatorV1alpha1) RESTClient() rest.Interface {
