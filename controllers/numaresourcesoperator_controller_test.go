@@ -242,11 +242,27 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Name:      rte.GetComponentName(nro.Name, mcp2.Name),
 					Namespace: testNamespace,
 				}
-				Expect(reconciler.Client.Get(context.TODO(), ds2Key, ds)).To(HaveOccurred(), "error: ds %v should have been deleted", ds2Key)
+				Expect(reconciler.Client.Get(context.TODO(), ds2Key, ds)).To(HaveOccurred(), "error: Daemonset %v should have been deleted", ds2Key)
+			})
+			It("should delete also the corresponding Machineconfig", func() {
+
+				mc := &machineconfigv1.MachineConfig{}
+
+				// Check ds1 still exist
+				mc1Key := client.ObjectKey{
+					Name: rte.GetMachineConfigName(nro.Name, mcp1.Name),
+				}
+				Expect(reconciler.Client.Get(context.TODO(), mc1Key, mc)).NotTo(HaveOccurred())
+
+				// check ds2 has been deleted
+				mc2Key := client.ObjectKey{
+					Name: rte.GetMachineConfigName(nro.Name, mcp2.Name),
+				}
+				Expect(reconciler.Client.Get(context.TODO(), mc2Key, mc)).To(HaveOccurred(), "error: Machineconfig %v should have been deleted", mc2Key)
 			})
 			When("a NOT owned Daemonset exists", func() {
 				BeforeEach(func() {
-					By("Create a new DS with correct name but not owner reference")
+					By("Create a new Daemonset with correct name but not owner reference")
 
 					ds := reconciler.RTEManifests.DaemonSet.DeepCopy()
 					ds.Name = rte.GetComponentName(nro.Name, mcp2.Name)
@@ -275,7 +291,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						Name:      rte.GetComponentName(nro.Name, mcp2.Name),
 						Namespace: testNamespace,
 					}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).NotTo(HaveOccurred(), "error: ds %v should NOT have been deleted", dsKey)
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).NotTo(HaveOccurred(), "error: Daemonset %v should NOT have been deleted", dsKey)
 				})
 			})
 		})
