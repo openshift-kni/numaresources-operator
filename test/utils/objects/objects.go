@@ -27,6 +27,7 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
@@ -62,6 +63,7 @@ func TestNRO(matchLabels map[string]string) *nropv1alpha1.NUMAResourcesOperator 
 					},
 				},
 			},
+			LogLevel: operatorv1.Debug,
 		},
 	}
 }
@@ -111,6 +113,17 @@ func TestKC(matchLabels map[string]string) (*machineconfigv1.KubeletConfig, erro
 			},
 		},
 	}, nil
+}
+
+func IsOwnedBy(obj metav1.ObjectMeta, owner metav1.ObjectMeta) bool {
+	ors := obj.GetOwnerReferences()
+
+	for _, or := range ors {
+		if or.UID == owner.GetUID() {
+			return true
+		}
+	}
+	return false
 }
 
 func getKubeletConfig() *kubeletconfigv1beta1.KubeletConfiguration {
