@@ -105,6 +105,13 @@ func (fl *Flags) Argv() []string {
 	return append([]string{fl.Command()}, args...)
 }
 
+func (fl *Flags) GetFlag(name string) (Val, bool) {
+	if val, ok := fl.args[name]; ok {
+		return val, ok
+	}
+	return Val{}, false
+}
+
 func toString(name string, val Val) string {
 	if val.Kind == FlagToggle {
 		return name
