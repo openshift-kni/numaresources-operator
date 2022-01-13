@@ -58,9 +58,8 @@ var _ = Describe("[Install] continuousIntegration", func() {
 	})
 
 	Context("with a running cluster with all the components", func() {
-		It("should perform overall deployment and verify the condition is reported as available", func() {
+		It("[test_id:47574] should perform overall deployment and verify the condition is reported as available", func() {
 			deployedObj := overallDeployment()
-
 			var nname client.ObjectKey
 			for _, obj := range deployedObj {
 				if nroObj, ok := obj.(*nropv1alpha1.NUMAResourcesOperator); ok {
