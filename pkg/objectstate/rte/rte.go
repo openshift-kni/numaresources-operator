@@ -342,7 +342,7 @@ func UpdateDaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, built
 		return nil
 	}
 	fl.SetToggle("--exit-on-conf-change")
-	cnt.Args = fl.Argv()
+	cnt.Args = fl.Args()
 	return nil
 }
 
