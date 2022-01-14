@@ -53,6 +53,7 @@ import (
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
+	mcphelpers "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -133,7 +134,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}
 
-	mcps, err := GetNodeGroupsMCPs(ctx, r.Client, instance.Spec.NodeGroups)
+	mcps, err := mcphelpers.GetNodeGroupsMCPs(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}
@@ -271,7 +272,8 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instanc
 			Conditions: mcp.Status.Conditions,
 		})
 
-		if !IsMachineConfigPoolUpdated(instance.Name, mcp) {
+		mcName := rtestate.GetMachineConfigName(instance.Name, mcp.Name)
+		if !mcphelpers.IsMachineConfigPoolUpdated(mcName, mcp) {
 			allMCPsUpdated = false
 			break
 		}
@@ -489,24 +491,6 @@ func validateUpdateEvent(e *event.UpdateEvent) bool {
 	}
 	if e.ObjectNew == nil {
 		klog.Error("Update event has no new runtime object for update")
-		return false
-	}
-
-	return true
-}
-
-func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	mcName := rtestate.GetMachineConfigName(instanceName, mcp.Name)
-	existing := false
-	for _, s := range mcp.Status.Configuration.Source {
-		if s.Name == mcName {
-			existing = true
-			break
-		}
-	}
-
-	// the Machine Config Pool still did not apply the machine config wait for one minute
-	if !existing || machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
 		return false
 	}
 

@@ -38,15 +38,17 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
+	mcphelpers "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	cfgstate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/cfg"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/sysinfo"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 const (
@@ -120,7 +122,7 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 		return nil, err
 	}
 
-	mcps, err := GetNodeGroupsMCPs(ctx, r.Client, instance.Spec.NodeGroups)
+	mcps, err := mcphelpers.GetNodeGroupsMCPs(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
 		return nil, err
 	}

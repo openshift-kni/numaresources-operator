@@ -26,14 +26,17 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/openshift-kni/numaresources-operator/controllers"
+
+	mcphelpers "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
+
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 var _ = Describe("[Uninstall]", func() {
@@ -91,7 +94,7 @@ var _ = Describe("[Uninstall]", func() {
 
 			if configuration.Platform == platform.OpenShift {
 				Eventually(func() bool {
-					mcps, err := controllers.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
+					mcps, err := mcphelpers.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
 					if err != nil {
 						klog.Warningf("failed to get machine config pools: %w", err)
 						return false

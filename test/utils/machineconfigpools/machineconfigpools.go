@@ -21,19 +21,19 @@ import (
 	"fmt"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	"github.com/openshift-kni/numaresources-operator/controllers"
+	mcphelpers "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 )
 
 // IsMachineConfigPoolsUpdated checks if all related to NUMAResourceOperator CR machines config pools have updated status
 func IsMachineConfigPoolsUpdated(nro *nropv1alpha1.NUMAResourcesOperator) (bool, error) {
-	mcps, err := controllers.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
+	mcps, err := mcphelpers.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
 	if err != nil {
 		return false, err
 	}
 
 	for _, mcp := range mcps {
-		if !controllers.IsMachineConfigPoolUpdated(nro.Name, mcp) {
+		if !mcphelpers.IsMachineConfigPoolUpdated(nro.Name, mcp) {
 			return false, nil
 		}
 	}
@@ -42,7 +42,7 @@ func IsMachineConfigPoolsUpdated(nro *nropv1alpha1.NUMAResourcesOperator) (bool,
 }
 
 func PauseMCPs(nodeGroups []nropv1alpha1.NodeGroup) (func() error, error) {
-	mcps, err := controllers.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nodeGroups)
+	mcps, err := mcphelpers.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nodeGroups)
 	if err != nil {
 		return nil, err
 	}
