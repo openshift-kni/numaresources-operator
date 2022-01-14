@@ -37,7 +37,7 @@ func TestNROScheduler() *nropv1alpha1.NUMAResourcesScheduler {
 			APIVersion: nropv1alpha1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "numaresourcesscheudler",
+			Name: "numaresourcesscheduler",
 		},
 		Spec: nropv1alpha1.NUMAResourcesSchedulerSpec{
 			SchedulerImage: "quay.io/openshift-kni/scheduler-plugins:4.10-snapshot",
