@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controllers
+package machineconfigpools
 
 import (
 	"context"
@@ -34,7 +34,10 @@ func GetNodeGroupsMCPs(ctx context.Context, cli client.Client, nodeGroups []nrop
 	if err := cli.List(ctx, mcps); err != nil {
 		return nil, err
 	}
+	return GetNodeGroupsMCPsFromList(mcps, nodeGroups)
+}
 
+func GetNodeGroupsMCPsFromList(mcps *machineconfigv1.MachineConfigPoolList, nodeGroups []nropv1alpha1.NodeGroup) ([]*machineconfigv1.MachineConfigPool, error) {
 	var result []*machineconfigv1.MachineConfigPool
 	for _, nodeGroup := range nodeGroups {
 		found := false
@@ -67,4 +70,21 @@ func GetNodeGroupsMCPs(ctx context.Context, cli client.Client, nodeGroups []nrop
 	}
 
 	return result, nil
+}
+
+func IsMachineConfigPoolUpdated(mcName string, mcp *machineconfigv1.MachineConfigPool) bool {
+	existing := false
+	for _, s := range mcp.Status.Configuration.Source {
+		if s.Name == mcName {
+			existing = true
+			break
+		}
+	}
+
+	// the Machine Config Pool still did not apply the machine config wait for one minute
+	if !existing || machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
+		return false
+	}
+
+	return true
 }
