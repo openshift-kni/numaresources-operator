@@ -149,6 +149,9 @@ binary-e2e-uninstall:
 binary-e2e-sched:
 	go test -c -v -o bin/e2e-sched.test ./test/e2e/sched
 
+binary-e2e-serial:
+	go test -c -v -o bin/e2e-serial.test ./test/e2e/serial
+
 binary-all: binary binary-rte
 
 build: generate fmt vet binary
