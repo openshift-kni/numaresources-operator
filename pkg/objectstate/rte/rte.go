@@ -336,14 +336,13 @@ func UpdateDaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, built
 	// if we run with operator-as-operand, we know we NEED this.
 	UpdateDaemonSetRunAsIDs(ds)
 
-	// TODO: we know this is in `Command`, but we should actually check
-	fl := flagcodec.ParseArgvKeyValue(cnt.Command)
+	fl := flagcodec.ParseArgvKeyValue(cnt.Args)
 	if fl == nil {
-		klog.Warningf("Cannot modify the command line %v", cnt.Command)
+		klog.Warningf("Cannot modify the command line arguments %v", cnt.Args)
 		return nil
 	}
 	fl.SetToggle("--exit-on-conf-change")
-	cnt.Command = fl.Argv()
+	cnt.Args = fl.Args()
 	return nil
 }
 

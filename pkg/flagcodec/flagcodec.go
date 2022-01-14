@@ -39,8 +39,12 @@ type Val struct {
 }
 
 type Flags struct {
-	argv0 string
-	args  map[string]Val
+	command string
+	args    map[string]Val
+}
+
+func ParseArgvKeyValue(args []string) *Flags {
+	return ParseArgvKeyValueWithCommand("", args)
 }
 
 // ParseArgvKeyValue parses a clean (trimmed) argv whose components are
@@ -51,20 +55,12 @@ type Flags struct {
 // "--opt=foo"
 // AND NOT
 // "--opt", "foo"
-func ParseArgvKeyValue(argv []string) *Flags {
-	if len(argv) == 0 {
-		return nil
-	}
-	// argv[0] is always expected to be the command name
+func ParseArgvKeyValueWithCommand(command string, args []string) *Flags {
 	ret := &Flags{
-		argv0: argv[0],
-		args:  make(map[string]Val),
+		command: command,
+		args:    make(map[string]Val),
 	}
-	if len(argv) < 1 {
-		return ret
-	}
-	ret.argv0 = argv[0]
-	for _, arg := range argv[1:] {
+	for _, arg := range args {
 		fields := strings.SplitN(arg, "=", 2)
 		if len(fields) == 1 {
 			ret.SetToggle(fields[0])
@@ -88,13 +84,25 @@ func (fl *Flags) SetOption(name, data string) {
 	}
 }
 
-func (fl *Flags) Argv() []string {
-	var argv []string
+func (fl *Flags) Command() string {
+	return fl.command
+}
+
+func (fl *Flags) Args() []string {
+	var args []string
 	for name, val := range fl.args {
-		argv = append(argv, toString(name, val))
+		args = append(args, toString(name, val))
 	}
-	sort.Strings(argv)
-	return append([]string{fl.argv0}, argv...)
+	sort.Strings(args)
+	return args
+}
+
+func (fl *Flags) Argv() []string {
+	args := fl.Args()
+	if fl.command == "" {
+		return args
+	}
+	return append([]string{fl.Command()}, args...)
 }
 
 func toString(name string, val Val) string {

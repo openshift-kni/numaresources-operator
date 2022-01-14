@@ -24,31 +24,30 @@ import (
 func TestParseStringRoundTrip(t *testing.T) {
 	type testCase struct {
 		name     string
-		argv     []string
+		command  string
+		args     []string
 		expected []string
 	}
 
 	testCases := []testCase{
 		{
-			name: "nil argv",
+			name: "nil",
 		},
 		{
-			name: "empty args",
-			argv: []string{},
+			name: "empty",
+			args: []string{},
 		},
 		{
-			name: "no args",
-			argv: []string{
-				"/bin/true",
-			},
+			name:    "only command",
+			command: "/bin/true",
 			expected: []string{
 				"/bin/true",
 			},
 		},
 		{
-			name: "simple",
-			argv: []string{
-				"/bin/resource-topology-exporter",
+			name:    "simple",
+			command: "/bin/resource-topology-exporter",
+			args: []string{
 				"--sleep-interval=10s",
 				"--sysfs=/host-sys",
 				"--kubelet-state-dir=/host-var/lib/kubelet",
@@ -66,15 +65,7 @@ func TestParseStringRoundTrip(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			fl := ParseArgvKeyValue(tc.argv)
-			if tc.argv == nil || len(tc.argv) == 0 {
-				if fl != nil {
-					t.Errorf("expected nil result with nil args")
-				}
-				// else the test is passed!
-				return
-			}
-
+			fl := ParseArgvKeyValueWithCommand(tc.command, tc.args)
 			got := fl.Argv()
 			if !reflect.DeepEqual(tc.expected, got) {
 				t.Errorf("expected %v got %v", tc.expected, got)

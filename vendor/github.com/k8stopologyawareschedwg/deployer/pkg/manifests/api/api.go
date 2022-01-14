@@ -59,7 +59,7 @@ func (mf Manifests) Clone() Manifests {
 	}
 }
 
-func (mf Manifests) Update() Manifests {
+func (mf Manifests) Render() Manifests {
 	ret := mf.Clone()
 	// nothing to do atm
 	return ret

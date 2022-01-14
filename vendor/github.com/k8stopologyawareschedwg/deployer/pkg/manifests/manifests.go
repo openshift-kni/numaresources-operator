@@ -373,8 +373,11 @@ func DaemonSet(component string, plat platform.Platform, namespace string) (*app
 		c := &ds.Spec.Template.Spec.Containers[i]
 		if c.Name == containerNameRTE {
 			c.Image = images.ResourceTopologyExporterImage
+			// we do this explicitely, but should be already OK from the YAML manifest
 			c.Command = []string{
 				"/bin/resource-topology-exporter",
+			}
+			c.Args = []string{
 				"--sleep-interval=10s",
 				fmt.Sprintf("--sysfs=%s", containerHostSysDir),
 				fmt.Sprintf("--podresources-socket=unix://%s", containerPodResourcesSocket),
@@ -382,8 +385,8 @@ func DaemonSet(component string, plat platform.Platform, namespace string) (*app
 			}
 
 			if plat == platform.OpenShift {
-				c.Command = append(
-					c.Command,
+				c.Args = append(
+					c.Args,
 					// TODO: we should fetch the policy from the KubeletConfig CR
 					"--topology-manager-policy=single-numa-node",
 				)
@@ -400,8 +403,8 @@ func DaemonSet(component string, plat platform.Platform, namespace string) (*app
 			}
 
 			if plat == platform.Kubernetes {
-				c.Command = append(
-					c.Command,
+				c.Args = append(
+					c.Args,
 					fmt.Sprintf("--kubelet-config-file=/%s/config.yaml", rteKubeletDirVolumeName),
 					fmt.Sprintf("--kubelet-state-dir=/%s", rteKubeletDirVolumeName),
 				)

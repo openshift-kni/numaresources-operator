@@ -20,6 +20,7 @@ spec:
         image: ${RTE_CONTAINER_IMAGE}
         command:
         - /bin/resource-topology-exporter
+        args:
         - --sleep-interval=${RTE_POLL_INTERVAL}
         - --sysfs=/host-sys
         - --podresources-socket=unix:///host-var/lib/kubelet/pod-resources/kubelet.sock
