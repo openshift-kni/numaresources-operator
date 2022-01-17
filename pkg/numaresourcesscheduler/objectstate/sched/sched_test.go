@@ -114,3 +114,107 @@ func TestDeploymentNamespacedNameFromObject(t *testing.T) {
 		t.Errorf("expected %v to be equal %v", objKey, nname)
 	}
 }
+
+const (
+	schedConfigNoProfiles = `apiVersion: kubescheduler.config.k8s.io/v1beta1
+kind: KubeSchedulerConfiguration
+leaderElection:
+  leaderElect: false
+profiles: []`
+
+	schedConfigOK = `apiVersion: kubescheduler.config.k8s.io/v1beta1
+kind: KubeSchedulerConfiguration
+leaderElection:
+  leaderElect: false
+profiles:
+  - schedulerName: test-topo-aware-sched
+    plugins:
+      filter:
+        enabled:
+          - name: NodeResourceTopologyMatch
+      score:
+        enabled:
+          - name: NodeResourceTopologyMatch
+    # optional plugin configs
+    pluginConfig:
+    - name: NodeResourceTopologyMatch
+      args:
+        kubeconfigpath: "" # needs to be empty string`
+)
+
+func TestSchedulerNameFromObject(t *testing.T) {
+	type testCase struct {
+		name          string
+		expectedFound bool
+		expectedName  string
+		configMap     corev1.ConfigMap
+	}
+
+	testCases := []testCase{
+		{
+			name: "zero-value",
+		},
+		{
+			name: "no-config",
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "no-config",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"different-config.json": "{}",
+				},
+			},
+		},
+		{
+			name: "bad-config",
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bad-config",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"config.yaml": "{{{",
+				},
+			},
+		},
+		{
+			name: "no-profiles",
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "no-profiles",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"config.yaml": schedConfigNoProfiles,
+				},
+			},
+		},
+		{
+			name: "good-config",
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "good-config",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"config.yaml": schedConfigOK,
+				},
+			},
+			expectedFound: true,
+			expectedName:  "test-topo-aware-sched",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotName, found := SchedulerNameFromObject(&tc.configMap)
+			if found != tc.expectedFound {
+				t.Errorf("find data: expected=%t got=%t", tc.expectedFound, found)
+			}
+			if gotName != tc.expectedName {
+				t.Errorf("find name: expected=%q got=%q", tc.expectedName, gotName)
+			}
+		})
+	}
+}
