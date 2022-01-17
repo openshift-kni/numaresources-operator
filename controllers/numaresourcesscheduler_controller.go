@@ -152,11 +152,18 @@ func isDeploymentRunning(ctx context.Context, c client.Client, key nrsv1alpha1.N
 }
 
 func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nrsv1alpha1.NUMAResourcesScheduler) (nrsv1alpha1.NamespacedName, string, error) {
+	var deploymentNName nrsv1alpha1.NamespacedName
+	schedulerName := instance.Spec.SchedulerName
+
 	schedstate.UpdateDeploymentImageSettings(r.SchedulerManifests.Deployment, instance.Spec.SchedulerImage)
 	schedstate.UpdateDeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name)
+	if schedulerName != "" {
+		err := schedstate.UpdateSchedulerName(r.SchedulerManifests.ConfigMap, instance.Spec.SchedulerName)
+		if err != nil {
+			return nrsv1alpha1.NamespacedName{}, schedulerName, err
+		}
+	}
 
-	var deploymentNName nrsv1alpha1.NamespacedName
-	var schedulerName string
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
 	for _, objState := range existing.State(r.SchedulerManifests) {
 		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
