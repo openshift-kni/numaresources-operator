@@ -126,6 +126,8 @@ spec:
                   namespace:
                     type: string
                 type: object
+              schedulerName:
+                type: string
             type: object
         type: object
     served: true

@@ -25,11 +25,17 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+
 	nrsv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
+)
+
+const (
+	SchedulerConfigFileName = "config.yaml"
 )
 
 type ExistingManifests struct {
@@ -146,6 +152,32 @@ func DeploymentNamespacedNameFromObject(obj client.Object) (nrsv1alpha1.Namespac
 	}
 	_, ok := obj.(*appsv1.Deployment)
 	return res, ok
+}
+
+func SchedulerNameFromObject(obj client.Object) (string, bool) {
+	cfg, ok := obj.(*corev1.ConfigMap)
+	if !ok {
+		return "", false
+	}
+	if cfg.Data == nil {
+		// can this ever happen?
+		return "", false
+	}
+	data, ok := cfg.Data[SchedulerConfigFileName]
+	if !ok {
+		return "", false
+	}
+	schedCfg, err := manifests.KubeSchedulerConfigurationFromData([]byte(data))
+	if err != nil {
+		return "", false
+	}
+	for _, schedProf := range schedCfg.Profiles {
+		// TODO: actually check this profile refers to a NodeResourceTopologyMatch
+		if schedProf.SchedulerName != nil {
+			return *schedProf.SchedulerName, true
+		}
+	}
+	return "", false
 }
 
 func newSchedConfigVolume(schedVolumeConfigName, configMapName string) corev1.Volume {

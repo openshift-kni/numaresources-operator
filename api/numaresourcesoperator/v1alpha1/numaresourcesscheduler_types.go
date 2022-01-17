@@ -27,7 +27,8 @@ type NUMAResourcesSchedulerSpec struct {
 
 // NUMAResourcesSchedulerStatus defines the observed state of NUMAResourcesScheduler
 type NUMAResourcesSchedulerStatus struct {
-	Deployment NamespacedName `json:"deployment,omitempty"`
+	Deployment    NamespacedName `json:"deployment,omitempty"`
+	SchedulerName string         `json:"schedulerName,omitempty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
