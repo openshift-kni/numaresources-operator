@@ -218,3 +218,62 @@ func TestSchedulerNameFromObject(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateSchedulerName(t *testing.T) {
+	type testCase struct {
+		name          string
+		schedulerName string
+		expectedName  string
+		isErrExpected bool
+		configMap     corev1.ConfigMap
+	}
+
+	testCases := []testCase{
+		{
+			name:          "with-empty-name",
+			schedulerName: "",
+			expectedName:  "test-topo-aware-sched",
+			isErrExpected: true,
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"config.yaml": schedConfigOK,
+				},
+			},
+		},
+		{
+			name:          "with-name",
+			schedulerName: "foo",
+			expectedName:  "foo",
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"config.yaml": schedConfigOK,
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := UpdateSchedulerName(&tc.configMap, tc.schedulerName); err != nil {
+				if !tc.isErrExpected {
+					t.Errorf("test %q: failed with error: %v", tc.name, err)
+				}
+			}
+			gotName, found := SchedulerNameFromObject(&tc.configMap)
+			if !found {
+				t.Errorf("test %q: did not find data", tc.name)
+			}
+			if gotName != tc.expectedName {
+				t.Errorf("test %q: find name: expected=%q got=%q", tc.name, tc.expectedName, gotName)
+			}
+		})
+	}
+}

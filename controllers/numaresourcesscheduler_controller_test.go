@@ -34,9 +34,12 @@ import (
 
 	nrsv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/testutils"
 )
+
+const testSchedulerName = "testSchedulerName"
 
 func NewFakeNUMAResourcesSchedulerReconciler(initObjects ...runtime.Object) (*NUMAResourcesSchedulerReconciler, error) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(initObjects...).Build()
@@ -71,19 +74,25 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 	ginkgo.Context("with unexpected NRS CR name", func() {
 		ginkgo.It("should updated the CR condition to degraded", func() {
-			nrs := testutils.NewNUMAResourcesScheduler("test", "some/url:latest")
+			nrs := testutils.NewNUMAResourcesScheduler("test", "some/url:latest", testSchedulerName)
 			verifyDegradedCondition(nrs, conditionTypeIncorrectNUMAResourcesSchedulerResourceName)
 		})
 	})
 
 	ginkgo.Context("with correct NRS CR", func() {
-		ginkgo.It("should create all components", func() {
-			nrs := testutils.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest")
-			reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nrs)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		var nrs *nrsv1alpha1.NUMAResourcesScheduler
+		var reconciler *NUMAResourcesSchedulerReconciler
 
+		ginkgo.BeforeEach(func() {
+			var err error
+			nrs = testutils.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName)
+			reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(nrs)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should create all components", func() {
 			key := client.ObjectKeyFromObject(nrs)
-			_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			key = client.ObjectKey{
@@ -110,6 +119,24 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			key.Name = "secondary-scheduler"
 			dp := &appsv1.Deployment{}
 			gomega.Expect(reconciler.Client.Get(context.TODO(), key, dp)).ToNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should have the correct schedulerName", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			key = client.ObjectKey{
+				Namespace: testNamespace,
+				Name:      "topo-aware-scheduler-config",
+			}
+
+			cm := &corev1.ConfigMap{}
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, cm)).ToNot(gomega.HaveOccurred())
+
+			name, found := sched.SchedulerNameFromObject(cm)
+			gomega.Expect(found).To(gomega.BeTrue())
+			gomega.Expect(name).To(gomega.BeEquivalentTo(testSchedulerName))
 		})
 	})
 })
