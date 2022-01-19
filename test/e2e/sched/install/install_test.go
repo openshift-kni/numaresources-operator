@@ -32,12 +32,15 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
+	"github.com/openshift-kni/numaresources-operator/test/utils/crds"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
+const crdName = "numaresourcesschedulers.nodetopology.openshift.io"
+
 var _ = Describe("[Scheduler] install", func() {
 	Context("with a running cluster with all the components", func() {
-		It("should perform the scheduler deployment and verify the condition is reported as available", func() {
+		It("[test_id: 47574] should perform the scheduler deployment and verify the condition is reported as available", func() {
 			var err error
 			nroSchedObj := objects.TestNROScheduler()
 
@@ -71,9 +74,14 @@ var _ = Describe("[Scheduler] install", func() {
 			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
 			Expect(err).NotTo(HaveOccurred())
 
+			By("checking the NumaResourcesScheduler Deployment is correctly deployed")
 			deploy, err := schedutils.GetDeploymentByOwnerReference(nroSchedObj.UID)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(deploy.Status.ReadyReplicas).To(BeIdenticalTo(int32(1)))
+
+			By("checking the NumaResourcesScheduler CRD is deployed")
+			_, err = crds.GetByName(e2eclient.Client, crdName)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })

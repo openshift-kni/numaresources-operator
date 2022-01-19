@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	v1 "k8s.io/api/apps/v1"
-	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -38,12 +37,12 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
+	"github.com/openshift-kni/numaresources-operator/test/utils/crds"
 	"github.com/openshift-kni/numaresources-operator/test/utils/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
 const (
-	crdName      = "noderesourcetopologies.topology.node.k8s.io"
 	newTestImage = "quay.io/openshift-kni/numaresources-operator:v0.1.0"
 )
 
@@ -58,9 +57,8 @@ var _ = Describe("[Install] continuousIntegration", func() {
 	})
 
 	Context("with a running cluster with all the components", func() {
-		It("should perform overall deployment and verify the condition is reported as available", func() {
+		It("[test_id: 47574] should perform overall deployment and verify the condition is reported as available", func() {
 			deployedObj := overallDeployment()
-
 			var nname client.ObjectKey
 			for _, obj := range deployedObj {
 				if nroObj, ok := obj.(*nropv1alpha1.NUMAResourcesOperator); ok {
@@ -70,8 +68,9 @@ var _ = Describe("[Install] continuousIntegration", func() {
 			Expect(nname.Name).ToNot(BeEmpty())
 
 			By("checking that the condition Available=true")
+			var updatedNROObj *nropv1alpha1.NUMAResourcesOperator
 			Eventually(func() bool {
-				updatedNROObj := &nropv1alpha1.NUMAResourcesOperator{}
+				updatedNROObj = &nropv1alpha1.NUMAResourcesOperator{}
 				err := e2eclient.Client.Get(context.TODO(), nname, updatedNROObj)
 				if err != nil {
 					klog.Warningf("failed to get the RTE resource: %v", err)
@@ -90,12 +89,45 @@ var _ = Describe("[Install] continuousIntegration", func() {
 			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "RTE condition did not become available")
 
 			By("checking the NRT CRD is deployed")
-			crd := &apiextensionv1.CustomResourceDefinition{}
-			key := client.ObjectKey{
-				Name: crdName,
-			}
-			err := e2eclient.Client.Get(context.TODO(), key, crd)
+			_, err := crds.GetByName(e2eclient.Client, crds.CrdNRTName)
 			Expect(err).NotTo(HaveOccurred())
+
+			By("checking the NRO CRD is deployed")
+			_, err = crds.GetByName(e2eclient.Client, crds.CrdNROName)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking Daemonset is up&running")
+			const DSCheckTimeout = 1 * time.Minute
+			const DSCheckPollingPeriod = 5 * time.Second
+			Eventually(func() bool {
+
+				ds, err := getDaemonSetByOwnerReference(updatedNROObj.UID)
+				if err != nil {
+					klog.Warningf("unable to get Daemonset  %v", err)
+					return false
+				}
+
+				if ds.Status.NumberMisscheduled != 0 {
+					klog.Warningf(" Misscheduled: There are %d nodes that should not be running Daemon pod but are", ds.Status.NumberMisscheduled)
+					return false
+				}
+
+				if ds.Status.NumberUnavailable != 0 {
+					klog.Infof(" NumberUnavailable %d (should be 0)", ds.Status.NumberUnavailable)
+					return false
+				}
+
+				if ds.Status.CurrentNumberScheduled != ds.Status.DesiredNumberScheduled {
+					klog.Infof(" CurrentNumberScheduled %d (should be %d)", ds.Status.CurrentNumberScheduled, ds.Status.DesiredNumberScheduled)
+					return false
+				}
+
+				if ds.Status.NumberReady != ds.Status.DesiredNumberScheduled {
+					klog.Infof(" NumberReady %d (should be %d)", ds.Status.CurrentNumberScheduled, ds.Status.DesiredNumberScheduled)
+					return false
+				}
+				return true
+			}, DSCheckTimeout, DSCheckPollingPeriod).Should(BeTrue(), "DaemonSet Status was not correct")
 		})
 	})
 })
