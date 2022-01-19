@@ -287,6 +287,11 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		klog.ErrorS(fmt.Errorf("failed to delete unused daemonsets"), "errors", errorList)
 	}
 
+	errorList = r.deleteUnusedMachineConfigs(ctx, instance, mcps)
+	if len(errorList) > 0 {
+		klog.ErrorS(fmt.Errorf("failed to delete unused machineconfigs"), "errors", errorList)
+	}
+
 	var daemonSetsNName []nropv1alpha1.NamespacedName
 
 	err := rtestate.UpdateDaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.ImageSpec, r.ImagePullPolicy)
@@ -312,11 +317,11 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 }
 
 func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []error {
-	klog.V(3).Info("Delete DS start")
+	klog.V(3).Info("Delete Daemonsets start")
 	var errors []error
 	var daemonSetList appsv1.DaemonSetList
 	if err := r.List(ctx, &daemonSetList, &client.ListOptions{Namespace: instance.Namespace}); err != nil {
-		klog.ErrorS(err, "error while getting DS list")
+		klog.ErrorS(err, "error while getting Daemonset list")
 		return append(errors, err)
 	}
 
@@ -334,8 +339,40 @@ func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Con
 				if err := r.Client.Delete(ctx, &ds); err != nil {
 					klog.ErrorS(err, "error while deleting daemonset", "DaemonSet", ds.Name)
 					errors = append(errors, err)
+				} else {
+					klog.V(3).Infof("Daemonset [%s] deleted", ds.Name)
 				}
-				klog.V(3).Infof("DS[%s] deleted", ds.Name)
+			}
+		}
+	}
+	return errors
+}
+
+func (r *NUMAResourcesOperatorReconciler) deleteUnusedMachineConfigs(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []error {
+	klog.V(3).Info("Delete Machineconfigs start")
+	var errors []error
+	var machineConfigList machineconfigv1.MachineConfigList
+	if err := r.List(ctx, &machineConfigList); err != nil {
+		klog.ErrorS(err, "error while getting MachineConfig list")
+		return append(errors, err)
+	}
+
+	// Generate the names of the MachineConfigs that should be running,
+	// one for each MachineConfigPool
+	expectedMachineConfigNames := sets.NewString()
+	for _, mcp := range mcps {
+		expectedMachineConfigNames = expectedMachineConfigNames.Insert(rtestate.GetMachineConfigName(instance.Name, mcp.Name))
+	}
+
+	for _, mc := range machineConfigList.Items {
+		if !expectedMachineConfigNames.Has(mc.Name) {
+			if isOwnedBy(mc.GetObjectMeta(), instance) {
+				if err := r.Client.Delete(ctx, &mc); err != nil {
+					klog.ErrorS(err, "error while deleting machineconfig", "MachineConfig", mc.Name)
+					errors = append(errors, err)
+				} else {
+					klog.V(3).Infof("Machineconfig [%s] deleted", mc.Name)
+				}
 			}
 		}
 	}
