@@ -75,9 +75,21 @@ var _ = Describe("[Scheduler] install", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking the NumaResourcesScheduler Deployment is correctly deployed")
-			deploy, err := schedutils.GetDeploymentByOwnerReference(nroSchedObj.UID)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(deploy.Status.ReadyReplicas).To(BeIdenticalTo(int32(1)))
+			const deploymentCheckTimeout = 5 * time.Minute
+			const deploymentCheckPollPeriod = 10 * time.Second
+			Eventually(func() bool {
+				deploy, err := schedutils.GetDeploymentByOwnerReference(nroSchedObj.UID)
+				if err != nil {
+					klog.Warningf("unable to get deployment by owner reference: %v", err)
+					return false
+				}
+
+				if deploy.Status.ReadyReplicas != *deploy.Spec.Replicas {
+					klog.Warningf("Invalid number of ready replicas: desired: %d, actual: %d", *deploy.Spec.Replicas, deploy.Status.ReadyReplicas)
+					return false
+				}
+				return true
+			}, deploymentCheckTimeout, deploymentCheckPollPeriod).Should(BeTrue(), "Deployment Status not OK")
 
 			By("checking the NumaResourcesScheduler CRD is deployed")
 			_, err = crds.GetByName(e2eclient.Client, crdName)
