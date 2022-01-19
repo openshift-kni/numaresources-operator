@@ -3,10 +3,11 @@
 source hack/common.sh
 
 ENABLE_SCHED_TESTS="${ENABLE_SCHED_TESTS:-false}"
+NO_TEARDOWN="${NO_TEARDOWN:-false}"
 
 function test_sched() {
   # Make sure that we always properly clean the environment
-  trap '{ echo "Running NROScheduler uninstall test suite"; ${BIN_DIR}/e2e-sched-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.reportFile=/tmp/artifacts/sched-uninstall; }' EXIT SIGINT SIGTERM SIGSTOP
+  trap '{ if [ ${NO_TEARDOWN} = false ]; then echo "Running NROScheduler uninstall test suite"; ${BIN_DIR}/e2e-sched-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.reportFile=/tmp/artifacts/sched-uninstall; fi }' EXIT SIGINT SIGTERM SIGSTOP
 
   # Run install test suite
   echo "Running NROScheduler install test suite"
@@ -34,7 +35,7 @@ if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
 fi
 
 # Make sure that we always properly clean the environment
-trap '{ echo "Running NRO uninstall test suite"; ${BIN_DIR}/e2e-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.reportFile=/tmp/artifacts/uninstall; }' EXIT SIGINT SIGTERM SIGSTOP
+trap '{ if [ ${NO_TEARDOWN} = false ]; then echo "Running NRO uninstall test suite"; ${BIN_DIR}/e2e-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.reportFile=/tmp/artifacts/uninstall; fi }' EXIT SIGINT SIGTERM SIGSTOP
 
 # Run install test suite
 echo "Running NRO install test suite"
