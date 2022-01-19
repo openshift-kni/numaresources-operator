@@ -18,6 +18,7 @@ package serial
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"os"
 	"sync"
@@ -28,9 +29,12 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
@@ -42,6 +46,10 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
+)
+
+const (
+	multiNUMALabel = "numa.hardware.openshift-kni.io/cell-count"
 )
 
 var (
@@ -59,8 +67,9 @@ var (
 // and indisturbed on the cluster. No concurrency at all is possible,
 // each test "owns" the cluster - but again, must leave no leftovers.
 
-// do not use this fixture outside this *file*
+// do not use these outside this *file*
 var __fxt *e2efixture.Fixture
+var __nrtList nrtv1alpha1.NodeResourceTopologyList
 
 var _ = BeforeSuite(func() {
 	// this must be the very first thing
@@ -70,6 +79,9 @@ var _ = BeforeSuite(func() {
 
 	__fxt, err = e2efixture.Setup("e2e-test-infra")
 	Expect(err).ToNot(HaveOccurred(), "unable to setup infra test fixture")
+
+	err = __fxt.Client.List(context.TODO(), &__nrtList)
+	Expect(err).ToNot(HaveOccurred())
 
 	nroSchedObj = &nropv1alpha1.NUMAResourcesScheduler{}
 	err = __fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
@@ -86,12 +98,16 @@ var _ = BeforeSuite(func() {
 	klog.Infof("scheduler name: %q", schedulerName)
 
 	setupInfra(__fxt, nroOperObj.Spec.NodeGroups, 3*time.Minute)
+
+	labelNodes(__fxt.Client, __nrtList)
 })
 
 var _ = AfterSuite(func() {
 	if _, ok := os.LookupEnv("E2E_INFRA_NO_TEARDOWN"); ok {
 		return
 	}
+
+	unlabelNodes(__fxt.Client, __nrtList)
 
 	// numacell daemonset automatically cleaned up when we remove the namespace
 	err := e2efixture.Teardown(__fxt)
@@ -160,4 +176,31 @@ func setupInfra(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup, ti
 	wg.Wait()
 
 	klog.Infof("e2e infra setup completed")
+}
+
+func labelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyList) {
+	for _, nrt := range nrtList.Items {
+		node := corev1.Node{}
+		err := cli.Get(context.TODO(), client.ObjectKey{Name: nrt.Name}, &node)
+		Expect(err).ToNot(HaveOccurred())
+		labelValue := fmt.Sprintf("%d", len(nrt.Zones))
+		node.Labels[multiNUMALabel] = labelValue
+
+		klog.Infof("labeling node %q with %s: %s", nrt.Name, multiNUMALabel, labelValue)
+		err = cli.Update(context.TODO(), &node)
+		Expect(err).ToNot(HaveOccurred())
+	}
+}
+
+func unlabelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyList) {
+	for _, nrt := range nrtList.Items {
+		node := corev1.Node{}
+		err := cli.Get(context.TODO(), client.ObjectKey{Name: nrt.Name}, &node)
+		Expect(err).ToNot(HaveOccurred())
+
+		klog.Infof("unlabeling node %q removing label %s", nrt.Name, multiNUMALabel)
+		delete(node.Labels, multiNUMALabel)
+		err = cli.Update(context.TODO(), &node)
+		Expect(err).ToNot(HaveOccurred())
+	}
 }

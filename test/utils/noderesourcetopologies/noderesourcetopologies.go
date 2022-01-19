@@ -19,6 +19,8 @@ package noderesourcetopologies
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +32,18 @@ import (
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 )
+
+func GetZoneIDFromName(zoneName string) (int, error) {
+	for _, prefix := range []string{
+		"node-",
+	} {
+		if !strings.HasPrefix(zoneName, prefix) {
+			continue
+		}
+		return strconv.Atoi(zoneName[len(prefix):])
+	}
+	return strconv.Atoi(zoneName)
+}
 
 func GetUpdated(cli client.Client, ref nrtv1alpha1.NodeResourceTopologyList, timeout time.Duration) (nrtv1alpha1.NodeResourceTopologyList, error) {
 	var updatedNrtList nrtv1alpha1.NodeResourceTopologyList
@@ -85,6 +99,26 @@ func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeRe
 		}
 	}
 	return "", nil
+}
+
+func SaturateZoneUntilLeft(zone nrtv1alpha1.Zone, requiredRes corev1.ResourceList) (corev1.ResourceList, error) {
+	paddingRes := make(corev1.ResourceList)
+	for resName, resQty := range requiredRes {
+		zoneQty, ok := findResourceAvailableByName(zone.Resources, string(resName))
+		if !ok {
+			return nil, fmt.Errorf("resource %q not found in zone %q", string(resName), zone.Name)
+		}
+
+		if zoneQty.Cmp(resQty) < 0 {
+			return nil, fmt.Errorf("resource %q already too scarce in zone %q (target %v amount %v)", resName, zone.Name, resQty, zoneQty)
+		}
+		klog.Infof("zone %q resource %q available %s allocation target %s", zone.Name, resName, zoneQty.String(), resQty.String())
+		paddingQty := zoneQty.DeepCopy()
+		paddingQty.Sub(resQty)
+		paddingRes[resName] = paddingQty
+	}
+
+	return paddingRes, nil
 }
 
 func checkEqualResourcesInfo(nodeName, zoneName string, resourcesInitial, resourcesUpdated []nrtv1alpha1.ResourceInfo) (bool, string, error) {
@@ -156,6 +190,19 @@ func FilterTopologyManagerPolicy(nrts []nrtv1alpha1.NodeResourceTopology, tmPoli
 	return ret
 }
 
+func FilterZoneCountEqual(nrts []nrtv1alpha1.NodeResourceTopology, count int) []nrtv1alpha1.NodeResourceTopology {
+	ret := []nrtv1alpha1.NodeResourceTopology{}
+	for _, nrt := range nrts {
+		if len(nrt.Zones) != count {
+			klog.Warningf("SKIP: node %q has %d zones (desired %d)", nrt.Name, len(nrt.Zones), count)
+			continue
+		}
+		klog.Infof("ADD : node %q has %d zones (desired %d)", nrt.Name, len(nrt.Zones), count)
+		ret = append(ret, nrt)
+	}
+	return ret
+}
+
 func FilterAnyZoneMatchingResources(nrts []nrtv1alpha1.NodeResourceTopology, requests corev1.ResourceList) []nrtv1alpha1.NodeResourceTopology {
 	ret := []nrtv1alpha1.NodeResourceTopology{}
 	for _, nrt := range nrts {
@@ -164,14 +211,14 @@ func FilterAnyZoneMatchingResources(nrts []nrtv1alpha1.NodeResourceTopology, req
 			if !zoneResourcesMatchesRequest(zone.Resources, requests) {
 				continue
 			}
-			klog.Infof(" ----> node %q zone %q provides at least %#v", nrt.Name, zone.Name, requests)
+			klog.Infof(" ----> node %q zone %q provides at least %#v", nrt.Name, zone.Name, ResourceListToString(requests))
 			matches++
 		}
 		if matches == 0 {
 			klog.Warningf("SKIP: node %q can't provide %#v", nrt.Name, requests)
 			continue
 		}
-		klog.Infof("ADD : node %q provides at least %#v", nrt.Name, requests)
+		klog.Infof("ADD : node %q provides at least %#v", nrt.Name, ResourceListToString(requests))
 		ret = append(ret, nrt)
 	}
 	return ret

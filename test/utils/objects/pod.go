@@ -17,8 +17,13 @@ limitations under the License.
 package objects
 
 import (
+	"context"
+	"fmt"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
 )
 
 func NewTestPodPause(namespace, name string) *corev1.Pod {
@@ -39,4 +44,23 @@ func NewTestPodPause(namespace, name string) *corev1.Pod {
 			},
 		},
 	}
+}
+
+func LogEventsForPod(k8sCli *kubernetes.Clientset, podNamespace, podName string) error {
+	klog.Infof("checking events for pod %s/%s", podNamespace, podName)
+	opts := metav1.ListOptions{
+		FieldSelector: fmt.Sprintf("involvedObject.name=%s", podName),
+		TypeMeta:      metav1.TypeMeta{Kind: "Pod"},
+	}
+	events, err := k8sCli.CoreV1().Events(podNamespace).List(context.TODO(), opts)
+	if err != nil {
+		klog.ErrorS(err, "cannot get events for pod %s/%s", podNamespace, podName)
+		return err
+	}
+	klog.Infof("begin events for %s/%s", podNamespace, podName)
+	for _, item := range events.Items {
+		klog.Infof("+- event: %s %s: %s %s", item.Type, item.ReportingController, item.Reason, item.Message)
+	}
+	klog.Infof("end events for %s/%s", podNamespace, podName)
+	return nil
 }
