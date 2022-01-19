@@ -18,6 +18,7 @@ package sched
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -35,7 +36,9 @@ import (
 )
 
 const (
-	SchedulerConfigFileName = "config.yaml"
+	SchedulerConfigFileName      = "config.yaml"
+	SchedulerConfigMapVolumeName = "etckubernetes"
+	SchedulerPluginName          = "NodeResourceTopologyMatch"
 )
 
 type ExistingManifests struct {
@@ -131,8 +134,6 @@ func FromClient(ctx context.Context, cli client.Client, mf schedmanifests.Manife
 	return ret
 }
 
-const SchedulerConfigMapVolumeName = "etckubernetes"
-
 func UpdateDeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) {
 	// There is only a single container
 	cnt := &dp.Spec.Template.Spec.Containers[0]
@@ -178,6 +179,45 @@ func SchedulerNameFromObject(obj client.Object) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func UpdateSchedulerName(cm *corev1.ConfigMap, name string) error {
+	if name == "" {
+		return fmt.Errorf("not allow to set an empty name for scheduler in ConfigMap: %s/%s", cm.Namespace, cm.Name)
+	}
+
+	if cm.Data == nil {
+		return fmt.Errorf("no data found in ConfigMap: %s/%s", cm.Namespace, cm.Name)
+	}
+
+	data, ok := cm.Data[SchedulerConfigFileName]
+	if !ok {
+		return fmt.Errorf("no data key named: %s found in ConfigMap: %s/%s", SchedulerConfigFileName, cm.Namespace, cm.Name)
+	}
+
+	schedCfg, err := manifests.KubeSchedulerConfigurationFromData([]byte(data))
+	if err != nil {
+		return err
+	}
+
+	for i, schedProf := range schedCfg.Profiles {
+		// if we have a configuration for the NodeResourceTopologyMatch
+		// this is a valid profile
+		for _, plugin := range schedProf.PluginConfig {
+			if plugin.Name == SchedulerPluginName {
+				schedCfg.Profiles[i].SchedulerName = &name
+			}
+		}
+	}
+
+	byteData, err := manifests.KubeSchedulerConfigurationToData(schedCfg)
+	if err != nil {
+		return err
+	}
+
+	cm.Data[SchedulerConfigFileName] = string(byteData)
+	return nil
+
 }
 
 func newSchedConfigVolume(schedVolumeConfigName, configMapName string) corev1.Volume {

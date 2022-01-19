@@ -41,6 +41,8 @@ spec:
             properties:
               imageSpec:
                 type: string
+              schedulerName:
+                type: string
             required:
             - imageSpec
             type: object

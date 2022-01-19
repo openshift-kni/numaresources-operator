@@ -33,7 +33,7 @@ func NewNUMAResourcesOperator(name string, labelSelectors []*metav1.LabelSelecto
 	}
 }
 
-func NewNUMAResourcesScheduler(name, imageSpec string) *nrov1alpha1.NUMAResourcesScheduler {
+func NewNUMAResourcesScheduler(name, imageSpec, schedulerName string) *nrov1alpha1.NUMAResourcesScheduler {
 	return &nrov1alpha1.NUMAResourcesScheduler{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NUMAResourcesScheduler",
@@ -44,6 +44,7 @@ func NewNUMAResourcesScheduler(name, imageSpec string) *nrov1alpha1.NUMAResource
 		},
 		Spec: nrov1alpha1.NUMAResourcesSchedulerSpec{
 			SchedulerImage: imageSpec,
+			SchedulerName:  schedulerName,
 		},
 	}
 }
