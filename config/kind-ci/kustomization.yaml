@@ -3,3 +3,4 @@ bases:
 
 patchesStrategicMerge:
 - imagePullPolicyNever.yaml
+- noReservedResources.yaml

@@ -20,6 +20,7 @@ jobs:
       built_image: "numaresources-operator:ci" # Arbitrary name
       E2E_NAMESPACE_NAME: numaresources
       E2E_TOPOLOGY_MANAGER_POLICY: SingleNUMANodeContainerLevel
+      LOG_DIR: /tmp/test_e2e_logs
     steps:
     - name: Checkout
       uses: actions/checkout@v2
@@ -57,14 +58,24 @@ jobs:
       if: "contains(github.event.head_commit.message, '[ci-run-e2e-kind]')"
       run: |
         export KUBECONFIG=${HOME}/.kube/config
-        make test-e2e
+        NO_TEARDOWN=true make test-e2e
+
+    - name: Export E2E Tests logs
+      if: ${{ failure() }}
+      run: |
+        mkdir -p ${LOG_DIR}
+        for pod in $(kubectl get pods -n $E2E_NAMESPACE_NAME --no-headers=true -o custom-columns=NAME:.metadata.name) 
+        do 
+          oc logs $pod -n $E2E_NAMESPACE_NAME > ${LOG_DIR}/${pod}.log
+          oc describe $pod -n $E2E_NAMESPACE_NAME > ${LOG_DIR}/${pod}.describe.log
+        done
 
     - name: Archive E2E Tests logs
       if: ${{ failure() }}
       uses: actions/upload-artifact@v2
       with:
         name: test_e2e_logs
-        path: /tmp/test_e2e_logs/
+        path: ${LOG_DIR}/
 
     - name: Export kind logs
       if: ${{ failure() }}

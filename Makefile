@@ -79,6 +79,8 @@ OPM="$(BIN_DIR)/$(OPM_BIN)"
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+KUSTOMIZE_DEPLOY_DIR ?= config/default
+
 all: build
 
 ##@ General
@@ -194,10 +196,10 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	kubectl apply -f $(CRD_MACHINE_CONFIG_POOL_URL)
 	kubectl apply -f $(CRD_KUBELET_CONFIG_URL)
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
+	$(KUSTOMIZE) build $(KUSTOMIZE_DEPLOY_DIR)
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/default | kubectl delete -f -
+	$(KUSTOMIZE) build $(KUSTOMIZE_DEPLOY_DIR) | kubectl delete -f -
 	# do not remove machine config pool CRD here, because the deployment can run on top of the OpenShift environment
 	# do not remove kubeletconfig CRD here, because the deployment can run on top of the OpenShift environment
 
