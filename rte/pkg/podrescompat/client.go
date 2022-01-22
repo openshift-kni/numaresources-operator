@@ -81,5 +81,19 @@ func MakeAllocatableResourcesResponseFromSysInfo(sysInfo sysinfo.SysInfo) *podre
 			resp.Devices = append(resp.Devices, &cntDevs)
 		}
 	}
+	for memoryType, memoryCounters := range sysInfo.Memory {
+		for numaCellID, numaCounter := range memoryCounters {
+			cntMemory := podresourcesapi.ContainerMemory{
+				MemoryType: memoryType,
+				Size_:      uint64(numaCounter),
+				Topology: &podresourcesapi.TopologyInfo{
+					Nodes: []*podresourcesapi.NUMANode{
+						{ID: int64(numaCellID)},
+					},
+				},
+			}
+			resp.Memory = append(resp.Memory, &cntMemory)
+		}
+	}
 	return &resp
 }

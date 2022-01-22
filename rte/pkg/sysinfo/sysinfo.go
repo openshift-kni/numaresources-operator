@@ -18,13 +18,19 @@ import (
 	"fmt"
 	"io/ioutil"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/ghodss/yaml"
 	"github.com/jaypipes/ghw/pkg/pci"
+	"github.com/jaypipes/ghw/pkg/topology"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
+
+	rtesysinfo "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/sysinfo"
 )
 
 const (
@@ -35,6 +41,8 @@ type Config struct {
 	ReservedCPUs string `json:"reservedCpus,omitempty"`
 	// vendor:device -> resourcename
 	ResourceMapping map[string]string `json:"resourceMapping,omitempty"`
+	// numa zone -> reserved amount
+	ReservedMemory map[int]int64 `json:"reservedMemory,omitempty"`
 }
 
 func (cfg Config) ToYAML() ([]byte, error) {
@@ -71,6 +79,52 @@ func ResourceMappingToString(rmap map[string]string) string {
 	return strings.Join(items, ",")
 }
 
+func ReservedMemoryFromString(s string) map[int]int64 {
+	// comma-separated 'numaID=amount'")
+	rmap := make(map[int]int64)
+	for _, keyvalue := range strings.Split(strings.TrimSpace(s), ",") {
+		if len(keyvalue) == 0 {
+			continue
+		}
+		items := strings.SplitN(keyvalue, "=", 2)
+		if len(items) != 2 {
+			klog.Infof("malformed resource mapping item %q, skipped", keyvalue)
+			continue
+		}
+		numaID, err := strconv.Atoi(strings.TrimSpace(items[0]))
+		if err != nil {
+			klog.Infof("cannot parse NUMA identifier %q: %v - skipped", items[0], err)
+			continue
+		}
+
+		res, err := resource.ParseQuantity(strings.TrimSpace(items[1]))
+		if err != nil {
+			klog.Infof("cannot parse NUMA memory amount %q: %v - skipped", items[1], err)
+			continue
+		}
+		val, ok := res.AsInt64()
+		if !ok {
+			klog.Infof("NUMA memory amount %q representation error: %v - skipped", items[1], err)
+			continue
+		}
+		rmap[numaID] = val
+	}
+	return rmap
+}
+
+func ReservedMemoryToString(rmap map[int]int64) string {
+	var keys []int
+	for key := range rmap {
+		keys = append(keys, key)
+	}
+	sort.Ints(keys)
+	var items []string
+	for _, key := range keys {
+		items = append(items, fmt.Sprintf("%d=%d", key, rmap[key]))
+	}
+	return strings.Join(items, ",")
+}
+
 func (cfg Config) IsEmpty() bool {
 	return cfg.ReservedCPUs == "" && len(cfg.ResourceMapping) == 0
 }
@@ -86,15 +140,56 @@ func (cfg Config) ToYAMLString() string {
 // NUMA Cell -> deviceIDs
 type PerNUMADevices map[int][]string
 
+// NUMA Cell -> counter
+type PerNUMACounters map[int]int64
+
 type SysInfo struct {
 	CPUs cpuset.CPUSet
 	// resource name -> devices
 	Resources map[string]PerNUMADevices
+	// memory type -> counters
+	Memory map[string]PerNUMACounters
+}
+
+func magnitude(order int) string {
+	orders := []string{
+		"Ki",
+		"Mi",
+		"Gi",
+		"Ti",
+		"Pi",
+		"Ei",
+	}
+	if order < 0 || order >= len(orders) {
+		return ""
+	}
+	return orders[order]
+}
+
+func FormatSize(v int64) string {
+	var k int64 = 1024
+	if v < k {
+		return fmt.Sprintf("%d", v)
+	}
+	m := 0
+	n := v / k
+	for n >= k {
+		n /= k
+		k *= k
+		m++
+	}
+	return fmt.Sprintf("%d%s", n, magnitude(m))
 }
 
 func (si SysInfo) String() string {
 	b := strings.Builder{}
 	fmt.Fprintf(&b, "cpus: allocatable %q\n", si.CPUs.String())
+	for memoryType, numaMem := range si.Memory {
+		fmt.Fprintf(&b, "%s:\n", memoryType)
+		for numaNode, amount := range numaMem {
+			fmt.Fprintf(&b, "  numa cell %d -> %s\n", numaNode, FormatSize(amount))
+		}
+	}
 	for resourceName, numaDevs := range si.Resources {
 		fmt.Fprintf(&b, "resource %q:\n", resourceName)
 		for numaNode, devs := range numaDevs {
@@ -117,6 +212,11 @@ func NewSysinfo(conf Config) (SysInfo, error) {
 	}
 
 	sysinfo.Resources, err = GetPCIResources(conf.ResourceMapping, GetPCIDevices)
+	if err != nil {
+		return sysinfo, err
+	}
+
+	sysinfo.Memory, err = GetMemoryResources(conf.ReservedMemory, GetAvailableMemory)
 	if err != nil {
 		return sysinfo, err
 	}
@@ -168,6 +268,42 @@ func GetPCIResources(resourceMap map[string]string, getPCIs func() ([]*pci.Devic
 	return numaResources, nil
 }
 
+// TODO: support hugepages reservation
+func GetMemoryResources(reservedMemory map[int]int64, getAvailableMemory func() ([]*topology.Node, []*rtesysinfo.Hugepages, error)) (map[string]PerNUMACounters, error) {
+	numaMemory := make(map[string]PerNUMACounters)
+	nodes, hugepages, err := getAvailableMemory()
+	if err != nil {
+		return numaMemory, err
+	}
+
+	counters := make(PerNUMACounters)
+	for _, node := range nodes {
+		counters[node.ID] += node.Memory.TotalUsableBytes
+	}
+	memCounters := make(PerNUMACounters)
+	for numaID, amount := range counters {
+		reserved := reservedMemory[numaID]
+		if reserved > amount {
+			// TODO log
+			memCounters[numaID] = 0
+		}
+		memCounters[numaID] = amount - reserved
+	}
+	numaMemory[string(corev1.ResourceMemory)] = memCounters
+
+	for _, hp := range hugepages {
+		name := rtesysinfo.HugepageResourceNameFromSize(hp.SizeKB)
+		hpCounters, ok := numaMemory[name]
+		if !ok {
+			hpCounters = make(PerNUMACounters)
+		}
+		hpCounters[hp.NodeID] += int64(hp.Total)
+		numaMemory[name] = hpCounters
+	}
+
+	return numaMemory, nil
+}
+
 func ResourceNameForDevice(dev *pci.Device, resourceMap map[string]string) (string, bool) {
 	devID := fmt.Sprintf("%s:%s", dev.Vendor.ID, dev.Product.ID)
 	if resourceName, ok := resourceMap[devID]; ok {
@@ -196,4 +332,16 @@ func GetPCIDevices() ([]*pci.Device, error) {
 		return nil, err
 	}
 	return info.Devices, nil
+}
+
+func GetAvailableMemory() ([]*topology.Node, []*rtesysinfo.Hugepages, error) {
+	hugepages, err := rtesysinfo.GetHugepages(rtesysinfo.Handle{})
+	if err != nil {
+		return nil, nil, err
+	}
+	info, err := topology.New()
+	if err != nil {
+		return nil, nil, err
+	}
+	return info.Nodes, hugepages, nil
 }
