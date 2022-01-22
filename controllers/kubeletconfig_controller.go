@@ -168,7 +168,8 @@ func mcoKubeletConfToKubeletConf(mcoKc *mcov1.KubeletConfig) (*kubeletconfigv1be
 func renderRTEConfig(namespace, name string, klConfig *kubeletconfigv1beta1.KubeletConfiguration) (*corev1.ConfigMap, error) {
 	conf := rteconfig.Config{
 		Resources: sysinfo.Config{
-			ReservedCPUs: klConfig.ReservedSystemCPUs,
+			ReservedCPUs:   klConfig.ReservedSystemCPUs,
+			ReservedMemory: findReservedMemoryFromKubelet(klConfig.ReservedMemory),
 		},
 		TopologyManagerPolicy: klConfig.TopologyManagerPolicy,
 		TopologyManagerScope:  klConfig.TopologyManagerScope,
@@ -178,4 +179,23 @@ func renderRTEConfig(namespace, name string, klConfig *kubeletconfigv1beta1.Kube
 		return nil, err
 	}
 	return rtemanifests.CreateConfigMap(namespace, name, string(data)), nil
+}
+
+func findReservedMemoryFromKubelet(klMemRes []kubeletconfigv1beta1.MemoryReservation) map[int]int64 {
+	res := make(map[int]int64)
+	for _, memRes := range klMemRes {
+		for resName, resQty := range memRes.Limits {
+			if resName != corev1.ResourceMemory {
+				// TODO we support only memory reservation atm
+				continue
+			}
+			v, ok := resQty.AsInt64()
+			if !ok {
+				// TODO log?
+				continue
+			}
+			res[int(memRes.NumaNode)] = v
+		}
+	}
+	return res
 }
