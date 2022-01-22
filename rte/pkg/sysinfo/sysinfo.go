@@ -58,7 +58,7 @@ func ResourceMappingFromString(s string) map[string]string {
 		}
 		items := strings.SplitN(keyvalue, "=", 2)
 		if len(items) != 2 {
-			klog.Infof("malformed resource mapping item %q, skipped", keyvalue)
+			klog.Warningf("malformed resource mapping item %q, skipped", keyvalue)
 			continue
 		}
 		rmap[strings.TrimSpace(items[0])] = strings.TrimSpace(items[1])
@@ -88,23 +88,23 @@ func ReservedMemoryFromString(s string) map[int]int64 {
 		}
 		items := strings.SplitN(keyvalue, "=", 2)
 		if len(items) != 2 {
-			klog.Infof("malformed resource mapping item %q, skipped", keyvalue)
+			klog.Warningf("malformed resource mapping item %q, skipped", keyvalue)
 			continue
 		}
 		numaID, err := strconv.Atoi(strings.TrimSpace(items[0]))
 		if err != nil {
-			klog.Infof("cannot parse NUMA identifier %q: %v - skipped", items[0], err)
+			klog.Warningf("cannot parse NUMA identifier %q: %v - skipped", items[0], err)
 			continue
 		}
 
 		res, err := resource.ParseQuantity(strings.TrimSpace(items[1]))
 		if err != nil {
-			klog.Infof("cannot parse NUMA memory amount %q: %v - skipped", items[1], err)
+			klog.Warningf("cannot parse NUMA memory amount %q: %v - skipped", items[1], err)
 			continue
 		}
 		val, ok := res.AsInt64()
 		if !ok {
-			klog.Infof("NUMA memory amount %q representation error: %v - skipped", items[1], err)
+			klog.Warningf("NUMA memory amount %q representation error: %v - skipped", items[1], err)
 			continue
 		}
 		rmap[numaID] = val
