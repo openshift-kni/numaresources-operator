@@ -45,7 +45,6 @@ import (
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/sysinfo"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
@@ -159,7 +158,7 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, instance *n
 	return rendered, nil
 }
 
-func findMCPForKubeletConfig(mcps []*machineconfigv1.MachineConfigPool, mcoKc *mcov1.KubeletConfig) (*machineconfigv1.MachineConfigPool, error) {
+func findMCPForKubeletConfig(mcps []*mcov1.MachineConfigPool, mcoKc *mcov1.KubeletConfig) (*mcov1.MachineConfigPool, error) {
 	if mcoKc.Spec.MachineConfigPoolSelector == nil {
 		return nil, fmt.Errorf("no MCP selector for kubeletconfig %s", mcoKc.Name)
 
