@@ -46,8 +46,9 @@ type ProgArgs struct {
 	NRTupdater      nrtupdater.Args
 	Resourcemonitor resourcemonitor.Args
 	RTE             resourcetopologyexporter.Args
-	Version         bool
 	LocalArgs       localArgs
+	Version         bool
+	SysinfoOnly     bool
 }
 
 func main() {
@@ -70,6 +71,10 @@ func main() {
 	}
 	klog.Infof("\n%s", sysInfo)
 	klog.Infof("==========================\n")
+
+	if parsedArgs.SysinfoOnly {
+		os.Exit(0)
+	}
 
 	k8sCli, err := podrescli.NewK8SClient(parsedArgs.RTE.PodResourcesSocketPath)
 	if err != nil {
@@ -110,13 +115,7 @@ func main() {
 
 // The args is passed only for testing purposes.
 func parseArgs(args ...string) (ProgArgs, error) {
-	pArgs := ProgArgs{
-		nrtupdater.Args{},
-		resourcemonitor.Args{},
-		resourcetopologyexporter.Args{},
-		false,
-		localArgs{},
-	}
+	pArgs := ProgArgs{}
 
 	var sysReservedCPUs string
 	var sysReservedMemory string
@@ -156,6 +155,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.StringVar(&sysReservedCPUs, "system-info-reserved-cpus", "", "kubelet reserved CPUs (cpuset format: 0,1 or 0,1-3 ...)")
 	flags.StringVar(&sysReservedMemory, "system-info-reserved-memory", "", "kubelet reserved memory: comma-separated 'numaID=amount' (example: '0=16Gi,1=8192Mi,3=1Gi')")
 	flags.StringVar(&sysResourceMapping, "system-info-resource-mapping", "", "kubelet resource mapping: comma-separated 'vendor:device=resourcename'")
+	flags.BoolVar(&pArgs.SysinfoOnly, "system-info", false, "Output detected system info and exit")
 
 	flags.BoolVar(&pArgs.Version, "version", false, "Output version and exit")
 	flags.BoolVar(&pArgs.LocalArgs.ExitOnConfigChanges, "exit-on-conf-change", false, "Exits when configuration file changes - so the supervisor can restart")
