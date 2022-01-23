@@ -25,11 +25,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
+
+func EmptyMatchLabels() map[string]string {
+	return map[string]string{}
+}
 
 func TestNROScheduler() *nropv1alpha1.NUMAResourcesScheduler {
 	return &nropv1alpha1.NUMAResourcesScheduler{
@@ -46,6 +51,14 @@ func TestNROScheduler() *nropv1alpha1.NUMAResourcesScheduler {
 	}
 }
 
+func NROName() string {
+	return "numaresourcesoperator"
+}
+
+func NROObjectKey() client.ObjectKey {
+	return client.ObjectKey{Name: NROName()}
+}
+
 func TestNRO(matchLabels map[string]string) *nropv1alpha1.NUMAResourcesOperator {
 	return &nropv1alpha1.NUMAResourcesOperator{
 		TypeMeta: metav1.TypeMeta{
@@ -53,7 +66,7 @@ func TestNRO(matchLabels map[string]string) *nropv1alpha1.NUMAResourcesOperator 
 			APIVersion: nropv1alpha1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "numaresourcesoperator",
+			Name: NROName(),
 		},
 		Spec: nropv1alpha1.NUMAResourcesOperatorSpec{
 			NodeGroups: []nropv1alpha1.NodeGroup{

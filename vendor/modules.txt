@@ -323,6 +323,8 @@ github.com/openshift/client-go/config/clientset/versioned/typed/config/v1
 # github.com/openshift/machine-config-operator v0.0.1-0.20211105081319-76d6155c1dab => github.com/openshift/machine-config-operator v0.0.1-0.20211110032239-0abf68a0c320
 ## explicit; go 1.16
 github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1
+github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/scheme
+github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/typed/machineconfiguration.openshift.io/v1
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
