@@ -54,6 +54,7 @@ import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/loglevel"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
@@ -296,6 +297,9 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 
 	err := rtestate.UpdateDaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.ImageSpec, r.ImagePullPolicy)
 	if err != nil {
+		return daemonSetsNName, err
+	}
+	if err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, instance.Spec.LogLevel); err != nil {
 		return daemonSetsNName, err
 	}
 

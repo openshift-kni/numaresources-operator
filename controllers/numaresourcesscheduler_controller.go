@@ -38,6 +38,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 )
 
@@ -162,6 +163,9 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		if err != nil {
 			return nrsv1alpha1.NamespacedName{}, schedulerName, err
 		}
+	}
+	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, instance.Spec.LogLevel); err != nil {
+		return deploymentNName, schedulerName, err
 	}
 
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)

@@ -26,6 +26,7 @@ import (
 type NumaresourcesoperatorV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	NUMAResourcesOperatorsGetter
+	NUMAResourcesSchedulersGetter
 }
 
 // NumaresourcesoperatorV1alpha1Client is used to interact with features provided by the numaresourcesoperator group.
@@ -35,6 +36,10 @@ type NumaresourcesoperatorV1alpha1Client struct {
 
 func (c *NumaresourcesoperatorV1alpha1Client) NUMAResourcesOperators() NUMAResourcesOperatorInterface {
 	return newNUMAResourcesOperators(c)
+}
+
+func (c *NumaresourcesoperatorV1alpha1Client) NUMAResourcesSchedulers() NUMAResourcesSchedulerInterface {
+	return newNUMAResourcesSchedulers(c)
 }
 
 // NewForConfig creates a new NumaresourcesoperatorV1alpha1Client for the given config.

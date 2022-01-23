@@ -314,6 +314,7 @@ github.com/opencontainers/runc/libcontainer/utils
 # github.com/openshift/api v0.0.0-20210924154557-a4f696157341
 ## explicit; go 1.16
 github.com/openshift/api/config/v1
+github.com/openshift/api/operator/v1
 github.com/openshift/api/security/v1
 # github.com/openshift/client-go v0.0.0-20210916133943-9acee1a0fb83
 ## explicit; go 1.16
@@ -325,6 +326,9 @@ github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.opens
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
+# github.com/pmezard/go-difflib v1.0.0
+## explicit
+github.com/pmezard/go-difflib/difflib
 # github.com/prometheus/client_golang v1.11.0
 ## explicit; go 1.13
 github.com/prometheus/client_golang/prometheus
@@ -353,6 +357,9 @@ github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.5
 ## explicit; go 1.12
 github.com/spf13/pflag
+# github.com/stretchr/testify v1.7.0
+## explicit; go 1.13
+github.com/stretchr/testify/assert
 # github.com/vincent-petithory/dataurl v0.0.0-20160330182126-9a301d65acbb
 ## explicit
 github.com/vincent-petithory/dataurl
