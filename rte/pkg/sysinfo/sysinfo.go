@@ -66,7 +66,7 @@ func ResourceMappingToString(rmap map[string]string) string {
 	sort.Strings(keys)
 	var items []string
 	for _, key := range keys {
-		items = append(items, "%s=%s", key, rmap[key])
+		items = append(items, fmt.Sprintf("%s=%s", key, rmap[key]))
 	}
 	return strings.Join(items, ",")
 }
