@@ -27,7 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/openshift-kni/numaresources-operator/controllers"
+	nropmcp "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
@@ -91,7 +91,7 @@ var _ = Describe("[Uninstall]", func() {
 
 			if configuration.Platform == platform.OpenShift {
 				Eventually(func() bool {
-					mcps, err := controllers.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
+					mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
 					if err != nil {
 						klog.Warningf("failed to get machine config pools: %w", err)
 						return false
