@@ -24,8 +24,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
@@ -35,17 +33,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
 	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
+	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	cfgstate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/cfg"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/sysinfo"
-	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 const (
@@ -119,12 +119,12 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 		return nil, err
 	}
 
-	mcps, err := GetNodeGroupsMCPs(ctx, r.Client, instance.Spec.NodeGroups)
+	mcps, err := machineconfigpools.GetNodeGroupsMCPs(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
 		return nil, err
 	}
 
-	mcp, err := findMCPForKubeletConfig(mcps, mcoKc)
+	mcp, err := machineconfigpools.FindMCPBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
 	if err != nil {
 		klog.ErrorS(err, "cannot find a matching mcp for MCO KubeletConfig", "name", kcKey.Name)
 		return nil, err
@@ -156,25 +156,6 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, instance *n
 		}
 	}
 	return rendered, nil
-}
-
-func findMCPForKubeletConfig(mcps []*mcov1.MachineConfigPool, mcoKc *mcov1.KubeletConfig) (*mcov1.MachineConfigPool, error) {
-	if mcoKc.Spec.MachineConfigPoolSelector == nil {
-		return nil, fmt.Errorf("no MCP selector for kubeletconfig %s", mcoKc.Name)
-
-	}
-
-	selector, err := metav1.LabelSelectorAsSelector(mcoKc.Spec.MachineConfigPoolSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, mcp := range mcps {
-		if selector.Matches(labels.Set(mcp.Labels)) {
-			return mcp, nil
-		}
-	}
-	return nil, fmt.Errorf("cannot find MCP related to the kubeletconfig %s", mcoKc.Name)
 }
 
 func mcoKubeletConfToKubeletConf(mcoKc *mcov1.KubeletConfig) (*kubeletconfigv1beta1.KubeletConfiguration, error) {

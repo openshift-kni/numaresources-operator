@@ -53,6 +53,7 @@ import (
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
+	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/loglevel"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
@@ -134,7 +135,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}
 
-	mcps, err := GetNodeGroupsMCPs(ctx, r.Client, instance.Spec.NodeGroups)
+	mcps, err := machineconfigpools.GetNodeGroupsMCPs(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}
