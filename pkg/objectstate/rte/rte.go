@@ -19,6 +19,7 @@ package rte
 import (
 	"context"
 	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -33,6 +34,7 @@ import (
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
@@ -67,7 +69,7 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests, inst
 	var ret []objectstate.ObjectState
 	for _, mcp := range mcps {
 		if mf.MachineConfig != nil {
-			mcName := GetMachineConfigName(instance.Name, mcp.Name)
+			mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
 			if mcp.Spec.MachineConfigSelector == nil {
 				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
 				continue
@@ -174,7 +176,7 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, plat platform.Plat
 			continue
 		}
 
-		generatedName := GetComponentName(instance.Name, mcp.Name)
+		generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
 		desiredDaemonSet := mf.DaemonSet.DeepCopy()
 		desiredDaemonSet.Name = generatedName
 		desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
@@ -260,7 +262,7 @@ func FromClient(
 
 	// should have the amount of resources equals to the amount of node groups
 	for _, mcp := range mcps {
-		generatedName := GetComponentName(instance.Name, mcp.Name)
+		generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
 		key := client.ObjectKey{
 			Name:      generatedName,
 			Namespace: namespace,
@@ -286,7 +288,7 @@ func FromClient(
 				ret.machineConfigs = map[string]machineConfigManifest{}
 			}
 
-			mcName := GetMachineConfigName(instance.Name, mcp.Name)
+			mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
 			key := client.ObjectKey{
 				Name: mcName,
 			}
@@ -361,12 +363,4 @@ func UpdateDaemonSetRunAsIDs(ds *appsv1.DaemonSet) {
 	cnt.SecurityContext.RunAsUser = &rootID
 	cnt.SecurityContext.RunAsGroup = &rootID
 	klog.InfoS("RTE container elevated privileges", "container", cnt.Name, "user", rootID, "group", rootID)
-}
-
-func GetMachineConfigName(instanceName, mcpName string) string {
-	return fmt.Sprintf("51-%s-%s", instanceName, mcpName)
-}
-
-func GetComponentName(instanceName, mcpName string) string {
-	return fmt.Sprintf("%s-%s", instanceName, mcpName)
 }
