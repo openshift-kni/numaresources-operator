@@ -196,7 +196,7 @@ deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in
 	kubectl apply -f $(CRD_MACHINE_CONFIG_POOL_URL)
 	kubectl apply -f $(CRD_KUBELET_CONFIG_URL)
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build $(KUSTOMIZE_DEPLOY_DIR)
+	$(KUSTOMIZE) build $(KUSTOMIZE_DEPLOY_DIR) | kubectl apply -f -
 
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build $(KUSTOMIZE_DEPLOY_DIR) | kubectl delete -f -
