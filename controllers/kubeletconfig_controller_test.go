@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	nrov1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/testutils"
 )
 
@@ -92,7 +92,7 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 				cm := &corev1.ConfigMap{}
 				key = client.ObjectKey{
 					Namespace: testNamespace,
-					Name:      rte.GetComponentName(nro.Name, mcp1.Name),
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
 				}
 				Expect(reconciler.Client.Get(context.TODO(), key, cm)).ToNot(HaveOccurred())
 

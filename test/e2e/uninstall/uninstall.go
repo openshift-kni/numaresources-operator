@@ -28,7 +28,7 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nropmcp "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/machineconfigpools"
@@ -98,7 +98,7 @@ var _ = Describe("[Uninstall]", func() {
 					}
 
 					for _, mcp := range mcps {
-						mcName := rte.GetMachineConfigName(nroObj.Name, mcp.Name)
+						mcName := objectnames.GetMachineConfigName(nroObj.Name, mcp.Name)
 						for _, s := range mcp.Status.Configuration.Source {
 							// the config is still existing under the machine config pool
 							if s.Name == mcName {

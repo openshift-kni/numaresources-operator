@@ -47,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	nrov1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/testutils"
@@ -163,7 +164,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).ToNot(HaveOccurred())
 			mcp1.Status.Configuration.Source = []corev1.ObjectReference{
 				{
-					Name: rte.GetMachineConfigName(nro.Name, mcp1.Name),
+					Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
 				},
 			}
 			mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
@@ -178,7 +179,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).ToNot(HaveOccurred())
 			mcp2.Status.Configuration.Source = []corev1.ObjectReference{
 				{
-					Name: rte.GetMachineConfigName(nro.Name, mcp2.Name),
+					Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
 				},
 			}
 			mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
@@ -195,14 +196,14 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			By("Check DaemonSets are created")
 			mcp1DSKey := client.ObjectKey{
-				Name:      rte.GetComponentName(nro.Name, mcp1.Name),
+				Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
 				Namespace: testNamespace,
 			}
 			ds := &appsv1.DaemonSet{}
 			Expect(reconciler.Client.Get(context.TODO(), mcp1DSKey, ds)).ToNot(HaveOccurred())
 
 			mcp2DSKey := client.ObjectKey{
-				Name:      rte.GetComponentName(nro.Name, mcp2.Name),
+				Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
 				Namespace: testNamespace,
 			}
 			Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).ToNot(HaveOccurred())
@@ -232,14 +233,14 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 				// Check ds1 still exist
 				ds1Key := client.ObjectKey{
-					Name:      rte.GetComponentName(nro.Name, mcp1.Name),
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
 					Namespace: testNamespace,
 				}
 				Expect(reconciler.Client.Get(context.TODO(), ds1Key, ds)).NotTo(HaveOccurred())
 
 				// check ds2 has been deleted
 				ds2Key := client.ObjectKey{
-					Name:      rte.GetComponentName(nro.Name, mcp2.Name),
+					Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
 					Namespace: testNamespace,
 				}
 				Expect(reconciler.Client.Get(context.TODO(), ds2Key, ds)).To(HaveOccurred(), "error: Daemonset %v should have been deleted", ds2Key)
@@ -250,13 +251,13 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 				// Check ds1 still exist
 				mc1Key := client.ObjectKey{
-					Name: rte.GetMachineConfigName(nro.Name, mcp1.Name),
+					Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
 				}
 				Expect(reconciler.Client.Get(context.TODO(), mc1Key, mc)).NotTo(HaveOccurred())
 
 				// check ds2 has been deleted
 				mc2Key := client.ObjectKey{
-					Name: rte.GetMachineConfigName(nro.Name, mcp2.Name),
+					Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
 				}
 				Expect(reconciler.Client.Get(context.TODO(), mc2Key, mc)).To(HaveOccurred(), "error: Machineconfig %v should have been deleted", mc2Key)
 			})
@@ -265,7 +266,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					By("Create a new Daemonset with correct name but not owner reference")
 
 					ds := reconciler.RTEManifests.DaemonSet.DeepCopy()
-					ds.Name = rte.GetComponentName(nro.Name, mcp2.Name)
+					ds.Name = objectnames.GetComponentName(nro.Name, mcp2.Name)
 					ds.Namespace = testNamespace
 
 					Expect(reconciler.Client.Create(context.TODO(), ds)).ToNot(HaveOccurred())
@@ -281,14 +282,14 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					// Check ds1 still exist
 					ds1Key := client.ObjectKey{
-						Name:      rte.GetComponentName(nro.Name, mcp1.Name),
+						Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
 						Namespace: testNamespace,
 					}
 					Expect(reconciler.Client.Get(context.TODO(), ds1Key, ds)).NotTo(HaveOccurred())
 
 					// Check not owned DS is NOT deleted even if the name corresponds to mcp2
 					dsKey := client.ObjectKey{
-						Name:      rte.GetComponentName(nro.Name, mcp2.Name),
+						Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
 						Namespace: testNamespace,
 					}
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).NotTo(HaveOccurred(), "error: Daemonset %v should NOT have been deleted", dsKey)
@@ -352,12 +353,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					// check MachineConfigs are created
 					mc := &machineconfigv1.MachineConfig{}
 					mc1Key := client.ObjectKey{
-						Name: rte.GetMachineConfigName(nro.Name, mcp1.Name),
+						Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
 					}
 					Expect(reconciler.Client.Get(context.TODO(), mc1Key, mc)).ToNot(HaveOccurred())
 
 					mc2Key := client.ObjectKey{
-						Name: rte.GetMachineConfigName(nro.Name, mcp2.Name),
+						Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
 					}
 					Expect(reconciler.Client.Get(context.TODO(), mc2Key, mc)).ToNot(HaveOccurred())
 				})
@@ -392,7 +393,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).ToNot(HaveOccurred())
 						mcp1.Status.Configuration.Source = []corev1.ObjectReference{
 							{
-								Name: rte.GetMachineConfigName(nro.Name, mcp1.Name),
+								Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
 							},
 						}
 						mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
@@ -407,7 +408,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).ToNot(HaveOccurred())
 						mcp2.Status.Configuration.Source = []corev1.ObjectReference{
 							{
-								Name: rte.GetMachineConfigName(nro.Name, mcp2.Name),
+								Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
 							},
 						}
 						mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
@@ -456,14 +457,14 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						Expect(reconciler.Client.Get(context.TODO(), resourceTopologyExporterKey, scc)).ToNot(HaveOccurred())
 
 						mcp1DSKey := client.ObjectKey{
-							Name:      rte.GetComponentName(nro.Name, mcp1.Name),
+							Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
 							Namespace: testNamespace,
 						}
 						ds := &appsv1.DaemonSet{}
 						Expect(reconciler.Client.Get(context.TODO(), mcp1DSKey, ds)).ToNot(HaveOccurred())
 
 						mcp2DSKey := client.ObjectKey{
-							Name:      rte.GetComponentName(nro.Name, mcp2.Name),
+							Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
 							Namespace: testNamespace,
 						}
 						Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).ToNot(HaveOccurred())
@@ -518,7 +519,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					mc := &machineconfigv1.MachineConfig{}
 					key = client.ObjectKey{
-						Name: rte.GetMachineConfigName(nro.Name, mcpWithComplexMachineConfigSelector.Name),
+						Name: objectnames.GetMachineConfigName(nro.Name, mcpWithComplexMachineConfigSelector.Name),
 					}
 					Expect(reconciler.Client.Get(context.TODO(), key, mc)).ToNot(HaveOccurred())
 				})
@@ -549,7 +550,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					mc := &machineconfigv1.MachineConfig{}
 					mcKey := client.ObjectKey{
-						Name: rte.GetMachineConfigName(nro.Name, mcpWithComplexMachineConfigSelector.Name),
+						Name: objectnames.GetMachineConfigName(nro.Name, mcpWithComplexMachineConfigSelector.Name),
 					}
 					err = reconciler.Client.Get(context.TODO(), mcKey, mc)
 					Expect(apierrors.IsNotFound(err)).To(BeTrue())

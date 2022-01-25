@@ -55,6 +55,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -334,7 +335,7 @@ func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Con
 	// one for each MachineConfigPool
 	expectedDaemonSetNames := sets.NewString()
 	for _, mcp := range mcps {
-		expectedDaemonSetNames = expectedDaemonSetNames.Insert(rtestate.GetComponentName(instance.Name, mcp.Name))
+		expectedDaemonSetNames = expectedDaemonSetNames.Insert(objectnames.GetComponentName(instance.Name, mcp.Name))
 	}
 
 	for _, ds := range daemonSetList.Items {
@@ -366,7 +367,7 @@ func (r *NUMAResourcesOperatorReconciler) deleteUnusedMachineConfigs(ctx context
 	// one for each MachineConfigPool
 	expectedMachineConfigNames := sets.NewString()
 	for _, mcp := range mcps {
-		expectedMachineConfigNames = expectedMachineConfigNames.Insert(rtestate.GetMachineConfigName(instance.Name, mcp.Name))
+		expectedMachineConfigNames = expectedMachineConfigNames.Insert(objectnames.GetMachineConfigName(instance.Name, mcp.Name))
 	}
 
 	for _, mc := range machineConfigList.Items {
@@ -501,7 +502,7 @@ func validateUpdateEvent(e *event.UpdateEvent) bool {
 }
 
 func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	mcName := rtestate.GetMachineConfigName(instanceName, mcp.Name)
+	mcName := objectnames.GetMachineConfigName(instanceName, mcp.Name)
 	existing := false
 	for _, s := range mcp.Status.Configuration.Source {
 		if s.Name == mcName {

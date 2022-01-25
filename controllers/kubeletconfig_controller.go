@@ -42,8 +42,8 @@ import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	cfgstate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/cfg"
-	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/sysinfo"
 )
@@ -131,7 +131,7 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 	}
 	klog.InfoS("matched MCP to MCO KubeletConfig", "kubeletconfig name", kcKey.Name, "MCP name", mcp.Name)
 
-	generatedName := rtestate.GetComponentName(instance.Name, mcp.Name)
+	generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
 	klog.V(3).InfoS("generated configMap name", "generatedName", generatedName)
 	return r.syncConfigMap(ctx, instance, kubeletConfig, generatedName)
 }
