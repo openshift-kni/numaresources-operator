@@ -18,15 +18,12 @@ package machineconfigpools
 
 import (
 	"context"
-	"fmt"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	mcpfind "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools/find"
 )
 
 func GetNodeGroupsMCPs(ctx context.Context, cli client.Client, nodeGroups []nropv1alpha1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
@@ -34,56 +31,5 @@ func GetNodeGroupsMCPs(ctx context.Context, cli client.Client, nodeGroups []nrop
 	if err := cli.List(ctx, mcps); err != nil {
 		return nil, err
 	}
-
-	var result []*mcov1.MachineConfigPool
-	for _, nodeGroup := range nodeGroups {
-		found := false
-
-		// handled by validation
-		if nodeGroup.MachineConfigPoolSelector == nil {
-			continue
-		}
-
-		for i := range mcps.Items {
-			mcp := &mcps.Items[i]
-
-			selector, err := metav1.LabelSelectorAsSelector(nodeGroup.MachineConfigPoolSelector)
-			// handled by validation
-			if err != nil {
-				klog.Errorf("bad node group machine config pool selector %q", nodeGroup.MachineConfigPoolSelector.String())
-				continue
-			}
-
-			mcpLabels := labels.Set(mcp.Labels)
-			if selector.Matches(mcpLabels) {
-				found = true
-				result = append(result, mcp)
-			}
-		}
-
-		if !found {
-			return nil, fmt.Errorf("failed to find MachineConfigPool for the node group with the selector %q", nodeGroup.MachineConfigPoolSelector.String())
-		}
-	}
-
-	return result, nil
-}
-
-func FindMCPBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelector) (*mcov1.MachineConfigPool, error) {
-	if sel == nil {
-		return nil, fmt.Errorf("no MCP selector for selector %v", sel)
-
-	}
-
-	selector, err := metav1.LabelSelectorAsSelector(sel)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, mcp := range mcps {
-		if selector.Matches(labels.Set(mcp.Labels)) {
-			return mcp, nil
-		}
-	}
-	return nil, fmt.Errorf("cannot find MCP related to the selector %v", sel)
+	return mcpfind.NodeGroupsMCPs(mcps, nodeGroups)
 }

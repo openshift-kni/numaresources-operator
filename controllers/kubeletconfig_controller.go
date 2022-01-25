@@ -42,6 +42,7 @@ import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	mcpfind "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools/find"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	cfgstate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/cfg"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
@@ -124,7 +125,7 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 		return nil, err
 	}
 
-	mcp, err := machineconfigpools.FindMCPBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
+	mcp, err := mcpfind.MCPBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
 	if err != nil {
 		klog.ErrorS(err, "cannot find a matching mcp for MCO KubeletConfig", "name", kcKey.Name)
 		return nil, err
@@ -167,7 +168,8 @@ func mcoKubeletConfToKubeletConf(mcoKc *mcov1.KubeletConfig) (*kubeletconfigv1be
 func renderRTEConfig(namespace, name string, klConfig *kubeletconfigv1beta1.KubeletConfiguration) (*corev1.ConfigMap, error) {
 	conf := rteconfig.Config{
 		Resources: sysinfo.Config{
-			ReservedCPUs: klConfig.ReservedSystemCPUs,
+			ReservedCPUs:   klConfig.ReservedSystemCPUs,
+			ReservedMemory: findReservedMemoryFromKubelet(klConfig.ReservedMemory),
 		},
 		TopologyManagerPolicy: klConfig.TopologyManagerPolicy,
 		TopologyManagerScope:  klConfig.TopologyManagerScope,
@@ -177,4 +179,23 @@ func renderRTEConfig(namespace, name string, klConfig *kubeletconfigv1beta1.Kube
 		return nil, err
 	}
 	return rtemanifests.CreateConfigMap(namespace, name, string(data)), nil
+}
+
+func findReservedMemoryFromKubelet(klMemRes []kubeletconfigv1beta1.MemoryReservation) map[int]int64 {
+	res := make(map[int]int64)
+	for _, memRes := range klMemRes {
+		for resName, resQty := range memRes.Limits {
+			if resName != corev1.ResourceMemory {
+				// TODO we support only memory reservation atm
+				continue
+			}
+			v, ok := resQty.AsInt64()
+			if !ok {
+				// TODO log?
+				continue
+			}
+			res[int(memRes.NumaNode)] = v
+		}
+	}
+	return res
 }

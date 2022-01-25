@@ -161,8 +161,8 @@ github.com/imdario/mergo
 # github.com/inconshreveable/mousetrap v1.0.0
 ## explicit
 github.com/inconshreveable/mousetrap
-# github.com/jaypipes/ghw v0.8.1-0.20210609141030-acb1a36eaf89
-## explicit; go 1.12
+# github.com/jaypipes/ghw v0.8.1-0.20211210215558-4d0ed8fddb8c
+## explicit; go 1.15
 github.com/jaypipes/ghw
 github.com/jaypipes/ghw/pkg/baseboard
 github.com/jaypipes/ghw/pkg/bios
@@ -323,6 +323,8 @@ github.com/openshift/client-go/config/clientset/versioned/typed/config/v1
 # github.com/openshift/machine-config-operator v0.0.1-0.20211105081319-76d6155c1dab => github.com/openshift/machine-config-operator v0.0.1-0.20211110032239-0abf68a0c320
 ## explicit; go 1.16
 github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1
+github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/scheme
+github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/typed/machineconfiguration.openshift.io/v1
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors

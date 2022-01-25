@@ -18,21 +18,32 @@ package rte
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	"github.com/ghodss/yaml"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
 	operatorv1 "github.com/openshift/api/operator/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	mcov1cli "github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/typed/machineconfiguration.openshift.io/v1"
+
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1alpha1"
+	nropv1alpha1cli "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
+	mcpfind "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools/find"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
+
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
@@ -41,7 +52,8 @@ const defaultNUMAResourcesOperatorCrName = "numaresourcesoperator"
 var _ = ginkgo.Describe("with a running cluster with all the components", func() {
 	var (
 		initialized bool
-		nropcli     *nropv1alpha1.NumaresourcesoperatorV1alpha1Client
+		nropcli     *nropv1alpha1cli.NumaresourcesoperatorV1alpha1Client
+		mcocli      *mcov1cli.MachineconfigurationV1Client
 	)
 
 	f := framework.NewDefaultFramework("rte")
@@ -53,11 +65,14 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			nropcli, err = newNUMAResourcesOperatorWithConfig(f.ClientConfig())
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+			mcocli, err = newMachineConfigClientWithConfig(f.ClientConfig())
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 			initialized = true
 		}
 	})
 
-	ginkgo.When("NRO CR configured with LogLevel", func() {
+	ginkgo.When("[config][rte] NRO CR configured with LogLevel", func() {
 		ginkgo.It("should have the corresponding klog under RTE container", func() {
 			nropObj, err := nropcli.NUMAResourcesOperators().Get(context.TODO(), defaultNUMAResourcesOperatorCrName, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -96,10 +111,70 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			}
 		})
 	})
+
+	ginkgo.When("[config][kubelet][rte] Kubelet Config includes reservations", func() {
+		ginkgo.It("should configure RTE accordingly", func() {
+			nroObj, err := nropcli.NUMAResourcesOperators().Get(context.TODO(), defaultNUMAResourcesOperatorCrName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(nroObj.Status.DaemonSets).ToNot(gomega.BeEmpty())
+			klog.Infof("NRO %q", nroObj.Name)
+
+			// NROP guarantees all the daemonsets are in the same namespace,
+			// so we pick the first for the sake of brevity
+			namespace := nroObj.Status.DaemonSets[0].Namespace
+			klog.Infof("namespace %q", namespace)
+
+			mcpList, err := mcocli.MachineConfigPools().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			klog.Infof("MCPs count: %d", len(mcpList.Items))
+
+			mcoKcList, err := mcocli.KubeletConfigs().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			for _, mcoKc := range mcoKcList.Items {
+				ginkgo.By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
+
+				kc, err := mcoKubeletConfToKubeletConf(&mcoKc)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				mcps, err := mcpfind.NodeGroupsMCPs(mcpList, nroObj.Spec.NodeGroups)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				mcp, err := mcpfind.MCPBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
+				ginkgo.By(fmt.Sprintf("Considering MCP %q", mcp.Name))
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				generatedName := objectnames.GetComponentName(nroObj.Name, mcp.Name)
+				klog.Infof("generated config map name: %q", generatedName)
+				cm, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				rc, err := rteConfigMapToRTEConfig(cm)
+				klog.Infof("RTE config: %#v", rc)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// we intentionally don't check the values themselves - atm this would
+				// be to complex, effectively rewriting most of the controller logic
+				if len(kc.ReservedSystemCPUs) > 0 {
+					gomega.Expect(rc.Resources.ReservedCPUs).ToNot(gomega.BeEmpty())
+				}
+				if len(kc.ReservedMemory) > 0 {
+					gomega.Expect(rc.Resources.ReservedMemory).ToNot(gomega.BeEmpty())
+				}
+			}
+		})
+	})
 })
 
-func newNUMAResourcesOperatorWithConfig(cfg *rest.Config) (*nropv1alpha1.NumaresourcesoperatorV1alpha1Client, error) {
-	clientset, err := nropv1alpha1.NewForConfig(cfg)
+func newMachineConfigClientWithConfig(cfg *rest.Config) (*mcov1cli.MachineconfigurationV1Client, error) {
+	clientset, err := mcov1cli.NewForConfig(cfg)
+	if err != nil {
+		klog.Exit(err.Error())
+	}
+	return clientset, nil
+}
+
+func newNUMAResourcesOperatorWithConfig(cfg *rest.Config) (*nropv1alpha1cli.NumaresourcesoperatorV1alpha1Client, error) {
+	clientset, err := nropv1alpha1cli.NewForConfig(cfg)
 	if err != nil {
 		klog.Exit(err.Error())
 	}
@@ -128,4 +203,17 @@ func matchLogLevelToKlog(cnt *corev1.Container, level operatorv1.LogLevel) (bool
 
 	val, found := rteFlags.GetFlag("--v")
 	return found, val.Data == kLvl.String()
+}
+
+func mcoKubeletConfToKubeletConf(mcoKc *mcov1.KubeletConfig) (*kubeletconfigv1beta1.KubeletConfiguration, error) {
+	kc := &kubeletconfigv1beta1.KubeletConfiguration{}
+	err := json.Unmarshal(mcoKc.Spec.KubeletConfig.Raw, kc)
+	return kc, err
+}
+
+func rteConfigMapToRTEConfig(cm *corev1.ConfigMap) (*rteconfig.Config, error) {
+	rc := &rteconfig.Config{}
+	// TODO constant
+	err := yaml.Unmarshal([]byte(cm.Data["config.yaml"]), rc)
+	return rc, err
 }

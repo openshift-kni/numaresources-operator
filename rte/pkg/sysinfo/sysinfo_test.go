@@ -18,9 +18,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/jaypipes/ghw/pkg/memory"
 	"github.com/jaypipes/ghw/pkg/pci"
 	"github.com/jaypipes/ghw/pkg/topology"
 	"github.com/jaypipes/pcidb"
+	rtesysinfo "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/sysinfo"
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 )
@@ -72,6 +74,55 @@ func TestResourceMappingFromString(t *testing.T) {
 			got := ResourceMappingFromString(testCase.data)
 			gotStr := ResourceMappingToString(got)
 			expStr := ResourceMappingToString(testCase.expected)
+			if gotStr != expStr {
+				t.Errorf("expected %s (%v) got %s (%v)", expStr, testCase.expected, gotStr, got)
+			}
+		})
+	}
+}
+
+func TestReservedMemoryFromString(t *testing.T) {
+	var testCases = []struct {
+		data     string
+		expected map[int]int64
+	}{
+		{
+			data:     "",
+			expected: nil,
+		},
+		{
+			data: "0=16Mi",
+			expected: map[int]int64{
+				0: 16 * 1024 * 1024,
+			},
+		},
+		{
+			data: "0=16Mi,,,",
+			expected: map[int]int64{
+				0: 16 * 1024 * 1024,
+			},
+		},
+		{
+			data: "0=16Gi,2=8Gi",
+			expected: map[int]int64{
+				0: 16 * 1024 * 1024 * 1024,
+				2: 8 * 1024 * 1024 * 1024,
+			},
+		},
+		{
+			data: "0=16Gi,1=8192Mi,3=1Gi",
+			expected: map[int]int64{
+				0: 16 * 1024 * 1024 * 1024,
+				1: 8 * 1024 * 1024 * 1024,
+				3: 1024 * 1024 * 1024,
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.data, func(t *testing.T) {
+			got := ReservedMemoryFromString(testCase.data)
+			gotStr := ReservedMemoryToString(got)
+			expStr := ReservedMemoryToString(testCase.expected)
 			if gotStr != expStr {
 				t.Errorf("expected %s (%v) got %s (%v)", expStr, testCase.expected, gotStr, got)
 			}
@@ -175,6 +226,181 @@ func TestGetPCIResources(t *testing.T) {
 	}
 }
 
+func TestGetMemoryResources(t *testing.T) {
+	var testCases = []struct {
+		name      string
+		nodes     []*topology.Node
+		hugepages []*rtesysinfo.Hugepages
+		resMem    map[int]int64
+		expected  map[string]PerNUMACounters
+	}{
+		{
+			"no hugepages",
+			[]*topology.Node{
+				{
+					ID: 0,
+					Memory: &memory.Area{
+						TotalUsableBytes: 32 * 1024 * 1024 * 1024,
+					},
+				},
+				{
+					ID: 1,
+					Memory: &memory.Area{
+						TotalUsableBytes: 32 * 1024 * 1024 * 1024,
+					},
+				},
+			},
+			nil,
+			nil,
+			map[string]PerNUMACounters{
+				"memory": {
+					0: 32 * 1024 * 1024 * 1024,
+					1: 32 * 1024 * 1024 * 1024,
+				},
+			},
+		},
+		{
+			"no hugepages, unequal zones",
+			[]*topology.Node{
+				{
+					ID: 0,
+					Memory: &memory.Area{
+						TotalUsableBytes: 64 * 1024 * 1024 * 1024,
+					},
+				},
+				{
+					ID: 1,
+					Memory: &memory.Area{
+						TotalUsableBytes: 16 * 1024 * 1024 * 1024,
+					},
+				},
+				{
+					ID: 2,
+					Memory: &memory.Area{
+						TotalUsableBytes: 16 * 1024 * 1024 * 1024,
+					},
+				},
+			},
+			nil,
+			nil,
+			map[string]PerNUMACounters{
+				"memory": {
+					0: 64 * 1024 * 1024 * 1024,
+					1: 16 * 1024 * 1024 * 1024,
+					2: 16 * 1024 * 1024 * 1024,
+				},
+			},
+		},
+		{
+			"hugepages 1G only",
+			[]*topology.Node{
+				{
+					ID: 0,
+					Memory: &memory.Area{
+						TotalUsableBytes: 32 * 1024 * 1024 * 1024,
+					},
+				},
+				{
+					ID: 1,
+					Memory: &memory.Area{
+						TotalUsableBytes: 32 * 1024 * 1024 * 1024,
+					},
+				},
+			},
+			[]*rtesysinfo.Hugepages{
+				{
+					NodeID: 0,
+					SizeKB: 1 * 1024 * 1024,
+					Total:  2,
+				},
+				{
+					NodeID: 1,
+					SizeKB: 1 * 1024 * 1024,
+					Total:  8,
+				},
+			},
+			nil,
+			map[string]PerNUMACounters{
+				"memory": {
+					0: 32 * 1024 * 1024 * 1024,
+					1: 32 * 1024 * 1024 * 1024,
+				},
+				"hugepages-1Gi": {
+					0: 2,
+					1: 8,
+				},
+			},
+		},
+		{
+			"all resources",
+			[]*topology.Node{
+				{
+					ID: 0,
+					Memory: &memory.Area{
+						TotalUsableBytes: 32 * 1024 * 1024 * 1024,
+					},
+				},
+				{
+					ID: 1,
+					Memory: &memory.Area{
+						TotalUsableBytes: 32 * 1024 * 1024 * 1024,
+					},
+				},
+			},
+			[]*rtesysinfo.Hugepages{
+				{
+					NodeID: 0,
+					SizeKB: 1 * 1024 * 1024,
+					Total:  2,
+				},
+				{
+					NodeID: 1,
+					SizeKB: 1 * 1024 * 1024,
+					Total:  8,
+				},
+				{
+					NodeID: 0,
+					SizeKB: 2 * 1024,
+					Total:  6,
+				},
+				{
+					NodeID: 1,
+					SizeKB: 2 * 1024,
+					Total:  16,
+				},
+			},
+			nil,
+			map[string]PerNUMACounters{
+				"memory": {
+					0: 32 * 1024 * 1024 * 1024,
+					1: 32 * 1024 * 1024 * 1024,
+				},
+				"hugepages-1Gi": {
+					0: 2,
+					1: 8,
+				},
+				"hugepages-2Mi": {
+					0: 6,
+					1: 16,
+				},
+			},
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			got, err := GetMemoryResources(testCase.resMem, func() ([]*topology.Node, []*rtesysinfo.Hugepages, error) {
+				return testCase.nodes, testCase.hugepages, nil
+			})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(got, testCase.expected) {
+				t.Errorf("got %v, want %v", got, testCase.expected)
+			}
+		})
+	}
+}
+
 func TestResourceNameForDevice(t *testing.T) {
 	var testCases = []struct {
 		name     string
@@ -194,6 +420,38 @@ func TestResourceNameForDevice(t *testing.T) {
 			got, _ := ResourceNameForDevice(testCase.dev, testCase.resMap)
 			if got != testCase.expected {
 				t.Errorf("got %q, want %q", got, testCase.expected)
+			}
+		})
+	}
+}
+
+func TestFormatSize(t *testing.T) {
+	var testCases = []struct {
+		value    int64
+		expected string
+	}{
+		{
+			value:    640,
+			expected: "640",
+		},
+		{
+			value:    3 * 1024,
+			expected: "3Ki",
+		},
+		{
+			value:    7 * 1024 * 1024,
+			expected: "7Mi",
+		},
+		{
+			value:    15 * 1024 * 1024 * 1024,
+			expected: "15360Mi",
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.expected, func(t *testing.T) {
+			got := FormatSize(testCase.value)
+			if got != testCase.expected {
+				t.Errorf("expected %s got %s", testCase.expected, got)
 			}
 		})
 	}
