@@ -19,6 +19,7 @@ package rte
 import (
 	"context"
 	"fmt"
+
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -31,7 +32,7 @@ import (
 
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1alpha1"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/loglevel"
+	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
