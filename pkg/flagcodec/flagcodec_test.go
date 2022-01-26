@@ -55,10 +55,10 @@ func TestParseStringRoundTrip(t *testing.T) {
 			},
 			expected: []string{
 				"/bin/resource-topology-exporter",
-				"--kubelet-state-dir=/host-var/lib/kubelet",
-				"--podresources-socket=unix:///host-var/lib/kubelet/pod-resources/kubelet.sock",
 				"--sleep-interval=10s",
 				"--sysfs=/host-sys",
+				"--kubelet-state-dir=/host-var/lib/kubelet",
+				"--podresources-socket=unix:///host-var/lib/kubelet/pod-resources/kubelet.sock",
 			},
 		},
 	}
@@ -66,6 +66,66 @@ func TestParseStringRoundTrip(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			fl := ParseArgvKeyValueWithCommand(tc.command, tc.args)
+			got := fl.Argv()
+			if !reflect.DeepEqual(tc.expected, got) {
+				t.Errorf("expected %v got %v", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestAddFlags(t *testing.T) {
+	type testOpt struct {
+		name  string
+		value string
+	}
+
+	type testCase struct {
+		name     string
+		command  string
+		args     []string
+		options  []testOpt
+		expected []string
+	}
+
+	testCases := []testCase{
+		{
+			name:    "add-mixed",
+			command: "/bin/resource-topology-exporter",
+			args: []string{
+				"--sleep-interval=10s",
+				"--sysfs=/host-sys",
+				"--kubelet-state-dir=/host-var/lib/kubelet",
+				"--podresources-socket=unix:///host-var/lib/kubelet/pod-resources/kubelet.sock",
+			},
+			options: []testOpt{
+				{
+					name:  "--hostname",
+					value: "host.test.net",
+				},
+				{
+					name:  "--v",
+					value: "2",
+				},
+			},
+			expected: []string{
+				"/bin/resource-topology-exporter",
+				"--sleep-interval=10s",
+				"--sysfs=/host-sys",
+				"--kubelet-state-dir=/host-var/lib/kubelet",
+				"--podresources-socket=unix:///host-var/lib/kubelet/pod-resources/kubelet.sock",
+				"--hostname=host.test.net",
+				"--v=2",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fl := ParseArgvKeyValueWithCommand(tc.command, tc.args)
+			for _, opt := range tc.options {
+				fl.SetOption(opt.name, opt.value)
+			}
 			got := fl.Argv()
 			if !reflect.DeepEqual(tc.expected, got) {
 				t.Errorf("expected %v got %v", tc.expected, got)
