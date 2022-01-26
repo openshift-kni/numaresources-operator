@@ -24,7 +24,6 @@ package flagcodec
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -41,6 +40,7 @@ type Val struct {
 type Flags struct {
 	command string
 	args    map[string]Val
+	keys    []string
 }
 
 func ParseArgvKeyValue(args []string) *Flags {
@@ -71,13 +71,21 @@ func ParseArgvKeyValueWithCommand(command string, args []string) *Flags {
 	return ret
 }
 
+func (fl *Flags) recordFlag(name string) {
+	if _, ok := fl.args[name]; !ok {
+		fl.keys = append(fl.keys, name)
+	}
+}
+
 func (fl *Flags) SetToggle(name string) {
+	fl.recordFlag(name)
 	fl.args[name] = Val{
 		Kind: FlagToggle,
 	}
 }
 
 func (fl *Flags) SetOption(name, data string) {
+	fl.recordFlag(name)
 	fl.args[name] = Val{
 		Kind: FlagOption,
 		Data: data,
@@ -90,10 +98,9 @@ func (fl *Flags) Command() string {
 
 func (fl *Flags) Args() []string {
 	var args []string
-	for name, val := range fl.args {
-		args = append(args, toString(name, val))
+	for _, name := range fl.keys {
+		args = append(args, toString(name, fl.args[name]))
 	}
-	sort.Strings(args)
 	return args
 }
 
