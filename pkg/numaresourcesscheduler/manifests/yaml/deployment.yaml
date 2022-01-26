@@ -30,8 +30,9 @@ spec:
             requests:
               cpu: "100m"
               memory: "500Mi"
-          args:
+          command:
             - /bin/kube-scheduler
+          args:
             - --config=/etc/kubernetes/config.yaml
           volumeMounts:
             - mountPath: "/etc/kubernetes"
