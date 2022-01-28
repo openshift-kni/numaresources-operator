@@ -139,6 +139,12 @@ binary-rte: build-tools
 		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/git-semver)" \
 		rte/main.go
 
+binary-numacell: build-tools
+	go build \
+		-o bin/numacell \
+		-ldflags "-s -w" \
+		test/deviceplugin/cmd/numacell/main.go
+
 binary-e2e-rte:
 	go test -c -v -o bin/e2e-rte.test ./test/e2e/rte
 
@@ -160,6 +166,8 @@ build: generate fmt vet binary
 
 build-rte: fmt vet binary-rte
 
+build-numacell: fmt vet binary-numacell
+
 build-e2e-rte: fmt vet binary-e2e-rte
 
 build-e2e-install: fmt vet binary-e2e-install
@@ -168,7 +176,7 @@ build-e2e-uninstall: fmt vet binary-e2e-uninstall
 
 build-e2e-all: fmt vet binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall
 
-build-all: generate fmt vet binary binary-rte
+build-all: generate fmt vet binary binary-rte binary-numacell
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
