@@ -36,6 +36,10 @@ func EmptyMatchLabels() map[string]string {
 	return map[string]string{}
 }
 
+func OpenshiftMatchLabels() map[string]string {
+	return map[string]string{"pools.operator.machineconfiguration.openshift.io/worker": ""}
+}
+
 func TestNROScheduler() *nropv1alpha1.NUMAResourcesScheduler {
 	return &nropv1alpha1.NUMAResourcesScheduler{
 		TypeMeta: metav1.TypeMeta{
