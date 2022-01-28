@@ -19,4 +19,7 @@ package images
 const (
 	RTETestImageCI   = "quay.io/openshift-kni/resource-topology-exporter:test-ci"
 	SchedTestImageCI = "quay.io/openshift-kni/scheduler-plugins:test-ci"
+
+	// NEVER EVER USE THIS OUTSIDE CI or (early) DEVELOPMENT ENVIRONMENTS
+	NUMACellDevicePluginTestImageCI = "quay.io/openshift-kni/numacell-device-plugin:test-ci"
 )

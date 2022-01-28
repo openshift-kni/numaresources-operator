@@ -37,20 +37,11 @@ import (
 
 var _ = Describe("[test_id:47593][serial][disruptive][scheduler] scheduler removal on a live cluster", func() {
 	var fxt *e2efixture.Fixture
-	var nroSchedObj *nropv1alpha1.NUMAResourcesScheduler
-	var schedulerName string
 
 	BeforeEach(func() {
 		var err error
 		fxt, err = e2efixture.Setup("e2e-test-sched-remove")
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
-
-		nroSchedObj = &nropv1alpha1.NUMAResourcesScheduler{}
-		err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
-		Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
-
-		schedulerName = nroSchedObj.Status.SchedulerName
-		Expect(schedulerName).ToNot(BeEmpty(), "cannot autodetect the TAS scheduler name from the cluster")
 
 		nrosched.CheckNROSchedulerAvailable(fxt.Client, nroSchedObj.Name)
 	})
