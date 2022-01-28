@@ -42,7 +42,7 @@ func ForDeploymentComplete(cli client.Client, dp *appsv1.Deployment, pollInterva
 			return false, nil
 		}
 
-		klog.Infof("deployment %#v not yet complete", key)
+		klog.Infof("deployment %#v complete", key)
 		return true, nil
 	})
 }
