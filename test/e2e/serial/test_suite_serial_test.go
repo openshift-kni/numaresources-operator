@@ -153,7 +153,7 @@ func setupInfra(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup, ti
 			klog.Infof("waiting for daemonset %q to be ready", ds.Name)
 
 			// TODO: what if timeout < period?
-			err := e2ewait.ForDaemonSetReady(fxt.Client, ds, 10*time.Second, timeout)
+			ds, err := e2ewait.ForDaemonSetReady(fxt.Client, ds, 10*time.Second, timeout)
 			Expect(err).ToNot(HaveOccurred(), "DaemonSet %q failed to go running", ds.Name)
 		}(ds)
 	}
