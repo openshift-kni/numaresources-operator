@@ -39,6 +39,7 @@ import (
 type localArgs struct {
 	SysConf             sysinfo.Config
 	ConfigPath          string
+	HasConfigFile       bool
 	ExitOnConfigChanges bool
 }
 
@@ -97,15 +98,19 @@ func main() {
 	}
 
 	if parsedArgs.LocalArgs.ExitOnConfigChanges {
-		cw, err := config.NewWatcher(parsedArgs.LocalArgs.ConfigPath, func() error {
-			klog.Infof("configuration file %q changed: exit", parsedArgs.LocalArgs.ConfigPath)
-			os.Exit(0)
-			return nil
-		})
-		if err != nil {
-			klog.Fatalf("cannot watch the configuration file %q: %v", parsedArgs.LocalArgs.ConfigPath, err)
+		if !parsedArgs.LocalArgs.HasConfigFile {
+			klog.Warningf("missing configuration file %q: exit on changes DISABLED", parsedArgs.LocalArgs.ConfigPath)
+		} else {
+			cw, err := config.NewWatcher(parsedArgs.LocalArgs.ConfigPath, func() error {
+				klog.Infof("configuration file %q changed: exit", parsedArgs.LocalArgs.ConfigPath)
+				os.Exit(0)
+				return nil
+			})
+			if err != nil {
+				klog.Fatalf("cannot watch the configuration file %q: %v", parsedArgs.LocalArgs.ConfigPath, err)
+			}
+			go cw.WaitUntilChanges()
 		}
-		go cw.WaitUntilChanges()
 	}
 
 	err = resourcetopologyexporter.Execute(cli, parsedArgs.NRTupdater, parsedArgs.Resourcemonitor, parsedArgs.RTE)
@@ -182,10 +187,11 @@ func parseArgs(args ...string) (ProgArgs, error) {
 		pArgs.RTE.ReferenceContainer = podrescli.ContainerIdentFromEnv()
 	}
 
-	conf, err := config.ReadConfig(pArgs.LocalArgs.ConfigPath)
+	conf, ok, err := config.ReadConfig(pArgs.LocalArgs.ConfigPath)
 	if err != nil {
 		return pArgs, fmt.Errorf("error getting exclude list from the configuration: %v", err)
 	}
+	pArgs.LocalArgs.HasConfigFile = ok
 	if len(conf.ExcludeList) != 0 {
 		pArgs.Resourcemonitor.ExcludeList.ExcludeList = conf.ExcludeList
 		klog.V(2).Infof("using exclude list:\n%s", pArgs.Resourcemonitor.ExcludeList.String())

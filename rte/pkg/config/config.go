@@ -32,7 +32,7 @@ type Config struct {
 	TopologyManagerScope  string              `json:"topologyManagerScope,omitempty"`
 }
 
-func ReadConfig(configPath string) (Config, error) {
+func ReadConfig(configPath string) (Config, bool, error) {
 	conf := Config{}
 	// TODO modernize using os.ReadFile
 	data, err := ioutil.ReadFile(configPath)
@@ -40,10 +40,10 @@ func ReadConfig(configPath string) (Config, error) {
 		// config is optional
 		if errors.Is(err, os.ErrNotExist) {
 			klog.Warningf("Info: couldn't find configuration in %q", configPath)
-			return conf, nil
+			return conf, false, nil
 		}
-		return conf, err
+		return conf, false, err
 	}
 	err = yaml.Unmarshal(data, &conf)
-	return conf, err
+	return conf, true, err
 }

@@ -21,9 +21,12 @@ import (
 )
 
 func TestReadNonExistent(t *testing.T) {
-	cfg, err := ReadConfig("/does/not/exist")
+	cfg, ok, err := ReadConfig("/does/not/exist")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+	if ok {
+		t.Errorf("unexpected config reported present")
 	}
 	if cfg.ExcludeList != nil || !cfg.Resources.IsEmpty() || cfg.TopologyManagerPolicy != "" {
 		t.Errorf("unexpected data: %#v", cfg)
@@ -31,7 +34,10 @@ func TestReadNonExistent(t *testing.T) {
 }
 
 func TestReadMalformed(t *testing.T) {
-	_, err := ReadConfig("/etc/services")
+	_, ok, err := ReadConfig("/etc/services")
+	if !ok {
+		t.Errorf("unexpected config reported missing")
+	}
 	if err == nil {
 		t.Errorf("unexpected success reading unrelated data")
 	}
@@ -51,9 +57,12 @@ func TestReadValidData(t *testing.T) {
 	if err := tmpfile.Close(); err != nil {
 		t.Errorf("closing the tempfile: %v", err)
 	}
-	cfg, err := ReadConfig(tmpfile.Name())
+	cfg, ok, err := ReadConfig(tmpfile.Name())
 	if err != nil {
 		t.Errorf("unexpected error reading back the config: %v", err)
+	}
+	if !ok {
+		t.Errorf("unexpected config reported missing")
 	}
 	if cfg.TopologyManagerPolicy != "restricted" {
 		t.Errorf("unexpected values: %#v", cfg)
