@@ -24,9 +24,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/k8stopologyawareschedwg/deployer/test/e2e/utils/nodes"
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	nrtutil "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
@@ -59,6 +61,7 @@ type Padder struct {
 type padRequest struct {
 	nNodes           int
 	allocationTarget corev1.ResourceList
+	targetedNodes    []string
 }
 
 // New return new padder object
@@ -92,7 +95,8 @@ func (p *Padder) UntilAvailableIsResourceList(resources corev1.ResourceList) *Pa
 
 // Pad will create pad pods in order to align the nodes
 // with the requested amount of available allocationTarget
-func (p *Padder) Pad() error {
+// and wait until timeout to see if nodes got updated
+func (p *Padder) Pad(timeout time.Duration) error {
 	if p.nNodes == 0 {
 		klog.Warningf("no nodes for padding were found. please specify at least one node")
 		return nil
@@ -104,8 +108,9 @@ func (p *Padder) Pad() error {
 	}
 
 	singleNumaNrt := filterSingleNumaNodePolicyNrts(nrtList.Items)
+	nNodes := p.nNodes
 
-	for i := 0; i < len(singleNumaNrt) && p.nNodes > 0; i++ {
+	for i := 0; i < len(singleNumaNrt) && nNodes > 0; i++ {
 		nrt := singleNumaNrt[i]
 		nodePadded := false
 		for _, zone := range nrt.Zones {
@@ -128,8 +133,7 @@ func (p *Padder) Pad() error {
 				padPod.Spec.Containers[0].Resources.Requests = diffList
 
 				// place the pod on the selected node
-				//padPod.Spec.NodeSelector = map[string]string{nodes.LabelHostname: nrt.Name}
-				padPod.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": nrt.Name}
+				padPod.Spec.NodeSelector = map[string]string{nodes.LabelHostname: nrt.Name}
 				if err := p.Client.Create(context.TODO(), padPod); err != nil {
 					return err
 				}
@@ -138,14 +142,25 @@ func (p *Padder) Pad() error {
 				}
 				klog.InfoS("created pod", "pod", fmt.Sprintf("%s/%s", padPod.Namespace, padPod.Name), "node", nrt.Name)
 				nodePadded = true
+				// store the node name, so we could check it's corresponding NRT later
+				p.padRequest.targetedNodes = append(p.targetedNodes, nrt.Name)
 			} else {
 				klog.Warningf("node: %q zone: %q, doesn't have enough available allocationTarget", nrt.Name, zone.Name)
 			}
 		}
 		if nodePadded {
-			p.nNodes--
+			nNodes--
 		}
 	}
+
+	success, err := p.waitForUpdatedNRTs(timeout)
+	if err != nil {
+		return err
+	}
+	if !success {
+		return fmt.Errorf("noderesourcestopologies are not updated with correct amount of available resources")
+	}
+
 	return nil
 }
 
@@ -162,7 +177,38 @@ func (p *Padder) Clean() error {
 	if errors.IsNotFound(err) {
 		err = nil
 	}
+	p.targetedNodes = []string{}
 	return err
+}
+
+func (p *Padder) waitForUpdatedNRTs(timeout time.Duration) (bool, error) {
+	NRTUpdated := false
+	err := k8swait.PollImmediate(time.Second, timeout, func() (bool, error) {
+		nrtList, err := nrtutil.GetUpdated(p.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+		if err != nil {
+			klog.Warningf("failed to get updated noderesourcestopologies objects")
+			return false, err
+		}
+
+		for _, nodeName := range p.targetedNodes {
+			nrt, err := nrtutil.FindFromList(nrtList.Items, nodeName)
+			if err != nil {
+				klog.Warningf("failed to get find noderesourcestopologies with name: %q", nodeName)
+				return false, err
+			}
+
+			for _, zone := range nrt.Zones {
+				if !isZoneMeetAllocationTarget(zone, p.allocationTarget) {
+					klog.Warningf("node: %q zone: %q does not meet allocationTarget: %v", nodeName, zone.Name, p.allocationTarget)
+					return false, nil
+				}
+			}
+		}
+		NRTUpdated = true
+		return true, nil
+	})
+
+	return NRTUpdated, err
 }
 
 // return a resourceList of differences between the available and expected amount of resources
@@ -209,4 +255,19 @@ func filterSingleNumaNodePolicyNrts(list []nrtv1alpha1.NodeResourceTopology) []n
 	singleNumaNrt = append(singleNumaNrt, singleNUMANodeContainerLevelNrts...)
 	singleNumaNrt = append(singleNumaNrt, singleNUMANodePodLevelNrts...)
 	return singleNumaNrt
+}
+
+func isZoneMeetAllocationTarget(zone nrtv1alpha1.Zone, target corev1.ResourceList) bool {
+	available := nrtutil.AvailableFromZone(zone)
+	for res, targetQuan := range target {
+		availQuan := available.Name(res, resource.DecimalSI)
+		// we expect target to be the upper limit of the available resources
+		if targetQuan.Cmp(*availQuan) < 0 {
+			klog.Infof("expected target: %q to be greater or equal to available: %q",
+				fmt.Sprintf("%s=%s", res, targetQuan.String()),
+				fmt.Sprintf("%s=%s", res, availQuan.String()))
+			return false
+		}
+	}
+	return true
 }
