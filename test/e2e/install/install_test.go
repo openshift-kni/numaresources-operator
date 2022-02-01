@@ -141,7 +141,7 @@ var _ = Describe("[Install] durability", func() {
 
 	Context("with deploying NUMAResourcesOperator with wrong name", func() {
 		It("should do nothing", func() {
-			nroObj := objects.TestNRO(nil)
+			nroObj := objects.TestNRO(objects.EmptyMatchLabels())
 			nroObj.Name = "wrong-name"
 
 			err := e2eclient.Client.Create(context.TODO(), nroObj)
@@ -273,7 +273,7 @@ func overallDeployment() []client.Object {
 
 	if configuration.Platform == platform.OpenShift {
 		// TODO: should this be configurable?
-		matchLabels = map[string]string{"pools.operator.machineconfiguration.openshift.io/worker": ""}
+		matchLabels = objects.OpenshiftMatchLabels()
 	}
 
 	nroObj := objects.TestNRO(matchLabels)

@@ -53,9 +53,9 @@ var _ = Describe("[Uninstall]", func() {
 		It("should delete all components after NRO deletion", func() {
 			By("deleting the NRO object")
 			// since we are getting an existing object, we don't need the real labels here
-			nroObj := objects.TestNRO(map[string]string{})
+			nroObj := objects.TestNRO(objects.EmptyMatchLabels())
 			By("deleting the KC object")
-			kcObj, err := objects.TestKC(map[string]string{})
+			kcObj, err := objects.TestKC(objects.EmptyMatchLabels())
 			Expect(err).To(Not(HaveOccurred()))
 
 			// failed to get the NRO object, nothing else we can do
