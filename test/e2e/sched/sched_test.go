@@ -28,10 +28,9 @@ import (
 
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
+	e2eimages "github.com/openshift-kni/numaresources-operator/test/utils/images"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
-
-const newTestImage = "quay.io/openshift-kni/scheduler-plugins:test-ci"
 
 var _ = Describe("[Scheduler] imageReplacement", func() {
 	var initialized bool
@@ -50,7 +49,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			uid := nroSchedObj.GetUID()
-			nroSchedObj.Spec.SchedulerImage = newTestImage
+			nroSchedObj.Spec.SchedulerImage = e2eimages.SchedTestImageCI
 
 			err = e2eclient.Client.Update(context.TODO(), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
@@ -67,7 +66,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 					return false
 				}
 
-				return deploy.Spec.Template.Spec.Containers[0].Image == newTestImage
+				return deploy.Spec.Template.Spec.Containers[0].Image == e2eimages.SchedTestImageCI
 			}, time.Minute, time.Second*10).Should(BeTrue())
 		})
 	})

@@ -38,12 +38,9 @@ import (
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/crds"
+	e2eimages "github.com/openshift-kni/numaresources-operator/test/utils/images"
 	"github.com/openshift-kni/numaresources-operator/test/utils/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-)
-
-const (
-	newTestImage = "quay.io/openshift-kni/numaresources-operator:v0.1.0"
 )
 
 var _ = Describe("[Install] continuousIntegration", func() {
@@ -235,7 +232,7 @@ var _ = Describe("[Install] durability", func() {
 
 			By("redeploy with other parameters")
 			// TODO change to an image which is test dedicated
-			nroObj.Spec.ExporterImage = newTestImage
+			nroObj.Spec.ExporterImage = e2eimages.RTETestImageCI
 			// resourceVersion should not be set on objects to be created
 			nroObj.ResourceVersion = ""
 
@@ -253,7 +250,7 @@ var _ = Describe("[Install] durability", func() {
 					return false
 				}
 
-				return ds.Spec.Template.Spec.Containers[0].Image == newTestImage
+				return ds.Spec.Template.Spec.Containers[0].Image == e2eimages.RTETestImageCI
 			}, 5*time.Minute, 10*time.Second).Should(BeTrue())
 		})
 	})
