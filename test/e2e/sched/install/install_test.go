@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -77,19 +78,32 @@ var _ = Describe("[Scheduler] install", func() {
 			By("checking the NumaResourcesScheduler Deployment is correctly deployed")
 			const deploymentCheckTimeout = 5 * time.Minute
 			const deploymentCheckPollPeriod = 10 * time.Second
+			deployment := &appsv1.Deployment{}
 			Eventually(func() bool {
-				deploy, err := schedutils.GetDeploymentByOwnerReference(nroSchedObj.UID)
+				deployment, err = schedutils.GetDeploymentByOwnerReference(nroSchedObj.UID)
 				if err != nil {
 					klog.Warningf("unable to get deployment by owner reference: %v", err)
 					return false
 				}
 
-				if deploy.Status.ReadyReplicas != *deploy.Spec.Replicas {
-					klog.Warningf("Invalid number of ready replicas: desired: %d, actual: %d", *deploy.Spec.Replicas, deploy.Status.ReadyReplicas)
+				if deployment.Status.ReadyReplicas != *deployment.Spec.Replicas {
+					klog.Warningf("Invalid number of ready replicas: desired: %d, actual: %d", *deployment.Spec.Replicas, deployment.Status.ReadyReplicas)
 					return false
 				}
 				return true
 			}, deploymentCheckTimeout, deploymentCheckPollPeriod).Should(BeTrue(), "Deployment Status not OK")
+
+			By("Check secondary scheduler pod is scheduled on a control-plane node")
+			podList, err := schedutils.ListPodsByDeployment(e2eclient.Client, *deployment)
+			Expect(err).NotTo(HaveOccurred())
+
+			nodeList, err := schedutils.ListMasterNodes(e2eclient.Client)
+			Expect(err).NotTo(HaveOccurred())
+
+			nodeNames := schedutils.GetNodeNames(nodeList)
+			for _, pod := range podList {
+				Expect(pod.Spec.NodeName).To(BeElementOf(nodeNames))
+			}
 
 			By("checking the NumaResourcesScheduler CRD is deployed")
 			_, err = crds.GetByName(e2eclient.Client, crdName)

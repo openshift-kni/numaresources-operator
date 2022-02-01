@@ -12,9 +12,18 @@ spec:
       app: "secondary-scheduler"
   template:
     metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: "secondary-scheduler"
     spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: Exists
       volumes:
         - name: "etckubernetes"
           configMap:
@@ -24,9 +33,6 @@ spec:
         - name: "secondary-scheduler"
           image: ${IMAGE}
           resources:
-            limits:
-              cpu: "100m"
-              memory: "500Mi"
             requests:
               cpu: "100m"
               memory: "500Mi"
@@ -38,4 +44,7 @@ spec:
             - mountPath: "/etc/kubernetes"
               name: "etckubernetes"
       serviceAccountName: "secondary-scheduler"
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
 
