@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/onsi/ginkgo"
@@ -73,21 +74,39 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 	})
 
 	ginkgo.When("[config][rte] NRO CR configured with LogLevel", func() {
+		timeout := 30 * time.Second
+		interval := 5 * time.Second
 		ginkgo.It("should have the corresponding klog under RTE container", func() {
 			nropObj, err := nropcli.NUMAResourcesOperators().Get(context.TODO(), defaultNUMAResourcesOperatorCrName, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			rteDss, err := getOwnedDss(f, nropObj.ObjectMeta)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(len(rteDss)).ToNot(gomega.BeZero())
+			gomega.Eventually(func() bool {
+				rteDss, err := getOwnedDss(f, nropObj.ObjectMeta)
+				if err != nil {
+					klog.Warningf("failed to get the owned DaemonSets: %v", err)
+					return false
+				}
+				if len(rteDss) == 0 {
+					klog.Warningf("expect the numaresourcesoperator to own at least one DaemonSet: %v")
+					return false
+				}
 
-			for _, ds := range rteDss {
-				// TODO better match by name than assumes container #0 is the right one
-				rteCnt := &ds.Spec.Template.Spec.Containers[0]
-				found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
-				gomega.Expect(found).To(gomega.BeTrue(), fmt.Sprintf("--v flag doesn't exist in container %s args", rteCnt.Name))
-				gomega.Expect(match).To(gomega.BeTrue(), fmt.Sprintf("LogLevel %s doesn't match the existing --v flag under %s container", nropObj.Spec.LogLevel, rteCnt))
-			}
+				for _, ds := range rteDss {
+					// TODO better match by name than assumes container #0 is the right one
+					rteCnt := &ds.Spec.Template.Spec.Containers[0]
+					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
+					if !found {
+						klog.Warningf("--v flag doesn't exist in container %q args managed by DaemonSet: %q", rteCnt.Name, ds.Name)
+						return false
+					}
+					if !match {
+						klog.Warningf("LogLevel %s doesn't match the existing --v flag in container: %q under DaemonSet: %q", nropObj.Spec.LogLevel, rteCnt.Name, ds.Name)
+						return false
+					}
+				}
+				return true
+
+			}, timeout, interval).Should(gomega.BeTrue())
 		})
 
 		ginkgo.It("can modify the LogLevel in NRO CR and klog under RTE container should change respectively", func() {
@@ -98,17 +117,34 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			nropObj, err = nropcli.NUMAResourcesOperators().Update(context.TODO(), nropObj, metav1.UpdateOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			rteDss, err := getOwnedDss(f, nropObj.ObjectMeta)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(len(rteDss)).ToNot(gomega.BeZero())
+			gomega.Eventually(func() bool {
+				rteDss, err := getOwnedDss(f, nropObj.ObjectMeta)
+				if err != nil {
+					klog.Warningf("failed to get the owned DaemonSets: %v", err)
+					return false
+				}
+				if len(rteDss) == 0 {
+					klog.Warningf("expect the numaresourcesoperator to own at least one DaemonSet: %v")
+					return false
+				}
 
-			for _, ds := range rteDss {
-				// TODO better match by name than assumes container #0 is the right one
-				rteCnt := &ds.Spec.Template.Spec.Containers[0]
-				found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
-				gomega.Expect(found).To(gomega.BeTrue(), fmt.Sprintf("--v flag doesn't exist in container %s args", rteCnt.Name))
-				gomega.Expect(match).To(gomega.BeTrue(), fmt.Sprintf("LogLevel %s doesn't match the existing --v flag under %s container", nropObj.Spec.LogLevel, rteCnt))
-			}
+				for _, ds := range rteDss {
+					// TODO better match by name than assumes container #0 is the right one
+					rteCnt := &ds.Spec.Template.Spec.Containers[0]
+					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
+					if !found {
+						klog.Warningf("--v flag doesn't exist in container %q args under DaemonSet: %q", rteCnt.Name, ds.Name)
+						return false
+					}
+
+					if !match {
+						klog.Warningf("LogLevel %s doesn't match the existing --v flag in container: %q managed by DaemonSet: %q", nropObj.Spec.LogLevel, rteCnt.Name, ds.Name)
+						return false
+					}
+				}
+				return true
+
+			}, timeout, interval).Should(gomega.BeTrue())
 		})
 	})
 
