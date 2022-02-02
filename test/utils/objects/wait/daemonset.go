@@ -37,8 +37,9 @@ func ForDaemonSetReady(cli client.Client, ds *appsv1.DaemonSet, pollInterval, po
 			return false, err
 		}
 
-		if !IsDaemonSetReady(ds, &updatedDs.Status) {
-			klog.Warningf("daemonset %#v desired %d scheduled %d ready %d", key,
+		if !AreDaemonSetPodsReady(&updatedDs.Status) {
+			klog.Warningf("daemonset %#v desired %d scheduled %d ready %d",
+				key,
 				updatedDs.Status.DesiredNumberScheduled,
 				updatedDs.Status.CurrentNumberScheduled,
 				updatedDs.Status.NumberReady)
@@ -53,9 +54,4 @@ func ForDaemonSetReady(cli client.Client, ds *appsv1.DaemonSet, pollInterval, po
 func AreDaemonSetPodsReady(newStatus *appsv1.DaemonSetStatus) bool {
 	return newStatus.DesiredNumberScheduled > 0 &&
 		newStatus.DesiredNumberScheduled == newStatus.NumberReady
-}
-
-func IsDaemonSetReady(ds *appsv1.DaemonSet, newStatus *appsv1.DaemonSetStatus) bool {
-	return AreDaemonSetPodsReady(newStatus) &&
-		newStatus.ObservedGeneration > ds.Generation
 }
