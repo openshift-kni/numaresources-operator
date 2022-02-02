@@ -74,7 +74,7 @@ func Role(namespace, name string) *rbacv1.Role {
 					"security.openshift.io",
 				},
 				ResourceNames: []string{
-					"hostaccess",
+					"privileged",
 				},
 				Resources: []string{
 					"securitycontextconstraints",
@@ -123,6 +123,7 @@ func DaemonSet(nodeSelector map[string]string, namespace, name, saName, image st
 	}
 	hostPathDirectory := corev1.HostPathDirectory
 	var zero int64
+	var true_ bool = true
 	ds := appsv1.DaemonSet{
 		// TODO: avoid to hardcode values
 		TypeMeta: metav1.TypeMeta{
@@ -151,6 +152,9 @@ func DaemonSet(nodeSelector map[string]string, namespace, name, saName, image st
 							Args: []string{
 								"-alsologtostderr",
 								"-v", "3",
+							},
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: &true_,
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
