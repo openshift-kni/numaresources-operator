@@ -201,9 +201,14 @@ var _ = Describe("[Install] durability", func() {
 			err := e2eclient.Client.Get(context.TODO(), nname, nroObj)
 			Expect(err).ToNot(HaveOccurred())
 
+			By("waiting for the DaemonSet to be created..")
 			uid := nroObj.GetUID()
-			ds, err := getDaemonSetByOwnerReference(uid)
-			Expect(err).ToNot(HaveOccurred())
+			ds := &v1.DaemonSet{}
+			Eventually(func() error {
+				var err error
+				ds, err = getDaemonSetByOwnerReference(uid)
+				return err
+			}, 5*time.Minute, 10*time.Second).Should(BeNil())
 
 			err = e2eclient.Client.Delete(context.TODO(), nroObj)
 			Expect(err).ToNot(HaveOccurred())

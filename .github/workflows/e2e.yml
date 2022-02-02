@@ -87,3 +87,76 @@ jobs:
       with:
         name: kind_logs
         path: /tmp/kind_logs
+  e2e-install:
+    runs-on: ubuntu-20.04
+    env:
+      built_image: "numaresources-operator:ci" # Arbitrary name
+      E2E_NAMESPACE_NAME: numaresources
+      E2E_TOPOLOGY_MANAGER_POLICY: SingleNUMANodeContainerLevel
+      LOG_DIR: /tmp/test_e2e_intall_logs
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0 # Fetch all history for all tags and branches
+
+    - name: Set up golang
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17
+
+    - name: Verify modules
+      run: go mod verify
+
+    - name: build test binary
+      run: |
+        make binary-e2e-rte binary-e2e-install binary-e2e-uninstall
+
+    - name: Build image
+      run: |
+        docker build . -t ${built_image}
+
+    - name: Create K8s Kind Cluster
+      run: |
+        # kind is part of 20.04 image, see: https://github.com/actions/virtual-environments/blob/main/images/linux/Ubuntu2004-README.md
+        kind create cluster --config=hack/kind-config-e2e-no-registry.yaml --image kindest/node:v1.21.1@sha256:69860bda5563ac81e3c0057d654b5253219618a22ec3a346306239bba8cfa1a6
+        kubectl label node kind-worker node-role.kubernetes.io/worker=''
+        kind load docker-image ${built_image}
+
+    - name: Deploy RTE Operator
+      run: |
+        IMG=${built_image} KUSTOMIZE_DEPLOY_DIR="config/kind-ci/" make deploy
+
+    - name: E2E-Install-Durability Tests
+      run: |
+        export KUBECONFIG=${HOME}/.kube/config
+        NO_TEARDOWN=true make test-install-e2e
+
+    - name: Export E2E Tests logs
+      if: ${{ failure() }}
+      run: |
+        mkdir -p ${LOG_DIR}
+        for pod in $(kubectl get pods -n $E2E_NAMESPACE_NAME --no-headers=true -o custom-columns=NAME:.metadata.name) 
+        do
+          kubectl logs $pod -n $E2E_NAMESPACE_NAME > ${LOG_DIR}/${pod}.log
+          kubectl describe $pod -n $E2E_NAMESPACE_NAME > ${LOG_DIR}/${pod}.describe.log
+        done
+
+    - name: Archive E2E Tests logs
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: test_e2e_logs
+        path: ${LOG_DIR}/
+
+    - name: Export kind logs
+      if: ${{ failure() }}
+      run: |
+        kind export logs /tmp/kind_logs
+
+    - name: Archive kind logs
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v2
+      with:
+        name: kind_logs
+        path: /tmp/kind_logs
