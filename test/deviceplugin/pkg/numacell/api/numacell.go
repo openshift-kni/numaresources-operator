@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Kubernetes Authors.
+Copyright 2020.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,12 +14,26 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package images
+package api
+
+import (
+	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
+)
 
 const (
-	RTETestImageCI   = "quay.io/openshift-kni/resource-topology-exporter:test-ci"
-	SchedTestImageCI = "quay.io/openshift-kni/scheduler-plugins:test-ci"
+	NUMACellDevicePath        = "/dev/null"
+	NUMACellResourceName      = "numacell"
+	NUMACellResourceNamespace = "kni.node"
 
-	// NEVER EVER USE THIS OUTSIDE CI or (early) DEVELOPMENT ENVIRONMENTS
-	NUMACellDevicePluginTestImageCI = "quay.io/openshift-kni/numacell-device-plugin:test-ci"
+	NUMACellEnvironVarName = "KNI_NODE_CELL_ID"
 )
+
+func MakeResourceName(numacellid int) corev1.ResourceName {
+	return corev1.ResourceName(fmt.Sprintf("%s/%s", NUMACellResourceNamespace, MakeDeviceID(numacellid))) // TODO
+}
+
+func MakeDeviceID(numacellid int) string {
+	return fmt.Sprintf("%s%02d", NUMACellResourceName, numacellid)
+}

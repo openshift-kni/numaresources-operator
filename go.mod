@@ -9,7 +9,9 @@ require (
 	github.com/jaypipes/ghw v0.8.1-0.20211210215558-4d0ed8fddb8c
 	github.com/jaypipes/pcidb v0.6.0
 	github.com/k8stopologyawareschedwg/deployer v0.3.0
+	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12
 	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.4.1
+	github.com/kubevirt/device-plugin-manager v1.18.8
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.14.0
@@ -17,6 +19,7 @@ require (
 	github.com/openshift/machine-config-operator v0.0.1-0.20211105081319-76d6155c1dab
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.0
+	golang.org/x/net v0.0.0-20210726213435-c6fcb2dbf985
 	google.golang.org/grpc v1.38.0
 	k8s.io/api v0.22.3
 	k8s.io/apiextensions-apiserver v0.22.3
@@ -64,6 +67,7 @@ require (
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
@@ -74,7 +78,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.11 // indirect
-	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
@@ -109,7 +112,6 @@ require (
 	go.uber.org/zap v1.18.1 // indirect
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a // indirect
 	golang.org/x/mod v0.4.2 // indirect
-	golang.org/x/net v0.0.0-20210726213435-c6fcb2dbf985 // indirect
 	golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602 // indirect
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
