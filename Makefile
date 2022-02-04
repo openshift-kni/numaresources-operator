@@ -128,19 +128,22 @@ test-install-e2e: build-e2e-all
 ##@ Build
 
 binary: build-tools
-	go build \
+	CGO_ENABLED=0 go build \
+		-mod=vendor \
 		-o bin/manager \
 		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/git-semver)" \
 		main.go
 
 binary-rte: build-tools
-	go build \
+	CGO_ENABLED=0 go build \
+		-mod=vendor \
 		-o bin/exporter \
 		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/git-semver)" \
 		rte/main.go
 
 binary-numacell: build-tools
-	go build \
+	CGO_ENABLED=0 go build \
+		-mod=vendor \
 		-o bin/numacell \
 		-ldflags "-s -w" \
 		test/deviceplugin/cmd/numacell/main.go
