@@ -24,7 +24,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,6 +42,11 @@ import (
 	e2eimages "github.com/openshift-kni/numaresources-operator/test/utils/images"
 	"github.com/openshift-kni/numaresources-operator/test/utils/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
+)
+
+const (
+	containerNameRTE = "resource-topology-exporter"
 )
 
 var _ = Describe("[Install] continuousIntegration", func() {
@@ -188,14 +194,68 @@ var _ = Describe("[Install] durability", func() {
 			}
 		})
 
-		It("should be able to delete NUMAResourceOperator CR and redeploy without polluting cluster state", func() {
-			var nname client.ObjectKey
-			for _, obj := range deployedObj {
-				if nroObj, ok := obj.(*nropv1alpha1.NUMAResourcesOperator); ok {
-					nname = client.ObjectKeyFromObject(nroObj)
+		It("[test_id: 47587] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", func() {
+
+			By("wait for DaemonSet to be ready")
+			nname := getNRONamespacedNameFromDeployedObjects(deployedObj)
+			Expect(nname.Name).NotTo(BeEmpty())
+
+			nroObj := &nropv1alpha1.NUMAResourcesOperator{}
+			err := e2eclient.Client.Get(context.TODO(), nname, nroObj)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("waiting for the DaemonSet to be created")
+			uid := nroObj.GetUID()
+			ds := &appsv1.DaemonSet{}
+
+			dsReadyTimeOut := 5 * time.Minute
+			dsReadyPollPeriod := 10 * time.Second
+			Eventually(func() bool {
+				var err error
+				ds, err = getDaemonSetByOwnerReference(uid)
+				if err != nil {
+					klog.Warningf("failed to get the daemonset for NRO %v: %v", uid, err)
+					return false
 				}
-			}
-			Expect(nname.Name).ToNot(BeEmpty())
+				return e2ewait.AreDaemonSetPodsReady(&ds.Status)
+			}, dsReadyTimeOut, dsReadyPollPeriod).Should(BeTrue())
+
+			By("Update RTE image in NRO")
+			err = e2eclient.Client.Get(context.TODO(), nname, nroObj)
+			Expect(err).ToNot(HaveOccurred())
+			nroObj.Spec.ExporterImage = e2eimages.RTETestImageCI
+			err = e2eclient.Client.Update(context.TODO(), nroObj)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Await for daemon to be ready again")
+			updatedNroObj := &nropv1alpha1.NUMAResourcesOperator{}
+			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), updatedNroObj)
+			Expect(err).ToNot(HaveOccurred())
+
+			Eventually(func() bool {
+				updatedDs, err := e2ewait.ForDaemonSetReady(e2eclient.Client, ds, dsReadyPollPeriod, dsReadyTimeOut)
+				if err != nil {
+					return false
+				}
+				klog.Warningf("Observed %v  Current %v", updatedDs.Status.ObservedGeneration, ds.Generation)
+				isUpdated := updatedDs.Status.ObservedGeneration > ds.Generation
+				if !isUpdated {
+					return false
+				}
+				ds = updatedDs
+				return true
+			}, dsReadyTimeOut, dsReadyPollPeriod).Should(BeTrue())
+
+			rteContainer, err := findContainerByName(*ds, containerNameRTE)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(rteContainer.Image).To(BeIdenticalTo(e2eimages.RTETestImageCI))
+
+		})
+
+		It("should be able to delete NUMAResourceOperator CR and redeploy without polluting cluster state", func() {
+			nname := getNRONamespacedNameFromDeployedObjects(deployedObj)
+			Expect(nname.Name).NotTo(BeEmpty())
 
 			nroObj := &nropv1alpha1.NUMAResourcesOperator{}
 			err := e2eclient.Client.Get(context.TODO(), nname, nroObj)
@@ -203,7 +263,7 @@ var _ = Describe("[Install] durability", func() {
 
 			By("waiting for the DaemonSet to be created..")
 			uid := nroObj.GetUID()
-			ds := &v1.DaemonSet{}
+			ds := &appsv1.DaemonSet{}
 			Eventually(func() error {
 				var err error
 				ds, err = getDaemonSetByOwnerReference(uid)
@@ -260,6 +320,27 @@ var _ = Describe("[Install] durability", func() {
 		})
 	})
 })
+
+func findContainerByName(daemonset appsv1.DaemonSet, containerName string) (*corev1.Container, error) {
+
+	//shortcut
+	containers := daemonset.Spec.Template.Spec.Containers
+
+	if len(containers) == 0 {
+		return nil, fmt.Errorf("there are no containers")
+	}
+	if containerName == "" {
+		return &containers[0], nil
+	}
+
+	for idx := 0; idx < len(containers); idx++ {
+		cnt := &containers[idx]
+		if cnt.Name == containerName {
+			return cnt, nil
+		}
+	}
+	return nil, fmt.Errorf("container %q not found in %s/%s", containerName, daemonset.Namespace, daemonset.Name)
+}
 
 // overallDeployment returns a slice of an objects created by it,
 // so it will be easier to introspect and delete them later.
@@ -318,8 +399,8 @@ func overallDeployment() []client.Object {
 	return deployedObj
 }
 
-func getDaemonSetByOwnerReference(uid types.UID) (*v1.DaemonSet, error) {
-	dsList := &v1.DaemonSetList{}
+func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {
+	dsList := &appsv1.DaemonSetList{}
 
 	if err := e2eclient.Client.List(context.TODO(), dsList); err != nil {
 		return nil, fmt.Errorf("failed to get daemonset: %w", err)
@@ -333,4 +414,13 @@ func getDaemonSetByOwnerReference(uid types.UID) (*v1.DaemonSet, error) {
 		}
 	}
 	return nil, fmt.Errorf("failed to get daemonset with owner reference uid: %s", uid)
+}
+
+func getNRONamespacedNameFromDeployedObjects(deployedObjects []client.Object) types.NamespacedName {
+	for _, obj := range deployedObjects {
+		if nroObj, ok := obj.(*nropv1alpha1.NUMAResourcesOperator); ok {
+			return client.ObjectKeyFromObject(nroObj)
+		}
+	}
+	return types.NamespacedName{}
 }

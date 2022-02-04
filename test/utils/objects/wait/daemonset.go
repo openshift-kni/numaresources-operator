@@ -27,9 +27,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ForDaemonSetReady(cli client.Client, ds *appsv1.DaemonSet, pollInterval, pollTimeout time.Duration) error {
-	return wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		updatedDs := &appsv1.DaemonSet{}
+func ForDaemonSetReady(cli client.Client, ds *appsv1.DaemonSet, pollInterval, pollTimeout time.Duration) (*appsv1.DaemonSet, error) {
+	updatedDs := &appsv1.DaemonSet{}
+	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		key := client.ObjectKeyFromObject(ds)
 		err := cli.Get(context.TODO(), key, updatedDs)
 		if err != nil {
@@ -49,6 +49,7 @@ func ForDaemonSetReady(cli client.Client, ds *appsv1.DaemonSet, pollInterval, po
 		klog.Infof("daemonset %#v ready", key)
 		return true, nil
 	})
+	return updatedDs, err
 }
 
 func AreDaemonSetPodsReady(newStatus *appsv1.DaemonSetStatus) bool {
