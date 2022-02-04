@@ -153,6 +153,7 @@ func DaemonSet(nodeSelector map[string]string, namespace, name, saName, image st
 								"-alsologtostderr",
 								"-v", "3",
 							},
+							ImagePullPolicy: corev1.PullAlways,
 							SecurityContext: &corev1.SecurityContext{
 								Privileged: &true_,
 							},
