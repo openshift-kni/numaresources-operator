@@ -21,7 +21,6 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -54,15 +53,6 @@ func ForPodDeleted(cli client.Client, podNamespace, podName string, timeout time
 		pod := &corev1.Pod{}
 		key := types.NamespacedName{Name: podName, Namespace: podNamespace}
 		err := cli.Get(context.TODO(), key, pod)
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				klog.Infof("pod %#v is gone", key)
-				return true, nil
-			}
-			klog.Warningf("failed to get the pod %#v: %v", key, err)
-			return false, err
-		}
-		klog.Infof("pod %#v still present", key)
-		return false, err
+		return deletionStatusFromError("Pod", key, err)
 	})
 }
