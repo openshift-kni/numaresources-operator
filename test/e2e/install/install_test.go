@@ -379,8 +379,11 @@ func overallDeployment() []client.Object {
 	Expect(err).NotTo(HaveOccurred())
 	deployedObj = append(deployedObj, nroObj)
 
-	err = unpause()
-	Expect(err).NotTo(HaveOccurred())
+	Eventually(
+		unpause,
+		configuration.MachineConfigPoolUpdateTimeout,
+		configuration.MachineConfigPoolUpdateInterval,
+	).ShouldNot(HaveOccurred())
 
 	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
 	Expect(err).NotTo(HaveOccurred())
