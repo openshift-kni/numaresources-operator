@@ -10,7 +10,7 @@ require (
 	github.com/jaypipes/pcidb v0.6.0
 	github.com/k8stopologyawareschedwg/deployer v0.3.0
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.4.1
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.4.2-0.20220206104702-bb95c4d402dc
 	github.com/kubevirt/device-plugin-manager v1.18.8
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo v1.16.4
@@ -19,7 +19,6 @@ require (
 	github.com/openshift/machine-config-operator v0.0.1-0.20211105081319-76d6155c1dab
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.0
-	golang.org/x/net v0.0.0-20210726213435-c6fcb2dbf985
 	google.golang.org/grpc v1.38.0
 	k8s.io/api v0.22.3
 	k8s.io/apiextensions-apiserver v0.22.3
@@ -112,6 +111,7 @@ require (
 	go.uber.org/zap v1.18.1 // indirect
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a // indirect
 	golang.org/x/mod v0.4.2 // indirect
+	golang.org/x/net v0.0.0-20210726213435-c6fcb2dbf985 // indirect
 	golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602 // indirect
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
