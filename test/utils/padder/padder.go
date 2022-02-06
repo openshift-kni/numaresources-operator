@@ -19,6 +19,8 @@ package padder
 import (
 	"context"
 	"fmt"
+	"github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +35,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	nrtutil "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
 // This package allows to control the amount of available allocationTarget under the nodes.
@@ -109,6 +110,7 @@ func (p *Padder) Pad(timeout time.Duration) error {
 
 	singleNumaNrt := filterSingleNumaNodePolicyNrts(nrtList.Items)
 	nNodes := p.nNodes
+	var pods []*corev1.Pod
 
 	for i := 0; i < len(singleNumaNrt) && nNodes > 0; i++ {
 		nrt := singleNumaNrt[i]
@@ -137,10 +139,7 @@ func (p *Padder) Pad(timeout time.Duration) error {
 				if err := p.Client.Create(context.TODO(), padPod); err != nil {
 					return err
 				}
-				if _, err = wait.ForPodPhase(p.Client, p.namespace, padPod.Name, corev1.PodRunning, time.Minute); err != nil {
-					return err
-				}
-				klog.InfoS("created pod", "pod", fmt.Sprintf("%s/%s", padPod.Namespace, padPod.Name), "node", nrt.Name)
+				pods = append(pods, padPod)
 				nodePadded = true
 				// store the node name, so we could check it's corresponding NRT later
 				p.padRequest.targetedNodes = append(p.targetedNodes, nrt.Name)
@@ -151,6 +150,14 @@ func (p *Padder) Pad(timeout time.Duration) error {
 		if nodePadded {
 			nNodes--
 		}
+	}
+
+	if failedPods := wait.ForPodListAllRunning(p.Client, pods); len(failedPods) > 0 {
+		var asStrings []string
+		for _, pod := range failedPods {
+			asStrings = append(asStrings, fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
+		}
+		return fmt.Errorf("pad pods are not running: %s", strings.Join(asStrings, ", "))
 	}
 
 	success, err := p.waitForUpdatedNRTs(timeout)
