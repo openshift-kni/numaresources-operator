@@ -30,6 +30,7 @@ import (
 	"github.com/jaypipes/ghw/pkg/topology"
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
 
+	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
 	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/plugin"
 )
@@ -69,8 +70,10 @@ func render(w io.Writer) int {
 func main() {
 	var renderManifest bool
 	var sysfsPath string
+	var deviceCount int
 	flag.BoolVar(&renderManifest, "render", false, "render daemonset manifest and exit")
 	flag.StringVar(&sysfsPath, "sysfs", "/sys", "mount path of sysfs")
+	flag.IntVar(&deviceCount, "devices", api.NUMACellDefaultDeviceCount, "amount of devices to expose (will not be decremented anyway)")
 	flag.Parse()
 
 	if renderManifest {
@@ -87,6 +90,6 @@ func main() {
 
 	klog.Infof("hardware detected:\n%s", summarize(topoInfo))
 
-	manager := dpm.NewManager(plugin.NewNUMACellLister(topoInfo))
+	manager := dpm.NewManager(plugin.NewNUMACellLister(topoInfo, deviceCount))
 	manager.Run()
 }

@@ -27,19 +27,27 @@ import (
 	"github.com/jaypipes/ghw/pkg/topology"
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
 
+	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 )
 
 // NUMACellLister is the object responsible for discovering initial pool of devices and their allocation.
 type NUMACellLister struct {
-	topoInfo *topology.Info
-	nameToID map[string]int64
+	topoInfo    *topology.Info
+	nameToID    map[string]int64
+	deviceCount int
 }
 
-func NewNUMACellLister(topoInfo *topology.Info) NUMACellLister {
+func NewNUMACellLister(topoInfo *topology.Info, deviceCount int) NUMACellLister {
+	if deviceCount <= 0 {
+		klog.Warningf("invalid devices count, reset to %d", api.NUMACellDefaultDeviceCount)
+		deviceCount = api.NUMACellDefaultDeviceCount
+	}
+	klog.Infof("NUMACell: %d devices per NUMA cell", deviceCount)
 	return NUMACellLister{
-		topoInfo: topoInfo,
-		nameToID: make(map[string]int64),
+		topoInfo:    topoInfo,
+		nameToID:    make(map[string]int64),
+		deviceCount: deviceCount,
 	}
 }
 
@@ -47,9 +55,10 @@ type message struct{}
 
 // NUMACellDevicePlugin is an implementation of DevicePlugin that is capable of exposing devices to containers.
 type NUMACellDevicePlugin struct {
-	deviceID   string
-	numacellID int64
-	update     chan message
+	deviceID    string
+	numacellID  int64
+	deviceCount int
+	update      chan message
 }
 
 func (ncl NUMACellLister) GetResourceNamespace() string {
@@ -70,15 +79,16 @@ func (ncl NUMACellLister) NewPlugin(deviceID string) dpm.PluginInterface {
 	numacellID, found := ncl.nameToID[deviceID]
 	klog.Infof("Creating device plugin %s -> %d (%v)", deviceID, numacellID, found)
 	return &NUMACellDevicePlugin{
-		deviceID:   deviceID,
-		numacellID: numacellID,
-		update:     make(chan message),
+		deviceID:    deviceID,
+		numacellID:  numacellID,
+		update:      make(chan message),
+		deviceCount: ncl.deviceCount,
 	}
 }
 
-func (dpi *NUMACellDevicePlugin) device() *pluginapi.Device {
+func (dpi *NUMACellDevicePlugin) device(idx int) *pluginapi.Device {
 	return &pluginapi.Device{
-		ID:     dpi.deviceID,
+		ID:     fmt.Sprintf("%s-%03d", dpi.deviceID, idx),
 		Health: pluginapi.Healthy,
 		Topology: &pluginapi.TopologyInfo{
 			Nodes: []*pluginapi.NUMANode{
@@ -90,9 +100,17 @@ func (dpi *NUMACellDevicePlugin) device() *pluginapi.Device {
 	}
 }
 
+func (dpi *NUMACellDevicePlugin) devices() []*pluginapi.Device {
+	devs := []*pluginapi.Device{}
+	for cnt := 0; cnt < dpi.deviceCount; cnt++ {
+		devs = append(devs, dpi.device(cnt))
+	}
+	return devs
+}
+
 // ListAndWatch sends gRPC stream of devices.
 func (dpi *NUMACellDevicePlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
-	devs := []*pluginapi.Device{dpi.device()}
+	devs := dpi.devices()
 
 	// Send initial list of devices
 	resp := new(pluginapi.ListAndWatchResponse)

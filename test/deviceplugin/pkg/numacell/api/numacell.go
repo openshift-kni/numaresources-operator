@@ -28,6 +28,8 @@ const (
 	NUMACellResourceNamespace = "kni.node"
 
 	NUMACellEnvironVarName = "KNI_NODE_CELL_ID"
+
+	NUMACellDefaultDeviceCount = 15
 )
 
 func MakeResourceName(numacellid int) corev1.ResourceName {
