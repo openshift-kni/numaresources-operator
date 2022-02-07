@@ -59,6 +59,10 @@ func PauseMCPs(nodeGroups []nropv1alpha1.NodeGroup) (func() error, error) {
 	}
 
 	unpause := func() error {
+		mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nodeGroups)
+		if err != nil {
+			return err
+		}
 		for i := range mcps {
 			mcps[i].Spec.Paused = false
 			err = e2eclient.Client.Update(context.TODO(), mcps[i])

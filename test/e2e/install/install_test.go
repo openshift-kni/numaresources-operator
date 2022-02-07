@@ -19,6 +19,7 @@ package install
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -31,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
@@ -62,12 +65,7 @@ var _ = Describe("[Install] continuousIntegration", func() {
 	Context("with a running cluster with all the components", func() {
 		It("[test_id: 47574] should perform overall deployment and verify the condition is reported as available", func() {
 			deployedObj := overallDeployment()
-			var nname client.ObjectKey
-			for _, obj := range deployedObj {
-				if nroObj, ok := obj.(*nropv1alpha1.NUMAResourcesOperator); ok {
-					nname = client.ObjectKeyFromObject(nroObj)
-				}
-			}
+			nname := client.ObjectKeyFromObject(deployedObj.nroObj)
 			Expect(nname.Name).ToNot(BeEmpty())
 
 			By("checking that the condition Available=true")
@@ -103,7 +101,6 @@ var _ = Describe("[Install] continuousIntegration", func() {
 			const DSCheckTimeout = 1 * time.Minute
 			const DSCheckPollingPeriod = 5 * time.Second
 			Eventually(func() bool {
-
 				ds, err := getDaemonSetByOwnerReference(updatedNROObj.UID)
 				if err != nil {
 					klog.Warningf("unable to get Daemonset  %v", err)
@@ -173,31 +170,25 @@ var _ = Describe("[Install] durability", func() {
 				return cond.Status == metav1.ConditionTrue
 			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "NUMAResourcesOperator condition did not become degraded")
 
-			err = e2eclient.Client.Delete(context.TODO(), nroObj)
-			Expect(err).ToNot(HaveOccurred())
+			deleteNROPSync(e2eclient.Client, nroObj)
 		})
 	})
 
 	Context("with a running cluster with all the components and overall deployment", func() {
-		var deployedObj []client.Object
+		var deployedObj nroDeployment
 
 		BeforeEach(func() {
 			deployedObj = overallDeployment()
 		})
 
 		AfterEach(func() {
-			for _, obj := range deployedObj {
-				err := e2eclient.Client.Delete(context.TODO(), obj)
-				if err != nil {
-					Expect(errors.IsNotFound(err)).To(BeTrue(), fmt.Sprintf("unexpected error: %v", err))
-				}
-			}
+			teardownDeployment(deployedObj, 5*time.Minute)
 		})
 
 		It("[test_id: 47587] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", func() {
 
 			By("wait for DaemonSet to be ready")
-			nname := getNRONamespacedNameFromDeployedObjects(deployedObj)
+			nname := client.ObjectKeyFromObject(deployedObj.nroObj)
 			Expect(nname.Name).NotTo(BeEmpty())
 
 			nroObj := &nropv1alpha1.NUMAResourcesOperator{}
@@ -254,7 +245,7 @@ var _ = Describe("[Install] durability", func() {
 		})
 
 		It("should be able to delete NUMAResourceOperator CR and redeploy without polluting cluster state", func() {
-			nname := getNRONamespacedNameFromDeployedObjects(deployedObj)
+			nname := client.ObjectKeyFromObject(deployedObj.nroObj)
 			Expect(nname.Name).NotTo(BeEmpty())
 
 			nroObj := &nropv1alpha1.NUMAResourcesOperator{}
@@ -270,8 +261,7 @@ var _ = Describe("[Install] durability", func() {
 				return err
 			}, 5*time.Minute, 10*time.Second).Should(BeNil())
 
-			err = e2eclient.Client.Delete(context.TODO(), nroObj)
-			Expect(err).ToNot(HaveOccurred())
+			deleteNROPSync(e2eclient.Client, nroObj)
 
 			By("checking there are no leftovers")
 			// by taking the ns from the ds we're avoiding the need to figure out in advanced
@@ -299,6 +289,7 @@ var _ = Describe("[Install] durability", func() {
 			// TODO change to an image which is test dedicated
 			nroObj.Spec.ExporterImage = e2eimages.RTETestImageCI
 			// resourceVersion should not be set on objects to be created
+			// TODO: don't reuse existing objects
 			nroObj.ResourceVersion = ""
 
 			err = e2eclient.Client.Create(context.TODO(), nroObj)
@@ -342,18 +333,24 @@ func findContainerByName(daemonset appsv1.DaemonSet, containerName string) (*cor
 	return nil, fmt.Errorf("container %q not found in %s/%s", containerName, daemonset.Namespace, daemonset.Name)
 }
 
-// overallDeployment returns a slice of an objects created by it,
+type nroDeployment struct {
+	mcpObj *machineconfigv1.MachineConfigPool
+	kcObj  *machineconfigv1.KubeletConfig
+	nroObj *nropv1alpha1.NUMAResourcesOperator
+}
+
+// overallDeployment returns a struct containing all the deployed objects,
 // so it will be easier to introspect and delete them later.
-func overallDeployment() []client.Object {
+func overallDeployment() nroDeployment {
 	var matchLabels map[string]string
-	var deployedObj []client.Object
+	var deployedObj nroDeployment
 
 	if configuration.Platform == platform.Kubernetes {
 		mcpObj := objects.TestMCP()
 		By(fmt.Sprintf("creating the machine config pool object: %s", mcpObj.Name))
 		err := e2eclient.Client.Create(context.TODO(), mcpObj)
 		Expect(err).NotTo(HaveOccurred())
-		deployedObj = append(deployedObj, mcpObj)
+		deployedObj.mcpObj = mcpObj
 		matchLabels = map[string]string{"test": "test"}
 	}
 
@@ -372,15 +369,18 @@ func overallDeployment() []client.Object {
 	By(fmt.Sprintf("creating the KC object: %s", kcObj.Name))
 	err = e2eclient.Client.Create(context.TODO(), kcObj)
 	Expect(err).NotTo(HaveOccurred())
-	deployedObj = append(deployedObj, kcObj)
+	deployedObj.kcObj = kcObj
 
 	By(fmt.Sprintf("creating the NRO object: %s", nroObj.Name))
 	err = e2eclient.Client.Create(context.TODO(), nroObj)
 	Expect(err).NotTo(HaveOccurred())
-	deployedObj = append(deployedObj, nroObj)
+	deployedObj.nroObj = nroObj
 
-	err = unpause()
-	Expect(err).NotTo(HaveOccurred())
+	Eventually(
+		unpause,
+		configuration.MachineConfigPoolUpdateTimeout,
+		configuration.MachineConfigPoolUpdateInterval,
+	).ShouldNot(HaveOccurred())
 
 	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
 	Expect(err).NotTo(HaveOccurred())
@@ -399,6 +399,57 @@ func overallDeployment() []client.Object {
 	return deployedObj
 }
 
+// TODO: what if timeout < period?
+func teardownDeployment(nrod nroDeployment, timeout time.Duration) {
+	var wg sync.WaitGroup
+	if nrod.mcpObj != nil {
+		err := e2eclient.Client.Delete(context.TODO(), nrod.mcpObj)
+		Expect(err).ToNot(HaveOccurred())
+
+		wg.Add(1)
+		go func(mcpObj *machineconfigv1.MachineConfigPool) {
+			defer GinkgoRecover()
+			defer wg.Done()
+			klog.Infof("waiting for MCP %q to be gone", mcpObj.Name)
+			err := e2ewait.ForMachineConfigPoolDeleted(e2eclient.Client, mcpObj, 10*time.Second, timeout)
+			Expect(err).ToNot(HaveOccurred(), "MCP %q failed to be deleted", mcpObj.Name)
+		}(nrod.mcpObj)
+	}
+
+	var err error
+	err = e2eclient.Client.Delete(context.TODO(), nrod.kcObj)
+	Expect(err).ToNot(HaveOccurred())
+	wg.Add(1)
+	go func(kcObj *machineconfigv1.KubeletConfig) {
+		defer GinkgoRecover()
+		defer wg.Done()
+		klog.Infof("waiting for KC %q to be gone", kcObj.Name)
+		err := e2ewait.ForKubeletConfigDeleted(e2eclient.Client, kcObj, 10*time.Second, timeout)
+		Expect(err).ToNot(HaveOccurred(), "KC %q failed to be deleted", kcObj.Name)
+	}(nrod.kcObj)
+
+	err = e2eclient.Client.Delete(context.TODO(), nrod.nroObj)
+	Expect(err).ToNot(HaveOccurred())
+	wg.Add(1)
+	go func(nropObj *nropv1alpha1.NUMAResourcesOperator) {
+		defer GinkgoRecover()
+		defer wg.Done()
+		klog.Infof("waiting for NROP %q to be gone", nropObj.Name)
+		err := e2ewait.ForNUMAResourcesOperatorDeleted(e2eclient.Client, nropObj, 10*time.Second, timeout)
+		Expect(err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
+	}(nrod.nroObj)
+
+	wg.Wait()
+}
+
+func deleteNROPSync(cli client.Client, nropObj *nropv1alpha1.NUMAResourcesOperator) {
+	var err error
+	err = cli.Delete(context.TODO(), nropObj)
+	Expect(err).ToNot(HaveOccurred())
+	err = e2ewait.ForNUMAResourcesOperatorDeleted(cli, nropObj, 10*time.Second, 2*time.Minute)
+	Expect(err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
+}
+
 func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {
 	dsList := &appsv1.DaemonSetList{}
 
@@ -414,13 +465,4 @@ func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {
 		}
 	}
 	return nil, fmt.Errorf("failed to get daemonset with owner reference uid: %s", uid)
-}
-
-func getNRONamespacedNameFromDeployedObjects(deployedObjects []client.Object) types.NamespacedName {
-	for _, obj := range deployedObjects {
-		if nroObj, ok := obj.(*nropv1alpha1.NUMAResourcesOperator); ok {
-			return client.ObjectKeyFromObject(nroObj)
-		}
-	}
-	return types.NamespacedName{}
 }
