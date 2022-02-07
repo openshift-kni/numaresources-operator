@@ -21,8 +21,9 @@ import (
 )
 
 const (
-	CrdNRTName = "noderesourcetopologies.topology.node.k8s.io"
-	CrdNROName = "numaresourcesoperators.nodetopology.openshift.io"
+	CrdNRTName  = "noderesourcetopologies.topology.node.k8s.io"
+	CrdNROName  = "numaresourcesoperators.nodetopology.openshift.io"
+	CrdNROSName = "numaresourcesschedulers.nodetopology.openshift.io"
 )
 
 func GetByName(aclient client.Client, crdName string) (*apiextensionv1.CustomResourceDefinition, error) {

@@ -37,8 +37,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
-const crdName = "numaresourcesschedulers.nodetopology.openshift.io"
-
 var _ = Describe("[Scheduler] install", func() {
 	Context("with a running cluster with all the components", func() {
 		It("[test_id: 48598] should perform the scheduler deployment and verify the condition is reported as available", func() {
@@ -107,7 +105,7 @@ var _ = Describe("[Scheduler] install", func() {
 			}
 
 			By("checking the NumaResourcesScheduler CRD is deployed")
-			_, err = crds.GetByName(e2eclient.Client, crdName)
+			_, err = crds.GetByName(e2eclient.Client, crds.CrdNROSName)
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

@@ -120,7 +120,7 @@ test-unit: envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/... ./pkg/... ./rte/pkg/...
 
 test-e2e: build-e2e-all
-	hack/run-test-e2e.sh
+	ENABLE_SCHED_TESTS=true hack/run-test-e2e.sh
 
 test-install-e2e: build-e2e-all
 	hack/run-test-install-e2e.sh
