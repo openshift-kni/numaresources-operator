@@ -99,10 +99,11 @@ var _ = Describe("[Scheduler] install", func() {
 
 			nodeList, err := schedutils.ListMasterNodes(e2eclient.Client)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(nodeList).ToNot(BeEmpty())
 
 			nodeNames := schedutils.GetNodeNames(nodeList)
 			for _, pod := range podList {
-				Expect(pod.Spec.NodeName).To(BeElementOf(nodeNames))
+				Expect(pod.Spec.NodeName).To(BeElementOf(nodeNames), "pod: %q landed on node: %q, which is not part of the master nodes group: %v", pod.Name, pod.Spec.NodeName, nodeNames)
 			}
 
 			By("checking the NumaResourcesScheduler CRD is deployed")
