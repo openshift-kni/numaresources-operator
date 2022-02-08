@@ -440,6 +440,17 @@ func teardownDeployment(nrod nroDeployment, timeout time.Duration) {
 	}(nrod.nroObj)
 
 	wg.Wait()
+
+	if configuration.Platform == platform.OpenShift {
+		Eventually(func() bool {
+			updated, err := machineconfigpools.IsMachineConfigPoolsUpdatedAfterDeletion(nrod.nroObj)
+			if err != nil {
+				klog.Errorf("failed to retrieve information about machine config pools: %w", err)
+				return false
+			}
+			return updated
+		}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
+	}
 }
 
 func deleteNROPSync(cli client.Client, nropObj *nropv1alpha1.NUMAResourcesOperator) {
