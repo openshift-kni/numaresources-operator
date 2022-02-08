@@ -42,6 +42,23 @@ func IsMachineConfigPoolsUpdated(nro *nropv1alpha1.NUMAResourcesOperator) (bool,
 	return true, nil
 }
 
+// IsMachineConfigPoolsUpdatedAfterDeletion checks if all related to NUMAResourceOperator CR machines config pools have updated status
+// after MachineConfig deletion
+func IsMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1alpha1.NUMAResourcesOperator) (bool, error) {
+	mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
+	if err != nil {
+		return false, err
+	}
+
+	for _, mcp := range mcps {
+		if !controllers.IsMachineConfigPoolUpdatedAfterDeletion(nro.Name, mcp) {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
 func PauseMCPs(nodeGroups []nropv1alpha1.NodeGroup) (func() error, error) {
 	mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nodeGroups)
 	if err != nil {

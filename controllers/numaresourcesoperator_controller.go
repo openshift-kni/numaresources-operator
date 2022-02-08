@@ -502,14 +502,7 @@ func validateUpdateEvent(e *event.UpdateEvent) bool {
 }
 
 func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	mcName := objectnames.GetMachineConfigName(instanceName, mcp.Name)
-	existing := false
-	for _, s := range mcp.Status.Configuration.Source {
-		if s.Name == mcName {
-			existing = true
-			break
-		}
-	}
+	existing := isMachineConfigExists(instanceName, mcp)
 
 	// the Machine Config Pool still did not apply the machine config wait for one minute
 	if !existing || machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
@@ -517,6 +510,27 @@ func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.Machin
 	}
 
 	return true
+}
+
+func IsMachineConfigPoolUpdatedAfterDeletion(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
+	existing := isMachineConfigExists(instanceName, mcp)
+
+	// the Machine Config Pool still has the machine config return false
+	if existing || machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
+		return false
+	}
+
+	return true
+}
+
+func isMachineConfigExists(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
+	mcName := objectnames.GetMachineConfigName(instanceName, mcp.Name)
+	for _, s := range mcp.Status.Configuration.Source {
+		if s.Name == mcName {
+			return true
+		}
+	}
+	return false
 }
 
 func validateMachineConfigLabels(mc client.Object, mcps []*machineconfigv1.MachineConfigPool) error {
