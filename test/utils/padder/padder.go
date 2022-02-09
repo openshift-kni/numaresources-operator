@@ -19,7 +19,6 @@ package padder
 import (
 	"context"
 	"fmt"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 	"strings"
 	"time"
 
@@ -30,11 +29,12 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/test/e2e/utils/nodes"
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 	"github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	nrtutil "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	"github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
 // This package allows to control the amount of available allocationTarget under the nodes.
@@ -42,13 +42,13 @@ import (
 //
 // Usage example:
 // pad := New(client, "test-ns")
-// pad.Nodes(2).UntilAvailableIsResource(corev1.ResourceCPU, "3").UntilAvailableIsResource(corev1.ResourceMemory, "100Mi").Pad()
+// pad.Nodes(2).UntilAvailableIsResource(corev1.ResourceCPU, "3").UntilAvailableIsResource(corev1.ResourceMemory, "100Mi").Pad(timeout)
 // or
 // rl := corev1.ResourceList {
 //		corev1.ResourceCPU: "10",
 //		corev1.ResourceMemory: "100Mi"
 //	}
-// pad.Nodes(2).UntilAvailableIsResourceList(rl).Pad()
+// pad.Nodes(2).UntilAvailableIsResourceList(rl).Pad(timeout)
 
 const PadderLabel = "nrop-test-pad-pod"
 
@@ -131,11 +131,15 @@ func (p *Padder) Pad(timeout time.Duration) error {
 				// label the pod with a pad label, so it will be easier to identify later
 				labelPod(padPod, map[string]string{PadderLabel: ""})
 
-				padPod.Spec.Containers[0].Resources.Limits = diffList
-				padPod.Spec.Containers[0].Resources.Requests = diffList
+				cnt := &padPod.Spec.Containers[0]
+				cnt.Resources.Limits = diffList
+				cnt.Resources.Requests = diffList
 
-				// place the pod on the selected node
-				padPod.Spec.NodeSelector = map[string]string{nodes.LabelHostname: nrt.Name}
+				padPod, err = pinPodTo(padPod, zone, nrt.Name)
+				if err != nil {
+					return err
+				}
+
 				if err := p.Client.Create(context.TODO(), padPod); err != nil {
 					return err
 				}
@@ -277,4 +281,33 @@ func isZoneMeetAllocationTarget(zone nrtv1alpha1.Zone, target corev1.ResourceLis
 		}
 	}
 	return true
+}
+
+func pinPodTo(pod *corev1.Pod, zone nrtv1alpha1.Zone, nodeName string) (*corev1.Pod, error) {
+	klog.Infof("forcing affinity to [%s: %s]", "kubernetes.io/hostname", nodeName)
+	pod.Spec.NodeSelector = map[string]string{
+		"kubernetes.io/hostname": nodeName,
+	}
+
+	// try to pin to specific zone only if the NUMA cell resources exists
+	if numaCellResourceFound(zone) {
+		zoneID, err := nrtutil.GetZoneIDFromName(zone.Name)
+		if err != nil {
+			return nil, err
+		}
+		klog.Infof("creating padding pod for node %q zone %d", nodeName, zoneID)
+
+		cnt := &pod.Spec.Containers[0] // shortcut
+		cnt.Resources.Limits[numacellapi.MakeResourceName(zoneID)] = resource.MustParse("1")
+	}
+	return pod, nil
+}
+
+func numaCellResourceFound(zone nrtv1alpha1.Zone) bool {
+	for _, res := range zone.Resources {
+		if strings.HasPrefix(res.Name, numacellapi.NUMACellResourceNamespace) {
+			return true
+		}
+	}
+	return false
 }
