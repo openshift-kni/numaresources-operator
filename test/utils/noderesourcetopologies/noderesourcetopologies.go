@@ -208,7 +208,7 @@ func FilterAnyZoneMatchingResources(nrts []nrtv1alpha1.NodeResourceTopology, req
 	for _, nrt := range nrts {
 		matches := 0
 		for _, zone := range nrt.Zones {
-			if !zoneResourcesMatchesRequest(zone.Resources, requests) {
+			if !ZoneResourcesMatchesRequest(zone.Resources, requests) {
 				continue
 			}
 			klog.Infof(" ----> node %q zone %q provides at least %#v", nrt.Name, zone.Name, ResourceListToString(requests))
@@ -233,16 +233,17 @@ func FindFromList(nrts []nrtv1alpha1.NodeResourceTopology, name string) (*nrtv1a
 	return nil, fmt.Errorf("failed to find NRT for %q", name)
 }
 
-func findZoneByName(nrt nrtv1alpha1.NodeResourceTopology, zoneName string) (*nrtv1alpha1.Zone, error) {
-	for idx := 0; idx < len(nrt.Zones); idx++ {
-		if nrt.Zones[idx].Name == zoneName {
-			return &nrt.Zones[idx], nil
-		}
+// AvailableFromZone returns a ResourceList of all available resources under the zone
+func AvailableFromZone(z nrtv1alpha1.Zone) corev1.ResourceList {
+	rl := corev1.ResourceList{}
+
+	for _, ri := range z.Resources {
+		rl[corev1.ResourceName(ri.Name)] = ri.Available
 	}
-	return nil, fmt.Errorf("cannot find zone %q", zoneName)
+	return rl
 }
 
-func zoneResourcesMatchesRequest(resources []nrtv1alpha1.ResourceInfo, requests corev1.ResourceList) bool {
+func ZoneResourcesMatchesRequest(resources []nrtv1alpha1.ResourceInfo, requests corev1.ResourceList) bool {
 	for resName, resQty := range requests {
 		zoneQty, ok := findResourceAvailableByName(resources, string(resName))
 		if !ok {
@@ -253,6 +254,15 @@ func zoneResourcesMatchesRequest(resources []nrtv1alpha1.ResourceInfo, requests 
 		}
 	}
 	return true
+}
+
+func findZoneByName(nrt nrtv1alpha1.NodeResourceTopology, zoneName string) (*nrtv1alpha1.Zone, error) {
+	for idx := 0; idx < len(nrt.Zones); idx++ {
+		if nrt.Zones[idx].Name == zoneName {
+			return &nrt.Zones[idx], nil
+		}
+	}
+	return nil, fmt.Errorf("cannot find zone %q", zoneName)
 }
 
 func findResourceAvailableByName(resources []nrtv1alpha1.ResourceInfo, name string) (resource.Quantity, bool) {
