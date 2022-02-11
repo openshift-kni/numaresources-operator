@@ -27,6 +27,12 @@ jobs:
       with:
         fetch-depth: 0 # Fetch all history for all tags and branches
 
+    # Secondary scheduler pod sometimes fails to run on master node due to lack of resources.
+    # Secondary scheduler deployment is created by NROSchedReconciler which loads this yaml file
+    # as template, so we use `yq` tool to delete the `requests` so the pod could be scheduled.
+    - name: Remove Secondary Scheduler Deployment Requests
+      run: yq eval -i 'del(.spec.template.spec.containers[select(.spec.template.containers[].name=="secondary-scheduler")].resources.requests)' pkg/numaresourcesscheduler/manifests/yaml/deployment.yaml
+
     - name: Set up golang
       uses: actions/setup-go@v2
       with:
