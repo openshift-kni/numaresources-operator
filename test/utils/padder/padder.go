@@ -108,7 +108,7 @@ func (p *Padder) Pad(timeout time.Duration) error {
 		return err
 	}
 
-	singleNumaNrt := filterSingleNumaNodePolicyNrts(nrtList.Items)
+	singleNumaNrt := nrtutil.FilterByPolicies(nrtList.Items, []nrtv1alpha1.TopologyManagerPolicy{nrtv1alpha1.SingleNUMANodePodLevel, nrtv1alpha1.SingleNUMANodeContainerLevel})
 	if p.nNodes > len(singleNumaNrt) {
 		return fmt.Errorf("not enough nodes were found for padding. requested: %d, got: %d", p.nNodes, len(singleNumaNrt))
 	}
@@ -277,16 +277,6 @@ func labelPod(pod *corev1.Pod, labelMap map[string]string) {
 	for k, v := range labelMap {
 		pod.Labels[k] = v
 	}
-}
-
-func filterSingleNumaNodePolicyNrts(list []nrtv1alpha1.NodeResourceTopology) []nrtv1alpha1.NodeResourceTopology {
-	singleNUMANodeContainerLevelNrts := nrtutil.FilterTopologyManagerPolicy(list, nrtv1alpha1.SingleNUMANodeContainerLevel)
-	singleNUMANodePodLevelNrts := nrtutil.FilterTopologyManagerPolicy(list, nrtv1alpha1.SingleNUMANodePodLevel)
-
-	var singleNumaNrt []nrtv1alpha1.NodeResourceTopology
-	singleNumaNrt = append(singleNumaNrt, singleNUMANodeContainerLevelNrts...)
-	singleNumaNrt = append(singleNumaNrt, singleNUMANodePodLevelNrts...)
-	return singleNumaNrt
 }
 
 func isZoneMeetAllocationTarget(zone nrtv1alpha1.Zone, target corev1.ResourceList) bool {
