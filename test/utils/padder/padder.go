@@ -54,15 +54,15 @@ const PadderLabel = "nrop-test-pad-pod"
 
 type Padder struct {
 	// Client defines the API client to run CRUD operations, that will be used for testing
-	Client    client.Client
-	namespace string
+	Client      client.Client
+	paddedNodes []string
+	namespace   string
 	*padRequest
 }
 
 type padRequest struct {
 	nNodes           int
 	allocationTarget corev1.ResourceList
-	targetedNodes    []string
 }
 
 // New return new padder object
@@ -115,18 +115,18 @@ func (p *Padder) Pad(timeout time.Duration) error {
 
 	nNodes := p.nNodes
 	var pods []*corev1.Pod
-	candidateNrts := nrtutil.AccumulateNames(singleNumaNrt)
+	candidateNodes := nrtutil.AccumulateNames(singleNumaNrt)
 
 	for nNodes > 0 {
 		nodePadded := false
 
 		// select one node randomly
-		nrtName, popped := candidateNrts.PopAny()
-		if !popped {
-			return fmt.Errorf("cannot select a node to be padded among %#v", candidateNrts.List())
+		nodeName, ok := candidateNodes.PopAny()
+		if !ok {
+			return fmt.Errorf("cannot select a node to be padded among %#v", candidateNodes.List())
 		}
 
-		nrt, err := nrtutil.FindFromList(singleNumaNrt, nrtName)
+		nrt, err := nrtutil.FindFromList(singleNumaNrt, nodeName)
 		if err != nil {
 			return err
 		}
@@ -161,14 +161,15 @@ func (p *Padder) Pad(timeout time.Duration) error {
 				}
 				pods = append(pods, padPod)
 				nodePadded = true
-				// store the node name, so we could check it's corresponding NRT later
-				p.padRequest.targetedNodes = append(p.targetedNodes, nrt.Name)
 			} else {
 				klog.Warningf("node: %q zone: %q, doesn't have enough available allocationTarget", nrt.Name, zone.Name)
 			}
 		}
 		if nodePadded {
 			nNodes--
+			// store the node name, so we could check it's corresponding NRT later
+			// or in order to return it to the user for further use later
+			p.paddedNodes = append(p.paddedNodes, nodeName)
 		}
 	}
 
@@ -204,8 +205,12 @@ func (p *Padder) Clean() error {
 	if errors.IsNotFound(err) {
 		err = nil
 	}
-	p.targetedNodes = []string{}
+	p.paddedNodes = []string{}
 	return err
+}
+
+func (p *Padder) GetPaddedNodes() []string {
+	return p.paddedNodes
 }
 
 func (p *Padder) waitForUpdatedNRTs(timeout time.Duration) (bool, error) {
@@ -217,7 +222,7 @@ func (p *Padder) waitForUpdatedNRTs(timeout time.Duration) (bool, error) {
 			return false, err
 		}
 
-		for _, nodeName := range p.targetedNodes {
+		for _, nodeName := range p.paddedNodes {
 			nrt, err := nrtutil.FindFromList(nrtList.Items, nodeName)
 			if err != nil {
 				klog.Warningf("failed to get find noderesourcestopologies with name: %q", nodeName)
