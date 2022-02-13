@@ -109,12 +109,28 @@ func (p *Padder) Pad(timeout time.Duration) error {
 	}
 
 	singleNumaNrt := filterSingleNumaNodePolicyNrts(nrtList.Items)
+	if p.nNodes > len(singleNumaNrt) {
+		return fmt.Errorf("not enough nodes were found for padding. requested: %d, got: %d", p.nNodes, len(singleNumaNrt))
+	}
+
 	nNodes := p.nNodes
 	var pods []*corev1.Pod
+	candidateNrts := nrtutil.AccumulateNames(singleNumaNrt)
 
-	for i := 0; i < len(singleNumaNrt) && nNodes > 0; i++ {
-		nrt := singleNumaNrt[i]
+	for nNodes > 0 {
 		nodePadded := false
+
+		// select one node randomly
+		nrtName, popped := candidateNrts.PopAny()
+		if !popped {
+			return fmt.Errorf("cannot select a node to be padded among %#v", candidateNrts.List())
+		}
+
+		nrt, err := nrtutil.FindFromList(singleNumaNrt, nrtName)
+		if err != nil {
+			return err
+		}
+
 		for _, zone := range nrt.Zones {
 			// check that zone has at least the amount of allocationTarget that needed
 			if nrtutil.ZoneResourcesMatchesRequest(zone.Resources, p.allocationTarget) {
