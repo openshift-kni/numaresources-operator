@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -196,17 +197,54 @@ func (p *Padder) Pad(timeout time.Duration) error {
 // in order to clean all the padding pod in an easier way
 func (p *Padder) Clean() error {
 	pod := &corev1.Pod{}
-	opts := []client.DeleteAllOfOption{
-		client.InNamespace(p.namespace),
-		client.MatchingLabels{PadderLabel: ""},
-		client.GracePeriodSeconds(5),
+	if err := p.Client.DeleteAllOf(
+		context.TODO(),
+		pod,
+		[]client.DeleteAllOfOption{
+			client.InNamespace(p.namespace),
+			client.MatchingLabels{PadderLabel: ""},
+			client.GracePeriodSeconds(5),
+		}...); err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
 	}
-	err := p.Client.DeleteAllOf(context.TODO(), pod, opts...)
-	if errors.IsNotFound(err) {
-		err = nil
+
+	podList := &corev1.PodList{}
+	if err := p.Client.List(
+		context.TODO(),
+		podList,
+		[]client.ListOption{
+			client.InNamespace(p.namespace),
+			client.MatchingLabels{PadderLabel: ""},
+		}...); err != nil {
+		return err
 	}
+
+	var errLock sync.Mutex
+	var deletionErrors []string
+
+	var wg sync.WaitGroup
+	for _, padPod := range podList.Items {
+		wg.Add(1)
+		go func(pod corev1.Pod) {
+			defer wg.Done()
+
+			klog.Infof("waiting for pod %q to get deleted", pod.Name)
+			if err := wait.ForPodDeleted(p.Client, p.namespace, pod.Name, time.Minute); err != nil {
+				errLock.Lock()
+				deletionErrors = append(deletionErrors, err.Error())
+				errLock.Unlock()
+			}
+		}(padPod)
+	}
+	wg.Wait()
+	if deletionErrors != nil {
+		return fmt.Errorf("failed to wait for pad pods deletion. errors: %s", strings.Join(deletionErrors, ", "))
+	}
+
 	p.paddedNodes = []string{}
-	return err
+	return nil
 }
 
 func (p *Padder) GetPaddedNodes() []string {
