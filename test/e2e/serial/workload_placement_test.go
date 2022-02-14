@@ -415,6 +415,98 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		})
 	})
+	Context("with at least two nodes suitable", func() {
+		It("[test_id: 47583] a guaranteed pod with one container should be scheduled into one NUMA zone", func() {
+
+			const requiredNUMAZones = 2
+			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
+			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
+
+			const neededNodes = 2
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes))
+			}
+
+			//TODO: we should calculate requiredRes from NUMA zones in cluster nodes instead.
+			requiredRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
+			}
+
+			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
+			nrtCandidates = e2enrt.FilterAnyZoneMatchingResources(nrtCandidates, requiredRes)
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d, needed: %d", len(nrtCandidates), neededNodes))
+			}
+			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
+
+			targetNodeName, ok := nrtCandidateNames.PopAny()
+			Expect(ok).To(BeTrue(), "cannot select a targe node among %#v", nrtCandidateNames.List())
+			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
+			// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
+			// but have enough allocatable resources at node level to shedule the pod on it.
+			// If we pad each zone with a pod with 3/4 of the required resources, as those nodes have at least
+			// 2 NUMA zones, they will have enogh allocatable resources at node level to accomodate the required
+			// resources but they won't have enough resources in only one NUMA zone.
+
+			By("Padding all other candidate nodes")
+			// TODO This should be calculated as 3/4 of requiredRes
+			paddingRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("3Gi"),
+			}
+
+			var paddingPods []*corev1.Pod
+			for _, nodeName := range nrtCandidateNames.List() {
+
+				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
+				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
+
+				for idx, zone := range nrtInfo.Zones {
+					podName := fmt.Sprintf("padding%s-%d", nodeName, idx)
+					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingRes)
+					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone", podName, zone.Name)
+
+					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
+					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone", podName, zone.Name)
+
+					err = fxt.Client.Create(context.TODO(), padPod)
+					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone", podName, zone.Name)
+
+					paddingPods = append(paddingPods, padPod)
+				}
+			}
+
+			// wait for all padding pods to be up&running ( or fail)
+			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
+			for _, failedPod := range failedPods {
+				// no need to check for errors here
+				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
+			}
+			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
+
+			By("Scheduling the testing pod")
+			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testPod")
+			pod.Spec.SchedulerName = schedulerName
+			pod.Spec.Containers[0].Resources.Limits = requiredRes
+
+			err := fxt.Client.Create(context.TODO(), pod)
+			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
+
+			By("waiting for node to be up&running")
+			podRunningTimeout := 1 * time.Minute
+			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
+			Expect(err).NotTo(HaveOccurred(), "Pod %q not up&running after %v", pod.Name, podRunningTimeout)
+
+			By("checking the pod has been scheduled in the proper node")
+			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName))
+
+			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
+			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
+		})
+	})
 })
 
 func makePaddingPod(namespace, nodeName string, zone nrtv1alpha1.Zone, podReqs corev1.ResourceList) (*corev1.Pod, error) {
