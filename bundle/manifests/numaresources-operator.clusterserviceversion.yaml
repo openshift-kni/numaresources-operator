@@ -8,20 +8,28 @@ metadata:
           "apiVersion": "nodetopology.openshift.io/v1alpha1",
           "kind": "NUMAResourcesOperator",
           "metadata": {
-            "name": "numaresourcesoperator-sample"
+            "name": "numaresourcesoperator"
           },
           "spec": {
-            "foo": "bar"
+            "nodeGroups": [
+              {
+                "machineConfigPoolSelector": {
+                  "matchLabels": {
+                    "pools.operator.machineconfiguration.openshift.io/worker": ""
+                  }
+                }
+              }
+            ]
           }
         },
         {
           "apiVersion": "nodetopology.openshift.io/v1alpha1",
           "kind": "NUMAResourcesScheduler",
           "metadata": {
-            "name": "numaresourcesscheduler-sample"
+            "name": "numaresourcesscheduler"
           },
           "spec": {
-            "foo": "bar"
+            "imageSpec": "quay.io/openshift-kni/scheduler-plugins:4.10-snapshot"
           }
         }
       ]
