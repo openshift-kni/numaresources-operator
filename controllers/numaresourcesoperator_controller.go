@@ -63,7 +63,7 @@ import (
 )
 
 const (
-	defaultNUMAResourcesOperatorCrName = "numaresourcesoperator"
+	DefaultNUMAResourcesOperatorCrName = "numaresourcesoperator"
 	numaResourcesRetryPeriod           = 1 * time.Minute
 )
 
@@ -127,7 +127,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, err
 	}
 
-	if req.Name != defaultNUMAResourcesOperatorCrName {
+	if req.Name != DefaultNUMAResourcesOperatorCrName {
 		message := fmt.Sprintf("incorrect NUMAResourcesOperator resource name: %s", instance.Name)
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, message)
 	}

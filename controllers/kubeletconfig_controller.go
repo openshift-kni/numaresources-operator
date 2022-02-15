@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -41,6 +40,7 @@ import (
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
+	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	mcpfind "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools/find"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
@@ -70,7 +70,7 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	defer klog.V(3).InfoS("Finish KubeletConfig reconcile loop", "object", req.NamespacedName)
 
 	nname := types.NamespacedName{
-		Name: defaultNUMAResourcesOperatorCrName,
+		Name: DefaultNUMAResourcesOperatorCrName,
 	}
 	instance := &nropv1alpha1.NUMAResourcesOperator{}
 	err := r.Get(ctx, nname, instance)
@@ -114,7 +114,7 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 		return nil, err
 	}
 
-	kubeletConfig, err := mcoKubeletConfToKubeletConf(mcoKc)
+	kubeletConfig, err := kubeletconfig.MCOKubeletConfToKubeletConf(mcoKc)
 	if err != nil {
 		klog.ErrorS(err, "cannot extract KubeletConfiguration from MCO KubeletConfig", "name", kcKey.Name)
 		return nil, err
@@ -157,12 +157,6 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, instance *n
 		}
 	}
 	return rendered, nil
-}
-
-func mcoKubeletConfToKubeletConf(mcoKc *mcov1.KubeletConfig) (*kubeletconfigv1beta1.KubeletConfiguration, error) {
-	kc := &kubeletconfigv1beta1.KubeletConfiguration{}
-	err := json.Unmarshal(mcoKc.Spec.KubeletConfig.Raw, kc)
-	return kc, err
 }
 
 func renderRTEConfig(namespace, name string, klConfig *kubeletconfigv1beta1.KubeletConfiguration) (*corev1.ConfigMap, error) {

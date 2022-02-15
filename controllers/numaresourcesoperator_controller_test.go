@@ -111,14 +111,14 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 	Context("with NRO empty machine config pool selector node group", func() {
 		It("should updated the CR condition to degraded", func() {
-			nro := testutils.NewNUMAResourcesOperator(defaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{nil})
+			nro := testutils.NewNUMAResourcesOperator(DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{nil})
 			verifyDegradedCondition(nro, validation.NodeGroupsError)
 		})
 	})
 
 	Context("without available machine config pools", func() {
 		It("should updated the CR condition to degraded", func() {
-			nro := testutils.NewNUMAResourcesOperator(defaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
+			nro := testutils.NewNUMAResourcesOperator(DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
 				{
 					MatchLabels: map[string]string{"test": "test"},
 				},
@@ -143,7 +143,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				"test2": "test2",
 			}
 
-			nro = testutils.NewNUMAResourcesOperator(defaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
+			nro = testutils.NewNUMAResourcesOperator(DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
 				{MatchLabels: label1},
 				{MatchLabels: label2},
 			})
@@ -313,7 +313,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				"test2": "test2",
 			}
 
-			nro = testutils.NewNUMAResourcesOperator(defaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
+			nro = testutils.NewNUMAResourcesOperator(DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
 				{MatchLabels: label1},
 				{MatchLabels: label2},
 			})
