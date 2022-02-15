@@ -256,6 +256,15 @@ func ZoneResourcesMatchesRequest(resources []nrtv1alpha1.ResourceInfo, requests 
 	return true
 }
 
+func FilterByPolicies(list []nrtv1alpha1.NodeResourceTopology, policies []nrtv1alpha1.TopologyManagerPolicy) []nrtv1alpha1.NodeResourceTopology {
+	var filteredNrts []nrtv1alpha1.NodeResourceTopology
+	for _, policy := range policies {
+		nrts := FilterTopologyManagerPolicy(list, policy)
+		filteredNrts = append(filteredNrts, nrts...)
+	}
+	return filteredNrts
+}
+
 func findZoneByName(nrt nrtv1alpha1.NodeResourceTopology, zoneName string) (*nrtv1alpha1.Zone, error) {
 	for idx := 0; idx < len(nrt.Zones); idx++ {
 		if nrt.Zones[idx].Name == zoneName {
