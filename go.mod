@@ -8,7 +8,7 @@ require (
 	github.com/google/go-cmp v0.5.6
 	github.com/jaypipes/ghw v0.8.1-0.20211210215558-4d0ed8fddb8c
 	github.com/jaypipes/pcidb v0.6.0
-	github.com/k8stopologyawareschedwg/deployer v0.3.0
+	github.com/k8stopologyawareschedwg/deployer v0.4.0
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12
 	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.4.2-0.20220206104702-bb95c4d402dc
 	github.com/kubevirt/device-plugin-manager v1.18.8

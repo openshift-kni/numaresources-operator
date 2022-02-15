@@ -17,6 +17,7 @@
 package clientutil
 
 import (
+	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 
@@ -71,6 +72,19 @@ func NewK8sExt() (*apiextension.Clientset, error) {
 		return nil, err
 	}
 	return clientset, nil
+}
+
+func NewDiscoveryClient() (*discovery.DiscoveryClient, error) {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	cli, err := discovery.NewDiscoveryClientForConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return cli, nil
 }
 
 func NewTopologyClient() (*topologyclientset.Clientset, error) {
