@@ -25,8 +25,12 @@ import (
 
 // NUMAResourcesOperatorSpec defines the desired state of NUMAResourcesOperator
 type NUMAResourcesOperatorSpec struct {
-	NodeGroups    []NodeGroup `json:"nodeGroups,omitempty"`
-	ExporterImage string      `json:"imageSpec,omitempty"`
+	// Group of Nodes to enable RTE on
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Group of nodes to enable RTE on"
+	NodeGroups []NodeGroup `json:"nodeGroups,omitempty"`
+	// Optional Resource Topology Exporter image URL
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Optional RTE image URL",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	ExporterImage string `json:"imageSpec,omitempty"`
 	// Valid values are: "Normal", "Debug", "Trace", "TraceAll".
 	// Defaults to "Normal".
 	// +optional
@@ -43,7 +47,11 @@ type NodeGroup struct {
 
 // NUMAResourcesOperatorStatus defines the observed state of NUMAResourcesOperator
 type NUMAResourcesOperatorStatus struct {
-	DaemonSets         []NamespacedName    `json:"daemonsets,omitempty"`
+	// DaemonSets of the configured RTEs, one per node group
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="RTE DaemonSets"
+	DaemonSets []NamespacedName `json:"daemonsets,omitempty"`
+	// MachineConfigPools resolved from configured node groups
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="RTE MCPs from node groups"
 	MachineConfigPools []MachineConfigPool `json:"machineconfigpools,omitempty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -66,6 +74,7 @@ type MachineConfigPool struct {
 //+kubebuilder:resource:shortName=numaresop,path=numaresourcesoperators,scope=Cluster
 
 // NUMAResourcesOperator is the Schema for the numaresourcesoperators API
+//+operator-sdk:csv:customresourcedefinitions:displayName="NUMA Resources Operator",resources={{DaemonSet,v1,rte-daemonset,ConfigMap,v1,rte-configmap}}
 type NUMAResourcesOperator struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

@@ -24,8 +24,12 @@ import (
 
 // NUMAResourcesSchedulerSpec defines the desired state of NUMAResourcesScheduler
 type NUMAResourcesSchedulerSpec struct {
+	// Scheduler container image URL
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler container image URL",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	SchedulerImage string `json:"imageSpec"`
-	SchedulerName  string `json:"schedulerName,omitempty"`
+	// Scheduler name to be used in pod templates
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler name",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	SchedulerName string `json:"schedulerName,omitempty"`
 	// Valid values are: "Normal", "Debug", "Trace", "TraceAll".
 	// Defaults to "Normal".
 	// +optional
@@ -35,8 +39,12 @@ type NUMAResourcesSchedulerSpec struct {
 
 // NUMAResourcesSchedulerStatus defines the observed state of NUMAResourcesScheduler
 type NUMAResourcesSchedulerStatus struct {
-	Deployment    NamespacedName `json:"deployment,omitempty"`
-	SchedulerName string         `json:"schedulerName,omitempty"`
+	// Deployment of the secondary scheduler, namespaced name
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Scheduler deployment"
+	Deployment NamespacedName `json:"deployment,omitempty"`
+	// Scheduler name to be used in pod templates
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Scheduler name"
+	SchedulerName string `json:"schedulerName,omitempty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
@@ -48,6 +56,7 @@ type NUMAResourcesSchedulerStatus struct {
 //+kubebuilder:resource:shortName=numaressched,path=numaresourcesschedulers,scope=Cluster
 
 // NUMAResourcesScheduler is the Schema for the numaresourcesschedulers API
+//+operator-sdk:csv:customresourcedefinitions:displayName="NUMA Aware Scheduler",resources={{Deployment,v1,secondary-scheduler-deployment}}
 type NUMAResourcesScheduler struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
