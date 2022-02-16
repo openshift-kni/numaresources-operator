@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -59,6 +60,13 @@ type Padder struct {
 	paddedNodes []string
 	namespace   string
 	*padRequest
+}
+
+// PaddingOptions is some configuration that modifies options for a pad request.
+type PaddingOptions struct {
+	// LabelSelector pad nodes with a given label.
+	// the number of padded nodes is still limit by padRequest.nNodes value
+	LabelSelector labels.Selector
 }
 
 type padRequest struct {
@@ -98,10 +106,22 @@ func (p *Padder) UntilAvailableIsResourceList(resources corev1.ResourceList) *Pa
 // Pad will create pad pods in order to align the nodes
 // with the requested amount of available allocationTarget
 // and wait until timeout to see if nodes got updated
-func (p *Padder) Pad(timeout time.Duration) error {
+func (p *Padder) Pad(timeout time.Duration, options PaddingOptions) error {
 	if p.nNodes == 0 {
 		klog.Warningf("no nodes for padding were found. please specify at least one node")
 		return nil
+	}
+
+	var opts []client.ListOption
+	if options.LabelSelector != nil {
+		opts = []client.ListOption{
+			client.MatchingLabelsSelector{Selector: options.LabelSelector},
+		}
+	}
+	nodeList := &corev1.NodeList{}
+	err := p.Client.List(context.TODO(), nodeList, opts...)
+	if err != nil {
+		return err
 	}
 
 	nrtList, err := nrtutil.GetUpdated(p.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
@@ -109,7 +129,10 @@ func (p *Padder) Pad(timeout time.Duration) error {
 		return err
 	}
 
-	singleNumaNrt := nrtutil.FilterByPolicies(nrtList.Items, []nrtv1alpha1.TopologyManagerPolicy{nrtv1alpha1.SingleNUMANodePodLevel, nrtv1alpha1.SingleNUMANodeContainerLevel})
+	// since there is a relation of 1 : 1 between nodes and NRTs we can filter by the nodes` name
+	nrts := filterNrtByNodeName(nrtList.Items, nodeList.Items)
+
+	singleNumaNrt := nrtutil.FilterByPolicies(nrts, []nrtv1alpha1.TopologyManagerPolicy{nrtv1alpha1.SingleNUMANodePodLevel, nrtv1alpha1.SingleNUMANodeContainerLevel})
 	if p.nNodes > len(singleNumaNrt) {
 		return fmt.Errorf("not enough nodes were found for padding. requested: %d, got: %d", p.nNodes, len(singleNumaNrt))
 	}
@@ -359,4 +382,14 @@ func numaCellResourceFound(zone nrtv1alpha1.Zone) bool {
 		}
 	}
 	return false
+}
+
+func filterNrtByNodeName(nrts []nrtv1alpha1.NodeResourceTopology, nodes []corev1.Node) []nrtv1alpha1.NodeResourceTopology {
+	var filtered []nrtv1alpha1.NodeResourceTopology
+	for _, node := range nodes {
+		if nrt, err := nrtutil.FindFromList(nrts, node.Name); err == nil {
+			filtered = append(filtered, *nrt)
+		}
+	}
+	return filtered
 }
