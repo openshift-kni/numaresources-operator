@@ -38,6 +38,7 @@ spec:
             description: NUMAResourcesOperatorSpec defines the desired state of NUMAResourcesOperator
             properties:
               imageSpec:
+                description: Optional Resource Topology Exporter image URL
                 type: string
               logLevel:
                 default: Normal
@@ -51,6 +52,7 @@ spec:
                 - TraceAll
                 type: string
               nodeGroups:
+                description: Group of Nodes to enable RTE on
                 items:
                   description: NodeGroup defines group of nodes that will run resource
                     topology exporter daemon set You can choose the group of node
@@ -180,6 +182,7 @@ spec:
                   type: object
                 type: array
               daemonsets:
+                description: DaemonSets of the configured RTEs, one per node group
                 items:
                   description: NamespacedName comprises a resource name, with a mandatory
                     namespace, rendered as "<namespace>/<name>".
@@ -191,6 +194,7 @@ spec:
                   type: object
                 type: array
               machineconfigpools:
+                description: MachineConfigPools resolved from configured node groups
                 items:
                   description: MachineConfigPool defines the observed state of each
                     MachineConfigPool selected by node groups
