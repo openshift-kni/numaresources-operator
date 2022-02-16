@@ -40,6 +40,7 @@ spec:
             description: NUMAResourcesSchedulerSpec defines the desired state of NUMAResourcesScheduler
             properties:
               imageSpec:
+                description: Scheduler container image URL
                 type: string
               logLevel:
                 default: Normal
@@ -53,6 +54,7 @@ spec:
                 - TraceAll
                 type: string
               schedulerName:
+                description: Scheduler name to be used in pod templates
                 type: string
             required:
             - imageSpec
@@ -133,8 +135,7 @@ spec:
                   type: object
                 type: array
               deployment:
-                description: NamespacedName comprises a resource name, with a mandatory
-                  namespace, rendered as "<namespace>/<name>".
+                description: Deployment of the secondary scheduler, namespaced name
                 properties:
                   name:
                     type: string
@@ -142,6 +143,7 @@ spec:
                     type: string
                 type: object
               schedulerName:
+                description: Scheduler name to be used in pod templates
                 type: string
             type: object
         type: object
