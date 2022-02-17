@@ -177,7 +177,7 @@ build-e2e-install: fmt vet binary-e2e-install
 
 build-e2e-uninstall: fmt vet binary-e2e-uninstall
 
-build-e2e-all: fmt vet binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall
+build-e2e-all: fmt vet binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial
 
 build-all: generate fmt vet binary binary-rte binary-numacell
 
