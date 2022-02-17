@@ -1,0 +1,12 @@
+# Build all the e2e suites
+FROM golang:1.17 as builder
+
+WORKDIR /go/src/github.com/openshift-kni/numaresources-operator
+COPY . .
+
+RUN make build-e2e-all
+
+FROM registry.access.redhat.com/ubi8/ubi-minimal
+COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/e2e*.test /usr/local/bin
+USER 65532:65532
+ENTRYPOINT ["/bin/bash"]
