@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 
+	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
@@ -416,8 +417,9 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 		})
 	})
 	Context("with at least two nodes suitable", func() {
-		It("[test_id: 47583] a guaranteed pod with one container should be scheduled into one NUMA zone", func() {
-
+		var targetNodeName string
+		var requiredRes corev1.ResourceList
+		BeforeEach(func() {
 			const requiredNUMAZones = 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
@@ -428,7 +430,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			}
 
 			//TODO: we should calculate requiredRes from NUMA zones in cluster nodes instead.
-			requiredRes := corev1.ResourceList{
+			requiredRes = corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("4"),
 				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			}
@@ -440,7 +442,8 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			}
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
-			targetNodeName, ok := nrtCandidateNames.PopAny()
+			var ok bool
+			targetNodeName, ok = nrtCandidateNames.PopAny()
 			Expect(ok).To(BeTrue(), "cannot select a targe node among %#v", nrtCandidateNames.List())
 			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
 			// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
@@ -484,6 +487,8 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
 			}
 			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
+		})
+		It("[test_id:48713] a guaranteed pod with one container should be scheduled into one NUMA zone", func() {
 
 			By("Scheduling the testing pod")
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testPod")
@@ -505,6 +510,41 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
+		})
+
+		It("[test_id:47583] a deployment with a guaranteed pod with one container should be scheduled into one NUMA zone", func() {
+
+			By("Scheduling the testing deployment")
+			var deploymentName string = "test-dp"
+			var replicas int32 = 1
+
+			podLabels := map[string]string{
+				"test": "test-dp",
+			}
+			nodeSelector := map[string]string{}
+			deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			deployment.Spec.Template.Spec.SchedulerName = schedulerName
+			deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
+
+			err := fxt.Client.Create(context.TODO(), deployment)
+			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
+
+			By("waiting for deployment to be up&running")
+			dpRunningTimeout := 1 * time.Minute
+			dpRunningPollInterval := 10 * time.Second
+			err = e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
+			Expect(err).NotTo(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, dpRunningTimeout)
+
+			By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", schedulerName, targetNodeName))
+			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
+			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+
+			for _, pod := range pods {
+				Expect(pod.Spec.NodeName).To(Equal(targetNodeName))
+				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, schedulerName)
+			}
 		})
 	})
 })
