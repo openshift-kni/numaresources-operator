@@ -63,7 +63,7 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 				"test1": "test1",
 			}
 			mcp1 = testutils.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
-			nro = testutils.NewNUMAResourcesOperator(DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
+			nro = testutils.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
 				{MatchLabels: label1},
 			})
 			kubeletConfig := &kubeletconfigv1beta1.KubeletConfiguration{}

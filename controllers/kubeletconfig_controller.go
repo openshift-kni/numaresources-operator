@@ -70,7 +70,7 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	defer klog.V(3).InfoS("Finish KubeletConfig reconcile loop", "object", req.NamespacedName)
 
 	nname := types.NamespacedName{
-		Name: DefaultNUMAResourcesOperatorCrName,
+		Name: objectnames.DefaultNUMAResourcesOperatorCrName,
 	}
 	instance := &nropv1alpha1.NUMAResourcesOperator{}
 	err := r.Get(ctx, nname, instance)

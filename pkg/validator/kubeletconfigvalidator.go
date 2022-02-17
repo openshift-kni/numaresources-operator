@@ -1,5 +1,5 @@
 /*
-Copyright 2022.
+	Copyright 2022.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validators
+package validator
 
 import (
 	"context"
@@ -29,45 +29,43 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/validator"
-	"github.com/openshift-kni/numaresources-operator/controllers"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	mcpsfind "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools/find"
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
-type KubeletConfigDataGatherer interface {
-	CollecData() (*kubeletConfigValidatorData, error)
+type KubeletConfigValidatorData struct {
+	tasEnabledNodeNames sets.String
+	kConfigs            map[string]*kubeletconfigv1beta1.KubeletConfiguration
+	versionInfo         *version.Info
 }
 
-type k8KubeletConfigDataGatherer struct {
-	conn    k8sConnection
-	nroName string
-}
-
-func (gatherer *k8KubeletConfigDataGatherer) CollecData() (*kubeletConfigValidatorData, error) {
+func CollectData(ctx context.Context, cli client.Client) (*KubeletConfigValidatorData, error) {
 
 	// Get Node Names for those nodes with TAS enabled
 	nroNamespacedName := types.NamespacedName{
-		Name: controllers.DefaultNUMAResourcesOperatorCrName,
+		Name: objectnames.DefaultNUMAResourcesOperatorCrName,
 	}
 	nroInstance := &nropv1alpha1.NUMAResourcesOperator{}
-	err := gatherer.conn.client.Get(gatherer.conn.context, nroNamespacedName, nroInstance)
+	err := cli.Get(ctx, nroNamespacedName, nroInstance)
 	if err != nil {
 		return nil, err
 	}
 
-	nroMcps, err := machineconfigpools.GetNodeGroupsMCPs(gatherer.conn.context, gatherer.conn.client, nroInstance.Spec.NodeGroups)
+	nroMcps, err := machineconfigpools.GetNodeGroupsMCPs(ctx, cli, nroInstance.Spec.NodeGroups)
 	if err != nil {
 		return nil, err
 	}
 
-	data := &kubeletConfigValidatorData{}
+	data := &KubeletConfigValidatorData{}
 
 	data.tasEnabledNodeNames = sets.NewString()
 	for _, mcp := range nroMcps {
-		nodes, err := machineconfigpools.GetNodeListFromMachineConfigPool(gatherer.conn.context, gatherer.conn.client, *mcp)
+		nodes, err := machineconfigpools.GetNodeListFromMachineConfigPool(ctx, cli, *mcp)
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +73,7 @@ func (gatherer *k8KubeletConfigDataGatherer) CollecData() (*kubeletConfigValidat
 	}
 
 	mcoKubeletConfigList := mcov1.KubeletConfigList{}
-	if err := gatherer.conn.client.List(gatherer.conn.context, &mcoKubeletConfigList); err != nil {
+	if err := cli.List(ctx, &mcoKubeletConfigList); err != nil {
 		return nil, err
 	}
 
@@ -87,13 +85,13 @@ func (gatherer *k8KubeletConfigDataGatherer) CollecData() (*kubeletConfigValidat
 			return nil, err
 		}
 
-		machineConfigPools, err := kubeletconfig.GetMCPsFromMCOKubeletConfig(gatherer.conn.context, gatherer.conn.client, mcoKubeletConfig)
+		machineConfigPools, err := mcpsfind.GetMCPsFromMCOKubeletConfig(ctx, cli, mcoKubeletConfig)
 		if err != nil {
 			return nil, err
 		}
 		for _, mcp := range machineConfigPools {
 
-			nodes, err := machineconfigpools.GetNodeListFromMachineConfigPool(gatherer.conn.context, gatherer.conn.client, *mcp)
+			nodes, err := machineconfigpools.GetNodeListFromMachineConfigPool(ctx, cli, *mcp)
 			if err != nil {
 				return nil, err
 			}
@@ -114,7 +112,6 @@ func (gatherer *k8KubeletConfigDataGatherer) CollecData() (*kubeletConfigValidat
 		}
 	}
 
-	// get Version Info
 	ver, err := getClusterVersionInfo()
 	if err != nil {
 		return nil, err
@@ -124,69 +121,16 @@ func (gatherer *k8KubeletConfigDataGatherer) CollecData() (*kubeletConfigValidat
 	return data, nil
 }
 
-type KubeletConfigValidator struct {
-	connection   k8sConnection
-	data         kubeletConfigValidatorData
-	dataGatherer KubeletConfigDataGatherer
-}
-type k8sConnection struct {
-	client  client.Client
-	context context.Context
-}
-type kubeletConfigValidatorData struct {
-	tasEnabledNodeNames sets.String
-	kConfigs            map[string]*kubeletconfigv1beta1.KubeletConfiguration
-	versionInfo         *version.Info
-}
-
-func NewKubeletConfigValidator(aContext context.Context, aClient client.Client) *KubeletConfigValidator {
-	defaultGatherer := &k8KubeletConfigDataGatherer{
-		conn: k8sConnection{
-			client:  aClient,
-			context: aContext,
-		},
-		nroName: controllers.DefaultNUMAResourcesOperatorCrName,
-	}
-	return NewKubeletConfigValidatorWithDataGatherer(aContext, aClient, defaultGatherer)
-}
-
-func NewKubeletConfigValidatorWithDataGatherer(aContext context.Context, aClient client.Client, aDataGatherer KubeletConfigDataGatherer) *KubeletConfigValidator {
-
-	ret := &KubeletConfigValidator{
-		connection: k8sConnection{
-			context: aContext,
-			client:  aClient,
-		},
-		dataGatherer: aDataGatherer,
-	}
-	return ret
-}
-
-func (kvalidator *KubeletConfigValidator) Setup() error {
-
-	data, err := kvalidator.dataGatherer.CollecData()
-	if err != nil {
-		return err
-	}
-	kvalidator.data = *data
-	return nil
-}
-
-func (kvalidator *KubeletConfigValidator) Validate() ([]validator.ValidationResult, error) {
+func Validate(data KubeletConfigValidatorData) ([]validator.ValidationResult, error) {
 
 	var ret []validator.ValidationResult
-	for _, nodeName := range kvalidator.data.tasEnabledNodeNames.List() {
-		kc := kvalidator.data.kConfigs[nodeName]
+	for _, nodeName := range data.tasEnabledNodeNames.List() {
+		kc := data.kConfigs[nodeName]
 		// if a TAS enabled node has no MCO kubelet configuration kc will be nil and ValidateClusterNodeKubeletConfig will fill the proper error
-		res := validator.ValidateClusterNodeKubeletConfig(nodeName, kvalidator.data.versionInfo, kc)
+		res := validator.ValidateClusterNodeKubeletConfig(nodeName, data.versionInfo, kc)
 		ret = append(ret, res...)
 	}
 	return ret, nil
-}
-
-func (kvalidator *KubeletConfigValidator) Teardown() error {
-	// nothing to do
-	return nil
 }
 
 func getClusterVersionInfo() (*version.Info, error) {

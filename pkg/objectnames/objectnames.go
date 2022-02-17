@@ -18,6 +18,8 @@ package objectnames
 
 import "fmt"
 
+const DefaultNUMAResourcesOperatorCrName = "numaresourcesoperator"
+
 func GetMachineConfigName(instanceName, mcpName string) string {
 	return fmt.Sprintf("51-%s-%s", instanceName, mcpName)
 }

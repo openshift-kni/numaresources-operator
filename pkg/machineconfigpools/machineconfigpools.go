@@ -37,14 +37,14 @@ func GetNodeGroupsMCPs(ctx context.Context, cli client.Client, nodeGroups []nrop
 	return mcpfind.NodeGroupsMCPs(mcps, nodeGroups)
 }
 
-func GetNodeListFromMachineConfigPool(aContext context.Context, aClient client.Client, mcp mcov1.MachineConfigPool) ([]corev1.Node, error) {
+func GetNodeListFromMachineConfigPool(ctx context.Context, cli client.Client, mcp mcov1.MachineConfigPool) ([]corev1.Node, error) {
 	sel, err := metav1.LabelSelectorAsSelector(mcp.Spec.MachineConfigSelector)
 	if err != nil {
 		return nil, err
 	}
 
 	nodeList := &corev1.NodeList{}
-	err = aClient.List(aContext, nodeList, &client.ListOptions{LabelSelector: sel})
+	err = cli.List(ctx, nodeList, &client.ListOptions{LabelSelector: sel})
 	if err != nil {
 		return nil, err
 	}
