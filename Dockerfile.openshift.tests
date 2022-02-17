@@ -1,0 +1,3 @@
+FROM registry.access.redhat.com/ubi8/ubi-minimal
+COPY e2e-*.test /usr/local/bin/
+ENTRYPOINT ["/bin/bash"]
