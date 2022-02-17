@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -54,15 +55,15 @@ const PadderLabel = "nrop-test-pad-pod"
 
 type Padder struct {
 	// Client defines the API client to run CRUD operations, that will be used for testing
-	Client    client.Client
-	namespace string
+	Client      client.Client
+	paddedNodes []string
+	namespace   string
 	*padRequest
 }
 
 type padRequest struct {
 	nNodes           int
 	allocationTarget corev1.ResourceList
-	targetedNodes    []string
 }
 
 // New return new padder object
@@ -108,13 +109,29 @@ func (p *Padder) Pad(timeout time.Duration) error {
 		return err
 	}
 
-	singleNumaNrt := filterSingleNumaNodePolicyNrts(nrtList.Items)
+	singleNumaNrt := nrtutil.FilterByPolicies(nrtList.Items, []nrtv1alpha1.TopologyManagerPolicy{nrtv1alpha1.SingleNUMANodePodLevel, nrtv1alpha1.SingleNUMANodeContainerLevel})
+	if p.nNodes > len(singleNumaNrt) {
+		return fmt.Errorf("not enough nodes were found for padding. requested: %d, got: %d", p.nNodes, len(singleNumaNrt))
+	}
+
 	nNodes := p.nNodes
 	var pods []*corev1.Pod
+	candidateNodes := nrtutil.AccumulateNames(singleNumaNrt)
 
-	for i := 0; i < len(singleNumaNrt) && nNodes > 0; i++ {
-		nrt := singleNumaNrt[i]
+	for nNodes > 0 {
 		nodePadded := false
+
+		// select one node randomly
+		nodeName, ok := candidateNodes.PopAny()
+		if !ok {
+			return fmt.Errorf("cannot select a node to be padded among %#v", candidateNodes.List())
+		}
+
+		nrt, err := nrtutil.FindFromList(singleNumaNrt, nodeName)
+		if err != nil {
+			return err
+		}
+
 		for _, zone := range nrt.Zones {
 			// check that zone has at least the amount of allocationTarget that needed
 			if nrtutil.ZoneResourcesMatchesRequest(zone.Resources, p.allocationTarget) {
@@ -145,14 +162,15 @@ func (p *Padder) Pad(timeout time.Duration) error {
 				}
 				pods = append(pods, padPod)
 				nodePadded = true
-				// store the node name, so we could check it's corresponding NRT later
-				p.padRequest.targetedNodes = append(p.targetedNodes, nrt.Name)
 			} else {
 				klog.Warningf("node: %q zone: %q, doesn't have enough available allocationTarget", nrt.Name, zone.Name)
 			}
 		}
 		if nodePadded {
 			nNodes--
+			// store the node name, so we could check it's corresponding NRT later
+			// or in order to return it to the user for further use later
+			p.paddedNodes = append(p.paddedNodes, nodeName)
 		}
 	}
 
@@ -179,17 +197,58 @@ func (p *Padder) Pad(timeout time.Duration) error {
 // in order to clean all the padding pod in an easier way
 func (p *Padder) Clean() error {
 	pod := &corev1.Pod{}
-	opts := []client.DeleteAllOfOption{
-		client.InNamespace(p.namespace),
-		client.MatchingLabels{PadderLabel: ""},
-		client.GracePeriodSeconds(5),
+	if err := p.Client.DeleteAllOf(
+		context.TODO(),
+		pod,
+		[]client.DeleteAllOfOption{
+			client.InNamespace(p.namespace),
+			client.MatchingLabels{PadderLabel: ""},
+			client.GracePeriodSeconds(5),
+		}...); err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
 	}
-	err := p.Client.DeleteAllOf(context.TODO(), pod, opts...)
-	if errors.IsNotFound(err) {
-		err = nil
+
+	podList := &corev1.PodList{}
+	if err := p.Client.List(
+		context.TODO(),
+		podList,
+		[]client.ListOption{
+			client.InNamespace(p.namespace),
+			client.MatchingLabels{PadderLabel: ""},
+		}...); err != nil {
+		return err
 	}
-	p.targetedNodes = []string{}
-	return err
+
+	var errLock sync.Mutex
+	var deletionErrors []string
+
+	var wg sync.WaitGroup
+	for _, padPod := range podList.Items {
+		wg.Add(1)
+		go func(pod corev1.Pod) {
+			defer wg.Done()
+
+			klog.Infof("waiting for pod %q to get deleted", pod.Name)
+			if err := wait.ForPodDeleted(p.Client, p.namespace, pod.Name, time.Minute); err != nil {
+				errLock.Lock()
+				deletionErrors = append(deletionErrors, err.Error())
+				errLock.Unlock()
+			}
+		}(padPod)
+	}
+	wg.Wait()
+	if deletionErrors != nil {
+		return fmt.Errorf("failed to wait for pad pods deletion. errors: %s", strings.Join(deletionErrors, ", "))
+	}
+
+	p.paddedNodes = []string{}
+	return nil
+}
+
+func (p *Padder) GetPaddedNodes() []string {
+	return p.paddedNodes
 }
 
 func (p *Padder) waitForUpdatedNRTs(timeout time.Duration) (bool, error) {
@@ -201,7 +260,7 @@ func (p *Padder) waitForUpdatedNRTs(timeout time.Duration) (bool, error) {
 			return false, err
 		}
 
-		for _, nodeName := range p.targetedNodes {
+		for _, nodeName := range p.paddedNodes {
 			nrt, err := nrtutil.FindFromList(nrtList.Items, nodeName)
 			if err != nil {
 				klog.Warningf("failed to get find noderesourcestopologies with name: %q", nodeName)
@@ -256,16 +315,6 @@ func labelPod(pod *corev1.Pod, labelMap map[string]string) {
 	for k, v := range labelMap {
 		pod.Labels[k] = v
 	}
-}
-
-func filterSingleNumaNodePolicyNrts(list []nrtv1alpha1.NodeResourceTopology) []nrtv1alpha1.NodeResourceTopology {
-	singleNUMANodeContainerLevelNrts := nrtutil.FilterTopologyManagerPolicy(list, nrtv1alpha1.SingleNUMANodeContainerLevel)
-	singleNUMANodePodLevelNrts := nrtutil.FilterTopologyManagerPolicy(list, nrtv1alpha1.SingleNUMANodePodLevel)
-
-	var singleNumaNrt []nrtv1alpha1.NodeResourceTopology
-	singleNumaNrt = append(singleNumaNrt, singleNUMANodeContainerLevelNrts...)
-	singleNumaNrt = append(singleNumaNrt, singleNUMANodePodLevelNrts...)
-	return singleNumaNrt
 }
 
 func isZoneMeetAllocationTarget(zone nrtv1alpha1.Zone, target corev1.ResourceList) bool {
