@@ -26,9 +26,11 @@ import (
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/util/taints"
@@ -569,7 +571,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 				corev1.ResourceMemory: resource.MustParse("8G"),
 			}
 			By("padding the nodes before test start")
-			err := padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout)
+			err := padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			nodes, err := e2enodes.GetWorkerNodes(fxt.Client)
@@ -715,6 +717,312 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		})
 	})
+
+	Context("cluster has at least one suitable node", func() {
+		timeout := 5 * time.Minute
+		// will be called at the end of the test to make sure we're not polluting the cluster
+		var cleanFuncs []func() error
+
+		BeforeEach(func() {
+			numOfNodeToBePadded := len(nrts) - 1
+
+			rl := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("8G"),
+			}
+			By("padding the nodes before test start")
+			err := padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{})
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			By("unpadding the nodes after test finish")
+			err := padder.Clean()
+			Expect(err).ToNot(HaveOccurred())
+
+			for _, f := range cleanFuncs {
+				err := f()
+				Expect(err).ToNot(HaveOccurred())
+			}
+		})
+
+		It("[test_id: 47591] should modify workload post scheduling while keeping the resource requests available", func() {
+			hostsRequired := 2
+			paddedNodes := padder.GetPaddedNodes()
+			paddedNodesSet := sets.NewString(paddedNodes...)
+
+			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+			Expect(err).ToNot(HaveOccurred())
+
+			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
+			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
+			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtInitialList.Items, 2)
+			if len(nrtCandidates) < hostsRequired {
+				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates)))
+			}
+
+			singleNUMAPolicyNrts := e2enrt.FilterByPolicies(nrtInitialList.Items, []nrtv1alpha1.TopologyManagerPolicy{nrtv1alpha1.SingleNUMANodePodLevel, nrtv1alpha1.SingleNUMANodeContainerLevel})
+			nodesNameSet := e2enrt.AccumulateNames(singleNUMAPolicyNrts)
+
+			// the only node which was not padded is the targetedNode
+			// since we know exactly how the test setup looks like we expect only targeted node here
+			targetNodeNameSet := nodesNameSet.Difference(paddedNodesSet)
+			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
+
+			targetNodeName, ok := targetNodeNameSet.PopAny()
+			Expect(ok).To(BeTrue())
+
+			var replicas int32 = 1
+			podLabels := map[string]string{
+				"test": "test-dp",
+			}
+			nodeSelector := map[string]string{}
+
+			// the pod is asking for 4 CPUS and 200Mi in total
+			requiredRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
+			}
+
+			podSpec := &corev1.PodSpec{
+				SchedulerName: schedulerName,
+				Containers: []corev1.Container{
+					{
+						Name:    "testdp-cnt",
+						Image:   objects.PauseImage,
+						Command: []string{objects.PauseCommand},
+						Resources: corev1.ResourceRequirements{
+							Limits:   requiredRes,
+							Requests: requiredRes,
+						},
+					},
+					{
+						Name:    "testdp-cnt2",
+						Image:   objects.PauseImage,
+						Command: []string{objects.PauseCommand},
+						Resources: corev1.ResourceRequirements{
+							Limits:   requiredRes,
+							Requests: requiredRes,
+						},
+					},
+				},
+				RestartPolicy: corev1.RestartPolicyAlways,
+			}
+
+			By("creating a deployment with a guaranteed pod with two containers")
+			dp := objects.NewTestDeploymentWithPodSpec(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp", *podSpec)
+
+			err = fxt.Client.Create(context.TODO(), dp)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+
+			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+
+			updatedDp := &appsv1.Deployment{}
+			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
+			Expect(err).ToNot(HaveOccurred())
+
+			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *updatedDp)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(pods)).To(Equal(1))
+
+			updatedPod := pods[0]
+			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
+			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
+				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
+
+			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
+			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
+
+			rl := e2enrt.ResourcesFromGuaranteedPod(updatedPod)
+
+			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, updatedPod.Spec.NodeName)
+			Expect(err).ToNot(HaveOccurred())
+
+			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
+			Expect(err).ToNot(HaveOccurred())
+
+			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetNodeName))
+			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
+			_, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, rl)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("updating the pod's resources such that it will still be available on the same node")
+			// now the pod is asking for 5 CPUS and 200Mi in total
+			requiredRes = corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
+			}
+
+			podSpec = &updatedDp.Spec.Template.Spec
+			podSpec.Containers[0].Resources.Requests = requiredRes
+			podSpec.Containers[0].Resources.Limits = requiredRes
+
+			err = fxt.Client.Update(context.TODO(), updatedDp)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
+			Expect(err).ToNot(HaveOccurred())
+
+			namespacedDpName := fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
+			Eventually(func() bool {
+				pods, err = schedutils.ListPodsByDeployment(fxt.Client, *updatedDp)
+				if err != nil {
+					klog.Warningf("failed to list the pods of deployment: %q error: %v", namespacedDpName, err)
+					return false
+				}
+				if len(pods) != 1 {
+					klog.Warningf("%d pods are exists under deployment %q", len(pods), namespacedDpName)
+					return false
+				}
+				return true
+			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be only one pod under deployment: %q", namespacedDpName)
+
+			nrtPostUpdateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtPostCreateDeploymentList, time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+
+			updatedPod = pods[0]
+			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
+			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
+				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
+
+			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
+			schedOK, err = nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
+
+			rl = e2enrt.ResourcesFromGuaranteedPod(updatedPod)
+
+			nrtPostCreate, err = e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
+			Expect(err).ToNot(HaveOccurred())
+
+			nrtPostUpdate, err := e2enrt.FindFromList(nrtPostUpdateDeploymentList.Items, updatedPod.Spec.NodeName)
+			Expect(err).ToNot(HaveOccurred())
+
+			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetNodeName))
+			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
+			_, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPostCreate, *nrtPostUpdate, rl)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("updating the pod's resources such that it won't be available on the same node, but on a different one")
+			// we clean the nodes from the padding pods
+			err = padder.Clean()
+			Expect(err).ToNot(HaveOccurred())
+
+			// we need to saturate the targeted node in such way that the pod won't be able to land on it.
+			// let's add a special label for the targeted node, so we can tell the padder package to pad it specifically
+			unlabel, err := labelNode(fxt.Client, "padded.node", targetNodeName)
+			Expect(err).ToNot(HaveOccurred())
+			cleanFuncs = append(cleanFuncs, unlabel)
+
+			sel, err := labels.Parse("padded.node=")
+			Expect(err).ToNot(HaveOccurred())
+
+			rl = corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("8G"),
+			}
+
+			err = padder.Nodes(1).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{LabelSelector: sel})
+			Expect(err).ToNot(HaveOccurred())
+
+			// we reorganize the cluster state, so we need to get an updated NRTs which will be treated as the initial ones
+			nrtInitialList, err = e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+			Expect(err).ToNot(HaveOccurred())
+
+			// there are now no more than 2 available CPUs under the targeted node and our test pod under the deployment is asking for 5 CPUs
+			// so in order to be certain that the pod will land on different node we need to request more than 7 CPUs in total
+			requiredRes = corev1.ResourceList{
+				// 6 here + 2 on the second container
+				corev1.ResourceCPU:    resource.MustParse("6"),
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
+			}
+
+			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
+			Expect(err).ToNot(HaveOccurred())
+
+			podSpec = &updatedDp.Spec.Template.Spec
+			podSpec.Containers[0].Resources.Requests = requiredRes
+			podSpec.Containers[0].Resources.Limits = requiredRes
+
+			err = fxt.Client.Update(context.TODO(), updatedDp)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
+			Expect(err).ToNot(HaveOccurred())
+
+			namespacedDpName = fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
+			Eventually(func() bool {
+				pods, err = schedutils.ListPodsByDeployment(fxt.Client, *updatedDp)
+				if err != nil {
+					klog.Warningf("failed to list the pods of deployment: %q error: %v", namespacedDpName, err)
+					return false
+				}
+				if len(pods) != 1 {
+					klog.Warningf("%d pods are exists under deployment %q", len(pods), namespacedDpName)
+					return false
+				}
+				return true
+			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be only one pod under deployment: %q", namespacedDpName)
+
+			nrtLastUpdateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtPostUpdateDeploymentList, time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+
+			updatedPod = pods[0]
+			By(fmt.Sprintf("checking the pod landed on a node which is different than target node %q vs %q", targetNodeName, updatedPod.Spec.NodeName))
+			Expect(updatedPod.Spec.NodeName).ToNot(Equal(targetNodeName),
+				"pod should not landed on node %q", targetNodeName)
+
+			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
+			schedOK, err = nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
+
+			rl = e2enrt.ResourcesFromGuaranteedPod(updatedPod)
+
+			nrtLastUpdate, err := e2enrt.FindFromList(nrtLastUpdateDeploymentList.Items, updatedPod.Spec.NodeName)
+			Expect(err).ToNot(HaveOccurred())
+
+			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetNodeName))
+			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
+			_, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPostUpdate, *nrtLastUpdate, rl)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("deleting the deployment")
+			err = fxt.Client.Delete(context.TODO(), updatedDp)
+			Expect(err).ToNot(HaveOccurred())
+
+			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
+			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
+			Eventually(func() bool {
+				By(fmt.Sprintf("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName))
+
+				nrtListPostDelete, err := e2enrt.GetUpdated(fxt.Client, nrtLastUpdateDeploymentList, 1*time.Minute)
+				Expect(err).ToNot(HaveOccurred())
+
+				nrtPostDelete, err := e2enrt.FindFromList(nrtListPostDelete.Items, updatedPod.Spec.NodeName)
+				Expect(err).ToNot(HaveOccurred())
+
+				nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, updatedPod.Spec.NodeName)
+				Expect(err).ToNot(HaveOccurred())
+
+				ok, err := e2enrt.CheckEqualAvailableResources(*nrtInitial, *nrtPostDelete)
+				Expect(err).ToNot(HaveOccurred())
+				return ok
+			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
+		})
+	})
 })
 
 func makePaddingPod(namespace, nodeName string, zone nrtv1alpha1.Zone, podReqs corev1.ResourceList) (*corev1.Pod, error) {
@@ -769,4 +1077,35 @@ func testToleration() []corev1.Toleration {
 			Effect:   corev1.TaintEffectNoSchedule,
 		},
 	}
+}
+
+func labelNode(cli client.Client, label, nodeName string) (func() error, error) {
+	nodeObj := &corev1.Node{}
+	nodeKey := client.ObjectKey{Name: nodeName}
+	if err := cli.Get(context.TODO(), nodeKey, nodeObj); err != nil {
+		return nil, err
+	}
+
+	nodeObj.Labels[label] = ""
+	klog.Infof("add label %q to node: %q", label, nodeName)
+	if err := cli.Update(context.TODO(), nodeObj); err != nil {
+		return nil, err
+	}
+
+	unlabel := func() error {
+		nodeObj := &corev1.Node{}
+		nodeKey := client.ObjectKey{Name: nodeName}
+		if err := cli.Get(context.TODO(), nodeKey, nodeObj); err != nil {
+			return err
+		}
+
+		delete(nodeObj.Labels, label)
+		klog.Infof("remove label %q from node: %q", label, nodeName)
+		if err := cli.Update(context.TODO(), nodeObj); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	return unlabel, nil
 }

@@ -24,6 +24,25 @@ import (
 
 func NewTestDeployment(replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace, name, image string, command, args []string) *appsv1.Deployment {
 	var zero int64
+	podSpec := corev1.PodSpec{
+		TerminationGracePeriodSeconds: &zero,
+		Containers: []corev1.Container{
+			{
+				Name:    name + "-cnt",
+				Image:   image,
+				Command: command,
+			},
+		},
+		RestartPolicy: corev1.RestartPolicyAlways,
+	}
+	dp := NewTestDeploymentWithPodSpec(replicas, podLabels, nodeSelector, namespace, name, podSpec)
+	if nodeSelector != nil {
+		dp.Spec.Template.Spec.NodeSelector = nodeSelector
+	}
+	return dp
+}
+
+func NewTestDeploymentWithPodSpec(replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace, name string, podSpec corev1.PodSpec) *appsv1.Deployment {
 	dp := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -38,17 +57,7 @@ func NewTestDeployment(replicas int32, podLabels map[string]string, nodeSelector
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: podLabels,
 				},
-				Spec: corev1.PodSpec{
-					TerminationGracePeriodSeconds: &zero,
-					Containers: []corev1.Container{
-						{
-							Name:    name + "-cnt",
-							Image:   image,
-							Command: command,
-						},
-					},
-					RestartPolicy: corev1.RestartPolicyAlways,
-				},
+				Spec: podSpec,
 			},
 		},
 	}
