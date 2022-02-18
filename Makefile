@@ -148,6 +148,8 @@ binary-numacell: build-tools
 		-ldflags "-s -w" \
 		test/deviceplugin/cmd/numacell/main.go
 
+binary-all: binary binary-rte
+
 binary-e2e-rte:
 	go test -c -v -o bin/e2e-rte.test ./test/e2e/rte
 
@@ -163,7 +165,7 @@ binary-e2e-sched:
 binary-e2e-serial:
 	go test -c -v -o bin/e2e-serial.test ./test/e2e/serial
 
-binary-all: binary binary-rte
+binary-e2e-all: binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial
 
 build: generate fmt vet binary
 
@@ -171,15 +173,15 @@ build-rte: fmt vet binary-rte
 
 build-numacell: fmt vet binary-numacell
 
+build-all: generate fmt vet binary binary-rte binary-numacell
+
 build-e2e-rte: fmt vet binary-e2e-rte
 
 build-e2e-install: fmt vet binary-e2e-install
 
 build-e2e-uninstall: fmt vet binary-e2e-uninstall
 
-build-e2e-all: fmt vet binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial
-
-build-all: generate fmt vet binary binary-rte binary-numacell
+build-e2e-all: fmt vet binary-e2e-all
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
