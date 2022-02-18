@@ -8,5 +8,6 @@ RUN make build-e2e-all
 
 FROM registry.access.redhat.com/ubi8/ubi-minimal
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/e2e*.test /usr/local/bin
+COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/run-e2e-serial.sh /usr/local/bin
 USER 65532:65532
-ENTRYPOINT ["/bin/bash"]
+ENTRYPOINT ["/usr/local/bin/run-e2e-serial.sh"]
