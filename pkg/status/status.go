@@ -17,19 +17,12 @@ limitations under the License.
 package status
 
 import (
-	"context"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
-
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 )
 
 // TODO: are we duping these?
@@ -44,7 +37,8 @@ const (
 	ConditionTypeIncorrectNUMAResourcesOperatorResourceName = "IncorrectNUMAResourcesOperatorResourceName"
 )
 
-func Update(ctx context.Context, client k8sclient.Client, rte *nropv1alpha1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
+func GetUpdatedConditions(currentConditions []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
+
 	conditions := NewConditions(condition, reason, message)
 
 	options := []cmp.Option{
@@ -52,15 +46,10 @@ func Update(ctx context.Context, client k8sclient.Client, rte *nropv1alpha1.NUMA
 		cmpopts.IgnoreFields(metav1.Condition{}, "ObservedGeneration"),
 	}
 
-	if cmp.Equal(conditions, rte.Status.Conditions, options...) {
-		return false, nil
+	if cmp.Equal(conditions, currentConditions, options...) {
+		return currentConditions, false
 	}
-	rte.Status.Conditions = conditions
-
-	if err := client.Status().Update(ctx, rte); err != nil {
-		return false, errors.Wrapf(err, "could not update status for object %s", k8sclient.ObjectKeyFromObject(rte))
-	}
-	return true, nil
+	return conditions, true
 }
 
 func FindCondition(conditions []metav1.Condition, condition string) *metav1.Condition {

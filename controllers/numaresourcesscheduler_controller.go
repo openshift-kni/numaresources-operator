@@ -23,7 +23,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
@@ -189,12 +188,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 }
 
 func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nrsv1alpha1.NUMAResourcesScheduler, condition string, reason string, message string) error {
-	conditions := status.NewConditions(condition, reason, message)
-	if apiequality.Semantic.DeepEqual(conditions, sched.Status.Conditions) {
-		return nil
-	}
-	sched.Status.Conditions = status.NewConditions(condition, reason, message)
-
+	sched.Status.Conditions, _ = status.GetUpdatedConditions(sched.Status.Conditions, condition, reason, message)
 	if err := r.Client.Status().Update(ctx, sched); err != nil {
 		return errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(sched))
 	}
