@@ -157,14 +157,27 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, condition string, reason string, message string) (ctrl.Result, error) {
 	klog.Error(message)
 
-	if _, err := status.Update(ctx, r.Client, instance, condition, reason, message); err != nil {
+	if _, err := updateStatus(ctx, r.Client, instance, condition, reason, message); err != nil {
 		klog.InfoS("Failed to update numaresourcesoperator status", "Desired condition", status.ConditionDegraded, "error", err)
 		return ctrl.Result{}, err
 	}
-
 	// we do not return an error here because to pass the validation error a user will need to update NRO CR
 	// that will anyway initiate to reconcile loop
 	return ctrl.Result{}, nil
+}
+
+func updateStatus(ctx context.Context, cli client.Client, rte *nropv1alpha1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
+
+	conditions, ok := status.GetUpdatedConditions(rte.Status.Conditions, condition, reason, message)
+	if !ok {
+		return false, nil
+	}
+	rte.Status.Conditions = conditions
+
+	if err := cli.Status().Update(ctx, rte); err != nil {
+		return false, errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(rte))
+	}
+	return true, nil
 }
 
 func messageFromError(err error) string {
