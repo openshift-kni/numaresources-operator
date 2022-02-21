@@ -22,7 +22,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/apimachinery/pkg/api/equality"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -42,17 +44,23 @@ const (
 	ConditionTypeIncorrectNUMAResourcesOperatorResourceName = "IncorrectNUMAResourcesOperatorResourceName"
 )
 
-func Update(ctx context.Context, client k8sclient.Client, rte *nropv1alpha1.NUMAResourcesOperator, condition string, reason string, message string) error {
+func Update(ctx context.Context, client k8sclient.Client, rte *nropv1alpha1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
 	conditions := NewConditions(condition, reason, message)
-	if equality.Semantic.DeepEqual(conditions, rte.Status.Conditions) {
-		return nil
+
+	options := []cmp.Option{
+		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime"),
+		cmpopts.IgnoreFields(metav1.Condition{}, "ObservedGeneration"),
 	}
-	rte.Status.Conditions = NewConditions(condition, reason, message)
+
+	if cmp.Equal(conditions, rte.Status.Conditions, options...) {
+		return false, nil
+	}
+	rte.Status.Conditions = conditions
 
 	if err := client.Status().Update(ctx, rte); err != nil {
-		return errors.Wrapf(err, "could not update status for object %s", k8sclient.ObjectKeyFromObject(rte))
+		return false, errors.Wrapf(err, "could not update status for object %s", k8sclient.ObjectKeyFromObject(rte))
 	}
-	return nil
+	return true, nil
 }
 
 func FindCondition(conditions []metav1.Condition, condition string) *metav1.Condition {
