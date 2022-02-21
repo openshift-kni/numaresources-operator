@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -38,7 +38,7 @@ func TestUpdate(t *testing.T) {
 	nro := testutils.NewNUMAResourcesOperator("test-nro", nil)
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(nro).Build()
 
-	err = Update(context.TODO(), fakeClient, nro, ConditionProgressing, "testReason", "test message")
+	_, err = Update(context.TODO(), fakeClient, nro, ConditionProgressing, "testReason", "test message")
 	if err != nil {
 		t.Errorf("Update() failed with: %v", err)
 	}
@@ -51,7 +51,35 @@ func TestUpdate(t *testing.T) {
 
 	//shortcut
 	progressingCondition := &updatedNro.Status.Conditions[2]
-	if progressingCondition.Status != v1.ConditionTrue {
-		t.Errorf("Update() failed to set correct status, expected: %q, got: %q", v1.ConditionTrue, progressingCondition.Status)
+	if progressingCondition.Status != metav1.ConditionTrue {
+		t.Errorf("Update() failed to set correct status, expected: %q, got: %q", metav1.ConditionTrue, progressingCondition.Status)
+	}
+}
+
+func TestUpdateIfNeeded(t *testing.T) {
+	err := nropv1alpha1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		t.Errorf("nropv1alpha1.AddToScheme() failed with: %v", err)
+	}
+
+	nro := testutils.NewNUMAResourcesOperator("test-nro", nil)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(nro).Build()
+
+	var ok bool
+	ok, err = Update(context.TODO(), fakeClient, nro, ConditionAvailable, "", "")
+	if err != nil {
+		t.Errorf("Update() failed with: %v", err)
+	}
+	if !ok {
+		t.Errorf("Update did not change status, but it should")
+	}
+
+	// same status twice in a row. We should not overwrite identical status to save transactions.
+	ok, err = Update(context.TODO(), fakeClient, nro, ConditionAvailable, "", "")
+	if err != nil {
+		t.Errorf("Update() failed with: %v", err)
+	}
+	if ok {
+		t.Errorf("Update did change status, but it should not")
 	}
 }
