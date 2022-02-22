@@ -746,7 +746,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			}
 		})
 
-		It("[test_id: 47591] should modify workload post scheduling while keeping the resource requests available", func() {
+		It("[test_id:47591] should modify workload post scheduling while keeping the resource requests available", func() {
 			hostsRequired := 2
 			paddedNodes := padder.GetPaddedNodes()
 			paddedNodesSet := sets.NewString(paddedNodes...)
