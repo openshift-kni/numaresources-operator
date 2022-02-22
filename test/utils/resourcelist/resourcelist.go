@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package noderesourcetopologies
+package resourcelist
 
 import (
 	"fmt"
@@ -23,10 +23,23 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func ResourceListToString(res corev1.ResourceList) string {
+func ToString(res corev1.ResourceList) string {
 	items := []string{}
 	for resName, resQty := range res {
 		items = append(items, fmt.Sprintf("%s=%s", string(resName), resQty.String()))
 	}
 	return strings.Join(items, ", ")
+}
+
+func FromGuaranteedPod(pod corev1.Pod) corev1.ResourceList {
+	res := make(corev1.ResourceList)
+	for idx := 0; idx < len(pod.Spec.Containers); idx++ {
+		cnt := &pod.Spec.Containers[idx] // shortcut
+		for resName, resQty := range cnt.Resources.Limits {
+			qty := res[resName]
+			qty.Add(resQty)
+			res[resName] = qty
+		}
+	}
+	return res
 }
