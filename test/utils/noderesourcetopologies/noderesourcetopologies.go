@@ -31,6 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+
+	e2ereslist "github.com/openshift-kni/numaresources-operator/test/utils/resourcelist"
 )
 
 func GetZoneIDFromName(zoneName string) (int, error) {
@@ -156,19 +158,6 @@ func checkConsumedResourcesAtLeast(resourcesInitial, resourcesUpdated []nrtv1alp
 	return true, nil
 }
 
-func ResourcesFromGuaranteedPod(pod corev1.Pod) corev1.ResourceList {
-	res := make(corev1.ResourceList)
-	for idx := 0; idx < len(pod.Spec.Containers); idx++ {
-		cnt := &pod.Spec.Containers[idx] // shortcut
-		for resName, resQty := range cnt.Resources.Limits {
-			qty := res[resName]
-			qty.Add(resQty)
-			res[resName] = qty
-		}
-	}
-	return res
-}
-
 func AccumulateNames(nrts []nrtv1alpha1.NodeResourceTopology) sets.String {
 	nodeNames := sets.NewString()
 	for _, nrt := range nrts {
@@ -211,14 +200,14 @@ func FilterAnyZoneMatchingResources(nrts []nrtv1alpha1.NodeResourceTopology, req
 			if !ZoneResourcesMatchesRequest(zone.Resources, requests) {
 				continue
 			}
-			klog.Infof(" ----> node %q zone %q provides at least %#v", nrt.Name, zone.Name, ResourceListToString(requests))
+			klog.Infof(" ----> node %q zone %q provides at least %#v", nrt.Name, zone.Name, e2ereslist.ToString(requests))
 			matches++
 		}
 		if matches == 0 {
 			klog.Warningf("SKIP: node %q can't provide %#v", nrt.Name, requests)
 			continue
 		}
-		klog.Infof("ADD : node %q provides at least %#v", nrt.Name, ResourceListToString(requests))
+		klog.Infof("ADD : node %q provides at least %#v", nrt.Name, e2ereslist.ToString(requests))
 		ret = append(ret, nrt)
 	}
 	return ret
