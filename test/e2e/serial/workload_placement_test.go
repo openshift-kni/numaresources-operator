@@ -211,7 +211,10 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 
 			// TODO: smarter cooldown
 			time.Sleep(18 * time.Second)
-			dumpNRTForNode(fxt.Client, targetNodeName)
+			for _, unsuitableNodeName := range unsuitableNodeNames {
+				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
+			}
+			dumpNRTForNode(fxt.Client, targetNodeName, "targeted")
 
 			By(fmt.Sprintf("running the test pod requiring: %s", e2ereslist.ToString(requiredRes)))
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
@@ -371,18 +374,26 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 
 			// TODO: smarter cooldown
 			time.Sleep(18 * time.Second)
-			dumpNRTForNode(fxt.Client, targetNodeName)
+			for _, unsuitableNodeName := range unsuitableNodeNames {
+				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
+			}
+			dumpNRTForNode(fxt.Client, targetNodeName, "target")
 
 			By("checking the resource allocation as the test starts")
 			nrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("running the test pod")
+			dumpPod(pod)
+
 			err = fxt.Client.Create(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for the pod to be scheduled")
 			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 2*time.Minute)
+			if err != nil {
+				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+			}
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
@@ -1059,13 +1070,19 @@ func pinPodTo(pod *corev1.Pod, nodeName, zoneName string) (*corev1.Pod, error) {
 	return pod, nil
 }
 
-func dumpNRTForNode(cli client.Client, nodeName string) {
+func dumpPod(pod *corev1.Pod) {
+	data, err := yaml.Marshal(pod)
+	Expect(err).ToNot(HaveOccurred())
+	klog.Infof("Pod:\n%s", data)
+}
+
+func dumpNRTForNode(cli client.Client, nodeName, tag string) {
 	nrt := nrtv1alpha1.NodeResourceTopology{}
 	err := cli.Get(context.TODO(), client.ObjectKey{Name: nodeName}, &nrt)
 	Expect(err).ToNot(HaveOccurred())
 	data, err := yaml.Marshal(nrt)
 	Expect(err).ToNot(HaveOccurred())
-	klog.Infof("NRT for node %q:\n%s", nodeName, data)
+	klog.Infof("NRT for node %q (%s):\n%s", nodeName, tag, data)
 }
 
 func testTaint() string {
