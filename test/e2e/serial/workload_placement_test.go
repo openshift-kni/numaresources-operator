@@ -45,6 +45,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
+	e2ereslist "github.com/openshift-kni/numaresources-operator/test/utils/resourcelist"
 )
 
 const testKey = "testkey"
@@ -100,7 +101,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 				corev1.ResourceMemory: resource.MustParse("8Gi"),
 			}
 
-			By(fmt.Sprintf("creating test pod, total resources required %s", e2enrt.ResourceListToString(requiredRes)))
+			By(fmt.Sprintf("creating test pod, total resources required %s", e2ereslist.ToString(requiredRes)))
 
 			// TODO: we need AT LEAST 2 (so 4, 8 is fine...) but we hardcode the padding logic to keep the test simple,
 			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
@@ -210,9 +211,12 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 
 			// TODO: smarter cooldown
 			time.Sleep(18 * time.Second)
-			dumpNRTForNode(fxt.Client, targetNodeName)
+			for _, unsuitableNodeName := range unsuitableNodeNames {
+				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
+			}
+			dumpNRTForNode(fxt.Client, targetNodeName, "targeted")
 
-			By(fmt.Sprintf("running the test pod requiring: %s", e2enrt.ResourceListToString(requiredRes)))
+			By(fmt.Sprintf("running the test pod requiring: %s", e2ereslist.ToString(requiredRes)))
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pod.Spec.SchedulerName = schedulerName
 			pod.Spec.Containers[0].Resources.Limits = requiredRes
@@ -266,15 +270,17 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 				multiNUMALabel: "2",
 			}
 			pod.Spec.Containers = append(pod.Spec.Containers, pod.Spec.Containers[0])
+			pod.Spec.Containers[0].Name = "testcnt-0"
 			pod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("6"),
 				corev1.ResourceMemory: resource.MustParse("6Gi"),
 			}
+			pod.Spec.Containers[0].Name = "testcnt-1"
 			pod.Spec.Containers[1].Resources.Limits = corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("12"),
 				corev1.ResourceMemory: resource.MustParse("8Gi"),
 			}
-			requiredRes := e2enrt.ResourcesFromGuaranteedPod(*pod)
+			requiredRes := e2ereslist.FromGuaranteedPod(*pod)
 
 			// make sure the sum is equal to the sum of the requirement of the test pod,
 			// so the *node* total free resources are equal between the target node and
@@ -324,7 +330,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 				zone := nrtInfo.Zones[idx]
 				cnt := pod.Spec.Containers[1-idx] // switch requirements intentionally - both couplings are legit anyway
 
-				By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2enrt.ResourceListToString(cnt.Resources.Limits)))
+				By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(cnt.Resources.Limits)))
 				padPod, err := makePaddingPod(fxt.Namespace.Name, "target", zone, cnt.Resources.Limits)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -345,7 +351,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 					padRes := unsuitableFreeRes[zoneIdx]
 
 					name := fmt.Sprintf("unsuitable%d", nodeIdx)
-					By(fmt.Sprintf("saturating node %q -> %q zone %q to fit only %s", nrtInfo.Name, name, zone.Name, e2enrt.ResourceListToString(padRes)))
+					By(fmt.Sprintf("saturating node %q -> %q zone %q to fit only %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes)))
 					padPod, err := makePaddingPod(fxt.Namespace.Name, name, zone, padRes)
 					Expect(err).ToNot(HaveOccurred())
 
@@ -368,18 +374,26 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 
 			// TODO: smarter cooldown
 			time.Sleep(18 * time.Second)
-			dumpNRTForNode(fxt.Client, targetNodeName)
+			for _, unsuitableNodeName := range unsuitableNodeNames {
+				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
+			}
+			dumpNRTForNode(fxt.Client, targetNodeName, "target")
 
 			By("checking the resource allocation as the test starts")
 			nrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("running the test pod")
+			dumpPod(pod)
+
 			err = fxt.Client.Create(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for the pod to be scheduled")
 			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 2*time.Minute)
+			if err != nil {
+				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+			}
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
@@ -678,7 +692,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			nrtPostCreateList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
 
-			rl := e2enrt.ResourcesFromGuaranteedPod(*updatedPod)
+			rl := e2ereslist.FromGuaranteedPod(*updatedPod)
 
 			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -746,7 +760,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			}
 		})
 
-		It("[test_id: 47591] should modify workload post scheduling while keeping the resource requests available", func() {
+		It("[test_id:47591] should modify workload post scheduling while keeping the resource requests available", func() {
 			hostsRequired := 2
 			paddedNodes := padder.GetPaddedNodes()
 			paddedNodesSet := sets.NewString(paddedNodes...)
@@ -839,7 +853,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
 
-			rl := e2enrt.ResourcesFromGuaranteedPod(updatedPod)
+			rl := e2ereslist.FromGuaranteedPod(updatedPod)
 
 			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -899,7 +913,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
 
-			rl = e2enrt.ResourcesFromGuaranteedPod(updatedPod)
+			rl = e2ereslist.FromGuaranteedPod(updatedPod)
 
 			nrtPostCreate, err = e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -989,7 +1003,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
 
-			rl = e2enrt.ResourcesFromGuaranteedPod(updatedPod)
+			rl = e2ereslist.FromGuaranteedPod(updatedPod)
 
 			nrtLastUpdate, err := e2enrt.FindFromList(nrtLastUpdateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -1026,14 +1040,14 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 })
 
 func makePaddingPod(namespace, nodeName string, zone nrtv1alpha1.Zone, podReqs corev1.ResourceList) (*corev1.Pod, error) {
-	klog.Infof("want to have zone %q with allocatable: %s", zone.Name, e2enrt.ResourceListToString(podReqs))
+	klog.Infof("want to have zone %q with allocatable: %s", zone.Name, e2ereslist.ToString(podReqs))
 
 	paddingReqs, err := e2enrt.SaturateZoneUntilLeft(zone, podReqs)
 	if err != nil {
 		return nil, err
 	}
 
-	klog.Infof("padding resource to saturate %q: %s", nodeName, e2enrt.ResourceListToString(paddingReqs))
+	klog.Infof("padding resource to saturate %q: %s", nodeName, e2ereslist.ToString(paddingReqs))
 
 	padPod := objects.NewTestPodPause(namespace, fmt.Sprintf("padpod-%s-%s", nodeName, zone.Name))
 	padPod.Spec.Containers[0].Resources.Limits = paddingReqs
@@ -1056,13 +1070,19 @@ func pinPodTo(pod *corev1.Pod, nodeName, zoneName string) (*corev1.Pod, error) {
 	return pod, nil
 }
 
-func dumpNRTForNode(cli client.Client, nodeName string) {
+func dumpPod(pod *corev1.Pod) {
+	data, err := yaml.Marshal(pod)
+	Expect(err).ToNot(HaveOccurred())
+	klog.Infof("Pod:\n%s", data)
+}
+
+func dumpNRTForNode(cli client.Client, nodeName, tag string) {
 	nrt := nrtv1alpha1.NodeResourceTopology{}
 	err := cli.Get(context.TODO(), client.ObjectKey{Name: nodeName}, &nrt)
 	Expect(err).ToNot(HaveOccurred())
 	data, err := yaml.Marshal(nrt)
 	Expect(err).ToNot(HaveOccurred())
-	klog.Infof("NRT for node %q:\n%s", nodeName, data)
+	klog.Infof("NRT for node %q (%s):\n%s", nodeName, tag, data)
 }
 
 func testTaint() string {
