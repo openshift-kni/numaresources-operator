@@ -168,9 +168,7 @@ binary-e2e-serial:
 binary-e2e-all: binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial runner-e2e-serial
 
 runner-e2e-serial:
-	@grep -v 'source hack/common.sh' hack/run-test-e2e-serial.sh | \
-		env BIN_DIR=/usr/local/bin envsubst > bin/run-e2e-serial.sh && \
-		chmod 0755 bin/run-e2e-serial.sh
+	hack/render-e2e-runner.sh
 
 build: generate fmt vet binary
 

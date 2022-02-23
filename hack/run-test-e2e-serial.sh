@@ -32,7 +32,13 @@ function setup() {
 	fi
 
 	echo "Running NRO install test suite"
-	${BIN_DIR}/e2e-install.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.reportFile=/tmp/artifacts/e2e-serial-install --ginkgo.focus='\[Install\] continuousIntegration'
+	${BIN_DIR}/e2e-install.test \
+		--ginkgo.v \
+		--ginkgo.failFast \
+		--ginkgo.reportFile=/tmp/artifacts/e2e-serial-install \
+		--test.parallel=1 \
+		--ginkgo.focus='\[Install\] continuousIntegration' \
+		${NO_COLOR}
 
 	RC="$?"
 	if [[ "${RC}" != "0" ]]; then
@@ -40,7 +46,12 @@ function setup() {
 	fi
 
 	echo "Running NROScheduler install test suite"
-	${BIN_DIR}/e2e-sched-install.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.reportFile=/tmp/artifacts/e2e-serial-install-sched
+	${BIN_DIR}/e2e-sched-install.test \
+		--ginkgo.v \
+		--ginkgo.failFast \
+		--test.parallel=1 \
+		--ginkgo.reportFile=/tmp/artifacts/e2e-serial-install-sched \
+		${NO_COLOR}
 }
 
 function teardown() {
@@ -49,7 +60,11 @@ function teardown() {
 	fi
 
 	echo "Running NROScheduler uninstall test suite";
-	${BIN_DIR}/e2e-sched-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.reportFile=/tmp/artifacts/e2e-serial-uninstall-sched
+	${BIN_DIR}/e2e-sched-uninstall.test \
+		--ginkgo.v \
+		--test.parallel=1 \
+		--ginkgo.reportFile=/tmp/artifacts/e2e-serial-uninstall-sched \
+		${NO_COLOR}
 
 	RC="$?"
 	if [[ "${RC}" != "0" ]]; then
@@ -57,7 +72,11 @@ function teardown() {
 	fi
 
 	echo "Running NRO uninstall test suite";
-	${BIN_DIR}/e2e-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.reportFile=/tmp/artifacts/e2e-serial-uninstall
+	${BIN_DIR}/e2e-uninstall.test \
+		--ginkgo.v \
+		--test.parallel=1 \
+		--ginkgo.reportFile=/tmp/artifacts/e2e-serial-uninstall \
+		${NO_COLOR}
 }
 
 function runtests() {
@@ -66,7 +85,12 @@ function runtests() {
 		return 0
 	fi
 	echo "Running Serial, disruptive E2E Tests"
-	${BIN_DIR}/e2e-serial.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.reportFile=/tmp/artifacts/e2e-serial-run --test.parallel=1 ${FOCUS}
+	${BIN_DIR}/e2e-serial.test \
+		--ginkgo.v \
+		--test.parallel=1 \
+		--ginkgo.reportFile=/tmp/artifacts/e2e-serial-run \
+		${NO_COLOR} \
+		${FOCUS}
 }
 
 # Make sure that we always properly clean the environment
