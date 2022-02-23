@@ -167,6 +167,13 @@ func mcoKubeletConfToKubeletConf(mcoKc *mcov1.KubeletConfig) (*kubeletconfigv1be
 
 func renderRTEConfig(namespace, name string, klConfig *kubeletconfigv1beta1.KubeletConfiguration) (*corev1.ConfigMap, error) {
 	conf := rteconfig.Config{
+		ExcludeList: map[string][]string{
+			"*": {
+				string(corev1.ResourceMemory),
+				"hugepages-1Gi",
+				"hugepages-2Mi",
+			},
+		},
 		Resources: sysinfo.Config{
 			ReservedCPUs:   klConfig.ReservedSystemCPUs,
 			ReservedMemory: findReservedMemoryFromKubelet(klConfig.ReservedMemory),
