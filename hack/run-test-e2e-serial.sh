@@ -66,7 +66,7 @@ function runtests() {
 		return 0
 	fi
 	echo "Running Serial, disruptive E2E Tests"
-	${BIN_DIR}/e2e-serial.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.reportFile=/tmp/artifacts/e2e-serial-run --test.parallel=1 ${FOCUS}
+	${BIN_DIR}/e2e-serial.test ${NO_COLOR} --ginkgo.v --ginkgo.reportFile=/tmp/artifacts/e2e-serial-run --test.parallel=1 ${FOCUS}
 }
 
 # Make sure that we always properly clean the environment
