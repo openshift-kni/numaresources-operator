@@ -350,7 +350,7 @@ func overallDeployment() nroDeployment {
 		mcpObj := objects.TestMCP()
 		By(fmt.Sprintf("creating the machine config pool object: %s", mcpObj.Name))
 		err := e2eclient.Client.Create(context.TODO(), mcpObj)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectWithOffset(1, err).NotTo(HaveOccurred())
 		deployedObj.mcpObj = mcpObj
 		matchLabels = map[string]string{"test": "test"}
 	}
@@ -362,23 +362,23 @@ func overallDeployment() nroDeployment {
 
 	nroObj := objects.TestNRO(matchLabels)
 	kcObj, err := objects.TestKC(matchLabels)
-	Expect(err).To(Not(HaveOccurred()))
+	ExpectWithOffset(1, err).To(Not(HaveOccurred()))
 
 	unpause, err := machineconfigpools.PauseMCPs(nroObj.Spec.NodeGroups)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	if _, ok := os.LookupEnv("E2E_NROP_INSTALL_SKIP_KC"); ok {
 		By("using cluster kubeletconfig (if any)")
 	} else {
 		By(fmt.Sprintf("creating the KC object: %s", kcObj.Name))
 		err = e2eclient.Client.Create(context.TODO(), kcObj)
-		Expect(err).NotTo(HaveOccurred())
+		ExpectWithOffset(1, err).NotTo(HaveOccurred())
 		deployedObj.kcObj = kcObj
 	}
 
 	By(fmt.Sprintf("creating the NRO object: %s", nroObj.Name))
 	err = e2eclient.Client.Create(context.TODO(), nroObj)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	deployedObj.nroObj = nroObj
 
 	Eventually(
@@ -388,7 +388,7 @@ func overallDeployment() nroDeployment {
 	).ShouldNot(HaveOccurred())
 
 	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
-	Expect(err).NotTo(HaveOccurred())
+	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	if configuration.Platform == platform.OpenShift {
 		Eventually(func() bool {
@@ -409,7 +409,7 @@ func teardownDeployment(nrod nroDeployment, timeout time.Duration) {
 	var wg sync.WaitGroup
 	if nrod.mcpObj != nil {
 		err := e2eclient.Client.Delete(context.TODO(), nrod.mcpObj)
-		Expect(err).ToNot(HaveOccurred())
+		ExpectWithOffset(1, err).ToNot(HaveOccurred())
 
 		wg.Add(1)
 		go func(mcpObj *machineconfigv1.MachineConfigPool) {
@@ -417,33 +417,33 @@ func teardownDeployment(nrod nroDeployment, timeout time.Duration) {
 			defer wg.Done()
 			klog.Infof("waiting for MCP %q to be gone", mcpObj.Name)
 			err := e2ewait.ForMachineConfigPoolDeleted(e2eclient.Client, mcpObj, 10*time.Second, timeout)
-			Expect(err).ToNot(HaveOccurred(), "MCP %q failed to be deleted", mcpObj.Name)
+			ExpectWithOffset(1, err).ToNot(HaveOccurred(), "MCP %q failed to be deleted", mcpObj.Name)
 		}(nrod.mcpObj)
 	}
 
 	var err error
 	if nrod.kcObj != nil {
 		err = e2eclient.Client.Delete(context.TODO(), nrod.kcObj)
-		Expect(err).ToNot(HaveOccurred())
+		ExpectWithOffset(1, err).ToNot(HaveOccurred())
 		wg.Add(1)
 		go func(kcObj *machineconfigv1.KubeletConfig) {
 			defer GinkgoRecover()
 			defer wg.Done()
 			klog.Infof("waiting for KC %q to be gone", kcObj.Name)
 			err := e2ewait.ForKubeletConfigDeleted(e2eclient.Client, kcObj, 10*time.Second, timeout)
-			Expect(err).ToNot(HaveOccurred(), "KC %q failed to be deleted", kcObj.Name)
+			ExpectWithOffset(1, err).ToNot(HaveOccurred(), "KC %q failed to be deleted", kcObj.Name)
 		}(nrod.kcObj)
 	}
 
 	err = e2eclient.Client.Delete(context.TODO(), nrod.nroObj)
-	Expect(err).ToNot(HaveOccurred())
+	ExpectWithOffset(1, err).ToNot(HaveOccurred())
 	wg.Add(1)
 	go func(nropObj *nropv1alpha1.NUMAResourcesOperator) {
 		defer GinkgoRecover()
 		defer wg.Done()
 		klog.Infof("waiting for NROP %q to be gone", nropObj.Name)
 		err := e2ewait.ForNUMAResourcesOperatorDeleted(e2eclient.Client, nropObj, 10*time.Second, timeout)
-		Expect(err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
+		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
 	}(nrod.nroObj)
 
 	wg.Wait()
@@ -463,9 +463,9 @@ func teardownDeployment(nrod nroDeployment, timeout time.Duration) {
 func deleteNROPSync(cli client.Client, nropObj *nropv1alpha1.NUMAResourcesOperator) {
 	var err error
 	err = cli.Delete(context.TODO(), nropObj)
-	Expect(err).ToNot(HaveOccurred())
+	ExpectWithOffset(1, err).ToNot(HaveOccurred())
 	err = e2ewait.ForNUMAResourcesOperatorDeleted(cli, nropObj, 10*time.Second, 2*time.Minute)
-	Expect(err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
+	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
 }
 
 func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {
