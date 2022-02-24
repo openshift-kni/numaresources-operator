@@ -162,5 +162,6 @@ func getKubeletConfig() *kubeletconfigv1beta1.KubeletConfiguration {
 			},
 		},
 		TopologyManagerPolicy: "single-numa-node",
+		TopologyManagerScope:  "pod",
 	}
 }
