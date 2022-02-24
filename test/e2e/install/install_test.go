@@ -19,6 +19,7 @@ package install
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
@@ -366,10 +367,14 @@ func overallDeployment() nroDeployment {
 	unpause, err := machineconfigpools.PauseMCPs(nroObj.Spec.NodeGroups)
 	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("creating the KC object: %s", kcObj.Name))
-	err = e2eclient.Client.Create(context.TODO(), kcObj)
-	Expect(err).NotTo(HaveOccurred())
-	deployedObj.kcObj = kcObj
+	if _, ok := os.LookupEnv("E2E_NROP_INSTALL_SKIP_KC"); ok {
+		By("using cluster kubeletconfig (if any)")
+	} else {
+		By(fmt.Sprintf("creating the KC object: %s", kcObj.Name))
+		err = e2eclient.Client.Create(context.TODO(), kcObj)
+		Expect(err).NotTo(HaveOccurred())
+		deployedObj.kcObj = kcObj
+	}
 
 	By(fmt.Sprintf("creating the NRO object: %s", nroObj.Name))
 	err = e2eclient.Client.Create(context.TODO(), nroObj)
@@ -417,16 +422,18 @@ func teardownDeployment(nrod nroDeployment, timeout time.Duration) {
 	}
 
 	var err error
-	err = e2eclient.Client.Delete(context.TODO(), nrod.kcObj)
-	Expect(err).ToNot(HaveOccurred())
-	wg.Add(1)
-	go func(kcObj *machineconfigv1.KubeletConfig) {
-		defer GinkgoRecover()
-		defer wg.Done()
-		klog.Infof("waiting for KC %q to be gone", kcObj.Name)
-		err := e2ewait.ForKubeletConfigDeleted(e2eclient.Client, kcObj, 10*time.Second, timeout)
-		Expect(err).ToNot(HaveOccurred(), "KC %q failed to be deleted", kcObj.Name)
-	}(nrod.kcObj)
+	if nrod.kcObj != nil {
+		err = e2eclient.Client.Delete(context.TODO(), nrod.kcObj)
+		Expect(err).ToNot(HaveOccurred())
+		wg.Add(1)
+		go func(kcObj *machineconfigv1.KubeletConfig) {
+			defer GinkgoRecover()
+			defer wg.Done()
+			klog.Infof("waiting for KC %q to be gone", kcObj.Name)
+			err := e2ewait.ForKubeletConfigDeleted(e2eclient.Client, kcObj, 10*time.Second, timeout)
+			Expect(err).ToNot(HaveOccurred(), "KC %q failed to be deleted", kcObj.Name)
+		}(nrod.kcObj)
+	}
 
 	err = e2eclient.Client.Delete(context.TODO(), nrod.nroObj)
 	Expect(err).ToNot(HaveOccurred())
