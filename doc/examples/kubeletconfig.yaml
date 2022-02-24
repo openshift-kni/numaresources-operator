@@ -22,3 +22,4 @@ spec:
     systemReserved: 
       memory: "512Mi"
     topologyManagerPolicy: "single-numa-node"
+    topologyManagerScope: "pod"
