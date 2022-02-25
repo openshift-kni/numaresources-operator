@@ -275,7 +275,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 				corev1.ResourceCPU:    resource.MustParse("6"),
 				corev1.ResourceMemory: resource.MustParse("6Gi"),
 			}
-			pod.Spec.Containers[0].Name = "testcnt-1"
+			pod.Spec.Containers[1].Name = "testcnt-1"
 			pod.Spec.Containers[1].Resources.Limits = corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("12"),
 				corev1.ResourceMemory: resource.MustParse("8Gi"),
