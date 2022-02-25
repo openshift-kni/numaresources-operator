@@ -21,7 +21,7 @@ The e2e suite can *optionally* setup/teardown the numaresources stack, but the s
 Please find [here](https://raw.githubusercontent.com/openshift-kni/numaresources-operator/main/doc/examples/kubeletconfig.yaml) an example of recommended kubeletconfig.
 
 The e2e suite can set a default `kubeletconfig`, but this is not recommended. The recommended flow is to pre-configure the cluster with a `kubeletconfig` object.
-Should you decide to use the default `kubeletconfig`, please elide the `-e E2E_NROP_INSTALL_SKIP_KC=true` into all the `podman` command lines below.
+Should you decide to use the default `kubeletconfig`, please omit the `-e E2E_NROP_INSTALL_SKIP_KC=true` from all the `podman` command lines below.
 
 The e2e suite assumes the cluster has the numaresources operator installed, but with no configuration. To install the numaresources operator, you can use the vehicle which best suits your use case (OLM, `make deploy`...).
 
