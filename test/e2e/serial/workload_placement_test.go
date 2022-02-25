@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -1049,8 +1050,30 @@ func makePaddingPod(namespace, nodeName string, zone nrtv1alpha1.Zone, podReqs c
 
 	klog.Infof("padding resource to saturate %q: %s", nodeName, e2ereslist.ToString(paddingReqs))
 
-	padPod := objects.NewTestPodPause(namespace, fmt.Sprintf("padpod-%s-%s", nodeName, zone.Name))
-	padPod.Spec.Containers[0].Resources.Limits = paddingReqs
+	var zero int64
+	padPod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			GenerateName: "padpod-",
+			Namespace:    namespace,
+			Labels: map[string]string{
+				"e2e-serial-pad-node":     nodeName,
+				"e2e-serial-pad-numazone": zone.Name,
+			},
+		},
+		Spec: corev1.PodSpec{
+			TerminationGracePeriodSeconds: &zero,
+			Containers: []corev1.Container{
+				{
+					Name:    "padpod-cnt-0",
+					Image:   objects.PauseImage,
+					Command: []string{objects.PauseCommand},
+					Resources: corev1.ResourceRequirements{
+						Limits: paddingReqs,
+					},
+				},
+			},
+		},
+	}
 	return padPod, nil
 }
 
