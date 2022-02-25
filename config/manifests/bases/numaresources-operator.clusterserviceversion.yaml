@@ -92,6 +92,7 @@ spec:
   - email: fromani@redhat.com
     name: fromani
   maturity: alpha
+  minKubeVersion: 1.23.0
   provider:
     name: Red Hat
   version: 4.11.0
