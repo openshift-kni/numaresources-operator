@@ -27,6 +27,12 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
 )
 
+const (
+	LabelRole   = "node-role.kubernetes.io"
+	RoleWorker  = "worker"
+	RoleMCPTest = "mcp-test"
+)
+
 func GetWorkerNodes(cli client.Client) ([]corev1.Node, error) {
 	nodes := &corev1.NodeList{}
 	selector, err := labels.Parse(fmt.Sprintf("%s/%s=", clientutil.LabelRole, clientutil.RoleWorker))
@@ -40,4 +46,12 @@ func GetWorkerNodes(cli client.Client) ([]corev1.Node, error) {
 	}
 
 	return nodes.Items, nil
+}
+
+func GetLabelRoleWorker() string {
+	return fmt.Sprintf("%s/%s", LabelRole, RoleWorker)
+}
+
+func GetLabelRoleMCPTest() string {
+	return fmt.Sprintf("%s/%s", LabelRole, RoleMCPTest)
 }
