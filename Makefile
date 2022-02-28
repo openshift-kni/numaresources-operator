@@ -158,19 +158,19 @@ binary-nrocli: build-tools
 binary-all: binary binary-rte
 
 binary-e2e-rte:
-	go test -c -v -o bin/e2e-rte.test ./test/e2e/rte
+	go test -c -v -o bin/e2e-nrop-rte.test ./test/e2e/rte
 
 binary-e2e-install:
-	go test -v -c -o bin/e2e-install.test ./test/e2e/install && go test -v -c -o bin/e2e-sched-install.test ./test/e2e/sched/install
+	go test -v -c -o bin/e2e-nrop-install.test ./test/e2e/install && go test -v -c -o bin/e2e-nrop-sched-install.test ./test/e2e/sched/install
 
 binary-e2e-uninstall:
-	go test -v -c -o bin/e2e-uninstall.test ./test/e2e/uninstall && go test -v -c -o bin/e2e-sched-uninstall.test ./test/e2e/sched/uninstall
+	go test -v -c -o bin/e2e-nrop-uninstall.test ./test/e2e/uninstall && go test -v -c -o bin/e2e-nrop-sched-uninstall.test ./test/e2e/sched/uninstall
 
 binary-e2e-sched:
-	go test -c -v -o bin/e2e-sched.test ./test/e2e/sched
+	go test -c -v -o bin/e2e-nrop-sched.test ./test/e2e/sched
 
 binary-e2e-serial:
-	go test -c -v -o bin/e2e-serial.test ./test/e2e/serial
+	go test -c -v -o bin/e2e-nrop-serial.test ./test/e2e/serial
 
 binary-e2e-all: binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial runner-e2e-serial
 
