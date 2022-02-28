@@ -149,7 +149,7 @@ func setupInfra(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup, ti
 		dsName := objectnames.GetComponentName(numacellmanifests.Prefix, mcp.Name)
 		klog.Infof("setting e2e infra for %q: daemonset %q", mcp.Name, dsName)
 
-		pullSpec := images.NUMACellDevicePluginTestImageCI
+		pullSpec := getNUMACellDevicePluginPullSpec()
 		ds := numacellmanifests.DaemonSet(mcp.Spec.NodeSelector.MatchLabels, fxt.Namespace.Name, dsName, sa.Name, pullSpec)
 		err = fxt.Client.Create(context.TODO(), ds)
 		Expect(err).ToNot(HaveOccurred(), "cannot create the numacell daemonset %q in the namespace %q", ds.Name, ds.Namespace)
@@ -176,6 +176,13 @@ func setupInfra(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup, ti
 	wg.Wait()
 
 	klog.Infof("e2e infra setup completed")
+}
+
+func getNUMACellDevicePluginPullSpec() string {
+	if pullSpec, ok := os.LookupEnv("E2E_NUMACELL_DEVICE_PLUGIN_URL"); ok {
+		return pullSpec
+	}
+	return images.NUMACellDevicePluginTestImageCI
 }
 
 func labelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyList) {
