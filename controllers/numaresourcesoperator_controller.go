@@ -314,6 +314,10 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	if err != nil {
 		return daemonSetsNName, err
 	}
+	err = rtestate.UpdateDaemonSetPauseContainerSettings(r.RTEManifests.DaemonSet)
+	if err != nil {
+		return daemonSetsNName, err
+	}
 	if err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, instance.Spec.LogLevel); err != nil {
 		return daemonSetsNName, err
 	}
