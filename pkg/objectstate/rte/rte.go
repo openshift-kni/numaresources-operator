@@ -317,6 +317,24 @@ func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1alpha1.Namespac
 	return res, ok
 }
 
+func UpdateDaemonSetPauseContainerSettings(ds *appsv1.DaemonSet) error {
+	// TODO: better match by name than assume container#0 is RTE proper (not minion)
+	rteCnt := &ds.Spec.Template.Spec.Containers[0]
+	// TODO: better match by name than assume container#1 is the RTE minion
+	cnt := &ds.Spec.Template.Spec.Containers[1]
+	cnt.Image = rteCnt.Image
+	cnt.ImagePullPolicy = rteCnt.ImagePullPolicy
+	cnt.Command = []string{
+		"/bin/sh",
+		"-c",
+		"--",
+	}
+	cnt.Args = []string{
+		"while true; do sleep 30s; done",
+	}
+	return nil
+}
+
 func UpdateDaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImageSpec string, builtinPullPolicy corev1.PullPolicy) error {
 	// TODO: better match by name than assume container#0 is RTE proper (not minion)
 	cnt := &ds.Spec.Template.Spec.Containers[0]
