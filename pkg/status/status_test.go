@@ -38,7 +38,8 @@ func TestUpdate(t *testing.T) {
 	nro := testutils.NewNUMAResourcesOperator("test-nro", nil)
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(nro).Build()
 
-	_, err = Update(context.TODO(), fakeClient, nro, ConditionProgressing, "testReason", "test message")
+	nro.Status.Conditions, _ = GetUpdatedConditions(nro.Status.Conditions, ConditionProgressing, "testReason", "test message")
+	err = fakeClient.Update(context.TODO(), nro)
 	if err != nil {
 		t.Errorf("Update() failed with: %v", err)
 	}
@@ -63,22 +64,15 @@ func TestUpdateIfNeeded(t *testing.T) {
 	}
 
 	nro := testutils.NewNUMAResourcesOperator("test-nro", nil)
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(nro).Build()
 
 	var ok bool
-	ok, err = Update(context.TODO(), fakeClient, nro, ConditionAvailable, "", "")
-	if err != nil {
-		t.Errorf("Update() failed with: %v", err)
-	}
+	nro.Status.Conditions, ok = GetUpdatedConditions(nro.Status.Conditions, ConditionAvailable, "", "")
 	if !ok {
 		t.Errorf("Update did not change status, but it should")
 	}
 
 	// same status twice in a row. We should not overwrite identical status to save transactions.
-	ok, err = Update(context.TODO(), fakeClient, nro, ConditionAvailable, "", "")
-	if err != nil {
-		t.Errorf("Update() failed with: %v", err)
-	}
+	_, ok = GetUpdatedConditions(nro.Status.Conditions, ConditionAvailable, "", "")
 	if ok {
 		t.Errorf("Update did change status, but it should not")
 	}
