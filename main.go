@@ -314,6 +314,7 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 		Namespace: namespace,
 	})
 	_ = rtestate.UpdateDaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
+	_ = rtestate.UpdateDaemonSetPauseContainerSettings(mf.DaemonSet)
 	return mf
 }
 
