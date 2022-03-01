@@ -17,12 +17,14 @@ limitations under the License.
 package find
 
 import (
+	"context"
 	"fmt"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 )
@@ -79,4 +81,26 @@ func MCPBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelector) (
 		}
 	}
 	return nil, fmt.Errorf("cannot find MCP related to the selector %v", sel)
+}
+
+func GetMCPsFromMCOKubeletConfig(ctx context.Context, cli client.Client, mcoKubeletConfig mcov1.KubeletConfig) ([]*mcov1.MachineConfigPool, error) {
+	mcps := &mcov1.MachineConfigPoolList{}
+	var result []*mcov1.MachineConfigPool
+	if err := cli.List(ctx, mcps); err != nil {
+		return nil, err
+	}
+	for index := range mcps.Items {
+		mcp := &mcps.Items[index]
+
+		sel, err := metav1.LabelSelectorAsSelector(mcoKubeletConfig.Spec.MachineConfigPoolSelector)
+		if err != nil {
+			return nil, err
+		}
+		mcpLabels := labels.Set(mcp.Labels)
+		if sel.Matches(mcpLabels) {
+			result = append(result, mcp)
+		}
+
+	}
+	return result, nil
 }

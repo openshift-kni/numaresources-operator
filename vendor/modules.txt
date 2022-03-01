@@ -36,6 +36,11 @@ github.com/StackExchange/wmi
 # github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129
 ## explicit
 github.com/andres-erbsen/clock
+# github.com/aquasecurity/go-version v0.0.0-20210121072130-637058cfe492
+## explicit; go 1.15
+github.com/aquasecurity/go-version/pkg/part
+github.com/aquasecurity/go-version/pkg/prerelease
+github.com/aquasecurity/go-version/pkg/version
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
@@ -197,7 +202,7 @@ github.com/josharian/intern
 # github.com/json-iterator/go v1.1.11
 ## explicit; go 1.12
 github.com/json-iterator/go
-# github.com/k8stopologyawareschedwg/deployer v0.3.0
+# github.com/k8stopologyawareschedwg/deployer v0.4.0
 ## explicit; go 1.16
 github.com/k8stopologyawareschedwg/deployer/pkg/assets/rte
 github.com/k8stopologyawareschedwg/deployer/pkg/clientutil
@@ -206,10 +211,12 @@ github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform
 github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect
 github.com/k8stopologyawareschedwg/deployer/pkg/deployer/wait
 github.com/k8stopologyawareschedwg/deployer/pkg/images
+github.com/k8stopologyawareschedwg/deployer/pkg/kubeletconfig
 github.com/k8stopologyawareschedwg/deployer/pkg/manifests
 github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api
 github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte
 github.com/k8stopologyawareschedwg/deployer/pkg/tlog
+github.com/k8stopologyawareschedwg/deployer/pkg/validator
 # github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12
 ## explicit; go 1.16
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology

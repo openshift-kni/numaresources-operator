@@ -19,8 +19,11 @@ package machineconfigpools
 import (
 	"context"
 
-	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	mcpfind "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools/find"
@@ -32,4 +35,19 @@ func GetNodeGroupsMCPs(ctx context.Context, cli client.Client, nodeGroups []nrop
 		return nil, err
 	}
 	return mcpfind.NodeGroupsMCPs(mcps, nodeGroups)
+}
+
+func GetNodeListFromMachineConfigPool(ctx context.Context, cli client.Client, mcp mcov1.MachineConfigPool) ([]corev1.Node, error) {
+	sel, err := metav1.LabelSelectorAsSelector(mcp.Spec.MachineConfigSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeList := &corev1.NodeList{}
+	err = cli.List(ctx, nodeList, &client.ListOptions{LabelSelector: sel})
+	if err != nil {
+		return nil, err
+	}
+
+	return nodeList.Items, nil
 }

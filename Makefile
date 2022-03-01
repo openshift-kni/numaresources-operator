@@ -148,6 +148,13 @@ binary-numacell: build-tools
 		-ldflags "-s -w" \
 		test/deviceplugin/cmd/numacell/main.go
 
+binary-nrocli: build-tools
+	CGO_ENABLED=0 go build \
+		-mod=vendor \
+		-o bin/nrocli \
+		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/git-semver)" \
+		nrocli/main.go
+
 binary-all: binary binary-rte
 
 binary-e2e-rte:
@@ -176,7 +183,9 @@ build-rte: fmt vet binary-rte
 
 build-numacell: fmt vet binary-numacell
 
-build-all: generate fmt vet binary binary-rte binary-numacell
+build-nrocli: fmt vet binary-nrocli
+
+build-all: generate fmt vet binary binary-rte binary-numacell binary-nrocli
 
 build-e2e-rte: fmt vet binary-e2e-rte
 

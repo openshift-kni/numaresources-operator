@@ -48,8 +48,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
-const defaultNUMAResourcesOperatorCrName = "numaresourcesoperator"
-
 var _ = ginkgo.Describe("with a running cluster with all the components", func() {
 	var (
 		initialized bool
@@ -77,7 +75,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		timeout := 30 * time.Second
 		interval := 5 * time.Second
 		ginkgo.It("should have the corresponding klog under RTE container", func() {
-			nropObj, err := nropcli.NUMAResourcesOperators().Get(context.TODO(), defaultNUMAResourcesOperatorCrName, metav1.GetOptions{})
+			nropObj, err := nropcli.NUMAResourcesOperators().Get(context.TODO(), objectnames.DefaultNUMAResourcesOperatorCrName, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			gomega.Eventually(func() bool {
@@ -110,7 +108,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		})
 
 		ginkgo.It("can modify the LogLevel in NRO CR and klog under RTE container should change respectively", func() {
-			nropObj, err := nropcli.NUMAResourcesOperators().Get(context.TODO(), defaultNUMAResourcesOperatorCrName, metav1.GetOptions{})
+			nropObj, err := nropcli.NUMAResourcesOperators().Get(context.TODO(), objectnames.DefaultNUMAResourcesOperatorCrName, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			nropObj.Spec.LogLevel = operatorv1.Trace
@@ -150,7 +148,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 	ginkgo.When("[config][kubelet][rte] Kubelet Config includes reservations", func() {
 		ginkgo.It("should configure RTE accordingly", func() {
-			nroObj, err := nropcli.NUMAResourcesOperators().Get(context.TODO(), defaultNUMAResourcesOperatorCrName, metav1.GetOptions{})
+			nroObj, err := nropcli.NUMAResourcesOperators().Get(context.TODO(), objectnames.DefaultNUMAResourcesOperatorCrName, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(nroObj.Status.DaemonSets).ToNot(gomega.BeEmpty())
 			klog.Infof("NRO %q", nroObj.Name)

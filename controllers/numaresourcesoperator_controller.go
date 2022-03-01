@@ -62,10 +62,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 )
 
-const (
-	defaultNUMAResourcesOperatorCrName = "numaresourcesoperator"
-	numaResourcesRetryPeriod           = 1 * time.Minute
-)
+const numaResourcesRetryPeriod = 1 * time.Minute
 
 // NUMAResourcesOperatorReconciler reconciles a NUMAResourcesOperator object
 type NUMAResourcesOperatorReconciler struct {
@@ -127,7 +124,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, err
 	}
 
-	if req.Name != defaultNUMAResourcesOperatorCrName {
+	if req.Name != objectnames.DefaultNUMAResourcesOperatorCrName {
 		message := fmt.Sprintf("incorrect NUMAResourcesOperator resource name: %s", instance.Name)
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, message)
 	}
