@@ -53,6 +53,7 @@ import (
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
+	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
@@ -320,6 +321,15 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	}
 	if err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, instance.Spec.LogLevel); err != nil {
 		return daemonSetsNName, err
+	}
+
+	// ConfigMap should be provided by the kubeletconfig reconciliation loop
+	if r.RTEManifests.ConfigMap != nil {
+		cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.RTEManifests.ConfigMap)
+		if err != nil {
+			return daemonSetsNName, err
+		}
+		rtestate.UpdateDaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
 	}
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, mcps, r.Namespace)
