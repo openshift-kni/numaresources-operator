@@ -103,7 +103,8 @@ func (p *Padder) UntilAvailableIsResourceList(resources corev1.ResourceList) *Pa
 	return p
 }
 
-// Pad will create pad pods in order to align the nodes
+// Pad will create guaranteed pad pods on each NUMA zone
+// in order to align the nodes
 // with the requested amount of available allocationTarget
 // and wait until timeout to see if nodes got updated
 func (p *Padder) Pad(timeout time.Duration, options PaddingOptions) error {

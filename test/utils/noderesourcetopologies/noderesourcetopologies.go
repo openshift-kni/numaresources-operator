@@ -18,6 +18,7 @@ package noderesourcetopologies
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -34,6 +35,9 @@ import (
 
 	e2ereslist "github.com/openshift-kni/numaresources-operator/test/utils/resourcelist"
 )
+
+// ErrNotEnoughResources means a NUMA zone or a node has not enough resouces to reserve
+var ErrNotEnoughResources = errors.New("nrt: Not enough resources")
 
 func GetZoneIDFromName(zoneName string) (int, error) {
 	for _, prefix := range []string{
@@ -112,10 +116,32 @@ func SaturateZoneUntilLeft(zone nrtv1alpha1.Zone, requiredRes corev1.ResourceLis
 		}
 
 		if zoneQty.Cmp(resQty) < 0 {
-			return nil, fmt.Errorf("resource %q already too scarce in zone %q (target %v amount %v)", resName, zone.Name, resQty, zoneQty)
+			klog.Errorf("resource %q already too scarce in zone %q (target %v amount %v)", resName, zone.Name, resQty, zoneQty)
+			return nil, ErrNotEnoughResources
 		}
 		klog.Infof("zone %q resource %q available %s allocation target %s", zone.Name, resName, zoneQty.String(), resQty.String())
 		paddingQty := zoneQty.DeepCopy()
+		paddingQty.Sub(resQty)
+		paddingRes[resName] = paddingQty
+	}
+
+	return paddingRes, nil
+}
+
+func SaturateNodeUntilLeft(node corev1.Node, requiredRes corev1.ResourceList) (corev1.ResourceList, error) {
+	paddingRes := make(corev1.ResourceList)
+	for resName, resQty := range requiredRes {
+		nodeQty, ok := node.Status.Allocatable[resName]
+		if !ok {
+			return nil, fmt.Errorf("resource %q not found in node %q", string(resName), node.Name)
+		}
+
+		if nodeQty.Cmp(resQty) < 0 {
+			klog.Errorf("resource %q already too scarce in zone %q (target %v amount %v)", resName, node.Name, resQty, nodeQty)
+			return nil, ErrNotEnoughResources
+		}
+		klog.Infof("node %q resource %q available %s allocation target %s", node.Name, resName, nodeQty.String(), resQty.String())
+		paddingQty := nodeQty.DeepCopy()
 		paddingQty.Sub(resQty)
 		paddingRes[resName] = paddingQty
 	}

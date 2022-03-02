@@ -18,6 +18,7 @@ package serial
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -29,7 +30,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -720,6 +721,128 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
 		})
 	})
+	Context("cluster with node/s having two numa zones, and there are enough resources on one node but not in any numa zone when trying to schedule a deployment with burstable pods", func() {
+		var nrtCandidates []nrtv1alpha1.NodeResourceTopology
+		var targetNodeName string
+		var targetNodeNRTInitial *nrtv1alpha1.NodeResourceTopology
+		var deployment *appsv1.Deployment
+
+		BeforeEach(func() {
+			const requiredNUMAZones = 2
+			By(fmt.Sprintf("filtering available nodes with %d NUMA zones", requiredNUMAZones))
+			nrtCandidates = e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
+
+			const neededNodes = 1
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with at least %d NUMA Zones: found %d, needed %d", requiredNUMAZones, len(nrtCandidates), neededNodes))
+			}
+
+			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
+
+			var ok bool
+			targetNodeName, ok = nrtCandidateNames.PopAny()
+			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtCandidateNames.List())
+			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
+
+			var err error
+			targetNodeNRTInitial, err = e2enrt.FindFromList(nrtCandidates, targetNodeName)
+			Expect(err).NotTo(HaveOccurred())
+
+			//get maximum zone CPU and Memory to be sure it wont fit on any zone
+			maxResources := corev1.ResourceList{
+				corev1.ResourceCPU:    maxResourceType(*targetNodeNRTInitial, corev1.ResourceCPU),
+				corev1.ResourceMemory: maxResourceType(*targetNodeNRTInitial, corev1.ResourceMemory),
+			}
+
+			// add a mim ammount of resources just in case all the zones
+			// are equal so the pod wont fit on any of them
+			excessRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("100m"),
+				corev1.ResourceMemory: resource.MustParse("100M"),
+			}
+			reqResources := maxResources.DeepCopy()
+
+			reqCpu := reqResources[corev1.ResourceCPU]
+			reqCpu.Add(excessRes[corev1.ResourceCPU])
+			reqResources[corev1.ResourceCPU] = reqCpu
+
+			reqMem := reqResources[corev1.ResourceMemory]
+			reqMem.Add(excessRes[corev1.ResourceMemory])
+			reqResources[corev1.ResourceMemory] = reqMem
+
+			By("Padding all other candidate nodes")
+			var paddingPods []*corev1.Pod
+			for _, nodeName := range nrtCandidateNames.List() {
+				node := &corev1.Node{}
+				nodeKey := client.ObjectKey{Name: nodeName}
+				err := fxt.Client.Get(context.TODO(), nodeKey, node)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Padding all the other nodes until only maxResources is free
+				// remember reqResources = maxReources + excessResources
+				// so we ensure out pod will not be scheduled on any other node.
+				padPod, err := makeNodePaddingPod(fxt.Namespace.Name, *node, maxResources)
+				if errors.Is(err, e2enrt.ErrNotEnoughResources) {
+					klog.Infof("Node %q has not enough resources without padding", nodeName)
+					continue
+				}
+				Expect(err).NotTo(HaveOccurred())
+
+				pinnedPadPod, err := pinPodToNode(padPod, nodeName)
+				Expect(err).NotTo(HaveOccurred())
+
+				err = fxt.Client.Create(context.TODO(), pinnedPadPod)
+				Expect(err).NotTo(HaveOccurred())
+
+				paddingPods = append(paddingPods, pinnedPadPod)
+			}
+
+			// Wait for all the padding pods to be up&running
+			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
+			for _, failedPod := range failedPods {
+				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
+			}
+			Expect(failedPods).To(BeEmpty())
+
+			By("create a deployment with one burstable pod")
+			deploymentName := "test-dp"
+			var replicas int32 = 1
+
+			podLabels := map[string]string{
+				"test": "test-dp",
+			}
+			nodeSelector := map[string]string{}
+			deployment = objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			deployment.Spec.Template.Spec.SchedulerName = schedulerName
+			// make it burstable
+			deployment.Spec.Template.Spec.Containers[0].Resources.Requests = reqResources
+
+			err = fxt.Client.Create(context.TODO(), deployment)
+			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
+
+			By("waiting for deployment to be up&running")
+			dpRunningTimeout := 1 * time.Minute
+			dpRunningPollInterval := 10 * time.Second
+			err = e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
+			Expect(err).NotTo(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, dpRunningTimeout)
+		})
+		It("[test_id:47618]should be properly scheduled with no changes in NRTs", func() {
+			By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", schedulerName, targetNodeName))
+			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
+			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+			for _, pod := range pods {
+				Expect(pod.Spec.NodeName).To(Equal(targetNodeName))
+				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, schedulerName)
+			}
+
+			targetNodeNRTCurrent, err := e2enrt.FindFromList(nrtCandidates, targetNodeName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(e2enrt.CheckEqualAvailableResources(*targetNodeNRTInitial, *targetNodeNRTCurrent)).To(BeTrue())
+		})
+
+	})
 	Context("with at least two nodes suitable", func() {
 		var targetNodeName string
 		var requiredRes corev1.ResourceList
@@ -1127,7 +1250,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 
 			By("deleting the test pod")
 			if err := fxt.Client.Delete(context.TODO(), updatedPod); err != nil {
-				if !errors.IsNotFound(err) {
+				if !apierrors.IsNotFound(err) {
 					Expect(err).ToNot(HaveOccurred())
 				}
 			}
@@ -1547,15 +1670,38 @@ func makePaddingPod(namespace, nodeName string, zone nrtv1alpha1.Zone, podReqs c
 
 	klog.Infof("padding resource to saturate %q: %s", nodeName, e2ereslist.ToString(paddingReqs))
 
+	padPod := newPaddingPod(nodeName, zone.Name, namespace, paddingReqs)
+	return padPod, nil
+}
+
+func makeNodePaddingPod(namespace string, node corev1.Node, podReqs corev1.ResourceList) (*corev1.Pod, error) {
+	klog.Infof("want to have node %q with allocatable: %s", node.Name, e2ereslist.ToString(podReqs))
+
+	paddingReqs, err := e2enrt.SaturateNodeUntilLeft(node, podReqs)
+	if err != nil {
+		return nil, err
+	}
+
+	klog.Infof("padding resource to saturate %q: %s", node.Name, e2ereslist.ToString(paddingReqs))
+
+	padPod := newPaddingPod(node.Name, "", namespace, paddingReqs)
+	return padPod, nil
+}
+
+func newPaddingPod(nodeName, zoneName, namespace string, resourceReqs corev1.ResourceList) *corev1.Pod {
 	var zero int64
+	labels := map[string]string{
+		"e2e-serial-pad-node": nodeName,
+	}
+	if len(zoneName) != 0 {
+		labels["e2e-serial-pad-numazone"] = zoneName
+	}
+
 	padPod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "padpod-",
 			Namespace:    namespace,
-			Labels: map[string]string{
-				"e2e-serial-pad-node":     nodeName,
-				"e2e-serial-pad-numazone": zone.Name,
-			},
+			Labels:       labels,
 		},
 		Spec: corev1.PodSpec{
 			TerminationGracePeriodSeconds: &zero,
@@ -1565,13 +1711,13 @@ func makePaddingPod(namespace, nodeName string, zone nrtv1alpha1.Zone, podReqs c
 					Image:   objects.PauseImage,
 					Command: []string{objects.PauseCommand},
 					Resources: corev1.ResourceRequirements{
-						Limits: paddingReqs,
+						Limits: resourceReqs,
 					},
 				},
 			},
 		},
 	}
-	return padPod, nil
+	return padPod
 }
 
 func pinPodTo(pod *corev1.Pod, nodeName, zoneName string) (*corev1.Pod, error) {
@@ -1579,14 +1725,25 @@ func pinPodTo(pod *corev1.Pod, nodeName, zoneName string) (*corev1.Pod, error) {
 	if err != nil {
 		return nil, err
 	}
-	klog.Infof("creating padding pod for node %q zone %d", nodeName, zoneID)
+
+	klog.Infof("pinning padding pod for node %q zone %d", nodeName, zoneID)
+	cnt := &pod.Spec.Containers[0] // shortcut
+	cnt.Resources.Limits[numacellapi.MakeResourceName(zoneID)] = resource.MustParse("1")
+
+	pinnedPod, err := pinPodToNode(pod, nodeName)
+	if err != nil {
+		return nil, err
+	}
+	return pinnedPod, nil
+}
+
+func pinPodToNode(pod *corev1.Pod, nodeName string) (*corev1.Pod, error) {
+	klog.Infof("pinning padding pod for node %q", nodeName)
 
 	klog.Infof("forcing affinity to [kubernetes.io/hostname: %s]", nodeName)
 	pod.Spec.NodeSelector = map[string]string{
 		"kubernetes.io/hostname": nodeName,
 	}
-	cnt := &pod.Spec.Containers[0] // shortcut
-	cnt.Resources.Limits[numacellapi.MakeResourceName(zoneID)] = resource.MustParse("1")
 	return pod, nil
 }
 
@@ -1652,4 +1809,20 @@ func labelNodeWithValue(cli client.Client, label, value, nodeName string) (func(
 	}
 
 	return unlabel, nil
+}
+
+func maxResourceType(nrtInfo nrtv1alpha1.NodeResourceTopology, resName corev1.ResourceName) resource.Quantity {
+	var max resource.Quantity
+
+	for _, zone := range nrtInfo.Zones {
+		zoneQty, ok := e2enrt.FindResourceAvailableByName(zone.Resources, resName.String())
+		if !ok {
+			continue
+		}
+
+		if zoneQty.Cmp(max) > 1 {
+			max = zoneQty
+		}
+	}
+	return max.DeepCopy()
 }
