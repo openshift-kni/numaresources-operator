@@ -39,3 +39,24 @@ To setup the stack, run the tests and then restore the pristine cluster state:
 ```
 podman run -ti -v $KUBECONFIG:/kubeconfig:z -e KUBECONFIG=/kubeconfig -e E2E_NROP_INSTALL_SKIP_KC=true quay.io/openshift-kni/numaresources-operator-tests:4.11.999-snapshot --setup --teardown
 ```
+
+
+### avoiding dependencies on other images
+
+The E2E suite depends on few extra images. These images are very stable, lightweight and little concern most of times:
+- `quay.io/openshift-kni/numacell-device-plugin:test-ci`
+- `gcr.io/google_containers/pause-amd64:3.0`
+
+However, in some cases it may be unpractical to depend on third party images.
+The E2E test image can act as replacement for all its dependencies, providing either the same code or replacements suitables for its use case.
+TO replace the dependencies, you need to set up some environment variables:
+```bash
+export E2E_IMAGE_URL=quay.io/openshift-kni/numaresources-operator-tests:4.11.999-snapshot
+podman run -ti \
+	-v $KUBECONFIG:/kubeconfig:z \
+	-e KUBECONFIG=/kubeconfig \
+	-e E2E_NROP_INSTALL_SKIP_KC=true \
+	-e E2E_NUMACELL_DEVICE_PLUGIN_URL=${E2E_IMAGE_URL} \
+	-e E2E_PAUSE_IMAGE_URL=${E2E_IMAGE_URL} \
+	${E2E_IMAGE_URL}
+```
