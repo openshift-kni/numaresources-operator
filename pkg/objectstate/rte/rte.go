@@ -33,7 +33,6 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
@@ -356,13 +355,6 @@ func UpdateDaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, built
 	// if we run with operator-as-operand, we know we NEED this.
 	UpdateDaemonSetRunAsIDs(ds)
 
-	fl := flagcodec.ParseArgvKeyValue(cnt.Args)
-	if fl == nil {
-		klog.Warningf("Cannot modify the command line arguments %v", cnt.Args)
-		return nil
-	}
-	fl.SetToggle("--exit-on-conf-change")
-	cnt.Args = fl.Args()
 	return nil
 }
 
