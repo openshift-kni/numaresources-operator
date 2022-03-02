@@ -444,6 +444,127 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		})
 	})
+	Context("with two nodes with two NUMA zones", func() {
+		It("[test_id:47598] should place the pod in the node with available resources in one NUMA zone and fulfilling node selector", func() {
+			requiredNUMAZones := 2
+			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
+			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
+
+			neededNodes := 2
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with %d NUMA Zones: found %d, needed %d", requiredNUMAZones, len(nrtCandidates), neededNodes))
+			}
+
+			requiredRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1000Mi"),
+			}
+
+			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
+			nrtCandidates = e2enrt.FilterAnyZoneMatchingResources(nrtCandidates, requiredRes)
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d, needed: %d, request: %v", len(nrtCandidates), neededNodes, requiredRes))
+			}
+			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
+
+			// we need to label two of the candidates nodes
+			// one of them will be the targetNode where we expect the pod to be scheduler
+			// and the other one will not have enough resources on only one numa zone
+			// but will fulfill the node selector filter.
+			targetNodeName, ok := nrtCandidateNames.PopAny()
+			Expect(ok).To(BeTrue(), "cannot select a targe node among %#v", nrtCandidateNames.List())
+			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
+
+			toAlsoLabelNodeName, ok := nrtCandidateNames.PopAny()
+			Expect(ok).To(BeTrue(), "cannot select a targe node among %#v", nrtCandidateNames.List())
+			By(fmt.Sprintf("selecting node to schedule the pod: %q", toAlsoLabelNodeName))
+
+			labelName := "size"
+			labelValue := "medium"
+			By(fmt.Sprintf("Labeling nodes %q and %q with label %q:%q", targetNodeName, toAlsoLabelNodeName, labelName, labelValue))
+
+			unlabelOneFunc, err := labelNodeWithValue(fxt.Client, labelName, labelName, targetNodeName)
+			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", targetNodeName)
+			defer func() {
+				err := unlabelOneFunc()
+				if err != nil {
+					klog.Errorf("Error while trying to unlable node %q. %v", targetNodeName, err)
+				}
+			}()
+
+			unlabelTwoFunc, err := labelNodeWithValue(fxt.Client, labelName, labelName, toAlsoLabelNodeName)
+			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", toAlsoLabelNodeName)
+			defer func() {
+				err := unlabelTwoFunc()
+				if err != nil {
+					klog.Errorf("Error while trying to unlable node %q. %v", toAlsoLabelNodeName, err)
+				}
+			}()
+
+			By("Padding all other candidate nodes")
+			// we nee to also pad one of the labeled nodes.
+			nrtToPadNames := append(nrtCandidateNames.List(), toAlsoLabelNodeName)
+
+			// WARNING: This should be calculated as 3/4 of requiredRes
+			paddingRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("750m"),
+				corev1.ResourceMemory: resource.MustParse("750Mi"),
+			}
+
+			var paddingPods []*corev1.Pod
+			for nidx, nodeName := range nrtToPadNames {
+
+				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
+				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
+
+				for zidx, zone := range nrtInfo.Zones {
+					podName := fmt.Sprintf("padding%d-%d", nidx, zidx)
+					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingRes)
+					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone", podName, zone.Name)
+
+					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
+					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone", podName, zone.Name)
+
+					err = fxt.Client.Create(context.TODO(), padPod)
+					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone", podName, zone.Name)
+
+					paddingPods = append(paddingPods, padPod)
+				}
+			}
+			By("Waiting for padding pods to be ready")
+			// wait for all padding pods to be up&running ( or fail)
+			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
+			for _, failedPod := range failedPods {
+				// no need to check for errors here
+				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
+			}
+			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
+
+			By("Scheduling the testing pod")
+			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testPod")
+			pod.Spec.SchedulerName = schedulerName
+			pod.Spec.Containers[0].Resources.Limits = requiredRes
+			pod.Spec.NodeSelector = map[string]string{
+				labelName: labelValue,
+			}
+
+			err = fxt.Client.Create(context.TODO(), pod)
+			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
+
+			By("waiting for node to be up&running")
+			podRunningTimeout := 1 * time.Minute
+			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
+			Expect(err).NotTo(HaveOccurred(), "Pod %q not up&running after %v", pod.Name, podRunningTimeout)
+
+			By("checking the pod has been scheduled in the proper node")
+			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName))
+
+			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
+			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
+		})
+	})
 	Context("with at least two nodes suitable", func() {
 		var targetNodeName string
 		var requiredRes corev1.ResourceList
@@ -1123,14 +1244,18 @@ func testToleration() []corev1.Toleration {
 }
 
 func labelNode(cli client.Client, label, nodeName string) (func() error, error) {
+	return labelNodeWithValue(cli, label, "", nodeName)
+}
+
+func labelNodeWithValue(cli client.Client, label, value, nodeName string) (func() error, error) {
 	nodeObj := &corev1.Node{}
 	nodeKey := client.ObjectKey{Name: nodeName}
 	if err := cli.Get(context.TODO(), nodeKey, nodeObj); err != nil {
 		return nil, err
 	}
 
-	nodeObj.Labels[label] = ""
-	klog.Infof("add label %q to node: %q", label, nodeName)
+	nodeObj.Labels[label] = value
+	klog.Infof("add label %q:%q to node: %q", label, value, nodeName)
 	if err := cli.Update(context.TODO(), nodeObj); err != nil {
 		return nil, err
 	}
