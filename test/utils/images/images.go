@@ -16,13 +16,11 @@ limitations under the License.
 
 package images
 
-const (
-	RTETestImageCI   = "quay.io/openshift-kni/resource-topology-exporter:test-ci"
-	SchedTestImageCI = "quay.io/openshift-kni/scheduler-plugins:test-ci"
+import "os"
 
-	// NEVER EVER USE THIS OUTSIDE CI or (early) DEVELOPMENT ENVIRONMENTS
-	NUMACellDevicePluginTestImageCI = "quay.io/openshift-kni/numacell-device-plugin:test-ci"
-
-	//the default image used for test pods
-	PauseImage = "gcr.io/google_containers/pause-amd64:3.0"
-)
+func GetPauseImage() string {
+	if pullSpec, ok := os.LookupEnv("E2E_PAUSE_IMAGE_URL"); ok {
+		return pullSpec
+	}
+	return PauseImage
+}

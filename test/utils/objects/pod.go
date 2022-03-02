@@ -24,6 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
+	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 )
 
 func NewTestPodPause(namespace, name string) *corev1.Pod {
@@ -38,7 +40,7 @@ func NewTestPodPause(namespace, name string) *corev1.Pod {
 			Containers: []corev1.Container{
 				{
 					Name:    name + "-cnt",
-					Image:   PauseImage,
+					Image:   images.GetPauseImage(),
 					Command: []string{PauseCommand},
 				},
 			},
