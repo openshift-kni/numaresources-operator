@@ -32,10 +32,10 @@ function setup() {
 	fi
 
 	echo "Running NRO install test suite"
-	${BIN_DIR}/e2e-install.test \
+	${BIN_DIR}/e2e-nrop-install.test \
 		--ginkgo.v \
 		--ginkgo.failFast \
-		--ginkgo.reportFile=/tmp/artifacts/e2e-serial-install \
+		--ginkgo.reportFile=/tmp/artifacts/nrop/e2e-serial-install \
 		--test.parallel=1 \
 		--ginkgo.focus='\[Install\] continuousIntegration' \
 		${NO_COLOR}
@@ -46,11 +46,11 @@ function setup() {
 	fi
 
 	echo "Running NROScheduler install test suite"
-	${BIN_DIR}/e2e-sched-install.test \
+	${BIN_DIR}/e2e-nrop-sched-install.test \
 		--ginkgo.v \
 		--ginkgo.failFast \
 		--test.parallel=1 \
-		--ginkgo.reportFile=/tmp/artifacts/e2e-serial-install-sched \
+		--ginkgo.reportFile=/tmp/artifacts/nrop/e2e-serial-install-sched \
 		${NO_COLOR}
 }
 
@@ -60,10 +60,10 @@ function teardown() {
 	fi
 
 	echo "Running NROScheduler uninstall test suite";
-	${BIN_DIR}/e2e-sched-uninstall.test \
+	${BIN_DIR}/e2e-nrop-sched-uninstall.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.reportFile=/tmp/artifacts/e2e-serial-uninstall-sched \
+		--ginkgo.reportFile=/tmp/artifacts/nrop/e2e-serial-uninstall-sched \
 		${NO_COLOR}
 
 	RC="$?"
@@ -72,10 +72,10 @@ function teardown() {
 	fi
 
 	echo "Running NRO uninstall test suite";
-	${BIN_DIR}/e2e-uninstall.test \
+	${BIN_DIR}/e2e-nrop-uninstall.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.reportFile=/tmp/artifacts/e2e-serial-uninstall \
+		--ginkgo.reportFile=/tmp/artifacts/nrop/e2e-serial-uninstall \
 		${NO_COLOR}
 }
 
@@ -85,10 +85,10 @@ function runtests() {
 		return 0
 	fi
 	echo "Running Serial, disruptive E2E Tests"
-	${BIN_DIR}/e2e-serial.test \
+	${BIN_DIR}/e2e-nrop-serial.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.reportFile=/tmp/artifacts/e2e-serial-run \
+		--ginkgo.reportFile=/tmp/artifacts/nrop/e2e-serial-run \
 		${NO_COLOR} \
 		${FOCUS}
 }
