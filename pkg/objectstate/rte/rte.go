@@ -34,6 +34,7 @@ import (
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
+	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -381,4 +382,12 @@ func UpdateDaemonSetRunAsIDs(ds *appsv1.DaemonSet) {
 	cnt.SecurityContext.RunAsUser = &rootID
 	cnt.SecurityContext.RunAsGroup = &rootID
 	klog.InfoS("RTE container elevated privileges", "container", cnt.Name, "user", rootID, "group", rootID)
+}
+
+func UpdateDaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
+	template := &ds.Spec.Template
+	if template.Annotations == nil {
+		template.Annotations = map[string]string{}
+	}
+	template.Annotations[hash.ConfigMapAnnotation] = cmHash
 }
