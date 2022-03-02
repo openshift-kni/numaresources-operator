@@ -29,6 +29,7 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
 	nrsv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -141,9 +142,13 @@ func UpdateDeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) 
 	klog.V(3).InfoS("Exporter image", "reason", "user-provided", "pullSpec", userImageSpec)
 }
 
-func UpdateDeploymentConfigMapSettings(dp *appsv1.Deployment, cmName string) {
-	spec := &dp.Spec.Template.Spec // shortcut
-	spec.Volumes[0] = newSchedConfigVolume(SchedulerConfigMapVolumeName, cmName)
+func UpdateDeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
+	template := &dp.Spec.Template // shortcut
+	template.Spec.Volumes[0] = newSchedConfigVolume(SchedulerConfigMapVolumeName, cmName)
+	if template.Annotations == nil {
+		template.Annotations = map[string]string{}
+	}
+	template.Annotations[hash.ConfigMapAnnotation] = cmHash
 }
 
 func DeploymentNamespacedNameFromObject(obj client.Object) (nrsv1alpha1.NamespacedName, bool) {

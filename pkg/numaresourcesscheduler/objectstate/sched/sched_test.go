@@ -17,6 +17,7 @@ limitations under the License.
 package sched
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -26,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrsv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 )
 
 var dp = &appsv1.Deployment{
@@ -78,28 +80,39 @@ func TestUpdateDeploymentImageSettings(t *testing.T) {
 func TestUpdateDeploymentConfigMapSettings(t *testing.T) {
 	type testCase struct {
 		cmName string
+		cmHash string
 	}
 
 	testCases := []testCase{
 		{
 			cmName: "cm1",
+			cmHash: "SHA256:c73d08de890479518ed60cf670d17faa26a4a71f995c1dcc978165399401a6c4",
 		},
 		{
 			cmName: "cm5",
+			cmHash: "SHA256:eb368a2dfd38b405f014118c7d9747fcc97f4f0ee75c05963cd9da6ee65ef498",
 		},
 		{
 			cmName: "cm3",
+			cmHash: "SHA256:a4bd99e1e0aba51814e81388badb23ecc560312c4324b2018ea76393ea1caca9",
 		},
 	}
 
 	podSpec := &dp.Spec.Template.Spec
 	for _, tc := range testCases {
-		UpdateDeploymentConfigMapSettings(dp, tc.cmName)
+		UpdateDeploymentConfigMapSettings(dp, tc.cmName, tc.cmHash)
 		if podSpec.Volumes[0].Name != SchedulerConfigMapVolumeName {
 			t.Errorf("failed to update deployment volume name, expected: %q actual: %q", SchedulerConfigMapVolumeName, podSpec.Volumes[0].Name)
 		}
 		if podSpec.Volumes[0].ConfigMap.LocalObjectReference.Name != tc.cmName {
 			t.Errorf("failed to update deployment volume configmap name, expected: %q actual: %q", tc.cmName, podSpec.Volumes[0].ConfigMap.LocalObjectReference.Name)
+		}
+		val, ok := dp.Spec.Template.Annotations[hash.ConfigMapAnnotation]
+		if !ok {
+			t.Errorf("failed to update deployment: %q with annotation key: %q", fmt.Sprintf("%s/%s", dp.Namespace, dp.Name), hash.ConfigMapAnnotation)
+		}
+		if val != tc.cmHash {
+			t.Errorf("failed to update deployment: %q with correct value in annotation %q, expected: %q, actual: %q", fmt.Sprintf("%s/%s", dp.Namespace, dp.Name), hash.ConfigMapAnnotation, tc.cmHash, val)
 		}
 	}
 }
