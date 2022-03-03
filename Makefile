@@ -172,7 +172,7 @@ binary-e2e-sched:
 binary-e2e-serial:
 	go test -c -v -o bin/e2e-nrop-serial.test ./test/e2e/serial
 
-binary-e2e-all: binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial runner-e2e-serial
+binary-e2e-all: binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial runner-e2e-serial build-pause
 
 runner-e2e-serial:
 	hack/render-e2e-runner.sh
@@ -194,6 +194,9 @@ build-e2e-install: fmt vet binary-e2e-install
 build-e2e-uninstall: fmt vet binary-e2e-uninstall
 
 build-e2e-all: fmt vet binary-e2e-all
+
+build-pause:
+	install -m 755 hack/pause bin/
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
