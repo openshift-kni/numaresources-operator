@@ -3,6 +3,7 @@ module github.com/openshift-kni/numaresources-operator
 go 1.17
 
 require (
+	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/go-cmp v0.5.6
