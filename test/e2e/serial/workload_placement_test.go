@@ -519,7 +519,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 		It("[test_id:48713] a guaranteed pod with one container should be scheduled into one NUMA zone", func() {
 
 			By("Scheduling the testing pod")
-			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testPod")
+			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pod.Spec.SchedulerName = schedulerName
 			pod.Spec.Containers[0].Resources.Limits = requiredRes
 
