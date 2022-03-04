@@ -18,6 +18,7 @@ package noderesourcetopologies
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -34,6 +35,9 @@ import (
 
 	e2ereslist "github.com/openshift-kni/numaresources-operator/test/utils/resourcelist"
 )
+
+// ErrNotEnoughResources means a NUMA zone or a node has not enough resouces to reserve
+var ErrNotEnoughResources = errors.New("nrt: Not enough resources")
 
 func GetZoneIDFromName(zoneName string) (int, error) {
 	for _, prefix := range []string{
@@ -106,13 +110,14 @@ func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeRe
 func SaturateZoneUntilLeft(zone nrtv1alpha1.Zone, requiredRes corev1.ResourceList) (corev1.ResourceList, error) {
 	paddingRes := make(corev1.ResourceList)
 	for resName, resQty := range requiredRes {
-		zoneQty, ok := findResourceAvailableByName(zone.Resources, string(resName))
+		zoneQty, ok := FindResourceAvailableByName(zone.Resources, string(resName))
 		if !ok {
 			return nil, fmt.Errorf("resource %q not found in zone %q", string(resName), zone.Name)
 		}
 
 		if zoneQty.Cmp(resQty) < 0 {
-			return nil, fmt.Errorf("resource %q already too scarce in zone %q (target %v amount %v)", resName, zone.Name, resQty, zoneQty)
+			klog.Errorf("resource %q already too scarce in zone %q (target %v amount %v)", resName, zone.Name, resQty, zoneQty)
+			return nil, ErrNotEnoughResources
 		}
 		klog.Infof("zone %q resource %q available %s allocation target %s", zone.Name, resName, zoneQty.String(), resQty.String())
 		paddingQty := zoneQty.DeepCopy()
@@ -123,10 +128,31 @@ func SaturateZoneUntilLeft(zone nrtv1alpha1.Zone, requiredRes corev1.ResourceLis
 	return paddingRes, nil
 }
 
+func SaturateNodeUntilLeft(node corev1.Node, requiredRes corev1.ResourceList) (corev1.ResourceList, error) {
+	paddingRes := make(corev1.ResourceList)
+	for resName, resQty := range requiredRes {
+		nodeQty, ok := node.Status.Allocatable[resName]
+		if !ok {
+			return nil, fmt.Errorf("resource %q not found in node %q", string(resName), node.Name)
+		}
+
+		if nodeQty.Cmp(resQty) < 0 {
+			klog.Errorf("resource %q already too scarce in zone %q (target %v amount %v)", resName, node.Name, resQty, nodeQty)
+			return nil, ErrNotEnoughResources
+		}
+		klog.Infof("node %q resource %q available %s allocation target %s", node.Name, resName, nodeQty.String(), resQty.String())
+		paddingQty := nodeQty.DeepCopy()
+		paddingQty.Sub(resQty)
+		paddingRes[resName] = paddingQty
+	}
+
+	return paddingRes, nil
+}
+
 func checkEqualResourcesInfo(nodeName, zoneName string, resourcesInitial, resourcesUpdated []nrtv1alpha1.ResourceInfo) (bool, string, error) {
 	for _, res := range resourcesInitial {
 		initialQty := res.Available
-		updatedQty, ok := findResourceAvailableByName(resourcesUpdated, res.Name)
+		updatedQty, ok := FindResourceAvailableByName(resourcesUpdated, res.Name)
 		if !ok {
 			return false, res.Name, fmt.Errorf("resource %q not found in the updated set", res.Name)
 		}
@@ -140,11 +166,11 @@ func checkEqualResourcesInfo(nodeName, zoneName string, resourcesInitial, resour
 
 func checkConsumedResourcesAtLeast(resourcesInitial, resourcesUpdated []nrtv1alpha1.ResourceInfo, required corev1.ResourceList) (bool, error) {
 	for resName, resQty := range required {
-		initialQty, ok := findResourceAvailableByName(resourcesInitial, string(resName))
+		initialQty, ok := FindResourceAvailableByName(resourcesInitial, string(resName))
 		if !ok {
 			return false, fmt.Errorf("resource %q not found in the initial set", string(resName))
 		}
-		updatedQty, ok := findResourceAvailableByName(resourcesUpdated, string(resName))
+		updatedQty, ok := FindResourceAvailableByName(resourcesUpdated, string(resName))
 		if !ok {
 			return false, fmt.Errorf("resource %q not found in the updated set", string(resName))
 		}
@@ -234,7 +260,7 @@ func AvailableFromZone(z nrtv1alpha1.Zone) corev1.ResourceList {
 
 func ZoneResourcesMatchesRequest(resources []nrtv1alpha1.ResourceInfo, requests corev1.ResourceList) bool {
 	for resName, resQty := range requests {
-		zoneQty, ok := findResourceAvailableByName(resources, string(resName))
+		zoneQty, ok := FindResourceAvailableByName(resources, string(resName))
 		if !ok {
 			return false
 		}
@@ -263,7 +289,7 @@ func findZoneByName(nrt nrtv1alpha1.NodeResourceTopology, zoneName string) (*nrt
 	return nil, fmt.Errorf("cannot find zone %q", zoneName)
 }
 
-func findResourceAvailableByName(resources []nrtv1alpha1.ResourceInfo, name string) (resource.Quantity, bool) {
+func FindResourceAvailableByName(resources []nrtv1alpha1.ResourceInfo, name string) (resource.Quantity, bool) {
 	for _, resource := range resources {
 		if resource.Name != name {
 			continue
