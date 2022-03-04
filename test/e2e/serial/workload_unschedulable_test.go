@@ -173,12 +173,6 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 			err := fxt.Client.Create(context.TODO(), deployment)
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
-			By("waiting for deployment to be completed")
-			dpRunningTimeout := 1 * time.Minute
-			dpRunningPollInterval := 10 * time.Second
-			err = e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
-			Expect(err).To(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, dpRunningTimeout)
-
 			By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q ", schedulerName))
 			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
@@ -205,12 +199,6 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 
 			err := fxt.Client.Create(context.TODO(), ds)
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", ds.Name)
-
-			By("waiting for daemonset to be ready")
-			dsRunningPollInterval := 10 * time.Second
-			dsRunningTimeout := 1 * time.Minute
-			ds, err = e2ewait.ForDaemonSetReady(fxt.Client, ds, dsRunningPollInterval, dsRunningTimeout)
-			Expect(err).To(HaveOccurred(), "Daemonset %q not up&running after %v", ds.Name, dsRunningTimeout)
 
 			By(fmt.Sprintf("checking daemonset pods have been scheduled with the topology aware scheduler %q ", schedulerName))
 			pods, err := schedutils.ListPodsByDaemonset(fxt.Client, *ds)
