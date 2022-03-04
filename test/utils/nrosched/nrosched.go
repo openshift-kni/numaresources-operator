@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -38,10 +39,13 @@ const (
 	NROSchedulerName   = "topo-aware-scheduler"
 	NROSchedObjectName = "numaresourcesscheduler"
 
-	ReasonScheduled = "Scheduled"
+	ReasonScheduled        = "Scheduled"
+	ReasonFailedScheduling = "FailedScheduling"
 )
 
-func CheckPODWasScheduledWith(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName string) (bool, error) {
+type eventChecker func(ev corev1.Event) bool
+
+func checkPODEvents(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName string, evCheck eventChecker) (bool, error) {
 	By(fmt.Sprintf("checking events for pod %s/%s", podNamespace, podName))
 	opts := metav1.ListOptions{
 		FieldSelector: fmt.Sprintf("involvedObject.name=%s", podName),
@@ -52,16 +56,30 @@ func CheckPODWasScheduledWith(k8sCli *kubernetes.Clientset, podNamespace, podNam
 		klog.ErrorS(err, "cannot get events for pod %s/%s", podNamespace, podName)
 		return false, err
 	}
+
 	for _, item := range events.Items {
 		klog.Infof("checking event: [%s: %s]", item.ReportingController, item.Reason)
-		// TODO: is this check robust enough?
-		if item.Reason == ReasonScheduled && item.ReportingController == schedulerName {
-			klog.Infof("-> found relevant scheduling event for pod %s/%s", podNamespace, podName)
+		if evCheck(item) {
+			klog.Infof("-> found relevant scheduling event for pod %s/%s: %v", podNamespace, podName, item)
 			return true, nil
 		}
 	}
 	klog.Warningf("Failed to find relevant scheduling event for pod %s/%s", podNamespace, podName)
 	return false, nil
+}
+
+func CheckPODSchedulingFailed(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName string) (bool, error) {
+	isFailedScheduling := func(item corev1.Event) bool {
+		return item.Reason == ReasonFailedScheduling && item.ReportingController == schedulerName
+	}
+	return checkPODEvents(k8sCli, podNamespace, podName, schedulerName, isFailedScheduling)
+}
+
+func CheckPODWasScheduledWith(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName string) (bool, error) {
+	isScheduledWith := func(item corev1.Event) bool {
+		return item.Reason == ReasonScheduled && item.ReportingController == schedulerName
+	}
+	return checkPODEvents(k8sCli, podNamespace, podName, schedulerName, isScheduledWith)
 }
 
 func CheckNROSchedulerAvailable(cli client.Client, nroSchedName string) *nropv1alpha1.NUMAResourcesScheduler {

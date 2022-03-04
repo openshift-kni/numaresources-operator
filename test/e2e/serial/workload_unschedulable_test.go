@@ -151,9 +151,9 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
+			isFailed, err := nrosched.CheckPODSchedulingFailed(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, schedulerName)
+			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, schedulerName)
 		})
 
 		It("a deployment with a guaranteed pod resources available on one node but not on a single numa", func() {
@@ -184,9 +184,9 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 
 			for _, pod := range pods {
-				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
+				isFailed, err := nrosched.CheckPODSchedulingFailed(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, schedulerName)
+				Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, schedulerName)
 			}
 		})
 
@@ -217,9 +217,9 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 			Expect(err).To(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 
 			for _, pod := range pods {
-				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
+				isFailed, err := nrosched.CheckPODSchedulingFailed(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, schedulerName)
+				Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, schedulerName)
 			}
 		})
 	})
