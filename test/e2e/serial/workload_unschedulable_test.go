@@ -137,7 +137,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 		It("[test_id:47617] workload requests guaranteed pod resources available on one node but not on a single numa", func() {
 
 			By("Scheduling the testing pod")
-			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testPod")
+			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pod.Spec.SchedulerName = schedulerName
 			pod.Spec.Containers[0].Resources.Limits = requiredRes
 
