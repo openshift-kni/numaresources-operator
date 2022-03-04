@@ -202,7 +202,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 
 			By(fmt.Sprintf("checking daemonset pods have been scheduled with the topology aware scheduler %q ", schedulerName))
 			pods, err := schedutils.ListPodsByDaemonset(fxt.Client, *ds)
-			Expect(err).To(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
+			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 
 			for _, pod := range pods {
 				isFailed, err := nrosched.CheckPODSchedulingFailed(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
