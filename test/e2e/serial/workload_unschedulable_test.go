@@ -163,7 +163,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 			var replicas int32 = 1
 
 			podLabels := map[string]string{
-				"test": "test-dp",
+				"test": "test-deployment",
 			}
 			nodeSelector := map[string]string{}
 			deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
@@ -196,7 +196,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 			dsName := "test-ds"
 
 			podLabels := map[string]string{
-				"test": "test-dp",
+				"test": "test-daemonset",
 			}
 			nodeSelector := map[string]string{}
 			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
