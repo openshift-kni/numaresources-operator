@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	nrsv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -137,6 +138,24 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			name, found := sched.SchedulerNameFromObject(cm)
 			gomega.Expect(found).To(gomega.BeTrue())
 			gomega.Expect(name).To(gomega.BeEquivalentTo(testSchedulerName))
+		})
+
+		ginkgo.It("should have a config hash annotation under deployment", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			key = client.ObjectKey{
+				Namespace: testNamespace,
+				Name:      "secondary-scheduler",
+			}
+			dp := &appsv1.Deployment{}
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, dp)).ToNot(gomega.HaveOccurred())
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			val, ok := dp.Spec.Template.Annotations[hash.ConfigMapAnnotation]
+			gomega.Expect(ok).To(gomega.BeTrue())
+			gomega.Expect(val).ToNot(gomega.BeEmpty())
 		})
 	})
 })

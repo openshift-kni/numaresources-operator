@@ -49,6 +49,7 @@ import (
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
+	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
@@ -315,6 +316,9 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 	})
 	_ = rtestate.UpdateDaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
 	_ = rtestate.UpdateDaemonSetPauseContainerSettings(mf.DaemonSet)
+	if mf.ConfigMap != nil {
+		rtestate.UpdateDaemonSetHashAnnotation(mf.DaemonSet, hash.ConfigMapData(mf.ConfigMap))
+	}
 	return mf
 }
 
@@ -322,6 +326,6 @@ func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec
 	klog.InfoS("Updating scheduler manifests")
 	mf := schedManifests.Clone()
 	schedstate.UpdateDeploymentImageSettings(mf.Deployment, imageSpec)
-	schedstate.UpdateDeploymentConfigMapSettings(mf.Deployment, schedManifests.ConfigMap.Name)
+	schedstate.UpdateDeploymentConfigMapSettings(mf.Deployment, schedManifests.ConfigMap.Name, hash.ConfigMapData(schedManifests.ConfigMap))
 	return mf
 }
