@@ -128,6 +128,8 @@ var _ = Describe("[serial][disruptive][scheduler] workload overhead", func() {
 				}
 			})
 			It("[test_id:47582][tier2] schedule a guaranteed Pod in a single NUMA zone and check overhead is not accounted in NRT", func() {
+				Skip("FIXME: NRT filter clashes with the noderesources fit plugin")
+
 				podResources := corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("1"),
 					corev1.ResourceMemory: resource.MustParse("1Gi"),
