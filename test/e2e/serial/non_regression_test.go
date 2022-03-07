@@ -107,7 +107,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			}
 		})
 
-		It("[test_id:47584] should be able to schedule guaranteed pod in selective way", func() {
+		It("[test_id:47584][tier2] should be able to schedule guaranteed pod in selective way", func() {
 			nrtList := nrtv1alpha1.NodeResourceTopologyList{}
 			nrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
