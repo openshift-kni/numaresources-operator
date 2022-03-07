@@ -1,0 +1,11 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+# default (and sane) config is to inherited from
+# parent OWNERS, see:
+# https://www.kubernetes.dev/docs/guide/owners/#owners
+reviewers:
+  - mrniranjan 
+  - shajmakh
+approvers:
+  - mrniranjan 
+  - shajmakh
