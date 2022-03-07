@@ -309,7 +309,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 					}
 				}
 			})
-			It("[test_id:47582] schedule a guaranteed Pod in a single NUMA zone and check overhead is not accounted in NRT", func() {
+			It("[test_id:47582][tier2] schedule a guaranteed Pod in a single NUMA zone and check overhead is not accounted in NRT", func() {
 				podResources := corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("1"),
 					corev1.ResourceMemory: resource.MustParse("1Gb"),
@@ -428,7 +428,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 	})
 
 	Context("cluster with multiple worker nodes suitable", func() {
-		It("[placement][test_id:47575] should make a pod with two gu containers land on a node with enough resources on a specific NUMA zone, each container on a different zone", func() {
+		It("[placement][test_id:47575][tier1] should make a pod with two gu containers land on a node with enough resources on a specific NUMA zone, each container on a different zone", func() {
 			hostsRequired := 2
 
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
@@ -611,7 +611,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 		})
 	})
 	Context("with two nodes with two NUMA zones", func() {
-		It("[test_id:47598] should place the pod in the node with available resources in one NUMA zone and fulfilling node selector", func() {
+		It("[test_id:47598][tier2] should place the pod in the node with available resources in one NUMA zone and fulfilling node selector", func() {
 			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
@@ -836,7 +836,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			err = e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
 			Expect(err).NotTo(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, dpRunningTimeout)
 		})
-		It("[test_id:47618]should be properly scheduled with no changes in NRTs", func() {
+		It("[test_id:47618][tier2] should be properly scheduled with no changes in NRTs", func() {
 			By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", schedulerName, targetNodeName))
 			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
@@ -925,7 +925,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			}
 			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
 		})
-		It("[test_id:48713] a guaranteed pod with one container should be scheduled into one NUMA zone", func() {
+		It("[test_id:48713][tier1] a guaranteed pod with one container should be scheduled into one NUMA zone", func() {
 
 			By("Scheduling the testing pod")
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
@@ -949,7 +949,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
 		})
 
-		It("[test_id:47583] a deployment with a guaranteed pod with one container should be scheduled into one NUMA zone", func() {
+		It("[test_id:47583][tier1] a deployment with a guaranteed pod with one container should be scheduled into one NUMA zone", func() {
 
 			By("Scheduling the testing deployment")
 			var deploymentName string = "test-dp"
@@ -1042,7 +1042,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("[test_id:47594] should make a pod with a toleration land on a node with enough resources on a specific NUMA zone", func() {
+		It("[test_id:47594][tier1] should make a pod with a toleration land on a node with enough resources on a specific NUMA zone", func() {
 			hostsRequired := 2
 			paddedNodes := padder.GetPaddedNodes()
 			paddedNodesSet := sets.NewString(paddedNodes...)
@@ -1170,7 +1170,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			}
 		})
 
-		It("[test_id:47591] should modify workload post scheduling while keeping the resource requests available", func() {
+		It("[test_id:47591][tier1] should modify workload post scheduling while keeping the resource requests available", func() {
 			hostsRequired := 2
 			paddedNodes := padder.GetPaddedNodes()
 			paddedNodesSet := sets.NewString(paddedNodes...)
@@ -1447,7 +1447,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		})
 
-		It("[test_id:47674][reboot_required][slow][images] should be able to modify the configurable values under the NUMAResourcesOperator and NUMAResourcesScheduler CR", func() {
+		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator and NUMAResourcesScheduler CR", func() {
 
 			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
 			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)

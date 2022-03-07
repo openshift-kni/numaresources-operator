@@ -35,7 +35,7 @@ import (
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
-var _ = Describe("[test_id:47593][serial][disruptive][scheduler] scheduler removal on a live cluster", func() {
+var _ = Describe("[test_id:47593][serial][disruptive][scheduler][tier1] scheduler removal on a live cluster", func() {
 	var fxt *e2efixture.Fixture
 
 	BeforeEach(func() {
@@ -103,7 +103,7 @@ var _ = Describe("[test_id:47593][serial][disruptive][scheduler] scheduler remov
 	})
 })
 
-var _ = Describe("[test_id:48069][serial][disruptive][scheduler] scheduler restart on a live cluster", func() {
+var _ = Describe("[test_id:48069][serial][disruptive][scheduler][tier2] scheduler restart on a live cluster", func() {
 	var fxt *e2efixture.Fixture
 	var nroSchedObj *nropv1alpha1.NUMAResourcesScheduler
 	var schedulerName string
