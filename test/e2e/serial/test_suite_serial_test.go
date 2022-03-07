@@ -49,7 +49,9 @@ import (
 )
 
 const (
-	multiNUMALabel = "numa.hardware.openshift-kni.io/cell-count"
+	multiNUMALabel    = "numa.hardware.openshift-kni.io/cell-count"
+	nropTestCIImage   = "quay.io/openshift-kni/resource-topology-exporter:test-ci"
+	schedulerTestName = "test-topology-scheduler"
 )
 
 var (
