@@ -130,12 +130,12 @@ var _ = Describe("[serial][disruptive][scheduler] workload overhead", func() {
 			It("[test_id:47582][tier2] schedule a guaranteed Pod in a single NUMA zone and check overhead is not accounted in NRT", func() {
 				podResources := corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("1"),
-					corev1.ResourceMemory: resource.MustParse("1Gb"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
 				}
 
 				minRes := corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("100m"),
-					corev1.ResourceMemory: resource.MustParse("100M"),
+					corev1.ResourceMemory: resource.MustParse("100Mi"),
 				}
 
 				// need a zone with resources for overhead, pod and a little bit more to avoid zone saturation
