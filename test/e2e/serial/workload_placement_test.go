@@ -1447,7 +1447,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		})
 
-		It("[test_id:47674][reboot_required][slow] should be able to modify the configurable values under the NUMAResourcesOperator and NUMAResourcesScheduler CR", func() {
+		It("[test_id:47674][reboot_required][slow][images] should be able to modify the configurable values under the NUMAResourcesOperator and NUMAResourcesScheduler CR", func() {
 
 			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
 			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
