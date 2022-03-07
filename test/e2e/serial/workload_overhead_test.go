@@ -105,7 +105,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload overhead", func() {
 						APIVersion: "node.k8s.io/vi",
 					},
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "rtClass",
+						Name: "test-rtclass",
 					},
 					Handler: "runc",
 					Overhead: &nodev1.Overhead{
