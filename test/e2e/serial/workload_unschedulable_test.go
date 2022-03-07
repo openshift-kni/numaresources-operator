@@ -156,7 +156,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, schedulerName)
 		})
 
-		It("a deployment with a guaranteed pod resources available on one node but not on a single numa", func() {
+		It("test_id:48963] a deployment with a guaranteed pod resources available on one node but not on a single numa", func() {
 
 			By("Scheduling the testing deployment")
 			deploymentName := "test-dp"
@@ -184,7 +184,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 			}
 		})
 
-		It("a daemonset with a guaranteed pod resources available on one node but not on a single numa", func() {
+		It("[test_id:48962] a daemonset with a guaranteed pod resources available on one node but not on a single numa", func() {
 
 			By("Scheduling the testing daemonset")
 			dsName := "test-ds"
