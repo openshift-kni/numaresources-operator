@@ -80,7 +80,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement considering
 	Context("with two nodes with two NUMA zones", func() {
 		It("[test_id:47598][tier2] should place the pod in the node with available resources in one NUMA zone and fulfilling node selector", func() {
 
-			Skip("FIXME: NRT filter clashes with the noderesources fit plugin")
+			skipUnlessEnvVar("E2E_SERIAL_STAGING", "FIXME: NRT filter clashes with the noderesources fit plugin")
 
 			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))

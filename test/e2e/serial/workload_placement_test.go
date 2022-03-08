@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -1263,4 +1265,23 @@ func maxResourceType(nrtInfo nrtv1alpha1.NodeResourceTopology, resName corev1.Re
 		}
 	}
 	return max.DeepCopy()
+}
+
+func skipUnlessEnvVar(envVar, message string) {
+	if isEnvTrue(envVar) {
+		return
+	}
+	Skip(message)
+}
+
+func isEnvTrue(envVar string) bool {
+	val, ok := os.LookupEnv(envVar)
+	if !ok {
+		return false
+	}
+	enabled, err := strconv.ParseBool(val)
+	if err != nil {
+		return false
+	}
+	return enabled
 }
