@@ -156,7 +156,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, schedulerName)
 		})
 
-		It("test_id:48963][tier2] a deployment with a guaranteed pod resources available on one node but not on a single numa", func() {
+		It("[test_id:48963][tier2] a deployment with a guaranteed pod resources available on one node but not on a single numa", func() {
 
 			By("Scheduling the testing deployment")
 			deploymentName := "test-dp"
@@ -179,6 +179,9 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 
 			for _, pod := range pods {
 				isFailed, err := nrosched.CheckPODSchedulingFailed(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
+				if err != nil {
+					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+				}
 				Expect(err).ToNot(HaveOccurred())
 				Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, schedulerName)
 			}
@@ -206,6 +209,9 @@ var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func(
 
 			for _, pod := range pods {
 				isFailed, err := nrosched.CheckPODSchedulingFailed(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
+				if err != nil {
+					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+				}
 				Expect(err).ToNot(HaveOccurred())
 				Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, schedulerName)
 			}
