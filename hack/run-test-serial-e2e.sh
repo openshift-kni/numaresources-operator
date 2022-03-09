@@ -25,6 +25,9 @@ fi
 if [ -n "${E2E_SERIAL_FOCUS}" ]; then
 	FOCUS="-ginkgo.focus=${E2E_SERIAL_FOCUS}"
 fi
+if [ -n "${E2E_SERIAL_SKIP}" ]; then
+	SKIP="-ginkgo.skip=${E2E_SERIAL_SKIP}"
+fi
 
 function setup() {
 	if [[ "${SETUP}" != "true" ]]; then
@@ -90,6 +93,7 @@ function runtests() {
 		--test.parallel=1 \
 		--ginkgo.reportFile=/tmp/artifacts/nrop/e2e-serial-run \
 		${NO_COLOR} \
+		${SKIP} \
 		${FOCUS}
 }
 

@@ -39,7 +39,7 @@ import (
 
 var _ = Describe("[Scheduler] install", func() {
 	Context("with a running cluster with all the components", func() {
-		It("[test_id: 48598][tier2] should perform the scheduler deployment and verify the condition is reported as available", func() {
+		It("[test_id:48598][tier2] should perform the scheduler deployment and verify the condition is reported as available", func() {
 			var err error
 			nroSchedObj := objects.TestNROScheduler()
 
