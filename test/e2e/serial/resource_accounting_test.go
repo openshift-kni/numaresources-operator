@@ -92,7 +92,7 @@ var _ = Describe("[serial][disruptive][scheduler] workload resource accounting",
 			}
 		})
 
-		It("[placement][case:1] should keep the pod pending if not enough resources available, then schedule when resources are freed", func() {
+		It("[placement][test_id:49068][tier2] should keep the pod pending if not enough resources available, then schedule when resources are freed", func() {
 			// make sure this is > 1 and LESS than required Res!
 			unsuitableFreeRes := corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("2"),
