@@ -20,7 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -38,16 +39,11 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/util/taints"
 
-	"github.com/google/go-cmp/cmp"
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
-	nropmcp "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	e2enodes "github.com/openshift-kni/numaresources-operator/test/utils/nodes"
@@ -57,7 +53,6 @@ import (
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/test/utils/resourcelist"
 	operatorv1 "github.com/openshift/api/operator/v1"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 const testKey = "testkey"
@@ -100,305 +95,6 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 	// This is ugly, but automatically computing the values is not straightforward
 	// and will we want to start lean and mean.
 
-	Context("cluster with at least a worker node suitable", func() {
-		var nrtTwoZoneCandidates []nrtv1alpha1.NodeResourceTopology
-		BeforeEach(func() {
-			const requiredNumaZones int = 2
-			const requiredNodeNumber int = 1
-			// TODO: we need AT LEAST 2 (so 4, 8 is fine...) but we hardcode the padding logic to keep the test simple,
-			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNumaZones))
-			nrtTwoZoneCandidates = e2enrt.FilterZoneCountEqual(nrts, requiredNumaZones)
-			if len(nrtTwoZoneCandidates) < requiredNodeNumber {
-				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtTwoZoneCandidates)))
-			}
-		})
-
-		It("[placement][case:1] should keep the pod pending if not enough resources available, then schedule when resources are freed", func() {
-			// make sure this is > 1 and LESS than required Res!
-			unsuitableFreeRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("2"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
-			}
-
-			requiredRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("4"),
-				corev1.ResourceMemory: resource.MustParse("8Gi"),
-			}
-
-			By(fmt.Sprintf("creating test pod, total resources required %s", e2ereslist.ToString(requiredRes)))
-
-			By("filtering available nodes with allocatable resources on each NUMA zone that can match request")
-			nrtCandidates := e2enrt.FilterAnyZoneMatchingResources(nrtTwoZoneCandidates, requiredRes)
-			if len(nrtCandidates) < 1 {
-				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d", len(nrtCandidates)))
-			}
-
-			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
-			// nodes we have now are all equal for our purposes. Pick one at random
-			// TODO: make sure we can control this randomness using ginkgo seed or any other way
-			targetNodeName, ok := candidateNodeNames.PopAny()
-			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
-			unsuitableNodeNames := candidateNodeNames.List()
-
-			By(fmt.Sprintf("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames))
-			var targetPaddingPods []*corev1.Pod
-			var paddingPods []*corev1.Pod
-
-			By(fmt.Sprintf("preparing target node %q to fit the test case", targetNodeName))
-			// first, let's make sure that ONLY the required res can fit in either zone on the target node
-			nrtInfo, err := e2enrt.FindFromList(nrtList.Items, targetNodeName)
-			Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", targetNodeName)
-
-			for _, zone := range nrtInfo.Zones {
-				By(fmt.Sprintf("padding node %q zone %q", nrtInfo.Name, zone.Name))
-				padPod, err := makePaddingPod(fxt.Namespace.Name, "target", zone, requiredRes)
-				Expect(err).ToNot(HaveOccurred())
-
-				padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
-				Expect(err).ToNot(HaveOccurred())
-
-				err = fxt.Client.Create(context.TODO(), padPod)
-				Expect(err).ToNot(HaveOccurred())
-				paddingPods = append(paddingPods, padPod)
-			}
-
-			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
-			for _, failedPod := range failedPods {
-				// ignore errors intentionally
-				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-			}
-			Expect(failedPods).To(BeEmpty())
-
-			for _, zone := range nrtInfo.Zones {
-				By(fmt.Sprintf("making node %q zone %q unsuitable with a placeholder pod", nrtInfo.Name, zone.Name))
-				Expect(err).ToNot(HaveOccurred(), "cannot detect the zone ID from %q", zone.Name)
-				// now put a minimal pod (1 cpu 1Gi) on both zones. Now the target node as whole will still have the
-				// required resources, but no NUMA zone individually will
-				targetedPaddingPod := objects.NewTestPodPause(fxt.Namespace.Name, fmt.Sprintf("tgtpadpod-%s", zone.Name))
-				targetedPaddingPod.Spec.NodeName = nrtInfo.Name
-				targetedPaddingPod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("1"),
-					corev1.ResourceMemory: resource.MustParse("1Gi"),
-				}
-
-				targetedPaddingPod, err = pinPodTo(targetedPaddingPod, nrtInfo.Name, zone.Name)
-				Expect(err).ToNot(HaveOccurred())
-
-				err = fxt.Client.Create(context.TODO(), targetedPaddingPod)
-				Expect(err).ToNot(HaveOccurred())
-				targetPaddingPods = append(targetPaddingPods, targetedPaddingPod)
-			}
-
-			failedPods = e2ewait.ForPodListAllRunning(fxt.Client, targetPaddingPods)
-			for _, failedPod := range failedPods {
-				// ignore errors intentionally
-				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-			}
-			Expect(failedPods).To(BeEmpty())
-
-			By("saturating nodes we want to be unsuitable")
-			for idx, unsuitableNodeName := range unsuitableNodeNames {
-				nrtInfo, err := e2enrt.FindFromList(nrtList.Items, unsuitableNodeName)
-				Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", unsuitableNodeName)
-
-				for _, zone := range nrtInfo.Zones {
-					name := fmt.Sprintf("unsuitable%d", idx)
-					By(fmt.Sprintf("saturating node %q -> %q zone %q", nrtInfo.Name, name, zone.Name))
-					padPod, err := makePaddingPod(fxt.Namespace.Name, name, zone, unsuitableFreeRes)
-					Expect(err).ToNot(HaveOccurred())
-
-					padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
-					Expect(err).ToNot(HaveOccurred())
-
-					err = fxt.Client.Create(context.TODO(), padPod)
-					Expect(err).ToNot(HaveOccurred())
-					paddingPods = append(paddingPods, padPod)
-				}
-			}
-
-			allPaddingPods := append([]*corev1.Pod{}, paddingPods...)
-			allPaddingPods = append(allPaddingPods, targetPaddingPods...)
-			By("waiting for ALL padding pods to go running - or fail")
-			failedPods = e2ewait.ForPodListAllRunning(fxt.Client, allPaddingPods)
-			for _, failedPod := range failedPods {
-				// ignore errors intentionally
-				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-			}
-			Expect(failedPods).To(BeEmpty())
-
-			// TODO: smarter cooldown
-			time.Sleep(18 * time.Second)
-			for _, unsuitableNodeName := range unsuitableNodeNames {
-				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
-			}
-			dumpNRTForNode(fxt.Client, targetNodeName, "targeted")
-
-			By(fmt.Sprintf("running the test pod requiring: %s", e2ereslist.ToString(requiredRes)))
-			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
-			pod.Spec.SchedulerName = schedulerName
-			pod.Spec.Containers[0].Resources.Limits = requiredRes
-			pod.Spec.NodeSelector = map[string]string{
-				multiNUMALabel: "2",
-			}
-			err = fxt.Client.Create(context.TODO(), pod)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("check the pod is still pending")
-			// TODO: lacking better ways, let's monitor the pod "long enough" and let's check it stays Pending
-			// if it stays Pending "long enough" it still means little, but OTOH if it goes Running or Failed we
-			// can tell for sure something's wrong
-			err = e2ewait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
-			if err != nil {
-				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
-			}
-			Expect(err).ToNot(HaveOccurred())
-
-			By("deleting a placeholder pod pod") // any pod is fine
-			targetPaddingPod := targetPaddingPods[0]
-			err = fxt.Client.Delete(context.TODO(), targetPaddingPod)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("checking the test pod is removed")
-			err = e2ewait.ForPodDeleted(fxt.Client, targetPaddingPod.Namespace, targetPaddingPod.Name, 3*time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("waiting for the pod to be scheduled")
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-
-			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
-			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
-				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
-
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerName)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
-		})
-	})
-
-	Context("with two nodes with two NUMA zones", func() {
-		It("[test_id:47598][tier2] should place the pod in the node with available resources in one NUMA zone and fulfilling node selector", func() {
-			requiredNUMAZones := 2
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
-			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
-
-			neededNodes := 2
-			if len(nrtCandidates) < neededNodes {
-				Skip(fmt.Sprintf("not enough nodes with %d NUMA Zones: found %d, needed %d", requiredNUMAZones, len(nrtCandidates), neededNodes))
-			}
-
-			requiredRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("1000Mi"),
-			}
-
-			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
-			nrtCandidates = e2enrt.FilterAnyZoneMatchingResources(nrtCandidates, requiredRes)
-			if len(nrtCandidates) < neededNodes {
-				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d, needed: %d, request: %v", len(nrtCandidates), neededNodes, requiredRes))
-			}
-			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
-
-			// we need to label two of the candidates nodes
-			// one of them will be the targetNode where we expect the pod to be scheduler
-			// and the other one will not have enough resources on only one numa zone
-			// but will fulfill the node selector filter.
-			targetNodeName, ok := nrtCandidateNames.PopAny()
-			Expect(ok).To(BeTrue(), "cannot select a targe node among %#v", nrtCandidateNames.List())
-			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
-
-			toAlsoLabelNodeName, ok := nrtCandidateNames.PopAny()
-			Expect(ok).To(BeTrue(), "cannot select a targe node among %#v", nrtCandidateNames.List())
-			By(fmt.Sprintf("selecting node to schedule the pod: %q", toAlsoLabelNodeName))
-
-			labelName := "size"
-			labelValue := "medium"
-			By(fmt.Sprintf("Labeling nodes %q and %q with label %q:%q", targetNodeName, toAlsoLabelNodeName, labelName, labelValue))
-
-			unlabelOneFunc, err := labelNodeWithValue(fxt.Client, labelName, labelName, targetNodeName)
-			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", targetNodeName)
-			defer func() {
-				err := unlabelOneFunc()
-				if err != nil {
-					klog.Errorf("Error while trying to unlable node %q. %v", targetNodeName, err)
-				}
-			}()
-
-			unlabelTwoFunc, err := labelNodeWithValue(fxt.Client, labelName, labelName, toAlsoLabelNodeName)
-			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", toAlsoLabelNodeName)
-			defer func() {
-				err := unlabelTwoFunc()
-				if err != nil {
-					klog.Errorf("Error while trying to unlable node %q. %v", toAlsoLabelNodeName, err)
-				}
-			}()
-
-			By("Padding all other candidate nodes")
-			// we nee to also pad one of the labeled nodes.
-			nrtToPadNames := append(nrtCandidateNames.List(), toAlsoLabelNodeName)
-
-			// WARNING: This should be calculated as 3/4 of requiredRes
-			paddingRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("750m"),
-				corev1.ResourceMemory: resource.MustParse("750Mi"),
-			}
-
-			var paddingPods []*corev1.Pod
-			for nidx, nodeName := range nrtToPadNames {
-
-				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
-				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
-
-				for zidx, zone := range nrtInfo.Zones {
-					podName := fmt.Sprintf("padding%d-%d", nidx, zidx)
-					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingRes)
-					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone", podName, zone.Name)
-
-					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
-					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone", podName, zone.Name)
-
-					err = fxt.Client.Create(context.TODO(), padPod)
-					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone", podName, zone.Name)
-
-					paddingPods = append(paddingPods, padPod)
-				}
-			}
-			By("Waiting for padding pods to be ready")
-			// wait for all padding pods to be up&running ( or fail)
-			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
-			for _, failedPod := range failedPods {
-				// no need to check for errors here
-				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-			}
-			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
-
-			By("Scheduling the testing pod")
-			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testPod")
-			pod.Spec.SchedulerName = schedulerName
-			pod.Spec.Containers[0].Resources.Limits = requiredRes
-			pod.Spec.NodeSelector = map[string]string{
-				labelName: labelValue,
-			}
-
-			err = fxt.Client.Create(context.TODO(), pod)
-			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
-
-			By("waiting for node to be up&running")
-			podRunningTimeout := 1 * time.Minute
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
-			Expect(err).NotTo(HaveOccurred(), "Pod %q not up&running after %v", pod.Name, podRunningTimeout)
-
-			By("checking the pod has been scheduled in the proper node")
-			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName))
-
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerName)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
-		})
-	})
 	Context("cluster with node/s having two numa zones, and there are enough resources on one node but not in any numa zone when trying to schedule a deployment with burstable pods", func() {
 		var nrtCandidates []nrtv1alpha1.NodeResourceTopology
 		var targetNodeName string
@@ -1114,231 +810,6 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 				return ok
 			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		})
-
-		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator and NUMAResourcesScheduler CR", func() {
-
-			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
-			initialNroSchedObj := nroSchedObj.DeepCopy()
-
-			nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
-			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: objects.NROName()}, nroOperObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", objects.NROName())
-			initialNroOperObj := nroOperObj.DeepCopy()
-
-			workers, err := e2enodes.GetWorkerNodes(fxt.Client)
-			Expect(err).ToNot(HaveOccurred())
-			// TODO choose randomly
-			targetedNode := workers[0]
-
-			unlabelFunc, err := labelNode(fxt.Client, e2enodes.GetLabelRoleMCPTest(), targetedNode.Name)
-			Expect(err).ToNot(HaveOccurred())
-
-			labelFunc, err := unlabelNode(fxt.Client, e2enodes.GetLabelRoleWorker(), "", targetedNode.Name)
-			Expect(err).ToNot(HaveOccurred())
-
-			defer func() {
-				By(fmt.Sprintf("unlabling node: %q", targetedNode.Name))
-				err = unlabelFunc()
-				Expect(err).ToNot(HaveOccurred())
-
-				By(fmt.Sprintf("labling node: %q", targetedNode.Name))
-				err = labelFunc()
-				Expect(err).ToNot(HaveOccurred())
-
-				By("reverting the changes under the NUMAResourcesScheduler object")
-				// we need that for the current ResourceVersion
-				nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroSchedObj), nroSchedObj)
-				Expect(err).ToNot(HaveOccurred())
-
-				nroSchedObj.Spec = initialNroSchedObj.Spec
-				err = fxt.Client.Update(context.TODO(), nroSchedObj)
-				Expect(err).ToNot(HaveOccurred())
-
-				By("reverting the changes under the NUMAResourcesOperator object")
-				// we need that for the current ResourceVersion
-				nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
-				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
-				Expect(err).ToNot(HaveOccurred())
-
-				nroOperObj.Spec = initialNroOperObj.Spec
-				err = fxt.Client.Update(context.TODO(), nroOperObj)
-				Expect(err).ToNot(HaveOccurred())
-
-				mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
-				Expect(err).ToNot(HaveOccurred())
-
-				var wg sync.WaitGroup
-				for _, mcp := range mcps {
-					wg.Add(1)
-					go func(mcpool *machineconfigv1.MachineConfigPool) {
-						defer GinkgoRecover()
-						defer wg.Done()
-						err = e2ewait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
-						Expect(err).ToNot(HaveOccurred())
-					}(mcp)
-				}
-				wg.Wait()
-
-				testMcp := objects.TestMCP()
-				By(fmt.Sprintf("deleting mcp: %q", testMcp.Name))
-				err = fxt.Client.Delete(context.TODO(), testMcp)
-				Expect(err).ToNot(HaveOccurred())
-
-				err = e2ewait.ForMachineConfigPoolDeleted(fxt.Client, testMcp, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
-				Expect(err).ToNot(HaveOccurred())
-			}() // end of defer
-
-			mcp := objects.TestMCP()
-			By(fmt.Sprintf("creating new MCP: %q", mcp.Name))
-			// we must have this label in order to match other machine configs that are necessary for proper functionality
-			mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": e2enodes.RoleMCPTest}
-			mcp.Spec.MachineConfigSelector = &metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      "machineconfiguration.openshift.io/role",
-						Operator: metav1.LabelSelectorOpIn,
-						Values:   []string{e2enodes.RoleWorker, e2enodes.RoleMCPTest},
-					},
-				},
-			}
-			mcp.Spec.NodeSelector = &metav1.LabelSelector{
-				MatchLabels: map[string]string{e2enodes.GetLabelRoleMCPTest(): ""},
-			}
-
-			err = fxt.Client.Create(context.TODO(), mcp)
-			Expect(err).ToNot(HaveOccurred())
-
-			By(fmt.Sprintf("modifing the NUMAResourcesOperator nodeGroups filed to match new mcp: %q labels %q", mcp.Name, mcp.Labels))
-			for i := range nroOperObj.Spec.NodeGroups {
-				nroOperObj.Spec.NodeGroups[i].MachineConfigPoolSelector.MatchLabels = mcp.Labels
-			}
-
-			err = fxt.Client.Update(context.TODO(), nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("waiting for mcps to get updated")
-			var wg sync.WaitGroup
-			for _, mcp := range mcps {
-				wg.Add(1)
-				go func(mcpool *machineconfigv1.MachineConfigPool) {
-					defer GinkgoRecover()
-					defer wg.Done()
-					err = e2ewait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
-					Expect(err).ToNot(HaveOccurred())
-				}(mcp)
-			}
-			wg.Wait()
-
-			Eventually(func() (bool, error) {
-				dss, err := getDsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
-				Expect(err).ToNot(HaveOccurred())
-
-				if len(dss) == 0 {
-					klog.Warningf("no daemonsets found owned by %q named %q", nroOperObj.Kind, nroOperObj.Name)
-					return false, nil
-				}
-
-				for _, ds := range dss {
-					if !cmp.Equal(ds.Spec.Template.Spec.NodeSelector, mcp.Spec.NodeSelector.MatchLabels) {
-						klog.Warningf("daemonset: %s/%s does not have a node selector matching for labels: %v", ds.Namespace, ds.Name, mcp.Spec.NodeSelector.MatchLabels)
-						return false, nil
-					}
-				}
-				return true, nil
-			}, 10*time.Minute, 30*time.Second).Should(BeTrue())
-
-			By(fmt.Sprintf("modifing the NUMAResourcesOperator ExporterImage filed to %q", nropTestCIImage))
-			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			nroOperObj.Spec.ExporterImage = nropTestCIImage
-			err = fxt.Client.Update(context.TODO(), nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("checking RTE has the correct image")
-			Eventually(func() (bool, error) {
-				dss, err := getDsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
-				Expect(err).ToNot(HaveOccurred())
-
-				if len(dss) == 0 {
-					klog.Warningf("no daemonsets found owned by %q named %q", nroOperObj.Kind, nroOperObj.Name)
-					return false, nil
-				}
-
-				for _, ds := range dss {
-					// RTE container shortcut
-					cnt := ds.Spec.Template.Spec.Containers[0]
-					if cnt.Image != nropTestCIImage {
-						klog.Warningf("container: %q image not updated yet. expected %q actual %q", cnt.Name, nropTestCIImage, cnt.Image)
-						return false, nil
-					}
-				}
-				return true, nil
-			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "failed to update RTE container with image %q", nropTestCIImage)
-
-			By(fmt.Sprintf("modifing the NUMAResourcesOperator LogLevel filed to %q", operatorv1.Trace))
-			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			nroOperObj.Spec.LogLevel = operatorv1.Trace
-			err = fxt.Client.Update(context.TODO(), nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("checking the correct LogLevel")
-			Eventually(func() (bool, error) {
-				dss, err := getDsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
-				Expect(err).ToNot(HaveOccurred())
-
-				if len(dss) == 0 {
-					klog.Warningf("no daemonsets found owned by %q named %q", nroOperObj.Kind, nroOperObj.Name)
-					return false, nil
-				}
-
-				for _, ds := range dss {
-					// RTE container shortcut
-					cnt := &ds.Spec.Template.Spec.Containers[0]
-					found, match := matchLogLevelToKlog(cnt, nroOperObj.Spec.LogLevel)
-					if !found {
-						klog.Warningf("--v flag doesn't exist in container %q args under DaemonSet: %q", cnt.Name, ds.Name)
-						return false, nil
-					}
-
-					if !match {
-						klog.Warningf("LogLevel %s doesn't match the existing --v flag in container: %q managed by DaemonSet: %q", nroOperObj.Spec.LogLevel, cnt.Name, ds.Name)
-						return false, nil
-					}
-				}
-				return true, nil
-			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "failed to update RTE container with LogLevel %q", operatorv1.Trace)
-
-			By(fmt.Sprintf("modifing the NUMAResourcesScheduler SchedulerName Filed to %q", schedulerTestName))
-			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			nroSchedObj.Spec.SchedulerName = schedulerTestName
-			err = fxt.Client.Update(context.TODO(), nroSchedObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("schedule pod using the new scheduler name")
-			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomName("testpod"))
-			testPod.Spec.SchedulerName = schedulerTestName
-
-			err = fxt.Client.Create(context.TODO(), testPod)
-			Expect(err).ToNot(HaveOccurred())
-
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, 5*time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerTestName)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerTestName)
-		})
 	})
 })
 
@@ -1562,4 +1033,23 @@ func maxResourceType(nrtInfo nrtv1alpha1.NodeResourceTopology, resName corev1.Re
 		}
 	}
 	return max.DeepCopy()
+}
+
+func skipUnlessEnvVar(envVar, message string) {
+	if isEnvTrue(envVar) {
+		return
+	}
+	Skip(message)
+}
+
+func isEnvTrue(envVar string) bool {
+	val, ok := os.LookupEnv(envVar)
+	if !ok {
+		return false
+	}
+	enabled, err := strconv.ParseBool(val)
+	if err != nil {
+		return false
+	}
+	return enabled
 }

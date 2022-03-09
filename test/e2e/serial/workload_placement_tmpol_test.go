@@ -75,7 +75,8 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement considering
 
 	DescribeTable("[placement] cluster with multiple worker nodes suitable",
 		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, podRes, unsuitableFreeRes []corev1.ResourceList) {
-			Skip("FIXME: NRT filter clashes with the noderesources fit plugin")
+
+			skipUnlessEnvVar("E2E_SERIAL_STAGING", "FIXME: NRT filter clashes with the noderesources fit plugin")
 
 			hostsRequired := 2
 
