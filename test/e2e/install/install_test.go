@@ -64,7 +64,7 @@ var _ = Describe("[Install] continuousIntegration", func() {
 	})
 
 	Context("with a running cluster with all the components", func() {
-		It("[test_id: 47574][tier1] should perform overall deployment and verify the condition is reported as available", func() {
+		It("[test_id:47574][tier1] should perform overall deployment and verify the condition is reported as available", func() {
 			deployedObj := overallDeployment()
 			nname := client.ObjectKeyFromObject(deployedObj.nroObj)
 			Expect(nname.Name).ToNot(BeEmpty())
@@ -186,7 +186,7 @@ var _ = Describe("[Install] durability", func() {
 			teardownDeployment(deployedObj, 5*time.Minute)
 		})
 
-		It("[test_id: 47587][tier1] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", func() {
+		It("[test_id:47587][tier1] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", func() {
 
 			By("wait for DaemonSet to be ready")
 			nname := client.ObjectKeyFromObject(deployedObj.nroObj)
