@@ -71,10 +71,15 @@ var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
 		err = fxt.Client.List(context.TODO(), &nrtList)
 		Expect(err).ToNot(HaveOccurred())
 
-		tmPolicy := nrtv1alpha1.SingleNUMANodeContainerLevel
-		nrts = e2enrt.FilterTopologyManagerPolicy(nrtList.Items, tmPolicy)
+		// we're ok with any TM policy as long as the updater can handle it,
+		// we use this as proxy for "there is valid NRT data for at least X nodes
+		policies := []nrtv1alpha1.TopologyManagerPolicy{
+			nrtv1alpha1.SingleNUMANodeContainerLevel,
+			nrtv1alpha1.SingleNUMANodePodLevel,
+		}
+		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
 		if len(nrts) < 2 {
-			Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
+			Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
 		}
 
 		// Note that this test, being part of "serial", expects NO OTHER POD being scheduled
