@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package serial
+package tests
 
 import (
 	"context"
@@ -22,7 +22,6 @@ import (
 	"math/rand"
 	"os"
 	"sync"
-	"testing"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -115,11 +114,6 @@ var _ = AfterSuite(func() {
 	err := e2efixture.Teardown(__fxt)
 	Expect(err).NotTo(HaveOccurred())
 })
-
-func TestSerial(t *testing.T) {
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "serial")
-}
 
 func setupInfra(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup, timeout time.Duration) {
 	klog.Infof("e2e infra setup begin")
