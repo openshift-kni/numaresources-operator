@@ -53,7 +53,7 @@ import (
 
 const testKey = "testkey"
 
-var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement", func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
