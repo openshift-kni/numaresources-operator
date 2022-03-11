@@ -19,6 +19,7 @@ package configuration
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
@@ -28,6 +29,7 @@ import (
 const (
 	envVarMCPUpdateTimeout  = "NROP_E2E_MCP_UPDATE_TIMEOUT"
 	envVarMCPUpdateInterval = "NROP_E2E_MCP_UPDATE_INTERVAL"
+	envVarPlatform          = "NROP_E2E_PLATFORM"
 )
 
 const (
@@ -56,8 +58,25 @@ func init() {
 
 	Platform, err = detect.Detect()
 	if err != nil {
+		Platform = getPlatformFromEnv(envVarPlatform)
+	}
+	if Platform == platform.Unknown {
 		panic(fmt.Errorf("failed to detect a platform: %w", err))
 	}
+}
+
+func getPlatformFromEnv(envVar string) platform.Platform {
+	val, ok := os.LookupEnv(envVar)
+	if !ok {
+		return platform.Unknown
+	}
+	switch strings.ToLower(val) {
+	case "kubernetes":
+		return platform.Kubernetes
+	case "openshift":
+		return platform.OpenShift
+	}
+	return platform.Unknown
 }
 
 func getMachineConfigPoolUpdateValueFromEnv(envVar string, fallback time.Duration) (time.Duration, error) {
