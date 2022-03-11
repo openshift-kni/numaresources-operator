@@ -22,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/klog/v2"
+
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
 )
@@ -61,7 +63,8 @@ func init() {
 		Platform = getPlatformFromEnv(envVarPlatform)
 	}
 	if Platform == platform.Unknown {
-		panic(fmt.Errorf("failed to detect a platform: %w", err))
+		Platform = platform.OpenShift
+		klog.Infof("forced to %q: failed to detect a platform: %w", Platform, err)
 	}
 }
 
