@@ -35,7 +35,7 @@ import (
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
-var _ = Describe("[test_id:47593][serial][disruptive][scheduler][tier1] scheduler removal on a live cluster", func() {
+var _ = Describe("[serial][disruptive][scheduler] scheduler removal on a live cluster", func() {
 	var fxt *e2efixture.Fixture
 
 	BeforeEach(func() {
@@ -55,7 +55,7 @@ var _ = Describe("[test_id:47593][serial][disruptive][scheduler][tier1] schedule
 	})
 
 	When("removing the topology aware scheduler from a live cluster", func() {
-		It("[case:1] should keep existing workloads running", func() {
+		It("[case:1][test_id:47593][tier1] should keep existing workloads running", func() {
 			var err error
 
 			dp := createDeploymentSync(fxt, "testdp", schedulerName)
@@ -78,7 +78,7 @@ var _ = Describe("[test_id:47593][serial][disruptive][scheduler][tier1] schedule
 			}
 		})
 
-		It("[case:2] should keep new scheduled workloads pending", func() {
+		It("[case:2][test_id:49093][tier1] should keep new scheduled workloads pending", func() {
 			var err error
 
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", nroSchedObj.Name))
@@ -103,7 +103,7 @@ var _ = Describe("[test_id:47593][serial][disruptive][scheduler][tier1] schedule
 	})
 })
 
-var _ = Describe("[test_id:48069][serial][disruptive][scheduler][tier2] scheduler restart on a live cluster", func() {
+var _ = Describe("[serial][disruptive][scheduler] scheduler restart on a live cluster", func() {
 	var fxt *e2efixture.Fixture
 	var nroSchedObj *nropv1alpha1.NUMAResourcesScheduler
 	var schedulerName string
@@ -129,7 +129,7 @@ var _ = Describe("[test_id:48069][serial][disruptive][scheduler][tier2] schedule
 	})
 
 	When("restarting the topology aware scheduler in a live cluster", func() {
-		It("[case:1] should schedule any pending workloads submitted while the scheduler was unavailable", func() {
+		It("[case:1][test_id:48069][tier2] should schedule any pending workloads submitted while the scheduler was unavailable", func() {
 			var err error
 
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", nroSchedObj.Name))
