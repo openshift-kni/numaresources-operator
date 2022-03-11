@@ -29,9 +29,9 @@ import (
 )
 
 const (
-	envVarMCPUpdateTimeout  = "NROP_E2E_MCP_UPDATE_TIMEOUT"
-	envVarMCPUpdateInterval = "NROP_E2E_MCP_UPDATE_INTERVAL"
-	envVarPlatform          = "NROP_E2E_PLATFORM"
+	envVarMCPUpdateTimeout  = "E2E_NROP_MCP_UPDATE_TIMEOUT"
+	envVarMCPUpdateInterval = "E2E_NROP_MCP_UPDATE_INTERVAL"
+	envVarPlatform          = "E2E_NROP_PLATFORM"
 )
 
 const (
