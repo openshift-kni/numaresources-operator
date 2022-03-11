@@ -36,7 +36,7 @@ import (
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
 )
 
-var _ = Describe("[serial][disruptive][scheduler] workload unschedulable", func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload unschedulable", func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList

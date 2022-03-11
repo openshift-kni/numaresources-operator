@@ -42,7 +42,7 @@ import (
 	e2ereslist "github.com/openshift-kni/numaresources-operator/test/utils/resourcelist"
 )
 
-var _ = Describe("[serial][disruptive][scheduler] workload resource accounting", func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload resource accounting", func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList

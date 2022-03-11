@@ -48,7 +48,7 @@ type paddingInfo struct {
 
 type setupPaddingFunc func(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod
 
-var _ = Describe("[serial][disruptive][scheduler] workload placement considering TM policy", func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering TM policy", func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
 
