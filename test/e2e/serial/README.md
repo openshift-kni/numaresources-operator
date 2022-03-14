@@ -18,3 +18,15 @@ IOW, the suite expects to run against a pristine, unloaded cluster to validate i
 
 It is responsability of the tests in this suite to clean up properly and to restore the cluster state as
 they found it before they run.
+
+### configuring using the environment variables
+
+- `E2E_NROP_INSTALL_SKIP_KC` (accepts boolean, e.g. `true`) instructs the suite to NOT deploy the builtin
+  `kubeletconfig`. With this enabled, the suite will expect a `kubeletconfig` already deployed (and consumed)
+  in the cluster against it is running.
+- `E2E_NROP_MCP_UPDATE_TIMEOUT` (accepts a duration, e.g. `5m`) instructs the suite how much time it should
+  wait for the MCP updates to take place before to exit with error.
+- `E2E_NROP_MCP_UPDATE_INTERVAL` (accepts a duration, e.g. `10s`) instructs the suite about how much it should
+  wait between checks for MCP updates.
+- `E2E_NROP_PLATFORM` (accepts a string, e.g. `Kubernetes`, `OpenShift`) instructs the suite to *disable* the
+  autodetection of the platform and force it to the provided value.
