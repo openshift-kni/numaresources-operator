@@ -22,8 +22,12 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	_ "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
+	serialtests "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
 )
+
+var _ = BeforeSuite(serialtests.BeforeSuiteHelper)
+
+var _ = AfterSuite(serialtests.AfterSuiteHelper)
 
 func TestSerial(t *testing.T) {
 	RegisterFailHandler(Fail)
