@@ -19,15 +19,19 @@ package configuration
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
+
+	"k8s.io/klog/v2"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
 )
 
 const (
-	envVarMCPUpdateTimeout  = "NROP_E2E_MCP_UPDATE_TIMEOUT"
-	envVarMCPUpdateInterval = "NROP_E2E_MCP_UPDATE_INTERVAL"
+	envVarMCPUpdateTimeout  = "E2E_NROP_MCP_UPDATE_TIMEOUT"
+	envVarMCPUpdateInterval = "E2E_NROP_MCP_UPDATE_INTERVAL"
+	envVarPlatform          = "E2E_NROP_PLATFORM"
 )
 
 const (
@@ -56,8 +60,26 @@ func init() {
 
 	Platform, err = detect.Detect()
 	if err != nil {
-		panic(fmt.Errorf("failed to detect a platform: %w", err))
+		Platform = getPlatformFromEnv(envVarPlatform)
 	}
+	if Platform == platform.Unknown {
+		Platform = platform.OpenShift
+		klog.Infof("forced to %q: failed to detect a platform: %w", Platform, err)
+	}
+}
+
+func getPlatformFromEnv(envVar string) platform.Platform {
+	val, ok := os.LookupEnv(envVar)
+	if !ok {
+		return platform.Unknown
+	}
+	switch strings.ToLower(val) {
+	case "kubernetes":
+		return platform.Kubernetes
+	case "openshift":
+		return platform.OpenShift
+	}
+	return platform.Unknown
 }
 
 func getMachineConfigPoolUpdateValueFromEnv(envVar string, fallback time.Duration) (time.Duration, error) {

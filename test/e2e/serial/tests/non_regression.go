@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package serial
+package tests
 
 import (
 	"context"
@@ -36,7 +36,7 @@ import (
 	e2ereslist "github.com/openshift-kni/numaresources-operator/test/utils/resourcelist"
 )
 
-var _ = Describe("[serial][disruptive][scheduler] workload placement", func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement", func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList

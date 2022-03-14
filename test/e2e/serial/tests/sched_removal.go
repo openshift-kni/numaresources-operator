@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package serial
+package tests
 
 import (
 	"context"
@@ -35,7 +35,7 @@ import (
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
-var _ = Describe("[serial][disruptive][scheduler] scheduler removal on a live cluster", func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler removal on a live cluster", func() {
 	var fxt *e2efixture.Fixture
 
 	BeforeEach(func() {
@@ -103,7 +103,7 @@ var _ = Describe("[serial][disruptive][scheduler] scheduler removal on a live cl
 	})
 })
 
-var _ = Describe("[serial][disruptive][scheduler] scheduler restart on a live cluster", func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restart on a live cluster", func() {
 	var fxt *e2efixture.Fixture
 	var nroSchedObj *nropv1alpha1.NUMAResourcesScheduler
 	var schedulerName string

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package serial
+package tests
 
 import (
 	"context"
@@ -48,7 +48,7 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
-var _ = Describe("[serial][disruptive][slow] configuration management", func() {
+var _ = Describe("[serial][disruptive][slow] numaresources configuration management", func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package serial
+package tests
 
 import (
 	"context"
@@ -35,7 +35,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var _ = Describe("[serial][disruptive][scheduler] workload placement considering node selector", func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering node selector", func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
