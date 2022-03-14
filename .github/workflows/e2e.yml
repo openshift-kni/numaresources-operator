@@ -19,7 +19,7 @@ jobs:
     env:
       built_image: "numaresources-operator:ci" # Arbitrary name
       E2E_NAMESPACE_NAME: numaresources
-      E2E_TOPOLOGY_MANAGER_POLICY: SingleNUMANodeContainerLevel
+      E2E_TOPOLOGY_MANAGER_POLICY: SingleNUMANodePodLevel
       LOG_DIR: /tmp/test_e2e_logs
     steps:
     - name: Checkout
