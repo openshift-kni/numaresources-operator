@@ -53,7 +53,7 @@ fi
 
 
 echo "Running Functional Tests: ${GINKGO_SUITS}"
-export E2E_TOPOLOGY_MANAGER_POLICY="${E2E_TOPOLOGY_MANAGER_POLICY:-SingleNUMANodeContainerLevel}"
+export E2E_TOPOLOGY_MANAGER_POLICY="${E2E_TOPOLOGY_MANAGER_POLICY:-SingleNUMANodePodLevel}"
 # -v: print out the text and location for each spec before running it and flush output to stdout in realtime
 # -r: run suites recursively
 # --failFast: ginkgo will stop the suite right after the first spec failure
