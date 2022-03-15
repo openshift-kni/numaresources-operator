@@ -72,7 +72,7 @@ var (
 var __fxt *e2efixture.Fixture
 var __nrtList nrtv1alpha1.NodeResourceTopologyList
 
-var _ = BeforeSuite(func() {
+func BeforeSuiteHelper() {
 	// this must be the very first thing
 	rand.Seed(time.Now().UnixNano())
 
@@ -101,9 +101,9 @@ var _ = BeforeSuite(func() {
 	setupInfra(__fxt, nroOperObj.Spec.NodeGroups, 3*time.Minute)
 
 	labelNodes(__fxt.Client, __nrtList)
-})
+}
 
-var _ = AfterSuite(func() {
+func AfterSuiteHelper() {
 	if _, ok := os.LookupEnv("E2E_INFRA_NO_TEARDOWN"); ok {
 		return
 	}
@@ -113,7 +113,7 @@ var _ = AfterSuite(func() {
 	// numacell daemonset automatically cleaned up when we remove the namespace
 	err := e2efixture.Teardown(__fxt)
 	Expect(err).NotTo(HaveOccurred())
-})
+}
 
 func setupInfra(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup, timeout time.Duration) {
 	klog.Infof("e2e infra setup begin")
