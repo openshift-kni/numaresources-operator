@@ -757,7 +757,7 @@ func skipUnlessEnvVar(envVar, message string) {
 	if isEnvTrue(envVar) {
 		return
 	}
-	Skip(message)
+	Skip(message, 1)
 }
 
 func isEnvTrue(envVar string) bool {
