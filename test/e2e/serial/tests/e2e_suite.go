@@ -29,7 +29,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,11 +45,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
-)
-
-const (
-	OCPBaseLoadMemory = "4608Mi" // estimate; OCP 4.10
-	OCPBaseLoadCores  = "2"      // estimate; OCP 4.10 actually roughly 1.3 cores, but let's take HT pairs
 )
 
 const (
@@ -212,15 +206,4 @@ func unlabelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyLis
 		err = cli.Update(context.TODO(), &node)
 		Expect(err).ToNot(HaveOccurred())
 	}
-}
-
-func applyBaseload(res corev1.ResourceList) corev1.ResourceList {
-	adjustedCPU := res.Cpu()
-	adjustedCPU.Add(resource.MustParse(OCPBaseLoadCores))
-	res[corev1.ResourceCPU] = *adjustedCPU
-
-	adjustedMemory := res.Memory()
-	adjustedMemory.Add(resource.MustParse(OCPBaseLoadMemory))
-	res[corev1.ResourceMemory] = *adjustedMemory
-	return res
 }
