@@ -33,6 +33,7 @@ import (
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
+	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
@@ -75,8 +76,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 	DescribeTable("[placement] cluster with multiple worker nodes suitable",
 		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, podRes, unsuitableFreeRes []corev1.ResourceList) {
-
-			skipUnlessEnvVar("E2E_SERIAL_STAGING", "FIXME: NRT filter clashes with the noderesources fit plugin")
 
 			hostsRequired := 2
 
@@ -141,7 +140,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(failedPods).To(BeEmpty())
 
 			// TODO: smarter cooldown
+			klog.Infof("cooling down")
 			time.Sleep(18 * time.Second)
+
 			for _, unsuitableNodeName := range unsuitableNodeNames {
 				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
 			}
@@ -246,22 +247,22 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			setupPaddingPodLevel,
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceCPU:    resource.MustParse("6"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 				},
 				{
 					corev1.ResourceCPU:    resource.MustParse("8"),
-					corev1.ResourceMemory: resource.MustParse("8Gi"),
+					corev1.ResourceMemory: resource.MustParse("12Gi"),
 				},
 			},
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    resource.MustParse("12"),
+					corev1.ResourceCPU:    resource.MustParse("14"),
 					corev1.ResourceMemory: resource.MustParse("10Gi"),
 				},
 				{
 					corev1.ResourceCPU:    resource.MustParse("10"),
-					corev1.ResourceMemory: resource.MustParse("12Gi"),
+					corev1.ResourceMemory: resource.MustParse("16Gi"),
 				},
 			},
 		),
@@ -269,6 +270,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 })
 
 func setupPaddingPodLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod {
+	baseload, err := nodes.GetLoad(fxt.K8sClient, padInfo.targetNodeName)
+	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", padInfo.targetNodeName)
+	By(fmt.Sprintf("computed base load: %s", baseload))
+
 	By(fmt.Sprintf("preparing target node %q to fit the test case", padInfo.targetNodeName))
 	// first, let's make sure that ONLY the required res can fit in either zone on the target node
 	nrtInfo, err := e2enrt.FindFromList(nrtList.Items, padInfo.targetNodeName)
@@ -299,6 +304,10 @@ func setupPaddingPodLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResou
 	paddingPods = append(paddingPods, padPod)
 
 	podTotRes := e2ereslist.FromGuaranteedPod(*padInfo.pod)
+	By(fmt.Sprintf("testpod resource requests (vanilla): %s", e2ereslist.ToString(podTotRes)))
+	podTotRes = baseload.Apply(podTotRes)
+	By(fmt.Sprintf("testpod resource requests (adjusted): %s", e2ereslist.ToString(podTotRes)))
+
 	zone = nrtInfo.Zones[1]
 	By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(podTotRes)))
 	padPod, err = makePaddingPod(fxt.Namespace.Name, "target", zone, podTotRes)
@@ -316,6 +325,10 @@ func setupPaddingPodLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResou
 }
 
 func setupPaddingContainerLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod {
+	baseload, err := nodes.GetLoad(fxt.K8sClient, padInfo.targetNodeName)
+	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", padInfo.targetNodeName)
+	By(fmt.Sprintf("computed base load: %s", baseload))
+
 	By(fmt.Sprintf("preparing target node %q to fit the test case", padInfo.targetNodeName))
 	// first, let's make sure that ONLY the required res can fit in either zone on the target node
 	nrtInfo, err := e2enrt.FindFromList(nrtList.Items, padInfo.targetNodeName)
@@ -330,6 +343,8 @@ func setupPaddingContainerLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.Nod
 		numaIdx := idx % 2
 		zone := nrtInfo.Zones[numaIdx]
 		cnt := padInfo.pod.Spec.Containers[idx] // TODO: reverse
+
+		// TODO: apply baseload
 
 		By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(cnt.Resources.Limits)))
 		padPod, err := makePaddingPod(fxt.Namespace.Name, "target", zone, cnt.Resources.Limits)
@@ -355,11 +370,20 @@ func setupPaddingForUnsuitableNodes(offset int, fxt *e2efixture.Fixture, nrtList
 		nrtInfo, err := e2enrt.FindFromList(nrtList.Items, unsuitableNodeName)
 		ExpectWithOffset(offset, err).ToNot(HaveOccurred(), "missing NRT info for %q", unsuitableNodeName)
 
+		baseload, err := nodes.GetLoad(fxt.K8sClient, unsuitableNodeName)
+		ExpectWithOffset(offset, err).ToNot(HaveOccurred(), "missing node load info for %q", unsuitableNodeName)
+		By(fmt.Sprintf("computed base load: %s", baseload))
+
 		for zoneIdx, zone := range nrtInfo.Zones {
 			padRes := padInfo.unsuitableFreeRes[zoneIdx]
-
 			name := fmt.Sprintf("unsuitable%d", nodeIdx)
-			By(fmt.Sprintf("saturating node %q -> %q zone %q to fit only %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes)))
+
+			By(fmt.Sprintf("saturating node %q -> %q zone %q to fit only (vanilla) %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes)))
+			if zoneIdx == 0 { // any random zone is actually fine
+				padRes = baseload.Apply(padRes)
+				By(fmt.Sprintf("saturating node %q -> %q zone %q to fit only (adjusted) %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes)))
+			}
+
 			padPod, err := makePaddingPod(fxt.Namespace.Name, name, zone, padRes)
 			ExpectWithOffset(offset, err).ToNot(HaveOccurred())
 
