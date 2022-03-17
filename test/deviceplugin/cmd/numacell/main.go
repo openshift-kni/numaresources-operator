@@ -17,79 +17,9 @@ limitations under the License.
 package main
 
 import (
-	"flag"
-	"fmt"
-	"io"
-	"os"
-	"strings"
-
-	"k8s.io/klog/v2"
-
-	"github.com/ghodss/yaml"
-	"github.com/jaypipes/ghw/pkg/option"
-	"github.com/jaypipes/ghw/pkg/topology"
-	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
-
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/plugin"
+	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/cmd"
 )
 
-func summarize(topoInfo *topology.Info) string {
-	var buf strings.Builder
-	for _, node := range topoInfo.Nodes {
-		fmt.Fprintf(&buf, "NUMA node %d\n", node.ID)
-		for _, core := range node.Cores {
-			fmt.Fprintf(&buf, "\t%s\n", core.String())
-		}
-	}
-	return buf.String()
-}
-
-func render(w io.Writer) int {
-	nodeSelector := map[string]string{
-		"${NODELABEL}": "${NODEVALUE}",
-	}
-	namespace := "${NAMESPACE}"
-	name := "${NAME}"
-	image := "${IMAGE}"
-	sa := manifests.ServiceAccount(namespace, name)
-	ro := manifests.Role(namespace, name)
-	rb := manifests.RoleBinding(namespace, name)
-	ds := manifests.DaemonSet(nodeSelector, namespace, name, sa.Name, image)
-	for _, obj := range []interface{}{sa, ro, rb, ds} {
-		data, err := yaml.Marshal(obj)
-		if err != nil {
-			return 1
-		}
-		fmt.Fprintf(w, "---\n%s", string(data))
-	}
-	return 0
-}
-
 func main() {
-	var renderManifest bool
-	var sysfsPath string
-	var deviceCount int
-	flag.BoolVar(&renderManifest, "render", false, "render daemonset manifest and exit")
-	flag.StringVar(&sysfsPath, "sysfs", "/sys", "mount path of sysfs")
-	flag.IntVar(&deviceCount, "devices", api.NUMACellDefaultDeviceCount, "amount of devices to expose (will not be decremented anyway)")
-	flag.Parse()
-
-	if renderManifest {
-		os.Exit(render(os.Stdout))
-	}
-
-	klog.Infof("using sysfs at %q", sysfsPath)
-	topoInfo, err := topology.New(option.WithPathOverrides(option.PathOverrides{
-		"/sys": sysfsPath,
-	}))
-	if err != nil {
-		klog.Fatalf("error getting topology info from %q: %v", sysfsPath, err)
-	}
-
-	klog.Infof("hardware detected:\n%s", summarize(topoInfo))
-
-	manager := dpm.NewManager(plugin.NewNUMACellLister(topoInfo, deviceCount))
-	manager.Run()
+	cmd.Execute()
 }
