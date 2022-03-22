@@ -27,6 +27,8 @@ import (
 
 	ginkgo_reporters "kubevirt.io/qe-tools/pkg/ginkgo-reporters"
 
+	"k8s.io/klog/v2"
+
 	serialtests "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
 )
 
@@ -35,7 +37,7 @@ var (
 )
 
 func init() {
-	junitPath = flag.String("junit", "junit.xml", "the path for the junit format report")
+	junitPath = flag.String("junit", "/tmp", "the path for the junit format report")
 }
 
 func TestSerial(t *testing.T) {
@@ -47,6 +49,7 @@ func TestSerial(t *testing.T) {
 	}
 	if *junitPath != "" {
 		junitFile := path.Join(*junitPath, "numaserial-junit.xml")
+		klog.Infof("junit path: %q", junitFile)
 		rr = append(rr, reporters.NewJUnitReporter(junitFile))
 	}
 	RunSpecsWithDefaultAndCustomReporters(t, "NUMAResources serial e2e tests", rr)
