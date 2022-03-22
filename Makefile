@@ -174,7 +174,7 @@ binary-e2e-serial:
 
 binary-e2e-all: binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial runner-e2e-serial build-pause
 
-runner-e2e-serial:
+runner-e2e-serial: bin/envsubst
 	hack/render-e2e-runner.sh
 
 build: generate fmt vet binary
@@ -330,6 +330,9 @@ build-tools: bin/git-semver
 
 bin/git-semver:
 	@go build -o bin/git-semver vendor/github.com/mdomke/git-semver/main.go
+
+bin/envsubst:
+	@go build -o bin/envsubst hack/envsubst.go
 
 verify-generated: bundle generate
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
