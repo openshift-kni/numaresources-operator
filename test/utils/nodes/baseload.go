@@ -1,13 +1,9 @@
 /*
-
 Copyright 2022 The Kubernetes Authors.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -25,6 +21,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/klog/v2"
+	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 )
 
 // we don't use corev1.ResourceList because we need values for CPU and Memory
@@ -48,32 +46,15 @@ func GetLoad(k8sCli *kubernetes.Clientset, nodeName string) (Load, error) {
 
 	cpu := &resource.Quantity{}
 	mem := &resource.Quantity{}
-
 	for _, pod := range pods.Items {
-		// TODO: we assume a steady state - aka we ignore InitContainers
-		for _, cnt := range pod.Spec.Containers {
-			for resName, resQty := range cnt.Resources.Requests {
-				switch resName {
-				case corev1.ResourceCPU:
-					cpu.Add(resQty)
-				case corev1.ResourceMemory:
-					mem.Add(resQty)
-				}
-			}
-		}
+		req, _ := resourcehelper.PodRequestsAndLimits(&pod)
+		cpu.Add(req[corev1.ResourceCPU])
+		mem.Add(req[corev1.ResourceMemory])
 	}
-	// get full cpus, and always take even number of CPUs
-	cpuMillis, _ := cpu.AsInt64()
-	// we round the CPU consumption as expressed in millicores (not entire cores)
-	// in order to (try to) avoid bugs related to integer division
-	// int64(2900 / 1000) -> 2 -> roundUp(2, 2) -> 2 (correct, but unexpected!)
-	// OTOH
-	// roundUp(2900, 2000) -> 4000 -> 4000/1000 -> 4 (intended behaviour)
-	// TODO: we can use some testing of the test utilities here (!)
-	cpuAmount := roundUp(cpuMillis, 2000)
-	nl.CPU = *resource.NewQuantity(cpuAmount/1000, resource.DecimalSI)
-
+	klog.Infof(fmt.Sprintf("Total resources' requests by pods on node %s: CPU=%s ; mem=%s ", nodeName, cpu, mem))
+	nl.CPU = *resource.NewQuantity(cpu.Value(), resource.DecimalSI)
 	mem.RoundUp(resource.Giga)
+	klog.Infof(fmt.Sprintf("Rounding up CPU millis %s equals to %d and memory to %s", cpu, cpu.Value(), mem))
 	nl.Memory = *mem
 	return nl, nil
 }
@@ -95,6 +76,6 @@ func (nl Load) Apply(res corev1.ResourceList) corev1.ResourceList {
 	return res
 }
 
-func roundUp(num, multiple int64) int64 {
-	return ((num + multiple - 1) / multiple) * multiple
-}
+// func roundUp(num, multiple int64) int64 {
+// 	return ((num + multiple - 1) / multiple) * multiple
+// }

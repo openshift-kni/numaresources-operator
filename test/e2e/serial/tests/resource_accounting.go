@@ -18,7 +18,6 @@ package tests
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -30,11 +29,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
+	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
+	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
@@ -269,6 +270,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 		var targetNodeNRTInitial *nrtv1alpha1.NodeResourceTopology
 		var deployment *appsv1.Deployment
 
+		/*
+			1. fully pad non-target nodesmake pod per numa considering the baseload: saturate the numa leaving only the baseload
+			2. create burstable pod consuming max resources of target node
+			Note: the test pod should request an amount of resources that are available on compute node level but not on a single numa,
+			   thus need to account for the baseload when running the test pod on the target node
+		*/
 		BeforeEach(func() {
 			const requiredNUMAZones = 2
 			By(fmt.Sprintf("filtering available nodes with %d NUMA zones", requiredNUMAZones))
@@ -284,65 +291,80 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			var ok bool
 			targetNodeName, ok = nrtCandidateNames.PopAny()
 			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtCandidateNames.List())
-			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
+			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 
 			var err error
 			targetNodeNRTInitial, err = e2enrt.FindFromList(nrtCandidates, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
 
-			//get maximum zone CPU and Memory to be sure it wont fit on any zone
-			maxResources := corev1.ResourceList{
-				corev1.ResourceCPU:    maxResourceType(*targetNodeNRTInitial, corev1.ResourceCPU),
-				corev1.ResourceMemory: maxResourceType(*targetNodeNRTInitial, corev1.ResourceMemory),
-			}
+			//calculate base load on the target node
+			baseload, err := nodes.GetLoad(fxt.K8sClient, targetNodeName)
+			ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
+			By(fmt.Sprintf("computed base load: %s", baseload))
 
-			// add a min ammount of resources just in case all the zones
-			// are equal so the pod wont fit on any of them
-			excessRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("100m"),
-				corev1.ResourceMemory: resource.MustParse("100M"),
+			//get maximum node CPU and Memory
+			maxResources := corev1.ResourceList{
+				corev1.ResourceCPU:    availableResourceType(*targetNodeNRTInitial, corev1.ResourceCPU),
+				corev1.ResourceMemory: availableResourceType(*targetNodeNRTInitial, corev1.ResourceMemory),
 			}
 			reqResources := maxResources.DeepCopy()
-
+			By("prepare the test's pod resources as maximum available resource on the target node without the baselaod")
+			//substract the baselaod from the max resources on the target node
 			reqCpu := reqResources[corev1.ResourceCPU]
-			reqCpu.Add(excessRes[corev1.ResourceCPU])
+			reqCpu.Sub(baseload.CPU)
 			reqResources[corev1.ResourceCPU] = reqCpu
-
 			reqMem := reqResources[corev1.ResourceMemory]
-			reqMem.Add(excessRes[corev1.ResourceMemory])
+			reqMem.Sub(baseload.Memory)
 			reqResources[corev1.ResourceMemory] = reqMem
+			By(fmt.Sprintf("test's pod requests: %s", e2ereslist.ToString(reqResources)))
 
-			By("Padding all other candidate nodes")
+			By("padding all other candidate nodes leaving room for the baseload on each node")
 			var paddingPods []*corev1.Pod
 			for _, nodeName := range nrtCandidateNames.List() {
 				node := &corev1.Node{}
 				nodeKey := client.ObjectKey{Name: nodeName}
-				err := fxt.Client.Get(context.TODO(), nodeKey, node)
+				err = fxt.Client.Get(context.TODO(), nodeKey, node)
 				Expect(err).NotTo(HaveOccurred())
 
-				// Padding all the other nodes until only maxResources is free
-				// remember reqResources = maxReources + excessResources
-				// so we ensure out pod will not be scheduled on any other node.
-				padPod, err := makeNodePaddingPod(fxt.Namespace.Name, *node, maxResources)
-				if errors.Is(err, e2enrt.ErrNotEnoughResources) {
-					klog.Infof("Node %q has not enough resources without padding", nodeName)
-					continue
+				//calculate base load on the node
+				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+				ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
+				By(fmt.Sprintf("computed base load: %s", baseload))
+
+				//get nrt info of the node
+				By(fmt.Sprintf("preparing node %q to fit the test case", nodeName))
+				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
+				ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing NRT info for %q", nodeName)
+
+				//TODO: currently, the all the padding pods account for the total baseload, need to enhance distributing it on all numa zones equally (not sure if valid though)
+				baseloadNumaRes := corev1.ResourceList{
+					corev1.ResourceCPU:    baseload.CPU,
+					corev1.ResourceMemory: baseload.Memory,
 				}
-				Expect(err).NotTo(HaveOccurred())
 
-				pinnedPadPod, err := pinPodToNode(padPod, nodeName)
-				Expect(err).NotTo(HaveOccurred())
+				//pas each zone with a pod so the test would be valid for both TM scopes: container & pod levels
+				By("pad all numa zones on the node,each with different pod.")
+				for _, zone := range nrtInfo.Zones {
+					By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(baseloadNumaRes)))
+					padPod, err := makePaddingPod(fxt.Namespace.Name, nrtInfo.Name, zone, baseloadNumaRes)
+					ExpectWithOffset(1, err).ToNot(HaveOccurred())
 
-				err = fxt.Client.Create(context.TODO(), pinnedPadPod)
-				Expect(err).NotTo(HaveOccurred())
+					padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
+					ExpectWithOffset(1, err).ToNot(HaveOccurred(), "unable to pin pod %q to zone %q", padPod.Name, zone.Name)
 
-				paddingPods = append(paddingPods, pinnedPadPod)
+					err = fxt.Client.Create(context.TODO(), padPod)
+					Expect(err).ToNot(HaveOccurred())
+					paddingPods = append(paddingPods, padPod)
+				}
 			}
 
 			// Wait for all the padding pods to be up&running
 			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
 			for _, failedPod := range failedPods {
 				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
+				//note that this test does not use podOverhead thus pod req and lim would be the pod's resources as set upon creating
+				req, lim := resourcehelper.PodRequestsAndLimits(failedPod)
+				klog.Infof("Resources for pod %q: requests: %s ; limits: %s", failedPod.Name, e2ereslist.ToString(req), e2ereslist.ToString(lim))
 			}
 			Expect(failedPods).To(BeEmpty())
 
@@ -359,6 +381,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			// make it burstable
 			deployment.Spec.Template.Spec.Containers[0].Resources.Requests = reqResources
 
+			klog.Infof("create the bustable test deployment with requests %s", e2ereslist.ToString(reqResources))
 			err = fxt.Client.Create(context.TODO(), deployment)
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
@@ -372,7 +395,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 		It("[test_id:47618][tier2] should be properly scheduled with no changes in NRTs", func() {
 			By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", schedulerName, targetNodeName))
 			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
-			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q: %v", deployment.Name, err)
 			for _, pod := range pods {
 				Expect(pod.Spec.NodeName).To(Equal(targetNodeName))
 				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
