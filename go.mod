@@ -14,8 +14,8 @@ require (
 	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.4.2-0.20220301124602-f5d26de74de3
 	github.com/kubevirt/device-plugin-manager v1.18.8
 	github.com/mdomke/git-semver v1.0.0
-	github.com/onsi/ginkgo v1.16.4
-	github.com/onsi/gomega v1.14.0
+	github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/gomega v1.17.0
 	github.com/openshift/api v0.0.0-20210924154557-a4f696157341
 	github.com/openshift/machine-config-operator v0.0.1-0.20211105081319-76d6155c1dab
 	github.com/pkg/errors v0.9.1
@@ -29,6 +29,7 @@ require (
 	k8s.io/klog/v2 v2.10.0
 	k8s.io/kubelet v0.22.3
 	k8s.io/kubernetes v1.22.3
+	kubevirt.io/qe-tools v0.1.6
 	sigs.k8s.io/controller-runtime v0.9.6
 	sigs.k8s.io/yaml v1.2.0
 )
@@ -85,7 +86,7 @@ require (
 	github.com/moby/spdystream v0.2.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
-	github.com/nxadm/tail v1.4.4 // indirect
+	github.com/nxadm/tail v1.4.8 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/runc v1.0.2 // indirect
 	github.com/openshift/client-go v0.0.0-20210916133943-9acee1a0fb83 // indirect
@@ -175,7 +176,7 @@ replace (
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
-	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.14.0
-	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
+	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/gomega => github.com/onsi/gomega v1.17.0
 	github.com/openshift/machine-config-operator => github.com/openshift/machine-config-operator v0.0.1-0.20211110032239-0abf68a0c320 // release-4.10
 )
