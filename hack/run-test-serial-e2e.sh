@@ -29,6 +29,7 @@ fi
 
 DRY_RUN="false"
 REPORT_DIR="/tmp/artifacts/nrop"
+REPORT_FILE=""
 
 # so few arguments is no bother enough for getopt
 while [[ $# -gt 0 ]]; do
@@ -63,8 +64,13 @@ while [[ $# -gt 0 ]]; do
 			shift
 			shift
 			;;
-		--report)
+		--report-dir)
 			REPORT_DIR="$2"
+			shift
+			shift
+			;;
+		--report-file)
+			REPORT_FILE="$2"
 			shift
 			shift
 			;;
@@ -77,9 +83,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 # mandatory
-if [ -z "${REPORT_DIR}" ]; then
+if [ -z "${REPORT_FILE}" ] && [ -z "${REPORT_DIR}" ]; then
 	echo "invalid report directory"
 	exit 1
+fi
+
+if [ -z "${REPORT_FILE}" ]; then
+	REPORT_FILE="${REPORT_DIR}/e2e-serial-run"
 fi
 
 function runcmd() {
@@ -152,7 +162,7 @@ function runtests() {
 	runcmd ${BIN_DIR}/e2e-nrop-serial.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-run \
+		--ginkgo.reportFile=${REPORT_FILE} \
 		${NO_COLOR} \
 		${SKIP} \
 		${FOCUS}
