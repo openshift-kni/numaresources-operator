@@ -28,7 +28,6 @@ if [ -n "${E2E_SERIAL_SKIP}" ]; then
 fi
 
 DRY_RUN="false"
-JUNIT_DIR=""
 REPORT_DIR="/tmp/artifacts/nrop"
 
 # so few arguments is no bother enough for getopt
@@ -69,11 +68,6 @@ while [[ $# -gt 0 ]]; do
 			shift
 			shift
 			;;
-		--junit)
-			JUNIT_DIR="$2"
-			shift
-			shift
-			;;
 		*)
 			echo "unrecognized option: $1"
 			echo "use the form --opt val and not the form --opt=val"
@@ -86,11 +80,6 @@ done
 if [ -z "${REPORT_DIR}" ]; then
 	echo "invalid report directory"
 	exit 1
-fi
-
-# optional
-if [ -n "${JUNIT_DIR}" ]; then
-	JUNIT="--junit=${JUNIT_DIR}"
 fi
 
 function runcmd() {
@@ -164,7 +153,6 @@ function runtests() {
 		--ginkgo.v \
 		--test.parallel=1 \
 		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-run \
-		${JUNIT} \
 		${NO_COLOR} \
 		${SKIP} \
 		${FOCUS}
