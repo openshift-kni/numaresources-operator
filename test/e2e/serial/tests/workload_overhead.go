@@ -37,6 +37,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
+
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhead", func() {
@@ -46,6 +48,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 	var nrts []nrtv1alpha1.NodeResourceTopology
 
 	BeforeEach(func() {
+		Expect(serialconfig.Config).ToNot(BeNil())
+
 		var err error
 		fxt, err = e2efixture.Setup("e2e-test-workload-overhead")
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
@@ -200,7 +204,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 				nodeSelector := map[string]string{}
 				deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
-				deployment.Spec.Template.Spec.SchedulerName = schedulerName
+				deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 				deployment.Spec.Template.Spec.Containers[0].Resources.Limits = podResources
 				deployment.Spec.Template.Spec.RuntimeClassName = &rtClass.Name
 
@@ -216,7 +220,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				nrtListPostCreate, err := e2enrt.GetUpdated(fxt.Client, nrtListInitial, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
 
-				By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", schedulerName, targetNodeName))
+				By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
 				pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
 				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 
@@ -226,9 +230,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 
 				for _, pod := range pods {
 					Expect(pod.Spec.NodeName).To(Equal(targetNodeName))
-					schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
+					schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, schedulerName)
+					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 
 					By(fmt.Sprintf("checking the resources are accounted as expected on %q", pod.Spec.NodeName))
 					nrtInitial, err := e2enrt.FindFromList(nrtListInitial.Items, pod.Spec.NodeName)

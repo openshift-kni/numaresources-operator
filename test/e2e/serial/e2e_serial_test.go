@@ -29,7 +29,8 @@ import (
 
 	ginkgo_reporters "kubevirt.io/qe-tools/pkg/ginkgo-reporters"
 
-	serialtests "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
+	_ "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
 )
 
 var (
@@ -57,7 +58,7 @@ func TestSerial(t *testing.T) {
 var _ = BeforeSuite(func() {
 	// this must be the very first thing
 	rand.Seed(time.Now().UnixNano())
-	serialtests.BeforeSuiteHelper()
+	serialconfig.Setup()
 })
 
-var _ = AfterSuite(serialtests.AfterSuiteHelper)
+var _ = AfterSuite(serialconfig.Teardown)

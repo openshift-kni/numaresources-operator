@@ -31,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
@@ -54,6 +55,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
 
 	BeforeEach(func() {
+		Expect(serialconfig.Config).ToNot(BeNil())
+
 		var err error
 		fxt, err = e2efixture.Setup("e2e-test-workload-placement-tmpol")
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
@@ -87,9 +90,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(len(unsuitableFreeRes)).To(Equal(hostsRequired), "mismatch unsuitable resource declarations (expected %d items)", hostsRequired)
 
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
-			pod.Spec.SchedulerName = schedulerName
+			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			pod.Spec.NodeSelector = map[string]string{
-				multiNUMALabel: "2",
+				serialconfig.MultiNUMALabel: "2",
 			}
 			pod.Spec.Containers = append(pod.Spec.Containers, pod.Spec.Containers[0])
 			pod.Spec.Containers[0].Name = "testcnt-0"
@@ -172,10 +175,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
 				"pod landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerName)
+			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
+			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By(fmt.Sprintf("checking the resources are accounted as expected on %q", updatedPod.Spec.NodeName))
 			nrtListPostCreate, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
