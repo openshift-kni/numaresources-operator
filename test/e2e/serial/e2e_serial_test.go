@@ -17,7 +17,9 @@ limitations under the License.
 package serial
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
@@ -39,6 +41,10 @@ func TestSerial(t *testing.T) {
 	RunSpecsWithDefaultAndCustomReporters(t, "NUMAResources serial e2e tests", rr)
 }
 
-var _ = BeforeSuite(serialtests.BeforeSuiteHelper)
+var _ = BeforeSuite(func() {
+	// this must be the very first thing
+	rand.Seed(time.Now().UnixNano())
+	serialtests.BeforeSuiteHelper()
+})
 
 var _ = AfterSuite(serialtests.AfterSuiteHelper)

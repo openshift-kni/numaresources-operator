@@ -19,7 +19,6 @@ package tests
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"os"
 	"sync"
 	"time"
@@ -73,9 +72,6 @@ var __fxt *e2efixture.Fixture
 var __nrtList nrtv1alpha1.NodeResourceTopologyList
 
 func BeforeSuiteHelper() {
-	// this must be the very first thing
-	rand.Seed(time.Now().UnixNano())
-
 	var err error
 
 	__fxt, err = e2efixture.Setup("e2e-test-infra")
