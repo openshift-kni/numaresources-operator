@@ -176,6 +176,7 @@ replace (
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
+	github.com/jaypipes/pcidb => github.com/jaypipes/pcidb v1.0.0
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega => github.com/onsi/gomega v1.17.0
 	github.com/openshift/machine-config-operator => github.com/openshift/machine-config-operator v0.0.1-0.20211110032239-0abf68a0c320 // release-4.10
