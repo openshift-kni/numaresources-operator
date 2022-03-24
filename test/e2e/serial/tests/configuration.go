@@ -29,12 +29,16 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
 
+	"github.com/ghodss/yaml"
 	"github.com/google/go-cmp/cmp"
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	nropmcp "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
@@ -44,6 +48,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
+	e2ereslist "github.com/openshift-kni/numaresources-operator/test/utils/resourcelist"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
@@ -345,5 +350,196 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
 		})
+
+		It("[test_id:47585][reboot_required][slow] can change kubeletconfig and controller should adapt", func() {
+			nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
+			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: objects.NROName()}, nroOperObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", objects.NROName())
+
+			initialNrtList := nrtv1alpha1.NodeResourceTopologyList{}
+			initialNrtList, err = e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
+			Expect(err).ToNot(HaveOccurred(), "cannot get any NodeResourceTopology object from the cluster")
+
+			mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), fxt.Client, nroOperObj.Spec.NodeGroups)
+			Expect(err).ToNot(HaveOccurred(), "cannot get MCPs associated with NUMAResourcesOperator %q", nroOperObj.Name)
+
+			kcList := &machineconfigv1.KubeletConfigList{}
+			err = fxt.Client.List(context.TODO(), kcList)
+			Expect(err).ToNot(HaveOccurred())
+
+			var targetedKC *machineconfigv1.KubeletConfig
+			for _, mcp := range mcps {
+				for i := 0; i < len(kcList.Items); i++ {
+					kc := &kcList.Items[i]
+					kcMcpSel, err := metav1.LabelSelectorAsSelector(kc.Spec.MachineConfigPoolSelector)
+					Expect(err).ToNot(HaveOccurred())
+
+					if kcMcpSel.Matches(labels.Set(mcp.Labels)) {
+						// pick the first one you find
+						targetedKC = kc
+					}
+				}
+			}
+			Expect(targetedKC).ToNot(BeNil(), "there should be at least one kubeletconfig.machineconfiguration object")
+
+			By("modifying reserved CPUs under kubeletconfig")
+			kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
+			Expect(err).ToNot(HaveOccurred())
+
+			initialRsvCPUs := kcObj.ReservedSystemCPUs
+			applyNewReservedSystemCPUsValue(&kcObj.ReservedSystemCPUs)
+			err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = fxt.Client.Update(context.TODO(), targetedKC)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("waiting for MachineConfigPools to get updated")
+			var wg sync.WaitGroup
+			for _, mcp := range mcps {
+				wg.Add(1)
+				go func(mcpool *machineconfigv1.MachineConfigPool) {
+					defer GinkgoRecover()
+					defer wg.Done()
+					err = e2ewait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
+					Expect(err).ToNot(HaveOccurred())
+				}(mcp)
+			}
+			wg.Wait()
+
+			By("checking that NUMAResourcesOperator's ConfigMap has changed")
+			cmList := &corev1.ConfigMapList{}
+			err = fxt.Client.List(context.TODO(), cmList)
+			Expect(err).ToNot(HaveOccurred())
+
+			var nropCm *corev1.ConfigMap
+			for i := 0; i < len(cmList.Items); i++ {
+				if objects.IsOwnedBy(cmList.Items[i].ObjectMeta, nroOperObj.ObjectMeta) {
+					// there is only one ConfigMap owned by NUMAResourcesOperator
+					nropCm = &cmList.Items[i]
+					break
+				}
+			}
+			Expect(nropCm).ToNot(BeNil(), "NUMAResourcesOperator %q should have exactly one ConfigMap", nroOperObj.Name)
+
+			cmKey := client.ObjectKeyFromObject(nropCm)
+			Eventually(func() bool {
+				err = fxt.Client.Get(context.TODO(), cmKey, nropCm)
+				Expect(err).ToNot(HaveOccurred())
+
+				data, ok := nropCm.Data["config.yaml"]
+				Expect(ok).To(BeTrue(), "failed to obtain config.yaml key from ConfigMap %q data", cmKey.String())
+
+				conf, err := rteConfigFrom(data)
+				Expect(err).ToNot(HaveOccurred(), "failed to obtain rteConfig from ConfigMap %q error: %v", cmKey.String(), err)
+
+				if conf.Resources.ReservedCPUs == initialRsvCPUs {
+					klog.Warningf("ConfigMap %q has not been updated with new ReservedCPUs value after kubeletconfig modification", cmKey.String())
+					return false
+				}
+				return true
+			}, timeout, time.Second*30).Should(BeTrue())
+
+			By("schedule another workload requesting resources")
+			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
+			schedulerName := nroSchedObj.Spec.SchedulerName
+
+			nrtPreCreatePodList, err := e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
+			Expect(err).ToNot(HaveOccurred())
+
+			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomizeName("testpod"))
+			testPod.Spec.SchedulerName = schedulerName
+			rl := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("100M"),
+			}
+			testPod.Spec.Containers[0].Resources.Limits = rl
+			testPod.Spec.Containers[0].Resources.Requests = rl
+
+			err = fxt.Client.Create(context.TODO(), testPod)
+			Expect(err).ToNot(HaveOccurred())
+
+			testPod, err = e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			Expect(err).ToNot(HaveOccurred())
+
+			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
+			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, testPod.Namespace, testPod.Name, schedulerName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", testPod.Namespace, testPod.Name, schedulerName)
+
+			rl = e2ereslist.FromGuaranteedPod(*testPod)
+
+			nrtPreCreate, err := e2enrt.FindFromList(nrtPreCreatePodList.Items, testPod.Spec.NodeName)
+			Expect(err).ToNot(HaveOccurred())
+
+			nrtPostCreatePodList, err := e2enrt.GetUpdated(fxt.Client, nrtPreCreatePodList, timeout)
+			Expect(err).ToNot(HaveOccurred())
+
+			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreatePodList.Items, testPod.Spec.NodeName)
+			Expect(err).ToNot(HaveOccurred())
+
+			By(fmt.Sprintf("checking NRT for target node %q updated correctly", testPod.Spec.NodeName))
+			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
+			_, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPreCreate, *nrtPostCreate, rl)
+			Expect(err).ToNot(HaveOccurred())
+
+			defer func() {
+				By("reverting kubeletconfig changes")
+				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), targetedKC)
+				Expect(err).ToNot(HaveOccurred())
+
+				kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
+				Expect(err).ToNot(HaveOccurred())
+
+				kcObj.ReservedSystemCPUs = initialRsvCPUs
+				err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = fxt.Client.Update(context.TODO(), targetedKC)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("waiting for MachineConfigPools to get updated")
+				for _, mcp := range mcps {
+					wg.Add(1)
+					go func(mcpool *machineconfigv1.MachineConfigPool) {
+						defer GinkgoRecover()
+						defer wg.Done()
+						err = e2ewait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
+						Expect(err).ToNot(HaveOccurred())
+					}(mcp)
+				}
+				wg.Wait()
+			}()
+		})
 	})
 })
+
+// each KubeletConfig has a (single) field of the ReservedSystemCPUs
+// since we don't care about the value itself, and we just want to trigger a machine-config change, we just pick some random value.
+// the current ReservedSystemCPUs value is unknown in runtime, hence there are two options here:
+// 1. the current value is equal to the random value we choose.
+// 2. the current value is not equal to the random value we choose.
+// in option number 2 we are good to go, but if happened, and we land on option number 1,
+// it won't trigger a machine-config change (because the value has left the same) so we just pick another random value,
+// which now we are certain that it is different from the existing one.
+// in conclusion, the maximum attempts is 2.
+func applyNewReservedSystemCPUsValue(oldRsvCPUs *string) {
+	newRsvCPUs := "3-4"
+	// if it happens to be the same, pick something else
+	if *oldRsvCPUs == newRsvCPUs {
+		newRsvCPUs = "3-5"
+	}
+	*oldRsvCPUs = newRsvCPUs
+}
+
+func rteConfigFrom(data string) (*rteconfig.Config, error) {
+	conf := &rteconfig.Config{}
+
+	err := yaml.Unmarshal([]byte(data), conf)
+	if err != nil {
+		return nil, err
+	}
+	return conf, nil
+}

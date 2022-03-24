@@ -29,3 +29,9 @@ func MCOKubeletConfToKubeletConf(mcoKc *mcov1.KubeletConfig) (*kubeletconfigv1be
 	err := json.Unmarshal(mcoKc.Spec.KubeletConfig.Raw, kc)
 	return kc, err
 }
+
+func KubeletConfToMCKubeletConf(kcObj *kubeletconfigv1beta1.KubeletConfiguration, kcAsMc *mcov1.KubeletConfig) error {
+	rawKc, err := json.Marshal(kcObj)
+	kcAsMc.Spec.KubeletConfig.Raw = rawKc
+	return err
+}
