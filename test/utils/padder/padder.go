@@ -167,7 +167,7 @@ func (p *Padder) Pad(timeout time.Duration, options PaddingOptions) error {
 
 				// create a pod that asks for exact amount of allocationTarget as the diff
 				// in order to reach to desired amount of available allocationTarget in the node
-				padPod := objects.NewTestPodPause(p.namespace, fixture.RandomName("padder"))
+				padPod := objects.NewTestPodPause(p.namespace, fixture.RandomizeName("padder"))
 
 				// label the pod with a pad label, so it will be easier to identify later
 				labelPod(padPod, map[string]string{PadderLabel: ""})

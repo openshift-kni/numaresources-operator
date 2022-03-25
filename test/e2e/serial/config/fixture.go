@@ -42,13 +42,17 @@ type E2EConfig struct {
 }
 
 func SetupFixture() *E2EConfig {
+	return SetupFixtureWithOptions("e2e-test-infra", e2efixture.OptionRandomizeName)
+}
+
+func SetupFixtureWithOptions(nsName string, options e2efixture.Options) *E2EConfig {
 	var err error
 	cfg := E2EConfig{
 		NROOperObj:  &nropv1alpha1.NUMAResourcesOperator{},
 		NROSchedObj: &nropv1alpha1.NUMAResourcesScheduler{},
 	}
 
-	cfg.Fixture, err = e2efixture.Setup("e2e-test-infra")
+	cfg.Fixture, err = e2efixture.SetupWithOptions(nsName, options)
 	Expect(err).ToNot(HaveOccurred(), "unable to setup infra test fixture")
 
 	err = cfg.Fixture.Client.List(context.TODO(), &cfg.NRTList)

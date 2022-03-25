@@ -332,7 +332,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			By("schedule pod using the new scheduler name")
-			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomName("testpod"))
+			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomizeName("testpod"))
 			testPod.Spec.SchedulerName = serialconfig.SchedulerTestName
 
 			err = fxt.Client.Create(context.TODO(), testPod)
