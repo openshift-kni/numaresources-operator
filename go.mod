@@ -7,8 +7,8 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/go-cmp v0.5.6
-	github.com/jaypipes/ghw v0.8.1-0.20211210215558-4d0ed8fddb8c
-	github.com/jaypipes/pcidb v0.6.0
+	github.com/jaypipes/ghw v0.9.0
+	github.com/jaypipes/pcidb v1.0.0
 	github.com/k8stopologyawareschedwg/deployer v0.4.0
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12
 	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.4.2-0.20220301124602-f5d26de74de3
@@ -64,7 +64,7 @@ require (
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
 	github.com/go-logr/logr v0.4.0 // indirect
 	github.com/go-logr/zapr v0.4.0 // indirect
-	github.com/go-ole/go-ole v1.2.5 // indirect
+	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-openapi/jsonpointer v0.19.5 // indirect
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
@@ -116,7 +116,7 @@ require (
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/net v0.0.0-20210726213435-c6fcb2dbf985 // indirect
 	golang.org/x/oauth2 v0.0.0-20210402161424-2e8d93401602 // indirect
-	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
+	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8 // indirect
 	golang.org/x/term v0.0.0-20210220032956-6a3ed077a48d // indirect
 	golang.org/x/text v0.3.6 // indirect
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac // indirect
@@ -130,7 +130,7 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
-	howett.net/plist v0.0.0-20181124034731-591f970eefbb // indirect
+	howett.net/plist v1.0.0 // indirect
 	k8s.io/apiserver v0.22.3 // indirect
 	k8s.io/component-base v0.22.3 // indirect
 	k8s.io/component-helpers v0.22.3 // indirect
@@ -176,7 +176,6 @@ replace (
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
-	github.com/jaypipes/pcidb => github.com/jaypipes/pcidb v1.0.0
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega => github.com/onsi/gomega v1.17.0
 	github.com/openshift/machine-config-operator => github.com/openshift/machine-config-operator v0.0.1-0.20211110032239-0abf68a0c320 // release-4.10
