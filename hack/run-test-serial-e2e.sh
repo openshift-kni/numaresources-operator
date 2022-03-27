@@ -3,18 +3,16 @@
 source hack/common.sh
 
 # we expect the lane to run against a already configured cluster
-SETUP="${SETUP:-false}"
-TEARDOWN="${TEARDOWN:-false}"
-RUN_TESTS="${RUN_TESTS:-true}"
-
-# so few arguments is no bother enough for getopt
-for arg in "$@"; do
-	case "${arg}" in
-		--setup) SETUP="true";;
-		--teardown) TEARDOWN="true";;
-		--no-run-tests) RUN_TESTS="false";;
-	esac
-done
+# we use this verbose form to play nice with envsubst
+if [ -z "${SETUP}" ]; then
+	SETUP="false"
+fi
+if [ -z "${TEARDOWN}" ]; then
+	TEARDOWN="false"
+fi
+if [ -z "${RUN_TESTS}" ]; then
+	RUN_TESTS="true"
+fi
 
 NO_COLOR=""
 if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
@@ -29,16 +27,89 @@ if [ -n "${E2E_SERIAL_SKIP}" ]; then
 	SKIP="-ginkgo.skip=${E2E_SERIAL_SKIP}"
 fi
 
+DRY_RUN="false"
+REPORT_DIR="/tmp/artifacts/nrop"
+REPORT_FILE=""
+
+# so few arguments is no bother enough for getopt
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		--setup)
+			SETUP="true"
+			shift
+			;;
+		--teardown)
+			TEARDOWN="true"
+			shift
+			;;
+		--no-run-tests)
+			RUN_TESTS="false"
+			shift
+			;;
+		--no-color)
+			NO_COLOR="-ginkgo.noColor"
+			shift
+			;;
+		--dry-run)
+			DRY_RUN="true"
+			shift
+			;;
+		--focus)
+			FOCUS="-ginkgo.focus=$2"
+			shift
+			shift
+			;;
+		--skip)
+			SKIP="-ginkgo.skip=$2"
+			shift
+			shift
+			;;
+		--report-dir)
+			REPORT_DIR="$2"
+			shift
+			shift
+			;;
+		--report-file)
+			REPORT_FILE="$2"
+			shift
+			shift
+			;;
+		*)
+			echo "unrecognized option: $1"
+			echo "use the form --opt val and not the form --opt=val"
+			exit 1
+			;;
+	esac
+done
+
+# mandatory
+if [ -z "${REPORT_FILE}" ] && [ -z "${REPORT_DIR}" ]; then
+	echo "invalid report directory"
+	exit 1
+fi
+
+if [ -z "${REPORT_FILE}" ]; then
+	REPORT_FILE="${REPORT_DIR}/e2e-serial-run"
+fi
+
+function runcmd() {
+	echo "Running: $@"
+	if [[ "${DRY_RUN}" == "true" ]]; then
+		return 0
+	fi
+	eval $@
+}
+
 function setup() {
 	if [[ "${SETUP}" != "true" ]]; then
 		return 0
 	fi
 
 	echo "Running NRO install test suite"
-	${BIN_DIR}/e2e-nrop-install.test \
+	runcmd ${BIN_DIR}/e2e-nrop-install.test \
 		--ginkgo.v \
 		--ginkgo.failFast \
-		--ginkgo.reportFile=/tmp/artifacts/nrop/e2e-serial-install \
+		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-install \
 		--test.parallel=1 \
 		--ginkgo.focus='\[Install\] continuousIntegration' \
 		${NO_COLOR}
@@ -49,11 +120,11 @@ function setup() {
 	fi
 
 	echo "Running NROScheduler install test suite"
-	${BIN_DIR}/e2e-nrop-sched-install.test \
+	runcmd ${BIN_DIR}/e2e-nrop-sched-install.test \
 		--ginkgo.v \
 		--ginkgo.failFast \
 		--test.parallel=1 \
-		--ginkgo.reportFile=/tmp/artifacts/nrop/e2e-serial-install-sched \
+		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-install-sched \
 		${NO_COLOR}
 }
 
@@ -63,10 +134,10 @@ function teardown() {
 	fi
 
 	echo "Running NROScheduler uninstall test suite";
-	${BIN_DIR}/e2e-nrop-sched-uninstall.test \
+	runcmd ${BIN_DIR}/e2e-nrop-sched-uninstall.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.reportFile=/tmp/artifacts/nrop/e2e-serial-uninstall-sched \
+		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-uninstall-sched \
 		${NO_COLOR}
 
 	RC="$?"
@@ -75,10 +146,10 @@ function teardown() {
 	fi
 
 	echo "Running NRO uninstall test suite";
-	${BIN_DIR}/e2e-nrop-uninstall.test \
+	runcmd ${BIN_DIR}/e2e-nrop-uninstall.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.reportFile=/tmp/artifacts/nrop/e2e-serial-uninstall \
+		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-uninstall \
 		${NO_COLOR}
 }
 
@@ -88,10 +159,10 @@ function runtests() {
 		return 0
 	fi
 	echo "Running Serial, disruptive E2E Tests"
-	${BIN_DIR}/e2e-nrop-serial.test \
+	runcmd ${BIN_DIR}/e2e-nrop-serial.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.reportFile=/tmp/artifacts/nrop/e2e-serial-run \
+		--ginkgo.reportFile=${REPORT_FILE} \
 		${NO_COLOR} \
 		${SKIP} \
 		${FOCUS}

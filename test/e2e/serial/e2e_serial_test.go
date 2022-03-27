@@ -17,8 +17,6 @@ limitations under the License.
 package serial
 
 import (
-	"flag"
-	"path"
 	"testing"
 
 	. "github.com/onsi/ginkgo"
@@ -30,14 +28,6 @@ import (
 	serialtests "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
 )
 
-var (
-	junitPath *string
-)
-
-func init() {
-	junitPath = flag.String("junit", "junit.xml", "the path for the junit format report")
-}
-
 func TestSerial(t *testing.T) {
 	RegisterFailHandler(Fail)
 
@@ -45,10 +35,7 @@ func TestSerial(t *testing.T) {
 	if ginkgo_reporters.Polarion.Run {
 		rr = append(rr, &ginkgo_reporters.Polarion)
 	}
-	if *junitPath != "" {
-		junitFile := path.Join(*junitPath, "numaserial-junit.xml")
-		rr = append(rr, reporters.NewJUnitReporter(junitFile))
-	}
+	rr = append(rr, reporters.NewJUnitReporter("numaresources"))
 	RunSpecsWithDefaultAndCustomReporters(t, "NUMAResources serial e2e tests", rr)
 }
 

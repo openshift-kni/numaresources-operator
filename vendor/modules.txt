@@ -80,6 +80,11 @@ github.com/davecgh/go-spew/spew
 ## explicit
 github.com/docker/distribution/digestset
 github.com/docker/distribution/reference
+# github.com/drone/envsubst v1.0.3
+## explicit; go 1.13
+github.com/drone/envsubst
+github.com/drone/envsubst/parse
+github.com/drone/envsubst/path
 # github.com/emicklei/go-restful v2.9.5+incompatible
 ## explicit
 github.com/emicklei/go-restful
