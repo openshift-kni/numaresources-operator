@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Kubernetes Authors.
+Copyright 2021 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
+package v1beta2
 
 import (
 	"bytes"
@@ -158,45 +158,47 @@ type KubeSchedulerProfile struct {
 // be invoked before default plugins, default plugins must be disabled and re-enabled here in desired order.
 type Plugins struct {
 	// QueueSort is a list of plugins that should be invoked when sorting pods in the scheduling queue.
-	QueueSort *PluginSet `json:"queueSort,omitempty"`
+	QueueSort PluginSet `json:"queueSort,omitempty"`
 
 	// PreFilter is a list of plugins that should be invoked at "PreFilter" extension point of the scheduling framework.
-	PreFilter *PluginSet `json:"preFilter,omitempty"`
+	PreFilter PluginSet `json:"preFilter,omitempty"`
 
 	// Filter is a list of plugins that should be invoked when filtering out nodes that cannot run the Pod.
-	Filter *PluginSet `json:"filter,omitempty"`
+	Filter PluginSet `json:"filter,omitempty"`
 
 	// PostFilter is a list of plugins that are invoked after filtering phase, no matter whether filtering succeeds or not.
-	PostFilter *PluginSet `json:"postFilter,omitempty"`
+	PostFilter PluginSet `json:"postFilter,omitempty"`
 
 	// PreScore is a list of plugins that are invoked before scoring.
-	PreScore *PluginSet `json:"preScore,omitempty"`
+	PreScore PluginSet `json:"preScore,omitempty"`
 
 	// Score is a list of plugins that should be invoked when ranking nodes that have passed the filtering phase.
-	Score *PluginSet `json:"score,omitempty"`
+	Score PluginSet `json:"score,omitempty"`
 
 	// Reserve is a list of plugins invoked when reserving/unreserving resources
 	// after a node is assigned to run the pod.
-	Reserve *PluginSet `json:"reserve,omitempty"`
+	Reserve PluginSet `json:"reserve,omitempty"`
 
 	// Permit is a list of plugins that control binding of a Pod. These plugins can prevent or delay binding of a Pod.
-	Permit *PluginSet `json:"permit,omitempty"`
+	Permit PluginSet `json:"permit,omitempty"`
 
 	// PreBind is a list of plugins that should be invoked before a pod is bound.
-	PreBind *PluginSet `json:"preBind,omitempty"`
+	PreBind PluginSet `json:"preBind,omitempty"`
 
 	// Bind is a list of plugins that should be invoked at "Bind" extension point of the scheduling framework.
 	// The scheduler call these plugins in order. Scheduler skips the rest of these plugins as soon as one returns success.
-	Bind *PluginSet `json:"bind,omitempty"`
+	Bind PluginSet `json:"bind,omitempty"`
 
 	// PostBind is a list of plugins that should be invoked after a pod is successfully bound.
-	PostBind *PluginSet `json:"postBind,omitempty"`
+	PostBind PluginSet `json:"postBind,omitempty"`
 }
 
 // PluginSet specifies enabled and disabled plugins for an extension point.
 // If an array is empty, missing, or nil, default plugins at that extension point will be used.
 type PluginSet struct {
 	// Enabled specifies plugins that should be enabled in addition to default plugins.
+	// If the default plugin is also configured in the scheduler config file, the weight of plugin will
+	// be overridden accordingly.
 	// These are called after default plugins and in the same order specified here.
 	// +listType=atomic
 	Enabled []Plugin `json:"enabled,omitempty"`

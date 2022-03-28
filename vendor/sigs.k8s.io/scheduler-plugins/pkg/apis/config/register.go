@@ -39,10 +39,10 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&CoschedulingArgs{},
 		&NodeResourcesAllocatableArgs{},
-		&CapacitySchedulingArgs{},
 		&TargetLoadPackingArgs{},
 		&LoadVariationRiskBalancingArgs{},
 		&NodeResourceTopologyMatchArgs{},
+		&PreemptionTolerationArgs{},
 	)
 	return nil
 }

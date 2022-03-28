@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nfd
+  name: nfd-master
+  namespace: node-feature-discovery
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfd-master
+  template:
+    metadata:
+      labels:
+        app: nfd-master
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: In
+                    values:
+                      - ""
+              weight: 1
+            - preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: In
+                    values:
+                      - ""
+              weight: 1
+      containers:
+        - args: []
+          command:
+            - nfd-master
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          image: ${NFD_CONTAINER_IMAGE}
+          imagePullPolicy: Always
+          livenessProbe:
+            exec:
+              command:
+                - /usr/bin/grpc_health_probe
+                - -addr=:8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          name: nfd-master
+          readinessProbe:
+            exec:
+              command:
+                - /usr/bin/grpc_health_probe
+                - -addr=:8080
+            failureThreshold: 10
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+          volumeMounts: []
+      serviceAccount: nfd-master
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Equal
+          value: ""
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+          operator: Equal
+          value: ""
+      volumes: []

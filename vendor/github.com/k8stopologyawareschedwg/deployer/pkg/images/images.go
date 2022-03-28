@@ -28,10 +28,14 @@ func init() {
 	if rteImage, ok := os.LookupEnv("TAS_RESOURCE_EXPORTER_IMAGE"); ok {
 		ResourceTopologyExporterImage = rteImage
 	}
+	if nfdImage, ok := os.LookupEnv("TAS_NODE_FEATURE_DISCOVERY_IMAGE"); ok {
+		NodeFeatureDiscoveryImage = nfdImage
+	}
 }
 
 var (
 	SchedulerPluginSchedulerImage  = SchedulerPluginSchedulerDefaultImageTag
 	SchedulerPluginControllerImage = SchedulerPluginSchedulerDefaultImageTag
 	ResourceTopologyExporterImage  = ResourceTopologyExporterDefaultImageTag
+	NodeFeatureDiscoveryImage      = NodeFeatureDiscoveryDefaultImageTag
 )
