@@ -17,7 +17,9 @@ limitations under the License.
 package serial
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/reporters"
@@ -25,7 +27,8 @@ import (
 
 	ginkgo_reporters "kubevirt.io/qe-tools/pkg/ginkgo-reporters"
 
-	serialtests "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
+	_ "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
 )
 
 func TestSerial(t *testing.T) {
@@ -39,6 +42,10 @@ func TestSerial(t *testing.T) {
 	RunSpecsWithDefaultAndCustomReporters(t, "NUMAResources serial e2e tests", rr)
 }
 
-var _ = BeforeSuite(serialtests.BeforeSuiteHelper)
+var _ = BeforeSuite(func() {
+	// this must be the very first thing
+	rand.Seed(time.Now().UnixNano())
+	serialconfig.Setup()
+})
 
-var _ = AfterSuite(serialtests.AfterSuiteHelper)
+var _ = AfterSuite(serialconfig.Teardown)

@@ -45,13 +45,21 @@ type Fixture struct {
 	Namespace corev1.Namespace
 }
 
-func Setup(baseName string) (*Fixture, error) {
+type Options uint
+
+const (
+	OptionNone          = 0
+	OptionRandomizeName = 1 << iota
+)
+
+func SetupWithOptions(name string, options Options) (*Fixture, error) {
 	if !e2eclient.ClientsEnabled {
 		return nil, fmt.Errorf("clients not enabled")
 	}
-	ns, err := setupNamespace(e2eclient.Client, baseName)
+	randomizeName := (options & OptionRandomizeName) == OptionRandomizeName
+	ns, err := setupNamespace(e2eclient.Client, name, randomizeName)
 	if err != nil {
-		klog.Errorf("cannot setup namespace %q: %v", baseName, err)
+		klog.Errorf("cannot setup namespace %q: %v", name, err)
 		return nil, err
 	}
 	By(fmt.Sprintf("set up the test namespace %q", ns.Name))
@@ -60,6 +68,11 @@ func Setup(baseName string) (*Fixture, error) {
 		K8sClient: e2eclient.K8sClient,
 		Namespace: ns,
 	}, nil
+
+}
+
+func Setup(baseName string) (*Fixture, error) {
+	return SetupWithOptions(baseName, OptionRandomizeName)
 }
 
 func Teardown(ft *Fixture) error {
@@ -71,15 +84,19 @@ func Teardown(ft *Fixture) error {
 	return err
 }
 
-func setupNamespace(cli client.Client, baseName string) (corev1.Namespace, error) {
-	// intentionally avoid GenerateName like the k8s e2e framework does
+func setupNamespace(cli client.Client, baseName string, randomize bool) (corev1.Namespace, error) {
+	name := baseName
+	if randomize {
+		// intentionally avoid GenerateName like the k8s e2e framework does
+		name = RandomizeName(baseName)
+	}
 	ns := v1.Namespace{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Namespace",
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: RandomName(baseName),
+			Name: name,
 		},
 	}
 
@@ -119,6 +136,6 @@ func teardownNamespace(cli client.Client, ns corev1.Namespace) error {
 	})
 }
 
-func RandomName(baseName string) string {
+func RandomizeName(baseName string) string {
 	return fmt.Sprintf("%s-%s", baseName, strconv.Itoa(rand.Intn(10000)))
 }

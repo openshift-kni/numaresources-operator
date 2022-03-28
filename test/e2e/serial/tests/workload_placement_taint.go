@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/taints"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	e2enodes "github.com/openshift-kni/numaresources-operator/test/utils/nodes"
@@ -48,6 +49,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	var nrts []nrtv1alpha1.NodeResourceTopology
 
 	BeforeEach(func() {
+		Expect(serialconfig.Config).ToNot(BeNil())
+
 		var err error
 		fxt, err = e2efixture.Setup("e2e-test-workload-placement")
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
@@ -174,7 +177,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			pSpec.Tolerations = append(pSpec.Tolerations, testToleration()...)
 
-			testPod.Spec.SchedulerName = schedulerName
+			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			cnt := &testPod.Spec.Containers[0]
 			requiredRes := corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("4"),
@@ -193,10 +196,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
 				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerName)
+			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
+			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			nrtPostCreateList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())

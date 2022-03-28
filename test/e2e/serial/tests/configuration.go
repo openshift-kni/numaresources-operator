@@ -46,6 +46,8 @@ import (
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
 var _ = Describe("[serial][disruptive][slow] numaresources configuration management", func() {
@@ -257,11 +259,11 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				return true, nil
 			}, 10*time.Minute, 30*time.Second).Should(BeTrue())
 
-			By(fmt.Sprintf("modifing the NUMAResourcesOperator ExporterImage filed to %q", nropTestCIImage))
+			By(fmt.Sprintf("modifing the NUMAResourcesOperator ExporterImage filed to %q", serialconfig.NropTestCIImage))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
-			nroOperObj.Spec.ExporterImage = nropTestCIImage
+			nroOperObj.Spec.ExporterImage = serialconfig.NropTestCIImage
 			err = fxt.Client.Update(context.TODO(), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -278,13 +280,13 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				for _, ds := range dss {
 					// RTE container shortcut
 					cnt := ds.Spec.Template.Spec.Containers[0]
-					if cnt.Image != nropTestCIImage {
-						klog.Warningf("container: %q image not updated yet. expected %q actual %q", cnt.Name, nropTestCIImage, cnt.Image)
+					if cnt.Image != serialconfig.NropTestCIImage {
+						klog.Warningf("container: %q image not updated yet. expected %q actual %q", cnt.Name, serialconfig.NropTestCIImage, cnt.Image)
 						return false, nil
 					}
 				}
 				return true, nil
-			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "failed to update RTE container with image %q", nropTestCIImage)
+			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "failed to update RTE container with image %q", serialconfig.NropTestCIImage)
 
 			By(fmt.Sprintf("modifing the NUMAResourcesOperator LogLevel filed to %q", operatorv1.Trace))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
@@ -321,17 +323,17 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				return true, nil
 			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "failed to update RTE container with LogLevel %q", operatorv1.Trace)
 
-			By(fmt.Sprintf("modifing the NUMAResourcesScheduler SchedulerName Filed to %q", schedulerTestName))
+			By(fmt.Sprintf("modifing the NUMAResourcesScheduler SchedulerName Filed to %q", serialconfig.SchedulerTestName))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
-			nroSchedObj.Spec.SchedulerName = schedulerTestName
+			nroSchedObj.Spec.SchedulerName = serialconfig.SchedulerTestName
 			err = fxt.Client.Update(context.TODO(), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("schedule pod using the new scheduler name")
-			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomName("testpod"))
-			testPod.Spec.SchedulerName = schedulerTestName
+			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomizeName("testpod"))
+			testPod.Spec.SchedulerName = serialconfig.SchedulerTestName
 
 			err = fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
@@ -339,9 +341,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, 5*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerTestName)
+			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerTestName)
+			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
 		})
 	})
 })

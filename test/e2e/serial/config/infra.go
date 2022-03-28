@@ -14,12 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package tests
+package config
 
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"os"
 	"sync"
 	"time"
@@ -42,80 +41,20 @@ import (
 	numacellmanifests "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/images"
-	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
-const (
-	multiNUMALabel    = "numa.hardware.openshift-kni.io/cell-count"
-	nropTestCIImage   = "quay.io/openshift-kni/resource-topology-exporter:test-ci"
-	schedulerTestName = "test-topology-scheduler"
-)
+func SetupInfra(fxt *e2efixture.Fixture, nroOperObj *nropv1alpha1.NUMAResourcesOperator, nrtList nrtv1alpha1.NodeResourceTopologyList) {
+	setupNUMACell(fxt, nroOperObj.Spec.NodeGroups, 3*time.Minute)
 
-var (
-	nroOperObj    *nropv1alpha1.NUMAResourcesOperator
-	nroSchedObj   *nropv1alpha1.NUMAResourcesScheduler
-	schedulerName string
-)
-
-// This suite holds the e2e tests which span across components,
-// e.g. involve both the behaviour of RTE and the scheduler.
-// These tests are almost always disruptive, meaning they significantly
-// alter the cluster state and need a very specific cluster state (which
-// is each test responsability to setup and cleanup).
-// Hence we call this suite serial, implying each test should run alone
-// and indisturbed on the cluster. No concurrency at all is possible,
-// each test "owns" the cluster - but again, must leave no leftovers.
-
-// do not use these outside this *file*
-var __fxt *e2efixture.Fixture
-var __nrtList nrtv1alpha1.NodeResourceTopologyList
-
-func BeforeSuiteHelper() {
-	// this must be the very first thing
-	rand.Seed(time.Now().UnixNano())
-
-	var err error
-
-	__fxt, err = e2efixture.Setup("e2e-test-infra")
-	Expect(err).ToNot(HaveOccurred(), "unable to setup infra test fixture")
-
-	err = __fxt.Client.List(context.TODO(), &__nrtList)
-	Expect(err).ToNot(HaveOccurred())
-
-	nroSchedObj = &nropv1alpha1.NUMAResourcesScheduler{}
-	err = __fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
-	Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
-
-	nroOperObj = &nropv1alpha1.NUMAResourcesOperator{}
-	err = __fxt.Client.Get(context.TODO(), client.ObjectKey{Name: objects.NROName()}, nroOperObj)
-	Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", objects.NROName())
-
-	Expect(nroOperObj.Spec.NodeGroups).ToNot(BeEmpty(), "cannot autodetect the TAS node groups from the cluster")
-
-	schedulerName = nroSchedObj.Status.SchedulerName
-	Expect(schedulerName).ToNot(BeEmpty(), "cannot autodetect the TAS scheduler name from the cluster")
-	klog.Infof("scheduler name: %q", schedulerName)
-
-	setupInfra(__fxt, nroOperObj.Spec.NodeGroups, 3*time.Minute)
-
-	labelNodes(__fxt.Client, __nrtList)
+	LabelNodes(fxt.Client, nrtList)
 }
 
-func AfterSuiteHelper() {
-	if _, ok := os.LookupEnv("E2E_INFRA_NO_TEARDOWN"); ok {
-		return
-	}
-
-	unlabelNodes(__fxt.Client, __nrtList)
-
-	// numacell daemonset automatically cleaned up when we remove the namespace
-	err := e2efixture.Teardown(__fxt)
-	Expect(err).NotTo(HaveOccurred())
+func TeardownInfra(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList) {
+	UnlabelNodes(fxt.Client, nrtList)
 }
 
-func setupInfra(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup, timeout time.Duration) {
+func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup, timeout time.Duration) {
 	klog.Infof("e2e infra setup begin")
 
 	mcps, err := machineconfigpools.GetNodeGroupsMCPs(context.TODO(), fxt.Client, nodeGroups)
@@ -181,28 +120,28 @@ func getNUMACellDevicePluginPullSpec() string {
 	return images.NUMACellDevicePluginTestImageCI
 }
 
-func labelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyList) {
+func LabelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyList) {
 	for _, nrt := range nrtList.Items {
 		node := corev1.Node{}
 		err := cli.Get(context.TODO(), client.ObjectKey{Name: nrt.Name}, &node)
 		Expect(err).ToNot(HaveOccurred())
 		labelValue := fmt.Sprintf("%d", len(nrt.Zones))
-		node.Labels[multiNUMALabel] = labelValue
+		node.Labels[MultiNUMALabel] = labelValue
 
-		klog.Infof("labeling node %q with %s: %s", nrt.Name, multiNUMALabel, labelValue)
+		klog.Infof("labeling node %q with %s: %s", nrt.Name, MultiNUMALabel, labelValue)
 		err = cli.Update(context.TODO(), &node)
 		Expect(err).ToNot(HaveOccurred())
 	}
 }
 
-func unlabelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyList) {
+func UnlabelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyList) {
 	for _, nrt := range nrtList.Items {
 		node := corev1.Node{}
 		err := cli.Get(context.TODO(), client.ObjectKey{Name: nrt.Name}, &node)
 		Expect(err).ToNot(HaveOccurred())
 
-		klog.Infof("unlabeling node %q removing label %s", nrt.Name, multiNUMALabel)
-		delete(node.Labels, multiNUMALabel)
+		klog.Infof("unlabeling node %q removing label %s", nrt.Name, MultiNUMALabel)
+		delete(node.Labels, MultiNUMALabel)
 		err = cli.Update(context.TODO(), &node)
 		Expect(err).ToNot(HaveOccurred())
 	}
