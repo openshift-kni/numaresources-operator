@@ -89,6 +89,32 @@ func UpdateResourceTopologyExporterDaemonSet(ds *appsv1.DaemonSet, configMapName
 	UpdateMetricsPort(ds, metricsPort)
 }
 
+func UpdateNFDTopologyUpdaterDaemonSet(ds *appsv1.DaemonSet, pullIfNotPresent bool, nodeSelector *metav1.LabelSelector) {
+	for i := range ds.Spec.Template.Spec.Containers {
+		c := &ds.Spec.Template.Spec.Containers[i]
+		if c.Name != containerNameNFDTopologyUpdater {
+			continue
+		}
+		c.ImagePullPolicy = pullPolicy(pullIfNotPresent)
+		c.Image = images.NodeFeatureDiscoveryImage
+
+	}
+	if nodeSelector != nil {
+		ds.Spec.Template.Spec.NodeSelector = nodeSelector.MatchLabels
+	}
+}
+
+func UpdateNFDMasterDeployment(ds *appsv1.Deployment, pullIfNotPresent bool) {
+	for i := range ds.Spec.Template.Spec.Containers {
+		c := &ds.Spec.Template.Spec.Containers[i]
+		if c.Name != containerNameNFDMaster {
+			continue
+		}
+		c.ImagePullPolicy = pullPolicy(pullIfNotPresent)
+		c.Image = images.NodeFeatureDiscoveryImage
+	}
+}
+
 func UpdateMachineConfig(mc *machineconfigv1.MachineConfig, name string, mcpSelector *metav1.LabelSelector) {
 	if name != "" {
 		mc.Name = fmt.Sprintf("51-%s", name)
