@@ -220,9 +220,11 @@ install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~
 uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl delete -f -
 
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	kubectl apply -f $(CRD_MACHINE_CONFIG_POOL_URL)
-	kubectl apply -f $(CRD_KUBELET_CONFIG_URL)
+deploy-mco-crds: build-tools
+	@echo "Verifying that the MCO CRDs are present in the cluster"
+	hack/deploy-mco-crds.sh
+
+deploy: manifests kustomize deploy-mco-crds ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build $(KUSTOMIZE_DEPLOY_DIR) | kubectl apply -f -
 
@@ -326,13 +328,16 @@ deps-update:
 #
 #
 .PHONY: build-tools
-build-tools: bin/git-semver
+build-tools: bin/git-semver bin/envsubst bin/lsplatform
 
 bin/git-semver:
 	@go build -o bin/git-semver vendor/github.com/mdomke/git-semver/main.go
 
 bin/envsubst:
-	@go build -o bin/envsubst hack/envsubst.go
+	@go build -o bin/envsubst hack/envsubst/envsubst.go
+
+bin/lsplatform:
+	@go build -o bin/lsplatform hack/lsplatform/lsplatform.go
 
 verify-generated: bundle generate
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
