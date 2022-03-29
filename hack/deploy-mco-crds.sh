@@ -14,7 +14,5 @@ if ${REPO_DIR}/bin/lsplatform -is-platform openshift; then
 	exit 0
 fi
 
-echo kubectl apply -f ${CRD_MACHINE_CONFIG_POOL_URL}
-kubectl apply -f ${CRD_MACHINE_CONFIG_POOL_URL}
-echo kubectl apply -f ${CRD_KUBELET_CONFIG_URL}
-kubectl apply -f ${CRD_KUBELET_CONFIG_URL}
+runcmd kubectl apply -f ${CRD_MACHINE_CONFIG_POOL_URL}
+runcmd kubectl apply -f ${CRD_KUBELET_CONFIG_URL}

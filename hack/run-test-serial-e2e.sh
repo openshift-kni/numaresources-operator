@@ -92,14 +92,6 @@ if [ -z "${REPORT_FILE}" ]; then
 	REPORT_FILE="${REPORT_DIR}/e2e-serial-run"
 fi
 
-function runcmd() {
-	echo "Running: $@"
-	if [[ "${DRY_RUN}" == "true" ]]; then
-		return 0
-	fi
-	eval $@
-}
-
 function setup() {
 	if [[ "${SETUP}" != "true" ]]; then
 		return 0
