@@ -18,15 +18,25 @@ package resourcelist
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 )
 
 func ToString(res corev1.ResourceList) string {
+	idx := 0
+	resNames := make([]string, len(res))
+	for resName := range res {
+		resNames[idx] = string(resName)
+		idx++
+	}
+	sort.Strings(resNames)
+
 	items := []string{}
-	for resName, resQty := range res {
-		items = append(items, fmt.Sprintf("%s=%s", string(resName), resQty.String()))
+	for _, resName := range resNames {
+		resQty := res[corev1.ResourceName(resName)]
+		items = append(items, fmt.Sprintf("%s=%s", resName, resQty.String()))
 	}
 	return strings.Join(items, ", ")
 }
