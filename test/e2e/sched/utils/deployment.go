@@ -20,17 +20,39 @@ import (
 	"context"
 	"fmt"
 
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 )
 
-func GetDeploymentByOwnerReference(uid types.UID) (*v1.Deployment, error) {
-	deployList := &v1.DeploymentList{}
+func GetDeploymentByNROSched(nroSched *nropv1alpha1.NUMAResourcesScheduler) (*appsv1.Deployment, error) {
+	if nroSched == nil {
+		return nil, fmt.Errorf("nil NROSched object")
+	}
+
+	// shortcuts
+	dpNamespace := nroSched.Status.Deployment.Namespace
+	dpName := nroSched.Status.Deployment.Name
+	if dpNamespace == "" || dpName == "" {
+		return nil, fmt.Errorf("status partially filled: namespace=%q name=%q", dpNamespace, dpName)
+	}
+
+	dp := appsv1.Deployment{}
+	if err := e2eclient.Client.Get(context.TODO(), client.ObjectKey{Namespace: dpNamespace, Name: dpName}, &dp); err != nil {
+		return nil, fmt.Errorf("failed to get deployment %s/%s: %w", dpNamespace, dpName, err)
+	}
+
+	return &dp, nil
+}
+
+func GetDeploymentByOwnerReference(uid types.UID) (*appsv1.Deployment, error) {
+	deployList := &appsv1.DeploymentList{}
 
 	if err := e2eclient.Client.List(context.TODO(), deployList); err != nil {
 		return nil, fmt.Errorf("failed to get deployment: %w", err)
@@ -46,7 +68,7 @@ func GetDeploymentByOwnerReference(uid types.UID) (*v1.Deployment, error) {
 	return nil, fmt.Errorf("failed to get deployment with uid: %s", uid)
 }
 
-func ListPodsByDeployment(aclient client.Client, deployment v1.Deployment) ([]corev1.Pod, error) {
+func ListPodsByDeployment(aclient client.Client, deployment appsv1.Deployment) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	sel, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
