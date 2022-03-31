@@ -37,6 +37,9 @@ import (
 	"k8s.io/klog/v2"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+
+	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
@@ -48,7 +51,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
-	e2ereslist "github.com/openshift-kni/numaresources-operator/test/utils/resourcelist"
 	operatorv1 "github.com/openshift/api/operator/v1"
 )
 

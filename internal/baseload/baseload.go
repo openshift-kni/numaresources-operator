@@ -15,16 +15,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package nodes
+package baseload
 
 import (
-	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
 
 // we don't use corev1.ResourceList because we need values for CPU and Memory
@@ -35,21 +32,15 @@ type Load struct {
 	Memory resource.Quantity
 }
 
-func GetLoad(k8sCli *kubernetes.Clientset, nodeName string) (Load, error) {
+func FromPods(nodeName string, pods []corev1.Pod) Load {
 	nl := Load{
 		Name: nodeName,
-	}
-	pods, err := k8sCli.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
-		FieldSelector: "spec.nodeName=" + nodeName,
-	})
-	if err != nil {
-		return nl, err
 	}
 
 	cpu := &resource.Quantity{}
 	mem := &resource.Quantity{}
 
-	for _, pod := range pods.Items {
+	for _, pod := range pods {
 		// TODO: we assume a steady state - aka we ignore InitContainers
 		for _, cnt := range pod.Spec.Containers {
 			for resName, resQty := range cnt.Resources.Requests {
@@ -63,6 +54,12 @@ func GetLoad(k8sCli *kubernetes.Clientset, nodeName string) (Load, error) {
 		}
 	}
 
+	nl.CPU = *cpu
+	nl.Memory = *mem
+	return nl.Round()
+}
+
+func (nl Load) Round() Load {
 	// get full cpus, and always take even number of CPUs
 	// we round the CPU consumption as expressed in millicores (not entire cores)
 	// in order to (try to) avoid bugs related to integer division
@@ -70,11 +67,14 @@ func GetLoad(k8sCli *kubernetes.Clientset, nodeName string) (Load, error) {
 	// OTOH
 	// roundUp(2900, 2000) -> 4000 -> 4000/1000 -> 4 (intended behaviour).
 	// Value() round up the millis and roundUp rounds it up to multiples of 2 if needed.
-	// TODO: we can use some testing of the test utilities here (!)
-	nl.CPU = *resource.NewQuantity(roundUp(cpu.Value(), 2), resource.DecimalSI)
-	mem.RoundUp(resource.Giga)
-	nl.Memory = *mem
-	return nl, nil
+	memory := nl.Memory
+	// FIXME: this rounds to G (1000) not to Gi (1024) which works but is not what we intended
+	memory.RoundUp(resource.Giga)
+	return Load{
+		Name:   nl.Name,
+		CPU:    *resource.NewQuantity(roundUp(nl.CPU.Value(), 2), resource.DecimalSI),
+		Memory: memory,
+	}
 }
 
 func (nl Load) String() string {

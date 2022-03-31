@@ -33,7 +33,7 @@ import (
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
-	e2ereslist "github.com/openshift-kni/numaresources-operator/test/utils/resourcelist"
+	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 )
 
 // ErrNotEnoughResources means a NUMA zone or a node has not enough resouces to reserve

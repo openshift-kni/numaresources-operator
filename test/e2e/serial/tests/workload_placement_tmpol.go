@@ -31,6 +31,9 @@ import (
 	"k8s.io/klog/v2"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+
+	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
@@ -38,7 +41,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
-	e2ereslist "github.com/openshift-kni/numaresources-operator/test/utils/resourcelist"
 )
 
 type paddingInfo struct {

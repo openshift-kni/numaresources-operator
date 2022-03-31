@@ -21,10 +21,14 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
+
+	"github.com/openshift-kni/numaresources-operator/internal/baseload"
 )
 
 const (
@@ -54,4 +58,18 @@ func GetLabelRoleWorker() string {
 
 func GetLabelRoleMCPTest() string {
 	return fmt.Sprintf("%s/%s", LabelRole, RoleMCPTest)
+}
+
+func GetLoad(k8sCli *kubernetes.Clientset, nodeName string) (baseload.Load, error) {
+	nl := baseload.Load{
+		Name: nodeName,
+	}
+	pods, err := k8sCli.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
+		FieldSelector: "spec.nodeName=" + nodeName,
+	})
+	if err != nil {
+		return nl, err
+	}
+
+	return baseload.FromPods(nodeName, pods.Items), nil
 }
