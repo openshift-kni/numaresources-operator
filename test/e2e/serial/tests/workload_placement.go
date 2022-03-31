@@ -417,20 +417,6 @@ func makePaddingPod(namespace, nodeName string, zone nrtv1alpha1.Zone, podReqs c
 	return padPod, nil
 }
 
-func makeNodePaddingPod(namespace string, node corev1.Node, podReqs corev1.ResourceList) (*corev1.Pod, error) {
-	klog.Infof("want to have node %q with allocatable: %s", node.Name, e2ereslist.ToString(podReqs))
-
-	paddingReqs, err := e2enrt.SaturateNodeUntilLeft(node, podReqs)
-	if err != nil {
-		return nil, err
-	}
-
-	klog.Infof("padding resource to saturate %q: %s", node.Name, e2ereslist.ToString(paddingReqs))
-
-	padPod := newPaddingPod(node.Name, "", namespace, paddingReqs)
-	return padPod, nil
-}
-
 func newPaddingPod(nodeName, zoneName, namespace string, resourceReqs corev1.ResourceList) *corev1.Pod {
 	var zero int64
 	labels := map[string]string{
@@ -621,22 +607,6 @@ func matchLogLevelToKlog(cnt *corev1.Container, level operatorv1.LogLevel) (bool
 
 	val, found := rteFlags.GetFlag("--v")
 	return found, val.Data == kLvl.String()
-}
-
-func maxResourceType(nrtInfo nrtv1alpha1.NodeResourceTopology, resName corev1.ResourceName) resource.Quantity {
-	var max resource.Quantity
-
-	for _, zone := range nrtInfo.Zones {
-		zoneQty, ok := e2enrt.FindResourceAvailableByName(zone.Resources, resName.String())
-		if !ok {
-			continue
-		}
-
-		if zoneQty.Cmp(max) > 1 {
-			max = zoneQty
-		}
-	}
-	return max.DeepCopy()
 }
 
 func skipUnlessEnvVar(envVar, message string) {
