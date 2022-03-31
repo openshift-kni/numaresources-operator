@@ -53,7 +53,7 @@ func ListPodsByDeployment(aclient client.Client, deployment v1.Deployment) ([]co
 		return nil, err
 	}
 
-	err = aclient.List(context.TODO(), podList, &client.ListOptions{LabelSelector: sel})
+	err = aclient.List(context.TODO(), podList, &client.ListOptions{Namespace: deployment.Namespace, LabelSelector: sel})
 	if err != nil {
 		return nil, err
 	}

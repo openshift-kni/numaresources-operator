@@ -219,21 +219,22 @@ func FilterZoneCountEqual(nrts []nrtv1alpha1.NodeResourceTopology, count int) []
 }
 
 func FilterAnyZoneMatchingResources(nrts []nrtv1alpha1.NodeResourceTopology, requests corev1.ResourceList) []nrtv1alpha1.NodeResourceTopology {
+	reqStr := e2ereslist.ToString(requests)
 	ret := []nrtv1alpha1.NodeResourceTopology{}
 	for _, nrt := range nrts {
 		matches := 0
 		for _, zone := range nrt.Zones {
+			klog.Infof(" ----> node %q zone %q provides %s requrst %s", nrt.Name, zone.Name, e2ereslist.ToString(AvailableFromZone(zone)), reqStr)
 			if !ZoneResourcesMatchesRequest(zone.Resources, requests) {
 				continue
 			}
-			klog.Infof(" ----> node %q zone %q provides at least %#v", nrt.Name, zone.Name, e2ereslist.ToString(requests))
 			matches++
 		}
 		if matches == 0 {
-			klog.Warningf("SKIP: node %q can't provide %#v", nrt.Name, requests)
+			klog.Warningf("SKIP: node %q can't provide %s", nrt.Name, reqStr)
 			continue
 		}
-		klog.Infof("ADD : node %q provides at least %#v", nrt.Name, e2ereslist.ToString(requests))
+		klog.Infof("ADD : node %q provides at least %s", nrt.Name, reqStr)
 		ret = append(ret, nrt)
 	}
 	return ret

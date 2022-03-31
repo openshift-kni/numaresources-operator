@@ -34,6 +34,7 @@ import (
 
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 
+	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
@@ -78,6 +79,161 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	// note we hardcode the values we need here and when we pad node.
 	// This is ugly, but automatically computing the values is not straightforward
 	// and will we want to start lean and mean.
+
+	Context("with at least two nodes suitable", func() {
+		var targetNodeName string
+		var requiredRes corev1.ResourceList
+		var nrtCandidates []nrtv1alpha1.NodeResourceTopology
+
+		BeforeEach(func() {
+			const requiredNUMAZones = 2
+			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
+			nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, requiredNUMAZones)
+
+			const neededNodes = 2
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes))
+			}
+
+			//TODO: we should calculate requiredRes from NUMA zones in cluster nodes instead.
+			requiredRes = corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
+			}
+
+			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
+			nrtCandidates = e2enrt.FilterAnyZoneMatchingResources(nrtCandidates, requiredRes)
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d, needed: %d", len(nrtCandidates), neededNodes))
+			}
+			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
+
+			var ok bool
+			targetNodeName, ok = nrtCandidateNames.PopAny()
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
+			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
+			// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
+			// but have enough allocatable resources at node level to shedule the pod on it.
+			// If we pad each zone with a pod with 3/4 of the required resources, as those nodes have at least
+			// 2 NUMA zones, they will have enogh allocatable resources at node level to accomodate the required
+			// resources but they won't have enough resources in only one NUMA zone.
+
+			By("Padding all other candidate nodes")
+			// TODO This should be calculated as 3/4 of requiredRes
+			paddingRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("3Gi"),
+			}
+
+			var paddingPods []*corev1.Pod
+			for _, nodeName := range nrtCandidateNames.List() {
+
+				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
+				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
+
+				for idx, zone := range nrtInfo.Zones {
+					podName := fmt.Sprintf("padding%s-%d", nodeName, idx)
+					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingRes)
+					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone", podName, zone.Name)
+
+					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
+					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone", podName, zone.Name)
+
+					err = fxt.Client.Create(context.TODO(), padPod)
+					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone", podName, zone.Name)
+
+					paddingPods = append(paddingPods, padPod)
+				}
+			}
+
+			// wait for all padding pods to be up&running ( or fail)
+			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
+			for _, failedPod := range failedPods {
+				// no need to check for errors here
+				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
+			}
+			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
+		})
+
+		// FIXME: this is a slight abuse of DescribeTable, but we need to run
+		// the same code which a different test_id per tmscope
+		DescribeTable("[tier1] a guaranteed pod with one container should be scheduled into one NUMA zone",
+			func(tmPolicy nrtv1alpha1.TopologyManagerPolicy) {
+				nrts := e2enrt.FilterTopologyManagerPolicy(nrtCandidates, tmPolicy)
+				if len(nrts) != len(nrtCandidates) {
+					Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
+				}
+
+				By("Scheduling the testing pod")
+				pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
+				pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
+				pod.Spec.Containers[0].Resources.Limits = requiredRes
+
+				err := fxt.Client.Create(context.TODO(), pod)
+				Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
+
+				By("waiting for node to be up&running")
+				podRunningTimeout := 1 * time.Minute
+				updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
+				Expect(err).NotTo(HaveOccurred(), "Pod %q not up&running after %v", pod.Name, podRunningTimeout)
+
+				By("checking the pod has been scheduled in the proper node")
+				Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName))
+
+				By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+			},
+			Entry("[test_id:48713][tmscope:cnt]", nrtv1alpha1.SingleNUMANodeContainerLevel),
+			Entry("[tmscope:pod]", nrtv1alpha1.SingleNUMANodePodLevel),
+		)
+
+		// FIXME: this is a slight abuse of DescribeTable, but we need to run
+		// the same code which a different test_id per tmscope
+		DescribeTable("[tier1] a deployment with a guaranteed pod with one container should be scheduled into one NUMA zone",
+			func(tmPolicy nrtv1alpha1.TopologyManagerPolicy) {
+				nrts := e2enrt.FilterTopologyManagerPolicy(nrtCandidates, tmPolicy)
+				if len(nrts) != len(nrtCandidates) {
+					Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
+				}
+
+				By("Scheduling the testing deployment")
+				var deploymentName string = "test-dp"
+				var replicas int32 = 1
+
+				podLabels := map[string]string{
+					"test": "test-dp",
+				}
+				nodeSelector := map[string]string{}
+				deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+				deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
+				deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
+
+				err := fxt.Client.Create(context.TODO(), deployment)
+				Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
+
+				By("waiting for deployment to be up&running")
+				dpRunningTimeout := 1 * time.Minute
+				dpRunningPollInterval := 10 * time.Second
+				err = e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
+				Expect(err).NotTo(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, dpRunningTimeout)
+
+				By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
+				pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
+				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+
+				for _, pod := range pods {
+					Expect(pod.Spec.NodeName).To(Equal(targetNodeName))
+					schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+				}
+			},
+			Entry("[test_id:47583][tmscope:cnt]", nrtv1alpha1.SingleNUMANodeContainerLevel),
+			Entry("[tmscope:pod]", nrtv1alpha1.SingleNUMANodePodLevel),
+		)
+	})
 
 	DescribeTable("[placement] cluster with multiple worker nodes suitable",
 		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, podRes, unsuitableFreeRes []corev1.ResourceList) {
