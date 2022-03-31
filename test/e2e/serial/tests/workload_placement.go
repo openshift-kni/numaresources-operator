@@ -601,6 +601,20 @@ func getDsOwnedBy(cli client.Client, objMeta metav1.ObjectMeta) ([]*appsv1.Daemo
 	return dss, nil
 }
 
+func availableResourceType(nrtInfo nrtv1alpha1.NodeResourceTopology, resName corev1.ResourceName) resource.Quantity {
+	var res resource.Quantity
+
+	for _, zone := range nrtInfo.Zones {
+		zoneQty, ok := e2enrt.FindResourceAvailableByName(zone.Resources, resName.String())
+		if !ok {
+			continue
+		}
+
+		res.Add(zoneQty)
+	}
+	return res.DeepCopy()
+}
+
 func matchLogLevelToKlog(cnt *corev1.Container, level operatorv1.LogLevel) (bool, bool) {
 	rteFlags := flagcodec.ParseArgvKeyValue(cnt.Args)
 	kLvl := loglevel.ToKlog(level)
