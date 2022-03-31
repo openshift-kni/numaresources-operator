@@ -62,17 +62,16 @@ func GetLoad(k8sCli *kubernetes.Clientset, nodeName string) (Load, error) {
 			}
 		}
 	}
+
 	// get full cpus, and always take even number of CPUs
-	cpuMillis, _ := cpu.AsInt64()
 	// we round the CPU consumption as expressed in millicores (not entire cores)
 	// in order to (try to) avoid bugs related to integer division
 	// int64(2900 / 1000) -> 2 -> roundUp(2, 2) -> 2 (correct, but unexpected!)
 	// OTOH
-	// roundUp(2900, 2000) -> 4000 -> 4000/1000 -> 4 (intended behaviour)
+	// roundUp(2900, 2000) -> 4000 -> 4000/1000 -> 4 (intended behaviour).
+	// Value() round up the millis and roundUp rounds it up to multiples of 2 if needed.
 	// TODO: we can use some testing of the test utilities here (!)
-	cpuAmount := roundUp(cpuMillis, 2000)
-	nl.CPU = *resource.NewQuantity(cpuAmount/1000, resource.DecimalSI)
-
+	nl.CPU = *resource.NewQuantity(roundUp(cpu.Value(), 2), resource.DecimalSI)
 	mem.RoundUp(resource.Giga)
 	nl.Memory = *mem
 	return nl, nil
