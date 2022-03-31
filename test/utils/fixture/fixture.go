@@ -80,8 +80,13 @@ func Teardown(ft *Fixture) error {
 	err := teardownNamespace(ft.Client, ft.Namespace)
 	if err != nil {
 		klog.Errorf("cannot teardown namespace %q: %s", ft.Namespace.Name, err)
+		return err
 	}
-	return err
+	// TODO
+	cooldown := 30 * time.Second
+	klog.Warningf("cooling down for %v", cooldown)
+	time.Sleep(cooldown)
+	return nil
 }
 
 func setupNamespace(cli client.Client, baseName string, randomize bool) (corev1.Namespace, error) {
