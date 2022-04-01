@@ -134,13 +134,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				for idx, zone := range nrtInfo.Zones {
 					podName := fmt.Sprintf("padding%s-%d", nodeName, idx)
 					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingRes)
-					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone", podName, zone.Name)
+					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
 
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
-					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone", podName, zone.Name)
+					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
 
 					err = fxt.Client.Create(context.TODO(), padPod)
-					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone", podName, zone.Name)
+					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", podName, zone.Name)
 
 					paddingPods = append(paddingPods, padPod)
 				}
@@ -175,6 +175,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				By("waiting for node to be up&running")
 				podRunningTimeout := 1 * time.Minute
 				updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
+				if err != nil {
+					_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
+				}
 				Expect(err).NotTo(HaveOccurred(), "Pod %q not up&running after %v", pod.Name, podRunningTimeout)
 
 				By("checking the pod has been scheduled in the proper node")
@@ -245,7 +248,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
 			}
 
-			Expect(len(unsuitableFreeRes)).To(Equal(hostsRequired), "mismatch unsuitable resource declarations (expected %d items)", hostsRequired)
+			Expect(len(unsuitableFreeRes)).To(Equal(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
 
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName

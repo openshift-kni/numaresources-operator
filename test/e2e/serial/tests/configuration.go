@@ -347,6 +347,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, 5*time.Minute)
+			if err != nil {
+				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
+			}
 			Expect(err).ToNot(HaveOccurred())
 
 			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
@@ -465,6 +468,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			testPod, err = e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			if err != nil {
+				_ = objects.LogEventsForPod(fxt.K8sClient, testPod.Namespace, testPod.Name)
+			}
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))

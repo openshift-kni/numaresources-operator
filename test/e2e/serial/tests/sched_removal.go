@@ -201,9 +201,12 @@ func createDeployment(fxt *e2efixture.Fixture, name, schedulerName string) *apps
 }
 
 func createDeploymentSync(fxt *e2efixture.Fixture, name, schedulerName string) *appsv1.Deployment {
+	dpRunningTimeout := time.Minute
+	dpRunningPollInterval := 10 * time.Second
 	dp := createDeployment(fxt, name, schedulerName)
 	By(fmt.Sprintf("waiting for the test deployment %q to be complete and ready", name))
-	err := e2ewait.ForDeploymentComplete(fxt.Client, dp, 2*time.Second, 30*time.Second)
-	Expect(err).ToNot(HaveOccurred())
+
+	err := e2ewait.ForDeploymentComplete(fxt.Client, dp, dpRunningPollInterval, dpRunningTimeout)
+	Expect(err).ToNot(HaveOccurred(), "Deployment %q is not up & running after %v", dp.Name, dpRunningTimeout)
 	return dp
 }
