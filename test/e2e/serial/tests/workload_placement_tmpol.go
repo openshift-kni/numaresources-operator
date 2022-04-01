@@ -466,7 +466,7 @@ func setupPaddingPodLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResou
 
 	podTotRes := e2ereslist.FromGuaranteedPod(*padInfo.pod)
 	By(fmt.Sprintf("testpod resource requests (vanilla): %s", e2ereslist.ToString(podTotRes)))
-	podTotRes = baseload.Apply(podTotRes)
+	baseload.Apply(podTotRes)
 	By(fmt.Sprintf("testpod resource requests (adjusted): %s", e2ereslist.ToString(podTotRes)))
 
 	zone = nrtInfo.Zones[1]
@@ -541,7 +541,7 @@ func setupPaddingForUnsuitableNodes(offset int, fxt *e2efixture.Fixture, nrtList
 
 			By(fmt.Sprintf("saturating node %q -> %q zone %q to fit only (vanilla) %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes)))
 			if zoneIdx == 0 { // any random zone is actually fine
-				padRes = baseload.Apply(padRes)
+				baseload.Apply(padRes)
 				By(fmt.Sprintf("saturating node %q -> %q zone %q to fit only (adjusted) %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes)))
 			}
 

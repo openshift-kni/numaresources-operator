@@ -128,22 +128,30 @@ func SaturateZoneUntilLeft(zone nrtv1alpha1.Zone, requiredRes corev1.ResourceLis
 	return paddingRes, nil
 }
 
-func SaturateNodeUntilLeft(node corev1.Node, requiredRes corev1.ResourceList) (corev1.ResourceList, error) {
-	paddingRes := make(corev1.ResourceList)
-	for resName, resQty := range requiredRes {
-		nodeQty, ok := node.Status.Allocatable[resName]
-		if !ok {
-			return nil, fmt.Errorf("resource %q not found in node %q", string(resName), node.Name)
-		}
+func SaturateNodeUntilLeft(nrtInfo nrtv1alpha1.NodeResourceTopology, requiredRes corev1.ResourceList) (map[string]corev1.ResourceList, error) {
+	//TODO: support splitting the requiredRes on multiple numas
+	//corrently the function deducts the requiredRes from the first Numa
 
-		if nodeQty.Cmp(resQty) < 0 {
-			klog.Errorf("resource %q already too scarce in zone %q (target %v amount %v)", resName, node.Name, resQty, nodeQty)
-			return nil, ErrNotEnoughResources
+	paddingRes := make(map[string]corev1.ResourceList)
+
+	zeroRes := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("0"),
+		corev1.ResourceMemory: resource.MustParse("0"),
+	}
+	var zonePadRes corev1.ResourceList
+	var err error
+	for ind, zone := range nrtInfo.Zones {
+		if ind == 0 {
+			zonePadRes, err = SaturateZoneUntilLeft(zone, zeroRes)
+		} else {
+			zonePadRes, err = SaturateZoneUntilLeft(zone, requiredRes)
 		}
-		klog.Infof("node %q resource %q available %s allocation target %s", node.Name, resName, nodeQty.String(), resQty.String())
-		paddingQty := nodeQty.DeepCopy()
-		paddingQty.Sub(resQty)
-		paddingRes[resName] = paddingQty
+		if err != nil {
+			klog.Errorf(fmt.Sprintf("could not make padding pod for zone %q leaving 0 resources available.", zone.Name))
+			return nil, err
+		}
+		klog.Infof("Padding resources for zone %q: %s", zone.Name, e2ereslist.ToString(zonePadRes))
+		paddingRes[zone.Name] = zonePadRes
 	}
 
 	return paddingRes, nil

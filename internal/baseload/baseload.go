@@ -83,7 +83,7 @@ func (nl Load) String() string {
 
 // Apply adjust the given ResourceList with the current node load, mutating
 // the parameter in place and also returning the updated value.
-func (nl Load) Apply(res corev1.ResourceList) corev1.ResourceList {
+func (nl Load) Apply(res corev1.ResourceList) {
 	adjustedCPU := res.Cpu()
 	adjustedCPU.Add(nl.CPU)
 	res[corev1.ResourceCPU] = *adjustedCPU
@@ -91,7 +91,18 @@ func (nl Load) Apply(res corev1.ResourceList) corev1.ResourceList {
 	adjustedMemory := res.Memory()
 	adjustedMemory.Add(nl.Memory)
 	res[corev1.ResourceMemory] = *adjustedMemory
-	return res
+}
+
+// Deduct subtract the current node load from the given ResourceList, mutating
+// the parameter in place and also returning the updated value.
+func (nl Load) Deduct(res corev1.ResourceList) {
+	adjustedCPU := res.Cpu()
+	adjustedCPU.Sub(nl.CPU)
+	res[corev1.ResourceCPU] = *adjustedCPU
+
+	adjustedMemory := res.Memory()
+	adjustedMemory.Sub(nl.Memory)
+	res[corev1.ResourceMemory] = *adjustedMemory
 }
 
 func roundUp(num, multiple int64) int64 {
