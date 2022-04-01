@@ -26,7 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	"github.com/openshift-kni/numaresources-operator/pkg/testutils"
+
+	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
 func TestUpdate(t *testing.T) {
@@ -35,7 +36,7 @@ func TestUpdate(t *testing.T) {
 		t.Errorf("nropv1alpha1.AddToScheme() failed with: %v", err)
 	}
 
-	nro := testutils.NewNUMAResourcesOperator("test-nro", nil)
+	nro := testobjs.NewNUMAResourcesOperator("test-nro", nil)
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(nro).Build()
 
 	nro.Status.Conditions, _ = GetUpdatedConditions(nro.Status.Conditions, ConditionProgressing, "testReason", "test message")
@@ -63,7 +64,7 @@ func TestUpdateIfNeeded(t *testing.T) {
 		t.Errorf("nropv1alpha1.AddToScheme() failed with: %v", err)
 	}
 
-	nro := testutils.NewNUMAResourcesOperator("test-nro", nil)
+	nro := testobjs.NewNUMAResourcesOperator("test-nro", nil)
 
 	var ok bool
 	nro.Status.Conditions, ok = GetUpdatedConditions(nro.Status.Conditions, ConditionAvailable, "", "")

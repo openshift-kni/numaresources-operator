@@ -7,7 +7,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	"github.com/openshift-kni/numaresources-operator/pkg/testutils"
+
+	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
 var _ = Describe("Validation", func() {
@@ -15,8 +16,8 @@ var _ = Describe("Validation", func() {
 		Context("with duplicates", func() {
 			It("should return an error", func() {
 				mcps := []*machineconfigv1.MachineConfigPool{
-					testutils.NewMachineConfigPool("test", nil, nil, nil),
-					testutils.NewMachineConfigPool("test", nil, nil, nil),
+					testobjs.NewMachineConfigPool("test", nil, nil, nil),
+					testobjs.NewMachineConfigPool("test", nil, nil, nil),
 				}
 
 				err := MachineConfigPoolDuplicates(mcps)
@@ -28,8 +29,8 @@ var _ = Describe("Validation", func() {
 		Context("without duplicates", func() {
 			It("should not return any error", func() {
 				mcps := []*machineconfigv1.MachineConfigPool{
-					testutils.NewMachineConfigPool("test", nil, nil, nil),
-					testutils.NewMachineConfigPool("test1", nil, nil, nil),
+					testobjs.NewMachineConfigPool("test", nil, nil, nil),
+					testobjs.NewMachineConfigPool("test1", nil, nil, nil),
 				}
 
 				err := MachineConfigPoolDuplicates(mcps)
