@@ -111,11 +111,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// and the other one will not have enough resources on only one numa zone
 			// but will fulfill the node selector filter.
 			targetNodeName, ok := nrtCandidateNames.PopAny()
-			Expect(ok).To(BeTrue(), "cannot select a targe node among %#v", nrtCandidateNames.List())
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
 			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
 
 			toAlsoLabelNodeName, ok := nrtCandidateNames.PopAny()
-			Expect(ok).To(BeTrue(), "cannot select a targe node among %#v", nrtCandidateNames.List())
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
 			By(fmt.Sprintf("selecting node to schedule the pod: %q", toAlsoLabelNodeName))
 
 			labelName := "size"
@@ -127,7 +127,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			defer func() {
 				err := unlabelOneFunc()
 				if err != nil {
-					klog.Errorf("Error while trying to unlable node %q. %v", targetNodeName, err)
+					klog.Errorf("Error while trying to unlabel node %q. %v", targetNodeName, err)
 				}
 			}()
 
@@ -136,7 +136,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			defer func() {
 				err := unlabelTwoFunc()
 				if err != nil {
-					klog.Errorf("Error while trying to unlable node %q. %v", toAlsoLabelNodeName, err)
+					klog.Errorf("Error while trying to unlabel node %q. %v", toAlsoLabelNodeName, err)
 				}
 			}()
 
@@ -180,7 +180,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
 
 			By("Scheduling the testing pod")
-			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testPod")
+			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			pod.Spec.Containers[0].Resources.Limits = requiredRes
 			pod.Spec.NodeSelector = map[string]string{
