@@ -81,8 +81,8 @@ func (nl Load) String() string {
 	return fmt.Sprintf("load for node %q: CPU=%s Memory=%s", nl.Name, nl.CPU.String(), nl.Memory.String())
 }
 
-// Apply adjust the given ResourceList with the current node load, mutating
-// the parameter in place and also returning the updated value.
+// Apply adjust the given ResourceList with the current node load by mutating
+// the parameter in place
 func (nl Load) Apply(res corev1.ResourceList) {
 	adjustedCPU := res.Cpu()
 	adjustedCPU.Add(nl.CPU)
@@ -93,8 +93,8 @@ func (nl Load) Apply(res corev1.ResourceList) {
 	res[corev1.ResourceMemory] = *adjustedMemory
 }
 
-// Deduct subtract the current node load from the given ResourceList, mutating
-// the parameter in place and also returning the updated value.
+// Deduct subtract the current node load from the given ResourceList by mutating
+// the parameter in place
 func (nl Load) Deduct(res corev1.ResourceList) {
 	adjustedCPU := res.Cpu()
 	adjustedCPU.Sub(nl.CPU)

@@ -257,6 +257,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 
 			By("waiting for the pod to be scheduled")
 			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
+			if err != nil {
+				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
+			}
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
