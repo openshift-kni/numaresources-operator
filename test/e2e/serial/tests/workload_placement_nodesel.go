@@ -122,7 +122,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			labelValue := "medium"
 			By(fmt.Sprintf("Labeling nodes %q and %q with label %q:%q", targetNodeName, toAlsoLabelNodeName, labelName, labelValue))
 
-			unlabelOneFunc, err := labelNodeWithValue(fxt.Client, labelName, labelName, targetNodeName)
+			unlabelOneFunc, err := labelNodeWithValue(fxt.Client, labelName, labelValue, targetNodeName)
 			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", targetNodeName)
 			defer func() {
 				err := unlabelOneFunc()
@@ -131,7 +131,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 			}()
 
-			unlabelTwoFunc, err := labelNodeWithValue(fxt.Client, labelName, labelName, toAlsoLabelNodeName)
+			unlabelTwoFunc, err := labelNodeWithValue(fxt.Client, labelName, labelValue, toAlsoLabelNodeName)
 			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", toAlsoLabelNodeName)
 			defer func() {
 				err := unlabelTwoFunc()
