@@ -83,9 +83,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	// and will we want to start lean and mean.
 	Context("with two nodes with two NUMA zones", func() {
 		It("[test_id:47598][tier2] should place the pod in the node with available resources in one NUMA zone and fulfilling node selector", func() {
-
-			skipUnlessEnvVar("E2E_SERIAL_STAGING", "FIXME: NRT filter clashes with the noderesources fit plugin")
-
 			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
