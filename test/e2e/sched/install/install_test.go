@@ -92,7 +92,7 @@ var _ = Describe("[Scheduler] install", func() {
 			}, deploymentCheckTimeout, deploymentCheckPollPeriod).Should(BeTrue(), "Deployment Status not OK")
 
 			By("Check secondary scheduler pod is scheduled on a control-plane node")
-			podList, err := schedutils.ListPodsByDeployment(e2eclient.Client, *deployment)
+			podList, err := schedutils.ListPodsByDeployment(e2eclient.K8sApis, deployment)
 			Expect(err).NotTo(HaveOccurred())
 
 			nodeList, err := schedutils.ListMasterNodes(e2eclient.Client)

@@ -177,7 +177,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
 			By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q ", serialconfig.Config.SchedulerName))
-			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
+			pods, err := schedutils.ListPodsByDeployment(fxt.K8sApis, deployment)
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 
 			for _, pod := range pods {

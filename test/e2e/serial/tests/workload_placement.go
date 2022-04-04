@@ -203,7 +203,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 
-			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *updatedDp)
+			pods, err := schedutils.ListPodsByDeployment(fxt.K8sApis, updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(pods)).To(Equal(1))
 
@@ -252,7 +252,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			namespacedDpName := fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
 			Eventually(func() bool {
-				pods, err = schedutils.ListPodsByDeployment(fxt.Client, *updatedDp)
+				pods, err = schedutils.ListPodsByDeployment(fxt.K8sApis, updatedDp)
 				if err != nil {
 					klog.Warningf("failed to list the pods of deployment: %q error: %v", namespacedDpName, err)
 					return false
@@ -342,7 +342,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			namespacedDpName = fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
 			Eventually(func() bool {
-				pods, err = schedutils.ListPodsByDeployment(fxt.Client, *updatedDp)
+				pods, err = schedutils.ListPodsByDeployment(fxt.K8sApis, updatedDp)
 				if err != nil {
 					klog.Warningf("failed to list the pods of deployment: %q error: %v", namespacedDpName, err)
 					return false

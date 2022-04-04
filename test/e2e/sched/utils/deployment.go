@@ -24,7 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	clientset "k8s.io/client-go/kubernetes"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 )
@@ -46,17 +47,19 @@ func GetDeploymentByOwnerReference(uid types.UID) (*v1.Deployment, error) {
 	return nil, fmt.Errorf("failed to get deployment with uid: %s", uid)
 }
 
-func ListPodsByDeployment(aclient client.Client, deployment v1.Deployment) ([]corev1.Pod, error) {
-	podList := &corev1.PodList{}
-	sel, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+func ListPodsByDeployment(aclient clientset.Interface, deployment *v1.Deployment) ([]corev1.Pod, error) {
+	podListFunc := func(namespace string, options metav1.ListOptions) (*corev1.PodList, error) {
+		return aclient.CoreV1().Pods(namespace).List(context.TODO(), options)
+	}
+
+	rsList, err := deploymentutil.ListReplicaSets(deployment, deploymentutil.RsListFromClient(aclient.AppsV1()))
 	if err != nil {
 		return nil, err
 	}
 
-	err = aclient.List(context.TODO(), podList, &client.ListOptions{Namespace: deployment.Namespace, LabelSelector: sel})
+	podList, err := deploymentutil.ListPods(deployment, rsList, podListFunc)
 	if err != nil {
 		return nil, err
 	}
-
 	return podList.Items, nil
 }
