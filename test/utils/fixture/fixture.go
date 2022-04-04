@@ -42,6 +42,8 @@ type Fixture struct {
 	Client client.Client
 	// K8sClient defines k8s client to run subresource operations, for example you should use it to get pod logs
 	K8sClient *kubernetes.Clientset
+	//k8sApis defines group of interfaces to have access to all k8s APIs
+	K8sApis   kubernetes.Interface
 	Namespace corev1.Namespace
 }
 
@@ -66,6 +68,7 @@ func SetupWithOptions(name string, options Options) (*Fixture, error) {
 	return &Fixture{
 		Client:    e2eclient.Client,
 		K8sClient: e2eclient.K8sClient,
+		K8sApis:   e2eclient.K8sApis,
 		Namespace: ns,
 	}, nil
 

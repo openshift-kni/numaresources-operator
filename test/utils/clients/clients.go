@@ -40,6 +40,8 @@ var (
 	Client client.Client
 	// K8sClient defines k8s client to run subresource operations, for example you should use it to get pod logs
 	K8sClient *kubernetes.Clientset
+	//k8sApis defines group of interfaces to have access to all k8s APIs
+	K8sApis kubernetes.Interface
 	// ClientsEnabled tells if the client from the package can be used
 	ClientsEnabled bool
 )
@@ -75,6 +77,12 @@ func init() {
 		ClientsEnabled = false
 		return
 	}
+	K8sApis, err = NewK8sInterface()
+	if err != nil {
+		klog.Info("Failed to initialize k8s client, check the KUBECONFIG env variable", err.Error())
+		ClientsEnabled = false
+		return
+	}
 	ClientsEnabled = true
 }
 
@@ -101,6 +109,20 @@ func NewK8s() (*kubernetes.Clientset, error) {
 		klog.Exit(err.Error())
 	}
 	return clientset, nil
+}
+
+// NewK8sInterface returns a kubernetes interface
+func NewK8sInterface() (kubernetes.Interface, error) {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		klog.Exit(err.Error())
+	}
+	return c, nil
 }
 
 func GetWithRetry(ctx context.Context, key client.ObjectKey, obj client.Object) error {
