@@ -27,6 +27,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
+	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
@@ -94,9 +95,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Skip(fmt.Sprintf("not enough nodes with %d NUMA Zones: found %d, needed %d", requiredNUMAZones, len(nrtCandidates), neededNodes))
 			}
 
+			// TODO: this should be >= 5 baseload
 			requiredRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("1000Mi"),
+				corev1.ResourceCPU:    resource.MustParse("16"),
+				corev1.ResourceMemory: resource.MustParse("16Gi"),
+			}
+			// WARNING: This should be calculated as 3/4 of requiredRes
+			paddingRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("12"),
+				corev1.ResourceMemory: resource.MustParse("12Gi"),
 			}
 
 			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
@@ -144,21 +151,23 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// we nee to also pad one of the labeled nodes.
 			nrtToPadNames := append(nrtCandidateNames.List(), toAlsoLabelNodeName)
 
-			// WARNING: This should be calculated as 3/4 of requiredRes
-			paddingRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("750m"),
-				corev1.ResourceMemory: resource.MustParse("750Mi"),
-			}
-
 			var paddingPods []*corev1.Pod
-			for nidx, nodeName := range nrtToPadNames {
+			for nIdx, nodeName := range nrtToPadNames {
 
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-				for zidx, zone := range nrtInfo.Zones {
-					podName := fmt.Sprintf("padding%d-%d", nidx, zidx)
-					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingRes)
+				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+				Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", nodeName)
+
+				for zIdx, zone := range nrtInfo.Zones {
+					zoneRes := paddingRes.DeepCopy() // to be extra safe
+					if zIdx == 0 {                   // any zone is fine
+						baseload.Apply(zoneRes)
+					}
+
+					podName := fmt.Sprintf("padding%d-%d", nIdx, zIdx)
+					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, zoneRes)
 					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
 
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
@@ -190,13 +199,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), pod)
 			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
 
-			By("waiting for node to be up&running")
-			podRunningTimeout := 1 * time.Minute
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
+			By("waiting for pod to be running")
+			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 1*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
-			Expect(err).NotTo(HaveOccurred(), "Pod %q not up&running after %v", pod.Name, podRunningTimeout)
+			Expect(err).NotTo(HaveOccurred())
 
 			By("checking the pod has been scheduled in the proper node")
 			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName))
