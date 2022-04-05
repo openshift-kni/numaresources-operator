@@ -1,0 +1,27 @@
+name: CI Format
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  format:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+
+    - name: set up golang
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.17
+
+    - name: format
+      run: ./hack/check-format.sh

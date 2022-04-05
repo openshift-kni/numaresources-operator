@@ -1,4 +1,4 @@
-name: CI Go
+name: CI Build
 
 on:
   push:
@@ -11,33 +11,6 @@ defaults:
     shell: bash
 
 jobs:
-  lint:
-    runs-on: ubuntu-20.04
-    steps:
-    - name: Check out code
-      uses: actions/checkout@v2
-
-    - name: Verify
-      uses: golangci/golangci-lint-action@v2
-      with:
-        version: v1.41.1
-        args: --timeout=15m0s --verbose
-
-  format:
-    runs-on: ubuntu-20.04
-    steps:
-    - uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
-
-    - name: set up golang
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.17
-
-    - name: format
-      run: ./hack/check-format.sh
-
   build:
     runs-on: ubuntu-20.04
     steps:
