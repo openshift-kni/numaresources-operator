@@ -229,7 +229,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 		})
 	})
-
 	Context("with at least two nodes with two numa zones and enough resources in one numazone", func() {
 		It("[test_id:47592][tier2][unsched] a daemonset with a guaranteed pod resources available on one node/one single numa zone but not in any other node", func() {
 			requiredNUMAZones := 2
@@ -340,4 +339,184 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 		})
 	})
+	Context("with at least one node", func() {
+		It("[test_id:47616][tier2][tmscope:pod] pod with two containers each on one numa zone can NOT be scheduled", func() {
+
+			// Requirements:
+			// Need at least this nodes
+			neededNodes := 1
+			// with at least this number of numa zones
+			requiredNUMAZones := 2
+			// and with this policy
+			tmPolicy := nrtv1alpha1.SingleNUMANodePodLevel
+
+			// filter by policy
+			nrtCandidates := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, tmPolicy)
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrtCandidates)))
+			}
+
+			// Filter by number of numa zones
+			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
+			nrtCandidates = e2enrt.FilterZoneCountEqual(nrtCandidates, requiredNUMAZones)
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes))
+			}
+
+			// filter by resources on each numa zone
+			requiredResCnt1 := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
+			}
+
+			requiredResCnt2 := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("5"),
+				corev1.ResourceMemory: resource.MustParse("5Gi"),
+			}
+
+			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
+			nrtCandidates = filterNRTsEachRequestOnADifferentZone(nrtCandidates, requiredResCnt1, requiredResCnt2)
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d, needed: %d", len(nrtCandidates), neededNodes))
+			}
+
+			// After filter get one of the candidate nodes left
+			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
+			targetNodeName, ok := nrtCandidateNames.PopAny()
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
+			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
+
+			By("Padding all other candidate nodes")
+			var paddingPods []*corev1.Pod
+			for nodeIdx, nodeName := range nrtCandidateNames.List() {
+
+				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
+				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
+
+				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
+
+				baseloadResources := corev1.ResourceList{
+					corev1.ResourceCPU:    baseload.CPU,
+					corev1.ResourceMemory: baseload.Memory,
+				}
+
+				paddingResources, err := e2enrt.SaturateNodeUntilLeft(*nrtInfo, baseloadResources)
+				Expect(err).ToNot(HaveOccurred(), "could not get padding resources for node %q", nrtInfo.Name)
+
+				for zoneIdx, zone := range nrtInfo.Zones {
+					podName := fmt.Sprintf("padding%d-%d", nodeIdx, zoneIdx)
+					padPod := newPaddingPod(nodeName, zone.Name, fxt.Namespace.Name, paddingResources[zone.Name])
+
+					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
+					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
+
+					err = fxt.Client.Create(context.TODO(), padPod)
+					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", podName, zone.Name)
+
+					paddingPods = append(paddingPods, padPod)
+				}
+			}
+
+			By("Padding target node")
+			//calculate base load on the target node
+			targetNodeBaseLoad, err := nodes.GetLoad(fxt.K8sClient, targetNodeName)
+			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
+
+			// Pad the zones so no one could handle both containers
+			// so we should left enought resources on each zone to accomodate
+			// the "biggest" ( in term of resources) container but not the
+			// sum of both
+			paddingResources := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("6"),
+				corev1.ResourceMemory: resource.MustParse("6Gi"),
+			}
+
+			targetNrt, err := e2enrt.FindFromList(nrtCandidates, targetNodeName)
+			Expect(err).NotTo(HaveOccurred(), "missing NRT info for targetNode %q", targetNodeName)
+
+			for zoneIdx, zone := range targetNrt.Zones {
+				zoneRes := paddingResources.DeepCopy()
+				if zoneIdx == 0 { //any zone would do it, we just choose one.
+					targetNodeBaseLoad.Apply(zoneRes)
+				}
+
+				paddingRes, err := e2enrt.SaturateZoneUntilLeft(zone, zoneRes)
+				Expect(err).NotTo(HaveOccurred(), "could not get padding resources for node %q", targetNrt.Name)
+
+				podName := fmt.Sprintf("padding-tgt-%d", zoneIdx)
+				padPod := newPaddingPod(targetNodeName, zone.Name, fxt.Namespace.Name, paddingRes)
+
+				padPod, err = pinPodTo(padPod, targetNodeName, zone.Name)
+				Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
+
+				err = fxt.Client.Create(context.TODO(), padPod)
+				Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", podName, zone.Name)
+
+				paddingPods = append(paddingPods, padPod)
+			}
+
+			By("waiting for padding pods to be ready ...")
+			// wait for all padding pods to be up&running ( or fail)
+			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
+			for _, failedPod := range failedPods {
+				// no need to check for errors here
+				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
+			}
+			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
+
+			By("Scheduling the testing pod")
+			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
+			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
+			pod.Spec.Containers = append(pod.Spec.Containers, pod.Spec.Containers[0])
+			pod.Spec.Containers[0].Name = pod.Name + "-cnt-0"
+			pod.Spec.Containers[0].Resources.Limits = requiredResCnt1
+			pod.Spec.Containers[1].Name = pod.Name + "cnt-1"
+			pod.Spec.Containers[1].Resources.Limits = requiredResCnt2
+
+			err = fxt.Client.Create(context.TODO(), pod)
+			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
+
+			interval := 10 * time.Second
+			By(fmt.Sprintf("Checking pod %q keeps in %q state for at least %v seconds ...", pod.Name, string(corev1.PodPending), interval*3))
+			err = e2ewait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, interval, 3)
+			if err != nil {
+				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+			}
+			Expect(err).ToNot(HaveOccurred())
+
+			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+			Expect(err).ToNot(HaveOccurred())
+			if !isFailed {
+				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+			}
+			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+		})
+	})
 })
+
+// Return only those NRTs where each request could fit into a different zone.
+func filterNRTsEachRequestOnADifferentZone(nrts []nrtv1alpha1.NodeResourceTopology, r1, r2 corev1.ResourceList) []nrtv1alpha1.NodeResourceTopology {
+	ret := []nrtv1alpha1.NodeResourceTopology{}
+	for _, nrt := range nrts {
+		if nrtCanAccomodateEachRequestOnADifferentZone(nrt, r1, r2) {
+			ret = append(ret, nrt)
+		}
+	}
+	return ret
+}
+
+// returns true if nrt can accomodate r1 and r2 in one of its two first zones.
+func nrtCanAccomodateEachRequestOnADifferentZone(nrt nrtv1alpha1.NodeResourceTopology, r1, r2 corev1.ResourceList) bool {
+	if len(nrt.Zones) < 2 {
+		return false
+	}
+	return eachRequestFitsOnADifferentZone(nrt.Zones[0], nrt.Zones[1], r1, r2)
+}
+
+//returns true if r1 fits on z1 AND r2 on z2 or the other way around
+func eachRequestFitsOnADifferentZone(z1, z2 nrtv1alpha1.Zone, r1, r2 corev1.ResourceList) bool {
+	return (e2enrt.ZoneResourcesMatchesRequest(z1.Resources, r1) && e2enrt.ZoneResourcesMatchesRequest(z2.Resources, r2)) ||
+		(e2enrt.ZoneResourcesMatchesRequest(z1.Resources, r2) && e2enrt.ZoneResourcesMatchesRequest(z2.Resources, r1))
+}
