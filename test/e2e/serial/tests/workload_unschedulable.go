@@ -146,7 +146,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
 		})
 
-		It("[test_id:47617][tier2] workload requests guaranteed pod resources available on one node but not on a single numa", func() {
+		It("[test_id:47617][tier2][unsched] workload requests guaranteed pod resources available on one node but not on a single numa", func() {
 
 			By("Scheduling the testing pod")
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
@@ -168,7 +168,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 		})
 
-		It("[test_id:48963][tier2] a deployment with a guaranteed pod resources available on one node but not on a single numa", func() {
+		It("[test_id:48963][tier2][unsched] a deployment with a guaranteed pod resources available on one node but not on a single numa", func() {
 
 			By("Scheduling the testing deployment")
 			deploymentName := "test-dp"
@@ -199,7 +199,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 		})
 
-		It("[test_id:48962][tier2] a daemonset with a guaranteed pod resources available on one node but not on a single numa", func() {
+		It("[test_id:48962][tier2][unsched] a daemonset with a guaranteed pod resources available on one node but not on a single numa", func() {
 
 			By("Scheduling the testing daemonset")
 			dsName := "test-ds"
