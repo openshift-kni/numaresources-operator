@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	kubeschedulerconfigv1beta2 "k8s.io/kube-scheduler/config/v1beta2"
 	"k8s.io/utils/pointer"
-	apiconfigv1beta2 "sigs.k8s.io/scheduler-plugins/pkg/apis/config/v1beta2"
+	apiconfigv1beta2 "sigs.k8s.io/scheduler-plugins/apis/config/v1beta2"
 
 	rteassets "github.com/k8stopologyawareschedwg/deployer/pkg/assets/rte"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
