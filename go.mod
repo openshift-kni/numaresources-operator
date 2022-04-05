@@ -7,7 +7,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/go-cmp v0.5.6
 	github.com/jaypipes/ghw v0.8.1-0.20211210215558-4d0ed8fddb8c
-	github.com/jaypipes/pcidb v0.6.0
+	github.com/jaypipes/pcidb v1.0.0
 	github.com/k8stopologyawareschedwg/deployer v0.3.0
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12
 	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.4.2-0.20220206104702-bb95c4d402dc
@@ -173,6 +173,7 @@ replace (
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
+	github.com/jaypipes/pcidb => github.com/jaypipes/pcidb v1.0.0
 	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.14.0
 	github.com/onsi/gomega => github.com/onsi/gomega v1.10.1
 	github.com/openshift/machine-config-operator => github.com/openshift/machine-config-operator v0.0.1-0.20211110032239-0abf68a0c320 // release-4.10
