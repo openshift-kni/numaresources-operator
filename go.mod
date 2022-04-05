@@ -12,7 +12,7 @@ require (
 	github.com/jaypipes/pcidb v1.0.0
 	github.com/k8stopologyawareschedwg/deployer v0.4.0
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.4.2-0.20220301124602-f5d26de74de3
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.4.3-0.20220405062856-7f4c0903e941
 	github.com/kubevirt/device-plugin-manager v1.18.8
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo v1.16.5
