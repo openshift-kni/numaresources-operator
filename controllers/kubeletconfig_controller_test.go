@@ -34,7 +34,8 @@ import (
 
 	nrov1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-	"github.com/openshift-kni/numaresources-operator/pkg/testutils"
+
+	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
 const (
@@ -62,12 +63,12 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 			label1 = map[string]string{
 				"test1": "test1",
 			}
-			mcp1 = testutils.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
-			nro = testutils.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
+			mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
+			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
 				{MatchLabels: label1},
 			})
 			kubeletConfig := &kubeletconfigv1beta1.KubeletConfiguration{}
-			mcoKc1 = testutils.NewKubeletConfig("test1", label1, mcp1.Spec.MachineConfigSelector, kubeletConfig)
+			mcoKc1 = testobjs.NewKubeletConfig("test1", label1, mcp1.Spec.MachineConfigSelector, kubeletConfig)
 		})
 
 		Context("on the first iteration", func() {
@@ -114,7 +115,7 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 			})
 
 			It("should send events when NRO present and operation failure", func() {
-				brokenMcoKc := testutils.NewKubeletConfigWithData("test1", label1, mcp1.Spec.MachineConfigSelector, []byte(""))
+				brokenMcoKc := testobjs.NewKubeletConfigWithData("test1", label1, mcp1.Spec.MachineConfigSelector, []byte(""))
 				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, brokenMcoKc)
 				Expect(err).ToNot(HaveOccurred())
 

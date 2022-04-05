@@ -50,8 +50,9 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
-	"github.com/openshift-kni/numaresources-operator/pkg/testutils"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
+
+	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
 const (
@@ -104,21 +105,21 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 	Context("with unexpected NRO CR name", func() {
 		It("should updated the CR condition to degraded", func() {
-			nro := testutils.NewNUMAResourcesOperator("test", nil)
+			nro := testobjs.NewNUMAResourcesOperator("test", nil)
 			verifyDegradedCondition(nro, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName)
 		})
 	})
 
 	Context("with NRO empty machine config pool selector node group", func() {
 		It("should updated the CR condition to degraded", func() {
-			nro := testutils.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{nil})
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{nil})
 			verifyDegradedCondition(nro, validation.NodeGroupsError)
 		})
 	})
 
 	Context("without available machine config pools", func() {
 		It("should updated the CR condition to degraded", func() {
-			nro := testutils.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
 				{
 					MatchLabels: map[string]string{"test": "test"},
 				},
@@ -143,13 +144,13 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				"test2": "test2",
 			}
 
-			nro = testutils.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
+			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
 				{MatchLabels: label1},
 				{MatchLabels: label2},
 			})
 
-			mcp1 = testutils.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
-			mcp2 = testutils.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
+			mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
+			mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
 
 			var err error
 			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, nro, mcp1, mcp2)
@@ -313,13 +314,13 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				"test2": "test2",
 			}
 
-			nro = testutils.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
+			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
 				{MatchLabels: label1},
 				{MatchLabels: label2},
 			})
 
-			mcp1 = testutils.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
-			mcp2 = testutils.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
+			mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
+			mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
 		})
 
 		Context("with machine config pool with SIMPLE machine config selector", func() {
@@ -479,7 +480,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			BeforeEach(func() {
 				label3 := map[string]string{"test3": "test3"}
-				mcpWithComplexMachineConfigSelector = testutils.NewMachineConfigPool(
+				mcpWithComplexMachineConfigSelector = testobjs.NewMachineConfigPool(
 					"complex-machine-config-selector",
 					label3,
 					&metav1.LabelSelector{MatchLabels: label3},

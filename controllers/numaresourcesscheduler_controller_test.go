@@ -37,7 +37,8 @@ import (
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
-	"github.com/openshift-kni/numaresources-operator/pkg/testutils"
+
+	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
 const testSchedulerName = "testSchedulerName"
@@ -75,7 +76,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 	ginkgo.Context("with unexpected NRS CR name", func() {
 		ginkgo.It("should updated the CR condition to degraded", func() {
-			nrs := testutils.NewNUMAResourcesScheduler("test", "some/url:latest", testSchedulerName)
+			nrs := testobjs.NewNUMAResourcesScheduler("test", "some/url:latest", testSchedulerName)
 			verifyDegradedCondition(nrs, conditionTypeIncorrectNUMAResourcesSchedulerResourceName)
 		})
 	})
@@ -86,7 +87,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 		ginkgo.BeforeEach(func() {
 			var err error
-			nrs = testutils.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName)
+			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName)
 			reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(nrs)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
