@@ -92,7 +92,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Skip(fmt.Sprintf("not enough nodes with %d NUMA Zones: found %d, needed %d", requiredNUMAZones, len(nrtCandidates), neededNodes))
 			}
 
-			// TODO: this should be >= 5 baseload
+			// TODO: this should be >= 5x baseload
 			requiredRes := corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("16"),
 				corev1.ResourceMemory: resource.MustParse("16Gi"),
@@ -111,42 +111,42 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
 			// we need to label two of the candidates nodes
-			// one of them will be the targetNode where we expect the pod to be scheduler
+			// one of them will be the targetNode where we expect the pod to be scheduled
 			// and the other one will not have enough resources on only one numa zone
 			// but will fulfill the node selector filter.
 			targetNodeName, ok := nrtCandidateNames.PopAny()
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
-			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
+			By(fmt.Sprintf("selecting target node we expect the pod will be scheduled into: %q", targetNodeName))
 
-			toAlsoLabelNodeName, ok := nrtCandidateNames.PopAny()
+			alternativeNodeName, ok := nrtCandidateNames.PopAny()
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
-			By(fmt.Sprintf("selecting node to schedule the pod: %q", toAlsoLabelNodeName))
+			By(fmt.Sprintf("selecting alternative node candidate for the scheduling: %q", alternativeNodeName))
 
 			labelName := "size"
 			labelValue := "medium"
-			By(fmt.Sprintf("Labeling nodes %q and %q with label %q:%q", targetNodeName, toAlsoLabelNodeName, labelName, labelValue))
+			By(fmt.Sprintf("Labeling nodes %q and %q with label %q:%q", targetNodeName, alternativeNodeName, labelName, labelValue))
 
-			unlabelOneFunc, err := labelNodeWithValue(fxt.Client, labelName, labelValue, targetNodeName)
+			unlabelTarget, err := labelNodeWithValue(fxt.Client, labelName, labelValue, targetNodeName)
 			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", targetNodeName)
 			defer func() {
-				err := unlabelOneFunc()
+				err := unlabelTarget()
 				if err != nil {
 					klog.Errorf("Error while trying to unlabel node %q. %v", targetNodeName, err)
 				}
 			}()
 
-			unlabelTwoFunc, err := labelNodeWithValue(fxt.Client, labelName, labelValue, toAlsoLabelNodeName)
-			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", toAlsoLabelNodeName)
+			unlabelAlternative, err := labelNodeWithValue(fxt.Client, labelName, labelValue, alternativeNodeName)
+			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", alternativeNodeName)
 			defer func() {
-				err := unlabelTwoFunc()
+				err := unlabelAlternative()
 				if err != nil {
-					klog.Errorf("Error while trying to unlabel node %q. %v", toAlsoLabelNodeName, err)
+					klog.Errorf("Error while trying to unlabel node %q. %v", alternativeNodeName, err)
 				}
 			}()
 
-			By("Padding all other candidate nodes")
 			// we nee to also pad one of the labeled nodes.
-			nrtToPadNames := append(nrtCandidateNames.List(), toAlsoLabelNodeName)
+			nrtToPadNames := append(nrtCandidateNames.List(), alternativeNodeName)
+			By(fmt.Sprintf("Padding all other candidate nodes: %v", nrtToPadNames))
 
 			var paddingPods []*corev1.Pod
 			for nIdx, nodeName := range nrtToPadNames {
