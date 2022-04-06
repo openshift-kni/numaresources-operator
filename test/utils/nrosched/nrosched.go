@@ -19,6 +19,7 @@ package nrosched
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -41,6 +42,8 @@ const (
 
 	ReasonScheduled        = "Scheduled"
 	ReasonFailedScheduling = "FailedScheduling"
+
+	ErrorCannotAlignPod = "cannot align pod"
 )
 
 type eventChecker func(ev corev1.Event) bool
@@ -75,6 +78,13 @@ func CheckPODSchedulingFailed(k8sCli *kubernetes.Clientset, podNamespace, podNam
 	return checkPODEvents(k8sCli, podNamespace, podName, schedulerName, isFailedScheduling)
 }
 
+func CheckPODSchedulingFailedForAlignment(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName string) (bool, error) {
+	isFailedSchedulingForAlignment := func(item corev1.Event) bool {
+		return item.Reason == ReasonFailedScheduling && item.ReportingController == schedulerName && IsSchedulingErrorCannotAlign(item.Message)
+	}
+	return checkPODEvents(k8sCli, podNamespace, podName, schedulerName, isFailedSchedulingForAlignment)
+}
+
 func CheckPODWasScheduledWith(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName string) (bool, error) {
 	isScheduledWith := func(item corev1.Event) bool {
 		return item.Reason == ReasonScheduled && item.ReportingController == schedulerName
@@ -104,4 +114,8 @@ func CheckNROSchedulerAvailable(cli client.Client, nroSchedName string) *nropv1a
 		return cond.Status == metav1.ConditionTrue
 	}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "Scheduler condition did not become available")
 	return nroSchedObj
+}
+
+func IsSchedulingErrorCannotAlign(msg string) bool {
+	return strings.Contains(msg, ErrorCannotAlignPod)
 }

@@ -31,6 +31,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
+	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
@@ -98,15 +99,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			//TODO: we should calculate requiredRes from NUMA zones in cluster nodes instead.
 			requiredRes = corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("4"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
+				corev1.ResourceCPU:    resource.MustParse("16"),
+				corev1.ResourceMemory: resource.MustParse("16Gi"),
 			}
 
 			By("Padding selected node")
 			// TODO This should be calculated as 3/4 of requiredRes
 			paddingRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("3Gi"),
+				corev1.ResourceCPU:    resource.MustParse("12"),
+				corev1.ResourceMemory: resource.MustParse("12Gi"),
 			}
 
 			var paddingPods []*corev1.Pod
@@ -115,9 +116,17 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
+				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+				Expect(err).NotTo(HaveOccurred(), "cannot get base load for %q", nodeName)
+
 				for idx, zone := range nrtInfo.Zones {
+					zoneRes := paddingRes.DeepCopy() // extra safety
+					if idx == 0 {                    // any zone is fine
+						baseload.Apply(zoneRes)
+					}
+
 					podName := fmt.Sprintf("padding%s-%d", nodeName, idx)
-					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingRes)
+					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, zoneRes)
 					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone", podName, zone.Name)
 
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
@@ -137,7 +146,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
 		})
 
-		It("[test_id:47617][tier2] workload requests guaranteed pod resources available on one node but not on a single numa", func() {
+		It("[test_id:47617][tier2][unsched] workload requests guaranteed pod resources available on one node but not on a single numa", func() {
 
 			By("Scheduling the testing pod")
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
@@ -154,12 +163,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
-			isFailed, err := nrosched.CheckPODSchedulingFailed(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 		})
 
-		It("[test_id:48963][tier2] a deployment with a guaranteed pod resources available on one node but not on a single numa", func() {
+		It("[test_id:48963][tier2][unsched] a deployment with a guaranteed pod resources available on one node but not on a single numa", func() {
 
 			By("Scheduling the testing deployment")
 			deploymentName := "test-dp"
@@ -181,7 +190,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 
 			for _, pod := range pods {
-				isFailed, err := nrosched.CheckPODSchedulingFailed(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
@@ -190,7 +199,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 		})
 
-		It("[test_id:48962][tier2] a daemonset with a guaranteed pod resources available on one node but not on a single numa", func() {
+		It("[test_id:48962][tier2][unsched] a daemonset with a guaranteed pod resources available on one node but not on a single numa", func() {
 
 			By("Scheduling the testing daemonset")
 			dsName := "test-ds"
@@ -211,7 +220,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 
 			for _, pod := range pods {
-				isFailed, err := nrosched.CheckPODSchedulingFailed(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
