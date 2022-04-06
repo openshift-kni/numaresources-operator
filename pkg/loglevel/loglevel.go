@@ -55,7 +55,7 @@ func UpdatePodSpec(podSpec *corev1.PodSpec, level operatorv1.LogLevel) error {
 		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
 	}
 	flags.SetOption("--v", kLog.String())
-	klog.InfoS("RTE container klog level", "container", cnt.Name, "--v", kLog.String())
+	klog.InfoS("container klog level", "container", cnt.Name, "--v", kLog.String())
 	cnt.Args = flags.Argv()
 	return nil
 }
