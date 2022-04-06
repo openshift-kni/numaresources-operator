@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/util/taints"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
@@ -129,16 +130,22 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("removing taints from the nodes")
+			// TODO: remove taints in parallel
 			for i := range nodes {
-				node := &nodes[i]
-				updatedNode, updated, err := taints.RemoveTaint(node, &t[0])
-				Expect(err).ToNot(HaveOccurred())
-				if updated {
-					node = updatedNode
-					klog.Infof("removing taint: %q from node: %q", t[0].String(), node.Name)
-					err = fxt.Client.Update(context.TODO(), node)
+				Eventually(func() error {
+					node := &corev1.Node{}
+					err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(&nodes[i]), node)
 					Expect(err).ToNot(HaveOccurred())
-				}
+
+					updatedNode, updated, err := taints.RemoveTaint(node, &t[0])
+					Expect(err).ToNot(HaveOccurred())
+					if !updated {
+						return nil
+					}
+
+					klog.Infof("removing taint: %q from node: %q", t[0].String(), updatedNode.Name)
+					return fxt.Client.Update(context.TODO(), updatedNode)
+				}, time.Minute, time.Second*5).ShouldNot(HaveOccurred())
 			}
 
 			By("unpadding the nodes after test finish")
