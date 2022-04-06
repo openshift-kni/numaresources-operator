@@ -27,6 +27,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
+	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
@@ -82,9 +83,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	// and will we want to start lean and mean.
 	Context("with two nodes with two NUMA zones", func() {
 		It("[test_id:47598][tier2] should place the pod in the node with available resources in one NUMA zone and fulfilling node selector", func() {
-
-			skipUnlessEnvVar("E2E_SERIAL_STAGING", "FIXME: NRT filter clashes with the noderesources fit plugin")
-
 			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
@@ -94,9 +92,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Skip(fmt.Sprintf("not enough nodes with %d NUMA Zones: found %d, needed %d", requiredNUMAZones, len(nrtCandidates), neededNodes))
 			}
 
+			// TODO: this should be >= 5x baseload
 			requiredRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("1000Mi"),
+				corev1.ResourceCPU:    resource.MustParse("16"),
+				corev1.ResourceMemory: resource.MustParse("16Gi"),
+			}
+			// WARNING: This should be calculated as 3/4 of requiredRes
+			paddingRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("12"),
+				corev1.ResourceMemory: resource.MustParse("12Gi"),
 			}
 
 			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
@@ -107,58 +111,60 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
 			// we need to label two of the candidates nodes
-			// one of them will be the targetNode where we expect the pod to be scheduler
+			// one of them will be the targetNode where we expect the pod to be scheduled
 			// and the other one will not have enough resources on only one numa zone
 			// but will fulfill the node selector filter.
 			targetNodeName, ok := nrtCandidateNames.PopAny()
-			Expect(ok).To(BeTrue(), "cannot select a targe node among %#v", nrtCandidateNames.List())
-			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
+			By(fmt.Sprintf("selecting target node we expect the pod will be scheduled into: %q", targetNodeName))
 
-			toAlsoLabelNodeName, ok := nrtCandidateNames.PopAny()
-			Expect(ok).To(BeTrue(), "cannot select a targe node among %#v", nrtCandidateNames.List())
-			By(fmt.Sprintf("selecting node to schedule the pod: %q", toAlsoLabelNodeName))
+			alternativeNodeName, ok := nrtCandidateNames.PopAny()
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
+			By(fmt.Sprintf("selecting alternative node candidate for the scheduling: %q", alternativeNodeName))
 
 			labelName := "size"
 			labelValue := "medium"
-			By(fmt.Sprintf("Labeling nodes %q and %q with label %q:%q", targetNodeName, toAlsoLabelNodeName, labelName, labelValue))
+			By(fmt.Sprintf("Labeling nodes %q and %q with label %q:%q", targetNodeName, alternativeNodeName, labelName, labelValue))
 
-			unlabelOneFunc, err := labelNodeWithValue(fxt.Client, labelName, labelName, targetNodeName)
+			unlabelTarget, err := labelNodeWithValue(fxt.Client, labelName, labelValue, targetNodeName)
 			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", targetNodeName)
 			defer func() {
-				err := unlabelOneFunc()
+				err := unlabelTarget()
 				if err != nil {
-					klog.Errorf("Error while trying to unlable node %q. %v", targetNodeName, err)
+					klog.Errorf("Error while trying to unlabel node %q. %v", targetNodeName, err)
 				}
 			}()
 
-			unlabelTwoFunc, err := labelNodeWithValue(fxt.Client, labelName, labelName, toAlsoLabelNodeName)
-			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", toAlsoLabelNodeName)
+			unlabelAlternative, err := labelNodeWithValue(fxt.Client, labelName, labelValue, alternativeNodeName)
+			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", alternativeNodeName)
 			defer func() {
-				err := unlabelTwoFunc()
+				err := unlabelAlternative()
 				if err != nil {
-					klog.Errorf("Error while trying to unlable node %q. %v", toAlsoLabelNodeName, err)
+					klog.Errorf("Error while trying to unlabel node %q. %v", alternativeNodeName, err)
 				}
 			}()
 
-			By("Padding all other candidate nodes")
 			// we nee to also pad one of the labeled nodes.
-			nrtToPadNames := append(nrtCandidateNames.List(), toAlsoLabelNodeName)
-
-			// WARNING: This should be calculated as 3/4 of requiredRes
-			paddingRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("750m"),
-				corev1.ResourceMemory: resource.MustParse("750Mi"),
-			}
+			nrtToPadNames := append(nrtCandidateNames.List(), alternativeNodeName)
+			By(fmt.Sprintf("Padding all other candidate nodes: %v", nrtToPadNames))
 
 			var paddingPods []*corev1.Pod
-			for nidx, nodeName := range nrtToPadNames {
+			for nIdx, nodeName := range nrtToPadNames {
 
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-				for zidx, zone := range nrtInfo.Zones {
-					podName := fmt.Sprintf("padding%d-%d", nidx, zidx)
-					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingRes)
+				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+				Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", nodeName)
+
+				for zIdx, zone := range nrtInfo.Zones {
+					zoneRes := paddingRes.DeepCopy() // to be extra safe
+					if zIdx == 0 {                   // any zone is fine
+						baseload.Apply(zoneRes)
+					}
+
+					podName := fmt.Sprintf("padding%d-%d", nIdx, zIdx)
+					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, zoneRes)
 					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
 
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
@@ -180,7 +186,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
 
 			By("Scheduling the testing pod")
-			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testPod")
+			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			pod.Spec.Containers[0].Resources.Limits = requiredRes
 			pod.Spec.NodeSelector = map[string]string{
@@ -190,13 +196,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), pod)
 			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
 
-			By("waiting for node to be up&running")
-			podRunningTimeout := 1 * time.Minute
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
+			By("waiting for pod to be running")
+			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 1*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
-			Expect(err).NotTo(HaveOccurred(), "Pod %q not up&running after %v", pod.Name, podRunningTimeout)
+			Expect(err).NotTo(HaveOccurred())
 
 			By("checking the pod has been scheduled in the proper node")
 			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName))
