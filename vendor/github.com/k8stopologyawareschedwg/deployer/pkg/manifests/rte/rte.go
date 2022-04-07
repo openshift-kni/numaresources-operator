@@ -281,7 +281,7 @@ func GetManifests(plat platform.Platform, namespace string) (Manifests, error) {
 	if err != nil {
 		return mf, err
 	}
-	mf.DaemonSet, err = manifests.DaemonSet(manifests.ComponentResourceTopologyExporter, plat, namespace)
+	mf.DaemonSet, err = manifests.DaemonSet(manifests.ComponentResourceTopologyExporter, "", plat, namespace)
 	if err != nil {
 		return mf, err
 	}

@@ -5,7 +5,7 @@ metadata:
   namespace: placeholder
 data:
   "config.yaml": |
-    apiVersion: kubescheduler.config.k8s.io/v1beta1
+    apiVersion: kubescheduler.config.k8s.io/v1beta2
     kind: KubeSchedulerConfiguration
     leaderElection:
       leaderElect: false
@@ -22,4 +22,5 @@ data:
         pluginConfig:
         - name: NodeResourceTopologyMatch
           args:
-            kubeconfigpath: "" # needs to be empty string
+            scoringStrategy:
+              type: LeastAllocated
