@@ -16,13 +16,13 @@ function test_sched() {
       exit 1
   fi
 
-  echo "Running Functional Tests: ${GINKGO_SUITS}"
-  # -v: print out the text and location for each spec before running it and flush output to stdout in realtime
-  # -r: run suites recursively
-  # --failFast: ginkgo will stop the suite right after the first spec failure
-  # --flakeAttempts: rerun the test if it fails
-  # -requireSuite: fail if tests are not executed because of missing suite
-  ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.flakeAttempts=2 --ginkgo.reportFile=/tmp/artifacts/nrop/e2e-sched
+#  echo "Running Functional Tests: ${GINKGO_SUITS}"
+#  # -v: print out the text and location for each spec before running it and flush output to stdout in realtime
+#  # -r: run suites recursively
+#  # --failFast: ginkgo will stop the suite right after the first spec failure
+#  # --flakeAttempts: rerun the test if it fails
+#  # -requireSuite: fail if tests are not executed because of missing suite
+#  ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.flakeAttempts=2 --ginkgo.reportFile=/tmp/artifacts/nrop/e2e-sched
 }
 
 NO_COLOR=""
@@ -51,15 +51,15 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-
-echo "Running Functional Tests: ${GINKGO_SUITS}"
-export E2E_TOPOLOGY_MANAGER_POLICY="${E2E_TOPOLOGY_MANAGER_POLICY:-SingleNUMANodePodLevel}"
-# -v: print out the text and location for each spec before running it and flush output to stdout in realtime
-# -r: run suites recursively
-# --failFast: ginkgo will stop the suite right after the first spec failure
-# --flakeAttempts: rerun the test if it fails
-# -requireSuite: fail if tests are not executed because of missing suite
-${BIN_DIR}/e2e-nrop-rte.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.flakeAttempts=2 --ginkgo.reportFile=/tmp/artifacts/nrop/e2e --ginkgo.skip='\[Disruptive\]|\[StateDirectories\]'
+#
+#echo "Running Functional Tests: ${GINKGO_SUITS}"
+#export E2E_TOPOLOGY_MANAGER_POLICY="${E2E_TOPOLOGY_MANAGER_POLICY:-SingleNUMANodePodLevel}"
+## -v: print out the text and location for each spec before running it and flush output to stdout in realtime
+## -r: run suites recursively
+## --failFast: ginkgo will stop the suite right after the first spec failure
+## --flakeAttempts: rerun the test if it fails
+## -requireSuite: fail if tests are not executed because of missing suite
+#${BIN_DIR}/e2e-nrop-rte.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.flakeAttempts=2 --ginkgo.reportFile=/tmp/artifacts/nrop/e2e --ginkgo.skip='\[Disruptive\]|\[StateDirectories\]'
 
 
 if [ "$ENABLE_SCHED_TESTS" = true ]; then

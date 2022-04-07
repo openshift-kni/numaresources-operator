@@ -58,7 +58,7 @@ var _ = Describe("[Scheduler] install", func() {
 			By("checking that the condition Available=true")
 			schedAvailable := false
 			updatedNROObj := &nropv1alpha1.NUMAResourcesScheduler{}
-			wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
+			wait.Poll(30*time.Second, 15*time.Minute, func() (bool, error) {
 				err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), updatedNROObj)
 				if err != nil {
 					klog.Warningf("failed to get the NRO Scheduler resource: %v", err)
@@ -87,13 +87,16 @@ var _ = Describe("[Scheduler] install", func() {
 				} else {
 					objects.GetLogsForPod(e2eclient.K8sClient, nropPod.Namespace, nropPod.Name)
 				}
+
+				objects.LogEventsForPod(e2eclient.K8sClient, nropPod.Namespace, nropPod.Name)
+
 			}
 			Expect(schedAvailable).To(BeTrue(), "NRO Scheduler condition did not become available")
 
 			By("checking the NumaResourcesScheduler Deployment is available")
 			deployment := &appsv1.Deployment{}
 			deploymentReady := false
-			wait.Poll(30*time.Second, 5*time.Minute, func() (bool, error) {
+			wait.Poll(30*time.Second, 15*time.Minute, func() (bool, error) {
 				key := client.ObjectKey{
 					Namespace: updatedNROObj.Status.Deployment.Namespace,
 					Name:      updatedNROObj.Status.Deployment.Name,
@@ -106,7 +109,7 @@ var _ = Describe("[Scheduler] install", func() {
 
 				deploymentReady := e2ewait.AreDeploymentReplicasAvailable(&deployment.Status, *deployment.Spec.Replicas)
 				if !deploymentReady {
-					klog.Warningf("deployment %v not ready", key)
+					klog.Warningf("deployment %v not ready: replicas=%d/%d", key, deployment.Status.ReadyReplicas, deployment.Status.AvailableReplicas)
 					return false, nil
 				}
 				return true, nil
@@ -117,6 +120,15 @@ var _ = Describe("[Scheduler] install", func() {
 					klog.Warningf("cannot find the operator pod: %v", err)
 				} else {
 					objects.GetLogsForPod(e2eclient.K8sClient, nropPod.Namespace, nropPod.Name)
+				}
+
+				pods, err := schedutils.ListPodsByDeployment(e2eclient.Client, *deployment)
+				if err != nil {
+					klog.Warningf("cannot find the deployment pods: %v", err)
+				} else {
+					for _, pod := range pods {
+						objects.LogEventsForPod(e2eclient.K8sClient, pod.Namespace, pod.Name)
+					}
 				}
 			}
 			Expect(deploymentReady).To(BeTrue(), "NRO Scheduler deployment is not ready")
