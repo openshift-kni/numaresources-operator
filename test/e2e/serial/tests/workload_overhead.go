@@ -31,6 +31,7 @@ import (
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
@@ -150,14 +151,25 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				// need a zone with resources for overhead, pod and a little bit more to avoid zone saturation
-				zoneRequiredResources := rtClass.Overhead.PodFixed.DeepCopy()
-				resourcelist.AddCoreResources(zoneRequiredResources, *podResources.Cpu(), *podResources.Memory())
+				klog.Infof("kubernetes pod fixed overhead: %s", e2ereslist.ToString(rtClass.Overhead.PodFixed))
+				podFixedOverheadCPU, podFixedOverheadMem := resourcelist.RoundUpCoreResources(*rtClass.Overhead.PodFixed.Cpu(), *rtClass.Overhead.PodFixed.Memory())
+				podFixedOverhead := corev1.ResourceList{
+					corev1.ResourceCPU:    podFixedOverheadCPU,
+					corev1.ResourceMemory: podFixedOverheadMem,
+				}
+				klog.Infof("kubernetes pod fixed overhead rounded to: %s", e2ereslist.ToString(podFixedOverhead))
+
+				zoneRequiredResources := podResources.DeepCopy()
+				resourcelist.AddCoreResources(zoneRequiredResources, *podFixedOverhead.Cpu(), *podFixedOverhead.Memory())
 				resourcelist.AddCoreResources(zoneRequiredResources, *minRes.Cpu(), *minRes.Memory())
+
+				resStr := e2ereslist.ToString(zoneRequiredResources)
+				klog.Infof("kubernetes final zone required resources: %s", resStr)
 
 				nrtCandidates := e2enrt.FilterAnyZoneMatchingResources(nrtTwoZoneCandidates, zoneRequiredResources)
 				minCandidates := 1
 				if len(nrtCandidates) < minCandidates {
-					Skip(fmt.Sprintf("There should be at least %d nodes with at least %v resources: found %d", minCandidates, zoneRequiredResources, len(nrtCandidates)))
+					Skip(fmt.Sprintf("There should be at least %d nodes with at least %s resources: found %d", minCandidates, resStr, len(nrtCandidates)))
 				}
 
 				candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
@@ -234,7 +246,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 
 				podResourcesWithOverhead := podResources.DeepCopy()
-				resourcelist.AddCoreResources(podResourcesWithOverhead, *rtClass.Overhead.PodFixed.Cpu(), *rtClass.Overhead.PodFixed.Memory())
+				resourcelist.AddCoreResources(podResourcesWithOverhead, *podFixedOverhead.Cpu(), *podFixedOverhead.Memory())
 
 				for _, pod := range pods {
 					Expect(pod.Spec.NodeName).To(Equal(targetNodeName))
@@ -248,17 +260,16 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					nrtPostCreate, err := e2enrt.FindFromList(nrtListPostCreate.Items, pod.Spec.NodeName)
 					Expect(err).ToNot(HaveOccurred())
 
-					_, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, podResources)
+					match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, podResources)
 					Expect(err).ToNot(HaveOccurred())
+					// If the pods are running, and they are because we reached this far, then the resources must have been accounted SOMEWHERE!
+					Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by deployment running")
 
-					match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, podResourcesWithOverhead)
+					matchWithOverhead, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, podResourcesWithOverhead)
 					Expect(err).ToNot(HaveOccurred())
-					// CheckZoneConsumedResourcesAtLeast returns "", nil if it correctly scanned all the NUMA zones, but none had
-					// resource allocation accounted to it at least as much as the quantity given. So, if we are here, it means
-					// we have no errors - which would be a test failure already AND no zone matches the resource levels,
-					// which we interpret as test success because it seems the overhead is not accounted. Yes, this is a bit
-					// convoluted and we should make it smoother/more robust.
-					Expect(match).To(Equal(""), "unexpected found resource allocation accounted to zone %q - expected none", match)
+					// OTOH if we add the overhead no zone is expected to have allocated the EXTRA resources - exactly because the overhead
+					// should not be taken into account!
+					Expect(matchWithOverhead).To(Equal(""), "unexpected found resource+overhead allocation accounted to zone %q", matchWithOverhead, match)
 				}
 
 			})
