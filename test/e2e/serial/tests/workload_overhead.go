@@ -135,8 +135,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 			})
 			It("[test_id:47582][tier2] schedule a guaranteed Pod in a single NUMA zone and check overhead is not accounted in NRT", func() {
 
-				skipUnlessEnvVar("E2E_SERIAL_STAGING", "FIXME: NRT filter clashes with the noderesources fit plugin")
-
 				// even if it is not a hard rule, and even if there are a LOT of edge cases, a good starting point is usually
 				// in the ballpark of 5x the base load. We start like this
 				podResources := corev1.ResourceList{
