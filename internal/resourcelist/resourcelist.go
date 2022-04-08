@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func ToString(res corev1.ResourceList) string {
@@ -52,4 +53,14 @@ func FromGuaranteedPod(pod corev1.Pod) corev1.ResourceList {
 		}
 	}
 	return res
+}
+
+func AddCoreResources(res corev1.ResourceList, cpu, mem resource.Quantity) {
+	adjustedCPU := res.Cpu()
+	adjustedCPU.Add(cpu)
+	res[corev1.ResourceCPU] = *adjustedCPU
+
+	adjustedMemory := res.Memory()
+	adjustedMemory.Add(mem)
+	res[corev1.ResourceMemory] = *adjustedMemory
 }

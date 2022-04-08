@@ -21,6 +21,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+
+	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 )
 
 // we don't use corev1.ResourceList because we need values for CPU and Memory
@@ -83,13 +85,7 @@ func (nl Load) String() string {
 // Apply adjust the given ResourceList with the current node load by mutating
 // the parameter in place
 func (nl Load) Apply(res corev1.ResourceList) {
-	adjustedCPU := res.Cpu()
-	adjustedCPU.Add(nl.CPU)
-	res[corev1.ResourceCPU] = *adjustedCPU
-
-	adjustedMemory := res.Memory()
-	adjustedMemory.Add(nl.Memory)
-	res[corev1.ResourceMemory] = *adjustedMemory
+	resourcelist.AddCoreResources(res, nl.CPU, nl.Memory)
 }
 
 // Deduct subtract the current node load from the given ResourceList by mutating
