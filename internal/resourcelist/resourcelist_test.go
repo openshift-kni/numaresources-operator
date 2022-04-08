@@ -112,3 +112,45 @@ func TestAddCoreResources(t *testing.T) {
 		})
 	}
 }
+
+func TestRoundUpCoreResources(t *testing.T) {
+	type testCase struct {
+		cpu         resource.Quantity
+		mem         resource.Quantity
+		expectedCpu resource.Quantity
+		expectedMem resource.Quantity
+	}
+
+	testCases := []testCase{
+		{
+			cpu:         resource.MustParse("1"),
+			mem:         resource.MustParse("2Gi"),
+			expectedCpu: resource.MustParse("2"),
+			expectedMem: resource.MustParse("3G"),
+		},
+		{
+			cpu:         resource.MustParse("2"),
+			mem:         resource.MustParse("2Gi"),
+			expectedCpu: resource.MustParse("2"),
+			expectedMem: resource.MustParse("3G"),
+		},
+		{
+			cpu:         resource.MustParse("3"),
+			mem:         resource.MustParse("4Gi"),
+			expectedCpu: resource.MustParse("4"),
+			expectedMem: resource.MustParse("5G"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run("", func(t *testing.T) {
+			gotCpu, gotMem := RoundUpCoreResources(tc.cpu, tc.mem)
+			if gotCpu.Cmp(tc.expectedCpu) != 0 {
+				t.Errorf("expected CPU %v got %v", tc.expectedCpu, gotCpu)
+			}
+			if gotMem.Cmp(tc.expectedMem) != 0 {
+				t.Errorf("expected Memory %v got %v", tc.expectedMem, gotMem)
+			}
+		})
+	}
+}
