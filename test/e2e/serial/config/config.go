@@ -48,6 +48,9 @@ func Teardown() {
 	if _, ok := os.LookupEnv("E2E_INFRA_NO_TEARDOWN"); ok {
 		return
 	}
+	if !Config.Ready() { // nothing to do
+		return
+	}
 	TeardownInfra(Config.Fixture, Config.NRTList)
 	// numacell daemonset automatically cleaned up when we remove the namespace
 	err := TeardownFixture()
