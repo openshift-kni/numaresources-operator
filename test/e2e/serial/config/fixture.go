@@ -19,8 +19,6 @@ package config
 import (
 	"context"
 
-	. "github.com/onsi/gomega"
-
 	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -43,16 +41,17 @@ type E2EConfig struct {
 
 var Config *E2EConfig
 
-func SetupFixture() {
-	Config = NewFixtureWithOptions("e2e-test-infra", e2efixture.OptionRandomizeName)
+func SetupFixture() error {
+	var err error
+	Config, err = NewFixtureWithOptions("e2e-test-infra", e2efixture.OptionRandomizeName)
+	return err
 }
 
-func TeardownFixture() {
-	err := e2efixture.Teardown(Config.Fixture)
-	Expect(err).NotTo(HaveOccurred())
+func TeardownFixture() error {
+	return e2efixture.Teardown(Config.Fixture)
 }
 
-func NewFixtureWithOptions(nsName string, options e2efixture.Options) *E2EConfig {
+func NewFixtureWithOptions(nsName string, options e2efixture.Options) (*E2EConfig, error) {
 	var err error
 	cfg := E2EConfig{
 		NROOperObj:  &nropv1alpha1.NUMAResourcesOperator{},
@@ -60,22 +59,27 @@ func NewFixtureWithOptions(nsName string, options e2efixture.Options) *E2EConfig
 	}
 
 	cfg.Fixture, err = e2efixture.SetupWithOptions(nsName, options)
-	Expect(err).ToNot(HaveOccurred(), "unable to setup infra test fixture")
+	if err != nil {
+		return nil, err
+	}
 
 	err = cfg.Fixture.Client.List(context.TODO(), &cfg.NRTList)
-	Expect(err).ToNot(HaveOccurred())
-
-	err = cfg.Fixture.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, cfg.NROSchedObj)
-	Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
+	if err != nil {
+		return nil, err
+	}
 
 	err = cfg.Fixture.Client.Get(context.TODO(), client.ObjectKey{Name: objects.NROName()}, cfg.NROOperObj)
-	Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", objects.NROName())
+	if err != nil {
+		return nil, err
+	}
 
-	Expect(cfg.NROOperObj.Spec.NodeGroups).ToNot(BeEmpty(), "cannot autodetect the TAS node groups from the cluster")
+	err = cfg.Fixture.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, cfg.NROSchedObj)
+	if err != nil {
+		return nil, err
+	}
 
 	cfg.SchedulerName = cfg.NROSchedObj.Status.SchedulerName
-	Expect(cfg.SchedulerName).ToNot(BeEmpty(), "cannot autodetect the TAS scheduler name from the cluster")
-	klog.Infof("scheduler name: %q", cfg.SchedulerName)
+	klog.Infof("detected scheduler name: %q", cfg.SchedulerName)
 
-	return &cfg
+	return &cfg, nil
 }

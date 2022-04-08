@@ -18,6 +18,8 @@ package config
 
 import (
 	"os"
+
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -36,7 +38,9 @@ const (
 // each test "owns" the cluster - but again, must leave no leftovers.
 
 func Setup() {
-	SetupFixture()
+	err := SetupFixture()
+	Expect(err).ToNot(HaveOccurred())
+	Expect(Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
 	SetupInfra(Config.Fixture, Config.NROOperObj, Config.NRTList)
 }
 
@@ -46,5 +50,6 @@ func Teardown() {
 	}
 	TeardownInfra(Config.Fixture, Config.NRTList)
 	// numacell daemonset automatically cleaned up when we remove the namespace
-	TeardownFixture()
+	err := TeardownFixture()
+	Expect(err).NotTo(HaveOccurred())
 }
