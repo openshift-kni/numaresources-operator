@@ -55,6 +55,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
+		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
 
 		var err error
 		fxt, err = e2efixture.Setup("e2e-test-resource-accounting")

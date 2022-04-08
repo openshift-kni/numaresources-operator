@@ -39,6 +39,19 @@ type E2EConfig struct {
 	SchedulerName string
 }
 
+func (cfg *E2EConfig) Ready() bool {
+	if cfg == nil {
+		return false
+	}
+	if cfg.Fixture == nil || cfg.NROOperObj == nil || cfg.NROSchedObj == nil {
+		return false
+	}
+	if cfg.SchedulerName == "" {
+		return false
+	}
+	return true
+}
+
 var Config *E2EConfig
 
 func SetupFixture() error {

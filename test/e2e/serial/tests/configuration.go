@@ -65,6 +65,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 	var nrts []nrtv1alpha1.NodeResourceTopology
 
 	BeforeEach(func() {
+		Expect(serialconfig.Config).ToNot(BeNil())
+		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
+
 		var err error
 		fxt, err = e2efixture.Setup("e2e-test-configuration")
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
