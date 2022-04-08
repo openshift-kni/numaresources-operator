@@ -35,10 +35,8 @@ const (
 // and indisturbed on the cluster. No concurrency at all is possible,
 // each test "owns" the cluster - but again, must leave no leftovers.
 
-var Config *E2EConfig
-
 func Setup() {
-	Config = SetupFixture()
+	SetupFixture()
 	SetupInfra(Config.Fixture, Config.NROOperObj, Config.NRTList)
 }
 
@@ -48,5 +46,5 @@ func Teardown() {
 	}
 	TeardownInfra(Config.Fixture, Config.NRTList)
 	// numacell daemonset automatically cleaned up when we remove the namespace
-	TeardownFixture(Config)
+	TeardownFixture()
 }

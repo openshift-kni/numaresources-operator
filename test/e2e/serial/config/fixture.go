@@ -41,11 +41,18 @@ type E2EConfig struct {
 	SchedulerName string
 }
 
-func SetupFixture() *E2EConfig {
-	return SetupFixtureWithOptions("e2e-test-infra", e2efixture.OptionRandomizeName)
+var Config *E2EConfig
+
+func SetupFixture() {
+	Config = NewFixtureWithOptions("e2e-test-infra", e2efixture.OptionRandomizeName)
 }
 
-func SetupFixtureWithOptions(nsName string, options e2efixture.Options) *E2EConfig {
+func TeardownFixture() {
+	err := e2efixture.Teardown(Config.Fixture)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func NewFixtureWithOptions(nsName string, options e2efixture.Options) *E2EConfig {
 	var err error
 	cfg := E2EConfig{
 		NROOperObj:  &nropv1alpha1.NUMAResourcesOperator{},
@@ -71,9 +78,4 @@ func SetupFixtureWithOptions(nsName string, options e2efixture.Options) *E2EConf
 	klog.Infof("scheduler name: %q", cfg.SchedulerName)
 
 	return &cfg
-}
-
-func TeardownFixture(cfg *E2EConfig) {
-	err := e2efixture.Teardown(cfg.Fixture)
-	Expect(err).NotTo(HaveOccurred())
 }
