@@ -30,6 +30,7 @@ import (
 
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	e2enodes "github.com/openshift-kni/numaresources-operator/test/utils/nodes"
@@ -45,6 +46,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	var nrts []nrtv1alpha1.NodeResourceTopology
 
 	BeforeEach(func() {
+		Expect(serialconfig.Config).ToNot(BeNil())
+		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
+
 		var err error
 		fxt, err = e2efixture.Setup("e2e-test-non-regression")
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")

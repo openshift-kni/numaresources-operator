@@ -46,7 +46,6 @@ import (
 
 func SetupInfra(fxt *e2efixture.Fixture, nroOperObj *nropv1alpha1.NUMAResourcesOperator, nrtList nrtv1alpha1.NodeResourceTopologyList) {
 	setupNUMACell(fxt, nroOperObj.Spec.NodeGroups, 3*time.Minute)
-
 	LabelNodes(fxt.Client, nrtList)
 }
 
@@ -56,6 +55,8 @@ func TeardownInfra(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopo
 
 func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup, timeout time.Duration) {
 	klog.Infof("e2e infra setup begin")
+
+	Expect(nodeGroups).ToNot(BeEmpty(), "cannot autodetect the TAS node groups from the cluster")
 
 	mcps, err := machineconfigpools.GetNodeGroupsMCPs(context.TODO(), fxt.Client, nodeGroups)
 	Expect(err).ToNot(HaveOccurred())
