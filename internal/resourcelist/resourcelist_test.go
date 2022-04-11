@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func TestRound(t *testing.T) {
+func TestToString(t *testing.T) {
 	type testCase struct {
 		data     corev1.ResourceList
 		expected string
@@ -71,6 +71,85 @@ func TestRound(t *testing.T) {
 			got := ToString(tc.data)
 			if got != tc.expected {
 				t.Errorf("expected %q got %q", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestAddCoreResources(t *testing.T) {
+	type testCase struct {
+		res      corev1.ResourceList
+		cpu      resource.Quantity
+		mem      resource.Quantity
+		expected corev1.ResourceList
+	}
+
+	testCases := []testCase{
+		{
+			res: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			cpu: resource.MustParse("2"),
+			mem: resource.MustParse("2Gi"),
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("3Gi"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(ToString(tc.expected), func(t *testing.T) {
+			res := tc.res.DeepCopy()
+			AddCoreResources(res, tc.cpu, tc.mem)
+			// comparing strings it just easier
+			got := ToString(res)
+			expected := ToString(tc.expected)
+			if got != expected {
+				t.Errorf("expected %q got %q", expected, got)
+			}
+		})
+	}
+}
+
+func TestRoundUpCoreResources(t *testing.T) {
+	type testCase struct {
+		cpu         resource.Quantity
+		mem         resource.Quantity
+		expectedCpu resource.Quantity
+		expectedMem resource.Quantity
+	}
+
+	testCases := []testCase{
+		{
+			cpu:         resource.MustParse("1"),
+			mem:         resource.MustParse("2Gi"),
+			expectedCpu: resource.MustParse("2"),
+			expectedMem: resource.MustParse("3G"),
+		},
+		{
+			cpu:         resource.MustParse("2"),
+			mem:         resource.MustParse("2Gi"),
+			expectedCpu: resource.MustParse("2"),
+			expectedMem: resource.MustParse("3G"),
+		},
+		{
+			cpu:         resource.MustParse("3"),
+			mem:         resource.MustParse("4Gi"),
+			expectedCpu: resource.MustParse("4"),
+			expectedMem: resource.MustParse("5G"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run("", func(t *testing.T) {
+			gotCpu, gotMem := RoundUpCoreResources(tc.cpu, tc.mem)
+			if gotCpu.Cmp(tc.expectedCpu) != 0 {
+				t.Errorf("expected CPU %v got %v", tc.expectedCpu, gotCpu)
+			}
+			if gotMem.Cmp(tc.expectedMem) != 0 {
+				t.Errorf("expected Memory %v got %v", tc.expectedMem, gotMem)
 			}
 		})
 	}

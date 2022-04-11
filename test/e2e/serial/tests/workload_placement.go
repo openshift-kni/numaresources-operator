@@ -19,8 +19,6 @@ package tests
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -608,23 +606,4 @@ func matchLogLevelToKlog(cnt *corev1.Container, level operatorv1.LogLevel) (bool
 
 	val, found := rteFlags.GetFlag("--v")
 	return found, val.Data == kLvl.String()
-}
-
-func skipUnlessEnvVar(envVar, message string) {
-	if isEnvTrue(envVar) {
-		return
-	}
-	Skip(message, 1)
-}
-
-func isEnvTrue(envVar string) bool {
-	val, ok := os.LookupEnv(envVar)
-	if !ok {
-		return false
-	}
-	enabled, err := strconv.ParseBool(val)
-	if err != nil {
-		return false
-	}
-	return enabled
 }
