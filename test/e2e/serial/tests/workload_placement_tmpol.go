@@ -115,13 +115,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("Padding all other candidate nodes")
 
 			var paddingPods []*corev1.Pod
-			for _, nodeName := range nrtCandidateNames.List() {
+			for nIdx, nodeName := range nrtCandidateNames.List() {
 
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				ExpectWithOffset(1, err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-				for idx, zone := range nrtInfo.Zones {
-					podName := fmt.Sprintf("padding%s-%d", nodeName, idx)
+				for zIdx, zone := range nrtInfo.Zones {
+					podName := fmt.Sprintf("padding-%d-%d", nIdx, zIdx)
 					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingRes)
 					ExpectWithOffset(1, err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
 
