@@ -26,18 +26,33 @@ Should you decide to use the default `kubeletconfig`, please omit the `-e E2E_NR
 The e2e suite assumes the cluster has the numaresources operator installed, but with no configuration. To install the numaresources operator, you can use the vehicle which best suits your use case (OLM, `make deploy`...).
 
 To actually run the tests and the tests only, assuming a pre-configured numaresources stack
-```
-podman run -ti -v $KUBECONFIG:/kubeconfig:z -e KUBECONFIG=/kubeconfig -e E2E_NROP_INSTALL_SKIP_KC=true quay.io/openshift-kni/numaresources-operator-tests:4.11.999-snapshot
+```bash
+podman run -ti \
+	-v $KUBECONFIG:/kubeconfig:z \
+	-e KUBECONFIG=/kubeconfig
+	-e E2E_NROP_INSTALL_SKIP_KC=true \
+	quay.io/openshift-kni/numaresources-operator-tests:4.11.999-snapshot
 ```
 
 To setup the stack from scratch and then run the tests (you may want to do that with *ephemeral* CI clusters)
-```
-podman run -ti -v $KUBECONFIG:/kubeconfig:z -e KUBECONFIG=/kubeconfig -e E2E_NROP_INSTALL_SKIP_KC=true quay.io/openshift-kni/numaresources-operator-tests:4.11.999-snapshot --setup
+```bash
+podman run -ti \
+	-v $KUBECONFIG:/kubeconfig:z \
+	-e KUBECONFIG=/kubeconfig \
+	-e E2E_NROP_INSTALL_SKIP_KC=true \
+	quay.io/openshift-kni/numaresources-operator-tests:4.11.999-snapshot \
+	--setup
 ```
 
 To setup the stack, run the tests and then restore the pristine cluster state:
-```
-podman run -ti -v $KUBECONFIG:/kubeconfig:z -e KUBECONFIG=/kubeconfig -e E2E_NROP_INSTALL_SKIP_KC=true quay.io/openshift-kni/numaresources-operator-tests:4.11.999-snapshot --setup --teardown
+```bash
+podman run -ti \
+	-v $KUBECONFIG:/kubeconfig:z \
+	-e KUBECONFIG=/kubeconfig \
+	-e E2E_NROP_INSTALL_SKIP_KC=true \
+	quay.io/openshift-kni/numaresources-operator-tests:4.11.999-snapshot \
+	--setup \
+	--teardown
 ```
 
 
