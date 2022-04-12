@@ -229,4 +229,115 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 		})
 	})
+
+	Context("with at least two nodes with two numa zones and enough resources in one numazone", func() {
+		It("[test_id:47592][tier2][unsched] a daemonset with a guaranteed pod resources available on one node/one single numa zone but not in any other node", func() {
+			requiredNUMAZones := 2
+			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
+			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
+
+			neededNodes := 2
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes))
+			}
+
+			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
+
+			targetNodeName, ok := nrtCandidateNames.PopAny()
+			Expect(ok).To(BeTrue(), "unable to get targetNodeName")
+
+			//TODO: we should calculate requiredRes from NUMA zones in cluster nodes instead.
+			requiredRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("16"),
+				corev1.ResourceMemory: resource.MustParse("16Gi"),
+			}
+
+			By("Padding non selected nodes")
+			// TODO This should be calculated as 3/4 of requiredRes
+			paddingRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("12"),
+				corev1.ResourceMemory: resource.MustParse("12Gi"),
+			}
+
+			var paddingPods []*corev1.Pod
+			for nodeIdx, nodeName := range nrtCandidateNames.List() {
+
+				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
+				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
+
+				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+				Expect(err).NotTo(HaveOccurred(), "cannot get base load for %q", nodeName)
+
+				for zoneIdx, zone := range nrtInfo.Zones {
+					zoneRes := paddingRes.DeepCopy() // extra safety
+					if zoneIdx == 0 {                // any zone is fine
+						baseload.Apply(zoneRes)
+					}
+
+					podName := fmt.Sprintf("padding%d-%d", nodeIdx, zoneIdx)
+					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, zoneRes)
+					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone", podName, zone.Name)
+
+					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
+					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone", podName, zone.Name)
+
+					err = fxt.Client.Create(context.TODO(), padPod)
+					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone", podName, zone.Name)
+
+					paddingPods = append(paddingPods, padPod)
+				}
+			}
+
+			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
+			for _, failedPod := range failedPods {
+				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
+			}
+			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
+
+			By("Scheduling the testing daemonset")
+			dsName := "test-ds"
+
+			podLabels := map[string]string{
+				"test": "test-daemonset",
+			}
+			nodeSelector := map[string]string{}
+			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
+			ds.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
+
+			err := fxt.Client.Create(context.TODO(), ds)
+			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", ds.Name)
+
+			By(fmt.Sprintf("checking daemonset pods have been scheduled with the topology aware scheduler %q ", serialconfig.Config.SchedulerName))
+			pods, err := schedutils.ListPodsByDaemonset(fxt.Client, *ds)
+			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
+
+			//TODO: should not we wait until pods have at least been scheduled? how?
+
+			By(fmt.Sprintf("checking only daemonset pod in targetNode:%q is up and running", targetNodeName))
+			podRunningTimeout := 3 * time.Minute
+			for _, pod := range pods {
+				if pod.Spec.NodeName == targetNodeName {
+					scheduledWithTAS, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+					if err != nil {
+						_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+					}
+					Expect(err).ToNot(HaveOccurred())
+					Expect(scheduledWithTAS).To(BeTrue(), "pod %s/%s was NOT scheduled with  %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+
+					_, err = e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
+					Expect(err).ToNot(HaveOccurred(), "unable to get pod %s/%s to be Running after %v", pod.Namespace, pod.Name, podRunningTimeout)
+
+				} else {
+					isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+					if err != nil {
+						_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+					}
+					Expect(err).ToNot(HaveOccurred())
+					Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+				}
+
+			}
+		})
+	})
 })
