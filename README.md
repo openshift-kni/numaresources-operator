@@ -14,7 +14,7 @@ Please check the issues section for the known issues and limitations of the NUMA
 ## running the e2e suite against your cluster
 
 The NUMA resources operator comes with a growing e2e suite to validate components of the stack (operator proper, RTE) as well as the NUMA aware scheduling as a whole.
-Pre-built container images including the suites [are available](https://quay.io/repository/openshift-kni/numaresources-operator-tests?tab=info).
+Pre-built container images including the suites [are available](https://quay.io/repository/openshift-kni/numaresources-operator-tests).
 There is **no support** for these e2e tests images, and they are recommended to be used only for development/CI purposes.
 
 The e2e suite can *optionally* setup/teardown the numaresources stack, but the suite expects a pre-configured kubeletconfig.
@@ -49,7 +49,7 @@ The E2E suite depends on few extra images. These images are very stable, lightwe
 
 However, in some cases it may be unpractical to depend on third party images.
 The E2E test image can act as replacement for all its dependencies, providing either the same code or replacements suitables for its use case.
-TO replace the dependencies, you need to set up some environment variables:
+To replace the dependencies, you need to set up some environment variables:
 ```bash
 export E2E_IMAGE_URL=quay.io/openshift-kni/numaresources-operator-tests:4.11.999-snapshot
 podman run -ti \
