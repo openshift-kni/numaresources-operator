@@ -83,23 +83,16 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 	Context("with at least two nodes suitable", func() {
 		var targetNodeName string
-		var requiredRes corev1.ResourceList
 		var nrtCandidates []nrtv1alpha1.NodeResourceTopology
 
-		BeforeEach(func() {
-			const requiredNUMAZones = 2
+		setupCluster := func(requiredRes, paddingRes corev1.ResourceList) {
+			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
 			nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, requiredNUMAZones)
 
-			const neededNodes = 2
+			neededNodes := 2
 			if len(nrtCandidates) < neededNodes {
 				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes))
-			}
-
-			//TODO: we should calculate requiredRes from NUMA zones in cluster nodes instead.
-			requiredRes = corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("4"),
-				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			}
 
 			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
@@ -111,7 +104,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			var ok bool
 			targetNodeName, ok = nrtCandidateNames.PopAny()
-			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
+			ExpectWithOffset(1, ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
 			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
 			// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
 			// but have enough allocatable resources at node level to shedule the pod on it.
@@ -120,28 +113,23 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// resources but they won't have enough resources in only one NUMA zone.
 
 			By("Padding all other candidate nodes")
-			// TODO This should be calculated as 3/4 of requiredRes
-			paddingRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("3Gi"),
-			}
 
 			var paddingPods []*corev1.Pod
 			for _, nodeName := range nrtCandidateNames.List() {
 
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
-				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
+				ExpectWithOffset(1, err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
 				for idx, zone := range nrtInfo.Zones {
 					podName := fmt.Sprintf("padding%s-%d", nodeName, idx)
 					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingRes)
-					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
+					ExpectWithOffset(1, err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
 
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
-					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
+					ExpectWithOffset(1, err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
 
 					err = fxt.Client.Create(context.TODO(), padPod)
-					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", podName, zone.Name)
+					ExpectWithOffset(1, err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", podName, zone.Name)
 
 					paddingPods = append(paddingPods, padPod)
 				}
@@ -153,13 +141,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				// no need to check for errors here
 				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
 			}
-			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
-		})
+			ExpectWithOffset(1, failedPods).To(BeEmpty(), "some padding pods have failed to run")
+		}
 
 		// FIXME: this is a slight abuse of DescribeTable, but we need to run
 		// the same code which a different test_id per tmscope
 		DescribeTable("[tier1] a guaranteed pod with one container should be scheduled into one NUMA zone",
-			func(tmPolicy nrtv1alpha1.TopologyManagerPolicy) {
+			func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, requiredRes, paddingRes corev1.ResourceList) {
+				setupCluster(requiredRes, paddingRes)
+
 				nrts := e2enrt.FilterTopologyManagerPolicy(nrtCandidates, tmPolicy)
 				if len(nrts) != len(nrtCandidates) {
 					Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
@@ -189,14 +179,36 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			},
-			Entry("[test_id:48713][tmscope:cnt]", nrtv1alpha1.SingleNUMANodeContainerLevel),
-			Entry("[tmscope:pod]", nrtv1alpha1.SingleNUMANodePodLevel),
+			Entry("[test_id:48713][tmscope:cnt]",
+				nrtv1alpha1.SingleNUMANodeContainerLevel,
+				corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+				corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("3"),
+					corev1.ResourceMemory: resource.MustParse("3Gi"),
+				},
+			),
+			Entry("[tmscope:pod]",
+				nrtv1alpha1.SingleNUMANodePodLevel,
+				corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+				corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("3"),
+					corev1.ResourceMemory: resource.MustParse("3Gi"),
+				},
+			),
 		)
 
 		// FIXME: this is a slight abuse of DescribeTable, but we need to run
 		// the same code which a different test_id per tmscope
 		DescribeTable("[tier1] a deployment with a guaranteed pod with one container should be scheduled into one NUMA zone",
-			func(tmPolicy nrtv1alpha1.TopologyManagerPolicy) {
+			func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, requiredRes, paddingRes corev1.ResourceList) {
+				setupCluster(requiredRes, paddingRes)
+
 				nrts := e2enrt.FilterTopologyManagerPolicy(nrtCandidates, tmPolicy)
 				if len(nrts) != len(nrtCandidates) {
 					Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
@@ -234,8 +246,28 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 				}
 			},
-			Entry("[test_id:47583][tmscope:cnt]", nrtv1alpha1.SingleNUMANodeContainerLevel),
-			Entry("[tmscope:pod]", nrtv1alpha1.SingleNUMANodePodLevel),
+			Entry("[test_id:47583][tmscope:cnt]",
+				nrtv1alpha1.SingleNUMANodeContainerLevel,
+				corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+				corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("3"),
+					corev1.ResourceMemory: resource.MustParse("3Gi"),
+				},
+			),
+			Entry("[tmscope:pod]",
+				nrtv1alpha1.SingleNUMANodePodLevel,
+				corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+				corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("3"),
+					corev1.ResourceMemory: resource.MustParse("3Gi"),
+				},
+			),
 		)
 	})
 
