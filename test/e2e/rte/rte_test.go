@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -195,6 +196,61 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 					gomega.Expect(rc.Resources.ReservedMemory).ToNot(gomega.BeEmpty())
 				}
 			}
+		})
+
+		ginkgo.It("should keep the ConfigMap aligned with the KubeletConfig info", func() {
+			nroObj, err := nropcli.NUMAResourcesOperators().Get(context.TODO(), objectnames.DefaultNUMAResourcesOperatorCrName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(nroObj.Status.DaemonSets).ToNot(gomega.BeEmpty())
+			klog.Infof("NRO %q", nroObj.Name)
+
+			// NROP guarantees all the daemonsets are in the same namespace,
+			// so we pick the first for the sake of brevity
+			namespace := nroObj.Status.DaemonSets[0].Namespace
+			klog.Infof("namespace %q", namespace)
+
+			mcpList, err := mcocli.MachineConfigPools().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			klog.Infof("MCPs count: %d", len(mcpList.Items))
+
+			mcoKcList, err := mcocli.KubeletConfigs().List(context.TODO(), metav1.ListOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			// pick the first for the sake of brevity
+			mcoKc := mcoKcList.Items[0]
+			ginkgo.By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
+
+			mcps, err := mcpfind.NodeGroupsMCPs(mcpList, nroObj.Spec.NodeGroups)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			mcp, err := mcpfind.MCPBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
+			ginkgo.By(fmt.Sprintf("Considering MCP %q", mcp.Name))
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			generatedName := objectnames.GetComponentName(nroObj.Name, mcp.Name)
+			klog.Infof("generated config map name: %q", generatedName)
+			cm, err := f.ClientSet.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			desiredMapState := make(map[string]string)
+			for k, v := range cm.Data {
+				desiredMapState[k] = v
+			}
+
+			cm.Data = nil
+			cm, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Eventually(func() bool {
+				cm, err = f.ClientSet.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				if !reflect.DeepEqual(cm.Data, desiredMapState) {
+					klog.Warningf("ConfigMap %q data is not in it's desired state, waiting for controller to update it")
+					return false
+				}
+				return true
+			}, time.Minute*5, time.Second*30).Should(gomega.BeTrue())
 		})
 	})
 })
