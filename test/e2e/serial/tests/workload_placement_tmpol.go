@@ -201,6 +201,32 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceMemory: resource.MustParse("3Gi"),
 				},
 			),
+			Entry("[tmscope:cnt][hugepages]",
+				nrtv1alpha1.SingleNUMANodeContainerLevel,
+				corev1.ResourceList{
+					corev1.ResourceCPU:                   resource.MustParse("4"),
+					corev1.ResourceMemory:                resource.MustParse("4Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("256Mi"),
+				},
+				corev1.ResourceList{
+					corev1.ResourceCPU:                   resource.MustParse("3"),
+					corev1.ResourceMemory:                resource.MustParse("3Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("192Mi"),
+				},
+			),
+			Entry("[tmscope:pod][hugepages]",
+				nrtv1alpha1.SingleNUMANodePodLevel,
+				corev1.ResourceList{
+					corev1.ResourceCPU:                   resource.MustParse("4"),
+					corev1.ResourceMemory:                resource.MustParse("4Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("256Mi"),
+				},
+				corev1.ResourceList{
+					corev1.ResourceCPU:                   resource.MustParse("3"),
+					corev1.ResourceMemory:                resource.MustParse("3Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("192Mi"),
+				},
+			),
 		)
 
 		// FIXME: this is a slight abuse of DescribeTable, but we need to run
@@ -266,6 +292,32 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("3"),
 					corev1.ResourceMemory: resource.MustParse("3Gi"),
+				},
+			),
+			Entry("[tmscope:cnt][hugepages]",
+				nrtv1alpha1.SingleNUMANodeContainerLevel,
+				corev1.ResourceList{
+					corev1.ResourceCPU:                   resource.MustParse("4"),
+					corev1.ResourceMemory:                resource.MustParse("4Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("256Mi"),
+				},
+				corev1.ResourceList{
+					corev1.ResourceCPU:                   resource.MustParse("3"),
+					corev1.ResourceMemory:                resource.MustParse("3Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("192Mi"),
+				},
+			),
+			Entry("[tmscope:pod][hugepages]",
+				nrtv1alpha1.SingleNUMANodePodLevel,
+				corev1.ResourceList{
+					corev1.ResourceCPU:                   resource.MustParse("4"),
+					corev1.ResourceMemory:                resource.MustParse("4Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("256Mi"),
+				},
+				corev1.ResourceList{
+					corev1.ResourceCPU:                   resource.MustParse("3"),
+					corev1.ResourceMemory:                resource.MustParse("3Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("192Mi"),
 				},
 			),
 		)
@@ -460,6 +512,62 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				{
 					corev1.ResourceCPU:    resource.MustParse("10"),
 					corev1.ResourceMemory: resource.MustParse("16Gi"),
+				},
+			},
+		),
+		Entry("[tmscope:cnt][hugepages] should make a pod with two gu cnt land on a node with enough resources on a specific NUMA zone, each cnt on a different zone",
+			nrtv1alpha1.SingleNUMANodeContainerLevel,
+			setupPaddingContainerLevel,
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:                   resource.MustParse("6"),
+					corev1.ResourceMemory:                resource.MustParse("6Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("96Mi"),
+				},
+				{
+					corev1.ResourceCPU:                   resource.MustParse("12"),
+					corev1.ResourceMemory:                resource.MustParse("8Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("128Mi"),
+				},
+			},
+			// make sure the sum is equal to the sum of the requirement of the test pod,
+			// so the *node* total free resources are equal between the target node and
+			// the unsuitable nodes
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+				{
+					corev1.ResourceCPU:                   resource.MustParse("16"),
+					corev1.ResourceMemory:                resource.MustParse("12Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("192Mi"),
+				},
+			},
+		),
+		Entry("[tmscope:pod][hugepages] should make a pod with two gu cnt land on a node with enough resources on a specific NUMA zone, all cnt on the same zone",
+			nrtv1alpha1.SingleNUMANodePodLevel,
+			setupPaddingPodLevel,
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("12Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:                   resource.MustParse("14"),
+					corev1.ResourceMemory:                resource.MustParse("10Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("32Mi"),
+				},
+				{
+					corev1.ResourceCPU:                   resource.MustParse("10"),
+					corev1.ResourceMemory:                resource.MustParse("16Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("144Mi"),
 				},
 			},
 		),
