@@ -94,3 +94,33 @@ podman run -ti \
 	/usr/bin/test-run.sh \
 	-ginkgo.focus="numaresources"
 ```
+
+### skipping reboot-requiring tests
+
+Some E2E tests require to reboot one or more worker node. This is intrinsically fragile and slow, and you may want to avoid to do this in your tier-1 runs.
+To do so, you can run
+```bash
+export E2E_IMAGE_URL=quay.io/openshift-kni/numaresources-operator-tests:4.11.999-snapshot
+podman run -ti \
+	-v $KUBECONFIG:/kubeconfig:z \
+	-e KUBECONFIG=/kubeconfig \
+	-e E2E_NROP_INSTALL_SKIP_KC=true \
+	-e E2E_NUMACELL_DEVICE_PLUGIN_URL=${E2E_IMAGE_URL} \
+	-e E2E_PAUSE_IMAGE_URL=${E2E_IMAGE_URL} \
+	${E2E_IMAGE_URL}
+	--skip '.*reboot_required.*'
+```
+or, with CNF tests:
+```bash
+export CNF_TESTS_URL="quay.io/openshift-kni/cnf-tests:4.11.0"
+podman run -ti \
+	-v $KUBECONFIG:/kubeconfig:z \
+	-e KUBECONFIG=/kubeconfig \
+	-e E2E_NROP_INSTALL_SKIP_KC=true \
+	-e E2E_NUMACELL_DEVICE_PLUGIN_URL=${CNF_TESTS_URL} \
+	-e E2E_PAUSE_IMAGE_URL=${CNF_TESTS_URL} \
+	${CNF_TESTS_URL} \
+	/usr/bin/test-run.sh \
+	-ginkgo.skip='.*reboot_required.*' \
+	-ginkgo.focus="numaresources"
+```
