@@ -60,3 +60,22 @@ podman run -ti \
 	-e E2E_PAUSE_IMAGE_URL=${E2E_IMAGE_URL} \
 	${E2E_IMAGE_URL}
 ```
+
+### running the tests using cnf-tests
+
+The [CNF tests](https://github.com/openshift-kni/cnf-features-deploy/blob/master/cnf-tests/README.md) [container images](https://quay.io/repository/openshift-kni/cnf-tests) includes the E2E suite.
+While the primary source for pre-built test container image is the [numaresources-operator-tests](https://quay.io/repository/openshift-kni/numaresources-operator-tests), the CNF tests integration
+will be updated shortly after. **Running the testsuite through CNF tests is fully supported**.
+To run the suite using the CNF tests image, you can run
+```bash
+export CNF_TESTS_URL="quay.io/openshift-kni/cnf-tests:4.11.0"
+podman run -ti \
+	-v $KUBECONFIG:/kubeconfig:z \
+	-e KUBECONFIG=/kubeconfig \
+	-e E2E_NROP_INSTALL_SKIP_KC=true \
+	-e E2E_NUMACELL_DEVICE_PLUGIN_URL=${CNF_TESTS_URL} \
+	-e E2E_PAUSE_IMAGE_URL=${CNF_TESTS_URL} \
+	${CNF_TESTS_URL} \
+	/usr/bin/test-run.sh \
+	-ginkgo.focus="numaresources"
+```
