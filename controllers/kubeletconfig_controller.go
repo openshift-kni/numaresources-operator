@@ -29,8 +29,11 @@ import (
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
@@ -64,6 +67,7 @@ type KubeletConfigReconciler struct {
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=kubeletconfigs,verbs=get;list;watch
+//+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=kubeletconfigs/finalizers,verbs=update
 
 func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	klog.V(3).InfoS("Starting KubeletConfig reconcile loop", "object", req.NamespacedName)
@@ -102,8 +106,17 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 }
 
 func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// we have nothing to do in case of deletion
+	p := predicate.Funcs{
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			kubelet := e.Object.(*mcov1.KubeletConfig)
+			klog.InfoS("KubeletConfig object got deleted", "KubeletConfig", kubelet.Name)
+			return false
+		},
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&mcov1.KubeletConfig{}).
+		For(&mcov1.KubeletConfig{}, builder.WithPredicates(p)).
 		Owns(&corev1.ConfigMap{}).
 		Complete(r)
 }
@@ -134,10 +147,10 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 
 	generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
 	klog.V(3).InfoS("generated configMap name", "generatedName", generatedName)
-	return r.syncConfigMap(ctx, instance, kubeletConfig, generatedName)
+	return r.syncConfigMap(ctx, mcoKc, kubeletConfig, generatedName)
 }
 
-func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, name string) (*corev1.ConfigMap, error) {
+func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov1.KubeletConfig, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, name string) (*corev1.ConfigMap, error) {
 	rendered, err := renderRTEConfig(r.Namespace, name, kubeletConfig)
 	if err != nil {
 		klog.ErrorS(err, "rendering config", "namespace", r.Namespace, "name", name)
@@ -149,7 +162,9 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, instance *n
 	}
 	existing := cfgstate.FromClient(context.TODO(), r.Client, r.Namespace, name)
 	for _, objState := range existing.State(cfgManifests) {
-		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
+		// the owner should be the KubeletConfig object and not the NUMAResourcesOperator CR
+		// this means that when KubeletConfig will get deleted, the ConfigMap gets deleted as well
+		if err := controllerutil.SetControllerReference(mcoKc, objState.Desired, r.Scheme); err != nil {
 			return nil, errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
 		if _, err := apply.ApplyObject(context.TODO(), r.Client, objState); err != nil {

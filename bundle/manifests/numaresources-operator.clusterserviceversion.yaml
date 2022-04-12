@@ -167,6 +167,12 @@ spec:
         - apiGroups:
           - machineconfiguration.openshift.io
           resources:
+          - kubeletconfigs/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - machineconfiguration.openshift.io
+          resources:
           - machineconfigpools
           verbs:
           - get
