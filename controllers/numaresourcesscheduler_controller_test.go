@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"k8s.io/klog/v2"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -157,6 +159,63 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			val, ok := dp.Spec.Template.Annotations[hash.ConfigMapAnnotation]
 			gomega.Expect(ok).To(gomega.BeTrue())
 			gomega.Expect(val).ToNot(gomega.BeEmpty())
+		})
+
+		ginkgo.It("should react to owned objects changes", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			key = client.ObjectKey{
+				Name:      "topo-aware-scheduler-config",
+				Namespace: testNamespace,
+			}
+
+			cm := &corev1.ConfigMap{}
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, cm)).ToNot(gomega.HaveOccurred())
+
+			key.Name = "secondary-scheduler"
+			dp := &appsv1.Deployment{}
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, dp)).ToNot(gomega.HaveOccurred())
+
+			initialCM := cm.DeepCopy()
+			cm.Data["somekey"] = "somevalue"
+
+			initialDP := dp.DeepCopy()
+			dp.Spec.Template.Spec.Hostname = "newname"
+			c := corev1.Container{Name: "newcontainer"}
+			dp.Spec.Template.Spec.Containers = append(dp.Spec.Template.Spec.Containers, c)
+
+			gomega.Eventually(func() bool {
+				if err = reconciler.Client.Update(context.TODO(), cm); err != nil {
+					klog.Warningf("failed to update MachineConfig %s; err: %v", cm.Name, err)
+					return false
+				}
+				return true
+			}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+			gomega.Eventually(func() bool {
+				if err = reconciler.Client.Update(context.TODO(), dp); err != nil {
+					klog.Warningf("failed to update DaemonSet %s/%s; err: %v", dp.Namespace, dp.Name, err)
+					return false
+				}
+				return true
+			}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+			key = client.ObjectKeyFromObject(nrs)
+			_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			key = client.ObjectKeyFromObject(cm)
+			err = reconciler.Client.Get(context.TODO(), key, cm)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(cm.Data).To(gomega.Equal(initialCM.Data))
+
+			key = client.ObjectKeyFromObject(dp)
+			err = reconciler.Client.Get(context.TODO(), key, dp)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(dp.Spec.Template.Spec).To(gomega.Equal(initialDP.Spec.Template.Spec))
+
 		})
 	})
 })
