@@ -70,6 +70,7 @@ export CNF_TESTS_URL="quay.io/openshift-kni/cnf-tests:4.11.0"
 podman run -ti \
 	-v $KUBECONFIG:/kubeconfig:z \
 	-e KUBECONFIG=/kubeconfig \
+	-e CLEAN_PERFORMANCE_PROFILE=false \
 	-e E2E_NROP_INSTALL_SKIP_KC=true \
 	-e E2E_NUMACELL_DEVICE_PLUGIN_URL=${CNF_TESTS_URL} \
 	-e E2E_PAUSE_IMAGE_URL=${CNF_TESTS_URL} \
@@ -99,6 +100,7 @@ export CNF_TESTS_URL="quay.io/openshift-kni/cnf-tests:4.11.0"
 podman run -ti \
 	-v $KUBECONFIG:/kubeconfig:z \
 	-e KUBECONFIG=/kubeconfig \
+	-e CLEAN_PERFORMANCE_PROFILE=false \
 	-e E2E_NROP_INSTALL_SKIP_KC=true \
 	-e E2E_NUMACELL_DEVICE_PLUGIN_URL=${CNF_TESTS_URL} \
 	-e E2E_PAUSE_IMAGE_URL=${CNF_TESTS_URL} \
