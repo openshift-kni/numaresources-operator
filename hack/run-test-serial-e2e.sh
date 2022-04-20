@@ -2,6 +2,7 @@
 
 source hack/common.sh
 
+### serial suite runner
 # we expect the lane to run against a already configured cluster
 # we use this verbose form to play nice with envsubst
 if [ -z "${SETUP}" ]; then
@@ -16,7 +17,7 @@ fi
 
 NO_COLOR=""
 if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
-  echo "Terminal does not seem to support colored output, disabling it"
+  echo "Terminal does not seem to support colored output, disabling it" 1>&2
   NO_COLOR="-ginkgo.noColor"
 fi
 
