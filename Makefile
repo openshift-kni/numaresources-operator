@@ -176,6 +176,7 @@ binary-e2e-all: binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-un
 
 runner-e2e-serial: bin/envsubst
 	hack/render-e2e-runner.sh
+	hack/test-e2e-runner.sh
 
 build: generate fmt vet binary
 

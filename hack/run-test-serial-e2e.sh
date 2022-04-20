@@ -2,6 +2,7 @@
 
 source hack/common.sh
 
+### serial suite runner
 # we expect the lane to run against a already configured cluster
 # we use this verbose form to play nice with envsubst
 if [ -z "${SETUP}" ]; then
