@@ -135,13 +135,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 			}
 
-			// wait for all padding pods to be up&running ( or fail)
-			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
-			for _, failedPod := range failedPods {
-				// no need to check for errors here
-				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-			}
-			ExpectWithOffset(1, failedPods).To(BeEmpty(), "some padding pods have failed to run")
+			By("Waiting for padding pods to be ready")
+			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			ExpectWithOffset(1, failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 		}
 
 		// FIXME: this is a slight abuse of DescribeTable, but we need to run
@@ -380,13 +376,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("Padding nodes to create the test workload scenario")
 			paddingPods := setupPadding(fxt, nrtList, padInfo)
 
-			By("waiting for ALL padding pods to go running - or fail")
-			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
-			for _, failedPod := range failedPods {
-				// ignore errors intentionally
-				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-			}
-			Expect(failedPods).To(BeEmpty())
+			By("Waiting for padding pods to be ready")
+			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			// TODO: smarter cooldown
 			klog.Infof("cooling down")

@@ -207,11 +207,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 
 				}
 
-				failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
-				for _, failedPod := range failedPods {
-					_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-				}
-				Expect(failedPods).To(BeEmpty())
+				By("Waiting for padding pods to be ready")
+				failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+				Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 				By("checking the resource allocation as the test starts")
 				nrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
