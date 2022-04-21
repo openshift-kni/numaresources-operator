@@ -550,12 +550,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			setupPaddingPodLevel,
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    resource.MustParse("6"),
-					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceCPU:                   resource.MustParse("6"),
+					corev1.ResourceMemory:                resource.MustParse("4Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("32Mi"),
 				},
 				{
-					corev1.ResourceCPU:    resource.MustParse("8"),
-					corev1.ResourceMemory: resource.MustParse("12Gi"),
+					corev1.ResourceCPU:                   resource.MustParse("8"),
+					corev1.ResourceMemory:                resource.MustParse("12Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("128Mi"),
 				},
 			},
 			[]corev1.ResourceList{
