@@ -19,6 +19,8 @@ package objects
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -48,7 +50,38 @@ func NewTestPodPause(namespace, name string) *corev1.Pod {
 	}
 }
 
+const (
+	envVarDumpEvents = "E2E_NROP_DUMP_EVENTS"
+)
+
 func LogEventsForPod(k8sCli *kubernetes.Clientset, podNamespace, podName string) error {
+	events, err := GetEventsForPod(k8sCli, podNamespace, podName)
+	if err != nil {
+		return err
+	}
+	klog.Infof("begin events for %s/%s", podNamespace, podName)
+	for _, item := range events {
+		klog.Infof("+- event: %s %s: %s %s", item.Type, item.ReportingController, item.Reason, item.Message)
+	}
+	klog.Infof("end events for %s/%s", podNamespace, podName)
+
+	if _, ok := os.LookupEnv(envVarDumpEvents); ok {
+		fmt.Println(DumpEventsForPod(events, podNamespace, podName))
+	}
+	return nil
+}
+
+func DumpEventsForPod(events []corev1.Event, podNamespace, podName string) string {
+	var buf strings.Builder
+	fmt.Fprintf(&buf, "begin event dump for %s/%s\n", podNamespace, podName)
+	for _, item := range events {
+		fmt.Fprintf(&buf, "+- event: %s %s: %s %s", item.Type, item.ReportingController, item.Reason, item.Message)
+	}
+	fmt.Fprintf(&buf, "end event dump for %s/%s", podNamespace, podName)
+	return buf.String()
+}
+
+func GetEventsForPod(k8sCli *kubernetes.Clientset, podNamespace, podName string) ([]corev1.Event, error) {
 	klog.Infof("checking events for pod %s/%s", podNamespace, podName)
 	opts := metav1.ListOptions{
 		FieldSelector: fmt.Sprintf("involvedObject.name=%s", podName),
@@ -57,12 +90,7 @@ func LogEventsForPod(k8sCli *kubernetes.Clientset, podNamespace, podName string)
 	events, err := k8sCli.CoreV1().Events(podNamespace).List(context.TODO(), opts)
 	if err != nil {
 		klog.ErrorS(err, "cannot get events for pod %s/%s", podNamespace, podName)
-		return err
+		return nil, err
 	}
-	klog.Infof("begin events for %s/%s", podNamespace, podName)
-	for _, item := range events.Items {
-		klog.Infof("+- event: %s %s: %s %s", item.Type, item.ReportingController, item.Reason, item.Message)
-	}
-	klog.Infof("end events for %s/%s", podNamespace, podName)
-	return nil
+	return events.Items, nil
 }
