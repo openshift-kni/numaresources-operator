@@ -141,11 +141,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				}
 			}
 
-			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
-			for _, failedPod := range failedPods {
-				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-			}
-			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
+			By("Waiting for padding pods to be ready")
+			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 		})
 
 		It("[test_id:47617][tier2][unsched] workload requests guaranteed pod resources available on one node but not on a single numa", func() {
@@ -289,11 +287,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				}
 			}
 
-			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
-			for _, failedPod := range failedPods {
-				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-			}
-			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
+			By("Waiting for padding pods to be ready")
+			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			By("Scheduling the testing daemonset")
 			dsName := "test-ds"
@@ -458,14 +454,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				paddingPods = append(paddingPods, padPod)
 			}
 
-			By("waiting for padding pods to be ready ...")
-			// wait for all padding pods to be up&running ( or fail)
-			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
-			for _, failedPod := range failedPods {
-				// no need to check for errors here
-				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-			}
-			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
+			By("Waiting for padding pods to be ready")
+			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			By("Scheduling the testing pod")
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")

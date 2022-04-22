@@ -169,13 +169,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 			}
 			By("Waiting for padding pods to be ready")
-			// wait for all padding pods to be up&running ( or fail)
-			failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
-			for _, failedPod := range failedPods {
-				// no need to check for errors here
-				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-			}
-			Expect(failedPods).To(BeEmpty(), "some padding pods have failed to run")
+			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
+
 			var err error
 			targetNodeNRTInitial, err = e2enrt.FindFromList(nrtCandidates, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
