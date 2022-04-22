@@ -1,4 +1,4 @@
-name: CI release flow
+name: CI operator release flow
 
 on:
   push:
