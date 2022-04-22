@@ -115,6 +115,10 @@ func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup,
 }
 
 func getNUMACellDevicePluginPullSpec() string {
+	if pullSpec, ok := os.LookupEnv("E2E_NROP_URL_NUMACELL_DEVICE_PLUGIN"); ok {
+		return pullSpec
+	}
+	// backward compatibility
 	if pullSpec, ok := os.LookupEnv("E2E_NUMACELL_DEVICE_PLUGIN_URL"); ok {
 		return pullSpec
 	}

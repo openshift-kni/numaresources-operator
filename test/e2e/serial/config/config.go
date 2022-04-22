@@ -45,6 +45,10 @@ func Setup() {
 }
 
 func Teardown() {
+	if _, ok := os.LookupEnv("E2E_NROP_INFRA_TEARDOWN_SKIP"); ok {
+		return
+	}
+	// backward compatibility
 	if _, ok := os.LookupEnv("E2E_INFRA_NO_TEARDOWN"); ok {
 		return
 	}
