@@ -257,3 +257,19 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 	})
 })
+
+const testKey = "testkey"
+
+func testTaint() string {
+	return fmt.Sprintf("%s:%s", testKey, corev1.TaintEffectNoSchedule)
+}
+
+func testToleration() []corev1.Toleration {
+	return []corev1.Toleration{
+		{
+			Key:      testKey,
+			Operator: corev1.TolerationOpExists,
+			Effect:   corev1.TaintEffectNoSchedule,
+		},
+	}
+}
