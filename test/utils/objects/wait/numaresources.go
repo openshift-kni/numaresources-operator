@@ -29,8 +29,8 @@ import (
 func ForNUMAResourcesOperatorDeleted(cli client.Client, nrop *nropv1alpha1.NUMAResourcesOperator, pollInterval, pollTimeout time.Duration) error {
 	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
 		updatedNrop := nropv1alpha1.NUMAResourcesOperator{}
-		key := client.ObjectKeyFromObject(nrop)
-		err := cli.Get(context.TODO(), key, &updatedNrop)
+		key := ObjectKeyFromObject(nrop)
+		err := cli.Get(context.TODO(), key.AsKey(), &updatedNrop)
 		return deletionStatusFromError("NUMAResourcesOperator", key, err)
 	})
 	return err
