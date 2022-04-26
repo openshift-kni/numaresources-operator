@@ -153,6 +153,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("unpadding the nodes after test finish")
 			err = padder.Clean()
 			Expect(err).ToNot(HaveOccurred())
+
+			// intentionally last
+			By("checking nodes have no taints left")
+			checkNodesUntainted(fxt.Client, nodeNames)
 		})
 
 		It("[test_id:47594][tier1] should make a pod with a toleration land on a node with enough resources on a specific NUMA zone", func() {
@@ -301,6 +305,23 @@ func untaintNodes(cli client.Client, taintedNodeNames []string, taint *corev1.Ta
 		}, time.Minute, 5*time.Second).ShouldNot(HaveOccurred())
 	}
 	return untaintedNodeNames
+}
+
+func checkNodesUntainted(cli client.Client, nodeNames []string) {
+	// TODO: check taints in parallel
+	for _, nodeName := range nodeNames {
+		EventuallyWithOffset(1, func() error {
+			var err error
+			node := &corev1.Node{}
+			err = cli.Get(context.TODO(), client.ObjectKey{Name: nodeName}, node)
+			ExpectWithOffset(1, err).ToNot(HaveOccurred())
+
+			if len(node.Spec.Taints) > 0 {
+				return fmt.Errorf("node %q has unexpected taints: %v", nodeName, node.Spec.Taints)
+			}
+			return nil
+		}, 3*time.Minute, 10*time.Second).ShouldNot(HaveOccurred())
+	}
 }
 
 func accumulateNodeNames(nodes []corev1.Node) []string {
