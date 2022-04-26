@@ -93,6 +93,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 	When("cluster has two feasible nodes with taint but only one has the requested resources on a single NUMA zone", func() {
 		timeout := 5 * time.Minute
+		var taintedNodeNames []string
+		var appliedTaints []corev1.Taint
+
 		BeforeEach(func() {
 			numOfNodeToBePadded := len(nrts) - 1
 
@@ -107,47 +110,45 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nodes, err := e2enodes.GetWorkerNodes(fxt.Client)
 			Expect(err).ToNot(HaveOccurred())
 
-			t, _, err := taints.ParseTaints([]string{testTaint()})
+			tnts, _, err := taints.ParseTaints([]string{testTaint()})
 			Expect(err).ToNot(HaveOccurred())
+			appliedTaints = tnts
 
+			tnt := &tnts[0] // shortcut
+			var updatedNodeNames []string
 			for i := range nodes {
 				node := &nodes[i]
-				updatedNode, updated, err := taints.AddOrUpdateTaint(node, &t[0])
+				updatedNode, updated, err := taints.AddOrUpdateTaint(node, tnt)
 				Expect(err).ToNot(HaveOccurred())
-				if updated {
-					node = updatedNode
-					klog.Infof("adding taint: %q to node: %q", t[0].String(), node.Name)
-					err = fxt.Client.Update(context.TODO(), node)
-					Expect(err).ToNot(HaveOccurred())
+				if !updated {
+					continue
 				}
+
+				klog.Infof("adding taint: %q to node: %q", tnt.String(), updatedNode.Name)
+				err = fxt.Client.Update(context.TODO(), updatedNode)
+				Expect(err).ToNot(HaveOccurred())
+
+				updatedNodeNames = append(updatedNodeNames, updatedNode.Name)
 			}
+			taintedNodeNames = updatedNodeNames
+
+			By(fmt.Sprintf("considering nodes: %v tainted with %q", updatedNodeNames, tnt.String()))
 		})
 
 		AfterEach(func() {
+			tnt := &appliedTaints[0] // shortcut
+			// first untaint the nodes we know we tainted
+			untaintedNodeNames := untaintNodes(fxt.Client, taintedNodeNames, tnt)
+			By(fmt.Sprintf("cleaned taint %q from the nodes %v", tnt.String(), untaintedNodeNames))
+
+			// leaking taints is especially bad AND we had some bugs in the pass, so let's try our very bes
+			// to be really really sure we didn't pollute the cluster.
 			nodes, err := e2enodes.GetWorkerNodes(fxt.Client)
 			Expect(err).ToNot(HaveOccurred())
 
-			t, _, err := taints.ParseTaints([]string{testTaint()})
-			Expect(err).ToNot(HaveOccurred())
-
-			By("removing taints from the nodes")
-			// TODO: remove taints in parallel
-			for i := range nodes {
-				Eventually(func() error {
-					node := &corev1.Node{}
-					err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(&nodes[i]), node)
-					Expect(err).ToNot(HaveOccurred())
-
-					updatedNode, updated, err := taints.RemoveTaint(node, &t[0])
-					Expect(err).ToNot(HaveOccurred())
-					if !updated {
-						return nil
-					}
-
-					klog.Infof("removing taint: %q from node: %q", t[0].String(), updatedNode.Name)
-					return fxt.Client.Update(context.TODO(), updatedNode)
-				}, time.Minute, time.Second*5).ShouldNot(HaveOccurred())
-			}
+			nodeNames := accumulateNodeNames(nodes)
+			doubleCheckedNodeNames := untaintNodes(fxt.Client, nodeNames, tnt)
+			By(fmt.Sprintf("cleaned taint %q from the nodes %v", tnt.String(), doubleCheckedNodeNames))
 
 			By("unpadding the nodes after test finish")
 			err = padder.Clean()
@@ -253,7 +254,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				ok, err := e2enrt.CheckEqualAvailableResources(*nrtInitial, *nrtPostDelete)
 				Expect(err).ToNot(HaveOccurred())
 				return ok
-			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
+			}, time.Minute, 5*time.Second).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		})
 	})
 })
@@ -272,4 +273,40 @@ func testToleration() []corev1.Toleration {
 			Effect:   corev1.TaintEffectNoSchedule,
 		},
 	}
+}
+
+func untaintNodes(cli client.Client, taintedNodeNames []string, taint *corev1.Taint) []string {
+	var untaintedNodeNames []string
+	// TODO: remove taints in parallel
+	for _, taintedNodeName := range taintedNodeNames {
+		EventuallyWithOffset(1, func() error {
+			var err error
+			node := &corev1.Node{}
+			err = cli.Get(context.TODO(), client.ObjectKey{Name: taintedNodeName}, node)
+			ExpectWithOffset(1, err).ToNot(HaveOccurred())
+
+			updatedNode, updated, err := taints.RemoveTaint(node, taint)
+			ExpectWithOffset(1, err).ToNot(HaveOccurred())
+			if !updated {
+				return nil
+			}
+
+			klog.Infof("removing taint: %q from node: %q", taint.String(), updatedNode.Name)
+			err = cli.Update(context.TODO(), updatedNode)
+			if err != nil {
+				return err
+			}
+			untaintedNodeNames = append(untaintedNodeNames, updatedNode.Name)
+			return nil
+		}, time.Minute, 5*time.Second).ShouldNot(HaveOccurred())
+	}
+	return untaintedNodeNames
+}
+
+func accumulateNodeNames(nodes []corev1.Node) []string {
+	var names []string
+	for idx := range nodes {
+		names = append(names, nodes[idx].Name)
+	}
+	return names
 }
