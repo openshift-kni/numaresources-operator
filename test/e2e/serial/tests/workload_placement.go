@@ -52,8 +52,6 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
-const testKey = "testkey"
-
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement", func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
@@ -482,20 +480,6 @@ func dumpNRTForNode(cli client.Client, nodeName, tag string) {
 	data, err := yaml.Marshal(nrt)
 	Expect(err).ToNot(HaveOccurred())
 	klog.Infof("NRT for node %q (%s):\n%s", nodeName, tag, data)
-}
-
-func testTaint() string {
-	return fmt.Sprintf("%s:%s", testKey, corev1.TaintEffectNoSchedule)
-}
-
-func testToleration() []corev1.Toleration {
-	return []corev1.Toleration{
-		{
-			Key:      testKey,
-			Operator: corev1.TolerationOpExists,
-			Effect:   corev1.TaintEffectNoSchedule,
-		},
-	}
 }
 
 func labelNode(cli client.Client, label, nodeName string) (func() error, error) {
