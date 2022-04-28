@@ -30,23 +30,23 @@ import (
 func ForDaemonSetReady(cli client.Client, ds *appsv1.DaemonSet, pollInterval, pollTimeout time.Duration) (*appsv1.DaemonSet, error) {
 	updatedDs := &appsv1.DaemonSet{}
 	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		key := client.ObjectKeyFromObject(ds)
-		err := cli.Get(context.TODO(), key, updatedDs)
+		key := ObjectKeyFromObject(ds)
+		err := cli.Get(context.TODO(), key.AsKey(), updatedDs)
 		if err != nil {
-			klog.Warningf("failed to get the daemonset %#v: %v", key, err)
+			klog.Warningf("failed to get the daemonset %s: %v", key.String(), err)
 			return false, err
 		}
 
 		if !AreDaemonSetPodsReady(&updatedDs.Status) {
-			klog.Warningf("daemonset %#v desired %d scheduled %d ready %d",
-				key,
+			klog.Warningf("daemonset %s desired %d scheduled %d ready %d",
+				key.String(),
 				updatedDs.Status.DesiredNumberScheduled,
 				updatedDs.Status.CurrentNumberScheduled,
 				updatedDs.Status.NumberReady)
 			return false, nil
 		}
 
-		klog.Infof("daemonset %#v ready", key)
+		klog.Infof("daemonset %s ready", key.String())
 		return true, nil
 	})
 	return updatedDs, err

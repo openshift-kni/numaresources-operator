@@ -19,18 +19,17 @@ package wait
 import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func deletionStatusFromError(kind string, key client.ObjectKey, err error) (bool, error) {
+func deletionStatusFromError(kind string, key ObjectKey, err error) (bool, error) {
 	if err == nil {
-		klog.Infof("%s %#v still present", kind, key)
+		klog.Infof("%s %s still present", kind, key.String())
 		return false, nil
 	}
 	if apierrors.IsNotFound(err) {
-		klog.Infof("%s %#v is gone", kind, key)
+		klog.Infof("%s %s is gone", kind, key.String())
 		return true, nil
 	}
-	klog.Warningf("failed to get the %s %#v: %v", kind, key, err)
+	klog.Warningf("failed to get the %s %s: %v", kind, key.String(), err)
 	return false, err
 }
