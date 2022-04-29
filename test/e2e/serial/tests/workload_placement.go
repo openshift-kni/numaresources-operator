@@ -223,9 +223,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetNodeName))
-			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
-			_, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, rl)
+			dataBefore, err := yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
+			dataAfter, err := yaml.Marshal(nrtPostCreate)
+			Expect(err).ToNot(HaveOccurred())
+			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
+			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, rl)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfter, e2ereslist.ToString(rl))
 
 			By("updating the pod's resources such that it will still be available on the same node")
 			// now the pod is asking for 5 CPUS and 200Mi in total
@@ -283,9 +288,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetNodeName))
-			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
-			_, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPostCreate, *nrtPostUpdate, rl)
+			dataBefore, err = yaml.Marshal(nrtPostCreate)
 			Expect(err).ToNot(HaveOccurred())
+			dataAfter, err = yaml.Marshal(nrtPostUpdate)
+			Expect(err).ToNot(HaveOccurred())
+			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
+			match, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPostCreate, *nrtPostUpdate, rl)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfter, e2ereslist.ToString(rl))
 
 			By("updating the pod's resources such that it won't be available on the same node, but on a different one")
 			// we clean the nodes from the padding pods
@@ -370,9 +380,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetNodeName))
-			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
-			_, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPostUpdate, *nrtLastUpdate, rl)
+			dataBefore, err = yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
+			dataAfter, err = yaml.Marshal(nrtPostCreate)
+			Expect(err).ToNot(HaveOccurred())
+			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
+			match, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPostUpdate, *nrtLastUpdate, rl)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the updated pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfter, e2ereslist.ToString(rl))
 
 			By("deleting the deployment")
 			err = fxt.Client.Delete(context.TODO(), updatedDp)
