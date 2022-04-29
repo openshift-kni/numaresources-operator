@@ -8,6 +8,24 @@ Should you decide to use the default `kubeletconfig`, please omit the `-e E2E_NR
 
 The e2e suite assumes the cluster has the numaresources operator installed, but with no configuration. To install the numaresources operator, you can use the vehicle which best suits your use case (OLM, `make deploy`...).
 
+## Running from the source tree
+
+This is the easiest way, recommended for developers and people which want to consume the latest and greatest source tree.
+From the NUMA Resources Operator source tree:
+```bash
+export KUBECONFIG=...
+./hack/run-test-serial-e2e.sh
+```
+
+To get all the options supported by the run script:
+```bash
+./hack/run-test-serial-e2e.sh --help
+```
+
+## Running from container images
+
+[Pre-built container images](https://quay.io/repository/openshift-kni/numaresources-operator-tests) are available which contain the full testsuite, to enable containerized flows.
+
 To actually run the tests and the tests only, assuming a pre-configured numaresources stack
 ```bash
 podman run -ti \
