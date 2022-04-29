@@ -301,7 +301,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 	Context("cluster with node/s having two numa zones, and there are enough resources on one node but not in any numa zone when trying to schedule a deployment with burstable pods", func() {
 		var nrtCandidates []nrtv1alpha1.NodeResourceTopology
 		var targetNodeName string
-		var targetNodeNRTInitial *nrtv1alpha1.NodeResourceTopology
+		var targetNrtInitial *nrtv1alpha1.NodeResourceTopology
+		var targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList
 		var deployment *appsv1.Deployment
 		var reqResources corev1.ResourceList
 		var err error
@@ -309,7 +310,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 		/*
 			1. choose a target node on which the test's burstable pod will run
 			2. fully pad the non-target nodes
-			3. test step: create a workload with burstable pod
+			3. test step: create a workload with burstable pod and check which scheduler took charge and NRT
 		*/
 		BeforeEach(func() {
 			const requiredNUMAZones = 2
@@ -328,7 +329,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtCandidateNames.List())
 			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 
-			targetNodeNRTInitial, err = e2enrt.FindFromList(nrtCandidates, targetNodeName)
+			targetNrtListInitial, err = e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+			targetNrtInitial, err = e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
 
 			//calculate base load on the target node
@@ -338,8 +341,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 
 			//get maximum available node CPU and Memory
 			reqResources := corev1.ResourceList{
-				corev1.ResourceCPU:    availableResourceType(*targetNodeNRTInitial, corev1.ResourceCPU),
-				corev1.ResourceMemory: availableResourceType(*targetNodeNRTInitial, corev1.ResourceMemory),
+				corev1.ResourceCPU:    availableResourceType(*targetNrtInitial, corev1.ResourceCPU),
+				corev1.ResourceMemory: availableResourceType(*targetNrtInitial, corev1.ResourceMemory),
 			}
 
 			By("prepare the test's pod resources as maximum available resources on the target node with the baselaod deducted")
@@ -424,9 +427,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			}
 
 			By("check NRT reflects no updates after scheduling the burstable pod")
-			// targetNodeNRTPostCreate, err := e2enrt.FindFromList(nrtCandidates, targetNodeName)
-			// Expect(err).NotTo(HaveOccurred())
-			// Expect(e2enrt.CheckEqualAvailableResources(*targetNodeNRTInitial, *targetNodeNRTPostCreate)).To(BeTrue(), "new resources are accounted in NRT although scheduling burstable pod")
+			targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+			targetNrtCurrent, err := e2enrt.FindFromList(targetNrtListCurrent.Items, targetNodeName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(e2enrt.CheckEqualAvailableResources(*targetNrtInitial, *targetNrtCurrent)).To(BeTrue(), "new resources are accounted in NRT although scheduling burstable pod")
 		})
 
 	})
