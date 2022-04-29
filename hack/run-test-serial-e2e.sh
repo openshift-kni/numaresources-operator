@@ -75,6 +75,22 @@ while [[ $# -gt 0 ]]; do
 			shift
 			shift
 			;;
+		--help)
+			echo "usage: $0 [options]"
+			echo "[options] are always '--opt val' and never '--opt=val'"
+			echo "available options:"
+			echo "--setup               perform cluster setup before to run the tests (if enabled, see --no-run-tests)"
+			echo "--teardown            perform cluster teardown after having run the tests (if enabled, see --no-run-tests)"
+			echo "--no-run-tests        don't run the tests (see --setup and --teardown)"
+			echo "--no-color            force colored output to off"
+			echo "--dry-run             logs what about to do, but don't actually do it"
+			echo "--focus <regex>       only run cases matching <regex> (passed to -ginkgo.focus)"
+			echo "--skip <regex>        skip cases matching <regex> (passed to -ginkgo.skip)"
+			echo "--report-dir <dir>    write report artifacts on <dir>"
+			echo "--report-file <file>  write report file for this suite on <file>"
+			echo "--help                shows this message and helps correctly"
+			exit 0
+			;;
 		*)
 			echo "unrecognized option: $1"
 			echo "use the form --opt val and not the form --opt=val"
