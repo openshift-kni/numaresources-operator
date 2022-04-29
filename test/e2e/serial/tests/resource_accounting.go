@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -128,7 +129,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
 			// nodes we have now are all equal for our purposes. Pick one at random
-			// TODO: make sure we can control this randomness using ginkgo seed or any other way
 			targetNodeName, ok := candidateNodeNames.PopAny()
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
 			unsuitableNodeNames := candidateNodeNames.List()
@@ -159,9 +159,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
-			for _, zone := range nrtInfo.Zones {
+			var targetNrtBefore *nrtv1alpha1.NodeResourceTopology
+			var targetNrtListBefore nrtv1alpha1.NodeResourceTopologyList
+			for idx, zone := range nrtInfo.Zones {
+				if idx == len(nrtInfo.Zones)-1 {
+					// store the NRT of the target node before scheduling the last placeholder pod,
+					// later we'll compare this when we delete of of those pods
+					targetNrtListBefore, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
+					Expect(err).ToNot(HaveOccurred())
+					targetNrtBefore, err = e2enrt.FindFromList(targetNrtListBefore.Items, targetNodeName)
+					Expect(err).NotTo(HaveOccurred())
+				}
 				By(fmt.Sprintf("making node %q zone %q unsuitable with a placeholder pod", nrtInfo.Name, zone.Name))
-				Expect(err).ToNot(HaveOccurred(), "cannot detect the zone ID from %q", zone.Name)
 				// now put a minimal pod (1 cpu 1Gi) on both zones. Now the target node as whole will still have the
 				// required resources, but no NUMA zone individually will
 				targetedPaddingPod := objects.NewTestPodPause(fxt.Namespace.Name, fmt.Sprintf("tgtpadpod-%s", zone.Name))
@@ -237,8 +246,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			}
 			Expect(err).ToNot(HaveOccurred())
 
-			By("deleting a placeholder pod pod") // any pod is fine
-			targetPaddingPod := targetPaddingPods[0]
+			By("deleting the last placeholder pod that was scheduled on the target node")
+			//Delete the LAst placeholder pod that was created because once verifying the NRT was updated properly,
+			// we'll compare with targetNrtBefore which is the topology of the target node without the last placeholder pod,
+			// this way we'll be sure that the test pod landed (should land otherwise it's a bug) on the correct numa zone that
+			//released the placeholder pod and is now feasible to accommodate the test pod
+			targetPaddingPod := targetPaddingPods[len(targetPaddingPods)-1]
 			err = fxt.Client.Delete(context.TODO(), targetPaddingPod)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -246,6 +259,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			err = e2ewait.ForPodDeleted(fxt.Client, targetPaddingPod.Namespace, targetPaddingPod.Name, 3*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
+			// the status of the test pod moving from pending to running expected to be fast after new resources are released,
+			// thus it is fragile to verify the NRT before make the pending pod running, so let's check
+			// that after the test pod start running
 			By("waiting for the pod to be scheduled")
 			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
 			if err != nil {
@@ -261,6 +277,24 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+
+			//Check that NRT of the target node reflect correct consumed resources
+			By("check NRT is updated properly when the test's pod is running")
+			targetNrtListAfter, err := e2enrt.GetUpdated(fxt.Client, targetNrtListBefore, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+			targetNrtAfter, err := e2enrt.FindFromList(targetNrtListAfter.Items, targetNodeName)
+			Expect(err).NotTo(HaveOccurred())
+			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtBefore, *targetNrtAfter, requiredRes)
+			Expect(err).ToNot(HaveOccurred())
+
+			dataBefore, err := yaml.Marshal(targetNrtBefore)
+			Expect(err).ToNot(HaveOccurred())
+			dataAfter, err := yaml.Marshal(targetNrtAfter)
+			Expect(err).ToNot(HaveOccurred())
+			if match != "" {
+				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
+			}
+			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 		})
 	})
 
@@ -373,11 +407,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			err = fxt.Client.Create(context.TODO(), deployment)
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
-			By("waiting for deployment to be up&running")
+			By("waiting for deployment to be up & running")
 			dpRunningTimeout := 1 * time.Minute
 			dpRunningPollInterval := 10 * time.Second
 			err = e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
-			Expect(err).NotTo(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, dpRunningTimeout)
+			Expect(err).NotTo(HaveOccurred(), "Deployment %q not up & running after %v", deployment.Name, dpRunningTimeout)
 
 			By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
 			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
@@ -389,9 +423,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 			}
 
-			targetNodeNRTCurrent, err := e2enrt.FindFromList(nrtCandidates, targetNodeName)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(e2enrt.CheckEqualAvailableResources(*targetNodeNRTInitial, *targetNodeNRTCurrent)).To(BeTrue())
+			By("check NRT reflects no updates after scheduling the burstable pod")
+			// targetNodeNRTPostCreate, err := e2enrt.FindFromList(nrtCandidates, targetNodeName)
+			// Expect(err).NotTo(HaveOccurred())
+			// Expect(e2enrt.CheckEqualAvailableResources(*targetNodeNRTInitial, *targetNodeNRTPostCreate)).To(BeTrue(), "new resources are accounted in NRT although scheduling burstable pod")
 		})
 
 	})
