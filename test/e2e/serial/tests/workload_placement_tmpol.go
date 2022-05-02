@@ -175,7 +175,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			},
-			Entry("[test_id:48713][tmscope:cnt]",
+			Entry("[test_id:48713][tmscope:cnt] with topology-manager-scope: container",
 				nrtv1alpha1.SingleNUMANodeContainerLevel,
 				corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("4"),
@@ -186,7 +186,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceMemory: resource.MustParse("3Gi"),
 				},
 			),
-			Entry("[tmscope:pod]",
+			Entry("[test_id:50156][tmscope:pod] with topology-manager-scope: pod",
 				nrtv1alpha1.SingleNUMANodePodLevel,
 				corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("4"),
@@ -197,7 +197,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceMemory: resource.MustParse("3Gi"),
 				},
 			),
-			Entry("[tmscope:cnt][hugepages]",
+			Entry("[test_id:50158][tmscope:cnt][hugepages] with topology-manager-scope: container with hugepages",
 				nrtv1alpha1.SingleNUMANodeContainerLevel,
 				corev1.ResourceList{
 					corev1.ResourceCPU:                   resource.MustParse("4"),
@@ -210,7 +210,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("192Mi"),
 				},
 			),
-			Entry("[tmscope:pod][hugepages]",
+			Entry("[test_id:50157][tmscope:pod][hugepages] with topology-manager-scope: pod with hugepages",
 				nrtv1alpha1.SingleNUMANodePodLevel,
 				corev1.ResourceList{
 					corev1.ResourceCPU:                   resource.MustParse("4"),
@@ -268,7 +268,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 				}
 			},
-			Entry("[test_id:47583][tmscope:cnt]",
+			Entry("[test_id:47583][tmscope:cnt] with topology-manager-scope: container",
 				nrtv1alpha1.SingleNUMANodeContainerLevel,
 				corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("4"),
@@ -279,7 +279,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceMemory: resource.MustParse("3Gi"),
 				},
 			),
-			Entry("[tmscope:pod]",
+			Entry("[test_id:50159][tmscope:pod] with topology-manager-scope: pod",
 				nrtv1alpha1.SingleNUMANodePodLevel,
 				corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("4"),
@@ -290,7 +290,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceMemory: resource.MustParse("3Gi"),
 				},
 			),
-			Entry("[tmscope:cnt][hugepages]",
+			Entry("[test_id:50165][tmscope:cnt][hugepages] with topology-manager-scope: container and with hugepages",
 				nrtv1alpha1.SingleNUMANodeContainerLevel,
 				corev1.ResourceList{
 					corev1.ResourceCPU:                   resource.MustParse("4"),
@@ -303,7 +303,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("192Mi"),
 				},
 			),
-			Entry("[tmscope:pod][hugepages]",
+			Entry("[test_id:50182][tmscope:pod][hugepages] with topology-manager-scope: pod and with hugepages",
 				nrtv1alpha1.SingleNUMANodePodLevel,
 				corev1.ResourceList{
 					corev1.ResourceCPU:                   resource.MustParse("4"),
@@ -507,7 +507,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[tmscope:cnt][hugepages] should make a pod with two gu cnt land on a node with enough resources on a specific NUMA zone, each cnt on a different zone",
+		Entry("[test_id:50183][tmscope:cnt][hugepages] should make a pod with two gu cnt land on a node with enough resources with hugepages on a specific NUMA zone, each cnt on a different zone",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
 			[]corev1.ResourceList{
@@ -537,7 +537,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[tmscope:pod][hugepages] should make a pod with two gu cnt land on a node with enough resources on a specific NUMA zone, all cnt on the same zone",
+		Entry("[test_id:50184][tmscope:pod][hugepages] should make a pod with two gu cnt land on a node with enough resources with hugepages on a specific NUMA zone, all cnt on the same zone",
 			nrtv1alpha1.SingleNUMANodePodLevel,
 			setupPaddingPodLevel,
 			[]corev1.ResourceList{
