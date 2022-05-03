@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
@@ -98,7 +99,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		var targetNodeName, alternativeNodeName string
 		var requiredRes corev1.ResourceList
 		var nrtCandidates []nrtv1alpha1.NodeResourceTopology
-		var targetNodeNRTInitial *nrtv1alpha1.NodeResourceTopology
+		var targetNrtInitial *nrtv1alpha1.NodeResourceTopology
+		var targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList
 		BeforeEach(func() {
 			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
@@ -173,7 +175,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			var err error
-			targetNodeNRTInitial, err = e2enrt.FindFromList(nrtCandidates, targetNodeName)
+			targetNrtListInitial, err = e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+			targetNrtInitial, err = e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -224,9 +228,17 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Verifing the NRT statistics are updated")
-			targetNodeNRTCurrent, err := e2enrt.FindFromList(nrtCandidates, targetNodeName)
+			targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+			targetNrtCurrent, err := e2enrt.FindFromList(targetNrtListCurrent.Items, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(e2enrt.CheckEqualAvailableResources(*targetNodeNRTInitial, *targetNodeNRTCurrent)).To(BeTrue(), "target node %q initial resources and current resources are different", targetNodeName)
+			dataBefore, err := yaml.Marshal(targetNrtInitial)
+			Expect(err).ToNot(HaveOccurred())
+			dataAfter, err := yaml.Marshal(targetNrtCurrent)
+			Expect(err).ToNot(HaveOccurred())
+			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtInitial, *targetNrtCurrent, requiredRes)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 		})
 
 		Context("label two nodes with different label values but both matching the node affinity of the deployment pod of the test", func() {
@@ -297,14 +309,22 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					}
 
 					By("Verifing the NRT statistics are updated")
-					targetNodeNRTCurrent, err := e2enrt.FindFromList(nrtCandidates, targetNodeName)
+					targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
+					Expect(err).ToNot(HaveOccurred())
+					targetNrtCurrent, err := e2enrt.FindFromList(targetNrtListCurrent.Items, targetNodeName)
 					Expect(err).NotTo(HaveOccurred())
-					Expect(e2enrt.CheckEqualAvailableResources(*targetNodeNRTInitial, *targetNodeNRTCurrent)).To(BeTrue(), "target node %q initial resources and current resources are different", targetNodeName)
+					dataBefore, err := yaml.Marshal(targetNrtInitial)
+					Expect(err).ToNot(HaveOccurred())
+					dataAfter, err := yaml.Marshal(targetNrtCurrent)
+					Expect(err).ToNot(HaveOccurred())
+					match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtInitial, *targetNrtCurrent, requiredRes)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 
 					By("unlabel nodes during execution and check that the test's pod was not evicted due to shaked matching criteria")
 					nodesUnlabeled = true
 					err = unlabelTarget()
-					//if at least on of the unlabling failed, set nodesUnlabeled to false to try again in afterEach
+					//if at least one of the unlabeling failed, set nodesUnlabeled to false to try again in afterEach
 					if err != nil {
 						nodesUnlabeled = false
 						klog.Errorf("Error while trying to unlabel node %q. %v", targetNodeName, err)

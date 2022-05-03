@@ -151,21 +151,26 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
 				}
 
+				targetNrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
+				Expect(err).ToNot(HaveOccurred())
+				targetNrtInitial, err := e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)
+				Expect(err).NotTo(HaveOccurred())
+
 				By("Scheduling the testing pod")
 				pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 				pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
 				pod.Spec.Containers[0].Resources.Limits = requiredRes
 
-				err := fxt.Client.Create(context.TODO(), pod)
+				err = fxt.Client.Create(context.TODO(), pod)
 				Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
 
-				By("waiting for node to be up&running")
+				By("waiting for pod to be up & running")
 				podRunningTimeout := 1 * time.Minute
 				updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 				}
-				Expect(err).NotTo(HaveOccurred(), "Pod %q not up&running after %v", pod.Name, podRunningTimeout)
+				Expect(err).NotTo(HaveOccurred(), "Pod %q not up & running after %v", pod.Name, podRunningTimeout)
 
 				By("checking the pod has been scheduled in the proper node")
 				Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName))
@@ -174,6 +179,21 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+
+				By("Verifying NRT is updated properly when running the test's pod")
+				targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
+				Expect(err).ToNot(HaveOccurred())
+				targetNrtCurrent, err := e2enrt.FindFromList(targetNrtListCurrent.Items, targetNodeName)
+				Expect(err).NotTo(HaveOccurred())
+
+				dataBefore, err := yaml.Marshal(targetNrtInitial)
+				Expect(err).ToNot(HaveOccurred())
+				dataAfter, err := yaml.Marshal(targetNrtCurrent)
+				Expect(err).ToNot(HaveOccurred())
+
+				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtInitial, *targetNrtCurrent, requiredRes)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 			},
 			Entry("[test_id:48713][tmscope:cnt] with topology-manager-scope: container",
 				nrtv1alpha1.SingleNUMANodeContainerLevel,
@@ -236,6 +256,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
 				}
 
+				targetNrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
+				Expect(err).ToNot(HaveOccurred())
+				targetNrtInitial, err := e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)
+				Expect(err).NotTo(HaveOccurred())
+
 				By("Scheduling the testing deployment")
 				var deploymentName string = "test-dp"
 				var replicas int32 = 1
@@ -248,14 +273,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 				deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 
-				err := fxt.Client.Create(context.TODO(), deployment)
+				err = fxt.Client.Create(context.TODO(), deployment)
 				Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
-				By("waiting for deployment to be up&running")
+				By("waiting for deployment to be up & running")
 				dpRunningTimeout := 1 * time.Minute
 				dpRunningPollInterval := 10 * time.Second
 				err = e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
-				Expect(err).NotTo(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, dpRunningTimeout)
+				Expect(err).NotTo(HaveOccurred(), "Deployment %q not up & running after %v", deployment.Name, dpRunningTimeout)
 
 				By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
 				pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
@@ -267,6 +292,21 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					Expect(err).ToNot(HaveOccurred())
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 				}
+
+				By("Verifying NRT is updated properly when running the test's pod")
+				targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
+				Expect(err).ToNot(HaveOccurred())
+				targetNrtCurrent, err := e2enrt.FindFromList(targetNrtListCurrent.Items, targetNodeName)
+				Expect(err).NotTo(HaveOccurred())
+
+				dataBefore, err := yaml.Marshal(targetNrtInitial)
+				Expect(err).ToNot(HaveOccurred())
+				dataAfter, err := yaml.Marshal(targetNrtCurrent)
+				Expect(err).ToNot(HaveOccurred())
+
+				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtInitial, *targetNrtCurrent, requiredRes)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 			},
 			Entry("[test_id:47583][tmscope:cnt] with topology-manager-scope: container",
 				nrtv1alpha1.SingleNUMANodeContainerLevel,
@@ -359,7 +399,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
 			// nodes we have now are all equal for our purposes. Pick one at random
-			// TODO: make sure we can control this randomness using ginkgo seed or any other way
 			targetNodeName, ok := candidateNodeNames.PopAny()
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
 			unsuitableNodeNames := candidateNodeNames.List()
@@ -428,8 +467,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
-			_, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, requiredRes)
+			dataBefore, err := yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
+			dataAfter, err := yaml.Marshal(nrtPostCreate)
+			Expect(err).ToNot(HaveOccurred())
+
+			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, requiredRes)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 
 			By("deleting the test pod")
 			err = fxt.Client.Delete(context.TODO(), updatedPod)

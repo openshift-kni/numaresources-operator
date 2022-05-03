@@ -21,8 +21,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -219,6 +221,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
+			By("Verifying NRT is updated properly when running the test's pod")
 			nrtPostCreateList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -230,8 +233,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			_, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, rl)
+			dataBefore, err := yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
+			dataAfter, err := yaml.Marshal(nrtPostCreate)
+			Expect(err).ToNot(HaveOccurred())
+			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, rl)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
 
 			By("deleting the test pod")
 			if err := fxt.Client.Delete(context.TODO(), updatedPod); err != nil {

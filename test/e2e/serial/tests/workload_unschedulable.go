@@ -21,12 +21,16 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
@@ -87,6 +91,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 	Context("with no suitable node", func() {
 		var requiredRes corev1.ResourceList
+		var nrtListInitial nrtv1alpha1.NodeResourceTopologyList
+
 		BeforeEach(func() {
 			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
@@ -144,6 +150,32 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			By("Waiting for padding pods to be ready")
 			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
+
+			//save initial NRT to compare the data after trying to schedule the workloads
+			var err error
+			nrtListInitial, err = e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			By("Verifying NRTs had no updates because the pods failed to be scheduled on any node")
+			nrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, nrtListInitial, time.Second*10)
+			Expect(err).ToNot(HaveOccurred())
+
+			for _, initialNrt := range nrtListInitial.Items {
+				nrtCurrent, err := e2enrt.FindFromList(nrtListCurrent.Items, initialNrt.Name)
+				Expect(err).ToNot(HaveOccurred())
+
+				dataBefore, err := yaml.Marshal(initialNrt)
+				Expect(err).ToNot(HaveOccurred())
+				dataAfter, err := yaml.Marshal(nrtCurrent)
+				Expect(err).ToNot(HaveOccurred())
+
+				// NRTs before and after should be equal ASSUMING the pods failed scheduling, if not there would be probably a failure in the test steps before this fails
+				ok, err := e2enrt.CheckEqualAvailableResources(initialNrt, *nrtCurrent)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(ok).To(BeTrue(), "NRT of node %q was updated although the pods failed to be scheduled, expected: %s\n  found: %s", initialNrt.Name, dataBefore, dataAfter)
+			}
 		})
 
 		It("[test_id:47617][tier2][unsched] workload requests guaranteed pod resources available on one node but not on a single numa", func() {
@@ -162,7 +194,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
 			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
@@ -185,7 +217,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			err := fxt.Client.Create(context.TODO(), deployment)
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
-			By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q ", serialconfig.Config.SchedulerName))
+			By(fmt.Sprintf("checking deployment pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
 			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 
@@ -215,7 +247,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			err := fxt.Client.Create(context.TODO(), ds)
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", ds.Name)
 
-			By(fmt.Sprintf("checking daemonset pods have been scheduled with the topology aware scheduler %q ", serialconfig.Config.SchedulerName))
+			By(fmt.Sprintf("checking daemonset pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
 			pods, err := schedutils.ListPodsByDaemonset(fxt.Client, *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 
@@ -229,7 +261,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 		})
 	})
-	Context("with at least two nodes with two numa zones and enough resources in one numazone", func() {
+	Context("with at least two nodes with two numa zones and enough resources in one numa zone", func() {
 		It("[test_id:47592][tier2][unsched] a daemonset with a guaranteed pod resources available on one node/one single numa zone but not in any other node", func() {
 			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
@@ -291,6 +323,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
+			targetNrtListBefore, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+			targetNrtBefore, err := e2enrt.FindFromList(targetNrtListBefore.Items, targetNodeName)
+			Expect(err).NotTo(HaveOccurred())
+
 			By("Scheduling the testing daemonset")
 			dsName := "test-ds"
 
@@ -302,14 +339,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			ds.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 
-			err := fxt.Client.Create(context.TODO(), ds)
+			err = fxt.Client.Create(context.TODO(), ds)
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", ds.Name)
 
 			By(fmt.Sprintf("checking daemonset pods have been scheduled with the topology aware scheduler %q ", serialconfig.Config.SchedulerName))
 			pods, err := schedutils.ListPodsByDaemonset(fxt.Client, *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 
-			//TODO: should not we wait until pods have at least been scheduled? how?
+			//TODO: should wait until ds pods have at least been scheduled.
+			time.Sleep(2 * time.Minute)
 
 			By(fmt.Sprintf("checking only daemonset pod in targetNode:%q is up and running", targetNodeName))
 			podRunningTimeout := 3 * time.Minute
@@ -335,8 +373,24 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				}
 
 			}
+
+			By("check NRT is updated properly when the test's pod is running")
+			targetNrtListAfter, err := e2enrt.GetUpdated(fxt.Client, targetNrtListBefore, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+			targetNrtAfter, err := e2enrt.FindFromList(targetNrtListAfter.Items, targetNodeName)
+			Expect(err).NotTo(HaveOccurred())
+
+			dataBefore, err := yaml.Marshal(targetNrtBefore)
+			Expect(err).ToNot(HaveOccurred())
+			dataAfter, err := yaml.Marshal(targetNrtAfter)
+			Expect(err).ToNot(HaveOccurred())
+
+			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtBefore, *targetNrtAfter, requiredRes)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 		})
 	})
+
 	Context("with at least one node", func() {
 		It("[test_id:47616][tier2][tmscope:pod] pod with two containers each on one numa zone can NOT be scheduled", func() {
 
@@ -458,6 +512,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
+			targetNrtListBefore, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+			targetNrtBefore, err := e2enrt.FindFromList(targetNrtListBefore.Items, targetNodeName)
+			Expect(err).NotTo(HaveOccurred())
+
 			By("Scheduling the testing pod")
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
@@ -478,13 +537,28 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled", serialconfig.Config.SchedulerName))
 			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			if !isFailed {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+
+			By("Verifying NRT reflects no updates")
+			targetNrtListAfter, err := e2enrt.GetUpdated(fxt.Client, targetNrtListBefore, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+			targetNrtAfter, err := e2enrt.FindFromList(targetNrtListAfter.Items, targetNodeName)
+			Expect(err).NotTo(HaveOccurred())
+
+			dataBefore, err := yaml.Marshal(targetNrtBefore)
+			Expect(err).ToNot(HaveOccurred())
+			dataAfter, err := yaml.Marshal(targetNrtAfter)
+			Expect(err).ToNot(HaveOccurred())
+
+			ok, err = e2enrt.CheckEqualAvailableResources(*targetNrtBefore, *targetNrtAfter)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ok).To(BeTrue(), "NRT of target node was updated although the pods failed to be scheduled, expected: %s\n  found: %s", dataBefore, dataAfter)
 		})
 	})
 
@@ -500,6 +574,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			if numOfnrtCandidates < neededNodes {
 				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes))
 			}
+
 			By("padding all the nodes")
 			requiredRes := corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("4"),
@@ -563,6 +638,25 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 			Expect(allFailed).To(BeTrue(), "some pods are running, but we expect all of them to fail")
 
+			By("Verifying NRTs had no updates because the pods failed to be scheduled on any node")
+			nrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Second*10)
+			Expect(err).ToNot(HaveOccurred())
+
+			for _, initialNrt := range nrtInitialList.Items {
+				nrtCurrent, err := e2enrt.FindFromList(nrtListCurrent.Items, initialNrt.Name)
+				Expect(err).ToNot(HaveOccurred())
+
+				dataBefore, err := yaml.Marshal(initialNrt)
+				Expect(err).ToNot(HaveOccurred())
+				dataAfter, err := yaml.Marshal(nrtCurrent)
+				Expect(err).ToNot(HaveOccurred())
+
+				// NRTs before and after should be equal ASSUMING the pods failed scheduling, if not there would be probably a failure in the test steps before this fails
+				ok, err := e2enrt.CheckEqualAvailableResources(initialNrt, *nrtCurrent)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(ok).To(BeTrue(), "NRT of node %q was updated although the pods failed to be scheduled, expected: %s\n  found: %s", initialNrt.Name, dataBefore, dataAfter)
+			}
+
 			By("updating deployment in such way that some pods will fit into NUMA nodes")
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), dp)
 			Expect(err).ToNot(HaveOccurred())
@@ -604,8 +698,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				nrtPostDpCreate, err := e2enrt.FindFromList(nrtPostDpCreateList.Items, initialNrt.Name)
 				Expect(err).ToNot(HaveOccurred())
 
-				_, err = e2enrt.CheckZoneConsumedResourcesAtLeast(initialNrt, *nrtPostDpCreate, numaLevelFitRequiredRes)
+				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(initialNrt, *nrtPostDpCreate, numaLevelFitRequiredRes)
 				Expect(err).ToNot(HaveOccurred())
+				Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the updated pods on node %q", initialNrt.Name)
 			}
 		})
 	})
