@@ -41,7 +41,7 @@ func GetConfig(kubeconfig string) (*rest.Config, error) {
 		config, err = rest.InClusterConfig()
 	}
 	if err != nil {
-		return nil, fmt.Errorf("could not get the client: %v", err)
+		return nil, fmt.Errorf("could not get the client: %w", err)
 	}
 
 	return config, nil
