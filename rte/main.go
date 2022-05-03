@@ -67,7 +67,7 @@ func main() {
 	klog.Infof("=== System information ===\n")
 	sysInfo, err := sysinfo.NewSysinfo(parsedArgs.LocalArgs.SysConf)
 	if err != nil {
-		klog.Fatalf("failed to query system info: %v", err)
+		klog.Fatalf("failed to query system info: %w", err)
 	}
 	klog.Infof("\n%s", sysInfo)
 	klog.Infof("==========================\n")
