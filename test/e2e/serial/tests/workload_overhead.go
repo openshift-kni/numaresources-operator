@@ -174,6 +174,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
+				// pick target node randomly
+				// TODO: make sure we can control this randomness using ginkgo seed or any other way
 				targetNodeName, ok := candidateNodeNames.PopAny()
 				Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
 

@@ -274,6 +274,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
+			// pick target node randomly
+			// TODO: make sure we can control this randomness using ginkgo seed or any other way
 			targetNodeName, ok := nrtCandidateNames.PopAny()
 			Expect(ok).To(BeTrue(), "unable to get targetNodeName")
 
@@ -347,6 +349,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 
 			//TODO: should wait until ds pods have at least been scheduled.
+			By("wait for 2 minutes to guarantee pods are scheduled/running")
 			time.Sleep(2 * time.Minute)
 
 			By(fmt.Sprintf("checking only daemonset pod in targetNode:%q is up and running", targetNodeName))
@@ -432,7 +435,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d, needed: %d", len(nrtCandidates), neededNodes))
 			}
 
-			// After filter get one of the candidate nodes left
+			// After filter randomly pick one of the candidate nodes left
+			// TODO: make sure we can control this randomness using ginkgo seed or any other way
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 			targetNodeName, ok := nrtCandidateNames.PopAny()
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())

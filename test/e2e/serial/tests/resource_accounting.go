@@ -129,6 +129,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
 			// nodes we have now are all equal for our purposes. Pick one at random
+			// TODO: make sure we can control this randomness using ginkgo seed or any other way
 			targetNodeName, ok := candidateNodeNames.PopAny()
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
 			unsuitableNodeNames := candidateNodeNames.List()
@@ -307,7 +308,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 		/*
 		 1. choose a target node on which the test's burstable pod will run
 		 2. fully pad the non-target nodes
-		 3. test step: create a workload with burstable pod and check which scheduler took charge and NRT
+		 3. test step: create a workload with burstable pod, check which scheduler took charge,and verify NRT is updated accordingly
 		*/
 		BeforeEach(func() {
 			const requiredNUMAZones = 2
@@ -321,6 +322,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
+			// pick target node randomly
+			// TODO: make sure we can control this randomness using ginkgo seed or any other way
 			var ok bool
 			targetNodeName, ok = nrtCandidateNames.PopAny()
 			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtCandidateNames.List())

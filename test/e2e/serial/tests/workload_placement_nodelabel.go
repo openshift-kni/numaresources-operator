@@ -129,6 +129,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
+			// randomly pick two nodes to label and make one of them the target node to run the test pods
+			// TODO: make sure we can control this randomness using ginkgo seed or any other way
 			var ok bool
 			targetNodeName, ok = nrtCandidateNames.PopAny()
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())

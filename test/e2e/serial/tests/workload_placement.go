@@ -144,6 +144,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			targetNodeNameSet := nodesNameSet.Difference(paddedNodesSet)
 			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
 
+			// pick target node randomly
+			// TODO: make sure we can control this randomness using ginkgo seed or any other way
 			targetNodeName, ok := targetNodeNameSet.PopAny()
 			Expect(ok).To(BeTrue())
 

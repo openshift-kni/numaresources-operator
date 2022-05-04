@@ -102,6 +102,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
+			// pick target node randomly
+			// TODO: make sure we can control this randomness using ginkgo seed or any other way
 			var ok bool
 			targetNodeName, ok = nrtCandidateNames.PopAny()
 			ExpectWithOffset(1, ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
@@ -399,6 +401,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
 			// nodes we have now are all equal for our purposes. Pick one at random
+			// TODO: make sure we can control this randomness using ginkgo seed or any other way
 			targetNodeName, ok := candidateNodeNames.PopAny()
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
 			unsuitableNodeNames := candidateNodeNames.List()
@@ -466,12 +469,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostCreate, err := e2enrt.FindFromList(nrtListPostCreate.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
 			dataBefore, err := yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err := yaml.Marshal(nrtPostCreate)
 			Expect(err).ToNot(HaveOccurred())
 
+			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
 			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, requiredRes)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
