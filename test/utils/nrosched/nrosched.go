@@ -36,8 +36,6 @@ import (
 )
 
 const (
-	// TODO: fetch this from NRO scheduler status
-	NROSchedulerName   = "topo-aware-scheduler"
 	NROSchedObjectName = "numaresourcesscheduler"
 
 	ReasonScheduled        = "Scheduled"
@@ -58,6 +56,9 @@ func checkPODEvents(k8sCli *kubernetes.Clientset, podNamespace, podName, schedul
 	if err != nil {
 		klog.ErrorS(err, "cannot get events for pod %s/%s", podNamespace, podName)
 		return false, err
+	}
+	if len(events.Items) == 0 {
+		return false, fmt.Errorf("no event received for %s/%s", podNamespace, podName)
 	}
 
 	for _, item := range events.Items {
@@ -118,4 +119,9 @@ func CheckNROSchedulerAvailable(cli client.Client, NUMAResourcesSchedObjName str
 
 func IsSchedulingErrorCannotAlign(msg string) bool {
 	return strings.Contains(msg, ErrorCannotAlignPod)
+}
+
+func GetNROSchedulerName(cli client.Client, NUMAResourcesSchedObjName string) string {
+	nroSchedObj := CheckNROSchedulerAvailable(cli, NUMAResourcesSchedObjName)
+	return nroSchedObj.Spec.SchedulerName
 }

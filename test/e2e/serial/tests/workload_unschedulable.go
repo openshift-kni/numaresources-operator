@@ -593,7 +593,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			By("creating a deployment")
 			dpName := "test-dp"
-			schedulerName := nrosched.NROSchedulerName
+			schedulerName := nrosched.GetNROSchedulerName(fxt.Client, nrosched.NROSchedObjectName)
 			replicas := int32(6)
 			podLabels := map[string]string{
 				"test": "test-dp",
