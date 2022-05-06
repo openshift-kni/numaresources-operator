@@ -390,7 +390,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtBefore, *targetNrtAfter, requiredRes)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
+			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 		})
 	})
 
@@ -704,7 +704,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(initialNrt, *nrtPostDpCreate, numaLevelFitRequiredRes)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the updated pods on node %q", initialNrt.Name)
+				Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the updated pods on node %q", initialNrt.Name)
 			}
 		})
 	})

@@ -153,9 +153,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
 				}
 
-				targetNrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
-				Expect(err).ToNot(HaveOccurred())
-				targetNrtInitial, err := e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)
+				targetNrtInitial, err := e2enrt.FindFromList(nrtCandidates, targetNodeName)
 				Expect(err).NotTo(HaveOccurred())
 
 				By("Scheduling the testing pod")
@@ -183,7 +181,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 				By("Verifying NRT is updated properly when running the test's pod")
-				targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
+				targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
 				targetNrtCurrent, err := e2enrt.FindFromList(targetNrtListCurrent.Items, targetNodeName)
 				Expect(err).NotTo(HaveOccurred())
@@ -195,7 +193,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtInitial, *targetNrtCurrent, requiredRes)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
+				Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 			},
 			Entry("[test_id:48713][tmscope:cnt] with topology-manager-scope: container",
 				nrtv1alpha1.SingleNUMANodeContainerLevel,
@@ -258,9 +256,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
 				}
 
-				targetNrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
-				Expect(err).ToNot(HaveOccurred())
-				targetNrtInitial, err := e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)
+				targetNrtInitial, err := e2enrt.FindFromList(nrtCandidates, targetNodeName)
 				Expect(err).NotTo(HaveOccurred())
 
 				By("Scheduling the testing deployment")
@@ -296,9 +292,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 
 				By("Verifying NRT is updated properly when running the test's pod")
-				targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
+				nrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
-				targetNrtCurrent, err := e2enrt.FindFromList(targetNrtListCurrent.Items, targetNodeName)
+				targetNrtCurrent, err := e2enrt.FindFromList(nrtListCurrent.Items, targetNodeName)
 				Expect(err).NotTo(HaveOccurred())
 
 				dataBefore, err := yaml.Marshal(targetNrtInitial)
@@ -308,7 +304,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtInitial, *targetNrtCurrent, requiredRes)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
+				Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 			},
 			Entry("[test_id:47583][tmscope:cnt] with topology-manager-scope: container",
 				nrtv1alpha1.SingleNUMANodeContainerLevel,
@@ -477,7 +473,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
 			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, requiredRes)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
+			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 
 			By("deleting the test pod")
 			err = fxt.Client.Delete(context.TODO(), updatedPod)

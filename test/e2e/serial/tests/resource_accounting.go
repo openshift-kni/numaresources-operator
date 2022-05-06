@@ -162,6 +162,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 
 			var targetNrtBefore *nrtv1alpha1.NodeResourceTopology
 			var targetNrtListBefore nrtv1alpha1.NodeResourceTopologyList
+			var targetZoneName string
 			for idx, zone := range nrtInfo.Zones {
 				if idx == len(nrtInfo.Zones)-1 {
 					// store the NRT of the target node before scheduling the last placeholder pod,
@@ -170,6 +171,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 					Expect(err).ToNot(HaveOccurred())
 					targetNrtBefore, err = e2enrt.FindFromList(targetNrtListBefore.Items, targetNodeName)
 					Expect(err).NotTo(HaveOccurred())
+					targetZoneName = zone.Name
 				}
 				By(fmt.Sprintf("making node %q zone %q unsuitable with a placeholder pod", nrtInfo.Name, zone.Name))
 				// now put a minimal pod (1 cpu 1Gi) on both zones. Now the target node as whole will still have the
@@ -292,7 +294,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			Expect(err).ToNot(HaveOccurred())
 			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtBefore, *targetNrtAfter, requiredRes)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
+			Expect(match).To(Equal(targetZoneName), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 		})
 	})
 
@@ -300,7 +302,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 		var nrtCandidates []nrtv1alpha1.NodeResourceTopology
 		var targetNodeName string
 		var targetNrtInitial *nrtv1alpha1.NodeResourceTopology
-		var targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList
 		var deployment *appsv1.Deployment
 		var reqResources corev1.ResourceList
 		var err error
@@ -329,9 +330,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtCandidateNames.List())
 			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 
-			targetNrtListInitial, err = e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-			targetNrtInitial, err = e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)
+			targetNrtInitial, err = e2enrt.FindFromList(nrtCandidates, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
 
 			//calculate base load on the target node
@@ -427,7 +426,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			}
 
 			By("Verifying NRT reflects no updates after scheduling the burstable pod")
-			targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
+			targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 			targetNrtCurrent, err := e2enrt.FindFromList(targetNrtListCurrent.Items, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
