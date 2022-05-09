@@ -124,12 +124,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					},
 				}
 
-				err := fxt.Client.Create(context.TODO(), rtClass)
-				Expect(err).NotTo(HaveOccurred())
+				Eventually(func() error {
+					return fxt.Client.Create(context.TODO(), rtClass)
+				}, time.Minute*2, time.Second*5).Should(BeNil())
 			})
 			AfterEach(func() {
 				if rtClass != nil {
-					err := fxt.Client.Delete(context.TODO(), rtClass)
+					var err error
+					maxStep := 5
+					for step := 0; step < maxStep; step++ {
+						time.Sleep(10 * time.Second)
+						err = fxt.Client.Delete(context.TODO(), rtClass)
+					}
 					if err != nil {
 						klog.Errorf("Unable to delete RuntimeClass %q", rtClass.Name)
 					}
@@ -201,8 +207,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 						pinnedPadPod, err := pinPodTo(padPod, nodeName, zone.Name)
 						Expect(err).NotTo(HaveOccurred())
 
-						err = fxt.Client.Create(context.TODO(), pinnedPadPod)
-						Expect(err).NotTo(HaveOccurred())
+						Eventually(func() error {
+							return fxt.Client.Create(context.TODO(), pinnedPadPod)
+						}, time.Minute*2, time.Second*5).Should(BeNil())
 
 						paddingPods = append(paddingPods, pinnedPadPod)
 					}
@@ -230,8 +237,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				deployment.Spec.Template.Spec.Containers[0].Resources.Limits = podResources
 				deployment.Spec.Template.Spec.RuntimeClassName = &rtClass.Name
 
-				err = fxt.Client.Create(context.TODO(), deployment)
-				Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
+				Eventually(func() error {
+					return fxt.Client.Create(context.TODO(), deployment)
+				}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create deployment %q", deployment.Name)
 
 				By("waiting for deployment to be up&running")
 				dpRunningTimeout := 1 * time.Minute

@@ -26,7 +26,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -127,8 +126,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 
 				klog.Infof("adding taint: %q to node: %q", tnt.String(), updatedNode.Name)
-				err = fxt.Client.Update(context.TODO(), updatedNode)
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() error {
+					return fxt.Client.Update(context.TODO(), updatedNode)
+				}, time.Minute*2, time.Second*5).Should(BeNil())
 
 				updatedNodeNames = append(updatedNodeNames, updatedNode.Name)
 			}
@@ -205,8 +205,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			cnt.Resources.Requests = requiredRes
 			cnt.Resources.Limits = requiredRes
 
-			err = fxt.Client.Create(context.TODO(), testPod)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), testPod)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
 			if err != nil {
@@ -244,11 +245,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
 
 			By("deleting the test pod")
-			if err := fxt.Client.Delete(context.TODO(), updatedPod); err != nil {
-				if !apierrors.IsNotFound(err) {
-					Expect(err).ToNot(HaveOccurred())
-				}
-			}
+			Eventually(func() error {
+				return fxt.Client.Delete(context.TODO(), updatedPod)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			By("checking the test pod is removed")
 			err = e2ewait.ForPodDeleted(fxt.Client, updatedPod.Namespace, testPod.Name, 3*time.Minute)

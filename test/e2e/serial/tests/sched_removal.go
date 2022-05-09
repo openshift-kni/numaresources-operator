@@ -66,8 +66,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler remova
 			dp := createDeploymentSync(fxt, "testdp", serialconfig.Config.SchedulerName)
 
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name))
-			err = fxt.Client.Delete(context.TODO(), serialconfig.Config.NROSchedObj)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Delete(context.TODO(), serialconfig.Config.NROSchedObj)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			maxStep := 3
 			for step := 0; step < maxStep; step++ {
@@ -87,8 +88,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler remova
 			var err error
 
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name))
-			err = fxt.Client.Delete(context.TODO(), serialconfig.Config.NROSchedObj)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Delete(context.TODO(), serialconfig.Config.NROSchedObj)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			dp := createDeployment(fxt, "testdp", serialconfig.Config.SchedulerName)
 
@@ -138,8 +140,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restar
 			var err error
 
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", nroSchedObj.Name))
-			err = fxt.Client.Delete(context.TODO(), nroSchedObj)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Delete(context.TODO(), nroSchedObj)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			dp := createDeployment(fxt, "testdp", schedulerName)
 
@@ -179,12 +182,12 @@ func restoreScheduler(fxt *e2efixture.Fixture, nroSchedObj *nropv1alpha1.NUMARes
 		Spec: nroSchedObj.Spec,
 	}
 
-	err := fxt.Client.Create(context.TODO(), nroSched)
-	Expect(err).NotTo(HaveOccurred())
+	Eventually(func() error {
+		return fxt.Client.Create(context.TODO(), nroSched)
+	}, time.Minute*2, time.Second*5).Should(BeNil())
 }
 
 func createDeployment(fxt *e2efixture.Fixture, name, schedulerName string) *appsv1.Deployment {
-	var err error
 	var replicas int32 = 2
 
 	podLabels := map[string]string{
@@ -195,8 +198,9 @@ func createDeployment(fxt *e2efixture.Fixture, name, schedulerName string) *apps
 	dp.Spec.Template.Spec.SchedulerName = schedulerName
 
 	By(fmt.Sprintf("creating a test deployment %q", name))
-	err = fxt.Client.Create(context.TODO(), dp)
-	Expect(err).ToNot(HaveOccurred())
+	Eventually(func() error {
+		return fxt.Client.Create(context.TODO(), dp)
+	}, time.Minute*2, time.Second*5).Should(BeNil())
 
 	return dp
 }

@@ -171,8 +171,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				Expect(err).ToNot(HaveOccurred())
 
 				nroSchedObj.Spec = initialNroSchedObj.Spec
-				err = fxt.Client.Update(context.TODO(), nroSchedObj)
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() error {
+					return fxt.Client.Update(context.TODO(), nroSchedObj)
+				}, time.Minute*2, time.Second*5).Should(BeNil())
 
 				By("reverting the changes under the NUMAResourcesOperator object")
 				// we need that for the current ResourceVersion
@@ -181,8 +182,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				Expect(err).ToNot(HaveOccurred())
 
 				nroOperObj.Spec = initialNroOperObj.Spec
-				err = fxt.Client.Update(context.TODO(), nroOperObj)
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() error {
+					return fxt.Client.Update(context.TODO(), nroOperObj)
+				}, time.Minute*2, time.Second*5).Should(BeNil())
 
 				mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
 				Expect(err).ToNot(HaveOccurred())
@@ -201,8 +203,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 				testMcp := objects.TestMCP()
 				By(fmt.Sprintf("deleting mcp: %q", testMcp.Name))
-				err = fxt.Client.Delete(context.TODO(), testMcp)
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() error {
+					return fxt.Client.Delete(context.TODO(), testMcp)
+				}, time.Minute*2, time.Second*5).Should(BeNil())
 
 				err = e2ewait.ForMachineConfigPoolDeleted(fxt.Client, testMcp, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
 				Expect(err).ToNot(HaveOccurred())
@@ -225,16 +228,18 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				MatchLabels: map[string]string{e2enodes.GetLabelRoleMCPTest(): ""},
 			}
 
-			err = fxt.Client.Create(context.TODO(), mcp)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), mcp)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			By(fmt.Sprintf("modifing the NUMAResourcesOperator nodeGroups filed to match new mcp: %q labels %q", mcp.Name, mcp.Labels))
 			for i := range nroOperObj.Spec.NodeGroups {
 				nroOperObj.Spec.NodeGroups[i].MachineConfigPoolSelector.MatchLabels = mcp.Labels
 			}
 
-			err = fxt.Client.Update(context.TODO(), nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Update(context.TODO(), nroOperObj)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
 			Expect(err).ToNot(HaveOccurred())
@@ -275,8 +280,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			nroOperObj.Spec.ExporterImage = serialconfig.NropTestCIImage
-			err = fxt.Client.Update(context.TODO(), nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Update(context.TODO(), nroOperObj)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			By("checking RTE has the correct image")
 			Eventually(func() (bool, error) {
@@ -304,8 +310,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			nroOperObj.Spec.LogLevel = operatorv1.Trace
-			err = fxt.Client.Update(context.TODO(), nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Update(context.TODO(), nroOperObj)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			By("checking the correct LogLevel")
 			Eventually(func() (bool, error) {
@@ -339,15 +346,17 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			nroSchedObj.Spec.SchedulerName = serialconfig.SchedulerTestName
-			err = fxt.Client.Update(context.TODO(), nroSchedObj)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Update(context.TODO(), nroSchedObj)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			By("schedule pod using the new scheduler name")
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomizeName("testpod"))
 			testPod.Spec.SchedulerName = serialconfig.SchedulerTestName
 
-			err = fxt.Client.Create(context.TODO(), testPod)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), testPod)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, 5*time.Minute)
 			if err != nil {
@@ -400,8 +409,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = fxt.Client.Update(context.TODO(), targetedKC)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Update(context.TODO(), targetedKC)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			By("waiting for MachineConfigPools to get updated")
 			var wg sync.WaitGroup
@@ -467,8 +477,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			testPod.Spec.Containers[0].Resources.Limits = rl
 			testPod.Spec.Containers[0].Resources.Requests = rl
 
-			err = fxt.Client.Create(context.TODO(), testPod)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), testPod)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			testPod, err = e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
 			if err != nil {
@@ -509,8 +520,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
 				Expect(err).ToNot(HaveOccurred())
 
-				err = fxt.Client.Update(context.TODO(), targetedKC)
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() error {
+					return fxt.Client.Update(context.TODO(), targetedKC)
+				}, time.Minute*2, time.Second*5).Should(BeNil())
 
 				By("waiting for MachineConfigPools to get updated")
 				for _, mcp := range mcps {

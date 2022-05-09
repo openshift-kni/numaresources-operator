@@ -130,8 +130,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
 					ExpectWithOffset(1, err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
 
-					err = fxt.Client.Create(context.TODO(), padPod)
-					ExpectWithOffset(1, err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", podName, zone.Name)
+					Eventually(func() error {
+						return fxt.Client.Create(context.TODO(), padPod)
+					}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create pod %q on zone %q", podName, zone.Name)
 
 					paddingPods = append(paddingPods, padPod)
 				}
@@ -161,8 +162,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
 				pod.Spec.Containers[0].Resources.Limits = requiredRes
 
-				err = fxt.Client.Create(context.TODO(), pod)
-				Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
+				Eventually(func() error {
+					return fxt.Client.Create(context.TODO(), pod)
+				}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create pod %q", pod.Name)
 
 				By("waiting for pod to be up & running")
 				podRunningTimeout := 1 * time.Minute
@@ -271,8 +273,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 				deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 
-				err = fxt.Client.Create(context.TODO(), deployment)
-				Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
+				Eventually(func() error {
+					return fxt.Client.Create(context.TODO(), deployment)
+				}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create deployment %q", deployment.Name)
 
 				By("waiting for deployment to be up & running")
 				dpRunningTimeout := 1 * time.Minute
@@ -437,8 +440,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			By("running the test pod")
-			err = fxt.Client.Create(context.TODO(), pod)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), pod)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			By("waiting for the pod to be scheduled")
 			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 2*time.Minute)
@@ -476,8 +480,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 
 			By("deleting the test pod")
-			err = fxt.Client.Delete(context.TODO(), updatedPod)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Delete(context.TODO(), updatedPod)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			By("checking the test pod is removed")
 			err = e2ewait.ForPodDeleted(fxt.Client, updatedPod.Namespace, updatedPod.Name, 3*time.Minute)
@@ -642,8 +647,9 @@ func setupPaddingPodLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResou
 	padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred())
 
-	err = fxt.Client.Create(context.TODO(), padPod)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+	Eventually(func() error {
+		return fxt.Client.Create(context.TODO(), padPod)
+	}, time.Minute*2, time.Second*5).Should(BeNil())
 	paddingPods = append(paddingPods, padPod)
 
 	podTotRes := e2ereslist.FromGuaranteedPod(*padInfo.pod)
@@ -659,8 +665,9 @@ func setupPaddingPodLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResou
 	padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred())
 
-	err = fxt.Client.Create(context.TODO(), padPod)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+	Eventually(func() error {
+		return fxt.Client.Create(context.TODO(), padPod)
+	}, time.Minute*2, time.Second*5).Should(BeNil())
 	paddingPods = append(paddingPods, padPod)
 
 	paddingPodsUnsuitable := setupPaddingForUnsuitableNodes(2, fxt, nrtList, padInfo)
@@ -696,8 +703,9 @@ func setupPaddingContainerLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.Nod
 		padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
 		ExpectWithOffset(1, err).ToNot(HaveOccurred())
 
-		err = fxt.Client.Create(context.TODO(), padPod)
-		ExpectWithOffset(1, err).ToNot(HaveOccurred())
+		Eventually(func() error {
+			return fxt.Client.Create(context.TODO(), padPod)
+		}, time.Minute*2, time.Second*5).Should(BeNil())
 		paddingPods = append(paddingPods, padPod)
 	}
 
@@ -733,8 +741,9 @@ func setupPaddingForUnsuitableNodes(offset int, fxt *e2efixture.Fixture, nrtList
 			padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
 			ExpectWithOffset(offset, err).ToNot(HaveOccurred())
 
-			err = fxt.Client.Create(context.TODO(), padPod)
-			ExpectWithOffset(offset, err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), padPod)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 			paddingPods = append(paddingPods, padPod)
 		}
 	}

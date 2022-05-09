@@ -189,8 +189,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("creating a deployment with a guaranteed pod with two containers")
 			dp := objects.NewTestDeploymentWithPodSpec(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp", *podSpec)
 
-			err = fxt.Client.Create(context.TODO(), dp)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), dp)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
@@ -245,8 +246,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podSpec.Containers[0].Resources.Requests = requiredRes
 			podSpec.Containers[0].Resources.Limits = requiredRes
 
-			err = fxt.Client.Update(context.TODO(), updatedDp)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Update(context.TODO(), updatedDp)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
@@ -340,8 +342,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podSpec.Containers[0].Resources.Requests = requiredRes
 			podSpec.Containers[0].Resources.Limits = requiredRes
 
-			err = fxt.Client.Update(context.TODO(), updatedDp)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Update(context.TODO(), updatedDp)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
@@ -392,8 +395,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the updated pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfter, e2ereslist.ToString(rl))
 
 			By("deleting the deployment")
-			err = fxt.Client.Delete(context.TODO(), updatedDp)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Delete(context.TODO(), updatedDp)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
 			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.

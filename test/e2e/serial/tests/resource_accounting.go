@@ -151,8 +151,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 				padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
 				Expect(err).ToNot(HaveOccurred())
 
-				err = fxt.Client.Create(context.TODO(), padPod)
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() error {
+					return fxt.Client.Create(context.TODO(), padPod)
+				}, time.Minute*2, time.Second*5).Should(BeNil())
 				paddingPods = append(paddingPods, padPod)
 			}
 
@@ -186,8 +187,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 				targetedPaddingPod, err = pinPodTo(targetedPaddingPod, nrtInfo.Name, zone.Name)
 				Expect(err).ToNot(HaveOccurred())
 
-				err = fxt.Client.Create(context.TODO(), targetedPaddingPod)
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() error {
+					return fxt.Client.Create(context.TODO(), targetedPaddingPod)
+				}, time.Minute*2, time.Second*5).Should(BeNil())
 				targetPaddingPods = append(targetPaddingPods, targetedPaddingPod)
 			}
 
@@ -209,8 +211,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 					padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
 					Expect(err).ToNot(HaveOccurred())
 
-					err = fxt.Client.Create(context.TODO(), padPod)
-					Expect(err).ToNot(HaveOccurred())
+					Eventually(func() error {
+						return fxt.Client.Create(context.TODO(), padPod)
+					}, time.Minute*2, time.Second*5).Should(BeNil())
 					paddingPods = append(paddingPods, padPod)
 				}
 			}
@@ -236,8 +239,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			pod.Spec.NodeSelector = map[string]string{
 				serialconfig.MultiNUMALabel: "2",
 			}
-			err = fxt.Client.Create(context.TODO(), pod)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), pod)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			By("check the pod is still pending")
 			// TODO: lacking better ways, let's monitor the pod "long enough" and let's check it stays Pending
@@ -255,8 +259,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			// this way we'll be sure that the test pod landed (should land otherwise it's a bug) on the correct numa zone that
 			//released the placeholder pod and is now feasible to accommodate the test pod
 			targetPaddingPod := targetPaddingPods[len(targetPaddingPods)-1]
-			err = fxt.Client.Delete(context.TODO(), targetPaddingPod)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Delete(context.TODO(), targetPaddingPod)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			By("checking the test pod is removed")
 			err = e2ewait.ForPodDeleted(fxt.Client, targetPaddingPod.Namespace, targetPaddingPod.Name, 3*time.Minute)
@@ -380,8 +385,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 					padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
 					Expect(err).ToNot(HaveOccurred(), "unable to pin pod %q to zone %q", padPod.Name, zone.Name)
 
-					err = fxt.Client.Create(context.TODO(), padPod)
-					Expect(err).ToNot(HaveOccurred())
+					Eventually(func() error {
+						return fxt.Client.Create(context.TODO(), padPod)
+					}, time.Minute*2, time.Second*5).Should(BeNil())
 					paddingPods = append(paddingPods, padPod)
 				}
 			}
@@ -406,8 +412,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			deployment.Spec.Template.Spec.Containers[0].Resources.Requests = reqResources
 
 			klog.Infof("create the bustable test deployment with requests %s", e2ereslist.ToString(reqResources))
-			err = fxt.Client.Create(context.TODO(), deployment)
-			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), deployment)
+			}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create deployment %q", deployment.Name)
 
 			By("waiting for deployment to be up & running")
 			dpRunningTimeout := 1 * time.Minute

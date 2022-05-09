@@ -146,8 +146,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			cnt.Resources.Limits = requiredRes
 
 			By(fmt.Sprintf("creating pod %s/%s", testPod.Namespace, testPod.Name))
-			err = fxt.Client.Create(context.TODO(), testPod)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), testPod)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
 			if err != nil {
@@ -172,8 +173,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("deleting the pod")
-			err = fxt.Client.Delete(context.TODO(), updatedPod)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Delete(context.TODO(), updatedPod)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
 			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.

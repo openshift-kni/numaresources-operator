@@ -64,16 +64,19 @@ func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup,
 	klog.Infof("setting e2e infra for %d MCPs", len(mcps))
 
 	sa := numacellmanifests.ServiceAccount(fxt.Namespace.Name, numacellmanifests.Prefix)
-	err = fxt.Client.Create(context.TODO(), sa)
-	Expect(err).ToNot(HaveOccurred(), "cannot create the numacell serviceaccount %q in the namespace %q", sa.Name, sa.Namespace)
+	Eventually(func() error {
+		return fxt.Client.Create(context.TODO(), sa)
+	}, time.Minute*2, time.Second*5).Should(BeNil(), "cannot create the numacell serviceaccount %q in the namespace %q", sa.Name, sa.Namespace)
 
 	ro := numacellmanifests.Role(fxt.Namespace.Name, numacellmanifests.Prefix)
-	err = fxt.Client.Create(context.TODO(), ro)
-	Expect(err).ToNot(HaveOccurred(), "cannot create the numacell role %q in the namespace %q", sa.Name, sa.Namespace)
+	Eventually(func() error {
+		return fxt.Client.Create(context.TODO(), ro)
+	}, time.Minute*2, time.Second*5).Should(BeNil(), "cannot create the numacell role %q in the namespace %q", sa.Name, sa.Namespace)
 
 	rb := numacellmanifests.RoleBinding(fxt.Namespace.Name, numacellmanifests.Prefix)
-	err = fxt.Client.Create(context.TODO(), rb)
-	Expect(err).ToNot(HaveOccurred(), "cannot create the numacell rolebinding %q in the namespace %q", sa.Name, sa.Namespace)
+	Eventually(func() error {
+		return fxt.Client.Create(context.TODO(), rb)
+	}, time.Minute*2, time.Second*5).Should(BeNil(), "cannot create the numacell rolebinding %q in the namespace %q", sa.Name, sa.Namespace)
 
 	var dss []*appsv1.DaemonSet
 	for _, mcp := range mcps {
@@ -87,8 +90,9 @@ func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup,
 
 		pullSpec := GetNUMACellDevicePluginPullSpec()
 		ds := numacellmanifests.DaemonSet(mcp.Spec.NodeSelector.MatchLabels, fxt.Namespace.Name, dsName, sa.Name, pullSpec)
-		err = fxt.Client.Create(context.TODO(), ds)
-		Expect(err).ToNot(HaveOccurred(), "cannot create the numacell daemonset %q in the namespace %q", ds.Name, ds.Namespace)
+		Eventually(func() error {
+			return fxt.Client.Create(context.TODO(), ds)
+		}, time.Minute*2, time.Second*5).Should(BeNil(), "cannot create the numacell daemonset %q in the namespace %q", ds.Name, ds.Namespace)
 
 		dss = append(dss, ds)
 	}

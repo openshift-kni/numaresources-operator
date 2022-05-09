@@ -140,8 +140,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
 					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone", podName, zone.Name)
 
-					err = fxt.Client.Create(context.TODO(), padPod)
-					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone", podName, zone.Name)
+					Eventually(func() error {
+						return fxt.Client.Create(context.TODO(), padPod)
+					}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create pod %q on zone", podName, zone.Name)
 
 					paddingPods = append(paddingPods, padPod)
 				}
@@ -185,10 +186,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			pod.Spec.Containers[0].Resources.Limits = requiredRes
 
-			err := fxt.Client.Create(context.TODO(), pod)
-			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), pod)
+			}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create pod %q", pod.Name)
 
-			err = e2ewait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+			err := e2ewait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
@@ -214,8 +216,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 
-			err := fxt.Client.Create(context.TODO(), deployment)
-			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), deployment)
+			}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create deployment %q", deployment.Name)
 
 			By(fmt.Sprintf("checking deployment pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
 			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
@@ -244,8 +247,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			ds.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 
-			err := fxt.Client.Create(context.TODO(), ds)
-			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", ds.Name)
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), ds)
+			}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create deployment %q", ds.Name)
 
 			By(fmt.Sprintf("checking daemonset pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
 			pods, err := schedutils.ListPodsByDaemonset(fxt.Client, *ds)
@@ -314,8 +318,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
 					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone", podName, zone.Name)
 
-					err = fxt.Client.Create(context.TODO(), padPod)
-					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone", podName, zone.Name)
+					Eventually(func() error {
+						return fxt.Client.Create(context.TODO(), padPod)
+					}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create pod %q on zone", podName, zone.Name)
 
 					paddingPods = append(paddingPods, padPod)
 				}
@@ -341,8 +346,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			ds.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 
-			err = fxt.Client.Create(context.TODO(), ds)
-			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", ds.Name)
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), ds)
+			}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create deployment %q", ds.Name)
 
 			By(fmt.Sprintf("checking daemonset pods have been scheduled with the topology aware scheduler %q ", serialconfig.Config.SchedulerName))
 			pods, err := schedutils.ListPodsByDaemonset(fxt.Client, *ds)
@@ -467,8 +473,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
 					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
 
-					err = fxt.Client.Create(context.TODO(), padPod)
-					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", podName, zone.Name)
+					Eventually(func() error {
+						return fxt.Client.Create(context.TODO(), padPod)
+					}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create pod %q on zone %q", podName, zone.Name)
 
 					paddingPods = append(paddingPods, padPod)
 				}
@@ -506,8 +513,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				padPod, err = pinPodTo(padPod, targetNodeName, zone.Name)
 				Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
 
-				err = fxt.Client.Create(context.TODO(), padPod)
-				Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", podName, zone.Name)
+				Eventually(func() error {
+					return fxt.Client.Create(context.TODO(), padPod)
+				}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create pod %q on zone %q", podName, zone.Name)
 
 				paddingPods = append(paddingPods, padPod)
 			}
@@ -530,8 +538,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			pod.Spec.Containers[1].Name = pod.Name + "cnt-1"
 			pod.Spec.Containers[1].Resources.Limits = requiredResCnt2
 
-			err = fxt.Client.Create(context.TODO(), pod)
-			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), pod)
+			}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create pod %q", pod.Name)
 
 			interval := 10 * time.Second
 			By(fmt.Sprintf("Checking pod %q keeps in %q state for at least %v seconds ...", pod.Name, string(corev1.PodPending), interval*3))
@@ -620,8 +629,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 			dp := objects.NewTestDeploymentWithPodSpec(replicas, podLabels, map[string]string{}, fxt.Namespace.Name, dpName, podSpec)
 
-			err = fxt.Client.Create(context.TODO(), dp)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), dp)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q ", schedulerName))
 			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *dp)
@@ -678,8 +688,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			cnt.Resources.Limits = numaLevelFitRequiredRes
 			cnt.Resources.Requests = numaLevelFitRequiredRes
 
-			err = fxt.Client.Update(context.TODO(), dp)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Update(context.TODO(), dp)
+			}, time.Minute*2, time.Second*5).Should(BeNil())
 
 			By("waiting for some of the pods to be running")
 			dpKey := client.ObjectKeyFromObject(dp)

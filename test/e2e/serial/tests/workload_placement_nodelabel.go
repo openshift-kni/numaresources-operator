@@ -166,8 +166,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
 					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
 
-					err = fxt.Client.Create(context.TODO(), padPod)
-					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", podName, zone.Name)
+					Eventually(func() error {
+						return fxt.Client.Create(context.TODO(), padPod)
+					}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create pod %q on zone %q", podName, zone.Name)
 
 					paddingPods = append(paddingPods, padPod)
 				}
@@ -209,8 +210,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				labelName: labelValueMedium,
 			}
 
-			err = fxt.Client.Create(context.TODO(), pod)
-			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
+			Eventually(func() error {
+				return fxt.Client.Create(context.TODO(), pod)
+			}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create pod %q", pod.Name)
 
 			By("waiting for pod to be running")
 			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 1*time.Minute)
@@ -289,13 +291,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 					deployment.Spec.Template.Spec.Affinity = affinity
 					klog.Infof("create the test deployment with requests %s", e2ereslist.ToString(requiredRes))
-					err := fxt.Client.Create(context.TODO(), deployment)
-					Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
+					Eventually(func() error {
+						return fxt.Client.Create(context.TODO(), deployment)
+					}, time.Minute*2, time.Second*5).Should(BeNil(), "unable to create deployment %q", deployment.Name)
 
 					By("waiting for deployment to be up & running")
 					dpRunningTimeout := 1 * time.Minute
 					dpRunningPollInterval := 10 * time.Second
-					err = e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
+					err := e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
 					Expect(err).NotTo(HaveOccurred(), "Deployment %q not up & running after %v", deployment.Name, dpRunningTimeout)
 
 					By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
