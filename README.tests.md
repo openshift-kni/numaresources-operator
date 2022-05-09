@@ -8,6 +8,8 @@ Should you decide to use the default `kubeletconfig`, please omit the `-e E2E_NR
 
 The e2e suite assumes the cluster has the numaresources operator installed, but with no configuration. To install the numaresources operator, you can use the vehicle which best suits your use case (OLM, `make deploy`...).
 
+In addition to kubelet config, refer to [doc/examples](doc/examples) directory for example specification files.  NUMAResourcesOperator CR and NUMAResourcesScheduler CR must be deployed in the cluster. These CRs take care of deployment of Resouce Topology Exporter daemon (on nodes that are targetted by the machine config pool selector) and NUMA-aware scheduler plugin as a secondary scheduler plugin respective.
+
 ## Running from the source tree
 
 This is the easiest way, recommended for developers and people which want to consume the latest and greatest source tree.
