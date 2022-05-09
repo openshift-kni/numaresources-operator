@@ -92,10 +92,10 @@ func CheckPODWasScheduledWith(k8sCli *kubernetes.Clientset, podNamespace, podNam
 	return checkPODEvents(k8sCli, podNamespace, podName, schedulerName, isScheduledWith)
 }
 
-func CheckNROSchedulerAvailable(cli client.Client, nroSchedName string) *nropv1alpha1.NUMAResourcesScheduler {
+func CheckNROSchedulerAvailable(cli client.Client, NUMAResourcesSchedObjName string) *nropv1alpha1.NUMAResourcesScheduler {
 	nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
 	Eventually(func() bool {
-		By(fmt.Sprintf("checking %q for the condition Available=true", nroSchedName))
+		By(fmt.Sprintf("checking %q for the condition Available=true", NUMAResourcesSchedObjName))
 
 		err := cli.Get(context.TODO(), client.ObjectKey{Name: NROSchedObjectName}, nroSchedObj)
 		if err != nil {
