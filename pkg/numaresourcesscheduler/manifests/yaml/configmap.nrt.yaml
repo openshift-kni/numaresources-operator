@@ -24,3 +24,34 @@ data:
           args:
             scoringStrategy:
               type: LeastAllocated
+      - schedulerName: topo-aware-scheduler-sorted
+        plugins:
+          filter:
+            disabled:
+              - name: '*'
+            enabled:
+              - name: NodeUnschedulable
+              - name: NodeName
+              - name: TaintToleration
+              - name: NodeAffinity
+              - name: NodePorts
+              - name: NodeResourceTopologyMatch
+              - name: NodeResourcesFit
+              - name: VolumeRestrictions
+              - name: EBSLimits
+              - name: GCEPDLimits
+              - name: NodeVolumeLimits
+              - name: AzureDiskLimits
+              - name: VolumeBinding
+              - name: VolumeZone
+              - name: PodTopologySpread
+              - name: InterPodAffinity
+          score:
+            enabled:
+              - name: NodeResourceTopologyMatch
+        # optional plugin configs
+        pluginConfig:
+        - name: NodeResourceTopologyMatch
+          args:
+            scoringStrategy:
+              type: LeastAllocated

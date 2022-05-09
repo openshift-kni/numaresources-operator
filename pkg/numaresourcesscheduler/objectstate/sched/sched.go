@@ -19,6 +19,7 @@ package sched
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -40,6 +41,7 @@ const (
 	SchedulerConfigFileName      = "config.yaml"
 	SchedulerConfigMapVolumeName = "etckubernetes"
 	SchedulerPluginName          = "NodeResourceTopologyMatch"
+	SchedulerProfileSortedSuffix = "-sorted"
 )
 
 type ExistingManifests struct {
@@ -205,13 +207,20 @@ func UpdateSchedulerName(cm *corev1.ConfigMap, name string) error {
 		return err
 	}
 
-	for i, schedProf := range schedCfg.Profiles {
+	for i := range schedCfg.Profiles {
+		schedProf := &schedCfg.Profiles[i]
 		// if we have a configuration for the NodeResourceTopologyMatch
 		// this is a valid profile
-		for _, plugin := range schedProf.PluginConfig {
-			if plugin.Name == SchedulerPluginName {
-				schedCfg.Profiles[i].SchedulerName = &name
+		for j := range schedProf.PluginConfig {
+			plugin := &schedProf.PluginConfig[j]
+			if plugin.Name != SchedulerPluginName {
+				continue
 			}
+			schedName := name
+			if schedProf.SchedulerName != nil && strings.HasSuffix(*schedProf.SchedulerName, SchedulerProfileSortedSuffix) {
+				schedName = name + SchedulerProfileSortedSuffix
+			}
+			schedProf.SchedulerName = &schedName
 		}
 	}
 
