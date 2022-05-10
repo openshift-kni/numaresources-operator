@@ -684,7 +684,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				Expect(err).ToNot(HaveOccurred())
 
 				if dp.Status.ReadyReplicas != expectedReadyReplicas {
-					klog.Warningf("deployment: %q has a wrong number of ready replicas, expected: %d got %d", dpKey.String(), expectedReadyReplicas, dp.Status.ReadyReplicas)
+					klog.Warningf("Waiting for deployment: %q to have %d replicas ready, current number of replicas: %d", dpKey.String(), expectedReadyReplicas, dp.Status.ReadyReplicas)
 					return false
 				}
 				return true
