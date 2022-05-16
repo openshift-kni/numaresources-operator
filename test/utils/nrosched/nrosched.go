@@ -123,5 +123,5 @@ func IsSchedulingErrorCannotAlign(msg string) bool {
 
 func GetNROSchedulerName(cli client.Client, NUMAResourcesSchedObjName string) string {
 	nroSchedObj := CheckNROSchedulerAvailable(cli, NUMAResourcesSchedObjName)
-	return nroSchedObj.Spec.SchedulerName
+	return nroSchedObj.Status.SchedulerName
 }
