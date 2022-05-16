@@ -719,7 +719,7 @@ func setupPaddingForUnsuitableNodes(offset int, fxt *e2efixture.Fixture, nrtList
 		By(fmt.Sprintf("computed base load: %s", baseload))
 
 		for zoneIdx, zone := range nrtInfo.Zones {
-			padRes := padInfo.unsuitableFreeRes[zoneIdx]
+			padRes := padInfo.unsuitableFreeRes[zoneIdx].DeepCopy()
 			name := fmt.Sprintf("unsuitable%d", nodeIdx)
 
 			By(fmt.Sprintf("saturating node %q -> %q zone %q to fit only (vanilla) %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes)))
