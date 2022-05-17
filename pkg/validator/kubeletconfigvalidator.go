@@ -55,7 +55,7 @@ func CollectData(ctx context.Context, cli client.Client) (*KubeletConfigValidato
 		return nil, err
 	}
 
-	nroMcps, err := machineconfigpools.GetNodeGroupsMCPs(ctx, cli, nroInstance.Spec.NodeGroups)
+	nroMcps, err := machineconfigpools.GetListByNodeGroups(ctx, cli, nroInstance.Spec.NodeGroups)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func CollectData(ctx context.Context, cli client.Client) (*KubeletConfigValidato
 			return nil, err
 		}
 
-		machineConfigPools, err := machineconfigpools.GetMCPsFromMCOKubeletConfig(ctx, cli, mcoKubeletConfig)
+		machineConfigPools, err := machineconfigpools.GetListFromMCOKubeletConfig(ctx, cli, mcoKubeletConfig)
 		if err != nil {
 			return nil, err
 		}

@@ -489,7 +489,7 @@ func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {
 
 // isMachineConfigPoolsUpdated checks if all related to NUMAResourceOperator CR machines config pools have updated status
 func isMachineConfigPoolsUpdated(nro *nropv1alpha1.NUMAResourcesOperator) (bool, error) {
-	mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
+	mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
 	if err != nil {
 		return false, err
 	}
@@ -506,7 +506,7 @@ func isMachineConfigPoolsUpdated(nro *nropv1alpha1.NUMAResourcesOperator) (bool,
 // isMachineConfigPoolsUpdatedAfterDeletion checks if all related to NUMAResourceOperator CR machines config pools have updated status
 // after MachineConfig deletion
 func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1alpha1.NUMAResourcesOperator) (bool, error) {
-	mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
+	mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
 	if err != nil {
 		return false, err
 	}

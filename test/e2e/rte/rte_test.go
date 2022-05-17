@@ -171,10 +171,10 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				kc, err := mcoKubeletConfToKubeletConf(&mcoKc)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				mcps, err := machineconfigpools.FindNodeGroupsMCPs(mcpList, nroObj.Spec.NodeGroups)
+				mcps, err := machineconfigpools.FindListByNodeGroups(mcpList, nroObj.Spec.NodeGroups)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				mcp, err := machineconfigpools.FindMCPBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
+				mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
 				ginkgo.By(fmt.Sprintf("Considering MCP %q", mcp.Name))
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -220,10 +220,10 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			mcoKc := mcoKcList.Items[0]
 			ginkgo.By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
 
-			mcps, err := machineconfigpools.FindNodeGroupsMCPs(mcpList, nroObj.Spec.NodeGroups)
+			mcps, err := machineconfigpools.FindListByNodeGroups(mcpList, nroObj.Spec.NodeGroups)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			mcp, err := machineconfigpools.FindMCPBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
+			mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
 			ginkgo.By(fmt.Sprintf("Considering MCP %q", mcp.Name))
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 

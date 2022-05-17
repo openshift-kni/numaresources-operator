@@ -91,7 +91,7 @@ var _ = Describe("[Uninstall]", func() {
 
 			if configuration.Platform == platform.OpenShift {
 				Eventually(func() bool {
-					mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
+					mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
 					if err != nil {
 						klog.Warningf("failed to get machine config pools: %w", err)
 						return false

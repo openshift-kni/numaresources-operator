@@ -31,30 +31,15 @@ import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 )
 
-func GetNodeGroupsMCPs(ctx context.Context, cli client.Client, nodeGroups []nropv1alpha1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
+func GetListByNodeGroups(ctx context.Context, cli client.Client, nodeGroups []nropv1alpha1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
 	mcps := &mcov1.MachineConfigPoolList{}
 	if err := cli.List(ctx, mcps); err != nil {
 		return nil, err
 	}
-	return FindNodeGroupsMCPs(mcps, nodeGroups)
+	return FindListByNodeGroups(mcps, nodeGroups)
 }
 
-func GetNodeListFromMachineConfigPool(ctx context.Context, cli client.Client, mcp mcov1.MachineConfigPool) ([]corev1.Node, error) {
-	sel, err := metav1.LabelSelectorAsSelector(mcp.Spec.MachineConfigSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	nodeList := &corev1.NodeList{}
-	err = cli.List(ctx, nodeList, &client.ListOptions{LabelSelector: sel})
-	if err != nil {
-		return nil, err
-	}
-
-	return nodeList.Items, nil
-}
-
-func GetMCPsFromMCOKubeletConfig(ctx context.Context, cli client.Client, mcoKubeletConfig mcov1.KubeletConfig) ([]*mcov1.MachineConfigPool, error) {
+func GetListFromMCOKubeletConfig(ctx context.Context, cli client.Client, mcoKubeletConfig mcov1.KubeletConfig) ([]*mcov1.MachineConfigPool, error) {
 	mcps := &mcov1.MachineConfigPoolList{}
 	var result []*mcov1.MachineConfigPool
 	if err := cli.List(ctx, mcps); err != nil {
@@ -76,7 +61,7 @@ func GetMCPsFromMCOKubeletConfig(ctx context.Context, cli client.Client, mcoKube
 	return result, nil
 }
 
-func FindNodeGroupsMCPs(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1alpha1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
+func FindListByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1alpha1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
 	var result []*mcov1.MachineConfigPool
 	for _, nodeGroup := range nodeGroups {
 		found := false
@@ -111,7 +96,7 @@ func FindNodeGroupsMCPs(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1al
 	return result, nil
 }
 
-func FindMCPBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelector) (*mcov1.MachineConfigPool, error) {
+func FindBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelector) (*mcov1.MachineConfigPool, error) {
 	if sel == nil {
 		return nil, fmt.Errorf("no MCP selector for selector %v", sel)
 
@@ -128,4 +113,19 @@ func FindMCPBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelecto
 		}
 	}
 	return nil, fmt.Errorf("cannot find MCP related to the selector %v", sel)
+}
+
+func GetNodeListFromMachineConfigPool(ctx context.Context, cli client.Client, mcp mcov1.MachineConfigPool) ([]corev1.Node, error) {
+	sel, err := metav1.LabelSelectorAsSelector(mcp.Spec.MachineConfigSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeList := &corev1.NodeList{}
+	err = cli.List(ctx, nodeList, &client.ListOptions{LabelSelector: sel})
+	if err != nil {
+		return nil, err
+	}
+
+	return nodeList.Items, nil
 }
