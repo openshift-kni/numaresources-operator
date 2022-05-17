@@ -39,13 +39,15 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	"github.com/openshift-kni/numaresources-operator/controllers"
+	nropmcp "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/crds"
 	e2eimages "github.com/openshift-kni/numaresources-operator/test/utils/images"
-	"github.com/openshift-kni/numaresources-operator/test/utils/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2epause "github.com/openshift-kni/numaresources-operator/test/utils/objects/pause"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
@@ -364,7 +366,7 @@ func overallDeployment() nroDeployment {
 	kcObj, err := objects.TestKC(matchLabels)
 	ExpectWithOffset(1, err).To(Not(HaveOccurred()))
 
-	unpause, err := machineconfigpools.PauseMCPs(nroObj.Spec.NodeGroups)
+	unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	if _, ok := os.LookupEnv("E2E_NROP_INSTALL_SKIP_KC"); ok {
@@ -392,7 +394,7 @@ func overallDeployment() nroDeployment {
 
 	if configuration.Platform == platform.OpenShift {
 		Eventually(func() bool {
-			updated, err := machineconfigpools.IsMachineConfigPoolsUpdated(nroObj)
+			updated, err := isMachineConfigPoolsUpdated(nroObj)
 			if err != nil {
 				klog.Errorf("failed to information about machine config pools: %w", err)
 				return false
@@ -450,7 +452,7 @@ func teardownDeployment(nrod nroDeployment, timeout time.Duration) {
 
 	if configuration.Platform == platform.OpenShift {
 		Eventually(func() bool {
-			updated, err := machineconfigpools.IsMachineConfigPoolsUpdatedAfterDeletion(nrod.nroObj)
+			updated, err := isMachineConfigPoolsUpdatedAfterDeletion(nrod.nroObj)
 			if err != nil {
 				klog.Errorf("failed to retrieve information about machine config pools: %w", err)
 				return false
@@ -483,4 +485,37 @@ func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {
 		}
 	}
 	return nil, fmt.Errorf("failed to get daemonset with owner reference uid: %s", uid)
+}
+
+// isMachineConfigPoolsUpdated checks if all related to NUMAResourceOperator CR machines config pools have updated status
+func isMachineConfigPoolsUpdated(nro *nropv1alpha1.NUMAResourcesOperator) (bool, error) {
+	mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
+	if err != nil {
+		return false, err
+	}
+
+	for _, mcp := range mcps {
+		if !controllers.IsMachineConfigPoolUpdated(nro.Name, mcp) {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+// isMachineConfigPoolsUpdatedAfterDeletion checks if all related to NUMAResourceOperator CR machines config pools have updated status
+// after MachineConfig deletion
+func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1alpha1.NUMAResourcesOperator) (bool, error) {
+	mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
+	if err != nil {
+		return false, err
+	}
+
+	for _, mcp := range mcps {
+		if !controllers.IsMachineConfigPoolUpdatedAfterDeletion(nro.Name, mcp) {
+			return false, nil
+		}
+	}
+
+	return true, nil
 }
