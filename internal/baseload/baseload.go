@@ -97,3 +97,9 @@ func (nl Load) Deduct(res corev1.ResourceList) {
 	adjustedMemory.Sub(nl.Memory)
 	res[corev1.ResourceMemory] = *adjustedMemory
 }
+
+func (nl Load) ToResourceList() corev1.ResourceList {
+	res := make(corev1.ResourceList)
+	nl.Apply(res)
+	return res
+}

@@ -29,9 +29,11 @@ import (
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
+	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
+	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
@@ -174,22 +176,37 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 		nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 		ExpectWithOffset(1, err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
+		baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
+		By(fmt.Sprintf("computed base load: %s", baseload))
+
 		for zIdx, zone := range nrtInfo.Zones {
-			paddingPods = append(paddingPods, createPaddingPod(1, fxt, fmt.Sprintf("padding-%d-%d", nIdx, zIdx), nodeName, zone, nodesState.FreeResources))
+			padRes := nodesState.FreeResources.DeepCopy()
+
+			By(fmt.Sprintf("saturating node %q zone %q to fit only (vanilla) %s", nodeName, zone.Name, e2ereslist.ToString(padRes)))
+			if zIdx == 0 { // any random zone is actually fine
+				baseload.Apply(padRes)
+				By(fmt.Sprintf("saturating node %q zone %q to fit only (adjusted) %s", nodeName, zone.Name, e2ereslist.ToString(padRes)))
+			}
+
+			paddingPods = append(paddingPods, createPaddingPod(1, fxt, fmt.Sprintf("padding-%d-%d", nIdx, zIdx), nodeName, zone, padRes))
 		}
 	}
 
 	By("Padding the target node")
 
+	baseload, err := nodes.GetLoad(fxt.K8sClient, targetNodeName)
+	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
+	By(fmt.Sprintf("computed base load: %s", baseload))
+
 	targetNrtInfo, err := e2enrt.FindFromList(nrtCandidates, targetNodeName)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "missing NRT info for target node %q", targetNodeName)
 
-	minimalRes := corev1.ResourceList{
-		corev1.ResourceCPU:    resource.MustParse("2"),
-		corev1.ResourceMemory: resource.MustParse("1Gi"),
-	}
-	paddingPods = append(paddingPods, createPaddingPod(1, fxt, "padding-tgt-0", targetNodeName, targetNrtInfo.Zones[0], minimalRes))
+	baseloadRes := baseload.ToResourceList()
+	By(fmt.Sprintf("saturating node %q zone %q to fit only (baseload) %s", targetNodeName, targetNrtInfo.Zones[0].Name, e2ereslist.ToString(baseloadRes)))
+	paddingPods = append(paddingPods, createPaddingPod(1, fxt, "padding-tgt-0", targetNodeName, targetNrtInfo.Zones[0], baseloadRes))
 	// any is fine, we hardcode zone#1 but we can do it smarter in the future
+	By(fmt.Sprintf("saturating node %q zone %q to fit the expected workload %s", targetNodeName, targetNrtInfo.Zones[0].Name, e2ereslist.ToString(nodesState.RequiredResources)))
 	paddingPods = append(paddingPods, createPaddingPod(1, fxt, "padding-tgt-1", targetNodeName, targetNrtInfo.Zones[1], nodesState.RequiredResources))
 
 	By("Waiting for padding pods to be ready")
