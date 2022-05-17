@@ -34,7 +34,6 @@ import (
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
-	mcpsfind "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools/find"
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
@@ -85,7 +84,7 @@ func CollectData(ctx context.Context, cli client.Client) (*KubeletConfigValidato
 			return nil, err
 		}
 
-		machineConfigPools, err := mcpsfind.GetMCPsFromMCOKubeletConfig(ctx, cli, mcoKubeletConfig)
+		machineConfigPools, err := machineconfigpools.GetMCPsFromMCOKubeletConfig(ctx, cli, mcoKubeletConfig)
 		if err != nil {
 			return nil, err
 		}
