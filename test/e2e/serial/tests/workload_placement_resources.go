@@ -122,13 +122,23 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 			},
 			Entry("[tmscope:pod] with topology-manager-scope: pod, using memory as deciding factor",
 				nrtv1alpha1.SingleNUMANodePodLevel,
+				// required resources for the test pod
 				corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("16"),
 					corev1.ResourceMemory: resource.MustParse("16Gi"),
 				},
+				// expected free resources on non-target node
+				// so non-target node must obviously have LESS free resources
+				// than the resources required by the test pod.
+				// Here we need to take into account the baseload which is possibly
+				// be accounted all on a NUMA zone (we can't nor we should predict this).
+				// For this test to be effective, a resource need to be LESS than
+				// the request - while all others are enough. "Less" can be any amount,
+				// so we make sure the gap is > of the estimated baseload for that resource.
+				// TODO: automate this computation, avoiding hardcoded values.
 				corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("16"),
-					corev1.ResourceMemory: resource.MustParse("15Gi"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
 				},
 			),
 		)
