@@ -134,7 +134,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}
 
-	mcps, err := machineconfigpools.GetNodeGroupsMCPs(ctx, r.Client, instance.Spec.NodeGroups)
+	mcps, err := machineconfigpools.GetListByNodeGroups(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}

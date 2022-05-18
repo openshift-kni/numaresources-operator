@@ -58,7 +58,7 @@ func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup,
 
 	Expect(nodeGroups).ToNot(BeEmpty(), "cannot autodetect the TAS node groups from the cluster")
 
-	mcps, err := machineconfigpools.GetNodeGroupsMCPs(context.TODO(), fxt.Client, nodeGroups)
+	mcps, err := machineconfigpools.GetListByNodeGroups(context.TODO(), fxt.Client, nodeGroups)
 	Expect(err).ToNot(HaveOccurred())
 
 	klog.Infof("setting e2e infra for %d MCPs", len(mcps))

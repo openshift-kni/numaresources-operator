@@ -42,7 +42,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	nropv1alpha1cli "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
-	mcpfind "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools/find"
+	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
@@ -171,10 +171,10 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				kc, err := mcoKubeletConfToKubeletConf(&mcoKc)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				mcps, err := mcpfind.NodeGroupsMCPs(mcpList, nroObj.Spec.NodeGroups)
+				mcps, err := machineconfigpools.FindListByNodeGroups(mcpList, nroObj.Spec.NodeGroups)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				mcp, err := mcpfind.MCPBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
+				mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
 				ginkgo.By(fmt.Sprintf("Considering MCP %q", mcp.Name))
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -220,10 +220,10 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			mcoKc := mcoKcList.Items[0]
 			ginkgo.By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
 
-			mcps, err := mcpfind.NodeGroupsMCPs(mcpList, nroObj.Spec.NodeGroups)
+			mcps, err := machineconfigpools.FindListByNodeGroups(mcpList, nroObj.Spec.NodeGroups)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			mcp, err := mcpfind.MCPBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
+			mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
 			ginkgo.By(fmt.Sprintf("Considering MCP %q", mcp.Name))
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 

@@ -31,8 +31,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
-	"github.com/openshift-kni/numaresources-operator/test/utils/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2epause "github.com/openshift-kni/numaresources-operator/test/utils/objects/pause"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
@@ -67,7 +67,7 @@ var _ = Describe("[Uninstall]", func() {
 				return
 			}
 
-			unpause, err := machineconfigpools.PauseMCPs(nroObj.Spec.NodeGroups)
+			unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups)
 			Expect(err).NotTo(HaveOccurred())
 
 			if err := e2eclient.Client.Delete(context.TODO(), nroObj); err != nil {
@@ -91,7 +91,7 @@ var _ = Describe("[Uninstall]", func() {
 
 			if configuration.Platform == platform.OpenShift {
 				Eventually(func() bool {
-					mcps, err := nropmcp.GetNodeGroupsMCPs(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
+					mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
 					if err != nil {
 						klog.Warningf("failed to get machine config pools: %w", err)
 						return false
