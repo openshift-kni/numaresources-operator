@@ -122,13 +122,23 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 			},
 			Entry("[tmscope:pod] with topology-manager-scope: pod, using memory as deciding factor",
 				nrtv1alpha1.SingleNUMANodePodLevel,
+				// required resources for the test pod
 				corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("16"),
 					corev1.ResourceMemory: resource.MustParse("16Gi"),
 				},
+				// expected free resources on non-target node
+				// so non-target node must obviously have LESS free resources
+				// than the resources required by the test pod.
+				// Here we need to take into account the baseload which is possibly
+				// be accounted all on a NUMA zone (we can't nor we should predict this).
+				// For this test to be effective, a resource need to be LESS than
+				// the request - while all others are enough. "Less" can be any amount,
+				// so we make sure the gap is > of the estimated baseload for that resource.
+				// TODO: automate this computation, avoiding hardcoded values.
 				corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("16"),
-					corev1.ResourceMemory: resource.MustParse("15Gi"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
 				},
 			),
 		)
@@ -183,10 +193,8 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 		for zIdx, zone := range nrtInfo.Zones {
 			padRes := nodesState.FreeResources.DeepCopy()
 
-			By(fmt.Sprintf("saturating node %q zone %q to fit only (vanilla) %s", nodeName, zone.Name, e2ereslist.ToString(padRes)))
 			if zIdx == 0 { // any random zone is actually fine
 				baseload.Apply(padRes)
-				By(fmt.Sprintf("saturating node %q zone %q to fit only (adjusted) %s", nodeName, zone.Name, e2ereslist.ToString(padRes)))
 			}
 
 			paddingPods = append(paddingPods, createPaddingPod(1, fxt, fmt.Sprintf("padding-%d-%d", nIdx, zIdx), nodeName, zone, padRes))
@@ -203,10 +211,8 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "missing NRT info for target node %q", targetNodeName)
 
 	baseloadRes := baseload.ToResourceList()
-	By(fmt.Sprintf("saturating node %q zone %q to fit only (baseload) %s", targetNodeName, targetNrtInfo.Zones[0].Name, e2ereslist.ToString(baseloadRes)))
 	paddingPods = append(paddingPods, createPaddingPod(1, fxt, "padding-tgt-0", targetNodeName, targetNrtInfo.Zones[0], baseloadRes))
 	// any is fine, we hardcode zone#1 but we can do it smarter in the future
-	By(fmt.Sprintf("saturating node %q zone %q to fit the expected workload %s", targetNodeName, targetNrtInfo.Zones[0].Name, e2ereslist.ToString(nodesState.RequiredResources)))
 	paddingPods = append(paddingPods, createPaddingPod(1, fxt, "padding-tgt-1", targetNodeName, targetNrtInfo.Zones[1], nodesState.RequiredResources))
 
 	By("Waiting for padding pods to be ready")
@@ -217,6 +223,8 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 }
 
 func createPaddingPod(offset int, fxt *e2efixture.Fixture, podName, nodeName string, zone nrtv1alpha1.Zone, expectedFreeRes corev1.ResourceList) *corev1.Pod {
+	By(fmt.Sprintf("creating padding pod %q for node %q zone %q with resource target %s", podName, nodeName, zone.Name, e2ereslist.ToString(expectedFreeRes)))
+
 	padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, expectedFreeRes)
 	ExpectWithOffset(offset+1, err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
 
