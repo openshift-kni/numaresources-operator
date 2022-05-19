@@ -232,8 +232,8 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/scheme
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/typed/topology/v1alpha1
-# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.4.3-0.20220407072408-d8e355742882
-## explicit; go 1.17
+# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.6.0
+## explicit; go 1.18
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8shelpers
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/kubeconf
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/notification
