@@ -18,6 +18,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -58,9 +59,11 @@ func main() {
 	}
 
 	if parsedArgs.Version {
-		fmt.Println(version.ProgramName(), version.Get())
+		fmt.Printf("%s %s (%s)\n", version.ProgramName(), version.Get(), runtime.Version())
 		os.Exit(0)
 	}
+
+	klog.Infof("starting %s %s (%s)\n", version.ProgramName(), version.Get(), runtime.Version())
 
 	// only for debug purposes
 	// printing the header so early includes any debug message from the sysinfo package
