@@ -1,6 +1,6 @@
 module github.com/openshift-kni/numaresources-operator
 
-go 1.17
+go 1.18
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
@@ -12,7 +12,7 @@ require (
 	github.com/jaypipes/pcidb v1.0.0
 	github.com/k8stopologyawareschedwg/deployer v0.6.0
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.4.3-0.20220407072408-d8e355742882
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.6.0
 	github.com/kubevirt/device-plugin-manager v1.18.8
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo v1.16.5
