@@ -141,6 +141,19 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 					corev1.ResourceMemory: resource.MustParse("8Gi"),
 				},
 			),
+			Entry("[tmscope:pod] with topology-manager-scope: pod, using CPU as the deciding factor",
+				nrtv1alpha1.SingleNUMANodePodLevel,
+				// required resources for the test pod
+				corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("16"),
+					corev1.ResourceMemory: resource.MustParse("16Gi"),
+				},
+				// TODO: automate this computation, avoiding hardcoded values.
+				corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("16Gi"),
+				},
+			),
 		)
 	})
 })
