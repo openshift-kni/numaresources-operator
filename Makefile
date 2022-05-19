@@ -172,7 +172,7 @@ binary-e2e-sched:
 binary-e2e-serial:
 	go test -c -v -o bin/e2e-nrop-serial.test ./test/e2e/serial
 
-binary-e2e-all: binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial runner-e2e-serial build-pause
+binary-e2e-all: goversion binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial runner-e2e-serial build-pause
 
 runner-e2e-serial: bin/envsubst
 	hack/render-e2e-runner.sh
@@ -327,9 +327,12 @@ deps-update:
 
 # Build tools:
 #
-#
+.PHONY: goversion
+goversion:
+	@go version
+
 .PHONY: build-tools
-build-tools: bin/git-semver bin/envsubst bin/lsplatform
+build-tools: goversion bin/git-semver bin/envsubst bin/lsplatform
 
 bin/git-semver:
 	@go build -o bin/git-semver vendor/github.com/mdomke/git-semver/main.go
