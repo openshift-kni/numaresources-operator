@@ -13,8 +13,26 @@ data:
       - schedulerName: topo-aware-scheduler
         plugins:
           filter:
+            disabled:
+              - name: '*'
             enabled:
+              - name: NodeUnschedulable
+              - name: NodeName
+              - name: TaintToleration
+              - name: NodeAffinity
+              - name: NodePorts
+              - name: KNIDebug
+              - name: NodeResourcesFit
               - name: NodeResourceTopologyMatch
+              - name: VolumeRestrictions
+              - name: EBSLimits
+              - name: GCEPDLimits
+              - name: NodeVolumeLimits
+              - name: AzureDiskLimits
+              - name: VolumeBinding
+              - name: VolumeZone
+              - name: PodTopologySpread
+              - name: InterPodAffinity
           score:
             enabled:
               - name: NodeResourceTopologyMatch
