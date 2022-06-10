@@ -131,14 +131,14 @@ binary: build-tools
 	CGO_ENABLED=0 go build \
 		-mod=vendor \
 		-o bin/manager \
-		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/git-semver)" \
+		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) -X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)" \
 		main.go
 
 binary-rte: build-tools
 	CGO_ENABLED=0 go build \
 		-mod=vendor \
 		-o bin/exporter \
-		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/git-semver)" \
+		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) -X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)" \
 		rte/main.go
 
 binary-numacell: build-tools
@@ -152,7 +152,7 @@ binary-nrocli: build-tools
 	CGO_ENABLED=0 go build \
 		-mod=vendor \
 		-o bin/nrocli \
-		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/git-semver)" \
+		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version)" \
 		nrocli/main.go
 
 binary-all: binary binary-rte
@@ -332,10 +332,10 @@ goversion:
 	@go version
 
 .PHONY: build-tools
-build-tools: goversion bin/git-semver bin/envsubst bin/lsplatform
+build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform
 
-bin/git-semver:
-	@go build -o bin/git-semver vendor/github.com/mdomke/git-semver/main.go
+bin/buildhelper:
+	@go build -o bin/buildhelper hack/buildhelper/buildhelper.go
 
 bin/envsubst:
 	@go build -o bin/envsubst hack/envsubst/envsubst.go
