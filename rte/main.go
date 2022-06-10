@@ -59,11 +59,10 @@ func main() {
 	}
 
 	if parsedArgs.Version {
-		fmt.Printf("%s %s (%s)\n", version.ProgramName(), version.Get(), runtime.Version())
+		fmt.Printf("%s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
 		os.Exit(0)
 	}
-
-	klog.Infof("starting %s %s (%s)\n", version.ProgramName(), version.Get(), runtime.Version())
+	klog.Infof("starting %s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
 
 	// only for debug purposes
 	// printing the header so early includes any debug message from the sysinfo package

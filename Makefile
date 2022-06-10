@@ -131,14 +131,14 @@ binary: build-tools
 	CGO_ENABLED=0 go build \
 		-mod=vendor \
 		-o bin/manager \
-		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/git-semver)" \
+		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) -X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)" \
 		main.go
 
 binary-rte: build-tools
 	CGO_ENABLED=0 go build \
 		-mod=vendor \
 		-o bin/exporter \
-		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/git-semver)" \
+		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) -X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)" \
 		rte/main.go
 
 binary-numacell: build-tools
@@ -317,10 +317,10 @@ deps-update:
 #
 #
 .PHONY: build-tools
-build-tools: bin/git-semver
+build-tools: bin/buildhelper
 
-bin/git-semver:
-	@go build -o bin/git-semver vendor/github.com/mdomke/git-semver/main.go
+bin/buildhelper:
+	@go build -o bin/buildhelper hack/buildhelper/buildhelper.go
 
 verify-generated: bundle generate
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
