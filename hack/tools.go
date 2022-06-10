@@ -21,6 +21,5 @@ limitations under the License.
 package tools
 
 import (
-	_ "github.com/mdomke/git-semver"
 	_ "k8s.io/code-generator"
 )

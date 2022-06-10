@@ -22,11 +22,14 @@ import (
 )
 
 const (
-	undefinedVersion string = "undefined"
+	undefined string = "undefined"
 )
 
 // version Must not be const, supposed to be set using ldflags at build time
-var version = undefinedVersion
+var version = undefined
+
+// gitcommit Must not be const, supposed to be set using ldflags at build time
+var gitcommit = undefined
 
 // Get returns the version as a string
 func Get() string {
@@ -35,7 +38,15 @@ func Get() string {
 
 // Undefined returns if version is at it's default value
 func Undefined() bool {
-	return version == undefinedVersion
+	return version == undefined
+}
+
+func GetGitCommit() string {
+	return gitcommit
+}
+
+func UndefinedGitCommit() bool {
+	return gitcommit == undefined
 }
 
 func ProgramName() string {

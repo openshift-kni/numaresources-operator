@@ -109,11 +109,11 @@ func main() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Printf("%s %s (%s)\n", version.ProgramName(), version.Get(), runtime.Version())
+		fmt.Printf("%s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
 		os.Exit(0)
 	}
 
-	klog.InfoS("starting", "program", version.ProgramName(), "version", version.Get(), "golang", runtime.Version())
+	klog.InfoS("starting", "program", version.ProgramName(), "version", version.Get(), "gitcommit", version.GetGitCommit(), "golang", runtime.Version())
 
 	// if it is unknown, it's fine
 	userPlatform, _ := platform.FromString(platformName)
