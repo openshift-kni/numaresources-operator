@@ -30,6 +30,18 @@ func TestUndefined(t *testing.T) {
 	}
 }
 
+func TestGetGitCommit(t *testing.T) {
+	if GetGitCommit() == "" {
+		t.Errorf("empty gitcommit")
+	}
+}
+
+func TestUndefinedGitCommit(t *testing.T) {
+	if !UndefinedGitCommit() {
+		t.Errorf("final gitcommit should be defined at link stage")
+	}
+}
+
 func TestProgramName(t *testing.T) {
 	if ProgramName() == "undefined" {
 		t.Errorf("program name should always be defined")
