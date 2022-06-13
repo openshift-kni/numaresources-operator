@@ -21,6 +21,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -38,7 +39,7 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	"k8s.io/apimachinery/pkg/runtime"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
@@ -58,7 +59,7 @@ import (
 )
 
 var (
-	scheme = runtime.NewScheme()
+	scheme = k8sruntime.NewScheme()
 
 	defaultImage     = ""
 	defaultNamespace = "numaresources-operator"
@@ -108,9 +109,11 @@ func main() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Println(version.ProgramName(), version.Get())
+		fmt.Printf("%s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
 		os.Exit(0)
 	}
+
+	klog.InfoS("starting", "program", version.ProgramName(), "version", version.Get(), "gitcommit", version.GetGitCommit(), "golang", runtime.Version())
 
 	// if it is unknown, it's fine
 	userPlatform, _ := platform.FromString(platformName)
