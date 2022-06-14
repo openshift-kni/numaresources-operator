@@ -5,3 +5,4 @@ metadata:
 spec:
   imageSpec: "quay.io/openshift-kni/scheduler-plugins:4.11-snapshot"
   logLevel: "Trace"
+  schedulerName: topo-aware-scheduler
