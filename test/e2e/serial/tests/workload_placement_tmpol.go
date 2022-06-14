@@ -45,10 +45,11 @@ import (
 )
 
 type paddingInfo struct {
-	pod                 *corev1.Pod
-	targetNodeName      string
-	unsuitableNodeNames []string
-	unsuitableFreeRes   []corev1.ResourceList
+	pod                  *corev1.Pod
+	targetNodeName       string
+	targetFreeResPerNUMA []corev1.ResourceList
+	unsuitableNodeNames  []string
+	unsuitableFreeRes    []corev1.ResourceList
 }
 
 type setupPaddingFunc func(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod
@@ -360,7 +361,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	})
 
 	DescribeTable("[placement] cluster with multiple worker nodes suitable",
-		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, podRes, unsuitableFreeRes []corev1.ResourceList) {
+		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, podRes, unsuitableFreeRes []corev1.ResourceList, targetFreeResPerNUMA []corev1.ResourceList) {
 
 			hostsRequired := 2
 
@@ -376,11 +377,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			pod.Spec.NodeSelector = map[string]string{
 				serialconfig.MultiNUMALabel: "2",
 			}
-			pod.Spec.Containers = append(pod.Spec.Containers, pod.Spec.Containers[0])
 			pod.Spec.Containers[0].Name = "testcnt-0"
 			pod.Spec.Containers[0].Resources.Limits = podRes[0]
-			pod.Spec.Containers[1].Name = "testcnt-1"
-			pod.Spec.Containers[1].Resources.Limits = podRes[1]
+			for i := 1; i < len(podRes); i++ {
+				pod.Spec.Containers = append(pod.Spec.Containers, pod.Spec.Containers[0])
+				pod.Spec.Containers[i].Name = fmt.Sprintf("testcnt-%d", i)
+				pod.Spec.Containers[i].Resources.Limits = podRes[i]
+			}
 
 			requiredRes := e2ereslist.FromGuaranteedPod(*pod)
 
@@ -405,11 +408,20 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			By(fmt.Sprintf("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames))
 
+			// make targetFreeResPerNUMA the complement of the test pod's resources
+			// IOW targetFreeResPerNUMA + baseload + podRes equals to all node's allocatable resources
+			if len(targetFreeResPerNUMA) == 0 {
+				for i := 0; i < len(podRes); i++ {
+					// appending a copy so mutating one object won't implicitly change the other
+					targetFreeResPerNUMA = append(targetFreeResPerNUMA, podRes[i].DeepCopy())
+				}
+			}
 			padInfo := paddingInfo{
-				pod:                 pod,
-				targetNodeName:      targetNodeName,
-				unsuitableNodeNames: unsuitableNodeNames,
-				unsuitableFreeRes:   unsuitableFreeRes,
+				pod:                  pod,
+				targetNodeName:       targetNodeName,
+				targetFreeResPerNUMA: targetFreeResPerNUMA,
+				unsuitableNodeNames:  unsuitableNodeNames,
+				unsuitableFreeRes:    unsuitableFreeRes,
 			}
 
 			By("Padding nodes to create the test workload scenario")
@@ -527,6 +539,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceMemory: resource.MustParse("12Gi"),
 				},
 			},
+			[]corev1.ResourceList{},
 		),
 		Entry("[test_id:47577][tmscope:pod][tier1] should make a pod with two gu cnt land on a node with enough resources on a specific NUMA zone, all cnt on the same zone",
 			nrtv1alpha1.SingleNUMANodePodLevel,
@@ -581,6 +594,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("192Mi"),
 				},
 			},
+			[]corev1.ResourceList{},
 		),
 		Entry("[test_id:50184][tmscope:pod][hugepages] should make a pod with two gu cnt land on a node with enough resources with hugepages on a specific NUMA zone, all cnt on the same zone",
 			nrtv1alpha1.SingleNUMANodePodLevel,
@@ -609,6 +623,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("144Mi"),
 				},
 			},
+			[]corev1.ResourceList{},
+		),
 		),
 	)
 })
@@ -678,20 +694,21 @@ func setupPaddingContainerLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.Nod
 	nrtInfo, err := e2enrt.FindFromList(nrtList.Items, padInfo.targetNodeName)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing NRT info for %q", padInfo.targetNodeName)
 
-	// if we get this far we can now depend on the fact that len(nrt.Zones) == len(pod.Spec.Containers) == 2
+	// if we get this far we can now depend on the fact that len(nrt.Zones) == len(padInfo.targetFreeResPerNUMA) == 2
 
-	numCnts := len(padInfo.pod.Spec.Containers)
+	numCnts := len(padInfo.targetFreeResPerNUMA)
 	paddingPods := []*corev1.Pod{}
 
 	for idx := 0; idx < numCnts; idx++ {
 		numaIdx := idx % 2
 		zone := nrtInfo.Zones[numaIdx]
-		cnt := padInfo.pod.Spec.Containers[idx] // TODO: reverse
+		numaRes := padInfo.targetFreeResPerNUMA[idx]
+		if idx == 0 { // any random zone is actually fine
+			baseload.Apply(numaRes)
+		}
 
-		// TODO: apply baseload
-
-		By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(cnt.Resources.Limits)))
-		padPod, err := makePaddingPod(fxt.Namespace.Name, "target", zone, cnt.Resources.Limits)
+		By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(numaRes)))
+		padPod, err := makePaddingPod(fxt.Namespace.Name, "target", zone, numaRes)
 		ExpectWithOffset(1, err).ToNot(HaveOccurred())
 
 		padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
