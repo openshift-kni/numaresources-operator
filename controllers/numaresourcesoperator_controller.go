@@ -329,6 +329,11 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		rtestate.UpdateDaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
 	}
 
+	err = rtestate.UpdateDaemonSetArgs(r.RTEManifests.DaemonSet)
+	if err != nil {
+		return daemonSetsNName, err
+	}
+
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, mcps, r.Namespace)
 	for _, objState := range existing.State(r.RTEManifests, r.Platform, instance, mcps) {
 		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {

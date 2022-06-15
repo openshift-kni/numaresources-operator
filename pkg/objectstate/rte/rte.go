@@ -33,6 +33,7 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
@@ -382,4 +383,16 @@ func UpdateDaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
 		template.Annotations = map[string]string{}
 	}
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
+}
+
+func UpdateDaemonSetArgs(ds *appsv1.DaemonSet) error {
+	// TODO: better match by name than assume container#0 is RTE proper (not minion)
+	cnt := &ds.Spec.Template.Spec.Containers[0]
+	flags := flagcodec.ParseArgvKeyValue(cnt.Args)
+	if flags == nil {
+		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
+	}
+	flags.SetToggle("--pods-fingerprint")
+	cnt.Args = flags.Argv()
+	return nil
 }
