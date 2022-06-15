@@ -39,6 +39,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
+	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 )
 
@@ -156,15 +157,15 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	var deploymentNName nrsv1alpha1.NamespacedName
 	schedulerName := instance.Spec.SchedulerName
 
-	schedstate.UpdateDeploymentImageSettings(r.SchedulerManifests.Deployment, instance.Spec.SchedulerImage)
+	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, instance.Spec.SchedulerImage)
 	cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.SchedulerManifests.ConfigMap)
 	if err != nil {
 		return deploymentNName, schedulerName, err
 	}
-	schedstate.UpdateDeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
+	schedupdate.DeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
 
 	if schedulerName != "" {
-		err := schedstate.UpdateSchedulerName(r.SchedulerManifests.ConfigMap, instance.Spec.SchedulerName)
+		err := schedupdate.SchedulerName(r.SchedulerManifests.ConfigMap, instance.Spec.SchedulerName)
 		if err != nil {
 			return nrsv1alpha1.NamespacedName{}, schedulerName, err
 		}
