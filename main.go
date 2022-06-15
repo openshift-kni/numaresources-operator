@@ -52,8 +52,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
-	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
-	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
+	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
+	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
 )
@@ -317,10 +317,10 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 	mf := rteManifests.Render(rtemanifests.RenderOptions{
 		Namespace: namespace,
 	})
-	_ = rtestate.UpdateDaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
-	_ = rtestate.UpdateDaemonSetPauseContainerSettings(mf.DaemonSet)
+	_ = rteupdate.DaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
+	rteupdate.DaemonSetPauseContainerSettings(mf.DaemonSet)
 	if mf.ConfigMap != nil {
-		rtestate.UpdateDaemonSetHashAnnotation(mf.DaemonSet, hash.ConfigMapData(mf.ConfigMap))
+		rteupdate.DaemonSetHashAnnotation(mf.DaemonSet, hash.ConfigMapData(mf.ConfigMap))
 	}
 	return mf
 }
@@ -328,7 +328,7 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec string) schedmanifests.Manifests {
 	klog.InfoS("Updating scheduler manifests")
 	mf := schedManifests.Clone()
-	schedstate.UpdateDeploymentImageSettings(mf.Deployment, imageSpec)
-	schedstate.UpdateDeploymentConfigMapSettings(mf.Deployment, schedManifests.ConfigMap.Name, hash.ConfigMapData(schedManifests.ConfigMap))
+	schedupdate.DeploymentImageSettings(mf.Deployment, imageSpec)
+	schedupdate.DeploymentConfigMapSettings(mf.Deployment, schedManifests.ConfigMap.Name, hash.ConfigMapData(schedManifests.ConfigMap))
 	return mf
 }
