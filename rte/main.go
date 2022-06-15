@@ -38,9 +38,8 @@ import (
 )
 
 type localArgs struct {
-	SysConf             sysinfo.Config
-	ConfigPath          string
-	ExitOnConfigChanges bool
+	SysConf    sysinfo.Config
+	ConfigPath string
 }
 
 type ProgArgs struct {
@@ -98,18 +97,6 @@ func main() {
 		klog.Fatalf("failed to start prometheus server: %v", err)
 	}
 
-	if parsedArgs.LocalArgs.ExitOnConfigChanges {
-		cw, err := config.NewWatcher(parsedArgs.LocalArgs.ConfigPath, func() error {
-			klog.Infof("configuration file %q changed: exit", parsedArgs.LocalArgs.ConfigPath)
-			os.Exit(0)
-			return nil
-		})
-		if err != nil {
-			klog.Fatalf("cannot watch the configuration file %q: %v", parsedArgs.LocalArgs.ConfigPath, err)
-		}
-		go cw.WaitUntilChanges()
-	}
-
 	err = resourcetopologyexporter.Execute(cli, parsedArgs.NRTupdater, parsedArgs.Resourcemonitor, parsedArgs.RTE)
 	// must never execute; if it does, we want to know
 	klog.Fatalf("failed to execute: %v", err)
@@ -160,7 +147,6 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.BoolVar(&pArgs.SysinfoOnly, "system-info", false, "Output detected system info and exit")
 
 	flags.BoolVar(&pArgs.Version, "version", false, "Output version and exit")
-	flags.BoolVar(&pArgs.LocalArgs.ExitOnConfigChanges, "exit-on-conf-change", false, "Exits when configuration file changes - so the supervisor can restart")
 
 	err := flags.Parse(args)
 	if err != nil {
