@@ -44,6 +44,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
@@ -91,8 +92,9 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				}
 
 				for _, ds := range rteDss {
-					// TODO better match by name than assumes container #0 is the right one
-					rteCnt := &ds.Spec.Template.Spec.Containers[0]
+					rteCnt, err := rteupdate.FindContainerByName(&ds.Spec.Template.Spec, rteupdate.MainContainerName)
+					gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
 						klog.Warningf("--v flag doesn't exist in container %q args managed by DaemonSet: %q", rteCnt.Name, ds.Name)
@@ -128,8 +130,9 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				}
 
 				for _, ds := range rteDss {
-					// TODO better match by name than assumes container #0 is the right one
-					rteCnt := &ds.Spec.Template.Spec.Containers[0]
+					rteCnt, err := rteupdate.FindContainerByName(&ds.Spec.Template.Spec, rteupdate.MainContainerName)
+					gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
 						klog.Warningf("--v flag doesn't exist in container %q args under DaemonSet: %q", rteCnt.Name, ds.Name)

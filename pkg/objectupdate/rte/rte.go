@@ -26,9 +26,17 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 )
 
+// these should be provided by a deployer API
+const (
+	MainContainerName   = "resource-topology-exporter"
+	HelperContainerName = "shared-pool-container"
+)
+
 func DaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImageSpec string, builtinPullPolicy corev1.PullPolicy) error {
-	// TODO: better match by name than assume container#0 is RTE proper (not minion)
-	cnt := &ds.Spec.Template.Spec.Containers[0]
+	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
+	if err != nil {
+		return err
+	}
 	if userImageSpec != "" {
 		// we don't really know what's out there, so we minimize the changes.
 		cnt.Image = userImageSpec
@@ -49,11 +57,16 @@ func DaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImag
 	return nil
 }
 
-func DaemonSetPauseContainerSettings(ds *appsv1.DaemonSet) {
-	// TODO: better match by name than assume container#0 is RTE proper (not minion)
-	rteCnt := &ds.Spec.Template.Spec.Containers[0]
-	// TODO: better match by name than assume container#1 is the RTE minion
-	cnt := &ds.Spec.Template.Spec.Containers[1]
+func DaemonSetPauseContainerSettings(ds *appsv1.DaemonSet) error {
+	rteCnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
+	if err != nil {
+		return err
+	}
+	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, HelperContainerName)
+	if err != nil {
+		return err
+	}
+
 	cnt.Image = rteCnt.Image
 	cnt.ImagePullPolicy = rteCnt.ImagePullPolicy
 	cnt.Command = []string{
@@ -64,6 +77,7 @@ func DaemonSetPauseContainerSettings(ds *appsv1.DaemonSet) {
 	cnt.Args = []string{
 		"while true; do sleep 30s; done",
 	}
+	return nil
 }
 
 // UpdateDaemonSetRunAsIDs bump the ds container privileges to 0/0.
@@ -72,9 +86,11 @@ func DaemonSetPauseContainerSettings(ds *appsv1.DaemonSet) {
 // OTOH, the rte image needs to have access to the files using *both* DAC and MAC;
 // the SCC/SELinux context take cares of the MAC (when needed, e.g. on OCP), while
 // we take care of DAC here.
-func DaemonSetRunAsIDs(ds *appsv1.DaemonSet) {
-	// TODO: better match by name than assume container#0 is RTE proper (not minion)
-	cnt := &ds.Spec.Template.Spec.Containers[0]
+func DaemonSetRunAsIDs(ds *appsv1.DaemonSet) error {
+	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
+	if err != nil {
+		return err
+	}
 	if cnt.SecurityContext == nil {
 		cnt.SecurityContext = &corev1.SecurityContext{}
 	}
@@ -82,6 +98,7 @@ func DaemonSetRunAsIDs(ds *appsv1.DaemonSet) {
 	cnt.SecurityContext.RunAsUser = &rootID
 	cnt.SecurityContext.RunAsGroup = &rootID
 	klog.InfoS("RTE container elevated privileges", "container", cnt.Name, "user", rootID, "group", rootID)
+	return nil
 }
 
 func DaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
@@ -90,4 +107,14 @@ func DaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
 		template.Annotations = map[string]string{}
 	}
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
+}
+
+func FindContainerByName(podSpec *corev1.PodSpec, containerName string) (*corev1.Container, error) {
+	for idx := 0; idx < len(podSpec.Containers); idx++ {
+		cnt := &podSpec.Containers[idx]
+		if cnt.Name == containerName {
+			return cnt, nil
+		}
+	}
+	return nil, fmt.Errorf("container %q not found - defaulting to the first", containerName)
 }
