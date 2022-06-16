@@ -307,14 +307,18 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		klog.ErrorS(fmt.Errorf("failed to delete unused machineconfigs"), "errors", errorList)
 	}
 
+	var err error
 	var daemonSetsNName []nropv1alpha1.NamespacedName
 
-	err := rteupdate.DaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.ImageSpec, r.ImagePullPolicy)
+	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.ImageSpec, r.ImagePullPolicy)
 	if err != nil {
 		return daemonSetsNName, err
 	}
 
-	rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.DaemonSet)
+	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.DaemonSet)
+	if err != nil {
+		return daemonSetsNName, err
+	}
 
 	err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, instance.Spec.LogLevel)
 	if err != nil {
