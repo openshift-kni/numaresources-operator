@@ -31,7 +31,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -60,17 +59,18 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 	f := framework.NewDefaultFramework("rte")
 
 	ginkgo.BeforeEach(func() {
-		if !initialized {
-			var err error
-
-			nropcli, err = newNUMAResourcesOperatorWithConfig(f.ClientConfig())
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			mcocli, err = newMachineConfigClientWithConfig(f.ClientConfig())
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			initialized = true
+		if initialized {
+			return
 		}
+		var err error
+
+		nropcli, err = nropv1alpha1cli.NewForConfig(f.ClientConfig())
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		mcocli, err = mcov1cli.NewForConfig(f.ClientConfig())
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		initialized = true
 	})
 
 	ginkgo.When("[config][rte] NRO CR configured with LogLevel", func() {
@@ -257,22 +257,6 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		})
 	})
 })
-
-func newMachineConfigClientWithConfig(cfg *rest.Config) (*mcov1cli.MachineconfigurationV1Client, error) {
-	clientset, err := mcov1cli.NewForConfig(cfg)
-	if err != nil {
-		klog.Exit(err.Error())
-	}
-	return clientset, nil
-}
-
-func newNUMAResourcesOperatorWithConfig(cfg *rest.Config) (*nropv1alpha1cli.NumaresourcesoperatorV1alpha1Client, error) {
-	clientset, err := nropv1alpha1cli.NewForConfig(cfg)
-	if err != nil {
-		klog.Exit(err.Error())
-	}
-	return clientset, nil
-}
 
 func getOwnedDss(f *framework.Framework, owner metav1.ObjectMeta) ([]appsv1.DaemonSet, error) {
 	dss, err := f.ClientSet.AppsV1().DaemonSets("").List(context.TODO(), metav1.ListOptions{})
