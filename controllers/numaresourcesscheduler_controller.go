@@ -163,12 +163,11 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	}
 	schedstate.UpdateDeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
 
-	if schedulerName != "" {
-		err := schedstate.UpdateSchedulerName(r.SchedulerManifests.ConfigMap, instance.Spec.SchedulerName)
-		if err != nil {
-			return nrsv1alpha1.NamespacedName{}, schedulerName, err
-		}
+	err = schedstate.UpdateSchedulerConfig(r.SchedulerManifests.ConfigMap, instance.Spec)
+	if err != nil {
+		return nrsv1alpha1.NamespacedName{}, schedulerName, err
 	}
+
 	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, instance.Spec.LogLevel); err != nil {
 		return deploymentNName, schedulerName, err
 	}

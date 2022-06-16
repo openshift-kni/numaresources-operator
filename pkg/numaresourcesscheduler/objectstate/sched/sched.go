@@ -19,11 +19,14 @@ package sched
 import (
 	"context"
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/klog/v2"
+	kubeschedulerconfigv1beta2 "k8s.io/kube-scheduler/config/v1beta2"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
@@ -186,11 +189,7 @@ func SchedulerNameFromObject(obj client.Object) (string, bool) {
 	return "", false
 }
 
-func UpdateSchedulerName(cm *corev1.ConfigMap, name string) error {
-	if name == "" {
-		return fmt.Errorf("not allow to set an empty name for scheduler in ConfigMap: %s/%s", cm.Namespace, cm.Name)
-	}
-
+func UpdateSchedulerConfig(cm *corev1.ConfigMap, spec nrsv1alpha1.NUMAResourcesSchedulerSpec) error {
 	if cm.Data == nil {
 		return fmt.Errorf("no data found in ConfigMap: %s/%s", cm.Namespace, cm.Name)
 	}
@@ -205,13 +204,18 @@ func UpdateSchedulerName(cm *corev1.ConfigMap, name string) error {
 		return err
 	}
 
-	for i, schedProf := range schedCfg.Profiles {
+	for idx := range schedCfg.Profiles {
+		cfgIdx := findTopologyMatchSchedulerProfileIndex(schedCfg.Profiles[idx])
+		if cfgIdx == -1 {
+			continue
+		}
+
 		// if we have a configuration for the NodeResourceTopologyMatch
 		// this is a valid profile
-		for _, plugin := range schedProf.PluginConfig {
-			if plugin.Name == SchedulerPluginName {
-				schedCfg.Profiles[i].SchedulerName = &name
-			}
+		schedProf := &schedCfg.Profiles[idx] // shortcut
+		err := updateSchedulerProfileFromSpec(schedProf, &schedProf.PluginConfig[cfgIdx], spec)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -222,7 +226,54 @@ func UpdateSchedulerName(cm *corev1.ConfigMap, name string) error {
 
 	cm.Data[SchedulerConfigFileName] = string(byteData)
 	return nil
+}
 
+func findTopologyMatchSchedulerProfileIndex(schedProf kubeschedulerconfigv1beta2.KubeSchedulerProfile) int {
+	for idx, plugin := range schedProf.PluginConfig {
+		if plugin.Name == SchedulerPluginName {
+			return idx
+		}
+	}
+	return -1
+}
+
+func updateSchedulerProfileFromSpec(schedProf *kubeschedulerconfigv1beta2.KubeSchedulerProfile, pluginConf *kubeschedulerconfigv1beta2.PluginConfig, spec nrsv1alpha1.NUMAResourcesSchedulerSpec) error {
+	if spec.SchedulerName != "" {
+		schedProf.SchedulerName = &spec.SchedulerName
+	}
+
+	if schedProf.Plugins == nil {
+		// should not happen
+		return fmt.Errorf("nil plugin configuration")
+	}
+
+	if spec.CacheReconcilePeriod != nil && *spec.CacheReconcilePeriod == 0 {
+		deconfigureNodeTopologyMatchPlugin(schedProf)
+		return nil
+	}
+	return configureNodeTopologyMatchPlugin(schedProf, pluginConf, spec.CacheReconcilePeriod)
+}
+
+func deconfigureNodeTopologyMatchPlugin(schedProf *kubeschedulerconfigv1beta2.KubeSchedulerProfile) {
+	var enabledReserve []kubeschedulerconfigv1beta2.Plugin
+	for _, plugin := range schedProf.Plugins.Reserve.Enabled {
+		if plugin.Name == SchedulerPluginName {
+			continue
+		}
+		enabledReserve = append(enabledReserve, plugin)
+	}
+	schedProf.Plugins.Reserve.Enabled = enabledReserve
+}
+
+func configureNodeTopologyMatchPlugin(schedProf *kubeschedulerconfigv1beta2.KubeSchedulerProfile, pluginConf *kubeschedulerconfigv1beta2.PluginConfig, period *time.Duration) error {
+	// the ordering does not matter here
+	schedProf.Plugins.Reserve.Enabled = append(schedProf.Plugins.Reserve.Enabled, kubeschedulerconfigv1beta2.Plugin{
+		Name: SchedulerPluginName,
+	})
+
+	// TODO: set the args
+
+	return nil
 }
 
 func newSchedConfigVolume(schedVolumeConfigName, configMapName string) corev1.Volume {

@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"time"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -35,6 +37,9 @@ type NUMAResourcesSchedulerSpec struct {
 	// +optional
 	// +kubebuilder:default=Normal
 	LogLevel operatorv1.LogLevel `json:"logLevel,omitempty"`
+	// Set the cache reconcile period. Use explicit 0 to disable.
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler cache setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:number"}
+	CacheReconcilePeriod *time.Duration `json:"cacheReconcilePeriod,omitEmpty"`
 }
 
 // NUMAResourcesSchedulerStatus defines the observed state of NUMAResourcesScheduler

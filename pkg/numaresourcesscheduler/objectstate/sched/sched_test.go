@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -275,7 +276,10 @@ func TestUpdateSchedulerName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := UpdateSchedulerName(&tc.configMap, tc.schedulerName); err != nil {
+			spec := nrsv1alpha1.NUMAResourcesSchedulerSpec{
+				SchedulerName: tc.schedulerName,
+			}
+			if err := UpdateSchedulerConfig(&tc.configMap, spec); err != nil {
 				if !tc.isErrExpected {
 					t.Errorf("test %q: failed with error: %v", tc.name, err)
 				}
@@ -289,4 +293,197 @@ func TestUpdateSchedulerName(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUpdateSchedulerCacheConfig(t *testing.T) {
+	type testCase struct {
+		name            string
+		reconcilePeriod *time.Duration
+		configMap       corev1.ConfigMap
+		expectedYAML    string
+	}
+
+	testCases := []testCase{
+		{
+			name:            "with-zero-reconcile-period",
+			reconcilePeriod: durationPtr(time.Duration(0)),
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"config.yaml": schedConfigOK,
+				},
+			},
+			expectedYAML: `apiVersion: kubescheduler.config.k8s.io/v1beta2
+clientConnection:
+  acceptContentTypes: ""
+  burst: 0
+  contentType: ""
+  kubeconfig: ""
+  qps: 0
+kind: KubeSchedulerConfiguration
+leaderElection:
+  leaderElect: false
+  leaseDuration: 0s
+  renewDeadline: 0s
+  resourceLock: ""
+  resourceName: ""
+  resourceNamespace: ""
+  retryPeriod: 0s
+profiles:
+- pluginConfig:
+  - args:
+      kubeconfigpath: ""
+    name: NodeResourceTopologyMatch
+  plugins:
+    bind: {}
+    filter:
+      enabled:
+      - name: NodeResourceTopologyMatch
+    multiPoint: {}
+    permit: {}
+    postBind: {}
+    postFilter: {}
+    preBind: {}
+    preFilter: {}
+    preScore: {}
+    queueSort: {}
+    reserve: {}
+    score:
+      enabled:
+      - name: NodeResourceTopologyMatch
+  schedulerName: test-topo-aware-sched
+`,
+		},
+		{
+			name: "with-nil-reconcile-period",
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"config.yaml": schedConfigOK,
+				},
+			},
+			expectedYAML: `apiVersion: kubescheduler.config.k8s.io/v1beta2
+clientConnection:
+  acceptContentTypes: ""
+  burst: 0
+  contentType: ""
+  kubeconfig: ""
+  qps: 0
+kind: KubeSchedulerConfiguration
+leaderElection:
+  leaderElect: false
+  leaseDuration: 0s
+  renewDeadline: 0s
+  resourceLock: ""
+  resourceName: ""
+  resourceNamespace: ""
+  retryPeriod: 0s
+profiles:
+- pluginConfig:
+  - args:
+      kubeconfigpath: ""
+    name: NodeResourceTopologyMatch
+  plugins:
+    bind: {}
+    filter:
+      enabled:
+      - name: NodeResourceTopologyMatch
+    multiPoint: {}
+    permit: {}
+    postBind: {}
+    postFilter: {}
+    preBind: {}
+    preFilter: {}
+    preScore: {}
+    queueSort: {}
+    reserve:
+      enabled:
+      - name: NodeResourceTopologyMatch
+    score:
+      enabled:
+      - name: NodeResourceTopologyMatch
+  schedulerName: test-topo-aware-sched
+`,
+		},
+		{
+			name:            "with-explicit-reconcile-period",
+			reconcilePeriod: durationPtr(time.Duration(2 * time.Minute)),
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"config.yaml": schedConfigOK,
+				},
+			},
+			expectedYAML: `apiVersion: kubescheduler.config.k8s.io/v1beta2
+clientConnection:
+  acceptContentTypes: ""
+  burst: 0
+  contentType: ""
+  kubeconfig: ""
+  qps: 0
+kind: KubeSchedulerConfiguration
+leaderElection:
+  leaderElect: false
+  leaseDuration: 0s
+  renewDeadline: 0s
+  resourceLock: ""
+  resourceName: ""
+  resourceNamespace: ""
+  retryPeriod: 0s
+profiles:
+- pluginConfig:
+  - args:
+      kubeconfigpath: ""
+    name: NodeResourceTopologyMatch
+  plugins:
+    bind: {}
+    filter:
+      enabled:
+      - name: NodeResourceTopologyMatch
+    multiPoint: {}
+    permit: {}
+    postBind: {}
+    postFilter: {}
+    preBind: {}
+    preFilter: {}
+    preScore: {}
+    queueSort: {}
+    reserve:
+      enabled:
+      - name: NodeResourceTopologyMatch
+    score:
+      enabled:
+      - name: NodeResourceTopologyMatch
+  schedulerName: test-topo-aware-sched
+`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := nrsv1alpha1.NUMAResourcesSchedulerSpec{
+				CacheReconcilePeriod: tc.reconcilePeriod,
+			}
+			if err := UpdateSchedulerConfig(&tc.configMap, spec); err != nil {
+				t.Errorf("test %q: failed with error: %v", tc.name, err)
+			}
+			gotYAML := tc.configMap.Data["config.yaml"]
+			if gotYAML != tc.expectedYAML {
+				t.Errorf("test %q: update config:\nexpected=%q\ngot=%q", tc.name, tc.expectedYAML, gotYAML)
+			}
+		})
+	}
+}
+
+func durationPtr(t time.Duration) *time.Duration {
+	return &t
 }
