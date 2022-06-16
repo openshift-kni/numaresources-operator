@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -38,6 +39,9 @@ import (
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	mcov1cli "github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/typed/machineconfiguration.openshift.io/v1"
 
+	nrtv1alpha1cli "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
+	"github.com/k8stopologyawareschedwg/podfingerprint"
+
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	nropv1alpha1cli "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
@@ -54,6 +58,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		initialized bool
 		nropcli     *nropv1alpha1cli.NumaresourcesoperatorV1alpha1Client
 		mcocli      *mcov1cli.MachineconfigurationV1Client
+		nrtcli      *nrtv1alpha1cli.Clientset
 	)
 
 	f := framework.NewDefaultFramework("rte")
@@ -68,6 +73,9 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		mcocli, err = mcov1cli.NewForConfig(f.ClientConfig())
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		nrtcli, err = nrtv1alpha1cli.NewForConfig(f.ClientConfig())
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		initialized = true
@@ -255,6 +263,19 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				return true
 			}, time.Minute*5, time.Second*30).Should(gomega.BeTrue())
 		})
+	})
+
+	ginkgo.It("[rte][podfingerprint] should expose the pod set fingerprint in NRT objects", func() {
+		nrtList, err := nrtcli.TopologyV1alpha1().NodeResourceTopologies().List(context.TODO(), metav1.ListOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		for _, nrt := range nrtList.Items {
+			pfp, ok := nrt.Annotations[podfingerprint.Annotation]
+			gomega.Expect(ok).To(gomega.BeTrue(), "missing podfingerprint annotation %q from NRT %q", podfingerprint.Annotation, nrt.Name)
+
+			seemsValid := strings.HasPrefix(pfp, podfingerprint.Prefix)
+			gomega.Expect(seemsValid).To(gomega.BeTrue(), "malformed podfingerprint %q from NRT %q", pfp, nrt.Name)
+		}
 	})
 })
 
