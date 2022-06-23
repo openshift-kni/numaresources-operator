@@ -446,9 +446,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("running the test pod")
-			if data, err := yaml.Marshal(pod); err != nil {
-				klog.Infof("Pod:\n%s", data)
-			}
+			data, err := yaml.Marshal(pod)
+			Expect(err).ToNot(HaveOccurred())
+			klog.Infof("Pod:\n%s", data)
 
 			By("running the test pod")
 			err = fxt.Client.Create(context.TODO(), pod)

@@ -233,6 +233,7 @@ func checkConsumedResourcesAtLeast(resourcesInitial, resourcesUpdated []nrtv1alp
 		expectedQty.Sub(resQty)
 		ret := updatedQty.Cmp(expectedQty)
 		if ret > 0 {
+			klog.Infof("quantity for resource %q is greater than expected. expected=%s actual=%s", resName, expectedQty.String(), updatedQty.String())
 			return false, nil
 		}
 	}
