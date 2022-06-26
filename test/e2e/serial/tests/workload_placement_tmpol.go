@@ -19,6 +19,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -50,6 +51,11 @@ type paddingInfo struct {
 	targetFreeResPerNUMA []corev1.ResourceList
 	unsuitableNodeNames  []string
 	unsuitableFreeRes    []corev1.ResourceList
+}
+
+type podResourcesRequest struct {
+	initCnt []corev1.ResourceList
+	appCnt  []corev1.ResourceList
 }
 
 type setupPaddingFunc func(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod
@@ -362,9 +368,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	})
 
 	DescribeTable("[placement] cluster with multiple worker nodes suitable",
-		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, checkConsumedRes checkConsumedResFunc, podRes, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
+		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, checkConsumedRes checkConsumedResFunc, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
 
 			hostsRequired := 2
+			sleepTimeoutInSec := "5"
 
 			nrts := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, tmPolicy)
 			if len(nrts) < hostsRequired {
@@ -379,12 +386,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				serialconfig.MultiNUMALabel: "2",
 			}
 			pod.Spec.Containers[0].Name = "testcnt-0"
-			pod.Spec.Containers[0].Resources.Limits = podRes[0]
-			for i := 1; i < len(podRes); i++ {
+			pod.Spec.Containers[0].Resources.Limits = podRes.appCnt[0]
+			for i := 1; i < len(podRes.appCnt); i++ {
 				pod.Spec.Containers = append(pod.Spec.Containers, pod.Spec.Containers[0])
 				pod.Spec.Containers[i].Name = fmt.Sprintf("testcnt-%d", i)
-				pod.Spec.Containers[i].Resources.Limits = podRes[i]
+				pod.Spec.Containers[i].Resources.Limits = podRes.appCnt[i]
 			}
+			// we expect init containers to be required less often than app containers, so we delegate that
+			makeInitTestContainers(pod, podRes.initCnt, sleepTimeoutInSec)
 
 			requiredRes := e2ereslist.FromGuaranteedPod(*pod)
 
@@ -410,11 +419,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By(fmt.Sprintf("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames))
 
 			// make targetFreeResPerNUMA the complement of the test pod's resources
-			// IOW targetFreeResPerNUMA + baseload + podRes equals to all node's allocatable resources
+			// IOW targetFreeResPerNUMA + baseload + podResourcesRequest equals to all node's allocatable resources
 			if len(targetFreeResPerNUMA) == 0 {
-				for i := 0; i < len(podRes); i++ {
+				for i := 0; i < len(podRes.appCnt); i++ {
 					// appending a copy so mutating one object won't implicitly change the other
-					targetFreeResPerNUMA = append(targetFreeResPerNUMA, podRes[i].DeepCopy())
+					targetFreeResPerNUMA = append(targetFreeResPerNUMA, podRes.appCnt[i].DeepCopy())
 				}
 			}
 			padInfo := paddingInfo{
@@ -517,14 +526,16 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
 			e2enrt.CheckNodeConsumedResourcesAtLeast,
-			[]corev1.ResourceList{
-				{
-					corev1.ResourceCPU:    resource.MustParse("6"),
-					corev1.ResourceMemory: resource.MustParse("6Gi"),
-				},
-				{
-					corev1.ResourceCPU:    resource.MustParse("12"),
-					corev1.ResourceMemory: resource.MustParse("8Gi"),
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("6"),
+						corev1.ResourceMemory: resource.MustParse("6Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("12"),
+						corev1.ResourceMemory: resource.MustParse("8Gi"),
+					},
 				},
 			},
 			// make sure the sum is equal to the sum of the requirement of the test pod,
@@ -546,14 +557,16 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtv1alpha1.SingleNUMANodePodLevel,
 			setupPaddingPodLevel,
 			e2enrt.CheckZoneConsumedResourcesAtLeast,
-			[]corev1.ResourceList{
-				{
-					corev1.ResourceCPU:    resource.MustParse("6"),
-					corev1.ResourceMemory: resource.MustParse("4Gi"),
-				},
-				{
-					corev1.ResourceCPU:    resource.MustParse("8"),
-					corev1.ResourceMemory: resource.MustParse("12Gi"),
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("6"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("8"),
+						corev1.ResourceMemory: resource.MustParse("12Gi"),
+					},
 				},
 			},
 			[]corev1.ResourceList{
@@ -571,16 +584,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
 			e2enrt.CheckNodeConsumedResourcesAtLeast,
-			[]corev1.ResourceList{
-				{
-					corev1.ResourceCPU:                   resource.MustParse("6"),
-					corev1.ResourceMemory:                resource.MustParse("6Gi"),
-					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("96Mi"),
-				},
-				{
-					corev1.ResourceCPU:                   resource.MustParse("12"),
-					corev1.ResourceMemory:                resource.MustParse("8Gi"),
-					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("128Mi"),
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:                   resource.MustParse("6"),
+						corev1.ResourceMemory:                resource.MustParse("6Gi"),
+						corev1.ResourceName("hugepages-2Mi"): resource.MustParse("96Mi"),
+					},
+					{
+						corev1.ResourceCPU:                   resource.MustParse("12"),
+						corev1.ResourceMemory:                resource.MustParse("8Gi"),
+						corev1.ResourceName("hugepages-2Mi"): resource.MustParse("128Mi"),
+					},
 				},
 			},
 			// make sure the sum is equal to the sum of the requirement of the test pod,
@@ -603,16 +618,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtv1alpha1.SingleNUMANodePodLevel,
 			setupPaddingPodLevel,
 			e2enrt.CheckZoneConsumedResourcesAtLeast,
-			[]corev1.ResourceList{
-				{
-					corev1.ResourceCPU:                   resource.MustParse("6"),
-					corev1.ResourceMemory:                resource.MustParse("4Gi"),
-					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("32Mi"),
-				},
-				{
-					corev1.ResourceCPU:                   resource.MustParse("8"),
-					corev1.ResourceMemory:                resource.MustParse("12Gi"),
-					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("128Mi"),
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:                   resource.MustParse("6"),
+						corev1.ResourceMemory:                resource.MustParse("4Gi"),
+						corev1.ResourceName("hugepages-2Mi"): resource.MustParse("32Mi"),
+					},
+					{
+						corev1.ResourceCPU:                   resource.MustParse("8"),
+						corev1.ResourceMemory:                resource.MustParse("12Gi"),
+						corev1.ResourceName("hugepages-2Mi"): resource.MustParse("128Mi"),
+					},
 				},
 			},
 			[]corev1.ResourceList{
@@ -762,4 +779,19 @@ func setupPaddingForUnsuitableNodes(offset int, fxt *e2efixture.Fixture, nrtList
 	}
 
 	return paddingPods
+}
+
+func makeInitTestContainers(pod *corev1.Pod, initCnt []corev1.ResourceList, timeout string) *corev1.Pod {
+	for i := 0; i < len(initCnt); i++ {
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
+			Name:  fmt.Sprintf("inittestcnt-%d", i),
+			Image: images.SchedTestImageCI,
+			Command: []string{"/bin/sleep"},
+			Args: []string{timeout},
+			Resources: corev1.ResourceRequirements{
+				Limits:  initCnt[i],
+			},
+		})
+	}
+	return pod
 }
