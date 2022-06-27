@@ -37,6 +37,7 @@ import (
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
@@ -45,13 +46,20 @@ import (
 )
 
 type paddingInfo struct {
-	pod                 *corev1.Pod
-	targetNodeName      string
-	unsuitableNodeNames []string
-	unsuitableFreeRes   []corev1.ResourceList
+	pod                  *corev1.Pod
+	targetNodeName       string
+	targetFreeResPerNUMA []corev1.ResourceList
+	unsuitableNodeNames  []string
+	unsuitableFreeRes    []corev1.ResourceList
+}
+
+type podResourcesRequest struct {
+	initCnt []corev1.ResourceList
+	appCnt  []corev1.ResourceList
 }
 
 type setupPaddingFunc func(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod
+type checkConsumedResFunc func(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourceTopology, required corev1.ResourceList) (string, error)
 
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering TM policy", func() {
 	var fxt *e2efixture.Fixture
@@ -360,9 +368,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	})
 
 	DescribeTable("[placement] cluster with multiple worker nodes suitable",
-		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, podRes, unsuitableFreeRes []corev1.ResourceList) {
+		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, checkConsumedRes checkConsumedResFunc, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
 
 			hostsRequired := 2
+			sleepTimeoutInSec := "5"
 
 			nrts := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, tmPolicy)
 			if len(nrts) < hostsRequired {
@@ -376,11 +385,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			pod.Spec.NodeSelector = map[string]string{
 				serialconfig.MultiNUMALabel: "2",
 			}
-			pod.Spec.Containers = append(pod.Spec.Containers, pod.Spec.Containers[0])
 			pod.Spec.Containers[0].Name = "testcnt-0"
-			pod.Spec.Containers[0].Resources.Limits = podRes[0]
-			pod.Spec.Containers[1].Name = "testcnt-1"
-			pod.Spec.Containers[1].Resources.Limits = podRes[1]
+			pod.Spec.Containers[0].Resources.Limits = podRes.appCnt[0]
+			for i := 1; i < len(podRes.appCnt); i++ {
+				pod.Spec.Containers = append(pod.Spec.Containers, pod.Spec.Containers[0])
+				pod.Spec.Containers[i].Name = fmt.Sprintf("testcnt-%d", i)
+				pod.Spec.Containers[i].Resources.Limits = podRes.appCnt[i]
+			}
+			// we expect init containers to be required less often than app containers, so we delegate that
+			makeInitTestContainers(pod, podRes.initCnt, sleepTimeoutInSec)
 
 			requiredRes := e2ereslist.FromGuaranteedPod(*pod)
 
@@ -405,11 +418,20 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			By(fmt.Sprintf("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames))
 
+			// make targetFreeResPerNUMA the complement of the test pod's resources
+			// IOW targetFreeResPerNUMA + baseload + podResourcesRequest equals to all node's allocatable resources
+			if len(targetFreeResPerNUMA) == 0 {
+				for i := 0; i < len(podRes.appCnt); i++ {
+					// appending a copy so mutating one object won't implicitly change the other
+					targetFreeResPerNUMA = append(targetFreeResPerNUMA, podRes.appCnt[i].DeepCopy())
+				}
+			}
 			padInfo := paddingInfo{
-				pod:                 pod,
-				targetNodeName:      targetNodeName,
-				unsuitableNodeNames: unsuitableNodeNames,
-				unsuitableFreeRes:   unsuitableFreeRes,
+				pod:                  pod,
+				targetNodeName:       targetNodeName,
+				targetFreeResPerNUMA: targetFreeResPerNUMA,
+				unsuitableNodeNames:  unsuitableNodeNames,
+				unsuitableFreeRes:    unsuitableFreeRes,
 			}
 
 			By("Padding nodes to create the test workload scenario")
@@ -433,9 +455,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("running the test pod")
-			if data, err := yaml.Marshal(pod); err != nil {
-				klog.Infof("Pod:\n%s", data)
-			}
+			data, err := yaml.Marshal(pod)
+			Expect(err).ToNot(HaveOccurred())
+			klog.Infof("Pod:\n%s", data)
 
 			By("running the test pod")
 			err = fxt.Client.Create(context.TODO(), pod)
@@ -471,8 +493,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err := yaml.Marshal(nrtPostCreate)
 			Expect(err).ToNot(HaveOccurred())
-
-			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, requiredRes)
+			match, err := checkConsumedRes(*nrtInitial, *nrtPostCreate, requiredRes)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 
@@ -504,14 +525,17 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Entry("[test_id:47575][tmscope:cnt][tier1] should make a pod with two gu cnt land on a node with enough resources on a specific NUMA zone, each cnt on a different zone",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
-			[]corev1.ResourceList{
-				{
-					corev1.ResourceCPU:    resource.MustParse("6"),
-					corev1.ResourceMemory: resource.MustParse("6Gi"),
-				},
-				{
-					corev1.ResourceCPU:    resource.MustParse("12"),
-					corev1.ResourceMemory: resource.MustParse("8Gi"),
+			e2enrt.CheckNodeConsumedResourcesAtLeast,
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("6"),
+						corev1.ResourceMemory: resource.MustParse("6Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("12"),
+						corev1.ResourceMemory: resource.MustParse("8Gi"),
+					},
 				},
 			},
 			// make sure the sum is equal to the sum of the requirement of the test pod,
@@ -527,18 +551,22 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceMemory: resource.MustParse("12Gi"),
 				},
 			},
+			[]corev1.ResourceList{},
 		),
 		Entry("[test_id:47577][tmscope:pod][tier1] should make a pod with two gu cnt land on a node with enough resources on a specific NUMA zone, all cnt on the same zone",
 			nrtv1alpha1.SingleNUMANodePodLevel,
 			setupPaddingPodLevel,
-			[]corev1.ResourceList{
-				{
-					corev1.ResourceCPU:    resource.MustParse("6"),
-					corev1.ResourceMemory: resource.MustParse("4Gi"),
-				},
-				{
-					corev1.ResourceCPU:    resource.MustParse("8"),
-					corev1.ResourceMemory: resource.MustParse("12Gi"),
+			e2enrt.CheckZoneConsumedResourcesAtLeast,
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("6"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("8"),
+						corev1.ResourceMemory: resource.MustParse("12Gi"),
+					},
 				},
 			},
 			[]corev1.ResourceList{
@@ -555,16 +583,19 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Entry("[test_id:50183][tmscope:cnt][hugepages] should make a pod with two gu cnt land on a node with enough resources with hugepages on a specific NUMA zone, each cnt on a different zone",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
-			[]corev1.ResourceList{
-				{
-					corev1.ResourceCPU:                   resource.MustParse("6"),
-					corev1.ResourceMemory:                resource.MustParse("6Gi"),
-					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("96Mi"),
-				},
-				{
-					corev1.ResourceCPU:                   resource.MustParse("12"),
-					corev1.ResourceMemory:                resource.MustParse("8Gi"),
-					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("128Mi"),
+			e2enrt.CheckNodeConsumedResourcesAtLeast,
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:                   resource.MustParse("6"),
+						corev1.ResourceMemory:                resource.MustParse("6Gi"),
+						corev1.ResourceName("hugepages-2Mi"): resource.MustParse("96Mi"),
+					},
+					{
+						corev1.ResourceCPU:                   resource.MustParse("12"),
+						corev1.ResourceMemory:                resource.MustParse("8Gi"),
+						corev1.ResourceName("hugepages-2Mi"): resource.MustParse("128Mi"),
+					},
 				},
 			},
 			// make sure the sum is equal to the sum of the requirement of the test pod,
@@ -581,20 +612,24 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("192Mi"),
 				},
 			},
+			[]corev1.ResourceList{},
 		),
 		Entry("[test_id:50184][tmscope:pod][hugepages] should make a pod with two gu cnt land on a node with enough resources with hugepages on a specific NUMA zone, all cnt on the same zone",
 			nrtv1alpha1.SingleNUMANodePodLevel,
 			setupPaddingPodLevel,
-			[]corev1.ResourceList{
-				{
-					corev1.ResourceCPU:                   resource.MustParse("6"),
-					corev1.ResourceMemory:                resource.MustParse("4Gi"),
-					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("32Mi"),
-				},
-				{
-					corev1.ResourceCPU:                   resource.MustParse("8"),
-					corev1.ResourceMemory:                resource.MustParse("12Gi"),
-					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("128Mi"),
+			e2enrt.CheckZoneConsumedResourcesAtLeast,
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:                   resource.MustParse("6"),
+						corev1.ResourceMemory:                resource.MustParse("4Gi"),
+						corev1.ResourceName("hugepages-2Mi"): resource.MustParse("32Mi"),
+					},
+					{
+						corev1.ResourceCPU:                   resource.MustParse("8"),
+						corev1.ResourceMemory:                resource.MustParse("12Gi"),
+						corev1.ResourceName("hugepages-2Mi"): resource.MustParse("128Mi"),
+					},
 				},
 			},
 			[]corev1.ResourceList{
@@ -607,6 +642,162 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceCPU:                   resource.MustParse("10"),
 					corev1.ResourceMemory:                resource.MustParse("16Gi"),
 					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("144Mi"),
+				},
+			},
+			[]corev1.ResourceList{},
+		),
+		Entry("[tier1][testtype4][tmscope:container] should make a pod with three gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			nrtv1alpha1.SingleNUMANodeContainerLevel,
+			setupPaddingContainerLevel,
+			e2enrt.CheckNodeConsumedResourcesAtLeast,
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("8"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("12"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+			},
+		),
+		Entry("[tier1][testtype11][tmscope:container] should make a pod with one init cnt and three gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			nrtv1alpha1.SingleNUMANodeContainerLevel,
+			setupPaddingContainerLevel,
+			e2enrt.CheckNodeConsumedResourcesAtLeast,
+			podResourcesRequest{
+				initCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("2"),
+						corev1.ResourceMemory: resource.MustParse("2Gi"),
+					},
+				},
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("8"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("12"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+			},
+		),
+		Entry("[tier1][testtype29][tmscope:container] should make a pod with 3 gu cnt and 3 init cnt land on a node with enough resources, when sum of init and app cnt resources are more than node resources",
+			nrtv1alpha1.SingleNUMANodeContainerLevel,
+			setupPaddingContainerLevel,
+			e2enrt.CheckNodeConsumedResourcesAtLeast,
+			podResourcesRequest{
+				initCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("8"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("8"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("8"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				},
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("8"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("12"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
 				},
 			},
 		),
@@ -678,20 +869,21 @@ func setupPaddingContainerLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.Nod
 	nrtInfo, err := e2enrt.FindFromList(nrtList.Items, padInfo.targetNodeName)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing NRT info for %q", padInfo.targetNodeName)
 
-	// if we get this far we can now depend on the fact that len(nrt.Zones) == len(pod.Spec.Containers) == 2
+	// if we get this far we can now depend on the fact that len(nrt.Zones) == len(padInfo.targetFreeResPerNUMA) == 2
 
-	numCnts := len(padInfo.pod.Spec.Containers)
+	numCnts := len(padInfo.targetFreeResPerNUMA)
 	paddingPods := []*corev1.Pod{}
 
 	for idx := 0; idx < numCnts; idx++ {
 		numaIdx := idx % 2
 		zone := nrtInfo.Zones[numaIdx]
-		cnt := padInfo.pod.Spec.Containers[idx] // TODO: reverse
+		numaRes := padInfo.targetFreeResPerNUMA[idx]
+		if idx == 0 { // any random zone is actually fine
+			baseload.Apply(numaRes)
+		}
 
-		// TODO: apply baseload
-
-		By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(cnt.Resources.Limits)))
-		padPod, err := makePaddingPod(fxt.Namespace.Name, "target", zone, cnt.Resources.Limits)
+		By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(numaRes)))
+		padPod, err := makePaddingPod(fxt.Namespace.Name, "target", zone, numaRes)
 		ExpectWithOffset(1, err).ToNot(HaveOccurred())
 
 		padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
@@ -741,4 +933,19 @@ func setupPaddingForUnsuitableNodes(offset int, fxt *e2efixture.Fixture, nrtList
 	}
 
 	return paddingPods
+}
+
+func makeInitTestContainers(pod *corev1.Pod, initCnt []corev1.ResourceList, timeout string) *corev1.Pod {
+	for i := 0; i < len(initCnt); i++ {
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
+			Name:    fmt.Sprintf("inittestcnt-%d", i),
+			Image:   images.SchedTestImageCI,
+			Command: []string{"/bin/sleep"},
+			Args:    []string{timeout},
+			Resources: corev1.ResourceRequirements{
+				Limits: initCnt[i],
+			},
+		})
+	}
+	return pod
 }

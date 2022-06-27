@@ -107,6 +107,53 @@ func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeRe
 	return "", nil
 }
 
+func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourceTopology, required corev1.ResourceList) (string, error) {
+	nodeResInitialInfo, err := accumulateNodeAvailableResources(nrtInitial)
+	if err != nil {
+		return "", err
+	}
+	nodeResUpdatedInfo, err := accumulateNodeAvailableResources(nrtUpdated)
+	if err != nil {
+		return "", err
+	}
+	ok, err := checkConsumedResourcesAtLeast(nodeResInitialInfo, nodeResUpdatedInfo, required)
+	if err != nil {
+		klog.Errorf("error checking node %q: %v", nrtInitial.Name, err)
+		return "", err
+	}
+	if ok {
+		klog.Infof("match for node %q", nrtInitial.Name)
+		return nrtInitial.Name, nil
+	}
+	return "", nil
+}
+
+func accumulateNodeAvailableResources(nrt nrtv1alpha1.NodeResourceTopology) ([]nrtv1alpha1.ResourceInfo, error) {
+	resList := make(corev1.ResourceList, 2)
+	for _, zone := range nrt.Zones {
+		for _, res := range zone.Resources {
+			if q, ok := resList[corev1.ResourceName(res.Name)]; ok {
+				q.Add(res.Available)
+				resList[corev1.ResourceName(res.Name)] = q
+			} else {
+				resList[corev1.ResourceName(res.Name)] = res.Available
+			}
+		}
+	}
+	var resInfoList []nrtv1alpha1.ResourceInfo
+	for r, q := range resList {
+		resInfo := nrtv1alpha1.ResourceInfo{
+			Name:      string(r),
+			Available: q,
+		}
+		resInfoList = append(resInfoList, resInfo)
+	}
+	if len(resInfoList) < 1 {
+		return resInfoList, fmt.Errorf("failed to accumulate resources for node %q", nrt.Name)
+	}
+	klog.Infof("resInfoList=%v", resInfoList)
+	return resInfoList, nil
+}
 func SaturateZoneUntilLeft(zone nrtv1alpha1.Zone, requiredRes corev1.ResourceList) (corev1.ResourceList, error) {
 	paddingRes := make(corev1.ResourceList)
 	for resName, resQty := range requiredRes {
@@ -186,6 +233,7 @@ func checkConsumedResourcesAtLeast(resourcesInitial, resourcesUpdated []nrtv1alp
 		expectedQty.Sub(resQty)
 		ret := updatedQty.Cmp(expectedQty)
 		if ret > 0 {
+			klog.Infof("quantity for resource %q is greater than expected. expected=%s actual=%s", resName, expectedQty.String(), updatedQty.String())
 			return false, nil
 		}
 	}
