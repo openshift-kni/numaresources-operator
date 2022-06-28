@@ -579,6 +579,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceMemory: resource.MustParse("16Gi"),
 				},
 			},
+			[]corev1.ResourceList{},
 		),
 		Entry("[test_id:50183][tmscope:cnt][hugepages] should make a pod with two gu cnt land on a node with enough resources with hugepages on a specific NUMA zone, each cnt on a different zone",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
