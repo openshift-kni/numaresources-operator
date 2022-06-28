@@ -94,13 +94,19 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 		var nrtListInitial nrtv1alpha1.NodeResourceTopologyList
 
 		BeforeEach(func() {
+			neededNodes := 1
+
 			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
-
-			neededNodes := 1
 			if len(nrtCandidates) < neededNodes {
 				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes))
+			}
+
+			tmPolicy := nrtv1alpha1.SingleNUMANodePodLevel
+			nrtCandidates = e2enrt.FilterTopologyManagerPolicy(nrtCandidates, tmPolicy)
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrtCandidates)))
 			}
 
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
@@ -261,6 +267,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 		})
 	})
+
 	Context("with at least two nodes with two numa zones and enough resources in one numa zone", func() {
 		It("[test_id:47592][tier2][unsched] a daemonset with a guaranteed pod resources available on one node/one single numa zone but not in any other node", func() {
 			requiredNUMAZones := 2
@@ -270,6 +277,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			neededNodes := 2
 			if len(nrtCandidates) < neededNodes {
 				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes))
+			}
+
+			tmPolicy := nrtv1alpha1.SingleNUMANodePodLevel
+			nrtCandidates = e2enrt.FilterTopologyManagerPolicy(nrtCandidates, tmPolicy)
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrtCandidates)))
 			}
 
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
