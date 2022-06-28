@@ -33,6 +33,7 @@ import (
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
+	e2enrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 )
 
@@ -108,11 +109,11 @@ func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeRe
 }
 
 func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourceTopology, required corev1.ResourceList) (string, error) {
-	nodeResInitialInfo, err := accumulateNodeAvailableResources(nrtInitial)
+	nodeResInitialInfo, err := accumulateNodeAvailableResources(nrtInitial, "initial")
 	if err != nil {
 		return "", err
 	}
-	nodeResUpdatedInfo, err := accumulateNodeAvailableResources(nrtUpdated)
+	nodeResUpdatedInfo, err := accumulateNodeAvailableResources(nrtUpdated, "updated")
 	if err != nil {
 		return "", err
 	}
@@ -128,7 +129,7 @@ func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeRe
 	return "", nil
 }
 
-func accumulateNodeAvailableResources(nrt nrtv1alpha1.NodeResourceTopology) ([]nrtv1alpha1.ResourceInfo, error) {
+func accumulateNodeAvailableResources(nrt nrtv1alpha1.NodeResourceTopology, reason string) ([]nrtv1alpha1.ResourceInfo, error) {
 	resList := make(corev1.ResourceList, 2)
 	for _, zone := range nrt.Zones {
 		for _, res := range zone.Resources {
@@ -151,7 +152,7 @@ func accumulateNodeAvailableResources(nrt nrtv1alpha1.NodeResourceTopology) ([]n
 	if len(resInfoList) < 1 {
 		return resInfoList, fmt.Errorf("failed to accumulate resources for node %q", nrt.Name)
 	}
-	klog.Infof("resInfoList=%v", resInfoList)
+	klog.Infof("resInfoList %s: %s", reason, e2enrt.ListToString(resInfoList))
 	return resInfoList, nil
 }
 func SaturateZoneUntilLeft(zone nrtv1alpha1.Zone, requiredRes corev1.ResourceList) (corev1.ResourceList, error) {
@@ -212,7 +213,7 @@ func checkEqualResourcesInfo(nodeName, zoneName string, resourcesInitial, resour
 			return false, res.Name, fmt.Errorf("resource %q not found in the updated set", res.Name)
 		}
 		if initialQty.Cmp(updatedQty) != 0 {
-			klog.Infof("node %q zone %q resource %q initial=%v updated=%v", nodeName, zoneName, res.Name, initialQty, updatedQty)
+			klog.Infof("node %q zone %q resource %q initial=%s updated=%s", nodeName, zoneName, res.Name, initialQty.String(), updatedQty.String())
 			return false, res.Name, nil
 		}
 	}
