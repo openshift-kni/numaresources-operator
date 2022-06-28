@@ -43,9 +43,13 @@ func ToString(res corev1.ResourceList) string {
 }
 
 func FromGuaranteedPod(pod corev1.Pod) corev1.ResourceList {
+	return FromContainers(pod.Spec.Containers)
+}
+
+func FromContainers(containers []corev1.Container) corev1.ResourceList {
 	res := make(corev1.ResourceList)
-	for idx := 0; idx < len(pod.Spec.Containers); idx++ {
-		cnt := &pod.Spec.Containers[idx] // shortcut
+	for idx := 0; idx < len(containers); idx++ {
+		cnt := &containers[idx] // shortcut
 		for resName, resQty := range cnt.Resources.Limits {
 			qty := res[resName]
 			qty.Add(resQty)

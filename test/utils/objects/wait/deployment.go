@@ -27,10 +27,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ForDeploymentComplete(cli client.Client, dp *appsv1.Deployment, pollInterval, pollTimeout time.Duration) error {
-	return wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		updatedDp := &appsv1.Deployment{}
-		key := ObjectKeyFromObject(dp)
+func ForDeploymentComplete(cli client.Client, dp *appsv1.Deployment, pollInterval, pollTimeout time.Duration) (*appsv1.Deployment, error) {
+	key := ObjectKeyFromObject(dp)
+	updatedDp := &appsv1.Deployment{}
+	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
 		err := cli.Get(context.TODO(), key.AsKey(), updatedDp)
 		if err != nil {
 			klog.Warningf("failed to get the deployment %s: %v", key.String(), err)
@@ -45,6 +45,7 @@ func ForDeploymentComplete(cli client.Client, dp *appsv1.Deployment, pollInterva
 		klog.Infof("deployment %s complete", key.String())
 		return true, nil
 	})
+	return updatedDp, err
 }
 
 func AreDeploymentReplicasAvailable(newStatus *appsv1.DeploymentStatus, replicas int32) bool {
