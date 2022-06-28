@@ -287,7 +287,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				By("waiting for deployment to be up & running")
 				dpRunningTimeout := 1 * time.Minute
 				dpRunningPollInterval := 10 * time.Second
-				err = e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
+				_, err = e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
 				Expect(err).NotTo(HaveOccurred(), "Deployment %q not up & running after %v", deployment.Name, dpRunningTimeout)
 
 				By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))

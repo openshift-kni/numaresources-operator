@@ -190,14 +190,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
+			updatedDp, err := e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-
-			updatedDp := &appsv1.Deployment{}
-			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 
 			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *updatedDp)
@@ -249,7 +245,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
+			updatedDp, err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedDpName := fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
@@ -341,10 +337,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Update(context.TODO(), updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
+			updatedDp, err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedDpName = fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
