@@ -335,7 +335,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	}
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, mcps, r.Namespace)
-	for _, objState := range existing.State(r.RTEManifests) {
+	for _, objState := range existing.State(r.RTEManifests, daemonsetUpdater) {
 		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
 			return nil, errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
@@ -349,6 +349,19 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		}
 	}
 	return daemonSetsNName, nil
+}
+
+func daemonsetUpdater(gdm *rtestate.GeneratedDesiredManifest) error {
+	// on kubernetes we can just mount the kubeletconfig (no SCC/Selinux),
+	// so handling the kubeletconfig configmap is not needed at all.
+	// We cannot do this at GetManifests time because we need to mount
+	// a specific configmap for each daemonset, whose nome we know only
+	// when we instantiate the daemonset from the MCP.
+	if gdm.ClusterPlatform != platform.OpenShift {
+		// nothing to do!
+		return nil
+	}
+	return rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
 }
 
 func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []error {
