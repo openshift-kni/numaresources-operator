@@ -36,9 +36,6 @@ const (
 func MachineConfigPoolDuplicates(mcps []*machineconfigv1.MachineConfigPool) error {
 	duplicates := map[string]int{}
 	for _, mcp := range mcps {
-		if _, ok := duplicates[mcp.Name]; !ok {
-			duplicates[mcp.Name] = 0
-		}
 		duplicates[mcp.Name] += 1
 	}
 
