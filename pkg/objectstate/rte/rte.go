@@ -61,16 +61,21 @@ type ExistingManifests struct {
 	roleBindingError        error
 	clusterRoleError        error
 	clusterRoleBindingError error
+	// internal helpers
+	plat      platform.Platform
+	instance  *nropv1alpha1.NUMAResourcesOperator
+	mcps      []*machineconfigv1.MachineConfigPool
+	namespace string
 }
 
-func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []objectstate.ObjectState {
+func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) []objectstate.ObjectState {
 	var ret []objectstate.ObjectState
-		if mf.MachineConfig == nil {
-			return ret
-		}
+	if mf.MachineConfig == nil {
+		return ret
+	}
 
-	for _, mcp := range mcps {
-		mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
+	for _, mcp := range em.mcps {
+		mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
 		if mcp.Spec.MachineConfigSelector == nil {
 			klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
 			continue
@@ -116,7 +121,7 @@ func GetMachineConfigLabel(mcp *machineconfigv1.MachineConfigPool) map[string]st
 	return labels
 }
 
-func (em *ExistingManifests) State(mf rtemanifests.Manifests, plat platform.Platform, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []objectstate.ObjectState {
+func (em *ExistingManifests) State(mf rtemanifests.Manifests) []objectstate.ObjectState {
 	ret := []objectstate.ObjectState{
 		// service account
 		{
@@ -170,13 +175,13 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, plat platform.Plat
 		})
 	}
 
-	for _, mcp := range mcps {
+	for _, mcp := range em.mcps {
 		if mcp.Spec.NodeSelector == nil {
 			klog.Warningf("the machine config pool %q does not have node selector", mcp.Name)
 			continue
 		}
 
-		generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
+		generatedName := objectnames.GetComponentName(em.instance.Name, mcp.Name)
 		desiredDaemonSet := mf.DaemonSet.DeepCopy()
 		desiredDaemonSet.Name = generatedName
 		desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
@@ -186,7 +191,7 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, plat platform.Plat
 		// We cannot do this at GetManifests time because we need to mount
 		// a specific configmap for each daemonset, whose nome we know only
 		// when we instantiate the daemonset from the MCP.
-		if plat == platform.OpenShift {
+		if em.plat == platform.OpenShift {
 			// TODO: actually check for the right container, don't just use "0"
 			manifests.UpdateResourceTopologyExporterContainerConfig(
 				&desiredDaemonSet.Spec.Template.Spec,
@@ -214,17 +219,13 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, plat platform.Plat
 	return ret
 }
 
-func FromClient(
-	ctx context.Context,
-	cli client.Client,
-	plat platform.Platform,
-	mf rtemanifests.Manifests,
-	instance *nropv1alpha1.NUMAResourcesOperator,
-	mcps []*machineconfigv1.MachineConfigPool,
-	namespace string,
-) ExistingManifests {
+func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool, namespace string) ExistingManifests {
 	ret := ExistingManifests{
-		existing: rtemanifests.New(plat),
+		existing:  rtemanifests.New(plat),
+		plat:      plat,
+		instance:  instance,
+		mcps:      mcps,
+		namespace: namespace,
 	}
 
 	// objects that should present in the single replica
