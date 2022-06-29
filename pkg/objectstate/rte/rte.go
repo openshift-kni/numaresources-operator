@@ -271,17 +271,12 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 			Name:      generatedName,
 			Namespace: namespace,
 		}
-
 		ds := &appsv1.DaemonSet{}
-		if err := cli.Get(ctx, key, ds); err == nil {
-			ret.daemonSets[generatedName] = daemonSetManifest{
-				daemonSet: ds,
-			}
-		} else {
-			ret.daemonSets[generatedName] = daemonSetManifest{
-				daemonSetError: err,
-			}
+		dsm := daemonSetManifest{}
+		if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
+			dsm.daemonSet = ds
 		}
+		ret.daemonSets[generatedName] = dsm
 
 		if plat == platform.OpenShift {
 			mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
@@ -289,15 +284,11 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 				Name: mcName,
 			}
 			mc := &machineconfigv1.MachineConfig{}
-			if err := cli.Get(ctx, key, mc); err == nil {
-				ret.machineConfigs[mcName] = machineConfigManifest{
-					machineConfig: mc,
-				}
-			} else {
-				ret.machineConfigs[mcName] = machineConfigManifest{
-					machineConfigError: err,
-				}
+			mcm := machineConfigManifest{}
+			if mcm.machineConfigError = cli.Get(ctx, key, mc); mcm.machineConfigError == nil {
+				mcm.machineConfig = mc
 			}
+			ret.machineConfigs[mcName] = mcm
 		}
 	}
 
