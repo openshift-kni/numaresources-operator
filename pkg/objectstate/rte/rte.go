@@ -221,11 +221,12 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests) []objectstate.Obje
 
 func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool, namespace string) ExistingManifests {
 	ret := ExistingManifests{
-		existing:  rtemanifests.New(plat),
-		plat:      plat,
-		instance:  instance,
-		mcps:      mcps,
-		namespace: namespace,
+		existing:   rtemanifests.New(plat),
+		daemonSets: make(map[string]daemonSetManifest),
+		plat:       plat,
+		instance:   instance,
+		mcps:       mcps,
+		namespace:  namespace,
 	}
 
 	// objects that should present in the single replica
@@ -259,6 +260,8 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		if ret.sccError = cli.Get(ctx, client.ObjectKeyFromObject(mf.SecurityContextConstraint), scc); ret.sccError == nil {
 			ret.existing.SecurityContextConstraint = scc
 		}
+
+		ret.machineConfigs = make(map[string]machineConfigManifest)
 	}
 
 	// should have the amount of resources equals to the amount of node groups
@@ -267,10 +270,6 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		key := client.ObjectKey{
 			Name:      generatedName,
 			Namespace: namespace,
-		}
-
-		if ret.daemonSets == nil {
-			ret.daemonSets = map[string]daemonSetManifest{}
 		}
 
 		ds := &appsv1.DaemonSet{}
@@ -285,10 +284,6 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		}
 
 		if plat == platform.OpenShift {
-			if ret.machineConfigs == nil {
-				ret.machineConfigs = map[string]machineConfigManifest{}
-			}
-
 			mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
 			key := client.ObjectKey{
 				Name: mcName,
