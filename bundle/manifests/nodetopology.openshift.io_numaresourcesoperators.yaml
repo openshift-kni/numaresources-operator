@@ -58,6 +58,10 @@ spec:
                     topology exporter daemon set You can choose the group of node
                     by MachineConfigPoolSelector or by NodeSelector
                   properties:
+                    disablePodsFingerprinting:
+                      description: DisablePodsFingerprinting defines if pod fingerprint
+                        should be omitted for the machines belonging to this group
+                      type: boolean
                     machineConfigPoolSelector:
                       description: MachineConfigPoolSelector defines label selector
                         for the machine config pool
