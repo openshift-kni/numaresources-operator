@@ -23,6 +23,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 )
@@ -121,6 +123,15 @@ func DaemonSetArgs(ds *appsv1.DaemonSet) error {
 	}
 	flags.SetToggle("--pods-fingerprint")
 	cnt.Args = flags.Argv()
+	return nil
+}
+
+func ContainerConfig(ds *appsv1.DaemonSet, name string) error {
+	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
+	if err != nil {
+		return err
+	}
+	manifests.UpdateResourceTopologyExporterContainerConfig(&ds.Spec.Template.Spec, cnt, name)
 	return nil
 }
 

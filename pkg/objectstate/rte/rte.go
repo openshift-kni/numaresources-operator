@@ -26,7 +26,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -121,7 +120,22 @@ func GetMachineConfigLabel(mcp *machineconfigv1.MachineConfigPool) map[string]st
 	return labels
 }
 
-func (em *ExistingManifests) State(mf rtemanifests.Manifests) []objectstate.ObjectState {
+type GeneratedDesiredManifest struct {
+	// context
+	ClusterPlatform   platform.Platform
+	MachineConfigPool *machineconfigv1.MachineConfigPool
+	NodeGroup         *nropv1alpha1.NodeGroup
+	// generated manifests
+	DaemonSet *appsv1.DaemonSet
+}
+
+type GenerateDesiredManifestUpdater func(gdm *GeneratedDesiredManifest) error
+
+func SkipManifestUpdate(gdm *GeneratedDesiredManifest) error {
+	return nil
+}
+
+func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDesiredManifestUpdater) []objectstate.ObjectState {
 	ret := []objectstate.ObjectState{
 		// service account
 		{
@@ -186,22 +200,23 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests) []objectstate.Obje
 		desiredDaemonSet.Name = generatedName
 		desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
 
-		// on kubernetes we can just mount the kubeletconfig (no SCC/Selinux),
-		// so handling the kubeletconfig configmap is not needed at all.
-		// We cannot do this at GetManifests time because we need to mount
-		// a specific configmap for each daemonset, whose nome we know only
-		// when we instantiate the daemonset from the MCP.
-		if em.plat == platform.OpenShift {
-			// TODO: actually check for the right container, don't just use "0"
-			manifests.UpdateResourceTopologyExporterContainerConfig(
-				&desiredDaemonSet.Spec.Template.Spec,
-				&desiredDaemonSet.Spec.Template.Spec.Containers[0],
-				generatedName)
+		if updater != nil {
+			gdm := GeneratedDesiredManifest{
+				ClusterPlatform:   em.plat,
+				MachineConfigPool: mcp.DeepCopy(),
+				DaemonSet:         desiredDaemonSet,
+			}
+
+			err := updater(&gdm)
+			if err != nil {
+				klog.Warningf("skipped daemonset for MCP %q: update failed: %v", mcp.Name, err)
+				continue
+			}
 		}
 
 		existingDaemonSet, ok := em.daemonSets[generatedName]
 		if !ok {
-			klog.Warningf("failed to find daemon set %q under the namespace %q", generatedName, desiredDaemonSet.Namespace)
+			klog.Warningf("failed to find daemon set %q under the namespace %q", desiredDaemonSet.Name, desiredDaemonSet.Namespace)
 			continue
 		}
 
