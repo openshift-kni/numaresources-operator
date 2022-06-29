@@ -66,33 +66,34 @@ type ExistingManifests struct {
 func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []objectstate.ObjectState {
 	var ret []objectstate.ObjectState
 	for _, mcp := range mcps {
-		if mf.MachineConfig != nil {
-			mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
-			if mcp.Spec.MachineConfigSelector == nil {
-				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
-				continue
-			}
-			desiredMachineConfig := mf.MachineConfig.DeepCopy()
-			// prefix machine config name to guarantee that we will have an option to override it
-			desiredMachineConfig.Name = mcName
-			desiredMachineConfig.Labels = GetMachineConfigLabel(mcp)
-
-			existingMachineConfig, ok := em.machineConfigs[mcName]
-			if !ok {
-				klog.Warningf("failed to find machine config %q under the namespace %q", mcName, desiredMachineConfig.Namespace)
-				continue
-			}
-
-			ret = append(ret,
-				objectstate.ObjectState{
-					Existing: existingMachineConfig.machineConfig,
-					Error:    existingMachineConfig.machineConfigError,
-					Desired:  desiredMachineConfig,
-					Compare:  compare.Object,
-					Merge:    merge.ObjectForUpdate,
-				},
-			)
+		if mf.MachineConfig == nil {
+			continue
 		}
+		mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
+		if mcp.Spec.MachineConfigSelector == nil {
+			klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
+			continue
+		}
+		desiredMachineConfig := mf.MachineConfig.DeepCopy()
+		// prefix machine config name to guarantee that we will have an option to override it
+		desiredMachineConfig.Name = mcName
+		desiredMachineConfig.Labels = GetMachineConfigLabel(mcp)
+
+		existingMachineConfig, ok := em.machineConfigs[mcName]
+		if !ok {
+			klog.Warningf("failed to find machine config %q under the namespace %q", mcName, desiredMachineConfig.Namespace)
+			continue
+		}
+
+		ret = append(ret,
+			objectstate.ObjectState{
+				Existing: existingMachineConfig.machineConfig,
+				Error:    existingMachineConfig.machineConfigError,
+				Desired:  desiredMachineConfig,
+				Compare:  compare.Object,
+				Merge:    merge.ObjectForUpdate,
+			},
+		)
 	}
 
 	return ret
