@@ -184,20 +184,16 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				RestartPolicy: corev1.RestartPolicyAlways,
 			}
 
-			By("creating a deployment with a guaranteed pod with two containers")
+			By(fmt.Sprintf("creating a deployment with a guaranteed pod with two containers requiring total %s", e2ereslist.ToString(e2ereslist.FromContainers(podSpec.Containers))))
 			dp := objects.NewTestDeploymentWithPodSpec(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp", *podSpec)
 
 			err = fxt.Client.Create(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
-			err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
+			updatedDp, err := e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-
-			updatedDp := &appsv1.Deployment{}
-			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 
 			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *updatedDp)
@@ -215,6 +211,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			rl := e2ereslist.FromGuaranteedPod(updatedPod)
+			klog.Infof("post-create pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainers(podSpec.Containers)), e2ereslist.ToString(rl))
 
 			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -222,15 +219,22 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetNodeName))
+			var checkConsumedRes checkConsumedResFunc
+			if nrtInitial.TopologyPolicies[0] == string(nrtv1alpha1.SingleNUMANodePodLevel) {
+				// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
+				checkConsumedRes = e2enrt.CheckZoneConsumedResourcesAtLeast
+			} else {
+				checkConsumedRes = e2enrt.CheckNodeConsumedResourcesAtLeast
+			}
+
+			By(fmt.Sprintf("checking post-create NRT for target node %q updated correctly", targetNodeName))
 			dataBefore, err := yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err := yaml.Marshal(nrtPostCreate)
 			Expect(err).ToNot(HaveOccurred())
-			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
-			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, rl)
+			match, err := checkConsumedRes(*nrtInitial, *nrtPostCreate, rl)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfter, e2ereslist.ToString(rl))
+			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfter, e2ereslist.ToString(rl))
 
 			By("updating the pod's resources such that it will still be available on the same node")
 			// now the pod is asking for 5 CPUS and 200Mi in total
@@ -243,13 +247,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podSpec.Containers[0].Resources.Requests = requiredRes
 			podSpec.Containers[0].Resources.Limits = requiredRes
 
-			err = fxt.Client.Update(context.TODO(), updatedDp)
-			Expect(err).ToNot(HaveOccurred())
+			By(fmt.Sprintf("updating the deployment to require total %s", e2ereslist.ToString(e2ereslist.FromContainers(podSpec.Containers))))
 
-			err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Update(context.TODO(), updatedDp)
+			}, 10*time.Second, 2*time.Minute).ShouldNot(HaveOccurred())
 
-			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
+			updatedDp, err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedDpName := fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
@@ -280,22 +284,21 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			rl = e2ereslist.FromGuaranteedPod(updatedPod)
-
-			nrtPostCreate, err = e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
-			Expect(err).ToNot(HaveOccurred())
+			klog.Infof("post-update pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainers(podSpec.Containers)), e2ereslist.ToString(rl))
 
 			nrtPostUpdate, err := e2enrt.FindFromList(nrtPostUpdateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetNodeName))
-			dataBefore, err = yaml.Marshal(nrtPostCreate)
+			By(fmt.Sprintf("checking post-update NRT for target node %q updated correctly", targetNodeName))
+			// it's simpler (no resource substraction/difference) to check against initial than compute
+			// the delta between postUpdate and postCreate. Both must yield the same result anyway.
+			dataBefore, err = yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err = yaml.Marshal(nrtPostUpdate)
 			Expect(err).ToNot(HaveOccurred())
-			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
-			match, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPostCreate, *nrtPostUpdate, rl)
+			match, err = checkConsumedRes(*nrtInitial, *nrtPostUpdate, rl)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfter, e2ereslist.ToString(rl))
+			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfter, e2ereslist.ToString(rl))
 
 			By("updating the pod's resources such that it won't be available on the same node, but on a different one")
 			// we clean the nodes from the padding pods
@@ -320,7 +323,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			// we reorganize the cluster state, so we need to get an updated NRTs which will be treated as the initial ones
-			nrtInitialList, err = e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+			nrtReorganizedList, err := e2enrt.GetUpdated(fxt.Client, nrtPostUpdateDeploymentList, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
 
 			// there are now no more than 2 available CPUs under the targeted node and our test pod under the deployment is asking for 5 CPUs
@@ -338,13 +341,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podSpec.Containers[0].Resources.Requests = requiredRes
 			podSpec.Containers[0].Resources.Limits = requiredRes
 
-			err = fxt.Client.Update(context.TODO(), updatedDp)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				return fxt.Client.Update(context.TODO(), updatedDp)
+			}, 10*time.Second, 2*time.Minute).ShouldNot(HaveOccurred())
 
-			err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
+			updatedDp, err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedDpName = fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
@@ -375,19 +376,22 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			rl = e2ereslist.FromGuaranteedPod(updatedPod)
+			klog.Infof("post-reroute pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainers(podSpec.Containers)), e2ereslist.ToString(rl))
+
+			nrtReorganized, err := e2enrt.FindFromList(nrtReorganizedList.Items, updatedPod.Spec.NodeName)
+			Expect(err).ToNot(HaveOccurred())
 
 			nrtLastUpdate, err := e2enrt.FindFromList(nrtLastUpdateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetNodeName))
-			dataBefore, err = yaml.Marshal(nrtInitial)
+			By(fmt.Sprintf("checking rerouted NRT for target node %q updated correctly", targetNodeName))
+			dataBefore, err = yaml.Marshal(nrtReorganized)
 			Expect(err).ToNot(HaveOccurred())
-			dataAfter, err = yaml.Marshal(nrtPostCreate)
+			dataAfter, err = yaml.Marshal(nrtLastUpdate)
 			Expect(err).ToNot(HaveOccurred())
-			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
-			match, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPostUpdate, *nrtLastUpdate, rl)
+			match, err = checkConsumedRes(*nrtReorganized, *nrtLastUpdate, rl)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the updated pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfter, e2ereslist.ToString(rl))
+			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the updated pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfter, e2ereslist.ToString(rl))
 
 			By("deleting the deployment")
 			err = fxt.Client.Delete(context.TODO(), updatedDp)
@@ -404,10 +408,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				nrtPostDelete, err := e2enrt.FindFromList(nrtListPostDelete.Items, updatedPod.Spec.NodeName)
 				Expect(err).ToNot(HaveOccurred())
 
-				nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, updatedPod.Spec.NodeName)
-				Expect(err).ToNot(HaveOccurred())
-
-				ok, err := e2enrt.CheckEqualAvailableResources(*nrtInitial, *nrtPostDelete)
+				ok, err := e2enrt.CheckEqualAvailableResources(*nrtReorganized, *nrtPostDelete)
 				Expect(err).ToNot(HaveOccurred())
 				return ok
 			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
