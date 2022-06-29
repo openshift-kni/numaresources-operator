@@ -65,10 +65,11 @@ type ExistingManifests struct {
 
 func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool) []objectstate.ObjectState {
 	var ret []objectstate.ObjectState
-	for _, mcp := range mcps {
 		if mf.MachineConfig == nil {
-			continue
+			return ret
 		}
+
+	for _, mcp := range mcps {
 		mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
 		if mcp.Spec.MachineConfigSelector == nil {
 			klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
