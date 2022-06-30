@@ -351,19 +351,6 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	return daemonSetsNName, nil
 }
 
-func daemonsetUpdater(gdm *rtestate.GeneratedDesiredManifest) error {
-	// on kubernetes we can just mount the kubeletconfig (no SCC/Selinux),
-	// so handling the kubeletconfig configmap is not needed at all.
-	// We cannot do this at GetManifests time because we need to mount
-	// a specific configmap for each daemonset, whose nome we know only
-	// when we instantiate the daemonset from the MCP.
-	if gdm.ClusterPlatform != platform.OpenShift {
-		// nothing to do!
-		return nil
-	}
-	return rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
-}
-
 func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree) []error {
 	klog.V(3).Info("Delete Daemonsets start")
 	var errors []error
@@ -602,4 +589,44 @@ func validateMachineConfigLabels(mc client.Object, trees []machineconfigpools.No
 		}
 	}
 	return nil
+}
+
+func daemonsetUpdater(gdm *rtestate.GeneratedDesiredManifest) error {
+	// on kubernetes we can just mount the kubeletconfig (no SCC/Selinux),
+	// so handling the kubeletconfig configmap is not needed at all.
+	// We cannot do this at GetManifests time because we need to mount
+	// a specific configmap for each daemonset, whose name we know only
+	// when we instantiate the daemonset from the MCP.
+	if gdm.ClusterPlatform != platform.OpenShift {
+		klog.V(5).InfoS("DaemonSet update: unsupported platform", "platform", gdm.ClusterPlatform)
+		// nothing to do!
+		return nil
+	}
+	err := rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
+	if err != nil {
+		// intentionally info because we want to keep going
+		klog.V(5).InfoS("DaemonSet update: cannot update config", "daemonset", gdm.DaemonSet.Name, "error", err)
+		return err
+	}
+
+	if !isPodFingerprintEnabled(gdm.NodeGroup) {
+		klog.V(5).InfoS("DaemonSet update: pod fingerprinting not enabled", "daemonset", gdm.DaemonSet.Name)
+		return nil
+	}
+	return rteupdate.DaemonSetArgs(gdm.DaemonSet)
+}
+
+func isPodFingerprintEnabled(ng *nropv1alpha1.NodeGroup) bool {
+	// this feature is supposed to be enabled most of the times,
+	// so we turn on by default and we offer a way to disable it.
+	if ng == nil {
+		return false
+	}
+	if ng.DisablePodsFingerprinting == nil {
+		return false
+	}
+	if *ng.DisablePodsFingerprinting {
+		return false
+	}
+	return true
 }
