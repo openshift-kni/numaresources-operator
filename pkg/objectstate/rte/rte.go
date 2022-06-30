@@ -31,6 +31,7 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -63,7 +64,7 @@ type ExistingManifests struct {
 	// internal helpers
 	plat      platform.Platform
 	instance  *nropv1alpha1.NUMAResourcesOperator
-	mcps      []*machineconfigv1.MachineConfigPool
+	trees     []machineconfigpools.NodeGroupTree
 	namespace string
 }
 
@@ -72,33 +73,34 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) []ob
 	if mf.MachineConfig == nil {
 		return ret
 	}
+	for _, tree := range em.trees {
+		for _, mcp := range tree.MachineConfigPools {
+			mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
+			if mcp.Spec.MachineConfigSelector == nil {
+				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
+				continue
+			}
+			desiredMachineConfig := mf.MachineConfig.DeepCopy()
+			// prefix machine config name to guarantee that we will have an option to override it
+			desiredMachineConfig.Name = mcName
+			desiredMachineConfig.Labels = GetMachineConfigLabel(mcp)
 
-	for _, mcp := range em.mcps {
-		mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
-		if mcp.Spec.MachineConfigSelector == nil {
-			klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
-			continue
+			existingMachineConfig, ok := em.machineConfigs[mcName]
+			if !ok {
+				klog.Warningf("failed to find machine config %q under the namespace %q", mcName, desiredMachineConfig.Namespace)
+				continue
+			}
+
+			ret = append(ret,
+				objectstate.ObjectState{
+					Existing: existingMachineConfig.machineConfig,
+					Error:    existingMachineConfig.machineConfigError,
+					Desired:  desiredMachineConfig,
+					Compare:  compare.Object,
+					Merge:    merge.ObjectForUpdate,
+				},
+			)
 		}
-		desiredMachineConfig := mf.MachineConfig.DeepCopy()
-		// prefix machine config name to guarantee that we will have an option to override it
-		desiredMachineConfig.Name = mcName
-		desiredMachineConfig.Labels = GetMachineConfigLabel(mcp)
-
-		existingMachineConfig, ok := em.machineConfigs[mcName]
-		if !ok {
-			klog.Warningf("failed to find machine config %q under the namespace %q", mcName, desiredMachineConfig.Namespace)
-			continue
-		}
-
-		ret = append(ret,
-			objectstate.ObjectState{
-				Existing: existingMachineConfig.machineConfig,
-				Error:    existingMachineConfig.machineConfigError,
-				Desired:  desiredMachineConfig,
-				Compare:  compare.Object,
-				Merge:    merge.ObjectForUpdate,
-			},
-		)
 	}
 
 	return ret
@@ -189,58 +191,59 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 		})
 	}
 
-	for _, mcp := range em.mcps {
-		if mcp.Spec.NodeSelector == nil {
-			klog.Warningf("the machine config pool %q does not have node selector", mcp.Name)
-			continue
-		}
-
-		generatedName := objectnames.GetComponentName(em.instance.Name, mcp.Name)
-		desiredDaemonSet := mf.DaemonSet.DeepCopy()
-		desiredDaemonSet.Name = generatedName
-		desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
-
-		if updater != nil {
-			gdm := GeneratedDesiredManifest{
-				ClusterPlatform:   em.plat,
-				MachineConfigPool: mcp.DeepCopy(),
-				DaemonSet:         desiredDaemonSet,
-			}
-
-			err := updater(&gdm)
-			if err != nil {
-				klog.Warningf("skipped daemonset for MCP %q: update failed: %v", mcp.Name, err)
+	for _, tree := range em.trees {
+		for _, mcp := range tree.MachineConfigPools {
+			if mcp.Spec.NodeSelector == nil {
+				klog.Warningf("the machine config pool %q does not have node selector", mcp.Name)
 				continue
 			}
-		}
 
-		existingDaemonSet, ok := em.daemonSets[generatedName]
-		if !ok {
-			klog.Warningf("failed to find daemon set %q under the namespace %q", desiredDaemonSet.Name, desiredDaemonSet.Namespace)
-			continue
-		}
+			generatedName := objectnames.GetComponentName(em.instance.Name, mcp.Name)
+			desiredDaemonSet := mf.DaemonSet.DeepCopy()
+			desiredDaemonSet.Name = generatedName
+			desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
 
-		ret = append(ret,
-			objectstate.ObjectState{
-				Existing: existingDaemonSet.daemonSet,
-				Error:    existingDaemonSet.daemonSetError,
-				Desired:  desiredDaemonSet,
-				Compare:  compare.Object,
-				Merge:    merge.ObjectForUpdate,
-			},
-		)
+			if updater != nil {
+				gdm := GeneratedDesiredManifest{
+					ClusterPlatform:   em.plat,
+					MachineConfigPool: mcp.DeepCopy(),
+					DaemonSet:         desiredDaemonSet,
+				}
+
+				err := updater(&gdm)
+				if err != nil {
+					klog.Warningf("skipped daemonset for MCP %q: update failed: %v", mcp.Name, err)
+					continue
+				}
+			}
+
+			existingDaemonSet, ok := em.daemonSets[generatedName]
+			if !ok {
+				klog.Warningf("failed to find daemon set %q under the namespace %q", desiredDaemonSet.Name, desiredDaemonSet.Namespace)
+				continue
+			}
+
+			ret = append(ret,
+				objectstate.ObjectState{
+					Existing: existingDaemonSet.daemonSet,
+					Error:    existingDaemonSet.daemonSetError,
+					Desired:  desiredDaemonSet,
+					Compare:  compare.Object,
+					Merge:    merge.ObjectForUpdate,
+				},
+			)
+		}
 	}
-
 	return ret
 }
 
-func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, mcps []*machineconfigv1.MachineConfigPool, namespace string) ExistingManifests {
+func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree, namespace string) ExistingManifests {
 	ret := ExistingManifests{
 		existing:   rtemanifests.New(plat),
 		daemonSets: make(map[string]daemonSetManifest),
 		plat:       plat,
 		instance:   instance,
-		mcps:       mcps,
+		trees:      trees,
 		namespace:  namespace,
 	}
 
@@ -280,30 +283,32 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 	}
 
 	// should have the amount of resources equals to the amount of node groups
-	for _, mcp := range mcps {
-		generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
-		key := client.ObjectKey{
-			Name:      generatedName,
-			Namespace: namespace,
-		}
-		ds := &appsv1.DaemonSet{}
-		dsm := daemonSetManifest{}
-		if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
-			dsm.daemonSet = ds
-		}
-		ret.daemonSets[generatedName] = dsm
-
-		if plat == platform.OpenShift {
-			mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
+	for _, tree := range trees {
+		for _, mcp := range tree.MachineConfigPools {
+			generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
 			key := client.ObjectKey{
-				Name: mcName,
+				Name:      generatedName,
+				Namespace: namespace,
 			}
-			mc := &machineconfigv1.MachineConfig{}
-			mcm := machineConfigManifest{}
-			if mcm.machineConfigError = cli.Get(ctx, key, mc); mcm.machineConfigError == nil {
-				mcm.machineConfig = mc
+			ds := &appsv1.DaemonSet{}
+			dsm := daemonSetManifest{}
+			if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
+				dsm.daemonSet = ds
 			}
-			ret.machineConfigs[mcName] = mcm
+			ret.daemonSets[generatedName] = dsm
+
+			if plat == platform.OpenShift {
+				mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
+				key := client.ObjectKey{
+					Name: mcName,
+				}
+				mc := &machineconfigv1.MachineConfig{}
+				mcm := machineConfigManifest{}
+				if mcm.machineConfigError = cli.Get(ctx, key, mc); mcm.machineConfigError == nil {
+					mcm.machineConfig = mc
+				}
+				ret.machineConfigs[mcName] = mcm
+			}
 		}
 	}
 
