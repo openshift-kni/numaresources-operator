@@ -344,13 +344,13 @@ goversion:
 build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform
 
 bin/buildhelper:
-	@go build -o bin/buildhelper hack/buildhelper/buildhelper.go
+	@go build -o bin/buildhelper tools/buildhelper/buildhelper.go
 
 bin/envsubst:
-	@go build -o bin/envsubst hack/envsubst/envsubst.go
+	@go build -o bin/envsubst tools/envsubst/envsubst.go
 
 bin/lsplatform:
-	@go build -o bin/lsplatform hack/lsplatform/lsplatform.go
+	@go build -o bin/lsplatform tools/lsplatform/lsplatform.go
 
 verify-generated: bundle generate
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
