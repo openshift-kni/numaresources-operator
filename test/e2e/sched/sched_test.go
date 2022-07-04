@@ -91,7 +91,8 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			dp, err := schedutils.GetDeploymentByOwnerReference(nroSchedObj.GetUID())
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(wait.ForDeploymentComplete(e2eclient.Client, dp, time.Second*30, time.Minute*2)).ToNot(HaveOccurred())
+			_, err = wait.ForDeploymentComplete(e2eclient.Client, dp, time.Second*30, time.Minute*2)
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		It("should react to owned objects changes", func() {
