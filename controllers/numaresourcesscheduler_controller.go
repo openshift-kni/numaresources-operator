@@ -23,12 +23,17 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/pkg/errors"
@@ -110,8 +115,22 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NUMAResourcesSchedulerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// we want to initiate reconcile loop only on changes under labels, annotations or spec of the object
+	p := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return e.ObjectNew.GetGeneration() != e.ObjectOld.GetGeneration() ||
+				!apiequality.Semantic.DeepEqual(e.ObjectNew.GetLabels(), e.ObjectOld.GetLabels()) ||
+				!apiequality.Semantic.DeepEqual(e.ObjectNew.GetAnnotations(), e.ObjectOld.GetAnnotations())
+		},
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&nrsv1alpha1.NUMAResourcesScheduler{}).
+		Owns(&rbacv1.ClusterRole{}, builder.WithPredicates(p)).
+		Owns(&rbacv1.ClusterRoleBinding{}, builder.WithPredicates(p)).
+		Owns(&corev1.ServiceAccount{}, builder.WithPredicates(p)).
+		Owns(&corev1.ConfigMap{}, builder.WithPredicates(p)).
+		Owns(&appsv1.Deployment{}, builder.WithPredicates(p)).
 		Complete(r)
 }
 
