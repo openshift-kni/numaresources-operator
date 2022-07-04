@@ -18,11 +18,3 @@ There is **no support** for these e2e tests images, and they are recommended to 
 
 See `README.tests.md` for detailed instructions about how to run the suite.
 See `tests/e2e/serial/README.md` for fine details about the suite and developer instructions.
-
-## Known Issues
-
-### Static pod resources not accounted
-
-Resource information (request and limit) provided in the static pod spec cannot be seen in the corresponding mirror pod status. Because of this, even if resource request==limit for a static pod, the pod QoS Class is BestEffort. Static pods are allocated resources from shared pool and resources requested by them are hence not accounted for when evaluating resources avaiable per NUMA.
-
-Kubernetes issue capturing this behaviour is [here](https://github.com/kubernetes/kubernetes/issues/110944).
