@@ -49,6 +49,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
 	var nrts []nrtv1alpha1.NodeResourceTopology
+	var tmPolicy string
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
@@ -73,6 +74,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 		if len(nrts) < 2 {
 			Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
 		}
+		// we expect having the same policy across all NRTs
+		tmPolicy = nrts[0].TopologyPolicies[0]
 
 		// Note that this test, being part of "serial", expects NO OTHER POD being scheduled
 		// in between, so we consider this information current and valid when the It()s run.
@@ -201,7 +204,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
-			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 		})
@@ -228,7 +231,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 
 			for _, pod := range pods {
-				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
@@ -258,7 +261,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 
 			for _, pod := range pods {
-				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
@@ -377,7 +380,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					Expect(err).ToNot(HaveOccurred(), "unable to get pod %s/%s to be Running after %v", pod.Namespace, pod.Name, podRunningTimeout)
 
 				} else {
-					isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+					isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, string(tmPolicy))
 					if err != nil {
 						_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 					}
@@ -551,7 +554,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled", serialconfig.Config.SchedulerName))
-			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, string(tmPolicy))
 			Expect(err).ToNot(HaveOccurred())
 			if !isFailed {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
