@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -31,13 +32,15 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	mcov1cli "github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/typed/machineconfiguration.openshift.io/v1"
+
+	nrtv1alpha1cli "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
+	"github.com/k8stopologyawareschedwg/podfingerprint"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	nropv1alpha1cli "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1alpha1"
@@ -55,22 +58,27 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		initialized bool
 		nropcli     *nropv1alpha1cli.NumaresourcesoperatorV1alpha1Client
 		mcocli      *mcov1cli.MachineconfigurationV1Client
+		nrtcli      *nrtv1alpha1cli.Clientset
 	)
 
 	f := framework.NewDefaultFramework("rte")
 
 	ginkgo.BeforeEach(func() {
-		if !initialized {
-			var err error
-
-			nropcli, err = newNUMAResourcesOperatorWithConfig(f.ClientConfig())
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			mcocli, err = newMachineConfigClientWithConfig(f.ClientConfig())
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			initialized = true
+		if initialized {
+			return
 		}
+		var err error
+
+		nropcli, err = nropv1alpha1cli.NewForConfig(f.ClientConfig())
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		mcocli, err = mcov1cli.NewForConfig(f.ClientConfig())
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		nrtcli, err = nrtv1alpha1cli.NewForConfig(f.ClientConfig())
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		initialized = true
 	})
 
 	ginkgo.When("[config][rte] NRO CR configured with LogLevel", func() {
@@ -256,23 +264,20 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			}, time.Minute*5, time.Second*30).Should(gomega.BeTrue())
 		})
 	})
+
+	ginkgo.It("[rte][podfingerprint] should expose the pod set fingerprint in NRT objects", func() {
+		nrtList, err := nrtcli.TopologyV1alpha1().NodeResourceTopologies().List(context.TODO(), metav1.ListOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		for _, nrt := range nrtList.Items {
+			pfp, ok := nrt.Annotations[podfingerprint.Annotation]
+			gomega.Expect(ok).To(gomega.BeTrue(), "missing podfingerprint annotation %q from NRT %q", podfingerprint.Annotation, nrt.Name)
+
+			seemsValid := strings.HasPrefix(pfp, podfingerprint.Prefix)
+			gomega.Expect(seemsValid).To(gomega.BeTrue(), "malformed podfingerprint %q from NRT %q", pfp, nrt.Name)
+		}
+	})
 })
-
-func newMachineConfigClientWithConfig(cfg *rest.Config) (*mcov1cli.MachineconfigurationV1Client, error) {
-	clientset, err := mcov1cli.NewForConfig(cfg)
-	if err != nil {
-		klog.Exit(err.Error())
-	}
-	return clientset, nil
-}
-
-func newNUMAResourcesOperatorWithConfig(cfg *rest.Config) (*nropv1alpha1cli.NumaresourcesoperatorV1alpha1Client, error) {
-	clientset, err := nropv1alpha1cli.NewForConfig(cfg)
-	if err != nil {
-		klog.Exit(err.Error())
-	}
-	return clientset, nil
-}
 
 func getOwnedDss(f *framework.Framework, owner metav1.ObjectMeta) ([]appsv1.DaemonSet, error) {
 	dss, err := f.ClientSet.AppsV1().DaemonSets("").List(context.TODO(), metav1.ListOptions{})

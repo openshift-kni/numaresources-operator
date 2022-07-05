@@ -31,44 +31,31 @@ import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 )
 
-func GetListByNodeGroups(ctx context.Context, cli client.Client, nodeGroups []nropv1alpha1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
+type NodeGroupTree struct {
+	NodeGroup          *nropv1alpha1.NodeGroup
+	MachineConfigPools []*mcov1.MachineConfigPool
+}
+
+func GetTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nropv1alpha1.NodeGroup) ([]NodeGroupTree, error) {
 	mcps := &mcov1.MachineConfigPoolList{}
 	if err := cli.List(ctx, mcps); err != nil {
 		return nil, err
 	}
-	return FindListByNodeGroups(mcps, nodeGroups)
+	return FindTreesByNodeGroups(mcps, nodeGroups)
 }
 
-func GetListFromMCOKubeletConfig(ctx context.Context, cli client.Client, mcoKubeletConfig mcov1.KubeletConfig) ([]*mcov1.MachineConfigPool, error) {
-	mcps := &mcov1.MachineConfigPoolList{}
-	var result []*mcov1.MachineConfigPool
-	if err := cli.List(ctx, mcps); err != nil {
-		return nil, err
-	}
-	for index := range mcps.Items {
-		mcp := &mcps.Items[index]
-
-		sel, err := metav1.LabelSelectorAsSelector(mcoKubeletConfig.Spec.MachineConfigPoolSelector)
-		if err != nil {
-			return nil, err
-		}
-		mcpLabels := labels.Set(mcp.Labels)
-		if sel.Matches(mcpLabels) {
-			result = append(result, mcp)
-		}
-
-	}
-	return result, nil
-}
-
-func FindListByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1alpha1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
-	var result []*mcov1.MachineConfigPool
-	for _, nodeGroup := range nodeGroups {
-		found := false
+func FindTreesByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1alpha1.NodeGroup) ([]NodeGroupTree, error) {
+	var result []NodeGroupTree
+	for idx := range nodeGroups {
+		nodeGroup := &nodeGroups[idx]
 
 		// handled by validation
 		if nodeGroup.MachineConfigPoolSelector == nil {
 			continue
+		}
+
+		tree := NodeGroupTree{
+			NodeGroup: nodeGroup,
 		}
 
 		for i := range mcps.Items {
@@ -83,17 +70,42 @@ func FindListByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1
 
 			mcpLabels := labels.Set(mcp.Labels)
 			if selector.Matches(mcpLabels) {
-				found = true
-				result = append(result, mcp)
+				tree.MachineConfigPools = append(tree.MachineConfigPools, mcp)
 			}
 		}
 
-		if !found {
+		if len(tree.MachineConfigPools) == 0 {
 			return nil, fmt.Errorf("failed to find MachineConfigPool for the node group with the selector %q", nodeGroup.MachineConfigPoolSelector.String())
 		}
+
+		result = append(result, tree)
 	}
 
 	return result, nil
+}
+
+func GetListByNodeGroups(ctx context.Context, cli client.Client, nodeGroups []nropv1alpha1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
+	mcps := &mcov1.MachineConfigPoolList{}
+	if err := cli.List(ctx, mcps); err != nil {
+		return nil, err
+	}
+	return FindListByNodeGroups(mcps, nodeGroups)
+}
+
+func FindListByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1alpha1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
+	trees, err := FindTreesByNodeGroups(mcps, nodeGroups)
+	if err != nil {
+		return nil, err
+	}
+	return flattenTrees(trees), nil
+}
+
+func flattenTrees(trees []NodeGroupTree) []*mcov1.MachineConfigPool {
+	var result []*mcov1.MachineConfigPool
+	for _, tree := range trees {
+		result = append(result, tree.MachineConfigPools...)
+	}
+	return result
 }
 
 func FindBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelector) (*mcov1.MachineConfigPool, error) {
@@ -128,4 +140,26 @@ func GetNodeListFromMachineConfigPool(ctx context.Context, cli client.Client, mc
 	}
 
 	return nodeList.Items, nil
+}
+
+func GetListFromMCOKubeletConfig(ctx context.Context, cli client.Client, mcoKubeletConfig mcov1.KubeletConfig) ([]*mcov1.MachineConfigPool, error) {
+	mcps := &mcov1.MachineConfigPoolList{}
+	var result []*mcov1.MachineConfigPool
+	if err := cli.List(ctx, mcps); err != nil {
+		return nil, err
+	}
+	for index := range mcps.Items {
+		mcp := &mcps.Items[index]
+
+		sel, err := metav1.LabelSelectorAsSelector(mcoKubeletConfig.Spec.MachineConfigPoolSelector)
+		if err != nil {
+			return nil, err
+		}
+		mcpLabels := labels.Set(mcp.Labels)
+		if sel.Matches(mcpLabels) {
+			result = append(result, mcp)
+		}
+
+	}
+	return result, nil
 }

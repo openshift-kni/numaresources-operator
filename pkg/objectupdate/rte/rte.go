@@ -23,6 +23,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+
+	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 )
 
@@ -107,6 +110,29 @@ func DaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
 		template.Annotations = map[string]string{}
 	}
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
+}
+
+func DaemonSetArgs(ds *appsv1.DaemonSet) error {
+	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
+	if err != nil {
+		return err
+	}
+	flags := flagcodec.ParseArgvKeyValue(cnt.Args)
+	if flags == nil {
+		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
+	}
+	flags.SetToggle("--pods-fingerprint")
+	cnt.Args = flags.Argv()
+	return nil
+}
+
+func ContainerConfig(ds *appsv1.DaemonSet, name string) error {
+	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
+	if err != nil {
+		return err
+	}
+	manifests.UpdateResourceTopologyExporterContainerConfig(&ds.Spec.Template.Spec, cnt, name)
+	return nil
 }
 
 func FindContainerByName(podSpec *corev1.PodSpec, containerName string) (*corev1.Container, error) {
