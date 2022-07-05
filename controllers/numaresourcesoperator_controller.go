@@ -59,6 +59,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
+	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 )
@@ -306,17 +307,21 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		klog.ErrorS(fmt.Errorf("failed to delete unused machineconfigs"), "errors", errorList)
 	}
 
+	var err error
 	var daemonSetsNName []nropv1alpha1.NamespacedName
 
-	err := rtestate.UpdateDaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.ImageSpec, r.ImagePullPolicy)
+	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.ImageSpec, r.ImagePullPolicy)
 	if err != nil {
 		return daemonSetsNName, err
 	}
-	err = rtestate.UpdateDaemonSetPauseContainerSettings(r.RTEManifests.DaemonSet)
+
+	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.DaemonSet)
 	if err != nil {
 		return daemonSetsNName, err
 	}
-	if err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, instance.Spec.LogLevel); err != nil {
+
+	err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, instance.Spec.LogLevel)
+	if err != nil {
 		return daemonSetsNName, err
 	}
 
@@ -326,7 +331,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		if err != nil {
 			return daemonSetsNName, err
 		}
-		rtestate.UpdateDaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
+		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
 	}
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, mcps, r.Namespace)

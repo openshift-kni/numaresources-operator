@@ -128,31 +128,40 @@ test-install-e2e: build-e2e-all
 ##@ Build
 
 binary: build-tools
+	LDFLAGS="-s -w "; \
+	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
+	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)"; \
 	CGO_ENABLED=0 go build \
 		-mod=vendor \
 		-o bin/manager \
-		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) -X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)" \
+		-ldflags "$$LDFLAGS" \
 		main.go
 
 binary-rte: build-tools
+	LDFLAGS="-s -w "; \
+	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
+	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)"; \
 	CGO_ENABLED=0 go build \
 		-mod=vendor \
 		-o bin/exporter \
-		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) -X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)" \
+		-ldflags "$$LDFLAGS" \
 		rte/main.go
 
 binary-numacell: build-tools
+	LDFLAGS="-s -w "; \
 	CGO_ENABLED=0 go build \
 		-mod=vendor \
 		-o bin/numacell \
-		-ldflags "-s -w" \
+		-ldflags "$$LDFLAGS" \
 		test/deviceplugin/cmd/numacell/main.go
 
 binary-nrocli: build-tools
+	LDFLAGS="-s -w "; \
+	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
 	CGO_ENABLED=0 go build \
 		-mod=vendor \
 		-o bin/nrocli \
-		-ldflags "-s -w -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version)" \
+		-ldflags "$$LDFLAGS" \
 		nrocli/main.go
 
 binary-all: binary binary-rte
