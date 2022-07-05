@@ -248,7 +248,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			podLabels := map[string]string{
 				"test": "test-daemonset",
 			}
-			nodeSelector := map[string]string{}
+			nodeSelector := map[string]string{
+				serialconfig.MultiNUMALabel: "2",
+			}
 			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
 			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			ds.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
@@ -350,7 +352,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			podLabels := map[string]string{
 				"test": "test-daemonset",
 			}
-			nodeSelector := map[string]string{}
+			nodeSelector := map[string]string{
+				serialconfig.MultiNUMALabel: "2",
+			}
 			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
 			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			ds.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
