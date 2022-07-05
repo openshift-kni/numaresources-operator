@@ -31,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 )
@@ -41,7 +42,8 @@ const (
 	ReasonScheduled        = "Scheduled"
 	ReasonFailedScheduling = "FailedScheduling"
 
-	ErrorCannotAlignPod = "cannot align pod"
+	ErrorCannotAlignPod       = "cannot align pod"
+	ErrorCannotAlignContainer = "cannot align container"
 )
 
 type eventChecker func(ev corev1.Event) bool
@@ -79,9 +81,16 @@ func CheckPODSchedulingFailed(k8sCli *kubernetes.Clientset, podNamespace, podNam
 	return checkPODEvents(k8sCli, podNamespace, podName, schedulerName, isFailedScheduling)
 }
 
-func CheckPODSchedulingFailedForAlignment(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName string) (bool, error) {
+func CheckPODSchedulingFailedForAlignment(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName, policy string) (bool, error) {
+	var alignmentErr string
+	if policy == string(nrtv1alpha1.SingleNUMANodeContainerLevel) {
+		alignmentErr = ErrorCannotAlignContainer
+	} else {
+		alignmentErr = ErrorCannotAlignPod
+	}
+
 	isFailedSchedulingForAlignment := func(item corev1.Event) bool {
-		return item.Reason == ReasonFailedScheduling && item.ReportingController == schedulerName && IsSchedulingErrorCannotAlign(item.Message)
+		return item.Reason == ReasonFailedScheduling && item.ReportingController == schedulerName && strings.Contains(item.Message, alignmentErr)
 	}
 	return checkPODEvents(k8sCli, podNamespace, podName, schedulerName, isFailedSchedulingForAlignment)
 }
@@ -115,10 +124,6 @@ func CheckNROSchedulerAvailable(cli client.Client, NUMAResourcesSchedObjName str
 		return cond.Status == metav1.ConditionTrue
 	}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "Scheduler condition did not become available")
 	return nroSchedObj
-}
-
-func IsSchedulingErrorCannotAlign(msg string) bool {
-	return strings.Contains(msg, ErrorCannotAlignPod)
 }
 
 func GetNROSchedulerName(cli client.Client, NUMAResourcesSchedObjName string) string {
