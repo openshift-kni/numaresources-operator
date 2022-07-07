@@ -287,7 +287,10 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instanc
 				Conditions: mcp.Status.Conditions,
 			})
 
-			if !IsMachineConfigPoolUpdated(instance.Name, mcp) {
+			isUpdated := IsMachineConfigPoolUpdated(instance.Name, mcp)
+			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instance.Name, "updated", isUpdated)
+
+			if !isUpdated {
 				return false
 			}
 		}
