@@ -26,7 +26,6 @@ import (
 	. "github.com/onsi/ginkgo"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -95,7 +94,7 @@ func setupNamespace(cli client.Client, baseName string, randomize bool) (corev1.
 		// intentionally avoid GenerateName like the k8s e2e framework does
 		name = RandomizeName(baseName)
 	}
-	ns := v1.Namespace{
+	ns := corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Namespace",
 			APIVersion: "v1",
