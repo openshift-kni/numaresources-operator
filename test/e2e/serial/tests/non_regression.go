@@ -189,7 +189,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				ok, err := e2enrt.CheckEqualAvailableResources(*nrtInitial, *nrtPostDelete)
 				Expect(err).ToNot(HaveOccurred())
 				return ok
-			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", targetedNodeName)
+			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(BeTrue(), "resources not restored on %q", targetedNodeName)
 		})
 	})
 })

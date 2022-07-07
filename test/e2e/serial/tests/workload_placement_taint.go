@@ -266,7 +266,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				ok, err := e2enrt.CheckEqualAvailableResources(*nrtInitial, *nrtPostDelete)
 				Expect(err).ToNot(HaveOccurred())
 				return ok
-			}, time.Minute, 5*time.Second).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
+			}).WithTimeout(time.Minute).WithPolling(5*time.Second).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		})
 	})
 })
@@ -310,7 +310,7 @@ func untaintNodes(cli client.Client, taintedNodeNames []string, taint *corev1.Ta
 			}
 			untaintedNodeNames = append(untaintedNodeNames, updatedNode.Name)
 			return nil
-		}, time.Minute, 5*time.Second).ShouldNot(HaveOccurred())
+		}).WithTimeout(time.Minute).WithPolling(5 * time.Second).ShouldNot(HaveOccurred())
 	}
 	return untaintedNodeNames
 }
@@ -328,7 +328,7 @@ func checkNodesUntainted(cli client.Client, nodeNames []string) {
 				return fmt.Errorf("node %q has unexpected taints: %v", nodeName, node.Spec.Taints)
 			}
 			return nil
-		}, 3*time.Minute, 10*time.Second).ShouldNot(HaveOccurred())
+		}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
 	}
 }
 
