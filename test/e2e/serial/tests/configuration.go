@@ -268,7 +268,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					}
 				}
 				return true, nil
-			}, 10*time.Minute, 30*time.Second).Should(BeTrue())
+			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(BeTrue())
 
 			By(fmt.Sprintf("modifing the NUMAResourcesOperator ExporterImage filed to %q", serialconfig.NropTestCIImage))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
@@ -297,7 +297,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					}
 				}
 				return true, nil
-			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "failed to update RTE container with image %q", serialconfig.NropTestCIImage)
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with image %q", serialconfig.NropTestCIImage)
 
 			By(fmt.Sprintf("modifing the NUMAResourcesOperator LogLevel filed to %q", operatorv1.Trace))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
@@ -332,7 +332,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					}
 				}
 				return true, nil
-			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "failed to update RTE container with LogLevel %q", operatorv1.Trace)
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with LogLevel %q", operatorv1.Trace)
 
 			By(fmt.Sprintf("modifing the NUMAResourcesScheduler SchedulerName Filed to %q", serialconfig.SchedulerTestName))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
@@ -447,7 +447,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					return false
 				}
 				return true
-			}, timeout, time.Second*30).Should(BeTrue())
+			}).WithTimeout(timeout).WithPolling(time.Second * 30).Should(BeTrue())
 
 			By("schedule another workload requesting resources")
 			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
