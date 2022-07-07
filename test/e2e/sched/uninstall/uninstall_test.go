@@ -73,7 +73,7 @@ var _ = Describe("[Scheduler] uninstall", func() {
 					}
 				}
 				return true
-			}, 5*time.Minute, 10*time.Second).Should(BeTrue())
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
 		})
 	})
 })

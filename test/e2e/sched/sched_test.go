@@ -67,7 +67,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 				}
 
 				return deploy.Spec.Template.Spec.Containers[0].Image == e2eimages.SchedTestImageCI
-			}, time.Minute, time.Second*10).Should(BeTrue())
+			}).WithTimeout(time.Minute).WithPolling(time.Second * 10).Should(BeTrue())
 		})
 	})
 })
