@@ -173,7 +173,7 @@ var _ = Describe("[Install] durability", func() {
 				klog.Infof("condition: %v", cond)
 
 				return cond.Status == metav1.ConditionTrue
-			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "NUMAResourcesOperator condition did not become degraded")
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "NUMAResourcesOperator condition did not become degraded")
 
 			deleteNROPSync(e2eclient.Client, nroObj)
 		})
@@ -281,7 +281,7 @@ var _ = Describe("[Install] durability", func() {
 				var err error
 				ds, err = getDaemonSetByOwnerReference(uid)
 				return err
-			}, 5*time.Minute, 10*time.Second).Should(BeNil())
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeNil())
 
 			deleteNROPSync(e2eclient.Client, nroObj)
 
@@ -307,7 +307,7 @@ var _ = Describe("[Install] durability", func() {
 					}
 				}
 				return true
-			}, 5*time.Minute, 10*time.Second).Should(BeTrue())
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
 
 			By("redeploy with other parameters")
 			nroObjRedep := objects.TestNRO(objects.EmptyMatchLabels())
@@ -333,7 +333,7 @@ var _ = Describe("[Install] durability", func() {
 				}
 
 				return ds.Spec.Template.Spec.Containers[0].Image == e2eimages.RTETestImageCI
-			}, 5*time.Minute, 10*time.Second).Should(BeTrue())
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
 		})
 	})
 })
@@ -406,11 +406,7 @@ func overallDeployment() nroDeployment {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	deployedObj.nroObj = nroObj
 
-	Eventually(
-		unpause,
-		configuration.MachineConfigPoolUpdateTimeout,
-		configuration.MachineConfigPoolUpdateInterval,
-	).ShouldNot(HaveOccurred())
+	Eventually(unpause).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).ShouldNot(HaveOccurred())
 
 	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
@@ -434,7 +430,7 @@ func waitForMCPUpdatedAfterNROCreated(offset int, nroObj *nropv1alpha1.NUMAResou
 		}
 
 		return updated
-	}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
+	}).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
 }
 
 // TODO: what if timeout < period?
@@ -497,7 +493,7 @@ func waitForMCPUpdatedAfterNRODeleted(offset int, nroObj *nropv1alpha1.NUMAResou
 			return false
 		}
 		return updated
-	}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
+	}).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
 }
 
 func deleteNROPSync(cli client.Client, nropObj *nropv1alpha1.NUMAResourcesOperator) {

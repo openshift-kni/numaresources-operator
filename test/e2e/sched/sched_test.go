@@ -71,7 +71,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 				}
 
 				return deploy.Spec.Template.Spec.Containers[0].Image == e2eimages.SchedTestImageCI
-			}, time.Minute, time.Second*10).Should(BeTrue())
+			}).WithTimeout(time.Minute).WithPolling(time.Second * 10).Should(BeTrue())
 
 			By("reverting NROS changes")
 			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
@@ -85,7 +85,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 					return false
 				}
 				return true
-			}, 30*time.Second, 5*time.Second)
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second)
 
 			// find deployment by the ownerReference
 			dp, err := schedutils.GetDeploymentByOwnerReference(nroSchedObj.GetUID())
@@ -123,7 +123,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 					return false
 				}
 				return true
-			}, 60*time.Second, 10*time.Second).Should(BeTrue())
+			}).WithTimeout(60 * time.Second).WithPolling(10 * time.Second).Should(BeTrue())
 
 			key := client.ObjectKeyFromObject(nroCM)
 			Eventually(func() bool {
@@ -138,7 +138,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 					return false
 				}
 				return true
-			}, time.Minute*2, time.Second*30).Should(BeTrue())
+			}).WithTimeout(time.Minute * 2).WithPolling(time.Second * 30).Should(BeTrue())
 
 			dp, err := schedutils.GetDeploymentByOwnerReference(nroSchedObj.GetUID())
 			Expect(err).ToNot(HaveOccurred())
@@ -155,8 +155,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 					return false
 				}
 				return true
-
-			}, 30*time.Second, 5*time.Second)
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second)
 			Expect(err).ToNot(HaveOccurred())
 
 			key = client.ObjectKeyFromObject(dp)
@@ -172,7 +171,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 					return false
 				}
 				return true
-			}, time.Minute*2, time.Second*30).Should(BeTrue())
+			}).WithTimeout(time.Minute * 2).WithPolling(time.Second * 30).Should(BeTrue())
 		})
 	})
 })
