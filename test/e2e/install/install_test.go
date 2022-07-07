@@ -190,61 +190,74 @@ var _ = Describe("[Install] durability", func() {
 
 		It("[test_id:47587][tier1] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", func() {
 
-			By("wait for DaemonSet to be ready")
-			nname := client.ObjectKeyFromObject(deployedObj.nroObj)
-			Expect(nname.Name).NotTo(BeEmpty())
+			By("getting up-to-date NRO object")
+			nroKey := client.ObjectKeyFromObject(deployedObj.nroObj)
+			Expect(nroKey.Name).NotTo(BeEmpty())
 
 			nroObj := &nropv1alpha1.NUMAResourcesOperator{}
-			err := e2eclient.Client.Get(context.TODO(), nname, nroObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("waiting for the DaemonSet to be created")
-			uid := nroObj.GetUID()
-			ds := &appsv1.DaemonSet{}
-
-			dsReadyTimeOut := 5 * time.Minute
-			dsReadyPollPeriod := 10 * time.Second
-			Eventually(func() bool {
-				var err error
-				ds, err = getDaemonSetByOwnerReference(uid)
+			Eventually(func() error {
+				err := e2eclient.Client.Get(context.TODO(), nroKey, nroObj)
 				if err != nil {
-					klog.Warningf("failed to get the daemonset for NRO %v: %v", uid, err)
-					return false
+					return err
 				}
-				return e2ewait.AreDaemonSetPodsReady(&ds.Status)
-			}, dsReadyTimeOut, dsReadyPollPeriod).Should(BeTrue())
+				if len(nroObj.Status.DaemonSets) != 1 {
+					return fmt.Errorf("unsupported daemonsets (/MCP) count: %d", len(nroObj.Status.DaemonSets))
+				}
+				return nil
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).ShouldNot(HaveOccurred(), "inconsistent NRO instance:\n%s", objects.ToYAML(nroObj))
+
+			dsKey := e2ewait.ObjectKey{
+				Namespace: nroObj.Status.DaemonSets[0].Namespace,
+				Name:      nroObj.Status.DaemonSets[0].Name,
+			}
+
+			By("waiting for DaemonSet to be ready")
+			ds, err := e2ewait.ForDaemonSetReadyByKey(e2eclient.Client, dsKey, 10*time.Second, 3*time.Minute)
+			Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
 			By("Update RTE image in NRO")
-			err = e2eclient.Client.Get(context.TODO(), nname, nroObj)
-			Expect(err).ToNot(HaveOccurred())
-			nroObj.Spec.ExporterImage = e2eimages.RTETestImageCI
-			err = e2eclient.Client.Update(context.TODO(), nroObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("Await for daemon to be ready again")
-			updatedNroObj := &nropv1alpha1.NUMAResourcesOperator{}
-			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), updatedNroObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			Eventually(func() bool {
-				updatedDs, err := e2ewait.ForDaemonSetReady(e2eclient.Client, ds, dsReadyPollPeriod, dsReadyTimeOut)
+			Eventually(func() error {
+				err := e2eclient.Client.Get(context.TODO(), nroKey, nroObj)
 				if err != nil {
+					return err
+				}
+				nroObj.Spec.ExporterImage = e2eimages.RTETestImageCI
+				return e2eclient.Client.Update(context.TODO(), nroObj)
+			}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
+
+			By("waiting for the daemonset to be ready again")
+			Eventually(func() bool {
+				updatedDs := &appsv1.DaemonSet{}
+				err := e2eclient.Client.Get(context.TODO(), dsKey.AsKey(), updatedDs)
+				if err != nil {
+					klog.Warningf("failed to get the daemonset %s: %v", dsKey.String(), err)
 					return false
 				}
-				klog.Warningf("Observed %v  Current %v", updatedDs.Status.ObservedGeneration, ds.Generation)
+
+				if !e2ewait.AreDaemonSetPodsReady(&updatedDs.Status) {
+					klog.Warningf("daemonset %s desired %d scheduled %d ready %d",
+						dsKey.String(),
+						updatedDs.Status.DesiredNumberScheduled,
+						updatedDs.Status.CurrentNumberScheduled,
+						updatedDs.Status.NumberReady)
+					return false
+				}
+
+				klog.Infof("daemonset %s ready", dsKey.String())
+
+				klog.Warningf("daemonset Generation observed %v current %v", updatedDs.Status.ObservedGeneration, ds.Generation)
 				isUpdated := updatedDs.Status.ObservedGeneration > ds.Generation
 				if !isUpdated {
 					return false
 				}
 				ds = updatedDs
 				return true
-			}, dsReadyTimeOut, dsReadyPollPeriod).Should(BeTrue())
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to get up to date DaemonSet")
 
 			rteContainer, err := findContainerByName(*ds, containerNameRTE)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(rteContainer.Image).To(BeIdenticalTo(e2eimages.RTETestImageCI))
-
 		})
 
 		It("should be able to delete NUMAResourceOperator CR and redeploy without polluting cluster state", func() {
