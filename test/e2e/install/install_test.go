@@ -87,7 +87,7 @@ var _ = Describe("[Install] continuousIntegration", func() {
 					return false
 				}
 
-				klog.Infof("condition: %v", cond)
+				klog.Infof("condition for %s: %v", nname.Name, cond)
 
 				return cond.Status == metav1.ConditionTrue
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "RTE condition did not become available")
