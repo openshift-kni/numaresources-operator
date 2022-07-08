@@ -22,7 +22,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
@@ -73,7 +72,6 @@ type NUMAResourcesOperatorReconciler struct {
 	Platform        platform.Platform
 	APIManifests    apimanifests.Manifests
 	RTEManifests    rtemanifests.Manifests
-	Helper          *deployer.Helper
 	Namespace       string
 	ImageSpec       string
 	ImagePullPolicy corev1.PullPolicy
@@ -226,14 +224,19 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 
 	instance.Status.DaemonSets = []nropv1alpha1.NamespacedName{}
 	for _, nname := range daemonSetsInfo {
-		ok, err := r.Helper.IsDaemonSetRunning(nname.Namespace, nname.Name)
+		ds := appsv1.DaemonSet{}
+		dsKey := client.ObjectKey{
+			Namespace: nname.Namespace,
+			Name:      nname.Name,
+		}
+		err = r.Client.Get(ctx, dsKey, &ds)
 		if err != nil {
 			return ctrl.Result{}, status.ConditionDegraded, err
 		}
-		if !ok {
+
+		if !isDaemonSetReady(&ds) {
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
 		}
-
 		instance.Status.DaemonSets = append(instance.Status.DaemonSets, nname)
 	}
 
@@ -633,4 +636,10 @@ func isPodFingerprintEnabled(ng *nropv1alpha1.NodeGroup) bool {
 		return false
 	}
 	return true
+}
+
+func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
+	ok := (ds.Status.DesiredNumberScheduled > 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberReady)
+	klog.V(5).InfoS("daemonset", "namespace", ds.Namespace, "name", ds.Name, "desired", ds.Status.DesiredNumberScheduled, "current", ds.Status.CurrentNumberScheduled, "ready", ds.Status.NumberReady)
+	return ok
 }

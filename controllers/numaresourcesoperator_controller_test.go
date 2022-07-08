@@ -27,11 +27,9 @@ import (
 
 	rbacv1 "k8s.io/api/rbac/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/tlog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -62,7 +60,6 @@ const (
 
 func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion platform.Version, initObjects ...runtime.Object) (*NUMAResourcesOperatorReconciler, error) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(initObjects...).Build()
-	helper := deployer.NewHelperWithClient(fakeClient, "", tlog.NewNullLogAdapter())
 	apiManifests, err := apimanifests.GetManifests(plat)
 	if err != nil {
 		return nil, err
@@ -81,7 +78,6 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 		Platform:     plat,
 		APIManifests: apiManifests,
 		RTEManifests: rteManifests,
-		Helper:       helper,
 		Namespace:    testNamespace,
 		ImageSpec:    testImageSpec,
 		Recorder:     recorder,
