@@ -85,7 +85,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 					return false
 				}
 				return true
-			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second)
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(BeTrue())
 
 			// find deployment by the ownerReference
 			dp, err := schedutils.GetDeploymentByOwnerReference(nroSchedObj.GetUID())
@@ -155,7 +155,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 					return false
 				}
 				return true
-			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second)
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(BeTrue())
 			Expect(err).ToNot(HaveOccurred())
 
 			key = client.ObjectKeyFromObject(dp)
