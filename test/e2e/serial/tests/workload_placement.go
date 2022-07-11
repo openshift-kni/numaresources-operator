@@ -26,7 +26,6 @@ import (
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -569,21 +568,6 @@ func unlabelNode(cli client.Client, key, val, nodeName string) (func() error, er
 		return nil
 	}
 	return labelFunc, nil
-}
-
-func getDsOwnedBy(cli client.Client, objMeta metav1.ObjectMeta) ([]*appsv1.DaemonSet, error) {
-	dsList := &appsv1.DaemonSetList{}
-	if err := cli.List(context.TODO(), dsList); err != nil {
-		return nil, err
-	}
-
-	var dss []*appsv1.DaemonSet
-	for i := range dsList.Items {
-		if objects.IsOwnedBy(dsList.Items[i].ObjectMeta, objMeta) {
-			dss = append(dss, &dsList.Items[i])
-		}
-	}
-	return dss, nil
 }
 
 func availableResourceType(nrtInfo nrtv1alpha1.NodeResourceTopology, resName corev1.ResourceName) resource.Quantity {
