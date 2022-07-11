@@ -17,6 +17,7 @@ limitations under the License.
 package controllers
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -29,7 +30,6 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 
 	nodetopologyv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	//+kubebuilder:scaffold:imports
@@ -46,10 +46,8 @@ var testEnv *envtest.Environment
 
 func TestNUMAResourcesOperatorControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
+	RunSpecs(t, "Controller Suite")
 
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Controller Suite",
-		[]Reporter{printer.NewlineReporter{}})
 }
 
 var _ = BeforeSuite(func() {
@@ -88,4 +86,8 @@ var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
+})
+
+var _ = ReportAfterSuite("Controller Suite", func(_ Report) {
+	fmt.Println()
 })
