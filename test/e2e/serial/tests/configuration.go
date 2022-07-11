@@ -253,7 +253,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			wg.Wait()
 
 			Eventually(func() (bool, error) {
-				dss, err := getDsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
+				dss, err := objects.GetDaemonSetsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
 				Expect(err).ToNot(HaveOccurred())
 
 				if len(dss) == 0 {
@@ -280,7 +280,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 			By("checking RTE has the correct image")
 			Eventually(func() (bool, error) {
-				dss, err := getDsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
+				dss, err := objects.GetDaemonSetsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
 				Expect(err).ToNot(HaveOccurred())
 
 				if len(dss) == 0 {
@@ -309,7 +309,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 			By("checking the correct LogLevel")
 			Eventually(func() (bool, error) {
-				dss, err := getDsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
+				dss, err := objects.GetDaemonSetsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
 				Expect(err).ToNot(HaveOccurred())
 
 				if len(dss) == 0 {

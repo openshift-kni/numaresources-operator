@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -72,28 +74,30 @@ var _ = Describe("[Install] continuousIntegration", func() {
 			Expect(nname.Name).ToNot(BeEmpty())
 
 			By("checking that the condition Available=true")
-			var updatedNROObj *nropv1alpha1.NUMAResourcesOperator
-			Eventually(func() bool {
-				updatedNROObj = &nropv1alpha1.NUMAResourcesOperator{}
+			updatedNROObj := &nropv1alpha1.NUMAResourcesOperator{}
+			err := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
 				err := e2eclient.Client.Get(context.TODO(), nname, updatedNROObj)
 				if err != nil {
-					klog.Warningf("failed to get the RTE resource: %v", err)
-					return false
+					klog.Warningf("failed to get the NRO resource: %v", err)
+					return false, err
 				}
 
 				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
 				if cond == nil {
 					klog.Warningf("missing conditions in %v", updatedNROObj)
-					return false
+					return false, err
 				}
 
 				klog.Infof("condition for %s: %v", nname.Name, cond)
-
-				return cond.Status == metav1.ConditionTrue
-			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "RTE condition did not become available")
+				return cond.Status == metav1.ConditionTrue, nil
+			})
+			if err != nil {
+				logRTEPodsLogs(e2eclient.Client, e2eclient.K8sClient, context.TODO(), updatedNROObj, "NRO never reported available")
+			}
+			Expect(err).NotTo(HaveOccurred(), "NRO never reported available")
 
 			By("checking the NRT CRD is deployed")
-			_, err := crds.GetByName(e2eclient.Client, crds.CrdNRTName)
+			_, err = crds.GetByName(e2eclient.Client, crds.CrdNRTName)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking the NRO CRD is deployed")
@@ -101,8 +105,6 @@ var _ = Describe("[Install] continuousIntegration", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking Daemonset is up&running")
-			const DSCheckTimeout = 1 * time.Minute
-			const DSCheckPollingPeriod = 5 * time.Second
 			Eventually(func() bool {
 				ds, err := getDaemonSetByOwnerReference(updatedNROObj.UID)
 				if err != nil {
@@ -130,7 +132,7 @@ var _ = Describe("[Install] continuousIntegration", func() {
 					return false
 				}
 				return true
-			}, DSCheckTimeout, DSCheckPollingPeriod).Should(BeTrue(), "DaemonSet Status was not correct")
+			}).WithTimeout(1*time.Minute).WithPolling(5*time.Second).Should(BeTrue(), "DaemonSet Status was not correct")
 		})
 	})
 })
@@ -195,16 +197,20 @@ var _ = Describe("[Install] durability", func() {
 			Expect(nroKey.Name).NotTo(BeEmpty())
 
 			nroObj := &nropv1alpha1.NUMAResourcesOperator{}
-			Eventually(func() error {
+			err := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
 				err := e2eclient.Client.Get(context.TODO(), nroKey, nroObj)
 				if err != nil {
-					return err
+					return false, err
 				}
 				if len(nroObj.Status.DaemonSets) != 1 {
-					return fmt.Errorf("unsupported daemonsets (/MCP) count: %d", len(nroObj.Status.DaemonSets))
+					return false, fmt.Errorf("unsupported daemonsets (/MCP) count: %d", len(nroObj.Status.DaemonSets))
 				}
-				return nil
-			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).ShouldNot(HaveOccurred(), "inconsistent NRO instance:\n%s", objects.ToYAML(nroObj))
+				return true, nil
+			})
+			if err != nil {
+				logRTEPodsLogs(e2eclient.Client, e2eclient.K8sClient, context.TODO(), nroObj, "NRO not available")
+			}
+			Expect(err).NotTo(HaveOccurred(), "inconsistent NRO instance:\n%s", objects.ToYAML(nroObj))
 
 			dsKey := e2ewait.ObjectKey{
 				Namespace: nroObj.Status.DaemonSets[0].Namespace,
@@ -531,4 +537,44 @@ func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1alpha1.NUMAResourcesOpe
 	}
 
 	return true, nil
+}
+
+func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context.Context, nroObj *nropv1alpha1.NUMAResourcesOperator, reason string) {
+
+	dss, err := objects.GetDaemonSetsOwnedBy(cli, nroObj.ObjectMeta)
+	if err != nil {
+		klog.Warningf("no DaemonSets for %s (%s)", nroObj.Name, nroObj.GetUID())
+		return
+	}
+
+	klog.Infof("%s (%d DaemonSet)", reason, len(dss))
+
+	for _, ds := range dss {
+		klog.Infof("daemonset %s/%s desired %d scheduled %d ready %d", ds.Namespace, ds.Name, ds.Status.DesiredNumberScheduled, ds.Status.CurrentNumberScheduled, ds.Status.NumberReady)
+
+		labSel, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+		if err != nil {
+			klog.Warningf("cannot use DaemonSet label selector as selector: %v", err)
+			continue
+		}
+
+		var podList corev1.PodList
+		err = cli.List(ctx, &podList, &client.ListOptions{
+			Namespace:     ds.Namespace,
+			LabelSelector: labSel,
+		})
+		if err != nil {
+			klog.Warningf("cannot get Pods by DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
+			continue
+		}
+
+		for _, pod := range podList.Items {
+			logs, err := objects.GetLogsForPod(k8sCli, pod.Namespace, pod.Name, containerNameRTE)
+			if err != nil {
+				klog.Warningf("DaemonSet %s/%s -> Pod %s/%s -> error getting logs: %v", ds.Namespace, ds.Name, pod.Namespace, pod.Name, err)
+				continue
+			}
+			klog.Infof("DaemonSet %s/%s -> Pod %s/%s -> logs:\n%s\n-----\n", ds.Namespace, ds.Name, pod.Namespace, pod.Name, logs)
+		}
+	}
 }
