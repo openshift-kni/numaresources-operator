@@ -572,11 +572,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			[]corev1.ResourceList{
 				{
 					corev1.ResourceCPU:    resource.MustParse("14"),
-					corev1.ResourceMemory: resource.MustParse("10Gi"),
+					corev1.ResourceMemory: resource.MustParse("6Gi"),
 				},
 				{
 					corev1.ResourceCPU:    resource.MustParse("10"),
-					corev1.ResourceMemory: resource.MustParse("16Gi"),
+					corev1.ResourceMemory: resource.MustParse("20Gi"),
 				},
 			},
 			[]corev1.ResourceList{},
