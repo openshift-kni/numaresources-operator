@@ -50,12 +50,7 @@ import (
 func TestSerial(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	rr := []Reporter{}
-	if ginkgo_reporters.Polarion.Run {
-		rr = append(rr, &ginkgo_reporters.Polarion)
-	}
-	rr = append(rr, reporters.NewJUnitReporter("numaresources"))
-	RunSpecsWithDefaultAndCustomReporters(t, "NUMAResources serial e2e tests", rr)
+	RunSpecs(t, "NUMAResources serial e2e tests")
 }
 
 var _ = BeforeSuite(func() {
@@ -65,3 +60,11 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(serialconfig.Teardown)
+
+var _ = ReportAfterSuite("e2e serial suite", func(r Report) {
+	if ginkgo_reporters.Polarion.Run {
+		reporters.ReportViaDeprecatedReporter(&ginkgo_reporters.Polarion, r)
+	}
+	reporters.ReportViaDeprecatedReporter(reporters.NewJUnitReporter("numaresources"), r)
+
+})

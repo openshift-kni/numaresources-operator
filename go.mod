@@ -30,7 +30,7 @@ require (
 	k8s.io/klog/v2 v2.30.0
 	k8s.io/kubelet v0.23.3
 	k8s.io/kubernetes v1.23.3
-	kubevirt.io/qe-tools v0.1.6
+	kubevirt.io/qe-tools v0.1.8
 	sigs.k8s.io/controller-runtime v0.11.1
 	sigs.k8s.io/yaml v1.3.0
 )
