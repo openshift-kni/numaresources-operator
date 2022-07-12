@@ -18,7 +18,7 @@ fi
 NO_COLOR=""
 if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
   echo "Terminal does not seem to support colored output, disabling it" 1>&2
-  NO_COLOR="-ginkgo.noColor"
+  NO_COLOR="-ginkgo.no-color"
 fi
 
 if [ -n "${E2E_SERIAL_FOCUS}" ]; then
@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
 			shift
 			;;
 		--no-color)
-			NO_COLOR="-ginkgo.noColor"
+			NO_COLOR="-ginkgo.no-color"
 			shift
 			;;
 		--dry-run)
@@ -117,8 +117,8 @@ function setup() {
 	echo "Running NRO install test suite"
 	runcmd ${BIN_DIR}/e2e-nrop-install.test \
 		--ginkgo.v \
-		--ginkgo.failFast \
-		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-install \
+		--ginkgo.fail-fast \
+		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-install \
 		--test.parallel=1 \
 		--ginkgo.focus='\[Install\] continuousIntegration' \
 		${NO_COLOR}
@@ -131,9 +131,9 @@ function setup() {
 	echo "Running NROScheduler install test suite"
 	runcmd ${BIN_DIR}/e2e-nrop-sched-install.test \
 		--ginkgo.v \
-		--ginkgo.failFast \
+		--ginkgo.fail-fast \
 		--test.parallel=1 \
-		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-install-sched \
+		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-install-sched \
 		${NO_COLOR}
 }
 
@@ -146,7 +146,7 @@ function teardown() {
 	runcmd ${BIN_DIR}/e2e-nrop-sched-uninstall.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-uninstall-sched \
+		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-uninstall-sched \
 		${NO_COLOR}
 
 	RC="$?"
@@ -158,7 +158,7 @@ function teardown() {
 	runcmd ${BIN_DIR}/e2e-nrop-uninstall.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-uninstall \
+		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-uninstall \
 		${NO_COLOR}
 }
 
@@ -171,7 +171,7 @@ function runtests() {
 	runcmd ${BIN_DIR}/e2e-nrop-serial.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.reportFile=${REPORT_FILE} \
+		--ginkgo.junit-report=${REPORT_FILE} \
 		${NO_COLOR} \
 		${SKIP} \
 		${FOCUS}
