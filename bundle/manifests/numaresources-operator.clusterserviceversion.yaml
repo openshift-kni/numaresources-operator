@@ -58,6 +58,10 @@ spec:
         path: imageSpec
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
+      - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll". Defaults
+          to "Normal".'
+        displayName: RTE log verbosity
+        path: logLevel
       - description: Group of Nodes to enable RTE on
         displayName: Group of nodes to enable RTE on
         path: nodeGroups
@@ -84,6 +88,10 @@ spec:
         path: imageSpec
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
+      - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll". Defaults
+          to "Normal".'
+        displayName: Scheduler log verbosity
+        path: logLevel
       - description: Scheduler name to be used in pod templates
         displayName: Scheduler name
         path: schedulerName
