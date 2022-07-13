@@ -100,13 +100,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 # mandatory
-if [ -z "${REPORT_FILE}" ] && [ -z "${REPORT_DIR}" ]; then
+if [ -z "${REPORT_DIR}" ]; then
 	echo "invalid report directory"
 	exit 1
 fi
 
 if [ -z "${REPORT_FILE}" ]; then
-	REPORT_FILE="${REPORT_DIR}/e2e-serial-run"
+	REPORT_FILE="e2e-serial-run"
 fi
 
 function setup() {
@@ -114,11 +114,14 @@ function setup() {
 		return 0
 	fi
 
+	echo "Ginkgo Version: " `ginkgo version`
+
 	echo "Running NRO install test suite"
 	runcmd ${BIN_DIR}/e2e-nrop-install.test \
 		--ginkgo.v \
 		--ginkgo.fail-fast \
-		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-install \
+		--ginkgo.output-dir=${REPORT_DIR} \
+		--ginkgo.junit-report=e2e-serial-install \
 		--test.parallel=1 \
 		--ginkgo.focus='\[Install\] continuousIntegration' \
 		${NO_COLOR}
@@ -133,7 +136,8 @@ function setup() {
 		--ginkgo.v \
 		--ginkgo.fail-fast \
 		--test.parallel=1 \
-		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-install-sched \
+		--ginkgo.output-dir=${REPORT_DIR} \
+		--ginkgo.junit-report=e2e-serial-install-sched \
 		${NO_COLOR}
 }
 
@@ -146,7 +150,8 @@ function teardown() {
 	runcmd ${BIN_DIR}/e2e-nrop-sched-uninstall.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-uninstall-sched \
+		--ginkgo.output-dir=${REPORT_DIR} \
+		--ginkgo.junit-report=e2e-serial-uninstall-sched \
 		${NO_COLOR}
 
 	RC="$?"
@@ -158,7 +163,8 @@ function teardown() {
 	runcmd ${BIN_DIR}/e2e-nrop-uninstall.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-uninstall \
+		--ginkgo.output-dir=${REPORT_DIR} \
+		--ginkgo.junit-report=e2e-serial-uninstall \
 		${NO_COLOR}
 }
 
@@ -171,6 +177,7 @@ function runtests() {
 	runcmd ${BIN_DIR}/e2e-nrop-serial.test \
 		--ginkgo.v \
 		--test.parallel=1 \
+		--ginkgo.output-dir=${REPORT_DIR} \
 		--ginkgo.junit-report=${REPORT_FILE} \
 		${NO_COLOR} \
 		${SKIP} \

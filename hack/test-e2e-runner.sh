@@ -5,6 +5,8 @@ set -eu
 
 source hack/common.sh
 
+echo "Ginkgo Version: " `ginkgo version`
+
 RUNNER="$( realpath ${REPO_DIR}/bin/run-e2e-nrop-serial.sh )"
 
 echo "basic sanity tests for ${RUNNER}:"
@@ -27,7 +29,7 @@ echo "[PASS] --dry-run returned zero exit code"
 echo "[TEST] --dry-run produces expected output"
 GOT=$( $RUNNER --dry-run --no-color)
 EXPECTED="Running Serial, disruptive E2E Tests
-Running: /usr/local/bin/e2e-nrop-serial.test --ginkgo.v --test.parallel=1 --ginkgo.junit-report=/tmp/artifacts/nrop/e2e-serial-run -ginkgo.no-color"
+Running: /usr/local/bin/e2e-nrop-serial.test --ginkgo.v --test.parallel=1 --ginkgo.output-dir=/tmp/artifacts/nrop --ginkgo.junit-report=e2e-serial-run -ginkgo.no-color"
 if [ "${GOT}" != "${EXPECTED}" ]; then
 	echo "[FAIL] --dry-run unexpected output: ${GOT}"
 	exit 1
