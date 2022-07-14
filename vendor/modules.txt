@@ -238,8 +238,9 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/client
 # github.com/k8stopologyawareschedwg/podfingerprint v0.0.2
 ## explicit; go 1.17
 github.com/k8stopologyawareschedwg/podfingerprint
-# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.6.1-0.20220615154701-bffcbc84fc3b
+# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.6.1-0.20220711155932-040caf11fd48
 ## explicit; go 1.18
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/dump
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8sannotations
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8shelpers
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/kubeconf
@@ -253,7 +254,6 @@ github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonito
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/sysinfo
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/topologypolicy
-github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/utils
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/client
