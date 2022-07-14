@@ -4,7 +4,7 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Basic Install
-    olm.skipRange: '>=4.10.0 <4.11.0'
+    olm.skipRange: '>=4.11.0 <4.12.0'
   name: numaresources-operator.v0.0.0
   namespace: placeholder
 spec:
@@ -104,4 +104,4 @@ spec:
   minKubeVersion: 1.23.0
   provider:
     name: Red Hat
-  version: 4.11.0
+  version: 4.12.0
