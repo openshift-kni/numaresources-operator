@@ -244,7 +244,8 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI() error {
-	klog.Info("APISync start")
+	klog.V(4).Info("APISync start")
+	defer klog.V(4).Info("APISync stop")
 
 	existing := apistate.FromClient(context.TODO(), r.Client, r.Platform, r.APIManifests)
 
@@ -257,7 +258,8 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI() error {
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree) error {
-	klog.Info("Machine Config Sync start")
+	klog.V(4).Info("Machine Config Sync start")
+	defer klog.V(4).Info("Machine Config Sync stop")
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
 
@@ -281,6 +283,9 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree) bool {
+	klog.V(4).Info("Machine Config Status Sync start")
+	defer klog.V(4).Info("Machine Config Status Sync stop")
+
 	instance.Status.MachineConfigPools = []nropv1alpha1.MachineConfigPool{}
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
@@ -302,7 +307,8 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instanc
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree) ([]nropv1alpha1.NamespacedName, error) {
-	klog.Info("RTESync start")
+	klog.V(4).Info("RTESync start")
+	defer klog.V(4).Info("RTESync stop")
 
 	errorList := r.deleteUnusedDaemonSets(ctx, instance, trees)
 	if len(errorList) > 0 {
