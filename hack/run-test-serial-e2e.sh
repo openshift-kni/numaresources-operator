@@ -120,7 +120,6 @@ function setup() {
 	runcmd ${BIN_DIR}/e2e-nrop-install.test \
 		--ginkgo.v \
 		--ginkgo.fail-fast \
-		--ginkgo.output-dir=${REPORT_DIR} \
 		--ginkgo.junit-report=e2e-serial-install \
 		--test.parallel=1 \
 		--ginkgo.focus='\[Install\] continuousIntegration' \
@@ -136,7 +135,6 @@ function setup() {
 		--ginkgo.v \
 		--ginkgo.fail-fast \
 		--test.parallel=1 \
-		--ginkgo.output-dir=${REPORT_DIR} \
 		--ginkgo.junit-report=e2e-serial-install-sched \
 		${NO_COLOR}
 }
@@ -150,7 +148,6 @@ function teardown() {
 	runcmd ${BIN_DIR}/e2e-nrop-sched-uninstall.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.output-dir=${REPORT_DIR} \
 		--ginkgo.junit-report=e2e-serial-uninstall-sched \
 		${NO_COLOR}
 
@@ -163,7 +160,6 @@ function teardown() {
 	runcmd ${BIN_DIR}/e2e-nrop-uninstall.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.output-dir=${REPORT_DIR} \
 		--ginkgo.junit-report=e2e-serial-uninstall \
 		${NO_COLOR}
 }
@@ -177,7 +173,6 @@ function runtests() {
 	runcmd ${BIN_DIR}/e2e-nrop-serial.test \
 		--ginkgo.v \
 		--test.parallel=1 \
-		--ginkgo.output-dir=${REPORT_DIR} \
 		--ginkgo.junit-report=${REPORT_FILE} \
 		${NO_COLOR} \
 		${SKIP} \

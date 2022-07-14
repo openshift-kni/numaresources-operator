@@ -11,8 +11,8 @@ if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
 fi
 
 # Make sure that we always properly clean the environment
-trap '{ echo "Running NRO uninstall test suite"; ${BIN_DIR}/e2e-nrop-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.output-dir=/tmp/artifacts --ginkgo.junit-report=uninstall; }' EXIT SIGINT SIGTERM SIGSTOP
+trap '{ echo "Running NRO uninstall test suite"; ${BIN_DIR}/e2e-nrop-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.junit-report=uninstall; }' EXIT SIGINT SIGTERM SIGSTOP
 
 # Run install test suite
 echo "Running NRO install test suite"
-${BIN_DIR}/e2e-nrop-install.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.output-dir=/tmp/artifacts --ginkgo.junit-report=install --ginkgo.focus='\[Install\] durability'
+${BIN_DIR}/e2e-nrop-install.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.junit-report=install --ginkgo.focus='\[Install\] durability'
