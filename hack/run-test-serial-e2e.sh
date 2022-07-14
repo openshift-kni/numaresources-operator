@@ -18,14 +18,14 @@ fi
 NO_COLOR=""
 if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
   echo "Terminal does not seem to support colored output, disabling it" 1>&2
-  NO_COLOR="-ginkgo.no-color"
+  NO_COLOR="-no-color"
 fi
 
 if [ -n "${E2E_SERIAL_FOCUS}" ]; then
-	FOCUS="-ginkgo.focus=${E2E_SERIAL_FOCUS}"
+	FOCUS="-focus=${E2E_SERIAL_FOCUS}"
 fi
 if [ -n "${E2E_SERIAL_SKIP}" ]; then
-	SKIP="-ginkgo.skip=${E2E_SERIAL_SKIP}"
+	SKIP="-skip=${E2E_SERIAL_SKIP}"
 fi
 
 DRY_RUN="false"
@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
 			shift
 			;;
 		--no-color)
-			NO_COLOR="-ginkgo.no-color"
+			NO_COLOR="-no-color"
 			shift
 			;;
 		--dry-run)
@@ -56,12 +56,12 @@ while [[ $# -gt 0 ]]; do
 			shift
 			;;
 		--focus)
-			FOCUS="-ginkgo.focus=$2"
+			FOCUS="-focus=$2"
 			shift
 			shift
 			;;
 		--skip)
-			SKIP="-ginkgo.skip=$2"
+			SKIP="-skip=$2"
 			shift
 			shift
 			;;
@@ -114,17 +114,16 @@ function setup() {
 		return 0
 	fi
 
-	echo "Ginkgo Version: " `ginkgo version`
-
 	echo "Running NRO install test suite"
-	runcmd ${BIN_DIR}/e2e-nrop-install.test \
-		--ginkgo.v \
-		--ginkgo.fail-fast \
-		--ginkgo.output-dir=${REPORT_DIR} \
-		--ginkgo.junit-report=e2e-serial-install \
-		--test.parallel=1 \
-		--ginkgo.focus='\[Install\] continuousIntegration' \
-		${NO_COLOR}
+	runcmd ginkgo \
+		-v \
+		-fail-fast \
+		-output-dir=${REPORT_DIR} \
+		-junit-report=e2e-serial-install \
+		-parallel=1 \
+		-focus='\[Install\] continuousIntegration' \
+		${NO_COLOR} \
+		${BIN_DIR}/e2e-nrop-install.test
 
 	RC="$?"
 	if [[ "${RC}" != "0" ]]; then
@@ -132,13 +131,14 @@ function setup() {
 	fi
 
 	echo "Running NROScheduler install test suite"
-	runcmd ${BIN_DIR}/e2e-nrop-sched-install.test \
-		--ginkgo.v \
-		--ginkgo.fail-fast \
-		--test.parallel=1 \
-		--ginkgo.output-dir=${REPORT_DIR} \
-		--ginkgo.junit-report=e2e-serial-install-sched \
-		${NO_COLOR}
+	runcmd ginkgo \
+		-v \
+		-fail-fast \
+		-parallel=1 \
+		-output-dir=${REPORT_DIR} \
+		-junit-report=e2e-serial-install-sched \
+		${NO_COLOR} \
+		${BIN_DIR}/e2e-nrop-sched-install.test
 }
 
 function teardown() {
@@ -147,12 +147,13 @@ function teardown() {
 	fi
 
 	echo "Running NROScheduler uninstall test suite";
-	runcmd ${BIN_DIR}/e2e-nrop-sched-uninstall.test \
-		--ginkgo.v \
-		--test.parallel=1 \
-		--ginkgo.output-dir=${REPORT_DIR} \
-		--ginkgo.junit-report=e2e-serial-uninstall-sched \
-		${NO_COLOR}
+	runcmd ginkgo \
+		-v \
+		-parallel=1 \
+		-output-dir=${REPORT_DIR} \
+		-junit-report=e2e-serial-uninstall-sched \
+		${NO_COLOR} \
+		${BIN_DIR}/e2e-nrop-sched-uninstall.test
 
 	RC="$?"
 	if [[ "${RC}" != "0" ]]; then
@@ -160,12 +161,13 @@ function teardown() {
 	fi
 
 	echo "Running NRO uninstall test suite";
-	runcmd ${BIN_DIR}/e2e-nrop-uninstall.test \
-		--ginkgo.v \
-		--test.parallel=1 \
-		--ginkgo.output-dir=${REPORT_DIR} \
-		--ginkgo.junit-report=e2e-serial-uninstall \
-		${NO_COLOR}
+	runcmd ginkgo \
+		-v \
+		-parallel=1 \
+		-output-dir=${REPORT_DIR} \
+		-junit-report=e2e-serial-uninstall \
+		${NO_COLOR} \
+		${BIN_DIR}/e2e-nrop-uninstall.test
 }
 
 function runtests() {
@@ -174,14 +176,15 @@ function runtests() {
 		return 0
 	fi
 	echo "Running Serial, disruptive E2E Tests"
-	runcmd ${BIN_DIR}/e2e-nrop-serial.test \
-		--ginkgo.v \
-		--test.parallel=1 \
-		--ginkgo.output-dir=${REPORT_DIR} \
-		--ginkgo.junit-report=${REPORT_FILE} \
+	runcmd ginkgo \
+		-v \
+		-parallel=1 \
+		-output-dir=${REPORT_DIR} \
+		-junit-report=${REPORT_FILE} \
 		${NO_COLOR} \
 		${SKIP} \
-		${FOCUS}
+		${FOCUS} \
+		${BIN_DIR}/e2e-nrop-serial.test
 }
 
 # Make sure that we always properly clean the environment
