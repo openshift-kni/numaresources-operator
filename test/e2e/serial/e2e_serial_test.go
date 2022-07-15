@@ -41,10 +41,16 @@ import (
 	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/klog/v2"
+
 	ginkgo_reporters "kubevirt.io/qe-tools/pkg/ginkgo-reporters"
 
+	nropmcp "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	_ "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
+	"github.com/openshift-kni/numaresources-operator/test/utils/hugepages"
+	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 )
 
 func TestSerial(t *testing.T) {
@@ -55,13 +61,40 @@ func TestSerial(t *testing.T) {
 		rr = append(rr, &ginkgo_reporters.Polarion)
 	}
 	rr = append(rr, reporters.NewJUnitReporter("numaresources"))
-	RunSpecsWithDefaultAndCustomReporters(t, "NUMAResources serial e2e tests", rr)
+	//RunSpecsWithDefaultAndCustomReporters(t, "NUMAResources serial e2e tests", rr)
 }
 
 var _ = BeforeSuite(func() {
 	// this must be the very first thing
 	rand.Seed(time.Now().UnixNano())
 	serialconfig.Setup()
+	err := setupHugepages()
+	if err != nil {
+		klog.Errorf("failed to configure hugpages: %v", err)
+	}
 })
 
+//TODO do we need to teardown hp settings? can that be by deleting the mc?
 var _ = AfterSuite(serialconfig.Teardown)
+
+func setupHugepages() error {
+	profile := hugepages.GetProfileWithHugepages()
+	mc, err := hugepages.GetHugepagesMachineConfig(profile)
+	if err != nil {
+		klog.Errorf("could not generate machineconfig with hugpages settings: %v", err)
+		return err
+	}
+
+	nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+	err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
+	Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
+
+	mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
+	Expect(err).ToNot(HaveOccurred())
+
+	err = hugepages.ApplyMachineConfig(mc, mcp)
+	if err != nil {
+		klog.Errorf("could not apply the machineconfig with hugpages settings: %v", err)
+		return err
+	}
+}
