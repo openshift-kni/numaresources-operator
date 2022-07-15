@@ -1,5 +1,4 @@
-# Build the manager binary
-FROM golang:1.18 as builder
+FROM docker.io/golang:1.18 AS builder
 
 WORKDIR /go/src/github.com/openshift-kni/numaresources-operator
 COPY . .
