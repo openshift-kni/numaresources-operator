@@ -269,7 +269,7 @@ var _ = Describe("[Install] durability", func() {
 			By("checking there are no leftovers")
 			// by taking the ns from the ds we're avoiding the need to figure out in advanced
 			// at which ns we should look for the resources
-			mf, err := rte.GetManifests(configuration.Platform, ds.Namespace)
+			mf, err := rte.GetManifests(configuration.Plat, configuration.PlatVersion, ds.Namespace)
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() bool {
@@ -348,7 +348,7 @@ func overallDeployment() nroDeployment {
 	var matchLabels map[string]string
 	var deployedObj nroDeployment
 
-	if configuration.Platform == platform.Kubernetes {
+	if configuration.Plat == platform.Kubernetes {
 		mcpObj := objects.TestMCP()
 		By(fmt.Sprintf("creating the machine config pool object: %s", mcpObj.Name))
 		err := e2eclient.Client.Create(context.TODO(), mcpObj)
@@ -357,7 +357,7 @@ func overallDeployment() nroDeployment {
 		matchLabels = map[string]string{"test": "test"}
 	}
 
-	if configuration.Platform == platform.OpenShift {
+	if configuration.Plat == platform.OpenShift {
 		// TODO: should this be configurable?
 		matchLabels = objects.OpenshiftMatchLabels()
 	}
@@ -392,7 +392,7 @@ func overallDeployment() nroDeployment {
 	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
-	if configuration.Platform == platform.OpenShift {
+	if configuration.Plat == platform.OpenShift {
 		Eventually(func() bool {
 			updated, err := isMachineConfigPoolsUpdated(nroObj)
 			if err != nil {
@@ -450,7 +450,7 @@ func teardownDeployment(nrod nroDeployment, timeout time.Duration) {
 
 	wg.Wait()
 
-	if configuration.Platform == platform.OpenShift {
+	if configuration.Plat == platform.OpenShift {
 		Eventually(func() bool {
 			updated, err := isMachineConfigPoolsUpdatedAfterDeletion(nrod.nroObj)
 			if err != nil {
