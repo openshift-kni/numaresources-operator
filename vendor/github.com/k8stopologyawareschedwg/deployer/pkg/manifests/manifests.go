@@ -429,7 +429,7 @@ func DaemonSet(component, subComponent string, plat platform.Platform, namespace
 	return ds, nil
 }
 
-func MachineConfig(component string) (*machineconfigv1.MachineConfig, error) {
+func MachineConfig(component string, ver platform.Version) (*machineconfigv1.MachineConfig, error) {
 	if component != ComponentResourceTopologyExporter {
 		return nil, fmt.Errorf("component %q is not an %q component", component, ComponentResourceTopologyExporter)
 	}
@@ -444,7 +444,7 @@ func MachineConfig(component string) (*machineconfigv1.MachineConfig, error) {
 		return nil, fmt.Errorf("unexpected type, got %t", obj)
 	}
 
-	ignitionConfig, err := getIgnitionConfig()
+	ignitionConfig, err := getIgnitionConfig(ver)
 	if err != nil {
 		return nil, err
 	}
@@ -453,11 +453,17 @@ func MachineConfig(component string) (*machineconfigv1.MachineConfig, error) {
 	return mc, nil
 }
 
-func getIgnitionConfig() ([]byte, error) {
+func getIgnitionConfig(ver platform.Version) ([]byte, error) {
 	var files []igntypes.File
 
+	// get SELinux policy
+	selinuxPolicy, err := rteassets.GetSELinuxPolicy(ver)
+	if err != nil {
+		return nil, err
+	}
+
 	// load SELinux policy
-	files = addFileToIgnitionConfig(files, rteassets.SELinuxPolicy, 0644, seLinuxRTEPolicyDst)
+	files = addFileToIgnitionConfig(files, selinuxPolicy, 0644, seLinuxRTEPolicyDst)
 
 	// load RTE notifier OCI hook config
 	notifierHookConfigContent, err := getTemplateContent(rteassets.HookConfigRTENotifier, map[string]string{

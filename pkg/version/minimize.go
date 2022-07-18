@@ -11,33 +11,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright 2021 Red Hat, Inc.
+ * Copyright 2022 Red Hat, Inc.
  */
 
-package platform
+package version
 
-import "strings"
+import (
+	"strings"
 
-type Platform string
-
-const (
-	Unknown    = Platform("Unknown")
-	Kubernetes = Platform("Kubernetes")
-	OpenShift  = Platform("OpenShift")
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 )
 
-func (p Platform) String() string {
-	return string(p)
-}
-
-func ParsePlatform(plat string) (Platform, bool) {
-	plat = strings.ToLower(plat)
-	switch plat {
-	case "kubernetes":
-		return Kubernetes, true
-	case "openshift":
-		return OpenShift, true
-	default:
-		return Unknown, false
+func Minimize(ver platform.Version) platform.Version {
+	items := strings.FieldsFunc(ver.String(), func(c rune) bool {
+		return c == '-'
+	})
+	if len(items) == 0 {
+		return ver
 	}
+	ret, err := platform.ParseVersion(items[0])
+	if err != nil {
+		return ver
+	}
+	return ret
 }

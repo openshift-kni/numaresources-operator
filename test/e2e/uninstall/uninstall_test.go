@@ -82,14 +82,14 @@ var _ = Describe("[Uninstall]", func() {
 			err = unpause()
 			Expect(err).NotTo(HaveOccurred())
 
-			if configuration.Platform == platform.Kubernetes {
+			if configuration.Plat == platform.Kubernetes {
 				mcpObj := objects.TestMCP()
 				if err := e2eclient.Client.Delete(context.TODO(), mcpObj); err != nil {
 					klog.Warningf("failed to delete the machine config pool %q", mcpObj.Name)
 				}
 			}
 
-			if configuration.Platform == platform.OpenShift {
+			if configuration.Plat == platform.OpenShift {
 				Eventually(func() bool {
 					mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
 					if err != nil {

@@ -80,6 +80,7 @@ func main() {
 	var enableLeaderElection bool
 	var probeAddr string
 	var platformName string
+	var platformVersion string
 	var detectPlatformOnly bool
 	var renderMode bool
 	var renderNamespace string
@@ -93,6 +94,7 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&platformName, "platform", "", "platform to deploy on - leave empty to autodetect")
+	flag.StringVar(&platformVersion, "platform-version", "", "platform version to deploy on - leave empty to autodetect")
 	flag.BoolVar(&detectPlatformOnly, "detect-platform-only", false, "detect and report the platform, then exits")
 	flag.BoolVar(&renderMode, "render", false, "outputs the rendered manifests, then exits")
 	flag.StringVar(&renderNamespace, "render-namespace", defaultNamespace, "outputs the manifests rendered using the given namespace")
@@ -116,22 +118,29 @@ func main() {
 	klog.InfoS("starting", "program", version.ProgramName(), "version", version.Get(), "gitcommit", version.GetGitCommit(), "golang", runtime.Version())
 
 	// if it is unknown, it's fine
-	userPlatform, _ := platform.FromString(platformName)
-	plat, err := detectPlatform(userPlatform)
-	if err != nil {
-		klog.ErrorS(err, "unable to detect the cluster platform")
-		os.Exit(1)
-	}
+	userPlatform, _ := platform.ParsePlatform(platformName)
+	userPlatformVersion, _ := platform.ParseVersion(platformVersion)
 
+	plat, reason, err := detect.FindPlatform(userPlatform)
+	klog.Infof("platform %s (%s)", plat.Discovered, reason)
 	clusterPlatform := plat.Discovered
 	if clusterPlatform == platform.Unknown {
-		klog.ErrorS(fmt.Errorf("unknown platform"), "cannot autodetect the platform, and no platform given")
+		klog.ErrorS(err, "cannot autodetect the platform, and no platform given")
 		os.Exit(1)
 	}
-	klog.InfoS("detected cluster", "platform", clusterPlatform)
+
+	platVersion, source, err := detect.FindVersion(clusterPlatform, userPlatformVersion)
+	klog.Infof("platform version %s (%s)", platVersion.Discovered, source)
+	clusterPlatformVersion := version.Minimize(platVersion.Discovered)
+	if clusterPlatformVersion == platform.MissingVersion {
+		klog.ErrorS(err, "cannot autodetect the platform version, and no platform given")
+		os.Exit(1)
+	}
+
+	klog.InfoS("detected cluster", "platform", clusterPlatform, "version", clusterPlatformVersion)
 
 	if detectPlatformOnly {
-		fmt.Printf("platform=%s\n", clusterPlatform)
+		fmt.Printf("platform=%s version=%s\n", clusterPlatform, clusterPlatformVersion)
 		os.Exit(0)
 	}
 
@@ -149,7 +158,7 @@ func main() {
 		namespace = defaultNamespace
 	}
 
-	rteManifests, err := rtemanifests.GetManifests(clusterPlatform, namespace)
+	rteManifests, err := rtemanifests.GetManifests(clusterPlatform, clusterPlatformVersion, namespace)
 	if err != nil {
 		klog.ErrorS(err, "unable to load the RTE manifests")
 		os.Exit(1)
@@ -267,37 +276,6 @@ func main() {
 		klog.ErrorS(err, "problem running manager")
 		os.Exit(1)
 	}
-}
-
-type detectionOutput struct {
-	AutoDetected platform.Platform `json:"autoDetected"`
-	UserSupplied platform.Platform `json:"userSupplied"`
-	Discovered   platform.Platform `json:"discovered"`
-}
-
-func detectPlatform(userSupplied platform.Platform) (detectionOutput, error) {
-	do := detectionOutput{
-		AutoDetected: platform.Unknown,
-		UserSupplied: userSupplied,
-		Discovered:   platform.Unknown,
-	}
-
-	if do.UserSupplied != platform.Unknown {
-		klog.InfoS("user-supplied", "platform", do.UserSupplied)
-		do.Discovered = do.UserSupplied
-		return do, nil
-	}
-
-	dp, err := detect.Detect()
-	if err != nil {
-		klog.ErrorS(err, "failed to detect the platform")
-		return do, err
-	}
-
-	klog.InfoS("auto-detected", "platform", dp)
-	do.AutoDetected = dp
-	do.Discovered = do.AutoDetected
-	return do, nil
 }
 
 func renderObjects(objs []client.Object) error {
