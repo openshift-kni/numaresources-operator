@@ -154,6 +154,12 @@ spec:
         - apiGroups:
           - config.openshift.io
           resources:
+          - clusteroperators
+          verbs:
+          - get
+        - apiGroups:
+          - config.openshift.io
+          resources:
           - clusterversions
           verbs:
           - list

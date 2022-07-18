@@ -15,14 +15,14 @@ func main() {
 	flag.StringVar(&platformName, "is-platform", "", "check if the detected platform matches the given one")
 	flag.Parse()
 
-	clusterPlatform, err := detect.Detect()
+	clusterPlatform, err := detect.Platform()
 	if err != nil {
 		log.Fatalf("error detecting the platform: %v", err)
 	}
 
 	if platformName != "" {
 		ret := 1
-		userPlatform, ok := platform.FromString(platformName)
+		userPlatform, ok := platform.ParsePlatform(platformName)
 		if !ok {
 			log.Fatalf("error parsing the user platform: %q", platformName)
 		}
@@ -32,5 +32,6 @@ func main() {
 		}
 		os.Exit(ret)
 	}
+
 	fmt.Printf("%s\n", clusterPlatform)
 }
