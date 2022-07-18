@@ -130,7 +130,7 @@ func main() {
 	}
 
 	platVersion, source := detect.FindVersion(clusterPlatform, userPlatformVersion)
-	klog.Infof("platform version %s (%s)", plat.Discovered, source)
+	klog.Infof("platform version %s (%s)", platVersion.Discovered, source)
 	clusterPlatformVersion := platVersion.Discovered
 	if clusterPlatformVersion == platform.MissingVersion {
 		klog.ErrorS(fmt.Errorf("unknown platform version"), "cannot autodetect the platform version, and no platform given")
