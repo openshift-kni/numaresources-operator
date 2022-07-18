@@ -43,7 +43,7 @@ const (
 	DetectedFailure     string = "autodetection failed"
 )
 
-func FindPlatform(userSupplied platform.Platform) (PlatformInfo, string) {
+func FindPlatform(userSupplied platform.Platform) (PlatformInfo, string, error) {
 	do := PlatformInfo{
 		AutoDetected: platform.Unknown,
 		UserSupplied: userSupplied,
@@ -52,20 +52,20 @@ func FindPlatform(userSupplied platform.Platform) (PlatformInfo, string) {
 
 	if do.UserSupplied != platform.Unknown {
 		do.Discovered = do.UserSupplied
-		return do, DetectedFromUser
+		return do, DetectedFromUser, nil
 	}
 
 	dp, err := Platform()
 	if err != nil {
-		return do, DetectedFailure
+		return do, DetectedFailure, err
 	}
 
 	do.AutoDetected = dp
 	do.Discovered = do.AutoDetected
-	return do, DetectedFromCluster
+	return do, DetectedFromCluster, nil
 }
 
-func FindVersion(plat platform.Platform, userSupplied platform.Version) (VersionInfo, string) {
+func FindVersion(plat platform.Platform, userSupplied platform.Version) (VersionInfo, string, error) {
 	do := VersionInfo{
 		AutoDetected: platform.MissingVersion,
 		UserSupplied: userSupplied,
@@ -74,15 +74,15 @@ func FindVersion(plat platform.Platform, userSupplied platform.Version) (Version
 
 	if do.UserSupplied != platform.MissingVersion {
 		do.Discovered = do.UserSupplied
-		return do, DetectedFromUser
+		return do, DetectedFromUser, nil
 	}
 
 	dv, err := Version(plat)
 	if err != nil {
-		return do, DetectedFailure
+		return do, DetectedFailure, err
 	}
 
 	do.AutoDetected = dv
 	do.Discovered = do.AutoDetected
-	return do, DetectedFromCluster
+	return do, DetectedFromCluster, nil
 }

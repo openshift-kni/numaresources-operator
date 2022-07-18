@@ -613,8 +613,8 @@ github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8
 github.com/julz/importas v0.0.0-20210419104244-841f0c0fe66d/go.mod h1:oSFU2R4XK/P7kNBrnL/FEQlDGN1/6WoxXEjSSXO0DV0=
 github.com/jung-kurt/gofpdf v1.0.3-0.20190309125859-24315acbbda5/go.mod h1:7Id9E/uU8ce6rXgefFLlgrJj/GYY22cpxn+r32jIOes=
 github.com/k0kubun/colorstring v0.0.0-20150214042306-9440f1994b88/go.mod h1:3w7q1U84EfirKl04SVQ/s7nPm1ZPhiXd34z40TNz36k=
-github.com/k8stopologyawareschedwg/deployer v0.7.0 h1:fib0BNEAsREinVx0rCaV7c3Fd2bm1FvCLS2l0WAurgw=
-github.com/k8stopologyawareschedwg/deployer v0.7.0/go.mod h1:MSR75HEnznUBtJWOiNmdtoLZKNvHbpb4RUCbDdIArfg=
+github.com/k8stopologyawareschedwg/deployer v0.7.1-0.20220718095602-ea39f76b1222 h1:7yebYmRbMXmEJwhOkdlnyaVk/2/DxsXKjE2UjQNn2dY=
+github.com/k8stopologyawareschedwg/deployer v0.7.1-0.20220718095602-ea39f76b1222/go.mod h1:MSR75HEnznUBtJWOiNmdtoLZKNvHbpb4RUCbDdIArfg=
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12 h1:NhXbOjO1st8hIcVpegr3zw/AGG12vs3z//tCDDcfPpE=
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12/go.mod h1:AkACMQGiTgCt0lQw3m7TTU8PLH9lYKNK5e9DqFf5VuM=
 github.com/k8stopologyawareschedwg/podfingerprint v0.0.2 h1:VkwY0dWu9dID7aKVbYF/vzCA4Hj8c8oXEWN0ZG/0boE=
