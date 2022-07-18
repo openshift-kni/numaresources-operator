@@ -19,14 +19,14 @@ package runtime
 import (
 	"fmt"
 	"path/filepath"
-	"runtime"
+	goruntime "runtime"
 )
 
 func GetBinariesPath() (string, error) {
-	_, file, _, ok := runtime.Caller(0)
+	_, file, _, ok := goruntime.Caller(0)
 	if !ok {
 		return "", fmt.Errorf("cannot retrieve tests directory")
 	}
 	basedir := filepath.Dir(file)
-	return filepath.Abs(filepath.Join(basedir, "..", "..", "..", "..", "bin"))
+	return filepath.Abs(filepath.Join(basedir, "..", "..", "..", "bin"))
 }

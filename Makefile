@@ -181,7 +181,10 @@ binary-e2e-sched:
 binary-e2e-serial:
 	go test -c -v -o bin/e2e-nrop-serial.test ./test/e2e/serial
 
-binary-e2e-all: goversion binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial runner-e2e-serial build-pause
+binary-e2e-tools:
+	go test -c -v -o bin/e2e-nrop-tools.test ./test/e2e/tools
+
+binary-e2e-all: goversion binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial binary-e2e-tools runner-e2e-serial build-pause
 
 runner-e2e-serial: bin/envsubst
 	hack/render-e2e-runner.sh
