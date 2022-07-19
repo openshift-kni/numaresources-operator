@@ -106,12 +106,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes))
 			}
 
-			tmPolicy := nrtv1alpha1.SingleNUMANodePodLevel
-			nrtCandidates = e2enrt.FilterTopologyManagerPolicy(nrtCandidates, tmPolicy)
-			if len(nrtCandidates) < neededNodes {
-				Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrtCandidates)))
-			}
-
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
 			//TODO: we should calculate requiredRes from NUMA zones in cluster nodes instead.
@@ -284,12 +278,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes))
 			}
 
-			tmPolicy := nrtv1alpha1.SingleNUMANodePodLevel
-			nrtCandidates = e2enrt.FilterTopologyManagerPolicy(nrtCandidates, tmPolicy)
-			if len(nrtCandidates) < neededNodes {
-				Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrtCandidates)))
-			}
-
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
 			targetNodeName, ok := nrtCandidateNames.PopAny()
@@ -384,7 +372,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					Expect(err).ToNot(HaveOccurred(), "unable to get pod %s/%s to be Running after %v", pod.Namespace, pod.Name, podRunningTimeout)
 
 				} else {
-					isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, string(tmPolicy))
+					isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
 					if err != nil {
 						_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 					}
