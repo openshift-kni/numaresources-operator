@@ -308,13 +308,12 @@ var _ = Describe("[Install] durability", func() {
 			}, 5*time.Minute, 10*time.Second).Should(BeTrue())
 
 			By("redeploy with other parameters")
+			nroObjRedep := objects.TestNRO(objects.EmptyMatchLabels())
+			nroObjRedep.Spec = *deployedObj.nroObj.Spec.DeepCopy()
 			// TODO change to an image which is test dedicated
-			nroObj.Spec.ExporterImage = e2eimages.RTETestImageCI
-			// resourceVersion should not be set on objects to be created
-			// TODO: don't reuse existing objects
-			nroObj.ResourceVersion = ""
+			nroObjRedep.Spec.ExporterImage = e2eimages.RTETestImageCI
 
-			err = e2eclient.Client.Create(context.TODO(), nroObj)
+			err = e2eclient.Client.Create(context.TODO(), nroObjRedep)
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() bool {
