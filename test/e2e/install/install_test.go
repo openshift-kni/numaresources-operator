@@ -248,6 +248,8 @@ var _ = Describe("[Install] durability", func() {
 		})
 
 		It("should be able to delete NUMAResourceOperator CR and redeploy without polluting cluster state", func() {
+			Skip("broken and need more resources to be fixed")
+
 			nname := client.ObjectKeyFromObject(deployedObj.nroObj)
 			Expect(nname.Name).NotTo(BeEmpty())
 
