@@ -421,15 +421,19 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.List(context.TODO(), cmList)
 			Expect(err).ToNot(HaveOccurred())
 
+			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), targetedKC)
+			Expect(err).ToNot(HaveOccurred())
+
 			var nropCm *corev1.ConfigMap
 			for i := 0; i < len(cmList.Items); i++ {
-				if objects.IsOwnedBy(cmList.Items[i].ObjectMeta, nroOperObj.ObjectMeta) {
-					// there is only one ConfigMap owned by NUMAResourcesOperator
+				// the owner should be the KubeletConfig object and not the NUMAResourcesOperator CR
+				// so when KubeletConfig gets deleted, the ConfigMap gets deleted as well
+				if objects.IsOwnedBy(cmList.Items[i].ObjectMeta, targetedKC.ObjectMeta) {
 					nropCm = &cmList.Items[i]
 					break
 				}
 			}
-			Expect(nropCm).ToNot(BeNil(), "NUMAResourcesOperator %q should have exactly one ConfigMap", nroOperObj.Name)
+			Expect(nropCm).ToNot(BeNil(), "NUMAResourcesOperator %q should have a ConfigMap owned by KubeletConfig %q", nroOperObj.Name, targetedKC.Name)
 
 			cmKey := client.ObjectKeyFromObject(nropCm)
 			Eventually(func() bool {
