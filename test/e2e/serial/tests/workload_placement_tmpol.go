@@ -692,6 +692,217 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
+		Entry("[tier1][testtype4][tmscope:container][cpu] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			nrtv1alpha1.SingleNUMANodeContainerLevel,
+			setupPaddingContainerLevel,
+			e2enrt.CheckNodeConsumedResourcesAtLeast,
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+		),
+		Entry("[tier1][testtype4][tmscope:container][memory] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			nrtv1alpha1.SingleNUMANodeContainerLevel,
+			setupPaddingContainerLevel,
+			e2enrt.CheckNodeConsumedResourcesAtLeast,
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("7Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+		),
+		Entry("[tier1][testtype4][tmscope:container][hugepages2Mi] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			nrtv1alpha1.SingleNUMANodeContainerLevel,
+			setupPaddingContainerLevel,
+			e2enrt.CheckNodeConsumedResourcesAtLeast,
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("16Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("48Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+		),
+		Entry("[tier1][testtype4][tmscope:container][hugepages1Gi] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			nrtv1alpha1.SingleNUMANodeContainerLevel,
+			setupPaddingContainerLevel,
+			e2enrt.CheckNodeConsumedResourcesAtLeast,
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("2Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+		),
 		Entry("[tier1][testtype11][tmscope:container] should make a pod with one init cnt and three gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
