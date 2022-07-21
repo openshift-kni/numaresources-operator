@@ -232,7 +232,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
 				By("waiting for deployment to be up&running")
-				dpRunningTimeout := 1 * time.Minute
+				dpRunningTimeout := 2 * time.Minute
 				dpRunningPollInterval := 10 * time.Second
 				_, err = e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
 				Expect(err).NotTo(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, dpRunningTimeout)
