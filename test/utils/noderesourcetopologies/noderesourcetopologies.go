@@ -357,6 +357,16 @@ func FindResourceAvailableByName(resources []nrtv1alpha1.ResourceInfo, name stri
 	return *resource.NewQuantity(0, resource.DecimalSI), false
 }
 
+func FindResourceAllocatableByName(resources []nrtv1alpha1.ResourceInfo, name string) (resource.Quantity, bool) {
+	for _, resource := range resources {
+		if resource.Name != name {
+			continue
+		}
+		return resource.Allocatable, true
+	}
+	return *resource.NewQuantity(0, resource.DecimalSI), false
+}
+
 func contains(items []string, st string) bool {
 	for _, item := range items {
 		if item == st {
