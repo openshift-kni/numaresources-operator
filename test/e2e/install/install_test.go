@@ -285,6 +285,8 @@ var _ = Describe("[Install] durability", func() {
 
 			deleteNROPSync(e2eclient.Client, nroObj)
 
+			waitForMCPUpdatedAfterNRODeleted(1, nroObj)
+
 			By("checking there are no leftovers")
 			// by taking the ns from the ds we're avoiding the need to figure out in advanced
 			// at which ns we should look for the resources
@@ -315,6 +317,8 @@ var _ = Describe("[Install] durability", func() {
 
 			err = e2eclient.Client.Create(context.TODO(), nroObjRedep)
 			Expect(err).ToNot(HaveOccurred())
+
+			waitForMCPUpdatedAfterNROCreated(1, nroObj)
 
 			Eventually(func() bool {
 				updatedNroObj := &nropv1alpha1.NUMAResourcesOperator{}
@@ -410,18 +414,26 @@ func overallDeployment() nroDeployment {
 	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
-	if configuration.Plat == platform.OpenShift {
-		Eventually(func() bool {
-			updated, err := isMachineConfigPoolsUpdated(nroObj)
-			if err != nil {
-				klog.Errorf("failed to information about machine config pools: %w", err)
-				return false
-			}
+	waitForMCPUpdatedAfterNROCreated(2, nroObj)
 
-			return updated
-		}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
-	}
 	return deployedObj
+}
+
+func waitForMCPUpdatedAfterNROCreated(offset int, nroObj *nropv1alpha1.NUMAResourcesOperator) {
+	if configuration.Plat != platform.OpenShift {
+		// nothing to do
+		return
+	}
+
+	EventuallyWithOffset(offset, func() bool {
+		updated, err := isMachineConfigPoolsUpdated(nroObj)
+		if err != nil {
+			klog.Errorf("failed to information about machine config pools: %w", err)
+			return false
+		}
+
+		return updated
+	}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
 }
 
 // TODO: what if timeout < period?
@@ -468,16 +480,23 @@ func teardownDeployment(nrod nroDeployment, timeout time.Duration) {
 
 	wg.Wait()
 
-	if configuration.Plat == platform.OpenShift {
-		Eventually(func() bool {
-			updated, err := isMachineConfigPoolsUpdatedAfterDeletion(nrod.nroObj)
-			if err != nil {
-				klog.Errorf("failed to retrieve information about machine config pools: %w", err)
-				return false
-			}
-			return updated
-		}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
+	waitForMCPUpdatedAfterNRODeleted(2, nrod.nroObj)
+}
+
+func waitForMCPUpdatedAfterNRODeleted(offset int, nroObj *nropv1alpha1.NUMAResourcesOperator) {
+	if configuration.Plat != platform.OpenShift {
+		// nothing to do
+		return
 	}
+
+	EventuallyWithOffset(offset, func() bool {
+		updated, err := isMachineConfigPoolsUpdatedAfterDeletion(nroObj)
+		if err != nil {
+			klog.Errorf("failed to retrieve information about machine config pools: %w", err)
+			return false
+		}
+		return updated
+	}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
 }
 
 func deleteNROPSync(cli client.Client, nropObj *nropv1alpha1.NUMAResourcesOperator) {
