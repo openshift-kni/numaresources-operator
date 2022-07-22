@@ -328,6 +328,7 @@ var _ = Describe("[Install] durability", func() {
 				ds, err := getDaemonSetByOwnerReference(updatedNroObj.GetUID())
 				if err != nil {
 					klog.Warningf("failed to get the RTE DaemonSet: %v", err)
+					klog.Warningf("NRO:\n%s\n", objects.ToYAML(updatedNroObj))
 					return false
 				}
 
