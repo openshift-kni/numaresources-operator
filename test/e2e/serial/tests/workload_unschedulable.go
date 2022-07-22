@@ -265,6 +265,38 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 			}
 		})
+
+		It("[test_id:47619][tier3][unsched][default-scheduler] a deployment with a guaranteed pod resources available on one node but not on a single numa; scheduled by default scheduler", func() {
+
+			By("Scheduling the testing deployment")
+			deploymentName := "test-dp-with-default-sched"
+			var replicas int32 = 1
+
+			podLabels := map[string]string{
+				"test": "test-deployment-with-default-sched",
+			}
+			nodeSelector := map[string]string{}
+			deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			// deployment is scheduled with the default scheduler
+			deployment.Spec.Template.Spec.SchedulerName = corev1.DefaultSchedulerName
+			deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
+
+			err := fxt.Client.Create(context.TODO(), deployment)
+			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
+
+			By(fmt.Sprintf("checking deployment pods have been handled by the default scheduler %q but failed to be scheduled", corev1.DefaultSchedulerName))
+			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
+			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+
+			for _, pod := range pods {
+				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, corev1.DefaultSchedulerName, tmPolicy)
+				if err != nil {
+					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+				}
+				Expect(err).ToNot(HaveOccurred())
+				Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, corev1.DefaultSchedulerName)
+			}
+		})
 	})
 
 	Context("with at least two nodes with two numa zones and enough resources in one numa zone", func() {
