@@ -18,7 +18,10 @@ package objects
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
+
+	"github.com/ghodss/yaml"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -164,4 +167,12 @@ func getKubeletConfig() *kubeletconfigv1beta1.KubeletConfiguration {
 		TopologyManagerPolicy: "single-numa-node",
 		TopologyManagerScope:  "pod",
 	}
+}
+
+func ToYAML(obj interface{}) string {
+	data, err := yaml.Marshal(obj)
+	if err != nil {
+		return fmt.Sprintf("<SERIALIZE ERROR: %v>", err)
+	}
+	return string(data)
 }

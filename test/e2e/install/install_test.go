@@ -31,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -72,28 +74,30 @@ var _ = Describe("[Install] continuousIntegration", func() {
 			Expect(nname.Name).ToNot(BeEmpty())
 
 			By("checking that the condition Available=true")
-			var updatedNROObj *nropv1alpha1.NUMAResourcesOperator
-			Eventually(func() bool {
-				updatedNROObj = &nropv1alpha1.NUMAResourcesOperator{}
+			updatedNROObj := &nropv1alpha1.NUMAResourcesOperator{}
+			err := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
 				err := e2eclient.Client.Get(context.TODO(), nname, updatedNROObj)
 				if err != nil {
-					klog.Warningf("failed to get the RTE resource: %v", err)
-					return false
+					klog.Warningf("failed to get the NRO resource: %v", err)
+					return false, err
 				}
 
 				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
 				if cond == nil {
 					klog.Warningf("missing conditions in %v", updatedNROObj)
-					return false
+					return false, err
 				}
 
-				klog.Infof("condition: %v", cond)
-
-				return cond.Status == metav1.ConditionTrue
-			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "RTE condition did not become available")
+				klog.Infof("condition for %s: %v", nname.Name, cond)
+				return cond.Status == metav1.ConditionTrue, nil
+			})
+			if err != nil {
+				logRTEPodsLogs(e2eclient.Client, e2eclient.K8sClient, context.TODO(), updatedNROObj, "NRO never reported available")
+			}
+			Expect(err).NotTo(HaveOccurred(), "NRO never reported available")
 
 			By("checking the NRT CRD is deployed")
-			_, err := crds.GetByName(e2eclient.Client, crds.CrdNRTName)
+			_, err = crds.GetByName(e2eclient.Client, crds.CrdNRTName)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking the NRO CRD is deployed")
@@ -101,8 +105,6 @@ var _ = Describe("[Install] continuousIntegration", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking Daemonset is up&running")
-			const DSCheckTimeout = 1 * time.Minute
-			const DSCheckPollingPeriod = 5 * time.Second
 			Eventually(func() bool {
 				ds, err := getDaemonSetByOwnerReference(updatedNROObj.UID)
 				if err != nil {
@@ -130,7 +132,7 @@ var _ = Describe("[Install] continuousIntegration", func() {
 					return false
 				}
 				return true
-			}, DSCheckTimeout, DSCheckPollingPeriod).Should(BeTrue(), "DaemonSet Status was not correct")
+			}).WithTimeout(1*time.Minute).WithPolling(5*time.Second).Should(BeTrue(), "DaemonSet Status was not correct")
 		})
 	})
 })
@@ -190,66 +192,81 @@ var _ = Describe("[Install] durability", func() {
 
 		It("[test_id:47587][tier1] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", func() {
 
-			By("wait for DaemonSet to be ready")
-			nname := client.ObjectKeyFromObject(deployedObj.nroObj)
-			Expect(nname.Name).NotTo(BeEmpty())
+			By("getting up-to-date NRO object")
+			nroKey := client.ObjectKeyFromObject(deployedObj.nroObj)
+			Expect(nroKey.Name).NotTo(BeEmpty())
 
 			nroObj := &nropv1alpha1.NUMAResourcesOperator{}
-			err := e2eclient.Client.Get(context.TODO(), nname, nroObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("waiting for the DaemonSet to be created")
-			uid := nroObj.GetUID()
-			ds := &appsv1.DaemonSet{}
-
-			dsReadyTimeOut := 5 * time.Minute
-			dsReadyPollPeriod := 10 * time.Second
-			Eventually(func() bool {
-				var err error
-				ds, err = getDaemonSetByOwnerReference(uid)
+			err := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
+				err := e2eclient.Client.Get(context.TODO(), nroKey, nroObj)
 				if err != nil {
-					klog.Warningf("failed to get the daemonset for NRO %v: %v", uid, err)
-					return false
+					return false, err
 				}
-				return e2ewait.AreDaemonSetPodsReady(&ds.Status)
-			}, dsReadyTimeOut, dsReadyPollPeriod).Should(BeTrue())
+				if len(nroObj.Status.DaemonSets) != 1 {
+					return false, fmt.Errorf("unsupported daemonsets (/MCP) count: %d", len(nroObj.Status.DaemonSets))
+				}
+				return true, nil
+			})
+			if err != nil {
+				logRTEPodsLogs(e2eclient.Client, e2eclient.K8sClient, context.TODO(), nroObj, "NRO not available")
+			}
+			Expect(err).NotTo(HaveOccurred(), "inconsistent NRO instance:\n%s", objects.ToYAML(nroObj))
+
+			dsKey := e2ewait.ObjectKey{
+				Namespace: nroObj.Status.DaemonSets[0].Namespace,
+				Name:      nroObj.Status.DaemonSets[0].Name,
+			}
+
+			By("waiting for DaemonSet to be ready")
+			ds, err := e2ewait.ForDaemonSetReadyByKey(e2eclient.Client, dsKey, 10*time.Second, 3*time.Minute)
+			Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
 			By("Update RTE image in NRO")
-			err = e2eclient.Client.Get(context.TODO(), nname, nroObj)
-			Expect(err).ToNot(HaveOccurred())
-			nroObj.Spec.ExporterImage = e2eimages.RTETestImageCI
-			err = e2eclient.Client.Update(context.TODO(), nroObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("Await for daemon to be ready again")
-			updatedNroObj := &nropv1alpha1.NUMAResourcesOperator{}
-			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), updatedNroObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			Eventually(func() bool {
-				updatedDs, err := e2ewait.ForDaemonSetReady(e2eclient.Client, ds, dsReadyPollPeriod, dsReadyTimeOut)
+			Eventually(func() error {
+				err := e2eclient.Client.Get(context.TODO(), nroKey, nroObj)
 				if err != nil {
+					return err
+				}
+				nroObj.Spec.ExporterImage = e2eimages.RTETestImageCI
+				return e2eclient.Client.Update(context.TODO(), nroObj)
+			}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
+
+			By("waiting for the daemonset to be ready again")
+			Eventually(func() bool {
+				updatedDs := &appsv1.DaemonSet{}
+				err := e2eclient.Client.Get(context.TODO(), dsKey.AsKey(), updatedDs)
+				if err != nil {
+					klog.Warningf("failed to get the daemonset %s: %v", dsKey.String(), err)
 					return false
 				}
-				klog.Warningf("Observed %v  Current %v", updatedDs.Status.ObservedGeneration, ds.Generation)
+
+				if !e2ewait.AreDaemonSetPodsReady(&updatedDs.Status) {
+					klog.Warningf("daemonset %s desired %d scheduled %d ready %d",
+						dsKey.String(),
+						updatedDs.Status.DesiredNumberScheduled,
+						updatedDs.Status.CurrentNumberScheduled,
+						updatedDs.Status.NumberReady)
+					return false
+				}
+
+				klog.Infof("daemonset %s ready", dsKey.String())
+
+				klog.Warningf("daemonset Generation observed %v current %v", updatedDs.Status.ObservedGeneration, ds.Generation)
 				isUpdated := updatedDs.Status.ObservedGeneration > ds.Generation
 				if !isUpdated {
 					return false
 				}
 				ds = updatedDs
 				return true
-			}, dsReadyTimeOut, dsReadyPollPeriod).Should(BeTrue())
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to get up to date DaemonSet")
 
 			rteContainer, err := findContainerByName(*ds, containerNameRTE)
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(rteContainer.Image).To(BeIdenticalTo(e2eimages.RTETestImageCI))
-
 		})
 
 		It("should be able to delete NUMAResourceOperator CR and redeploy without polluting cluster state", func() {
-			Skip("broken and need more resources to be fixed")
-
 			nname := client.ObjectKeyFromObject(deployedObj.nroObj)
 			Expect(nname.Name).NotTo(BeEmpty())
 
@@ -267,6 +284,8 @@ var _ = Describe("[Install] durability", func() {
 			}, 5*time.Minute, 10*time.Second).Should(BeNil())
 
 			deleteNROPSync(e2eclient.Client, nroObj)
+
+			waitForMCPUpdatedAfterNRODeleted(1, nroObj)
 
 			By("checking there are no leftovers")
 			// by taking the ns from the ds we're avoiding the need to figure out in advanced
@@ -291,14 +310,15 @@ var _ = Describe("[Install] durability", func() {
 			}, 5*time.Minute, 10*time.Second).Should(BeTrue())
 
 			By("redeploy with other parameters")
+			nroObjRedep := objects.TestNRO(objects.EmptyMatchLabels())
+			nroObjRedep.Spec = *deployedObj.nroObj.Spec.DeepCopy()
 			// TODO change to an image which is test dedicated
-			nroObj.Spec.ExporterImage = e2eimages.RTETestImageCI
-			// resourceVersion should not be set on objects to be created
-			// TODO: don't reuse existing objects
-			nroObj.ResourceVersion = ""
+			nroObjRedep.Spec.ExporterImage = e2eimages.RTETestImageCI
 
-			err = e2eclient.Client.Create(context.TODO(), nroObj)
+			err = e2eclient.Client.Create(context.TODO(), nroObjRedep)
 			Expect(err).ToNot(HaveOccurred())
+
+			waitForMCPUpdatedAfterNROCreated(1, nroObj)
 
 			Eventually(func() bool {
 				updatedNroObj := &nropv1alpha1.NUMAResourcesOperator{}
@@ -308,6 +328,7 @@ var _ = Describe("[Install] durability", func() {
 				ds, err := getDaemonSetByOwnerReference(updatedNroObj.GetUID())
 				if err != nil {
 					klog.Warningf("failed to get the RTE DaemonSet: %v", err)
+					klog.Warningf("NRO:\n%s\n", objects.ToYAML(updatedNroObj))
 					return false
 				}
 
@@ -394,18 +415,26 @@ func overallDeployment() nroDeployment {
 	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
-	if configuration.Plat == platform.OpenShift {
-		Eventually(func() bool {
-			updated, err := isMachineConfigPoolsUpdated(nroObj)
-			if err != nil {
-				klog.Errorf("failed to information about machine config pools: %w", err)
-				return false
-			}
+	waitForMCPUpdatedAfterNROCreated(2, nroObj)
 
-			return updated
-		}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
-	}
 	return deployedObj
+}
+
+func waitForMCPUpdatedAfterNROCreated(offset int, nroObj *nropv1alpha1.NUMAResourcesOperator) {
+	if configuration.Plat != platform.OpenShift {
+		// nothing to do
+		return
+	}
+
+	EventuallyWithOffset(offset, func() bool {
+		updated, err := isMachineConfigPoolsUpdated(nroObj)
+		if err != nil {
+			klog.Errorf("failed to information about machine config pools: %w", err)
+			return false
+		}
+
+		return updated
+	}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
 }
 
 // TODO: what if timeout < period?
@@ -452,16 +481,23 @@ func teardownDeployment(nrod nroDeployment, timeout time.Duration) {
 
 	wg.Wait()
 
-	if configuration.Plat == platform.OpenShift {
-		Eventually(func() bool {
-			updated, err := isMachineConfigPoolsUpdatedAfterDeletion(nrod.nroObj)
-			if err != nil {
-				klog.Errorf("failed to retrieve information about machine config pools: %w", err)
-				return false
-			}
-			return updated
-		}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
+	waitForMCPUpdatedAfterNRODeleted(2, nrod.nroObj)
+}
+
+func waitForMCPUpdatedAfterNRODeleted(offset int, nroObj *nropv1alpha1.NUMAResourcesOperator) {
+	if configuration.Plat != platform.OpenShift {
+		// nothing to do
+		return
 	}
+
+	EventuallyWithOffset(offset, func() bool {
+		updated, err := isMachineConfigPoolsUpdatedAfterDeletion(nroObj)
+		if err != nil {
+			klog.Errorf("failed to retrieve information about machine config pools: %w", err)
+			return false
+		}
+		return updated
+	}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
 }
 
 func deleteNROPSync(cli client.Client, nropObj *nropv1alpha1.NUMAResourcesOperator) {
@@ -520,4 +556,44 @@ func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1alpha1.NUMAResourcesOpe
 	}
 
 	return true, nil
+}
+
+func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context.Context, nroObj *nropv1alpha1.NUMAResourcesOperator, reason string) {
+
+	dss, err := objects.GetDaemonSetsOwnedBy(cli, nroObj.ObjectMeta)
+	if err != nil {
+		klog.Warningf("no DaemonSets for %s (%s)", nroObj.Name, nroObj.GetUID())
+		return
+	}
+
+	klog.Infof("%s (%d DaemonSet)", reason, len(dss))
+
+	for _, ds := range dss {
+		klog.Infof("daemonset %s/%s desired %d scheduled %d ready %d", ds.Namespace, ds.Name, ds.Status.DesiredNumberScheduled, ds.Status.CurrentNumberScheduled, ds.Status.NumberReady)
+
+		labSel, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+		if err != nil {
+			klog.Warningf("cannot use DaemonSet label selector as selector: %v", err)
+			continue
+		}
+
+		var podList corev1.PodList
+		err = cli.List(ctx, &podList, &client.ListOptions{
+			Namespace:     ds.Namespace,
+			LabelSelector: labSel,
+		})
+		if err != nil {
+			klog.Warningf("cannot get Pods by DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
+			continue
+		}
+
+		for _, pod := range podList.Items {
+			logs, err := objects.GetLogsForPod(k8sCli, pod.Namespace, pod.Name, containerNameRTE)
+			if err != nil {
+				klog.Warningf("DaemonSet %s/%s -> Pod %s/%s -> error getting logs: %v", ds.Namespace, ds.Name, pod.Namespace, pod.Name, err)
+				continue
+			}
+			klog.Infof("DaemonSet %s/%s -> Pod %s/%s -> logs:\n%s\n-----\n", ds.Namespace, ds.Name, pod.Namespace, pod.Name, logs)
+		}
+	}
 }
