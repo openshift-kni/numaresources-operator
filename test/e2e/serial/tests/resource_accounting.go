@@ -414,7 +414,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Verifying NRT reflects no updates after scheduling the best-effort pod")
-			expectNrtUnchanged(fxt, targetNrtListInitial, updatedPod.Spec.NodeName, "scheduling best-effort pod")
+			expectNrtUnchanged(fxt, targetNrtListInitial, updatedPod.Spec.NodeName)
 		})
 
 		It("[test_id:48686][tier1] should properly schedule a burstable pod with no changes in NRTs", func() {
@@ -444,7 +444,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Verifying NRT reflects no updates after scheduling the burstable pod")
-			expectNrtUnchanged(fxt, targetNrtListInitial, updatedPod.Spec.NodeName, "scheduling burstable pod")
+			expectNrtUnchanged(fxt, targetNrtListInitial, updatedPod.Spec.NodeName)
 		})
 
 		It("[test_id:47618][tier2] should properly schedule deployment with burstable pod with no changes in NRTs", func() {
@@ -547,7 +547,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Verifying NRT reflects no updates after scheduling the burstable pod")
-			expectNrtUnchanged(fxt, targetNrtListInitial, updatedPod.Spec.NodeName, "scheduling burstable pod")
+			expectNrtUnchanged(fxt, targetNrtListInitial, updatedPod.Spec.NodeName)
 		})
 		It("[test_id:49071][tier2] should properly schedule daemonset with burstable pod with no changes in NRTs", func() {
 			By("create a daemonset with one burstable pod")
@@ -599,7 +599,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 	})
 })
 
-func expectNrtUnchanged(fxt *e2efixture.Fixture, targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList, nodeName, reason string) {
+func expectNrtUnchanged(fxt *e2efixture.Fixture, targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList, nodeName string) {
 	targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred())
 
