@@ -181,7 +181,10 @@ binary-e2e-sched:
 binary-e2e-serial:
 	go test -c -v -o bin/e2e-nrop-serial.test ./test/e2e/serial
 
-binary-e2e-all: goversion binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial runner-e2e-serial build-pause
+binary-e2e-tools:
+	go test -c -v -o bin/e2e-nrop-tools.test ./test/e2e/tools
+
+binary-e2e-all: goversion binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial binary-e2e-tools runner-e2e-serial build-pause
 
 runner-e2e-serial: bin/envsubst
 	hack/render-e2e-runner.sh
@@ -344,13 +347,13 @@ goversion:
 build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform
 
 bin/buildhelper:
-	@go build -o bin/buildhelper hack/buildhelper/buildhelper.go
+	@go build -o bin/buildhelper tools/buildhelper/buildhelper.go
 
 bin/envsubst:
-	@go build -o bin/envsubst hack/envsubst/envsubst.go
+	@go build -o bin/envsubst tools/envsubst/envsubst.go
 
 bin/lsplatform:
-	@go build -o bin/lsplatform hack/lsplatform/lsplatform.go
+	@go build -o bin/lsplatform tools/lsplatform/lsplatform.go
 
 verify-generated: bundle generate
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
