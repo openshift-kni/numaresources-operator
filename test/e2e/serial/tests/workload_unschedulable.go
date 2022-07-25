@@ -696,7 +696,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					return false
 				}
 				return true
-			}, time.Minute*5, time.Second*30).Should(BeTrue(), "deployment %q failed to have %d running replicas within the defined period", dpKey.String(), expectedReadyReplicas)
+			}).WithTimeout(time.Minute*5).WithPolling(time.Second*30).Should(BeTrue(), "deployment %q failed to have %d running replicas within the defined period", dpKey.String(), expectedReadyReplicas)
 
 			By("checking NRT objects updated accordingly")
 			nrtPostDpCreateList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Second*10)

@@ -250,7 +250,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			Eventually(func() error {
 				return fxt.Client.Update(context.TODO(), updatedDp)
-			}, 10*time.Second, 2*time.Minute).ShouldNot(HaveOccurred())
+			}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
 
 			updatedDp, err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
@@ -267,7 +267,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				return true
-			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be only one pod under deployment: %q", namespacedDpName)
+			}).WithTimeout(time.Minute).WithPolling(5*time.Second).Should(BeTrue(), "there should be only one pod under deployment: %q", namespacedDpName)
 
 			nrtPostUpdateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtPostCreateDeploymentList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
@@ -342,7 +342,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			Eventually(func() error {
 				return fxt.Client.Update(context.TODO(), updatedDp)
-			}, 10*time.Second, 2*time.Minute).ShouldNot(HaveOccurred())
+			}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
 
 			updatedDp, err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
@@ -359,7 +359,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				return true
-			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be only one pod under deployment: %q", namespacedDpName)
+			}).WithTimeout(time.Minute).WithPolling(5*time.Second).Should(BeTrue(), "there should be only one pod under deployment: %q", namespacedDpName)
 
 			nrtLastUpdateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtPostUpdateDeploymentList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
@@ -410,7 +410,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				ok, err := e2enrt.CheckEqualAvailableResources(*nrtReorganized, *nrtPostDelete)
 				Expect(err).ToNot(HaveOccurred())
 				return ok
-			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
+			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		})
 	})
 })

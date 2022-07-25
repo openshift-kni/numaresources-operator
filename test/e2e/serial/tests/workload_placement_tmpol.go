@@ -519,7 +519,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				ok, err := e2enrt.CheckEqualAvailableResources(*nrtInitial, *nrtPostDelete)
 				Expect(err).ToNot(HaveOccurred())
 				return ok
-			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
+			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		},
 
 		Entry("[test_id:47575][tmscope:cnt][tier1] should make a pod with two gu cnt land on a node with enough resources on a specific NUMA zone, each cnt on a different zone",

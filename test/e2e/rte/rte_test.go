@@ -115,7 +115,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				}
 				return true
 
-			}, timeout, interval).Should(gomega.BeTrue())
+			}).WithTimeout(timeout).WithPolling(interval).Should(gomega.BeTrue())
 		})
 
 		ginkgo.It("can modify the LogLevel in NRO CR and klog under RTE container should change respectively", func() {
@@ -154,7 +154,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				}
 				return true
 
-			}, timeout, interval).Should(gomega.BeTrue())
+			}).WithTimeout(timeout).WithPolling(interval).Should(gomega.BeTrue())
 		})
 	})
 
@@ -261,7 +261,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 					return false
 				}
 				return true
-			}, time.Minute*5, time.Second*30).Should(gomega.BeTrue())
+			}).WithTimeout(time.Minute * 5).WithPolling(time.Second * 30).Should(gomega.BeTrue())
 		})
 	})
 

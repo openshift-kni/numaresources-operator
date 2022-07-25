@@ -112,7 +112,7 @@ var _ = Describe("[Uninstall]", func() {
 					}
 
 					return true
-				}, configuration.MachineConfigPoolUpdateTimeout, configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
+				}).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
 			}
 		})
 	})

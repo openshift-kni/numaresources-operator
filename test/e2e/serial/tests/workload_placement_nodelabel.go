@@ -342,7 +342,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 						err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(deployment), updatedDp)
 						Expect(err).ToNot(HaveOccurred())
 						return e2ewait.IsDeploymentComplete(deployment, &updatedDp.Status)
-					}, time.Second*30, time.Second*5).Should(BeTrue(), "deployment %q became unready", deployment.Name)
+					}).WithTimeout(time.Second*30).WithPolling(time.Second*5).Should(BeTrue(), "deployment %q became unready", deployment.Name)
 				},
 				Entry("[test_id:47597] should be able to schedule pod with affinity property requiredDuringSchedulingIgnoredDuringExecution on the available node with feasible numa zone", createNodeAffinityRequiredDuringSchedulingIgnoredDuringExecution),
 				Entry("[test_id:49843] should be able to schedule pod with affinity property prefferdDuringSchedulingIgnoredDuringExecution on the available node with feasible numa zone", createNodeAffinityPreferredDuringSchedulingIgnoredDuringExecution),

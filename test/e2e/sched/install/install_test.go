@@ -68,7 +68,7 @@ var _ = Describe("[Scheduler] install", func() {
 				klog.Infof("condition: %v", cond)
 
 				return cond.Status == metav1.ConditionTrue
-			}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "NRO Scheduler condition did not become available")
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "NRO Scheduler condition did not become available")
 
 			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
 			Expect(err).NotTo(HaveOccurred())
@@ -89,7 +89,7 @@ var _ = Describe("[Scheduler] install", func() {
 					return false
 				}
 				return true
-			}, deploymentCheckTimeout, deploymentCheckPollPeriod).Should(BeTrue(), "Deployment Status not OK")
+			}).WithTimeout(deploymentCheckTimeout).WithPolling(deploymentCheckPollPeriod).Should(BeTrue(), "Deployment Status not OK")
 
 			By("Check secondary scheduler pod is scheduled on a control-plane node")
 			podList, err := schedutils.ListPodsByDeployment(e2eclient.Client, *deployment)
