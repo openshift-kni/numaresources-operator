@@ -289,7 +289,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 
 			for _, pod := range pods {
-				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, corev1.DefaultSchedulerName, tmPolicy)
+				isFailed, err := nrosched.CheckPODKubeletRejectWithTopologyAffinityError(fxt.K8sClient, pod.Namespace, pod.Name)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
