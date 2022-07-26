@@ -56,7 +56,7 @@ func (em ExistingManifests) State(mf schedmanifests.Manifests) []objectstate.Obj
 			Error:    em.serviceAccountError,
 			Desired:  mf.ServiceAccount.DeepCopy(),
 			Compare:  compare.Object,
-			Merge:    merge.MetadataForUpdate,
+			Merge:    merge.ServiceAccountForUpdate,
 		},
 		{
 			Existing: em.Existing.ConfigMap,
