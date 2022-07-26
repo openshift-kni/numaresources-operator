@@ -489,6 +489,53 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			Expect(e2enrt.CheckEqualAvailableResources(*targetNrtInitial, *targetNrtCurrent)).To(BeTrue(), "new resources are accounted in NRT although scheduling burstable pod")
 		})
 
+		It("[test_id:49071][tier2] should properly schedule daemonset with burstable pod with no changes in NRTs", func() {
+			By("create a daemonset with one burstable pod")
+			dsName := "test-ds"
+
+			podLabels := map[string]string{
+				"test": "test-ds",
+			}
+			nodeSelector := map[string]string{}
+			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+
+			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
+			// make it burstable
+			ds.Spec.Template.Spec.Containers[0].Resources.Requests = reqResources
+
+			klog.Infof("create the bustable test daemonset with requests %s", e2ereslist.ToString(reqResources))
+			err = fxt.Client.Create(context.TODO(), ds)
+			Expect(err).NotTo(HaveOccurred(), "unable to create daemonset %q", ds.Name)
+
+			By("waiting for daemoneset to be up & running")
+			dsRunningTimeout := 1 * time.Minute
+			dsRunningPollInterval := 10 * time.Second
+
+			_, err = e2ewait.ForDaemonSetReady(fxt.Client, ds, dsRunningTimeout, dsRunningPollInterval)
+			Expect(err).NotTo(HaveOccurred(), "Daemonset %q not up & running after %v", ds.Name, dsRunningTimeout)
+
+			By(fmt.Sprintf("checking Daemonset pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
+			pods, err := schedutils.ListPodsByDaemonset(fxt.Client, *ds)
+			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Daemonset %q: %v", ds.Name, err)
+			for _, pod := range pods {
+				Expect(pod.Spec.NodeName).To(Equal(targetNodeName), "pod %s/%s is scheduled on node %q but expected to be on the target node %q", pod.Namespace, pod.Name, targetNodeName)
+				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+			}
+
+			By("Verifying NRT reflects no updates after scheduling the burstable pod")
+			targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+			targetNrtCurrent, err := e2enrt.FindFromList(targetNrtListCurrent.Items, targetNodeName)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(e2enrt.CheckEqualAvailableResources(*targetNrtInitial, *targetNrtCurrent)).To(BeTrue(), "new resources are accounted in NRT although scheduling burstable pod")
+
+			By("deleting the daemonset")
+			err = fxt.Client.Delete(context.TODO(), ds)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
 	})
 })
 
