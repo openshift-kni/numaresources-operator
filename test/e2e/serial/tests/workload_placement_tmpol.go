@@ -19,6 +19,8 @@ package tests
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"strings"
 	"time"
 
@@ -1028,6 +1030,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			Expect(len(unsuitableFreeRes)).To(Equal(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
 
+			for _, nrt := range nrts {
+				for _, zone := range nrt.Zones {
+					avail := e2enrt.AvailableFromZone(zone)
+					if !isHugePageInAvailable(avail) {
+						Skip(fmt.Sprintf("no hugepages found under node: %q", nrt.Name))
+					}
+				}
+			}
+
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			pod.Spec.NodeSelector = map[string]string{
@@ -1498,4 +1509,13 @@ func makeInitTestContainers(pod *corev1.Pod, initCnt []corev1.ResourceList, time
 		})
 	}
 	return pod
+}
+
+func isHugePageInAvailable(rl corev1.ResourceList) bool {
+	for name, quan := range rl {
+		if helper.IsHugePageResourceName(core.ResourceName(name)) && !quan.IsZero() {
+			return true
+		}
+	}
+	return false
 }
