@@ -79,22 +79,28 @@ func TestToString(t *testing.T) {
 func TestAddCoreResources(t *testing.T) {
 	type testCase struct {
 		res      corev1.ResourceList
-		cpu      resource.Quantity
-		mem      resource.Quantity
+		resToAdd corev1.ResourceList
 		expected corev1.ResourceList
 	}
 
 	testCases := []testCase{
 		{
 			res: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("1Gi"),
+				corev1.ResourceCPU:                   resource.MustParse("1"),
+				corev1.ResourceMemory:                resource.MustParse("1Gi"),
+				corev1.ResourceName("hugepages-2Mi"): resource.MustParse("4"),
 			},
-			cpu: resource.MustParse("2"),
-			mem: resource.MustParse("2Gi"),
+			resToAdd: corev1.ResourceList{
+				corev1.ResourceCPU:                   resource.MustParse("2"),
+				corev1.ResourceMemory:                resource.MustParse("2Gi"),
+				corev1.ResourceName("hugepages-2Mi"): resource.MustParse("2"),
+				corev1.ResourceName("hugepages-1Gi"): resource.MustParse("2"),
+			},
 			expected: corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("3Gi"),
+				corev1.ResourceCPU:                   resource.MustParse("3"),
+				corev1.ResourceMemory:                resource.MustParse("3Gi"),
+				corev1.ResourceName("hugepages-2Mi"): resource.MustParse("6"),
+				corev1.ResourceName("hugepages-1Gi"): resource.MustParse("2"),
 			},
 		},
 	}
@@ -102,7 +108,67 @@ func TestAddCoreResources(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(ToString(tc.expected), func(t *testing.T) {
 			res := tc.res.DeepCopy()
-			AddCoreResources(res, tc.cpu, tc.mem)
+			AddCoreResources(res, tc.resToAdd)
+			// comparing strings it just easier
+			got := ToString(res)
+			expected := ToString(tc.expected)
+			if got != expected {
+				t.Errorf("expected %q got %q", expected, got)
+			}
+		})
+	}
+}
+
+func TestSubCoreResources(t *testing.T) {
+	type testCase struct {
+		res      corev1.ResourceList
+		resToSub corev1.ResourceList
+		expected corev1.ResourceList
+	}
+
+	testCases := []testCase{
+		{
+			res: corev1.ResourceList{
+				corev1.ResourceCPU:                   resource.MustParse("3"),
+				corev1.ResourceMemory:                resource.MustParse("7Gi"),
+				corev1.ResourceName("hugepages-2Mi"): resource.MustParse("5"),
+			},
+			resToSub: corev1.ResourceList{
+				corev1.ResourceCPU:                   resource.MustParse("2"),
+				corev1.ResourceMemory:                resource.MustParse("2Gi"),
+				corev1.ResourceName("hugepages-2Mi"): resource.MustParse("2"),
+			},
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:                   resource.MustParse("1"),
+				corev1.ResourceMemory:                resource.MustParse("5Gi"),
+				corev1.ResourceName("hugepages-2Mi"): resource.MustParse("3"),
+			},
+		},
+		{
+			res: corev1.ResourceList{
+				corev1.ResourceCPU:                   resource.MustParse("3"),
+				corev1.ResourceMemory:                resource.MustParse("7Gi"),
+				corev1.ResourceName("hugepages-2Mi"): resource.MustParse("5"),
+				corev1.ResourceName("hugepages-1Gi"): resource.MustParse("2"),
+			},
+			resToSub: corev1.ResourceList{
+				corev1.ResourceCPU:                   resource.MustParse("2"),
+				corev1.ResourceMemory:                resource.MustParse("2Gi"),
+				corev1.ResourceName("hugepages-2Mi"): resource.MustParse("2"),
+			},
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:                   resource.MustParse("1"),
+				corev1.ResourceMemory:                resource.MustParse("5Gi"),
+				corev1.ResourceName("hugepages-2Mi"): resource.MustParse("3"),
+				corev1.ResourceName("hugepages-1Gi"): resource.MustParse("2"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(ToString(tc.expected), func(t *testing.T) {
+			res := tc.res.DeepCopy()
+			SubCoreResources(res, tc.resToSub)
 			// comparing strings it just easier
 			got := ToString(res)
 			expected := ToString(tc.expected)

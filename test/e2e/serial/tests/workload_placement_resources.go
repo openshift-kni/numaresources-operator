@@ -223,8 +223,7 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 	targetNrtInfo, err := e2enrt.FindFromList(nrtCandidates, targetNodeName)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "missing NRT info for target node %q", targetNodeName)
 
-	baseloadRes := baseload.ToResourceList()
-	paddingPods = append(paddingPods, createPaddingPod(1, fxt, "padding-tgt-0", targetNodeName, targetNrtInfo.Zones[0], baseloadRes))
+	paddingPods = append(paddingPods, createPaddingPod(1, fxt, "padding-tgt-0", targetNodeName, targetNrtInfo.Zones[0], baseload.Resources))
 	// any is fine, we hardcode zone#1 but we can do it smarter in the future
 	paddingPods = append(paddingPods, createPaddingPod(1, fxt, "padding-tgt-1", targetNodeName, targetNrtInfo.Zones[1], nodesState.RequiredResources))
 

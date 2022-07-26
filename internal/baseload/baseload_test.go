@@ -19,6 +19,7 @@ package baseload
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -31,27 +32,34 @@ func TestRound(t *testing.T) {
 	testCases := []testCase{
 		{
 			data: Load{
-				Name:   "test",
-				CPU:    resource.MustParse("990m"),
-				Memory: resource.MustParse("4G"),
+				Name: "test",
+				Resources: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("990m"),
+					corev1.ResourceMemory: resource.MustParse("4G"),
+				},
 			},
-			expected: "load for node \"test\": CPU=2 Memory=4G",
+			expected: "load for node \"test\": cpu=2, memory=4G",
 		},
 		{
 			data: Load{
-				Name:   "test",
-				CPU:    resource.MustParse("1"),
-				Memory: resource.MustParse("4Gi"),
+				Name: "test",
+				Resources: corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
 			},
-			expected: "load for node \"test\": CPU=2 Memory=5000000000",
+			expected: "load for node \"test\": cpu=2, memory=5000000000",
 		},
 		{
 			data: Load{
-				Name:   "test",
-				CPU:    resource.MustParse("3"),
-				Memory: resource.MustParse("2232Mi"),
+				Name: "test",
+				Resources: corev1.ResourceList{
+					corev1.ResourceCPU:                   resource.MustParse("3"),
+					corev1.ResourceMemory:                resource.MustParse("2232Mi"),
+					corev1.ResourceName("hugepages-1Gi"): resource.MustParse("2"),
+				},
 			},
-			expected: "load for node \"test\": CPU=4 Memory=3000000000",
+			expected: "load for node \"test\": cpu=4, hugepages-1Gi=2, memory=3000000000",
 		},
 	}
 
