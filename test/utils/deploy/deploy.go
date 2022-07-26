@@ -23,22 +23,24 @@ import (
 	"sync"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	nropmcp "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2epause "github.com/openshift-kni/numaresources-operator/test/utils/objects/pause"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 type NroDeployment struct {
@@ -209,4 +211,49 @@ func WaitForMCPUpdatedAfterNROCreated(offset int, nroObj *nropv1alpha1.NUMAResou
 
 		return updated
 	}).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
+}
+
+// Deploy a test NUMAResourcesScheduler and waits until its available
+// or a timeout happens (5 min right now).
+//
+// see: `TestNROScheduler` to see the specific object characteristics.
+func DeployNROScheduler() *nropv1alpha1.NUMAResourcesScheduler {
+
+	nroSchedObj := objects.TestNROScheduler()
+
+	err := e2eclient.Client.Create(context.TODO(), nroSchedObj)
+	Expect(err).WithOffset(1).NotTo(HaveOccurred())
+
+	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
+	Expect(err).WithOffset(1).NotTo(HaveOccurred())
+
+	Eventually(func() bool {
+		updatedNROObj := &nropv1alpha1.NUMAResourcesScheduler{}
+		err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), updatedNROObj)
+		if err != nil {
+			klog.Warningf("failed to get the NRO Scheduler resource: %v", err)
+			return false
+		}
+
+		cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
+		if cond == nil {
+			klog.Warningf("missing conditions in %v", updatedNROObj)
+			return false
+		}
+
+		klog.Infof("condition: %v", cond)
+
+		return cond.Status == metav1.ConditionTrue
+	}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).WithOffset(1).Should(BeTrue(), "NRO Scheduler condition did not become available")
+	return nroSchedObj
+}
+
+func TeardownNROScheduler(nroSched *nropv1alpha1.NUMAResourcesScheduler, timeout time.Duration) {
+	if nroSched != nil {
+		err := e2eclient.Client.Delete(context.TODO(), nroSched)
+		ExpectWithOffset(1, err).ToNot(HaveOccurred())
+
+		err = e2ewait.ForNUMAResourcesSchedulerDeleted(e2eclient.Client, nroSched, 10*time.Second, timeout)
+		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "NROScheduler %q failed to be deleted", nroSched.Name)
+	}
 }
