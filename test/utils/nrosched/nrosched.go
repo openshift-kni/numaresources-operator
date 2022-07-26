@@ -39,16 +39,25 @@ import (
 const (
 	NROSchedObjectName = "numaresourcesscheduler"
 
+	// scheduler
 	ReasonScheduled        = "Scheduled"
 	ReasonFailedScheduling = "FailedScheduling"
+	// kubelet
+	ReasonTopologyAffinityError = "TopologyAffinityError"
 
+	// scheduler
 	ErrorCannotAlignPod       = "cannot align pod"
 	ErrorCannotAlignContainer = "cannot align container"
+	// kubeket
+	ErrorTopologyAffinityError = "Resources cannot be allocated with Topology locality"
+
+	// component name
+	kubeletName = "kubelet"
 )
 
 type eventChecker func(ev corev1.Event) bool
 
-func checkPODEvents(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName string, evCheck eventChecker) (bool, error) {
+func checkPODEvents(k8sCli *kubernetes.Clientset, podNamespace, podName string, evCheck eventChecker) (bool, error) {
 	By(fmt.Sprintf("checking events for pod %s/%s", podNamespace, podName))
 	opts := metav1.ListOptions{
 		FieldSelector: fmt.Sprintf("involvedObject.name=%s", podName),
@@ -64,7 +73,7 @@ func checkPODEvents(k8sCli *kubernetes.Clientset, podNamespace, podName, schedul
 	}
 
 	for _, item := range events.Items {
-		klog.Infof("checking event: [%s: %s]", item.ReportingController, item.Reason)
+		klog.Infof("checking event: %s/%s [%s: %s - %s]", podNamespace, podName, item.ReportingController, item.Reason, item.Message)
 		if evCheck(item) {
 			klog.Infof("-> found relevant scheduling event for pod %s/%s: %v", podNamespace, podName, item)
 			return true, nil
@@ -78,7 +87,27 @@ func CheckPODSchedulingFailed(k8sCli *kubernetes.Clientset, podNamespace, podNam
 	isFailedScheduling := func(item corev1.Event) bool {
 		return item.Reason == ReasonFailedScheduling && item.ReportingController == schedulerName
 	}
-	return checkPODEvents(k8sCli, podNamespace, podName, schedulerName, isFailedScheduling)
+	return checkPODEvents(k8sCli, podNamespace, podName, isFailedScheduling)
+}
+
+func CheckPODKubeletRejectWithTopologyAffinityError(k8sCli *kubernetes.Clientset, podNamespace, podName string) (bool, error) {
+	isKubeletRejectForTopologyAffinityError := func(item corev1.Event) bool {
+		if item.Reason != ReasonTopologyAffinityError {
+			klog.Warningf("pod %s/%s reason %q expected %q", podNamespace, podName, item.Reason, ReasonTopologyAffinityError)
+			return false
+		}
+		// kubernetes is quirky and the component naming is a bit of hard to grok
+		if item.Source.Component != kubeletName {
+			klog.Warningf("pod %s/%s controller %q expected %q", podNamespace, podName, item.Source.Component, kubeletName)
+			return false
+		}
+		if !strings.Contains(item.Message, ErrorTopologyAffinityError) {
+			klog.Warningf("pod %s/%s message %q expected %q", podNamespace, podName, item.Message, ErrorTopologyAffinityError)
+			return false
+		}
+		return true
+	}
+	return checkPODEvents(k8sCli, podNamespace, podName, isKubeletRejectForTopologyAffinityError)
 }
 
 func CheckPODSchedulingFailedForAlignment(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName, policy string) (bool, error) {
@@ -90,16 +119,29 @@ func CheckPODSchedulingFailedForAlignment(k8sCli *kubernetes.Clientset, podNames
 	}
 
 	isFailedSchedulingForAlignment := func(item corev1.Event) bool {
-		return item.Reason == ReasonFailedScheduling && item.ReportingController == schedulerName && strings.Contains(item.Message, alignmentErr)
+		if item.Reason != ReasonFailedScheduling {
+			klog.Warningf("pod %s/%s reason %q expected %q", podNamespace, podName, item.Reason, ReasonFailedScheduling)
+			return false
+		}
+		if item.ReportingController != schedulerName {
+			klog.Warningf("pod %s/%s controller %q expected %q", podNamespace, podName, item.ReportingController, schedulerName)
+			return false
+		}
+		// workaround kubelet race/confusing behaviour
+		if !strings.Contains(item.Message, alignmentErr) {
+			klog.Warningf("pod %s/%s message %q expected %q", podNamespace, podName, item.Message, alignmentErr)
+			return false
+		}
+		return true
 	}
-	return checkPODEvents(k8sCli, podNamespace, podName, schedulerName, isFailedSchedulingForAlignment)
+	return checkPODEvents(k8sCli, podNamespace, podName, isFailedSchedulingForAlignment)
 }
 
 func CheckPODWasScheduledWith(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName string) (bool, error) {
 	isScheduledWith := func(item corev1.Event) bool {
 		return item.Reason == ReasonScheduled && item.ReportingController == schedulerName
 	}
-	return checkPODEvents(k8sCli, podNamespace, podName, schedulerName, isScheduledWith)
+	return checkPODEvents(k8sCli, podNamespace, podName, isScheduledWith)
 }
 
 func CheckNROSchedulerAvailable(cli client.Client, NUMAResourcesSchedObjName string) *nropv1alpha1.NUMAResourcesScheduler {
