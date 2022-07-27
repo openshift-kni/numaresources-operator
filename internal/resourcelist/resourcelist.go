@@ -59,14 +59,24 @@ func FromContainers(containers []corev1.Container) corev1.ResourceList {
 	return res
 }
 
-func AddCoreResources(res corev1.ResourceList, cpu, mem resource.Quantity) {
-	adjustedCPU := res.Cpu()
-	adjustedCPU.Add(cpu)
-	res[corev1.ResourceCPU] = *adjustedCPU
+func AddCoreResources(res, resToAdd corev1.ResourceList) {
+	for resName, resQty := range resToAdd {
+		qty := res[resName]
+		qty.Add(resQty)
+		res[resName] = qty
+	}
+}
 
-	adjustedMemory := res.Memory()
-	adjustedMemory.Add(mem)
-	res[corev1.ResourceMemory] = *adjustedMemory
+func SubCoreResources(res, resToSub corev1.ResourceList) error {
+	for resName, resQty := range resToSub {
+		if resQty.Cmp(res[resName]) > 0 {
+			return fmt.Errorf("cannot substract resource %q because it is not found in the current resources", resName)
+		}
+		qty := res[resName]
+		qty.Sub(resQty)
+		res[resName] = qty
+	}
+	return nil
 }
 
 func RoundUpCoreResources(cpu, mem resource.Quantity) (resource.Quantity, resource.Quantity) {

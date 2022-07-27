@@ -343,7 +343,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			}
 
 			By("prepare the test's pod resources as maximum available resources on the target node with the baselaod deducted")
-			baseload.Deduct(reqResources)
+			err = baseload.Deduct(reqResources)
+			Expect(err).ToNot(HaveOccurred(), "failed deducting resources from baseload: %v", err)
 
 			By("padding all other candidate nodes leaving room for the baseload only")
 			var paddingPods []*corev1.Pod
@@ -363,12 +364,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-				baseloadRes := corev1.ResourceList{
-					corev1.ResourceCPU:    baseload.CPU,
-					corev1.ResourceMemory: baseload.Memory,
-				}
-
-				paddingRes, err := e2enrt.SaturateNodeUntilLeft(*nrtInfo, baseloadRes)
+				paddingRes, err := e2enrt.SaturateNodeUntilLeft(*nrtInfo, baseload.Resources)
 				Expect(err).ToNot(HaveOccurred(), "could not get padding resources for node %q", nrtInfo.Name)
 
 				for _, zone := range nrtInfo.Zones {
@@ -512,7 +508,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 						numaRes[resName] = quan
 					}
 				}
-				baseload.Deduct(numaRes)
+				err = baseload.Deduct(numaRes)
+				Expect(err).ToNot(HaveOccurred(), "failed deducting resources from baseload: %v", err)
 				reqResPerNUMA = append(reqResPerNUMA, numaRes)
 			}
 

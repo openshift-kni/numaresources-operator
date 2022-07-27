@@ -488,12 +488,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 
-				baseloadResources := corev1.ResourceList{
-					corev1.ResourceCPU:    baseload.CPU,
-					corev1.ResourceMemory: baseload.Memory,
-				}
-
-				paddingResources, err := e2enrt.SaturateNodeUntilLeft(*nrtInfo, baseloadResources)
+				paddingResources, err := e2enrt.SaturateNodeUntilLeft(*nrtInfo, baseload.Resources)
 				Expect(err).ToNot(HaveOccurred(), "could not get padding resources for node %q", nrtInfo.Name)
 
 				for zoneIdx, zone := range nrtInfo.Zones {
