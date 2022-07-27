@@ -108,6 +108,10 @@ func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
 
+	zaplog := zap.New(zap.UseFlagOptions(&opts))
+	ctrl.SetLogger(zaplog)
+	klog.SetLogger(zaplog)
+
 	if showVersion {
 		fmt.Printf("%s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
 		os.Exit(0)
@@ -162,8 +166,6 @@ func main() {
 		os.Exit(1)
 	}
 	klog.InfoS("manifests loaded", "component", "RTE")
-
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	if renderMode {
 		var objs []client.Object
