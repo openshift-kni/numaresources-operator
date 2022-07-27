@@ -195,7 +195,7 @@ func main() {
 	imageSpec, pullPolicy, err := images.GetCurrentImage(context.Background())
 	if err != nil {
 		// intentionally continue
-		klog.ErrorS(err, "unable to find current image, using hardcoded")
+		klog.InfoS("unable to find current image, using hardcoded", "error", err)
 	}
 	klog.InfoS("using RTE image", "spec", imageSpec)
 
