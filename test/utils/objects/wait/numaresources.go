@@ -35,3 +35,13 @@ func ForNUMAResourcesOperatorDeleted(cli client.Client, nrop *nropv1alpha1.NUMAR
 	})
 	return err
 }
+
+func ForNUMAResourcesSchedulerDeleted(cli client.Client, nrSched *nropv1alpha1.NUMAResourcesScheduler, pollInterval, pollTimeout time.Duration) error {
+	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
+		updatedNROSched := nropv1alpha1.NUMAResourcesScheduler{}
+		key := ObjectKeyFromObject(nrSched)
+		err := cli.Get(context.TODO(), key.AsKey(), &updatedNROSched)
+		return deletionStatusFromError("NUMAResourcesScheduler", key, err)
+	})
+	return err
+}

@@ -19,8 +19,6 @@ package install
 import (
 	"context"
 	"fmt"
-	"os"
-	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -36,20 +34,15 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	"github.com/openshift-kni/numaresources-operator/controllers"
-	nropmcp "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/crds"
+	"github.com/openshift-kni/numaresources-operator/test/utils/deploy"
 	e2eimages "github.com/openshift-kni/numaresources-operator/test/utils/images"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2epause "github.com/openshift-kni/numaresources-operator/test/utils/objects/pause"
 	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
@@ -69,8 +62,8 @@ var _ = Describe("[Install] continuousIntegration", func() {
 
 	Context("with a running cluster with all the components", func() {
 		It("[test_id:47574][tier1] should perform overall deployment and verify the condition is reported as available", func() {
-			deployedObj := overallDeployment()
-			nname := client.ObjectKeyFromObject(deployedObj.nroObj)
+			deployedObj := deploy.OverallDeployment()
+			nname := client.ObjectKeyFromObject(deployedObj.NroObj)
 			Expect(nname.Name).ToNot(BeEmpty())
 
 			By("checking that the condition Available=true")
@@ -180,20 +173,20 @@ var _ = Describe("[Install] durability", func() {
 	})
 
 	Context("with a running cluster with all the components and overall deployment", func() {
-		var deployedObj nroDeployment
+		var deployedObj deploy.NroDeployment
 
 		BeforeEach(func() {
-			deployedObj = overallDeployment()
+			deployedObj = deploy.OverallDeployment()
 		})
 
 		AfterEach(func() {
-			teardownDeployment(deployedObj, 5*time.Minute)
+			deploy.TeardownDeployment(deployedObj, 5*time.Minute)
 		})
 
 		It("[test_id:47587][tier1] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", func() {
 
 			By("getting up-to-date NRO object")
-			nroKey := client.ObjectKeyFromObject(deployedObj.nroObj)
+			nroKey := client.ObjectKeyFromObject(deployedObj.NroObj)
 			Expect(nroKey.Name).NotTo(BeEmpty())
 
 			nroObj := &nropv1alpha1.NUMAResourcesOperator{}
@@ -267,7 +260,7 @@ var _ = Describe("[Install] durability", func() {
 		})
 
 		It("should be able to delete NUMAResourceOperator CR and redeploy without polluting cluster state", func() {
-			nname := client.ObjectKeyFromObject(deployedObj.nroObj)
+			nname := client.ObjectKeyFromObject(deployedObj.NroObj)
 			Expect(nname.Name).NotTo(BeEmpty())
 
 			nroObj := &nropv1alpha1.NUMAResourcesOperator{}
@@ -285,7 +278,7 @@ var _ = Describe("[Install] durability", func() {
 
 			deleteNROPSync(e2eclient.Client, nroObj)
 
-			waitForMCPUpdatedAfterNRODeleted(1, nroObj)
+			deploy.WaitForMCPUpdatedAfterNRODeleted(1, nroObj)
 
 			By("checking there are no leftovers")
 			// by taking the ns from the ds we're avoiding the need to figure out in advanced
@@ -311,14 +304,14 @@ var _ = Describe("[Install] durability", func() {
 
 			By("redeploy with other parameters")
 			nroObjRedep := objects.TestNRO(objects.EmptyMatchLabels())
-			nroObjRedep.Spec = *deployedObj.nroObj.Spec.DeepCopy()
+			nroObjRedep.Spec = *deployedObj.NroObj.Spec.DeepCopy()
 			// TODO change to an image which is test dedicated
 			nroObjRedep.Spec.ExporterImage = e2eimages.RTETestImageCI
 
 			err = e2eclient.Client.Create(context.TODO(), nroObjRedep)
 			Expect(err).ToNot(HaveOccurred())
 
-			waitForMCPUpdatedAfterNROCreated(1, nroObj)
+			deploy.WaitForMCPUpdatedAfterNROCreated(1, nroObj)
 
 			Eventually(func() bool {
 				updatedNroObj := &nropv1alpha1.NUMAResourcesOperator{}
@@ -359,143 +352,6 @@ func findContainerByName(daemonset appsv1.DaemonSet, containerName string) (*cor
 	return nil, fmt.Errorf("container %q not found in %s/%s", containerName, daemonset.Namespace, daemonset.Name)
 }
 
-type nroDeployment struct {
-	mcpObj *machineconfigv1.MachineConfigPool
-	kcObj  *machineconfigv1.KubeletConfig
-	nroObj *nropv1alpha1.NUMAResourcesOperator
-}
-
-// overallDeployment returns a struct containing all the deployed objects,
-// so it will be easier to introspect and delete them later.
-func overallDeployment() nroDeployment {
-	var matchLabels map[string]string
-	var deployedObj nroDeployment
-
-	if configuration.Plat == platform.Kubernetes {
-		mcpObj := objects.TestMCP()
-		By(fmt.Sprintf("creating the machine config pool object: %s", mcpObj.Name))
-		err := e2eclient.Client.Create(context.TODO(), mcpObj)
-		ExpectWithOffset(1, err).NotTo(HaveOccurred())
-		deployedObj.mcpObj = mcpObj
-		matchLabels = map[string]string{"test": "test"}
-	}
-
-	if configuration.Plat == platform.OpenShift {
-		// TODO: should this be configurable?
-		matchLabels = objects.OpenshiftMatchLabels()
-	}
-
-	nroObj := objects.TestNRO(matchLabels)
-	kcObj, err := objects.TestKC(matchLabels)
-	ExpectWithOffset(1, err).To(Not(HaveOccurred()))
-
-	unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
-
-	if _, ok := os.LookupEnv("E2E_NROP_INSTALL_SKIP_KC"); ok {
-		By("using cluster kubeletconfig (if any)")
-	} else {
-		By(fmt.Sprintf("creating the KC object: %s", kcObj.Name))
-		err = e2eclient.Client.Create(context.TODO(), kcObj)
-		ExpectWithOffset(1, err).NotTo(HaveOccurred())
-		deployedObj.kcObj = kcObj
-	}
-
-	By(fmt.Sprintf("creating the NRO object: %s", nroObj.Name))
-	err = e2eclient.Client.Create(context.TODO(), nroObj)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
-	deployedObj.nroObj = nroObj
-
-	Eventually(unpause).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).ShouldNot(HaveOccurred())
-
-	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
-
-	waitForMCPUpdatedAfterNROCreated(2, nroObj)
-
-	return deployedObj
-}
-
-func waitForMCPUpdatedAfterNROCreated(offset int, nroObj *nropv1alpha1.NUMAResourcesOperator) {
-	if configuration.Plat != platform.OpenShift {
-		// nothing to do
-		return
-	}
-
-	EventuallyWithOffset(offset, func() bool {
-		updated, err := isMachineConfigPoolsUpdated(nroObj)
-		if err != nil {
-			klog.Errorf("failed to information about machine config pools: %w", err)
-			return false
-		}
-
-		return updated
-	}).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
-}
-
-// TODO: what if timeout < period?
-func teardownDeployment(nrod nroDeployment, timeout time.Duration) {
-	var wg sync.WaitGroup
-	if nrod.mcpObj != nil {
-		err := e2eclient.Client.Delete(context.TODO(), nrod.mcpObj)
-		ExpectWithOffset(1, err).ToNot(HaveOccurred())
-
-		wg.Add(1)
-		go func(mcpObj *machineconfigv1.MachineConfigPool) {
-			defer GinkgoRecover()
-			defer wg.Done()
-			klog.Infof("waiting for MCP %q to be gone", mcpObj.Name)
-			err := e2ewait.ForMachineConfigPoolDeleted(e2eclient.Client, mcpObj, 10*time.Second, timeout)
-			ExpectWithOffset(1, err).ToNot(HaveOccurred(), "MCP %q failed to be deleted", mcpObj.Name)
-		}(nrod.mcpObj)
-	}
-
-	var err error
-	if nrod.kcObj != nil {
-		err = e2eclient.Client.Delete(context.TODO(), nrod.kcObj)
-		ExpectWithOffset(1, err).ToNot(HaveOccurred())
-		wg.Add(1)
-		go func(kcObj *machineconfigv1.KubeletConfig) {
-			defer GinkgoRecover()
-			defer wg.Done()
-			klog.Infof("waiting for KC %q to be gone", kcObj.Name)
-			err := e2ewait.ForKubeletConfigDeleted(e2eclient.Client, kcObj, 10*time.Second, timeout)
-			ExpectWithOffset(1, err).ToNot(HaveOccurred(), "KC %q failed to be deleted", kcObj.Name)
-		}(nrod.kcObj)
-	}
-
-	err = e2eclient.Client.Delete(context.TODO(), nrod.nroObj)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-	wg.Add(1)
-	go func(nropObj *nropv1alpha1.NUMAResourcesOperator) {
-		defer GinkgoRecover()
-		defer wg.Done()
-		klog.Infof("waiting for NROP %q to be gone", nropObj.Name)
-		err := e2ewait.ForNUMAResourcesOperatorDeleted(e2eclient.Client, nropObj, 10*time.Second, timeout)
-		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
-	}(nrod.nroObj)
-
-	wg.Wait()
-
-	waitForMCPUpdatedAfterNRODeleted(2, nrod.nroObj)
-}
-
-func waitForMCPUpdatedAfterNRODeleted(offset int, nroObj *nropv1alpha1.NUMAResourcesOperator) {
-	if configuration.Plat != platform.OpenShift {
-		// nothing to do
-		return
-	}
-
-	EventuallyWithOffset(offset, func() bool {
-		updated, err := isMachineConfigPoolsUpdatedAfterDeletion(nroObj)
-		if err != nil {
-			klog.Errorf("failed to retrieve information about machine config pools: %w", err)
-			return false
-		}
-		return updated
-	}).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
-}
-
 func deleteNROPSync(cli client.Client, nropObj *nropv1alpha1.NUMAResourcesOperator) {
 	var err error
 	err = cli.Delete(context.TODO(), nropObj)
@@ -519,39 +375,6 @@ func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {
 		}
 	}
 	return nil, fmt.Errorf("failed to get daemonset with owner reference uid: %s", uid)
-}
-
-// isMachineConfigPoolsUpdated checks if all related to NUMAResourceOperator CR machines config pools have updated status
-func isMachineConfigPoolsUpdated(nro *nropv1alpha1.NUMAResourcesOperator) (bool, error) {
-	mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
-	if err != nil {
-		return false, err
-	}
-
-	for _, mcp := range mcps {
-		if !controllers.IsMachineConfigPoolUpdated(nro.Name, mcp) {
-			return false, nil
-		}
-	}
-
-	return true, nil
-}
-
-// isMachineConfigPoolsUpdatedAfterDeletion checks if all related to NUMAResourceOperator CR machines config pools have updated status
-// after MachineConfig deletion
-func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1alpha1.NUMAResourcesOperator) (bool, error) {
-	mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
-	if err != nil {
-		return false, err
-	}
-
-	for _, mcp := range mcps {
-		if !controllers.IsMachineConfigPoolUpdatedAfterDeletion(nro.Name, mcp) {
-			return false, nil
-		}
-	}
-
-	return true, nil
 }
 
 func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context.Context, nroObj *nropv1alpha1.NUMAResourcesOperator, reason string) {
