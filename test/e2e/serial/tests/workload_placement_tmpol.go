@@ -1151,7 +1151,7 @@ func makeInitTestContainers(pod *corev1.Pod, initCnt []corev1.ResourceList, time
 	for i := 0; i < len(initCnt); i++ {
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
 			Name:    fmt.Sprintf("inittestcnt-%d", i),
-			Image:   images.SchedTestImageCI,
+			Image:   images.GetPauseImage(),
 			Command: []string{"/bin/sleep"},
 			Args:    []string{timeout},
 			Resources: corev1.ResourceRequirements{
