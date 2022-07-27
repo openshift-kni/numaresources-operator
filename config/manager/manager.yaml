@@ -41,6 +41,8 @@ spec:
         - /bin/numaresources-operator
         args:
         - --leader-elect
+        - --zap-time-encoding=iso8601
+        - --skip_headers=true
         - --enable-scheduler
         image: controller:latest
         name: manager

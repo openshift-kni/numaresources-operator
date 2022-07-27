@@ -310,6 +310,8 @@ spec:
               containers:
               - args:
                 - --leader-elect
+                - --zap-time-encoding=iso8601
+                - --skip_headers=true
                 - --enable-scheduler
                 command:
                 - /bin/numaresources-operator
