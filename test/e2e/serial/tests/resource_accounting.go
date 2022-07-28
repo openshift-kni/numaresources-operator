@@ -554,7 +554,9 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			podLabels := map[string]string{
 				"test": "test-ds",
 			}
-			nodeSelector := map[string]string{}
+			nodeSelector := map[string]string{
+				"kubernetes.io/hostname": targetNodeName,
+			}
 			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
 
 			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
