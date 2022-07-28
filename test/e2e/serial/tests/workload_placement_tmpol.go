@@ -19,6 +19,9 @@ package tests
 import (
 	"context"
 	"fmt"
+	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"strings"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -1014,6 +1017,352 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 	)
+	DescribeTable("[placement][negative] cluster with multiple worker nodes suitable",
+		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, errMsg string, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
+
+			hostsRequired := 2
+			sleepTimeoutInSec := "5"
+
+			nrts := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, tmPolicy)
+			if len(nrts) < hostsRequired {
+				Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
+			}
+
+			Expect(len(unsuitableFreeRes)).To(Equal(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
+
+			for _, nrt := range nrts {
+				for _, zone := range nrt.Zones {
+					avail := e2enrt.AvailableFromZone(zone)
+					if !isHugePageInAvailable(avail) {
+						Skip(fmt.Sprintf("no hugepages found under node: %q", nrt.Name))
+					}
+				}
+			}
+
+			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
+			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
+			pod.Spec.NodeSelector = map[string]string{
+				serialconfig.MultiNUMALabel: "2",
+			}
+			pod.Spec.Containers[0].Name = "testcnt-0"
+			pod.Spec.Containers[0].Resources.Limits = podRes.appCnt[0]
+			for i := 1; i < len(podRes.appCnt); i++ {
+				pod.Spec.Containers = append(pod.Spec.Containers, pod.Spec.Containers[0])
+				pod.Spec.Containers[i].Name = fmt.Sprintf("testcnt-%d", i)
+				pod.Spec.Containers[i].Resources.Limits = podRes.appCnt[i]
+			}
+			// we expect init containers to be required less often than app containers, so we delegate that
+			makeInitTestContainers(pod, podRes.initCnt, sleepTimeoutInSec)
+
+			requiredRes := e2ereslist.FromGuaranteedPod(*pod)
+
+			numaZonesRequired := 2
+
+			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", numaZonesRequired))
+			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, numaZonesRequired)
+			if len(nrtCandidates) < hostsRequired {
+				Skip(fmt.Sprintf("not enough nodes with %d NUMA Zones: found %d", numaZonesRequired, len(nrtCandidates)))
+			}
+			By("filtering available nodes with allocatable resources on each NUMA zone that can match request")
+			nrtCandidates = e2enrt.FilterAnyZoneMatchingResources(nrtCandidates, requiredRes)
+			if len(nrtCandidates) < hostsRequired {
+				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d", len(nrtCandidates)))
+			}
+
+			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
+			// nodes we have now are all equal for our purposes. Pick one at random
+			targetNodeName, ok := candidateNodeNames.PopAny()
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
+			unsuitableNodeNames := candidateNodeNames.List()
+
+			By(fmt.Sprintf("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames))
+
+			// make targetFreeResPerNUMA the complement of the test pod's resources
+			// IOW targetFreeResPerNUMA + baseload + podResourcesRequest equals to all node's allocatable resources
+			if len(targetFreeResPerNUMA) == 0 {
+				for i := 0; i < len(podRes.appCnt); i++ {
+					// appending a copy so mutating one object won't implicitly change the other
+					targetFreeResPerNUMA = append(targetFreeResPerNUMA, podRes.appCnt[i].DeepCopy())
+				}
+			}
+			padInfo := paddingInfo{
+				pod:                  pod,
+				targetNodeName:       targetNodeName,
+				targetFreeResPerNUMA: targetFreeResPerNUMA,
+				unsuitableNodeNames:  unsuitableNodeNames,
+				unsuitableFreeRes:    unsuitableFreeRes,
+			}
+
+			By("Padding nodes to create the test workload scenario")
+			paddingPods := setupPadding(fxt, nrtList, padInfo)
+
+			By("Waiting for padding pods to be ready")
+			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
+
+			// TODO: smarter cooldown
+			klog.Infof("cooling down")
+			time.Sleep(18 * time.Second)
+
+			for _, unsuitableNodeName := range unsuitableNodeNames {
+				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
+			}
+			dumpNRTForNode(fxt.Client, targetNodeName, "target")
+
+			By("running the test pod")
+			data, err := yaml.Marshal(pod)
+			Expect(err).ToNot(HaveOccurred())
+			klog.Infof("Pod:\n%s", data)
+
+			By("running the test pod")
+			err = fxt.Client.Create(context.TODO(), pod)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("verify the pod keep on pending")
+			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 2*time.Minute)
+			if err != nil {
+				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+			}
+			Expect(err).ToNot(HaveOccurred())
+
+			By("checking the scheduler report the expected error in the pod events`")
+			Eventually(func() bool {
+				events, err := objects.GetEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+				if err != nil {
+					klog.Errorf("failed to get events for pod %s/%s; error: %v", pod.Namespace, pod.Name, err)
+				}
+				for _, e := range events {
+					if e.Reason == "FailedScheduling" && strings.Contains(e.Message, errMsg) {
+						return true
+					}
+				}
+				klog.Warningf("failed to find the expected event with Reason=\"FailedScheduling\" and Message contains: %q", errMsg)
+				return false
+			}).WithTimeout(2*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "pod %s/%s doesn't contains the expected event error", updatedPod.Namespace, updatedPod.Name)
+
+			By("deleting the test pod")
+			err = fxt.Client.Delete(context.TODO(), updatedPod)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("checking the test pod is removed")
+			err = e2ewait.ForPodDeleted(fxt.Client, updatedPod.Namespace, updatedPod.Name, 3*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+
+			// we don't need to wait for NRT update since we already checked it hasn't changed in prior step
+		},
+
+		Entry("[tier1][negative][tmscope:container][cpu] pod with two gu cnt keep on pending",
+			nrtv1alpha1.SingleNUMANodeContainerLevel,
+			setupPaddingContainerLevel,
+			"cannot align container: testcnt-1",
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("5"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+		),
+		Entry("[tier1][negative][tmscope:container][memory] pod with two gu cnt keep on pending",
+			nrtv1alpha1.SingleNUMANodeContainerLevel,
+			setupPaddingContainerLevel,
+			"cannot align container: testcnt-1",
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("5Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("7Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+		),
+		Entry("[tier1][negative][tmscope:container][hugepages2Mi] pod with two gu cnt keep on pending",
+			nrtv1alpha1.SingleNUMANodeContainerLevel,
+			setupPaddingContainerLevel,
+			"cannot align container: testcnt-1",
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("16Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("48Mi"),
+						"hugepages-1Gi":       resource.MustParse("1Gi"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+		),
+		Entry("[tier1][negative][tmscope:container][hugepages1Gi] pod with two gu cnt keep on pending",
+			nrtv1alpha1.SingleNUMANodeContainerLevel,
+			setupPaddingContainerLevel,
+			"cannot align container: testcnt-1",
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+						"hugepages-1Gi":       resource.MustParse("2Gi"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"hugepages-2Mi":       resource.MustParse("32Mi"),
+					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+		),
+	)
 })
 
 func setupPaddingPodLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod {
@@ -1160,4 +1509,13 @@ func makeInitTestContainers(pod *corev1.Pod, initCnt []corev1.ResourceList, time
 		})
 	}
 	return pod
+}
+
+func isHugePageInAvailable(rl corev1.ResourceList) bool {
+	for name, quan := range rl {
+		if helper.IsHugePageResourceName(core.ResourceName(name)) && !quan.IsZero() {
+			return true
+		}
+	}
+	return false
 }
