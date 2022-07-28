@@ -42,6 +42,7 @@ import (
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
@@ -119,7 +120,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 			}
 		})
-
 		It("[test_id:47591][tier1] should modify workload post scheduling while keeping the resource requests available", func() {
 			hostsRequired := 2
 			paddedNodes := padder.GetPaddedNodes()
@@ -366,8 +366,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			updatedPod = pods[0]
 			By(fmt.Sprintf("checking the pod landed on a node which is different than target node %q vs %q", targetNodeName, updatedPod.Spec.NodeName))
-			Expect(updatedPod.Spec.NodeName).ToNot(Equal(targetNodeName),
-				"pod should not landed on node %q", targetNodeName)
+			if updatedPod.Spec.NodeName == targetNodeName {
+				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
+				//print the logs of the scheduler pod
+				logSchedulerPluginLogs(*fxt)
+			}
+			Expect(updatedPod.Spec.NodeName).ToNot(Equal(targetNodeName), "pod should not land on node %q", targetNodeName)
 
 			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
 			schedOK, err = nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
@@ -397,7 +401,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
-			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
+			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			Eventually(func() bool {
 				By(fmt.Sprintf("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName))
 
@@ -590,4 +594,34 @@ func matchLogLevelToKlog(cnt *corev1.Container, level operatorv1.LogLevel) (bool
 
 	val, found := rteFlags.GetFlag("--v")
 	return found, val.Data == kLvl.String()
+}
+
+func logSchedulerPluginLogs(fxt e2efixture.Fixture) {
+	nroSchedObj := objects.TestNROScheduler()
+	err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
+	if err != nil {
+		klog.Warningf("error getting the scheduler plugin CR: %v", err)
+		return
+	}
+	schedDp, err := schedutils.GetDeploymentByOwnerReference(nroSchedObj.GetUID())
+	if err != nil {
+		klog.Warningf("error getting the scheduler deployment: %v", err)
+		return
+	}
+	schedPods, err := schedutils.ListPodsByDeployment(fxt.Client, *schedDp)
+	if err != nil {
+		klog.Warningf("error getting the scheduler pod: %v", err)
+		return
+	}
+	if len(schedPods) != 1 {
+		klog.Warningf("found %d scheduler pods while expected is 1", len(schedPods))
+		return
+	}
+	schedPod := schedPods[0]
+	logs, err := objects.GetLogsForPod(fxt.K8sClient, schedPod.Namespace, schedPod.Name, schedPod.Spec.Containers[0].Name)
+	if err != nil {
+		klog.Warningf("error getting logs of the scheduler pod %s/%s: %v", schedPod.Namespace, schedPod.Name, err)
+		return
+	}
+	klog.Infof("show logs of the scheduler plugin pod %s/%s:\n%s\n-----\n", schedPod.Namespace, schedPod.Name, logs)
 }
