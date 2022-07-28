@@ -569,7 +569,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			dsRunningTimeout := 1 * time.Minute
 			dsRunningPollInterval := 10 * time.Second
 
-			_, err = e2ewait.ForDaemonSetReady(fxt.Client, ds, dsRunningTimeout, dsRunningPollInterval)
+			_, err = e2ewait.ForDaemonSetReady(fxt.Client, ds, dsRunningPollInterval, dsRunningTimeout)
 			Expect(err).NotTo(HaveOccurred(), "Daemonset %q not up & running after %v", ds.Name, dsRunningTimeout)
 
 			By(fmt.Sprintf("checking Daemonset pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
