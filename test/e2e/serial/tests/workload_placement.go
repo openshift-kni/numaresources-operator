@@ -328,8 +328,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// there are now no more than 2 available CPUs under the targeted node and our test pod under the deployment is asking for 5 CPUs
 			// so in order to be certain that the pod will land on different node we need to request more than 7 CPUs in total
 			requiredRes = corev1.ResourceList{
-				// 6 here + 2 on the second container
-				corev1.ResourceCPU:    resource.MustParse("6"),
+				// 8 here + 2 on the second container
+				corev1.ResourceCPU:    resource.MustParse("8"),
 				corev1.ResourceMemory: resource.MustParse("100Mi"),
 			}
 
@@ -366,8 +366,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			updatedPod = pods[0]
 			By(fmt.Sprintf("checking the pod landed on a node which is different than target node %q vs %q", targetNodeName, updatedPod.Spec.NodeName))
-			Expect(updatedPod.Spec.NodeName).ToNot(Equal(targetNodeName),
-				"pod should not landed on node %q", targetNodeName)
+			if updatedPod.Spec.NodeName == targetNodeName {
+				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
+			}
+			Expect(updatedPod.Spec.NodeName).ToNot(Equal(targetNodeName), "pod should not landed on node %q", targetNodeName)
 
 			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
 			schedOK, err = nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
@@ -397,7 +399,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
-			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
+			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			Eventually(func() bool {
 				By(fmt.Sprintf("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName))
 
