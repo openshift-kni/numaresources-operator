@@ -334,19 +334,20 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			//calculate base load on the target node
 			baseload, err := nodes.GetLoad(fxt.K8sClient, targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
-			klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
+			By(fmt.Sprintf("considering the computed base load: %s", baseload))
 
 			//get maximum available node CPU and Memory
 			reqResources = corev1.ResourceList{
 				corev1.ResourceCPU:    availableResourceType(*targetNrtInitial, corev1.ResourceCPU),
 				corev1.ResourceMemory: availableResourceType(*targetNrtInitial, corev1.ResourceMemory),
 			}
+			By(fmt.Sprintf("considering maximum available resources: %s", e2ereslist.ToString(reqResources)))
 
 			By("prepare the test's pod resources as maximum available resources on the target node with the baselaod deducted")
 			err = baseload.Deduct(reqResources)
 			Expect(err).ToNot(HaveOccurred(), "failed deducting resources from baseload: %v", err)
 
-			By("padding all other candidate nodes leaving room for the baseload only")
+			By(fmt.Sprintf("padding all other candidate nodes leaving room for the baseload only (updated maximum available resources: %s)", e2ereslist.ToString(reqResources)))
 			var paddingPods []*corev1.Pod
 			for _, nodeName := range nrtCandidateNames.List() {
 				node := &corev1.Node{}
