@@ -108,6 +108,10 @@ func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
 
+	zaplog := zap.New(zap.UseFlagOptions(&opts))
+	ctrl.SetLogger(zaplog)
+	klog.SetLogger(zaplog)
+
 	if showVersion {
 		fmt.Printf("%s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
 		os.Exit(0)
@@ -120,7 +124,7 @@ func main() {
 	userPlatformVersion, _ := platform.ParseVersion(platformVersion)
 
 	plat, reason, err := detect.FindPlatform(userPlatform)
-	klog.Infof("platform %s (%s)", plat.Discovered, reason)
+	klog.InfoS("platform detection", "kind", plat.Discovered, "reason", reason)
 	clusterPlatform := plat.Discovered
 	if clusterPlatform == platform.Unknown {
 		klog.ErrorS(err, "cannot autodetect the platform, and no platform given")
@@ -128,7 +132,7 @@ func main() {
 	}
 
 	platVersion, source, err := detect.FindVersion(clusterPlatform, userPlatformVersion)
-	klog.Infof("platform version %s (%s)", platVersion.Discovered, source)
+	klog.InfoS("platform detection", "version", platVersion.Discovered, "reason", source)
 	clusterPlatformVersion := version.Minimize(platVersion.Discovered)
 	if clusterPlatformVersion == platform.MissingVersion {
 		klog.ErrorS(err, "cannot autodetect the platform version, and no platform given")
@@ -162,8 +166,6 @@ func main() {
 		os.Exit(1)
 	}
 	klog.InfoS("manifests loaded", "component", "RTE")
-
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	if renderMode {
 		var objs []client.Object
@@ -212,7 +214,7 @@ func main() {
 	imageSpec, pullPolicy, err := images.GetCurrentImage(context.Background())
 	if err != nil {
 		// intentionally continue
-		klog.ErrorS(err, "unable to find current image, using hardcoded")
+		klog.InfoS("unable to find current image, using hardcoded", "error", err)
 	}
 	klog.InfoS("using RTE image", "spec", imageSpec)
 
