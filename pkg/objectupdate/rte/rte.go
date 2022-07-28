@@ -97,9 +97,19 @@ func DaemonSetRunAsIDs(ds *appsv1.DaemonSet) error {
 	if cnt.SecurityContext == nil {
 		cnt.SecurityContext = &corev1.SecurityContext{}
 	}
+
 	var rootID int64 = 0
 	cnt.SecurityContext.RunAsUser = &rootID
 	cnt.SecurityContext.RunAsGroup = &rootID
+	cnt.SecurityContext.Capabilities = &corev1.Capabilities{
+		Drop: []corev1.Capability{
+			"ALL",
+		},
+	}
+	cnt.SecurityContext.SeccompProfile = &corev1.SeccompProfile{
+		Type: corev1.SeccompProfileTypeRuntimeDefault,
+	}
+
 	klog.InfoS("RTE container elevated privileges", "container", cnt.Name, "user", rootID, "group", rootID)
 	return nil
 }
