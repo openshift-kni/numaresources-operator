@@ -337,7 +337,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 
 			//get maximum available node CPU and Memory
-			reqResources := corev1.ResourceList{
+			reqResources = corev1.ResourceList{
 				corev1.ResourceCPU:    availableResourceType(*targetNrtInitial, corev1.ResourceCPU),
 				corev1.ResourceMemory: availableResourceType(*targetNrtInitial, corev1.ResourceMemory),
 			}
