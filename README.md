@@ -6,8 +6,6 @@ The operator provides minimal support to deploy [secondary schedulers](https://g
 
 ## current limitations
 
-* the NUMA-aware scheduling stack does not yet support [the "container" topology manager scope](https://kubernetes.io/docs/tasks/administer-cluster/topology-manager/#topology-manager-scopes)
-
 Please check the [issues section](https://github.com/openshift-kni/numaresources-operator/issues) for the known issues and limitations of the NUMA resources operator.
 
 ## running the e2e suite against your cluster
