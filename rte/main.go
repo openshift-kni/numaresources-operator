@@ -52,6 +52,8 @@ type ProgArgs struct {
 }
 
 func main() {
+	klog.Infof("starting %s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
+
 	parsedArgs, err := parseArgs(os.Args[1:]...)
 	if err != nil {
 		klog.Fatalf("failed to parse args: %v", err)
@@ -61,7 +63,6 @@ func main() {
 		fmt.Printf("%s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
 		os.Exit(0)
 	}
-	klog.Infof("starting %s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
 
 	// only for debug purposes
 	// printing the header so early includes any debug message from the sysinfo package
