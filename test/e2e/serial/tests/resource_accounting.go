@@ -47,7 +47,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources workload resource accounting", func() {
+var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workload resource accounting", func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
@@ -334,19 +334,20 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			//calculate base load on the target node
 			baseload, err := nodes.GetLoad(fxt.K8sClient, targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
-			klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
+			By(fmt.Sprintf("considering the computed base load: %s", baseload))
 
 			//get maximum available node CPU and Memory
-			reqResources := corev1.ResourceList{
+			reqResources = corev1.ResourceList{
 				corev1.ResourceCPU:    availableResourceType(*targetNrtInitial, corev1.ResourceCPU),
 				corev1.ResourceMemory: availableResourceType(*targetNrtInitial, corev1.ResourceMemory),
 			}
+			By(fmt.Sprintf("considering maximum available resources: %s", e2ereslist.ToString(reqResources)))
 
 			By("prepare the test's pod resources as maximum available resources on the target node with the baselaod deducted")
 			err = baseload.Deduct(reqResources)
 			Expect(err).ToNot(HaveOccurred(), "failed deducting resources from baseload: %v", err)
 
-			By("padding all other candidate nodes leaving room for the baseload only")
+			By(fmt.Sprintf("padding all other candidate nodes leaving room for the baseload only (updated maximum available resources: %s)", e2ereslist.ToString(reqResources)))
 			var paddingPods []*corev1.Pod
 			for _, nodeName := range nrtCandidateNames.List() {
 				node := &corev1.Node{}
@@ -553,7 +554,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			podLabels := map[string]string{
 				"test": "test-ds",
 			}
-			nodeSelector := map[string]string{}
+			nodeSelector := map[string]string{
+				"kubernetes.io/hostname": targetNodeName,
+			}
 			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
 
 			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
@@ -568,7 +571,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload resourc
 			dsRunningTimeout := 1 * time.Minute
 			dsRunningPollInterval := 10 * time.Second
 
-			_, err = e2ewait.ForDaemonSetReady(fxt.Client, ds, dsRunningTimeout, dsRunningPollInterval)
+			_, err = e2ewait.ForDaemonSetReady(fxt.Client, ds, dsRunningPollInterval, dsRunningTimeout)
 			Expect(err).NotTo(HaveOccurred(), "Daemonset %q not up & running after %v", ds.Name, dsRunningTimeout)
 
 			By(fmt.Sprintf("checking Daemonset pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
