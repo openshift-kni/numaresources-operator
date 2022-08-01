@@ -196,7 +196,8 @@ var _ = Describe("[Install] durability", func() {
 					return false, err
 				}
 				if len(nroObj.Status.DaemonSets) != 1 {
-					return false, fmt.Errorf("unsupported daemonsets (/MCP) count: %d", len(nroObj.Status.DaemonSets))
+					klog.Warningf("unsupported daemonsets (/MCP) count: %d", len(nroObj.Status.DaemonSets))
+					return false, nil
 				}
 				return true, nil
 			})

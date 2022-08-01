@@ -49,7 +49,7 @@ type NroDeployment struct {
 	NroObj *nropv1alpha1.NUMAResourcesOperator
 }
 
-// overallDeployment returns a struct containing all the deployed objects,
+// OverallDeployment returns a struct containing all the deployed objects,
 // so it will be easier to introspect and delete them later.
 func OverallDeployment() NroDeployment {
 	var matchLabels map[string]string
@@ -95,6 +95,7 @@ func OverallDeployment() NroDeployment {
 	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
+	By("waiting for MCP to get updated")
 	WaitForMCPUpdatedAfterNROCreated(2, nroObj)
 
 	return deployedObj
