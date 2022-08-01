@@ -19,10 +19,11 @@ package tests
 import (
 	"context"
 	"fmt"
-	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
 	"strings"
 	"time"
+
+	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/core/helper"
 
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo"
@@ -374,7 +375,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, checkConsumedRes checkConsumedResFunc, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
 
 			hostsRequired := 2
-			sleepTimeoutInSec := "5"
 
 			nrts := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, tmPolicy)
 			if len(nrts) < hostsRequired {
@@ -396,7 +396,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				pod.Spec.Containers[i].Resources.Limits = podRes.appCnt[i]
 			}
 			// we expect init containers to be required less often than app containers, so we delegate that
-			makeInitTestContainers(pod, podRes.initCnt, sleepTimeoutInSec)
+			makeInitTestContainers(pod, podRes.initCnt)
 
 			requiredRes := e2ereslist.FromGuaranteedPod(*pod)
 
@@ -1021,7 +1021,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, errMsg string, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
 
 			hostsRequired := 2
-			sleepTimeoutInSec := "5"
 
 			nrts := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, tmPolicy)
 			if len(nrts) < hostsRequired {
@@ -1052,7 +1051,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				pod.Spec.Containers[i].Resources.Limits = podRes.appCnt[i]
 			}
 			// we expect init containers to be required less often than app containers, so we delegate that
-			makeInitTestContainers(pod, podRes.initCnt, sleepTimeoutInSec)
+			makeInitTestContainers(pod, podRes.initCnt)
 
 			requiredRes := e2ereslist.FromGuaranteedPod(*pod)
 
@@ -1496,13 +1495,12 @@ func setupPaddingForUnsuitableNodes(offset int, fxt *e2efixture.Fixture, nrtList
 	return paddingPods
 }
 
-func makeInitTestContainers(pod *corev1.Pod, initCnt []corev1.ResourceList, timeout string) *corev1.Pod {
+func makeInitTestContainers(pod *corev1.Pod, initCnt []corev1.ResourceList) *corev1.Pod {
 	for i := 0; i < len(initCnt); i++ {
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
 			Name:    fmt.Sprintf("inittestcnt-%d", i),
 			Image:   images.GetPauseImage(),
-			Command: []string{"/bin/sleep"},
-			Args:    []string{timeout},
+			Command: []string{objects.PauseCommand},
 			Resources: corev1.ResourceRequirements{
 				Limits: initCnt[i],
 			},
