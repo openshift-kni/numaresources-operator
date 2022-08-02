@@ -739,6 +739,182 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 		})
 	})
+
+	Context("Requesting allocatable resources on the node", func() {
+		var requiredRes corev1.ResourceList
+		var targetNodeName string
+		var nrtListInitial nrtv1alpha1.NodeResourceTopologyList
+		var targetNrtInitial *nrtv1alpha1.NodeResourceTopology
+		var targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList
+		var err error
+
+		BeforeEach(func() {
+			const requiredNUMAZones = 2
+			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
+			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
+
+			const neededNodes = 1
+			if len(nrtCandidates) < neededNodes {
+				Skip(fmt.Sprintf("not enough nodes with at least %d NUMA Zones: found %d, needed %d", requiredNUMAZones, len(nrtCandidates), neededNodes))
+			}
+			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
+
+			var ok bool
+			targetNodeName, ok = nrtCandidateNames.PopAny()
+			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtCandidateNames.List())
+			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
+
+			err = fxt.Client.List(context.TODO(), &targetNrtListInitial)
+			Expect(err).ToNot(HaveOccurred())
+			targetNrtInitial, err = e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)
+			Expect(err).NotTo(HaveOccurred())
+
+			//get maximum available node CPU and Memory
+			requiredRes = corev1.ResourceList{
+				corev1.ResourceCPU:    allocatableResourceType(*targetNrtInitial, corev1.ResourceCPU),
+				corev1.ResourceMemory: allocatableResourceType(*targetNrtInitial, corev1.ResourceMemory),
+			}
+
+			By("padding all other candidate nodes leaving room for the baseload only")
+			var paddingPods []*corev1.Pod
+			for _, nodeName := range nrtCandidateNames.List() {
+
+				//calculate base load on the node
+				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
+				klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
+
+				//get nrt info of the node
+				klog.Infof(fmt.Sprintf("preparing node %q to fit the test case", nodeName))
+				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
+				Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", nodeName)
+
+				paddingRes, err := e2enrt.SaturateNodeUntilLeft(*nrtInfo, baseload.Resources)
+				Expect(err).ToNot(HaveOccurred(), "could not get padding resources for node %q", nrtInfo.Name)
+
+				for _, zone := range nrtInfo.Zones {
+					By(fmt.Sprintf("fully padding node %q zone %q ", nrtInfo.Name, zone.Name))
+					padPod := newPaddingPod(nrtInfo.Name, zone.Name, fxt.Namespace.Name, paddingRes[zone.Name])
+
+					padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
+					Expect(err).ToNot(HaveOccurred(), "unable to pin pod %q to zone %q", padPod.Name, zone.Name)
+
+					err = fxt.Client.Create(context.TODO(), padPod)
+					Expect(err).ToNot(HaveOccurred())
+					paddingPods = append(paddingPods, padPod)
+				}
+			}
+
+			By("Waiting for padding pods to be ready")
+			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
+
+			//save initial NRT to compare the data after trying to schedule the workloads
+			var err error
+			nrtListInitial, err = e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			By("Verifying NRTs had no updates because the pods failed to be scheduled on any node")
+			nrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, nrtListInitial, time.Second*10)
+			Expect(err).ToNot(HaveOccurred())
+
+			for _, initialNrt := range nrtListInitial.Items {
+				nrtCurrent, err := e2enrt.FindFromList(nrtListCurrent.Items, initialNrt.Name)
+				Expect(err).ToNot(HaveOccurred())
+
+				dataBefore, err := yaml.Marshal(initialNrt)
+				Expect(err).ToNot(HaveOccurred())
+				dataAfter, err := yaml.Marshal(nrtCurrent)
+				Expect(err).ToNot(HaveOccurred())
+
+				// NRTs before and after should be equal ASSUMING the pods failed scheduling, if not there would be probably a failure in the test steps before this fails
+				ok, err := e2enrt.CheckEqualAvailableResources(initialNrt, *nrtCurrent)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(ok).To(BeTrue(), "NRT of node %q was updated although the pods failed to be scheduled, expected: %s\n  found: %s", initialNrt.Name, dataBefore, dataAfter)
+			}
+		})
+
+		It("[test_id:47614][tier3][unsched][pod] workload requests guaranteed pod resources available on one node but not on a single numa", func() {
+
+			By("Scheduling the testing pod")
+			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
+			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
+			pod.Spec.Containers[0].Resources.Limits = requiredRes
+
+			err := fxt.Client.Create(context.TODO(), pod)
+			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
+
+			By("check the pod is still pending")
+			err = e2ewait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+			if err != nil {
+				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+			}
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("[test_id:47614][tier3][unsched][deployment] a deployment with a guaranteed pod resources available on one node but not on a single numa", func() {
+
+			By("Scheduling the testing deployment")
+			deploymentName := "test-dp"
+			var replicas int32 = 1
+
+			podLabels := map[string]string{
+				"test": "test-deployment",
+			}
+			nodeSelector := map[string]string{}
+			deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
+			deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
+
+			err := fxt.Client.Create(context.TODO(), deployment)
+			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
+
+			By("check the deployment pod is still pending")
+			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
+			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+
+			for _, pod := range pods {
+				err = e2ewait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+				if err != nil {
+					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+				}
+				Expect(err).ToNot(HaveOccurred())
+			}
+		})
+
+		It("[test_id:47614][tier3][unsched][daemonset] a daemonset with a guaranteed pod resources available on one node but not on a single numa", func() {
+
+			By("Scheduling the testing daemonset")
+			dsName := "test-ds"
+
+			podLabels := map[string]string{
+				"test": "test-daemonset",
+			}
+			nodeSelector := map[string]string{
+				serialconfig.MultiNUMALabel: "2",
+			}
+			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
+			ds.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
+
+			err := fxt.Client.Create(context.TODO(), ds)
+			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", ds.Name)
+
+			By("check the daemonset pods are still pending")
+			pods, err := schedutils.ListPodsByDaemonset(fxt.Client, *ds)
+			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
+
+			for _, pod := range pods {
+				err = e2ewait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+				if err != nil {
+					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+				}
+				Expect(err).ToNot(HaveOccurred())
+			}
+		})
+	})
 })
 
 // Return only those NRTs where each request could fit into a different zone.
