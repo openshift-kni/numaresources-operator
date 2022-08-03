@@ -155,7 +155,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 }
 
 func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, condition string, reason string, message string) (ctrl.Result, error) {
-	klog.Error(message)
+	klog.InfoS("updateStatus", "condition", condition, "reason", reason, "message", message)
 
 	if _, err := updateStatus(ctx, r.Client, instance, condition, reason, message); err != nil {
 		klog.InfoS("Failed to update numaresourcesoperator status", "Desired condition", status.ConditionDegraded, "error", err)
