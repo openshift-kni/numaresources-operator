@@ -153,7 +153,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 }
 
 func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, condition string, reason string, message string) (ctrl.Result, error) {
-	klog.Error(message)
+	klog.InfoS("updateStatus", "condition", condition, "reason", reason, "message", message)
 
 	if _, err := updateStatus(ctx, r.Client, instance, condition, reason, message); err != nil {
 		klog.InfoS("Failed to update numaresourcesoperator status", "Desired condition", status.ConditionDegraded, "error", err)
@@ -388,7 +388,7 @@ func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Con
 					klog.ErrorS(err, "error while deleting daemonset", "DaemonSet", ds.Name)
 					errors = append(errors, err)
 				} else {
-					klog.V(3).Infof("Daemonset [%s] deleted", ds.Name)
+					klog.V(3).InfoS("Daemonset deleted", "name", ds.Name)
 				}
 			}
 		}
@@ -419,7 +419,7 @@ func (r *NUMAResourcesOperatorReconciler) deleteUnusedMachineConfigs(ctx context
 					klog.ErrorS(err, "error while deleting machineconfig", "MachineConfig", mc.Name)
 					errors = append(errors, err)
 				} else {
-					klog.V(3).Infof("Machineconfig [%s] deleted", mc.Name)
+					klog.V(3).InfoS("Machineconfig deleted", "name", mc.Name)
 				}
 			}
 		}
