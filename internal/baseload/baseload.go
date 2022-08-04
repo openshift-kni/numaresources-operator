@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 )
@@ -84,4 +85,12 @@ func (nl Load) Apply(res corev1.ResourceList) {
 // the parameter in place
 func (nl Load) Deduct(res corev1.ResourceList) error {
 	return resourcelist.SubCoreResources(res, nl.Resources)
+}
+
+func (nl Load) CPU() resource.Quantity {
+	return *nl.Resources.Cpu()
+}
+
+func (nl Load) Memory() resource.Quantity {
+	return *nl.Resources.Memory()
 }
