@@ -498,8 +498,13 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 			By(fmt.Sprintf("checking NRT for target node %q updated correctly", testPod.Spec.NodeName))
 			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
-			_, err = e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPreCreate, *nrtPostCreate, rl)
+			dataBefore, err := yaml.Marshal(nrtPreCreate)
 			Expect(err).ToNot(HaveOccurred())
+			dataAfter, err := yaml.Marshal(nrtPostCreate)
+			Expect(err).ToNot(HaveOccurred())
+			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPreCreate, *nrtPostCreate, rl)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
 
 			defer func() {
 				By("reverting kubeletconfig changes")
