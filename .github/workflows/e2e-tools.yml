@@ -1,4 +1,4 @@
-name: CI E2E
+name: CI E2E - for tools
 
 on:
   push:
@@ -9,17 +9,17 @@ on:
       - "v[0-9]+.[0-9]+.[0-9]+"
       - "v[0-9]+.[0-9]+"
 
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
 defaults:
   run:
     shell: bash
 
 jobs:
-  e2e:
+  e2e-tools:
     runs-on: ubuntu-20.04
     env:
-      built_image: "numaresources-operator:ci" # Arbitrary name
-      E2E_NAMESPACE_NAME: numaresources
-      E2E_TOPOLOGY_MANAGER_POLICY: SingleNUMANodePodLevel
       LOG_DIR: /tmp/test_e2e_logs
     steps:
     - name: Checkout
@@ -35,13 +35,13 @@ jobs:
     - name: Verify modules
       run: go mod verify
 
-    - name: build test binary
+    - name: Build tools test binary
       run: |
-        make binary-e2e-rte binary-e2e-install binary-e2e-uninstall
+        make binary-e2e-tools
 
-    - name: Build image
+    - name: Build tools
       run: |
-        docker build . -t ${built_image}
+        make build-tools binary-nrocli
 
     - name: Create K8s Kind Cluster
       run: |
@@ -49,16 +49,16 @@ jobs:
         kind version
         kind create cluster --config=hack/kind-config-e2e-no-registry.yaml --image kindest/node:v1.21.1@sha256:69860bda5563ac81e3c0057d654b5253219618a22ec3a346306239bba8cfa1a6
         kubectl label node kind-worker node-role.kubernetes.io/worker=''
-        kind load docker-image ${built_image}
 
     - name: Deploy RTE Operator
       run: |
-        IMG=${built_image} KUSTOMIZE_DEPLOY_DIR="config/kind-ci/" make deploy
+        # no operator image, no problem
+        KUSTOMIZE_DEPLOY_DIR="config/kind-ci/" make deploy
 
     - name: E2E Tests
       run: |
         export KUBECONFIG=${HOME}/.kube/config
-        NO_TEARDOWN=true make test-e2e
+        hack/run-test-tools-e2e.sh --no-color
 
     - name: Export E2E Tests logs
       if: ${{ failure() }}
