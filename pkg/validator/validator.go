@@ -28,13 +28,19 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/validator"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 )
+
+type Report struct {
+	Succeeded bool                                 `json:"succeeded"`
+	Errors    []deployervalidator.ValidationResult `json:"errors,omitempty"`
+}
 
 type ValidatorData struct {
 	tasEnabledNodeNames sets.String
@@ -95,7 +101,7 @@ func Collect(ctx context.Context, cli client.Client) (ValidatorData, error) {
 
 type validateHelper func(data ValidatorData) ([]validator.ValidationResult, error)
 
-func Validate(data ValidatorData) ([]validator.ValidationResult, error) {
+func Validate(data ValidatorData) (Report, error) {
 	var ret []validator.ValidationResult
 	for _, helper := range []validateHelper{
 		ValidateKubeletConfig,
@@ -103,11 +109,15 @@ func Validate(data ValidatorData) ([]validator.ValidationResult, error) {
 	} {
 		res, err := helper(data)
 		if err != nil {
-			return ret, err
+			return Report{}, err
 		}
 		ret = append(ret, res...)
 	}
-	return ret, nil
+
+	return Report{
+		Succeeded: len(ret) == 0,
+		Errors:    ret,
+	}, nil
 }
 
 func getClusterVersionInfo() (*version.Info, error) {

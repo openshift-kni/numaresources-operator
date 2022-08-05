@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -57,6 +58,7 @@ type ProgArgs struct {
 	Version bool
 	Verbose bool
 	Quiet   bool
+	JSON    bool
 }
 
 func main() {
@@ -85,6 +87,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 
 	flags.BoolVar(&pArgs.Version, "version", false, "Output version and exit")
 	flags.BoolVar(&pArgs.Verbose, "verbose", false, "Verbose output")
+	flags.BoolVar(&pArgs.JSON, "json", false, "Output JSON, not free text")
 	flags.BoolVar(&pArgs.Quiet, "quiet", false, "Avoid all output. Has precende over 'verbose'")
 
 	err := flags.Parse(args)
@@ -106,15 +109,21 @@ func validateCluster(args ProgArgs) error {
 		return err
 	}
 
-	result, err := nrovalidator.Validate(data)
+	rep, err := nrovalidator.Validate(data)
 	if err != nil {
 		return err
 	}
 
-	if !args.Quiet {
-		printValidationResults(result, args.Verbose)
+	if args.Quiet {
+		return nil
 	}
-	return nil
+
+	if !args.JSON {
+		printValidationResults(rep.Errors, args.Verbose)
+		return nil
+	}
+
+	return json.NewEncoder(os.Stdout).Encode(rep)
 }
 
 func printValidationResults(items []deployervalidator.ValidationResult, verbose bool) {
