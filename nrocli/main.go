@@ -46,11 +46,10 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := validateCluster(parsedArgs); err != nil {
-		if !parsedArgs.Quiet {
-			fmt.Fprintf(os.Stderr, "Error while trying to validate cluster: %v\n", err)
-		}
-		os.Exit(-1)
+	err = validateCluster(parsedArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error while trying to validate cluster: %v\n", err)
+		os.Exit(2)
 	}
 }
 
@@ -65,10 +64,6 @@ func parseArgs(args ...string) (ProgArgs, error) {
 
 	err := flags.Parse(args)
 	if err != nil {
-		return pArgs, err
-	}
-
-	if pArgs.Version {
 		return pArgs, err
 	}
 
@@ -100,13 +95,16 @@ func validateCluster(args ProgArgs) error {
 func printValidationResults(items []deployervalidator.ValidationResult, verbose bool) {
 	if len(items) == 0 {
 		fmt.Printf("PASSED>>: cluster kubelet configuration looks ok!\n")
-	} else {
-		fmt.Printf("FAILED>>: cluster kubelet configuration does NOT look ok!\n")
+		return
+	}
 
-		if verbose {
-			for idx, item := range items {
-				fmt.Fprintf(os.Stderr, "ERROR#%03d: %s\n", idx, item.String())
-			}
-		}
+	fmt.Printf("FAILED>>: cluster kubelet configuration does NOT look ok!\n")
+
+	if !verbose {
+		return
+	}
+
+	for idx, item := range items {
+		fmt.Fprintf(os.Stderr, "ERROR#%03d: %s\n", idx, item.String())
 	}
 }
