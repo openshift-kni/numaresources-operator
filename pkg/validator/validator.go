@@ -32,11 +32,15 @@ import (
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+
+	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 )
 
 type ValidatorData struct {
 	tasEnabledNodeNames sets.String
 	kConfigs            map[string]*kubeletconfigv1beta1.KubeletConfiguration
+	nrtCrdMissing       bool
+	nrtList             *nrtv1alpha1.NodeResourceTopologyList
 	versionInfo         *version.Info
 }
 
@@ -79,6 +83,7 @@ func Collect(ctx context.Context, cli client.Client) (ValidatorData, error) {
 
 	for _, helper := range []collectHelper{
 		CollectKubeletConfig,
+		CollectNodeResourceTopologies,
 	} {
 		err = helper(ctx, cli, &data)
 		if err != nil {
@@ -94,6 +99,7 @@ func Validate(data ValidatorData) ([]validator.ValidationResult, error) {
 	var ret []validator.ValidationResult
 	for _, helper := range []validateHelper{
 		ValidateKubeletConfig,
+		ValidateNodeResourceTopologies,
 	} {
 		res, err := helper(data)
 		if err != nil {
