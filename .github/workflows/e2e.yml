@@ -35,6 +35,10 @@ jobs:
     - name: Verify modules
       run: go mod verify
 
+    - name: Reuse kustomize from the host
+      run: |
+        if kustomize version | grep -Eq 'v4\.5'; then mkdir -p bin/ && ln -s $(which kustomize) bin/kustomize; fi
+
     - name: build test binary
       run: |
         make binary-e2e-rte binary-e2e-install binary-e2e-uninstall
