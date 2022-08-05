@@ -22,12 +22,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -55,10 +57,11 @@ func init() {
 }
 
 type ProgArgs struct {
-	Version bool
-	Verbose bool
-	Quiet   bool
-	JSON    bool
+	Version     bool
+	Verbose     bool
+	Quiet       bool
+	JSON        bool
+	Validations sets.String
 }
 
 func main() {
@@ -73,6 +76,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	if len(parsedArgs.Validations) == 0 || parsedArgs.Validations.Has("help") {
+		fmt.Fprintf(os.Stderr, "available validators: %v\n", strings.Join(nrovalidator.Available().List(), ","))
+		os.Exit(0)
+	}
+
 	err = validateCluster(parsedArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error while trying to validate cluster: %v\n", err)
@@ -83,19 +91,23 @@ func main() {
 func parseArgs(args ...string) (ProgArgs, error) {
 	pArgs := ProgArgs{}
 
+	var validationsArg string
+
 	flags := flag.NewFlagSet(version.ProgramName(), flag.ExitOnError)
 
 	flags.BoolVar(&pArgs.Version, "version", false, "Output version and exit")
 	flags.BoolVar(&pArgs.Verbose, "verbose", false, "Verbose output")
 	flags.BoolVar(&pArgs.JSON, "json", false, "Output JSON, not free text")
-	flags.BoolVar(&pArgs.Quiet, "quiet", false, "Avoid all output. Has precende over 'verbose'")
+	flags.BoolVar(&pArgs.Quiet, "quiet", false, "Avoid all output. Overrides 'verbose'")
+	flags.StringVar(&validationsArg, "what", "all", "Validations to perform")
 
 	err := flags.Parse(args)
 	if err != nil {
 		return pArgs, err
 	}
 
-	return pArgs, nil
+	pArgs.Validations, err = nrovalidator.Requested(validationsArg)
+	return pArgs, err
 }
 
 func validateCluster(args ProgArgs) error {
@@ -104,7 +116,11 @@ func validateCluster(args ProgArgs) error {
 		return err
 	}
 
-	data, err := nrovalidator.Collect(context.TODO(), cli)
+	if !args.Quiet {
+		fmt.Fprintf(os.Stderr, "INFO>>>>: enabled validators: %s\n", strings.Join(args.Validations.List(), ","))
+	}
+
+	data, err := nrovalidator.Collect(context.TODO(), cli, args.Validations)
 	if err != nil {
 		return err
 	}

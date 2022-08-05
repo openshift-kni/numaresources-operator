@@ -18,6 +18,8 @@ package validator
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,18 +44,72 @@ type Report struct {
 	Errors    []deployervalidator.ValidationResult `json:"errors,omitempty"`
 }
 
+func Requested(what string) (sets.String, error) {
+	items := strings.FieldsFunc(what, func(c rune) bool {
+		return c == ','
+	})
+	available := Available()
+
+	// handle special case first
+	for _, item := range items {
+		if strings.ToLower(item) == "help" {
+			return sets.NewString("help"), nil
+		}
+		if strings.ToLower(item) == "all" {
+			return available, nil
+		}
+	}
+
+	ret := sets.NewString()
+	for _, item := range items {
+		vd := strings.ToLower(strings.TrimSpace(item))
+		if !available.Has(vd) {
+			return nil, fmt.Errorf("unknown validator: %q", item)
+		}
+		ret.Insert(vd)
+	}
+	return ret, nil
+}
+
+func Available() sets.String {
+	return sets.NewString(
+		ValidatorKubeletConfig,
+		ValidatorNodeResourceTopologies,
+	)
+}
+
 type ValidatorData struct {
 	tasEnabledNodeNames sets.String
 	kConfigs            map[string]*kubeletconfigv1beta1.KubeletConfiguration
 	nrtCrdMissing       bool
 	nrtList             *nrtv1alpha1.NodeResourceTopologyList
 	versionInfo         *version.Info
+	what                sets.String
 }
 
-type collectHelper func(ctx context.Context, cli client.Client, data *ValidatorData) error
+type CollectFunc func(ctx context.Context, cli client.Client, data *ValidatorData) error
 
-func Collect(ctx context.Context, cli client.Client) (ValidatorData, error) {
-	data := ValidatorData{}
+func Collectors() map[string]CollectFunc {
+	return map[string]CollectFunc{
+		ValidatorKubeletConfig:          CollectKubeletConfig,
+		ValidatorNodeResourceTopologies: CollectNodeResourceTopologies,
+	}
+}
+
+func Collect(ctx context.Context, cli client.Client, what sets.String) (ValidatorData, error) {
+	collectors := Collectors()
+	colFns := []CollectFunc{}
+	for _, vd := range what.UnsortedList() {
+		fn, ok := collectors[vd]
+		if !ok {
+			return ValidatorData{}, fmt.Errorf("unsupported collector: %q", vd)
+		}
+		colFns = append(colFns, fn)
+	}
+
+	data := ValidatorData{
+		what: what,
+	}
 
 	ver, err := getClusterVersionInfo()
 	if err != nil {
@@ -87,10 +143,7 @@ func Collect(ctx context.Context, cli client.Client) (ValidatorData, error) {
 	}
 	data.tasEnabledNodeNames = enabledNodeNames
 
-	for _, helper := range []collectHelper{
-		CollectKubeletConfig,
-		CollectNodeResourceTopologies,
-	} {
+	for _, helper := range colFns {
 		err = helper(ctx, cli, &data)
 		if err != nil {
 			return data, err
@@ -99,14 +152,28 @@ func Collect(ctx context.Context, cli client.Client) (ValidatorData, error) {
 	return data, nil
 }
 
-type validateHelper func(data ValidatorData) ([]validator.ValidationResult, error)
+type ValidateFunc func(data ValidatorData) ([]validator.ValidationResult, error)
+
+func Validators() map[string]ValidateFunc {
+	return map[string]ValidateFunc{
+		ValidatorKubeletConfig:          ValidateKubeletConfig,
+		ValidatorNodeResourceTopologies: ValidateNodeResourceTopologies,
+	}
+}
 
 func Validate(data ValidatorData) (Report, error) {
+	validators := Validators()
+	valFns := []ValidateFunc{}
+	for _, vd := range data.what.UnsortedList() {
+		fn, ok := validators[vd]
+		if !ok {
+			return Report{}, fmt.Errorf("unsupported validator: %q", vd)
+		}
+		valFns = append(valFns, fn)
+	}
+
 	var ret []validator.ValidationResult
-	for _, helper := range []validateHelper{
-		ValidateKubeletConfig,
-		ValidateNodeResourceTopologies,
-	} {
+	for _, helper := range valFns {
 		res, err := helper(data)
 		if err != nil {
 			return Report{}, err

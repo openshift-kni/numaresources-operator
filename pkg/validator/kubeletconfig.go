@@ -30,6 +30,10 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 )
 
+const (
+	ValidatorKubeletConfig = "k8scfg"
+)
+
 func CollectKubeletConfig(ctx context.Context, cli client.Client, data *ValidatorData) error {
 	mcoKubeletConfigList := mcov1.KubeletConfigList{}
 	if err := cli.List(ctx, &mcoKubeletConfigList); err != nil {

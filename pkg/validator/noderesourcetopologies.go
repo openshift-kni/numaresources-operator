@@ -32,6 +32,10 @@ import (
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 )
 
+const (
+	ValidatorNodeResourceTopologies = "nrt"
+)
+
 func CollectNodeResourceTopologies(ctx context.Context, _ client.Client, data *ValidatorData) error {
 
 	cli, err := getTopologyClient()
