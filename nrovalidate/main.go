@@ -130,7 +130,7 @@ func printValidationResults(items []deployervalidator.ValidationResult, verbose 
 	}
 
 	for idx, item := range items {
-		fmt.Fprintf(os.Stderr, "ERROR#%03d: %s\n", idx, item.String())
+		fmt.Printf("ERROR#%03d: %s\n", idx, item.String())
 	}
 }
 
