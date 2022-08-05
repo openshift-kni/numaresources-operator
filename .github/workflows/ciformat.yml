@@ -20,7 +20,7 @@ jobs:
     - name: Set up golang
       uses: actions/setup-go@v2
       with:
-        go-version: 1.18.1
+        go-version: 1.18.4
 
     - name: format
       run: ./hack/check-format.sh
