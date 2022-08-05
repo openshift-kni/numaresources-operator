@@ -45,7 +45,7 @@ jobs:
 
     - name: Build tools
       run: |
-        make build-tools binary-nrocli
+        make build-tools binary-nrovalidate
 
     - name: Create K8s Kind Cluster
       run: |
