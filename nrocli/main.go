@@ -20,7 +20,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"syscall"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
@@ -39,8 +38,7 @@ func main() {
 	parsedArgs, err := parseArgs(os.Args[1:]...)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to parse args: %v\n", err)
-		//TODO: print usage
-		os.Exit(int(syscall.EINVAL))
+		os.Exit(1)
 	}
 
 	if parsedArgs.Version {
