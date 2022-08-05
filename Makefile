@@ -125,6 +125,9 @@ test-e2e: build-e2e-all
 test-install-e2e: build-e2e-all
 	hack/run-test-install-e2e.sh
 
+test-must-gather-e2e: build-must-gather-e2e
+	hack/run-test-must-gather-e2e.sh
+
 ##@ Build
 
 binary: build-tools
@@ -184,6 +187,9 @@ binary-e2e-serial:
 binary-e2e-tools:
 	go test -c -v -o bin/e2e-nrop-tools.test ./test/e2e/tools
 
+binary-must-gather-e2e:
+	go test -c -v -o bin/e2e-nrop-must-gather.test ./test/e2e/must-gather
+
 binary-e2e-all: goversion binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial binary-e2e-tools runner-e2e-serial build-pause
 
 runner-e2e-serial: bin/envsubst
@@ -207,6 +213,8 @@ build-e2e-install: fmt vet binary-e2e-install
 build-e2e-uninstall: fmt vet binary-e2e-uninstall
 
 build-e2e-all: fmt vet binary-e2e-all
+
+build-must-gather-e2e: fmt vet binary-must-gather-e2e
 
 build-pause:
 	install -m 755 hack/pause bin/
