@@ -29,6 +29,8 @@ func TestRequested(t *testing.T) {
 		expectedError error
 	}
 
+	available := strings.Join(Available().List(), ",")
+
 	testcases := []testCase{
 		{
 			what:          "",
@@ -48,19 +50,19 @@ func TestRequested(t *testing.T) {
 		},
 		{
 			what:          "all",
-			expectedValue: available(),
+			expectedValue: available,
 		},
 		{
 			what:          "k8scfg,nrt",
-			expectedValue: available(),
+			expectedValue: available,
 		},
 		{
 			what:          "nrt,k8scfg",
-			expectedValue: available(),
+			expectedValue: available,
 		},
 		{
 			what:          " nrt,  k8scfg ",
-			expectedValue: available(),
+			expectedValue: available,
 		},
 	}
 
@@ -77,8 +79,4 @@ func TestRequested(t *testing.T) {
 			}
 		})
 	}
-}
-
-func available() string {
-	return strings.Join(Available().List(), ",")
 }
