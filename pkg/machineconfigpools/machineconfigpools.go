@@ -128,7 +128,7 @@ func FindBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelector) 
 }
 
 func GetNodeListFromMachineConfigPool(ctx context.Context, cli client.Client, mcp mcov1.MachineConfigPool) ([]corev1.Node, error) {
-	sel, err := metav1.LabelSelectorAsSelector(mcp.Spec.MachineConfigSelector)
+	sel, err := metav1.LabelSelectorAsSelector(mcp.Spec.NodeSelector)
 	if err != nil {
 		return nil, err
 	}

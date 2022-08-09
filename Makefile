@@ -158,14 +158,14 @@ binary-numacell: build-tools
 		-ldflags "$$LDFLAGS" \
 		test/deviceplugin/cmd/numacell/main.go
 
-binary-nrocli: build-tools
+binary-nrovalidate: build-tools
 	LDFLAGS="-s -w "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
 	CGO_ENABLED=0 go build \
 		-mod=vendor \
-		-o bin/nrocli \
+		-o bin/nrovalidate \
 		-ldflags "$$LDFLAGS" \
-		nrocli/main.go
+		nrovalidate/main.go
 
 binary-all: binary binary-rte
 
@@ -202,9 +202,9 @@ build-rte: fmt vet binary-rte
 
 build-numacell: fmt vet binary-numacell
 
-build-nrocli: fmt vet binary-nrocli
+build-nrovalidate: fmt vet binary-nrovalidate
 
-build-all: generate fmt vet binary binary-rte binary-numacell binary-nrocli
+build-all: generate fmt vet binary binary-rte binary-numacell binary-nrovalidate
 
 build-e2e-rte: fmt vet binary-e2e-rte
 

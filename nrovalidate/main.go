@@ -20,14 +20,37 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"syscall"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
+	securityv1 "github.com/openshift/api/security/v1"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	k8sruntime "k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
+
+	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 
 	nrovalidator "github.com/openshift-kni/numaresources-operator/pkg/validator"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 )
+
+var (
+	scheme = k8sruntime.NewScheme()
+)
+
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
+	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
+	utilruntime.Must(nropv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(machineconfigv1.Install(scheme))
+	utilruntime.Must(securityv1.Install(scheme))
+}
 
 type ProgArgs struct {
 	Version bool
@@ -39,8 +62,7 @@ func main() {
 	parsedArgs, err := parseArgs(os.Args[1:]...)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to parse args: %v\n", err)
-		//TODO: print usage
-		os.Exit(int(syscall.EINVAL))
+		os.Exit(1)
 	}
 
 	if parsedArgs.Version {
@@ -48,11 +70,10 @@ func main() {
 		os.Exit(0)
 	}
 
-	if err := validateCluster(parsedArgs); err != nil {
-		if !parsedArgs.Quiet {
-			fmt.Fprintf(os.Stderr, "Error while trying to validate cluster: %v\n", err)
-		}
-		os.Exit(-1)
+	err = validateCluster(parsedArgs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error while trying to validate cluster: %v\n", err)
+		os.Exit(2)
 	}
 }
 
@@ -70,15 +91,11 @@ func parseArgs(args ...string) (ProgArgs, error) {
 		return pArgs, err
 	}
 
-	if pArgs.Version {
-		return pArgs, err
-	}
-
 	return pArgs, nil
 }
 
 func validateCluster(args ProgArgs) error {
-	cli, err := clientutil.New()
+	cli, err := NewClientWithScheme(scheme)
 	if err != nil {
 		return err
 	}
@@ -102,13 +119,24 @@ func validateCluster(args ProgArgs) error {
 func printValidationResults(items []deployervalidator.ValidationResult, verbose bool) {
 	if len(items) == 0 {
 		fmt.Printf("PASSED>>: cluster kubelet configuration looks ok!\n")
-	} else {
-		fmt.Printf("FAILED>>: cluster kubelet configuration does NOT look ok!\n")
-
-		if verbose {
-			for idx, item := range items {
-				fmt.Fprintf(os.Stderr, "ERROR#%03d: %s\n", idx, item.String())
-			}
-		}
+		return
 	}
+
+	fmt.Printf("FAILED>>: cluster kubelet configuration does NOT look ok!\n")
+
+	if !verbose {
+		return
+	}
+
+	for idx, item := range items {
+		fmt.Fprintf(os.Stderr, "ERROR#%03d: %s\n", idx, item.String())
+	}
+}
+
+func NewClientWithScheme(scheme *k8sruntime.Scheme) (client.Client, error) {
+	cfg, err := config.GetConfig()
+	if err != nil {
+		return nil, err
+	}
+	return client.New(cfg, client.Options{Scheme: scheme})
 }
