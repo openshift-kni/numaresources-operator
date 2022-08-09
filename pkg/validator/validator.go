@@ -19,9 +19,11 @@ package validator
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
@@ -96,7 +98,7 @@ func Collectors() map[string]CollectFunc {
 	}
 }
 
-func Collect(ctx context.Context, cli client.Client, what sets.String) (ValidatorData, error) {
+func Collect(ctx context.Context, cli client.Client, userLabels string, what sets.String) (ValidatorData, error) {
 	collectors := Collectors()
 	colFns := []CollectFunc{}
 	for _, vd := range what.UnsortedList() {
@@ -119,28 +121,17 @@ func Collect(ctx context.Context, cli client.Client, what sets.String) (Validato
 	data.versionInfo = ver
 
 	// Get Node Names for those nodes with TAS enabled
-	nroNamespacedName := types.NamespacedName{
-		Name: objectnames.DefaultNUMAResourcesOperatorCrName,
+	var enabledNodeNames sets.String
+	if userLabels != "" {
+		enabledNodeNames, err = GetNodesByLabels(ctx, cli, userLabels)
+	} else {
+		enabledNodeNames, err = GetNodesByNRO(ctx, cli)
 	}
-	nroInstance := &nropv1alpha1.NUMAResourcesOperator{}
-	err = cli.Get(ctx, nroNamespacedName, nroInstance)
 	if err != nil {
 		return data, err
 	}
 
-	nroMcps, err := machineconfigpools.GetListByNodeGroups(ctx, cli, nroInstance.Spec.NodeGroups)
-	if err != nil {
-		return data, err
-	}
-
-	enabledNodeNames := sets.NewString()
-	for _, mcp := range nroMcps {
-		nodes, err := machineconfigpools.GetNodeListFromMachineConfigPool(ctx, cli, *mcp)
-		if err != nil {
-			return data, err
-		}
-		enabledNodeNames.Insert(getNodeNames(nodes)...)
-	}
+	fmt.Fprintf(os.Stderr, "INFO>>>>: inspecting nodes: %s\n", strings.Join(enabledNodeNames.UnsortedList(), ","))
 	data.tasEnabledNodeNames = enabledNodeNames
 
 	for _, helper := range colFns {
@@ -150,6 +141,50 @@ func Collect(ctx context.Context, cli client.Client, what sets.String) (Validato
 		}
 	}
 	return data, nil
+}
+
+func GetNodesByLabels(ctx context.Context, cli client.Client, userLabels string) (sets.String, error) {
+	enabledNodeNames := sets.NewString()
+	sel, err := labels.Parse(userLabels)
+	if err != nil {
+		return enabledNodeNames, err
+	}
+
+	nodeList := &corev1.NodeList{}
+	err = cli.List(ctx, nodeList, &client.ListOptions{LabelSelector: sel})
+	if err != nil {
+		return enabledNodeNames, err
+	}
+
+	enabledNodeNames.Insert(getNodeNames(nodeList.Items)...)
+	return enabledNodeNames, err
+}
+
+func GetNodesByNRO(ctx context.Context, cli client.Client) (sets.String, error) {
+	enabledNodeNames := sets.NewString()
+	nroNamespacedName := types.NamespacedName{
+		Name: objectnames.DefaultNUMAResourcesOperatorCrName,
+	}
+	nroInstance := &nropv1alpha1.NUMAResourcesOperator{}
+	err := cli.Get(ctx, nroNamespacedName, nroInstance)
+	if err != nil {
+		return enabledNodeNames, err
+	}
+
+	nroMcps, err := machineconfigpools.GetListByNodeGroups(ctx, cli, nroInstance.Spec.NodeGroups)
+	if err != nil {
+		return enabledNodeNames, err
+	}
+
+	for _, mcp := range nroMcps {
+		nodes, err := machineconfigpools.GetNodeListFromMachineConfigPool(ctx, cli, *mcp)
+		if err != nil {
+			return enabledNodeNames, err
+		}
+		enabledNodeNames.Insert(getNodeNames(nodes)...)
+	}
+
+	return enabledNodeNames, nil
 }
 
 type ValidateFunc func(data ValidatorData) ([]validator.ValidationResult, error)

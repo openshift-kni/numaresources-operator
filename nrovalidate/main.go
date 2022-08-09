@@ -61,6 +61,7 @@ type ProgArgs struct {
 	Verbose     bool
 	Quiet       bool
 	JSON        bool
+	Labels      string
 	Validations sets.String
 }
 
@@ -100,6 +101,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.BoolVar(&pArgs.JSON, "json", false, "Output JSON, not free text")
 	flags.BoolVar(&pArgs.Quiet, "quiet", false, "Avoid all output. Overrides 'verbose'")
 	flags.StringVar(&validationsArg, "what", "all", "Validations to perform")
+	flags.StringVar(&pArgs.Labels, "labels", "", "Selector (label query) to filter on. e.g. -l key1=value1,key2=value2; autodetect with NRO if missing.")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -120,7 +122,7 @@ func validateCluster(args ProgArgs) error {
 		fmt.Fprintf(os.Stderr, "INFO>>>>: enabled validators: %s\n", strings.Join(args.Validations.List(), ","))
 	}
 
-	data, err := nrovalidator.Collect(context.TODO(), cli, args.Validations)
+	data, err := nrovalidator.Collect(context.TODO(), cli, args.Labels, args.Validations)
 	if err != nil {
 		return err
 	}
