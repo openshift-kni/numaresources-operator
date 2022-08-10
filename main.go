@@ -75,6 +75,13 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
+type RenderParams struct {
+	NRTCRD         bool
+	Namespace      string
+	Image          string
+	ImageScheduler string
+}
+
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -82,12 +89,10 @@ func main() {
 	var platformName string
 	var platformVersion string
 	var detectPlatformOnly bool
-	var renderMode bool
-	var renderNamespace string
-	var renderImage string
-	var renderImageScheduler string
 	var showVersion bool
 	var enableScheduler bool
+	var renderMode bool
+	var render RenderParams
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -97,9 +102,10 @@ func main() {
 	flag.StringVar(&platformVersion, "platform-version", "", "platform version to deploy on - leave empty to autodetect")
 	flag.BoolVar(&detectPlatformOnly, "detect-platform-only", false, "detect and report the platform, then exits")
 	flag.BoolVar(&renderMode, "render", false, "outputs the rendered manifests, then exits")
-	flag.StringVar(&renderNamespace, "render-namespace", defaultNamespace, "outputs the manifests rendered using the given namespace")
-	flag.StringVar(&renderImage, "render-image", defaultImage, "outputs the manifests rendered using the given image")
-	flag.StringVar(&renderImageScheduler, "render-image-scheduler", "", "outputs the manifests rendered using the given image for the scheduler")
+	flag.BoolVar(&render.NRTCRD, "render-nrt-crd", false, "outputs only the rendered NodeResourceTopology CRD manifest, then exits")
+	flag.StringVar(&render.Namespace, "render-namespace", defaultNamespace, "outputs the manifests rendered using the given namespace")
+	flag.StringVar(&render.Image, "render-image", defaultImage, "outputs the manifests rendered using the given image")
+	flag.StringVar(&render.ImageScheduler, "render-image-scheduler", "", "outputs the manifests rendered using the given image for the scheduler")
 	flag.BoolVar(&showVersion, "version", false, "outputs the version and exit")
 	flag.BoolVar(&enableScheduler, "enable-scheduler", false, "enable support for the NUMAResourcesScheduler object")
 
@@ -168,32 +174,7 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	if renderMode {
-		var objs []client.Object
-		if enableScheduler {
-			if renderImageScheduler == "" {
-				klog.Errorf("missing scheduler image")
-				os.Exit(1)
-			}
-
-			schedManifests, err := schedmanifests.GetManifests(namespace)
-			if err != nil {
-				klog.ErrorS(err, "unable to load the Scheduler manifests")
-				os.Exit(1)
-			}
-			klog.InfoS("manifests loaded", "component", "Scheduler")
-
-			mf := renderSchedulerManifests(schedManifests, renderImageScheduler)
-			objs = append(objs, mf.ToObjects()...)
-		}
-
-		mf := renderRTEManifests(rteManifests, renderNamespace, renderImage)
-		objs = append(objs, mf.ToObjects()...)
-
-		if err := renderObjects(objs); err != nil {
-			klog.ErrorS(err, "unable to render manifests")
-			os.Exit(1)
-		}
-		os.Exit(0)
+		os.Exit(manageRendering(render, clusterPlatform, apiManifests, rteManifests, namespace, enableScheduler))
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -276,6 +257,44 @@ func main() {
 		klog.ErrorS(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func manageRendering(render RenderParams, clusterPlatform platform.Platform, apiMf apimanifests.Manifests, rteMf rtemanifests.Manifests, namespace string, enableScheduler bool) int {
+	if render.NRTCRD {
+		if err := renderObjects(apiMf.ToObjects()); err != nil {
+			klog.ErrorS(err, "unable to render manifests")
+			return 1
+		}
+		return 0
+	}
+
+	var objs []client.Object
+	if enableScheduler {
+		if render.ImageScheduler == "" {
+			klog.Errorf("missing scheduler image")
+			return 1
+		}
+
+		schedMf, err := schedmanifests.GetManifests(namespace)
+		if err != nil {
+			klog.ErrorS(err, "unable to load the Scheduler manifests")
+			return 1
+		}
+		klog.InfoS("manifests loaded", "component", "Scheduler")
+
+		mf := renderSchedulerManifests(schedMf, render.ImageScheduler)
+		objs = append(objs, mf.ToObjects()...)
+	}
+
+	mf := renderRTEManifests(rteMf, render.Namespace, render.Image)
+	objs = append(objs, mf.ToObjects()...)
+
+	if err := renderObjects(objs); err != nil {
+		klog.ErrorS(err, "unable to render manifests")
+		return 1
+	}
+
+	return 0
 }
 
 func renderObjects(objs []client.Object) error {
