@@ -94,6 +94,7 @@ func OverallDeployment() NroDeployment {
 
 	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	deployedObj.NroObj = nroObj
 
 	By("waiting for MCP to get updated")
 	WaitForMCPUpdatedAfterNROCreated(2, nroObj)
@@ -235,6 +236,7 @@ func DeployNROScheduler() *nropv1alpha1.NUMAResourcesScheduler {
 			klog.Warningf("failed to get the NRO Scheduler resource: %v", err)
 			return false
 		}
+		nroSchedObj = updatedNROObj
 
 		cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
 		if cond == nil {

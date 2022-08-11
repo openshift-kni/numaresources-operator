@@ -23,12 +23,15 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
+	"github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
 var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
@@ -104,8 +107,13 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 				err = checkfilesExist(crdInstances, mgContentFolder)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				ginkgo.By("Checking 'numaresources' namespace")
-				namespaceFolder := filepath.Join(mgContentFolder, "namespaces/numaresources")
+				ginkgo.By("Looking for namespace in NUMAResourcesOperator")
+				updatedNRO, err := wait.ForDaemonsetInNUMAResourcesOperatorStatus(e2eclient.Client, deployment.NroObj, 5*time.Second, 2*time.Minute)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				namespace := updatedNRO.Status.DaemonSets[0].Namespace
+
+				ginkgo.By(fmt.Sprintf("Checking: %q namespace\n", namespace))
+				namespaceFolder := filepath.Join(mgContentFolder, "namespaces/", namespace)
 				items := []string{
 					"core/pods.yaml",
 					"pods",

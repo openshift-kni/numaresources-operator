@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
@@ -44,4 +45,24 @@ func ForNUMAResourcesSchedulerDeleted(cli client.Client, nrSched *nropv1alpha1.N
 		return deletionStatusFromError("NUMAResourcesScheduler", key, err)
 	})
 	return err
+}
+
+func ForDaemonsetInNUMAResourcesOperatorStatus(cli client.Client, nroObj *nropv1alpha1.NUMAResourcesOperator, interval time.Duration, timeout time.Duration) (*nropv1alpha1.NUMAResourcesOperator, error) {
+	updatedNRO := nropv1alpha1.NUMAResourcesOperator{}
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		key := ObjectKeyFromObject(nroObj)
+		err := cli.Get(context.TODO(), key.AsKey(), &updatedNRO)
+		if err != nil {
+			klog.Warningf("failed to get the NUMAResourcesOperator %s: %v", key.String(), err)
+			return false, err
+		}
+
+		if len(updatedNRO.Status.DaemonSets) == 0 {
+			klog.Warningf("failed to get the DaemonSet from NUMAResourcesOperator %s", key.String())
+			return false, nil
+		}
+		klog.Infof("Daemonset info %s/%s ready in NUMAResourcesOperator %s", updatedNRO.Status.DaemonSets[0].Namespace, updatedNRO.Status.DaemonSets[0].Name, key.String())
+		return true, nil
+	})
+	return &updatedNRO, err
 }
