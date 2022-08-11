@@ -49,5 +49,4 @@ var _ = Describe("[tools] Auxiliary tools", func() {
 			Expect(ok).To(BeTrue(), "cannot recognize detected platform: %s", text)
 		})
 	})
-
 })
