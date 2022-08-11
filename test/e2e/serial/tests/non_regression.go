@@ -36,6 +36,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
+	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	e2enodes "github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
@@ -319,4 +320,98 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		})
 	})
+
+	Context("Requesting resources that are greater than allocatable at numa level", func() {
+		It("[test_id:47613][tier3] should not schedule a pod requesting resources that are not allocatable at numa level", func() {
+			//the test can run on node with any numa number, so no need to filter the nrts
+			nrtNames := e2enrt.AccumulateNames(nrts)
+
+			//select target node
+			targetNodeName, ok := nrtNames.PopAny()
+			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtNames.List())
+			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
+
+			//pad non target nodes
+			By("padding non target nodes leaving room for the baseload only")
+			var paddingPods []*corev1.Pod
+			for _, nodeName := range nrtNames.List() {
+
+				//calculate base load on the node
+				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
+				klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
+
+				//get nrt info of the node
+				klog.Infof(fmt.Sprintf("preparing node %q to fit the test case", nodeName))
+				nrtInfo, err := e2enrt.FindFromList(nrts, nodeName)
+				Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", nodeName)
+
+				paddingRes, err := e2enrt.SaturateNodeUntilLeft(*nrtInfo, baseload.Resources)
+				Expect(err).ToNot(HaveOccurred(), "could not get padding resources for node %q", nrtInfo.Name)
+
+				for _, zone := range nrtInfo.Zones {
+					By(fmt.Sprintf("fully padding node %q zone %q ", nrtInfo.Name, zone.Name))
+					padPod := newPaddingPod(nrtInfo.Name, zone.Name, fxt.Namespace.Name, paddingRes[zone.Name])
+
+					padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
+					Expect(err).ToNot(HaveOccurred(), "unable to pin pod %q to zone %q", padPod.Name, zone.Name)
+
+					err = fxt.Client.Create(context.TODO(), padPod)
+					Expect(err).ToNot(HaveOccurred())
+					paddingPods = append(paddingPods, padPod)
+				}
+			}
+
+			By("Waiting for padding pods to be ready")
+			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
+
+			//prepare the test pod
+			//get maximum allocatable resources across all numas of the target node
+			var targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList
+			err := fxt.Client.List(context.TODO(), &targetNrtListInitial)
+			Expect(err).ToNot(HaveOccurred())
+			targetNrtInitial, err := e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)
+			Expect(err).NotTo(HaveOccurred())
+
+			requiredRes := corev1.ResourceList{
+				corev1.ResourceCPU:    e2enrt.GetMaxAllocatableResourceNumaLevel(*targetNrtInitial, corev1.ResourceCPU),
+				corev1.ResourceMemory: e2enrt.GetMaxAllocatableResourceNumaLevel(*targetNrtInitial, corev1.ResourceMemory),
+			}
+			//add minimal amount of cpu and memory to the max allocatable resources to ensure the requested amount is greater than allocatable would afford
+			minRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("100Mi"),
+			}
+			e2ereslist.AddCoreResources(requiredRes, minRes)
+
+			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
+			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
+			pod.Spec.Containers[0].Resources.Limits = requiredRes
+
+			By(fmt.Sprintf("Scheduling the testing pod with resources that are not allocatable on any numa zone of the target node. requested resources of the test pod: %s", e2ereslist.ToString(e2ereslist.FromContainers(pod.Spec.Containers))))
+			err = fxt.Client.Create(context.TODO(), pod)
+			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
+
+			By("check the pod keeps on pending")
+			err = e2ewait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+			if err != nil {
+				objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+			}
+			Expect(err).ToNot(HaveOccurred())
+
+			By("check the NRT has no changes")
+			nrtListPostPodCreate, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+
+			nrtPostCreate, err := e2enrt.FindFromList(nrtListPostPodCreate.Items, targetNodeName)
+			Expect(err).ToNot(HaveOccurred())
+
+			isEqual, err := e2enrt.CheckEqualAvailableResources(*targetNrtInitial, *nrtPostCreate)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(isEqual).To(BeTrue(), "new changes were detected in the nrt of the target node, but expected no change")
+
+		})
+	})
+
 })
