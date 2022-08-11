@@ -367,6 +367,22 @@ func FindResourceAllocatableByName(resources []nrtv1alpha1.ResourceInfo, name st
 	return *resource.NewQuantity(0, resource.DecimalSI), false
 }
 
+func GetMaxAllocatableResourceNumaLevel(nrtInfo nrtv1alpha1.NodeResourceTopology, resName corev1.ResourceName) resource.Quantity {
+	var maxAllocatable resource.Quantity
+
+	// Finding the maximum allocatable resources of a resource type across all zones
+	for _, zone := range nrtInfo.Zones {
+		zoneQty, ok := FindResourceAllocatableByName(zone.Resources, resName.String())
+		if !ok {
+			continue
+		}
+		if zoneQty.Cmp(maxAllocatable) > 0 {
+			maxAllocatable = zoneQty
+		}
+	}
+	return maxAllocatable
+}
+
 func contains(items []string, st string) bool {
 	for _, item := range items {
 		if item == st {

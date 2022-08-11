@@ -1049,19 +1049,7 @@ func allocatableResourceType(nrtInfo nrtv1alpha1.NodeResourceTopology, resName c
 // NUMA nodes so that all the replicas can successfully obtain resources
 // from all the NUMA nodes.
 func leastAvailableResourceQtyInAllZone(nrtInfo nrtv1alpha1.NodeResourceTopology, baseload baseload.Load, resName corev1.ResourceName) resource.Quantity {
-	var maxResAllocatable resource.Quantity
-
-	// Finding the maximum allocatable resources of a resource type across all zones
-	for _, zone := range nrtInfo.Zones {
-		zoneQty, ok := e2enrt.FindResourceAllocatableByName(zone.Resources, resName.String())
-		if !ok {
-			continue
-		}
-		if zoneQty.Cmp(maxResAllocatable) > 0 {
-			maxResAllocatable = zoneQty
-		}
-	}
-
+	maxResAllocatable := e2enrt.GetMaxAllocatableResourceNumaLevel(nrtInfo, resName)
 	return getLeastAvailableResourceQty(maxResAllocatable, nrtInfo.Zones, resName, baseload)
 }
 
