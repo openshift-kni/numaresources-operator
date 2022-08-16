@@ -21,6 +21,7 @@ import (
 	"sort"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -40,6 +41,20 @@ func ToString(res corev1.ResourceList) string {
 		items = append(items, fmt.Sprintf("%s=%s", resName, resQty.String()))
 	}
 	return strings.Join(items, ", ")
+}
+
+func FromReplicaSet(rs appsv1.ReplicaSet) corev1.ResourceList {
+	rl := FromContainers(rs.Spec.Template.Spec.Containers)
+	replicas := rs.Spec.Replicas
+	for resName, resQty := range rl {
+		replicaResQty := resQty.DeepCopy()
+		// index begins from 1 because we already have resources of one replica
+		for i := 1; i < int(*replicas); i++ {
+			resQty.Add(replicaResQty)
+		}
+		rl[resName] = resQty
+	}
+	return rl
 }
 
 func FromGuaranteedPod(pod corev1.Pod) corev1.ResourceList {
