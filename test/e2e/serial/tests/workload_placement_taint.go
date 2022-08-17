@@ -35,12 +35,12 @@ import (
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
+	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
-	e2enodes "github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
@@ -110,7 +110,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err := padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
-			nodes, err := e2enodes.GetWorkerNodes(fxt.Client)
+			nodes, err := nodes.GetWorkerNodes(fxt.Client)
 			Expect(err).ToNot(HaveOccurred())
 
 			tnts, _, err := taints.ParseTaints([]string{testTaint()})
@@ -146,7 +146,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			// leaking taints is especially bad AND we had some bugs in the pass, so let's try our very bes
 			// to be really really sure we didn't pollute the cluster.
-			nodes, err := e2enodes.GetWorkerNodes(fxt.Client)
+			nodes, err := nodes.GetWorkerNodes(fxt.Client)
 			Expect(err).ToNot(HaveOccurred())
 
 			nodeNames := accumulateNodeNames(nodes)

@@ -44,6 +44,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 
 	"github.com/openshift-kni/numaresources-operator/internal/baseload"
+	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
@@ -54,7 +55,6 @@ import (
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
-	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
