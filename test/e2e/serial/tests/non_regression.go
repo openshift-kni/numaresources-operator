@@ -30,6 +30,7 @@ import (
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
+	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
@@ -37,8 +38,6 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
-	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
-	e2enodes "github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
@@ -123,7 +122,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
-			workers, err := e2enodes.GetWorkerNodes(fxt.Client)
+			workers, err := nodes.GetWorkerNodes(fxt.Client)
 			Expect(err).ToNot(HaveOccurred())
 
 			// TODO choose randomly
@@ -208,7 +207,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err := fxt.Client.List(context.TODO(), &nrtInitialList)
 			Expect(err).ToNot(HaveOccurred())
 
-			workers, err := e2enodes.GetWorkerNodes(fxt.Client)
+			workers, err := nodes.GetWorkerNodes(fxt.Client)
 			Expect(err).ToNot(HaveOccurred())
 
 			// TODO choose randomly
