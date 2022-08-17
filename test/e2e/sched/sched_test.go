@@ -28,12 +28,13 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
+
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	e2eimages "github.com/openshift-kni/numaresources-operator/test/utils/images"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2eobjects "github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
 var _ = Describe("[Scheduler] imageReplacement", func() {

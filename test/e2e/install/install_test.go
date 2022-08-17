@@ -37,13 +37,15 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
+
+	nrowait "github.com/openshift-kni/numaresources-operator/internal/wait"
+
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/crds"
 	"github.com/openshift-kni/numaresources-operator/test/utils/deploy"
 	e2eimages "github.com/openshift-kni/numaresources-operator/test/utils/images"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
 const (
@@ -206,13 +208,13 @@ var _ = Describe("[Install] durability", func() {
 			}
 			Expect(err).NotTo(HaveOccurred(), "inconsistent NRO instance:\n%s", objects.ToYAML(nroObj))
 
-			dsKey := e2ewait.ObjectKey{
+			dsKey := nrowait.ObjectKey{
 				Namespace: nroObj.Status.DaemonSets[0].Namespace,
 				Name:      nroObj.Status.DaemonSets[0].Name,
 			}
 
 			By("waiting for DaemonSet to be ready")
-			ds, err := e2ewait.ForDaemonSetReadyByKey(e2eclient.Client, dsKey, 10*time.Second, 3*time.Minute)
+			ds, err := nrowait.ForDaemonSetReadyByKey(e2eclient.Client, dsKey, 10*time.Second, 3*time.Minute)
 			Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
 			By("Update RTE image in NRO")
@@ -234,7 +236,7 @@ var _ = Describe("[Install] durability", func() {
 					return false
 				}
 
-				if !e2ewait.AreDaemonSetPodsReady(&updatedDs.Status) {
+				if !nrowait.AreDaemonSetPodsReady(&updatedDs.Status) {
 					klog.Warningf("daemonset %s desired %d scheduled %d ready %d",
 						dsKey.String(),
 						updatedDs.Status.DesiredNumberScheduled,
@@ -357,7 +359,7 @@ func deleteNROPSync(cli client.Client, nropObj *nropv1alpha1.NUMAResourcesOperat
 	var err error
 	err = cli.Delete(context.TODO(), nropObj)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-	err = e2ewait.ForNUMAResourcesOperatorDeleted(cli, nropObj, 10*time.Second, 2*time.Minute)
+	err = nrowait.ForNUMAResourcesOperatorDeleted(cli, nropObj, 10*time.Second, 2*time.Minute)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
 }
 
