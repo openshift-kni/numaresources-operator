@@ -30,13 +30,15 @@ import (
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
-	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
+
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
+
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
 /*
@@ -106,7 +108,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 
 				By("waiting for pod to be up and running")
 				podRunningTimeout := 1 * time.Minute
-				updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
+				updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 				}

@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,14 +36,19 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
-	"github.com/openshift-kni/numaresources-operator/internal/baseload"
-	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
+
+	"github.com/openshift-kni/numaresources-operator/internal/baseload"
+	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
+
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
+
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
@@ -51,10 +57,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
-	operatorv1 "github.com/openshift/api/operator/v1"
-	appsv1 "k8s.io/api/apps/v1"
 )
 
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement", func() {
@@ -194,7 +197,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedDp, err := e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
+			updatedDp, err := wait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Minute)
@@ -257,7 +260,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				return fxt.Client.Update(context.TODO(), updatedDp)
 			}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
 
-			updatedDp, err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
+			updatedDp, err = wait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedDpName := fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
@@ -349,7 +352,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				return fxt.Client.Update(context.TODO(), updatedDp)
 			}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
 
-			updatedDp, err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
+			updatedDp, err = wait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedDpName = fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
@@ -510,7 +513,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			// 3 minutes is plenty, should never timeout
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -563,7 +566,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// TODO: lacking better ways, let's monitor the pod "long enough" and let's check it stays Pending
 			// if it stays Pending "long enough" it still means little, but OTOH if it goes Running or Failed we
 			// can tell for sure something's wrong
-			err = e2ewait.WhileInPodPhase(fxt.Client, pod2.Namespace, pod2.Name, corev1.PodPending, 10*time.Second, 3)
+			err = wait.WhileInPodPhase(fxt.Client, pod2.Namespace, pod2.Name, corev1.PodPending, 10*time.Second, 3)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod2.Namespace, pod2.Name)
 			}
@@ -731,7 +734,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedDp, err := e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, 2*time.Minute)
+			updatedDp, err := wait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, 2*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
@@ -789,7 +792,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				return fxt.Client.Update(context.TODO(), updatedDp)
 			}, 10*time.Second, 2*time.Minute).ShouldNot(HaveOccurred())
 
-			updatedDp, err = e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute*2)
+			updatedDp, err = wait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute*2)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedDpName := fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)

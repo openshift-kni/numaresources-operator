@@ -36,15 +36,16 @@ import (
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
-	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	e2enodes "github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
+
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering taints", func() {
@@ -206,7 +207,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -249,7 +250,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			By("checking the test pod is removed")
-			err = e2ewait.ForPodDeleted(fxt.Client, updatedPod.Namespace, testPod.Name, 3*time.Minute)
+			err = wait.ForPodDeleted(fxt.Client, updatedPod.Namespace, testPod.Name, 3*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control

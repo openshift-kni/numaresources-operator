@@ -34,6 +34,7 @@ import (
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
@@ -41,7 +42,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
@@ -240,7 +240,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			// TODO: lacking better ways, let's monitor the pod "long enough" and let's check it stays Pending
 			// if it stays Pending "long enough" it still means little, but OTOH if it goes Running or Failed we
 			// can tell for sure something's wrong
-			err = e2ewait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+			err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
@@ -256,14 +256,14 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the test pod is removed")
-			err = e2ewait.ForPodDeleted(fxt.Client, targetPaddingPod.Namespace, targetPaddingPod.Name, 3*time.Minute)
+			err = wait.ForPodDeleted(fxt.Client, targetPaddingPod.Namespace, targetPaddingPod.Name, 3*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			// the status of the test pod moving from pending to running expected to be fast after new resources are released,
 			// thus it is fragile to verify the NRT before make the pending pod running, so let's check
 			// that after the test pod start running
 			By("waiting for the pod to be scheduled")
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -399,7 +399,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By("waiting for the pod to be scheduled")
 			// 3 minutes is plenty, should never timeout
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -429,7 +429,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By("waiting for the pod to be scheduled")
 			// 3 minutes is plenty, should never timeout
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -465,7 +465,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			By("waiting for deployment to be up & running")
 			dpRunningTimeout := 1 * time.Minute
 			dpRunningPollInterval := 10 * time.Second
-			_, err = e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
+			_, err = wait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
 			Expect(err).NotTo(HaveOccurred(), "Deployment %q not up & running after %v", deployment.Name, dpRunningTimeout)
 
 			By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
@@ -533,7 +533,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By("waiting for the pod to be scheduled")
 			// 3 minutes is plenty, should never timeout
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -563,7 +563,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By("waiting for the pod to be scheduled")
 			// 3 minutes is plenty, should never timeout
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, podBurstable.Namespace, podBurstable.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, podBurstable.Namespace, podBurstable.Name, corev1.PodRunning, 3*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -608,7 +608,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By("check the pod is still pending")
 
-			err = e2ewait.WhileInPodPhase(fxt.Client, podGuanranteed.Namespace, podGuanranteed.Name, corev1.PodPending, 10*time.Second, 3)
+			err = wait.WhileInPodPhase(fxt.Client, podGuanranteed.Namespace, podGuanranteed.Name, corev1.PodPending, 10*time.Second, 3)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, podGuanranteed.Namespace, podGuanranteed.Name)
 			}
@@ -624,7 +624,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By("waiting for the guaranteed pod to be scheduled")
 			// 3 minutes is plenty, should never timeout
-			updatedPod2, err := e2ewait.ForPodPhase(fxt.Client, podGuanranteed.Namespace, podGuanranteed.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod2, err := wait.ForPodPhase(fxt.Client, podGuanranteed.Namespace, podGuanranteed.Name, corev1.PodRunning, 3*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod2.Namespace, updatedPod2.Name)
 			}
@@ -709,7 +709,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			dsRunningTimeout := 1 * time.Minute
 			dsRunningPollInterval := 10 * time.Second
 
-			_, err = e2ewait.ForDaemonSetReady(fxt.Client, ds, dsRunningPollInterval, dsRunningTimeout)
+			_, err = wait.ForDaemonSetReady(fxt.Client, ds, dsRunningPollInterval, dsRunningTimeout)
 			Expect(err).NotTo(HaveOccurred(), "Daemonset %q not up & running after %v", ds.Name, dsRunningTimeout)
 
 			By(fmt.Sprintf("checking Daemonset pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))

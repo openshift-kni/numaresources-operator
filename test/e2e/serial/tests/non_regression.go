@@ -31,6 +31,7 @@ import (
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
@@ -40,7 +41,6 @@ import (
 	e2enodes "github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
 )
 
@@ -154,7 +154,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -252,7 +252,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedDp, err := e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
+			updatedDp, err := wait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Minute)
@@ -394,7 +394,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
 
 			By("check the pod keeps on pending")
-			err = e2ewait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+			err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
 			if err != nil {
 				objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}

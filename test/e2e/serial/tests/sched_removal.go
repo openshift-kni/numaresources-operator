@@ -31,10 +31,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
+
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
@@ -81,7 +82,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler remova
 				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(e2ewait.IsDeploymentComplete(dp, &updatedDp.Status)).To(BeTrue(), "deployment %q become unready", dp.Name)
+				Expect(wait.IsDeploymentComplete(dp, &updatedDp.Status)).To(BeTrue(), "deployment %q become unready", dp.Name)
 			}
 		})
 
@@ -104,7 +105,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler remova
 				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(e2ewait.IsDeploymentComplete(dp, &updatedDp.Status)).To(BeFalse(), "deployment %q become ready", dp.Name)
+				Expect(wait.IsDeploymentComplete(dp, &updatedDp.Status)).To(BeFalse(), "deployment %q become ready", dp.Name)
 			}
 		})
 	})
@@ -174,14 +175,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restar
 				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(e2ewait.IsDeploymentComplete(dp, &updatedDp.Status)).To(BeFalse(), "deployment %q become ready", dp.Name)
+				Expect(wait.IsDeploymentComplete(dp, &updatedDp.Status)).To(BeFalse(), "deployment %q become ready", dp.Name)
 			}
 
 			restoreScheduler(fxt, nroSchedObj)
 			nrosched.CheckNROSchedulerAvailable(fxt.Client, nroSchedObj.Name)
 
 			By(fmt.Sprintf("waiting for the test deployment %q to become complete and ready", updatedDp.Name))
-			_, err = e2ewait.ForDeploymentComplete(fxt.Client, updatedDp, 2*time.Second, 30*time.Second)
+			_, err = wait.ForDeploymentComplete(fxt.Client, updatedDp, 2*time.Second, 30*time.Second)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -228,7 +229,7 @@ func createDeploymentSync(fxt *e2efixture.Fixture, name, schedulerName string) *
 	dp := createDeployment(fxt, name, schedulerName)
 	By(fmt.Sprintf("waiting for the test deployment %q to be complete and ready", name))
 
-	_, err := e2ewait.ForDeploymentComplete(fxt.Client, dp, dpRunningPollInterval, dpRunningTimeout)
+	_, err := wait.ForDeploymentComplete(fxt.Client, dp, dpRunningPollInterval, dpRunningTimeout)
 	Expect(err).ToNot(HaveOccurred(), "Deployment %q is not up & running after %v", dp.Name, dpRunningTimeout)
 	return dp
 }

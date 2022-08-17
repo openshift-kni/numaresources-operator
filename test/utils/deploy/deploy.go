@@ -30,17 +30,20 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	nropmcp "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
+
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
+
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2epause "github.com/openshift-kni/numaresources-operator/test/utils/objects/pause"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 type NroDeployment struct {
@@ -114,7 +117,7 @@ func TeardownDeployment(nrod NroDeployment, timeout time.Duration) {
 			defer GinkgoRecover()
 			defer wg.Done()
 			klog.Infof("waiting for MCP %q to be gone", mcpObj.Name)
-			err := e2ewait.ForMachineConfigPoolDeleted(e2eclient.Client, mcpObj, 10*time.Second, timeout)
+			err := wait.ForMachineConfigPoolDeleted(e2eclient.Client, mcpObj, 10*time.Second, timeout)
 			ExpectWithOffset(1, err).ToNot(HaveOccurred(), "MCP %q failed to be deleted", mcpObj.Name)
 		}(nrod.McpObj)
 	}
@@ -128,7 +131,7 @@ func TeardownDeployment(nrod NroDeployment, timeout time.Duration) {
 			defer GinkgoRecover()
 			defer wg.Done()
 			klog.Infof("waiting for KC %q to be gone", kcObj.Name)
-			err := e2ewait.ForKubeletConfigDeleted(e2eclient.Client, kcObj, 10*time.Second, timeout)
+			err := wait.ForKubeletConfigDeleted(e2eclient.Client, kcObj, 10*time.Second, timeout)
 			ExpectWithOffset(1, err).ToNot(HaveOccurred(), "KC %q failed to be deleted", kcObj.Name)
 		}(nrod.KcObj)
 	}
@@ -140,7 +143,7 @@ func TeardownDeployment(nrod NroDeployment, timeout time.Duration) {
 		defer GinkgoRecover()
 		defer wg.Done()
 		klog.Infof("waiting for NROP %q to be gone", nropObj.Name)
-		err := e2ewait.ForNUMAResourcesOperatorDeleted(e2eclient.Client, nropObj, 10*time.Second, timeout)
+		err := wait.ForNUMAResourcesOperatorDeleted(e2eclient.Client, nropObj, 10*time.Second, timeout)
 		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
 	}(nrod.NroObj)
 
@@ -256,7 +259,7 @@ func TeardownNROScheduler(nroSched *nropv1alpha1.NUMAResourcesScheduler, timeout
 		err := e2eclient.Client.Delete(context.TODO(), nroSched)
 		ExpectWithOffset(1, err).ToNot(HaveOccurred())
 
-		err = e2ewait.ForNUMAResourcesSchedulerDeleted(e2eclient.Client, nroSched, 10*time.Second, timeout)
+		err = wait.ForNUMAResourcesSchedulerDeleted(e2eclient.Client, nroSched, 10*time.Second, timeout)
 		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "NROScheduler %q failed to be deleted", nroSched.Name)
 	}
 }

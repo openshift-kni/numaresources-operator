@@ -37,16 +37,17 @@ import (
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
-	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
+
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
 type paddingInfo struct {
@@ -178,7 +179,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 				By("waiting for pod to be up & running")
 				podRunningTimeout := 1 * time.Minute
-				updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
+				updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 				}
@@ -291,7 +292,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				By("waiting for deployment to be up & running")
 				dpRunningTimeout := 1 * time.Minute
 				dpRunningPollInterval := 10 * time.Second
-				_, err = e2ewait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
+				_, err = wait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
 				Expect(err).NotTo(HaveOccurred(), "Deployment %q not up & running after %v", deployment.Name, dpRunningTimeout)
 
 				By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
@@ -467,7 +468,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for the pod to be scheduled")
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 2*time.Minute)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 2*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
@@ -505,7 +506,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the test pod is removed")
-			err = e2ewait.ForPodDeleted(fxt.Client, updatedPod.Namespace, updatedPod.Name, 3*time.Minute)
+			err = wait.ForPodDeleted(fxt.Client, updatedPod.Namespace, updatedPod.Name, 3*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
@@ -1118,7 +1119,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("verify the pod keep on pending")
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 2*time.Minute)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 2*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
@@ -1144,7 +1145,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the test pod is removed")
-			err = e2ewait.ForPodDeleted(fxt.Client, updatedPod.Namespace, updatedPod.Name, 3*time.Minute)
+			err = wait.ForPodDeleted(fxt.Client, updatedPod.Namespace, updatedPod.Name, 3*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			// we don't need to wait for NRT update since we already checked it hasn't changed in prior step

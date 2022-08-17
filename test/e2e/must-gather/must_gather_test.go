@@ -30,8 +30,10 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
+
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
 var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
