@@ -17,14 +17,18 @@
 package mustgather
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/deploy"
+
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var deployment deploy.NroDeployment
@@ -37,6 +41,9 @@ func TestMustGather(t *testing.T) {
 }
 
 var _ = ginkgo.BeforeSuite(func() {
+	if configuration.Plat != platform.OpenShift {
+		ginkgo.Skip(fmt.Sprintf("running on %q platfrom but must-gather is only supported on %q platform", configuration.Plat, platform.OpenShift))
+	}
 	deployment = deploy.OverallDeployment()
 	nroSchedObj = deploy.DeployNROScheduler()
 })

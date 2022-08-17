@@ -28,10 +28,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
+
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
@@ -133,7 +134,6 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 					podFolderNames = append(podFolderNames, podFolder.Name())
 				}
 				gomega.Expect(podFolderNames).To(gomega.ContainElement(gomega.MatchRegexp("^numaresources-controller-manager*")))
-				gomega.Expect(podFolderNames).To(gomega.ContainElement(gomega.MatchRegexp("^numaresourcesoperator-mcp-test*")))
 				gomega.Expect(podFolderNames).To(gomega.ContainElement(gomega.MatchRegexp("^secondary-scheduler*")))
 			}
 		})
