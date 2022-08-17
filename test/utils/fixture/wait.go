@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package wait
+package fixture
 
 import (
 	"fmt"
@@ -24,14 +24,14 @@ import (
 	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
 
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
-	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
-// ForPaddingPodsRunning waits for all padding pods to be up and running ( or fail)
-func ForPaddingPodsRunning(fxt *e2efixture.Fixture, paddingPods []*corev1.Pod) []string {
+// WaitPodsRunning waits for all padding pods to be up and running ( or fail)
+func WaitForPaddingPodsRunning(fxt *Fixture, paddingPods []*corev1.Pod) []string {
 	var failedPodIds []string
-	failedPods := ForPodListAllRunning(fxt.Client, paddingPods)
+	failedPods := e2ewait.ForPodListAllRunning(fxt.Client, paddingPods)
 	for _, failedPod := range failedPods {
 		_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
 		//note that this test does not use podOverhead thus pod req and lim would be the pod's resources as set upon creating
