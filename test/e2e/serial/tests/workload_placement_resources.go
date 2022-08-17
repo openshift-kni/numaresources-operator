@@ -185,7 +185,7 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 	nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
 	var ok bool
-	targetNodeName, ok := nrtCandidateNames.PopAny()
+	targetNodeName, ok := e2efixture.PopNodeName(nrtCandidateNames)
 	ExpectWithOffset(1, ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
 	By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
 	// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources

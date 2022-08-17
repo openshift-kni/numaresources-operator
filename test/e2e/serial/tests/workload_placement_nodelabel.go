@@ -132,7 +132,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
 			var ok bool
-			targetNodeName, ok = nrtCandidateNames.PopAny()
+			targetNodeName, ok = e2efixture.PopNodeName(nrtCandidateNames)
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
 			By(fmt.Sprintf("selecting target node we expect the pod will be scheduled into: %q", targetNodeName))
 

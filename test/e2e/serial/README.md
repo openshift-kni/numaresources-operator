@@ -32,3 +32,5 @@ they found it before they run.
   autodetection of the platform and force it to the provided value.
 - `E2E_NROP_DUMP_EVENTS` (accepts boolean, e.g. `true`) requests the suite to dump events pertaining to pods
   failed unexpectedly on standard output, alongside (not replacing) the logging of the said events.
+- `E2E_NROP_TARGET_NODE` (accepts string, e.g. `node-0.my-cluster.io`) instructs the suite to always pick the
+  node matching the given name when a random node is needed.
