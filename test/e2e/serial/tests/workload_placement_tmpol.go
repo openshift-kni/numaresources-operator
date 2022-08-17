@@ -1018,7 +1018,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 	)
-	DescribeTable("[placement][negative] cluster with multiple worker nodes suitable",
+	DescribeTable("[placement][negative] cluster with one worker nodes suitable",
 		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, errMsg string, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
 
 			hostsRequired := 2
@@ -1151,7 +1151,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// we don't need to wait for NRT update since we already checked it hasn't changed in prior step
 		},
 
-		Entry("[tier1][negative][tmscope:container][cpu] pod with two gu cnt keep on pending",
+		// below tests try to schedule a multi-container pod, when having only one worker node with available resources (target node) for the total pod's containers,
+		// but only one container can be aligned to a single numa node while the second container cannot. Because of that, the pod should keep on pending and we expect
+		// to see the reason for not scheduling the pod on that target node as "cannot align container: testcnt-1", because the other worker nodes have insufficient
+		// free resources to accommodate the pod thus they will be rejected as candidates at earlier stage
+		Entry("[tier1][negative][tmscope:container][cpu] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
 			"cannot align container: testcnt-1",
@@ -1204,7 +1208,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[tier1][negative][tmscope:container][memory] pod with two gu cnt keep on pending",
+		Entry("[tier1][negative][tmscope:container][memory] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
 			"cannot align container: testcnt-1",
@@ -1257,7 +1261,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[tier1][negative][tmscope:container][hugepages2Mi] pod with two gu cnt keep on pending",
+		Entry("[tier1][negative][tmscope:container][hugepages2Mi] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
 			"cannot align container: testcnt-1",
@@ -1310,7 +1314,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[tier1][negative][tmscope:container][hugepages1Gi] pod with two gu cnt keep on pending",
+		Entry("[tier1][negative][tmscope:container][hugepages1Gi] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
 			"cannot align container: testcnt-1",
