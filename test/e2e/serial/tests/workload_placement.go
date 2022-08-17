@@ -151,7 +151,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			targetNodeNameSet := nodesNameSet.Difference(paddedNodesSet)
 			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
 
-			targetNodeName, ok := targetNodeNameSet.PopAny()
+			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
 
 			var replicas int32 = 1
@@ -448,7 +448,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			targetNodeNameSet := nodesNameSet.Difference(paddedNodesSet)
 			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
 
-			targetNodeName, ok := targetNodeNameSet.PopAny()
+			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
 
 			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, targetNodeName)
@@ -687,7 +687,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			targetNodeNameSet := nodesNameSet.Difference(paddedNodesSet)
 			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
 
-			targetNodeName, ok := targetNodeNameSet.PopAny()
+			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
 
 			targetNrtInitial, err := e2enrt.FindFromList(nrtList.Items, targetNodeName)

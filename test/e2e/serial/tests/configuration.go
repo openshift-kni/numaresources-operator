@@ -148,8 +148,10 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 			workers, err := nodes.GetWorkerNodes(fxt.Client)
 			Expect(err).ToNot(HaveOccurred())
-			// TODO choose randomly
-			targetedNode := workers[0]
+
+			targetIdx, ok := e2efixture.PickNodeIndex(workers)
+			Expect(ok).To(BeTrue())
+			targetedNode := workers[targetIdx]
 
 			unlabelFunc, err := labelNode(fxt.Client, nodes.GetLabelRoleMCPTest(), targetedNode.Name)
 			Expect(err).ToNot(HaveOccurred())

@@ -116,7 +116,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
 			var ok bool
-			targetNodeName, ok = nrtCandidateNames.PopAny()
+			targetNodeName, ok = e2efixture.PopNodeName(nrtCandidateNames)
 			ExpectWithOffset(1, ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
 			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
 			// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
@@ -416,7 +416,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
 			// nodes we have now are all equal for our purposes. Pick one at random
-			targetNodeName, ok := candidateNodeNames.PopAny()
+			targetNodeName, ok := e2efixture.PopNodeName(candidateNodeNames)
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
 			unsuitableNodeNames := candidateNodeNames.List()
 
@@ -1071,7 +1071,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
 			// nodes we have now are all equal for our purposes. Pick one at random
-			targetNodeName, ok := candidateNodeNames.PopAny()
+			targetNodeName, ok := e2efixture.PopNodeName(candidateNodeNames)
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
 			unsuitableNodeNames := candidateNodeNames.List()
 

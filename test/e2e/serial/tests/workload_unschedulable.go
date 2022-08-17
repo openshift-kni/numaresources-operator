@@ -314,7 +314,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
-			targetNodeName, ok := nrtCandidateNames.PopAny()
+			targetNodeName, ok := e2efixture.PopNodeName(nrtCandidateNames)
 			Expect(ok).To(BeTrue(), "unable to get targetNodeName")
 
 			//TODO: we should calculate requiredRes from NUMA zones in cluster nodes instead.
@@ -476,7 +476,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			// After filter get one of the candidate nodes left
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
-			targetNodeName, ok := nrtCandidateNames.PopAny()
+			targetNodeName, ok := e2efixture.PopNodeName(nrtCandidateNames)
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
 			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
 
@@ -762,7 +762,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
 			var ok bool
-			targetNodeName, ok = nrtCandidateNames.PopAny()
+			targetNodeName, ok = e2efixture.PopNodeName(nrtCandidateNames)
 			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtCandidateNames.List())
 			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 

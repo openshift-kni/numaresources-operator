@@ -129,7 +129,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
 			// nodes we have now are all equal for our purposes. Pick one at random
-			targetNodeName, ok := candidateNodeNames.PopAny()
+			targetNodeName, ok := e2efixture.PopNodeName(candidateNodeNames)
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
 			unsuitableNodeNames := candidateNodeNames.List()
 
@@ -322,7 +322,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
 			var ok bool
-			targetNodeName, ok = nrtCandidateNames.PopAny()
+			targetNodeName, ok = e2efixture.PopNodeName(nrtCandidateNames)
 			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtCandidateNames.List())
 			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 

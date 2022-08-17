@@ -125,8 +125,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			workers, err := nodes.GetWorkerNodes(fxt.Client)
 			Expect(err).ToNot(HaveOccurred())
 
-			// TODO choose randomly
-			targetedNodeName := workers[0].Name
+			targetIdx, ok := e2efixture.PickNodeIndex(workers)
+			Expect(ok).To(BeTrue())
+			targetedNodeName := workers[targetIdx].Name
 
 			nrtInitial, err := e2enrt.FindFromList(nrtListInitial.Items, targetedNodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -210,8 +211,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			workers, err := nodes.GetWorkerNodes(fxt.Client)
 			Expect(err).ToNot(HaveOccurred())
 
-			// TODO choose randomly
-			targetNodeName := workers[0].Name
+			targetIdx, ok := e2efixture.PickNodeIndex(workers)
+			Expect(ok).To(BeTrue())
+			targetNodeName := workers[targetIdx].Name
+
 			By(fmt.Sprintf("explicitly specfying the node where the pod should land: %q. Scheduler Name does not matter in this case", targetNodeName))
 			nonExistingSchedulerName := "foo"
 
@@ -326,7 +329,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtNames := e2enrt.AccumulateNames(nrts)
 
 			//select target node
-			targetNodeName, ok := nrtNames.PopAny()
+			targetNodeName, ok := e2efixture.PopNodeName(nrtNames)
 			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtNames.List())
 			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 

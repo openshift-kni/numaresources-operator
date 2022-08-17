@@ -185,7 +185,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			targetNodeNameSet := nodesNameSet.Difference(paddedNodesSet)
 			Expect(targetNodeNameSet.Len()).To(Equal(1))
 
-			targetNodeName, ok := targetNodeNameSet.PopAny()
+			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
 
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")

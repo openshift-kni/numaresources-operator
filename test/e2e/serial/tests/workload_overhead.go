@@ -176,7 +176,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
-				targetNodeName, ok := candidateNodeNames.PopAny()
+				targetNodeName, ok := e2efixture.PopNodeName(candidateNodeNames)
 				Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
 
 				By("padding non-target nodes")
