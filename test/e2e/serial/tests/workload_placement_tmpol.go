@@ -1126,6 +1126,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the scheduler report the expected error in the pod events`")
+			loggedEvents := false
 			Eventually(func() bool {
 				events, err := objects.GetEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				if err != nil {
@@ -1137,6 +1138,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					}
 				}
 				klog.Warningf("failed to find the expected event with Reason=\"FailedScheduling\" and Message contains: %q", errMsg)
+				if !loggedEvents {
+					objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+					loggedEvents = true
+				}
 				return false
 			}).WithTimeout(2*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "pod %s/%s doesn't contains the expected event error", updatedPod.Namespace, updatedPod.Name)
 
