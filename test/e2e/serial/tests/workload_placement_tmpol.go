@@ -1187,7 +1187,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 				{
-					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceCPU:    resource.MustParse("4"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
@@ -1234,7 +1234,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// and then the pod might land on the unsuitable node.
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceCPU:    resource.MustParse("1"),
 					corev1.ResourceMemory: resource.MustParse("1Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
@@ -1293,7 +1293,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 				{
-					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceCPU:    resource.MustParse("4"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
@@ -1345,7 +1345,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 				{
-					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceCPU:    resource.MustParse("4"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
