@@ -29,14 +29,16 @@ import (
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
+	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
-	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
+
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
-	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
+
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
 /*
@@ -106,7 +108,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 
 				By("waiting for pod to be up and running")
 				podRunningTimeout := 1 * time.Minute
-				updatedPod, err := e2ewait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
+				updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 				}
@@ -183,7 +185,7 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 	nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
 	var ok bool
-	targetNodeName, ok := nrtCandidateNames.PopAny()
+	targetNodeName, ok := e2efixture.PopNodeName(nrtCandidateNames)
 	ExpectWithOffset(1, ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
 	By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
 	// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
@@ -228,7 +230,7 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 	paddingPods = append(paddingPods, createPaddingPod(1, fxt, "padding-tgt-1", targetNodeName, targetNrtInfo.Zones[1], nodesState.RequiredResources))
 
 	By("Waiting for padding pods to be ready")
-	failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+	failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 	ExpectWithOffset(1, failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 	return nrtCandidates, targetNodeName

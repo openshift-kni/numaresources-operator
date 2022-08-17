@@ -38,10 +38,12 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
+
 	numacellmanifests "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
+
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/images"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 )
 
 func SetupInfra(fxt *e2efixture.Fixture, nroOperObj *nropv1alpha1.NUMAResourcesOperator, nrtList nrtv1alpha1.NodeResourceTopologyList) {
@@ -105,7 +107,7 @@ func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup,
 			klog.Infof("waiting for daemonset %q to be ready", ds.Name)
 
 			// TODO: what if timeout < period?
-			ds, err := e2ewait.ForDaemonSetReady(fxt.Client, ds, 10*time.Second, timeout)
+			ds, err := wait.ForDaemonSetReady(fxt.Client, ds, 10*time.Second, timeout)
 			Expect(err).ToNot(HaveOccurred(), "DaemonSet %q failed to go running", ds.Name)
 		}(ds)
 	}

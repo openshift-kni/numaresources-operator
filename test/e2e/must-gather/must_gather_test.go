@@ -25,14 +25,15 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 )
 
 var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {

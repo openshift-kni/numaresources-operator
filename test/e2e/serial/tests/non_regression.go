@@ -30,17 +30,16 @@ import (
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
+	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
-	"github.com/openshift-kni/numaresources-operator/test/utils/nodes"
-	e2enodes "github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
 )
 
@@ -123,11 +122,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
-			workers, err := e2enodes.GetWorkerNodes(fxt.Client)
+			workers, err := nodes.GetWorkerNodes(fxt.Client)
 			Expect(err).ToNot(HaveOccurred())
 
-			// TODO choose randomly
-			targetedNodeName := workers[0].Name
+			targetIdx, ok := e2efixture.PickNodeIndex(workers)
+			Expect(ok).To(BeTrue())
+			targetedNodeName := workers[targetIdx].Name
 
 			nrtInitial, err := e2enrt.FindFromList(nrtListInitial.Items, targetedNodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -154,7 +154,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -208,11 +208,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err := fxt.Client.List(context.TODO(), &nrtInitialList)
 			Expect(err).ToNot(HaveOccurred())
 
-			workers, err := e2enodes.GetWorkerNodes(fxt.Client)
+			workers, err := nodes.GetWorkerNodes(fxt.Client)
 			Expect(err).ToNot(HaveOccurred())
 
-			// TODO choose randomly
-			targetNodeName := workers[0].Name
+			targetIdx, ok := e2efixture.PickNodeIndex(workers)
+			Expect(ok).To(BeTrue())
+			targetNodeName := workers[targetIdx].Name
+
 			By(fmt.Sprintf("explicitly specfying the node where the pod should land: %q. Scheduler Name does not matter in this case", targetNodeName))
 			nonExistingSchedulerName := "foo"
 
@@ -252,7 +254,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedDp, err := e2ewait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
+			updatedDp, err := wait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Minute)
@@ -327,7 +329,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtNames := e2enrt.AccumulateNames(nrts)
 
 			//select target node
-			targetNodeName, ok := nrtNames.PopAny()
+			targetNodeName, ok := e2efixture.PopNodeName(nrtNames)
 			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtNames.List())
 			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 
@@ -363,7 +365,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			By("Waiting for padding pods to be ready")
-			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			//prepare the test pod
@@ -394,7 +396,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
 
 			By("check the pod keeps on pending")
-			err = e2ewait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+			err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
 			if err != nil {
 				objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}

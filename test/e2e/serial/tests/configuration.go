@@ -38,22 +38,24 @@ import (
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 
-	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+	operatorv1 "github.com/openshift/api/operator/v1"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	nropmcp "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
+
+	"github.com/openshift-kni/numaresources-operator/internal/nodes"
+	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
+
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
-	e2enodes "github.com/openshift-kni/numaresources-operator/test/utils/nodes"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
-	operatorv1 "github.com/openshift/api/operator/v1"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
@@ -144,15 +146,17 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", objects.NROName())
 			initialNroOperObj := nroOperObj.DeepCopy()
 
-			workers, err := e2enodes.GetWorkerNodes(fxt.Client)
-			Expect(err).ToNot(HaveOccurred())
-			// TODO choose randomly
-			targetedNode := workers[0]
-
-			unlabelFunc, err := labelNode(fxt.Client, e2enodes.GetLabelRoleMCPTest(), targetedNode.Name)
+			workers, err := nodes.GetWorkerNodes(fxt.Client)
 			Expect(err).ToNot(HaveOccurred())
 
-			labelFunc, err := unlabelNode(fxt.Client, e2enodes.GetLabelRoleWorker(), "", targetedNode.Name)
+			targetIdx, ok := e2efixture.PickNodeIndex(workers)
+			Expect(ok).To(BeTrue())
+			targetedNode := workers[targetIdx]
+
+			unlabelFunc, err := labelNode(fxt.Client, nodes.GetLabelRoleMCPTest(), targetedNode.Name)
+			Expect(err).ToNot(HaveOccurred())
+
+			labelFunc, err := unlabelNode(fxt.Client, nodes.GetLabelRoleWorker(), "", targetedNode.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			defer func() {
@@ -193,7 +197,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					go func(mcpool *machineconfigv1.MachineConfigPool) {
 						defer GinkgoRecover()
 						defer wg.Done()
-						err = e2ewait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
+						err = wait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
 						Expect(err).ToNot(HaveOccurred())
 					}(mcp)
 				}
@@ -204,25 +208,25 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				err = fxt.Client.Delete(context.TODO(), testMcp)
 				Expect(err).ToNot(HaveOccurred())
 
-				err = e2ewait.ForMachineConfigPoolDeleted(fxt.Client, testMcp, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
+				err = wait.ForMachineConfigPoolDeleted(fxt.Client, testMcp, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
 				Expect(err).ToNot(HaveOccurred())
 			}() // end of defer
 
 			mcp := objects.TestMCP()
 			By(fmt.Sprintf("creating new MCP: %q", mcp.Name))
 			// we must have this label in order to match other machine configs that are necessary for proper functionality
-			mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": e2enodes.RoleMCPTest}
+			mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": nodes.RoleMCPTest}
 			mcp.Spec.MachineConfigSelector = &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
 						Key:      "machineconfiguration.openshift.io/role",
 						Operator: metav1.LabelSelectorOpIn,
-						Values:   []string{e2enodes.RoleWorker, e2enodes.RoleMCPTest},
+						Values:   []string{nodes.RoleWorker, nodes.RoleMCPTest},
 					},
 				},
 			}
 			mcp.Spec.NodeSelector = &metav1.LabelSelector{
-				MatchLabels: map[string]string{e2enodes.GetLabelRoleMCPTest(): ""},
+				MatchLabels: map[string]string{nodes.GetLabelRoleMCPTest(): ""},
 			}
 
 			err = fxt.Client.Create(context.TODO(), mcp)
@@ -246,7 +250,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				go func(mcpool *machineconfigv1.MachineConfigPool) {
 					defer GinkgoRecover()
 					defer wg.Done()
-					err = e2ewait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
+					err = wait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
 					Expect(err).ToNot(HaveOccurred())
 				}(mcp)
 			}
@@ -349,7 +353,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, 5*time.Minute)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, 5*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -410,7 +414,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				go func(mcpool *machineconfigv1.MachineConfigPool) {
 					defer GinkgoRecover()
 					defer wg.Done()
-					err = e2ewait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
+					err = wait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
 					Expect(err).ToNot(HaveOccurred())
 				}(mcp)
 			}
@@ -474,7 +478,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			testPod, err = e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			testPod, err = wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, testPod.Namespace, testPod.Name)
 			}
@@ -527,7 +531,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					go func(mcpool *machineconfigv1.MachineConfigPool) {
 						defer GinkgoRecover()
 						defer wg.Done()
-						err = e2ewait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
+						err = wait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
 						Expect(err).ToNot(HaveOccurred())
 					}(mcp)
 				}

@@ -29,11 +29,13 @@ import (
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
-	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
+
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2ewait "github.com/openshift-kni/numaresources-operator/test/utils/objects/wait"
+
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
 var _ = Describe("[serial][fundamentals][scheduler] numaresources fundamentals non-regression", func() {
@@ -75,7 +77,7 @@ var _ = Describe("[serial][fundamentals][scheduler] numaresources fundamentals n
 			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the test pod is removed")
-			err = e2ewait.ForPodDeleted(fxt.Client, testPod.Namespace, testPod.Name, 3*time.Minute)
+			err = wait.ForPodDeleted(fxt.Client, testPod.Namespace, testPod.Name, 3*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -88,7 +90,7 @@ var _ = Describe("[serial][fundamentals][scheduler] numaresources fundamentals n
 			Expect(err).ToNot(HaveOccurred())
 
 			timeout := 5 * time.Minute
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -112,7 +114,7 @@ var _ = Describe("[serial][fundamentals][scheduler] numaresources fundamentals n
 			Expect(err).ToNot(HaveOccurred())
 
 			timeout := 5 * time.Minute
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -136,7 +138,7 @@ var _ = Describe("[serial][fundamentals][scheduler] numaresources fundamentals n
 			Expect(err).ToNot(HaveOccurred())
 
 			timeout := 5 * time.Minute
-			updatedPod, err := e2ewait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
