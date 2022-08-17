@@ -363,7 +363,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			By("Waiting for padding pods to be ready")
-			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			//prepare the test pod

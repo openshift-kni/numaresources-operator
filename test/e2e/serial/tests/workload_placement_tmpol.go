@@ -148,7 +148,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			By("Waiting for padding pods to be ready")
-			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			ExpectWithOffset(1, failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 		}
 
@@ -441,7 +441,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			paddingPods := setupPadding(fxt, nrtList, padInfo)
 
 			By("Waiting for padding pods to be ready")
-			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			// TODO: smarter cooldown
@@ -1096,7 +1096,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			paddingPods := setupPadding(fxt, nrtList, padInfo)
 
 			By("Waiting for padding pods to be ready")
-			failedPodIds := e2ewait.ForPaddingPodsRunning(fxt, paddingPods)
+			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			// TODO: smarter cooldown
