@@ -61,7 +61,7 @@ func GetUpdated(cli client.Client, ref nrtv1alpha1.NodeResourceTopologyList, tim
 			return false, err
 		}
 		klog.Infof("NRT List current ResourceVersion %s reference %s", updatedNrtList.ListMeta.ResourceVersion, ref.ListMeta.ResourceVersion)
-		return (updatedNrtList.ListMeta.ResourceVersion != ref.ListMeta.ResourceVersion), nil
+		return updatedNrtList.ListMeta.ResourceVersion != ref.ListMeta.ResourceVersion, nil
 	})
 	return updatedNrtList, err
 }
