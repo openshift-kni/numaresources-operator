@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo"
@@ -1018,7 +1019,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 	)
-	DescribeTable("[placement][negative] cluster with multiple worker nodes suitable",
+	DescribeTable("[placement][negative] cluster with one worker nodes suitable",
 		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, errMsg string, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
 
 			hostsRequired := 2
@@ -1119,13 +1120,17 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("verify the pod keep on pending")
-			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 2*time.Minute)
+			err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 5)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
 			Expect(err).ToNot(HaveOccurred())
+			updatedPod := &corev1.Pod{}
+			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: pod.Name}, updatedPod)
+			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the scheduler report the expected error in the pod events`")
+			loggedEvents := false
 			Eventually(func() bool {
 				events, err := objects.GetEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				if err != nil {
@@ -1137,6 +1142,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					}
 				}
 				klog.Warningf("failed to find the expected event with Reason=\"FailedScheduling\" and Message contains: %q", errMsg)
+				if !loggedEvents {
+					objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+					loggedEvents = true
+				}
 				return false
 			}).WithTimeout(2*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "pod %s/%s doesn't contains the expected event error", updatedPod.Namespace, updatedPod.Name)
 
@@ -1151,14 +1160,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// we don't need to wait for NRT update since we already checked it hasn't changed in prior step
 		},
 
-		Entry("[tier1][negative][tmscope:container][cpu] pod with two gu cnt keep on pending",
+		// below tests try to schedule a multi-container pod, when having only one worker node with available resources (target node) for the total pod's containers,
+		// but only one container can be aligned to a single numa node while the second container cannot. Because of that, the pod should keep on pending and we expect
+		// to see the reason for not scheduling the pod on that target node as "cannot align container: testcnt-1", because the other worker nodes have insufficient
+		// free resources to accommodate the pod thus they will be rejected as candidates at earlier stage
+		Entry("[tier1][negative][tmscope:container][cpu] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
 			"cannot align container: testcnt-1",
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
 					{
-						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceCPU:    resource.MustParse("5"),
 						corev1.ResourceMemory: resource.MustParse("4Gi"),
 						"hugepages-2Mi":       resource.MustParse("32Mi"),
 						"hugepages-1Gi":       resource.MustParse("1Gi"),
@@ -1183,28 +1196,36 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 				{
-					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceCPU:    resource.MustParse("4"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 			},
+			// the free resources that should be left on the target node should not depend that there will be some baseload added upon padding the node,
+			// those free resources should match the pod requests in total. The reason behind that is that Noderesourcesfit plugin (the plugin that is
+			// responsible for accepting/rejecting compute nodes as candidates for placing the pod) actually accounts for the baseload, it compares the
+			// actual available resources on node with the pod requested resources, if the available resources can accommodate the pod resources then it
+			// will mark the node as a possible candidate, if not it will reject it.
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    resource.MustParse("4"),
+					// the baseload will be added to the first numa zone upon padding, this need to consider
+					// that baseCpus + targetNodeFreeCpus does not make the first numa a candidate for any of the containers. Take into account that the baseCpus can be at least 2 cpus
+					//so for example if cpus(cont1) = 5 and cpus(cont2) = 5 then cpus(numa0)<5 and since the basecpus usually is 2 then we should make pass at most 2 free cpus as the free cpus in numa0
+					corev1.ResourceCPU:    resource.MustParse("1"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 				{
-					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceCPU:    resource.MustParse("9"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 			},
 		),
-		Entry("[tier1][negative][tmscope:container][memory] pod with two gu cnt keep on pending",
+		Entry("[tier1][negative][tmscope:container][memory] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
 			"cannot align container: testcnt-1",
@@ -1212,13 +1233,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				appCnt: []corev1.ResourceList{
 					{
 						corev1.ResourceCPU:    resource.MustParse("4"),
-						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						corev1.ResourceMemory: resource.MustParse("7Gi"),
 						"hugepages-2Mi":       resource.MustParse("32Mi"),
 						"hugepages-1Gi":       resource.MustParse("1Gi"),
 					},
 					{
 						corev1.ResourceCPU:    resource.MustParse("4"),
-						corev1.ResourceMemory: resource.MustParse("5Gi"),
+						corev1.ResourceMemory: resource.MustParse("7Gi"),
 						"hugepages-2Mi":       resource.MustParse("32Mi"),
 						"hugepages-1Gi":       resource.MustParse("1Gi"),
 					},
@@ -1230,7 +1251,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// and then the pod might land on the unsuitable node.
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceCPU:    resource.MustParse("1"),
 					corev1.ResourceMemory: resource.MustParse("1Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
@@ -1242,22 +1263,28 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 			},
+			// the free resources that should be left on the target node should not depend that there will be some baseload added upon padding the node,
+			// those free resources should match the pod requests in total. The reason behind that is that Noderesourcesfit plugin (the plugin that is
+			// responsible for accepting/rejecting compute nodes as candidates for placing the pod) actually accounts for the baseload, it compares the
+			// actual available resources on node with the pod requested resources, if the available resources can accommodate the pod resources then it
+			// will mark the node as a possible candidate, if not it will reject it.
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    resource.MustParse("4"),
-					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceCPU: resource.MustParse("4"),
+					//the base memory on the node could be 4.5Gi, so we need to consider that 4.5Gi + 1Gi is not enough for any of the pod containers
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 				{
 					corev1.ResourceCPU:    resource.MustParse("4"),
-					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceMemory: resource.MustParse("13Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 			},
 		),
-		Entry("[tier1][negative][tmscope:container][hugepages2Mi] pod with two gu cnt keep on pending",
+		Entry("[tier1][negative][tmscope:container][hugepages2Mi] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
 			"cannot align container: testcnt-1",
@@ -1289,12 +1316,17 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 				{
-					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceCPU:    resource.MustParse("4"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 			},
+			// the free resources that should be left on the target node should not depend that there will be some baseload added upon padding the node,
+			// those free resources should match the pod requests in total. The reason behind that is that Noderesourcesfit plugin (the plugin that is
+			// responsible for accepting/rejecting compute nodes as candidates for placing the pod) actually accounts for the baseload, it compares the
+			// actual available resources on node with the pod requested resources, if the available resources can accommodate the pod resources then it
+			// will mark the node as a possible candidate, if not it will reject it.
 			[]corev1.ResourceList{
 				{
 					corev1.ResourceCPU:    resource.MustParse("4"),
@@ -1310,7 +1342,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[tier1][negative][tmscope:container][hugepages1Gi] pod with two gu cnt keep on pending",
+		Entry("[tier1][negative][tmscope:container][hugepages1Gi] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
 			"cannot align container: testcnt-1",
@@ -1341,12 +1373,17 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 				{
-					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceCPU:    resource.MustParse("4"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 			},
+			// the free resources that should be left on the target node should not depend that there will be some baseload added upon padding the node,
+			// those free resources should match the pod requests in total. The reason behind that is that Noderesourcesfit plugin (the plugin that is
+			// responsible for accepting/rejecting compute nodes as candidates for placing the pod) actually accounts for the baseload, it compares the
+			// actual available resources on node with the pod requested resources, if the available resources can accommodate the pod resources then it
+			// will mark the node as a possible candidate, if not it will reject it.
 			[]corev1.ResourceList{
 				{
 					corev1.ResourceCPU:    resource.MustParse("4"),
