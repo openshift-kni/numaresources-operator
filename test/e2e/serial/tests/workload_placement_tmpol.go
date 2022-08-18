@@ -1202,11 +1202,16 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 			},
+			// the free resources that should be left on the target node should not depend that there will be some baseload added upon padding the node,
+			// those free resources should match the pod requests in total. The reason behind that is that Noderesourcesfit plugin (the plugin that is
+			// responsible for accepting/rejecting compute nodes as candidates for placing the pod) actually accounts for the baseload, it compares the
+			// actual available resources on node with the pod requested resources, if the available resources can accommodate the pod resources then it
+			// will mark the node as a possible candidate, if not it will reject it.
 			[]corev1.ResourceList{
 				{
 					// the baseload will be added to the first numa zone upon padding, this need to consider
 					// that baseCpus + targetNodeFreeCpus does not make the first numa a candidate for any of the containers. Take into account that the baseCpus can be at least 2 cpus
-					//so for example if cpus(cont1) = 5 and cpus(cont2) = 5 then cpus(numa0)<5 and since teh basecpus usually is 2 then we should make pass at most 2 free cpus as the free cpus in numa0
+					//so for example if cpus(cont1) = 5 and cpus(cont2) = 5 then cpus(numa0)<5 and since the basecpus usually is 2 then we should make pass at most 2 free cpus as the free cpus in numa0
 					corev1.ResourceCPU:    resource.MustParse("1"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
@@ -1228,13 +1233,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				appCnt: []corev1.ResourceList{
 					{
 						corev1.ResourceCPU:    resource.MustParse("4"),
-						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						corev1.ResourceMemory: resource.MustParse("7Gi"),
 						"hugepages-2Mi":       resource.MustParse("32Mi"),
 						"hugepages-1Gi":       resource.MustParse("1Gi"),
 					},
 					{
 						corev1.ResourceCPU:    resource.MustParse("4"),
-						corev1.ResourceMemory: resource.MustParse("5Gi"),
+						corev1.ResourceMemory: resource.MustParse("7Gi"),
 						"hugepages-2Mi":       resource.MustParse("32Mi"),
 						"hugepages-1Gi":       resource.MustParse("1Gi"),
 					},
@@ -1258,16 +1263,22 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 			},
+			// the free resources that should be left on the target node should not depend that there will be some baseload added upon padding the node,
+			// those free resources should match the pod requests in total. The reason behind that is that Noderesourcesfit plugin (the plugin that is
+			// responsible for accepting/rejecting compute nodes as candidates for placing the pod) actually accounts for the baseload, it compares the
+			// actual available resources on node with the pod requested resources, if the available resources can accommodate the pod resources then it
+			// will mark the node as a possible candidate, if not it will reject it.
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    resource.MustParse("4"),
-					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceCPU: resource.MustParse("4"),
+					//the base memory on the node could be 4.5Gi, so we need to consider that 4.5Gi + 1Gi is not enough for any of the pod containers
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 				{
 					corev1.ResourceCPU:    resource.MustParse("4"),
-					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceMemory: resource.MustParse("13Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
@@ -1311,6 +1322,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 			},
+			// the free resources that should be left on the target node should not depend that there will be some baseload added upon padding the node,
+			// those free resources should match the pod requests in total. The reason behind that is that Noderesourcesfit plugin (the plugin that is
+			// responsible for accepting/rejecting compute nodes as candidates for placing the pod) actually accounts for the baseload, it compares the
+			// actual available resources on node with the pod requested resources, if the available resources can accommodate the pod resources then it
+			// will mark the node as a possible candidate, if not it will reject it.
 			[]corev1.ResourceList{
 				{
 					corev1.ResourceCPU:    resource.MustParse("4"),
@@ -1363,6 +1379,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
 				},
 			},
+			// the free resources that should be left on the target node should not depend that there will be some baseload added upon padding the node,
+			// those free resources should match the pod requests in total. The reason behind that is that Noderesourcesfit plugin (the plugin that is
+			// responsible for accepting/rejecting compute nodes as candidates for placing the pod) actually accounts for the baseload, it compares the
+			// actual available resources on node with the pod requested resources, if the available resources can accommodate the pod resources then it
+			// will mark the node as a possible candidate, if not it will reject it.
 			[]corev1.ResourceList{
 				{
 					corev1.ResourceCPU:    resource.MustParse("4"),
