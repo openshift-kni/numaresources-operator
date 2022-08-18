@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo"
@@ -1119,10 +1120,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("verify the pod keep on pending")
-			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 2*time.Minute)
+			err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 5)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
+			Expect(err).ToNot(HaveOccurred())
+			updatedPod := &corev1.Pod{}
+			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: pod.Name}, updatedPod)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the scheduler report the expected error in the pod events`")
