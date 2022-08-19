@@ -27,6 +27,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -622,7 +623,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				corev1.ResourceCPU:    resource.MustParse("3"),
 				corev1.ResourceMemory: resource.MustParse("8Gi"),
 			}
-			err := padder.Nodes(len(nrts)).UntilAvailableIsResourceList(padUntilRes).Pad(time.Minute*2, e2epadder.PaddingOptions{})
+
+			labSel, err := labels.Parse(serialconfig.MultiNUMALabel + "=2")
+			Expect(err).ToNot(HaveOccurred())
+			err = padder.Nodes(len(nrts)).UntilAvailableIsResourceList(padUntilRes).Pad(time.Minute*2, e2epadder.PaddingOptions{
+				LabelSelector: labSel,
+			})
 			Expect(err).ToNot(HaveOccurred())
 
 			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)

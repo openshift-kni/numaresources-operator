@@ -114,7 +114,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				corev1.ResourceMemory: resource.MustParse("8G"),
 			}
 			By("padding the nodes before test start")
-			err := padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{})
+			labSel, err := labels.Parse(serialconfig.MultiNUMALabel + "=2")
+			Expect(err).ToNot(HaveOccurred())
+
+			err = padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{
+				LabelSelector: labSel,
+			})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -158,7 +163,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podLabels := map[string]string{
 				"test": "test-dp",
 			}
-			nodeSelector := map[string]string{}
+			nodeSelector := map[string]string{
+				serialconfig.MultiNUMALabel: "2",
+			}
 
 			// the pod is asking for 4 CPUS and 200Mi in total
 			requiredRes := corev1.ResourceList{
@@ -923,6 +930,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 							},
 						},
 					},
+				},
+				NodeSelector: map[string]string{
+					serialconfig.MultiNUMALabel: "2",
 				},
 			})
 
