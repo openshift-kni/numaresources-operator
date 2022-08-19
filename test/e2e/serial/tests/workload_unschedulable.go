@@ -77,6 +77,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 		if len(nrts) < 2 {
 			Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
 		}
+
+		nrts = e2enrt.FilterZoneCountEqual(nrts, 2)
+		if len(nrts) < 2 {
+			Skip(fmt.Sprintf("not enough nodes with %d NUMA zones - found %d", 2, len(nrts)))
+		}
+
 		// we expect having the same policy across all NRTs
 		tmPolicy = nrts[0].TopologyPolicies[0]
 
