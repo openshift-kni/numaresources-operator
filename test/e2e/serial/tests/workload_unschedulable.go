@@ -672,20 +672,20 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *dp)
 			Expect(err).ToNot(HaveOccurred(), "unable to get pods from deployment %q:  %v", dp.Name, err)
 
-			allFailed := true
+			var succeededPods []string
 			for _, pod := range pods {
 				isFailed, err := nrosched.CheckPODSchedulingFailed(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
 				Expect(err).ToNot(HaveOccurred())
-				allFailed = allFailed && isFailed
 				if !isFailed {
+					succeededPods = append(succeededPods, fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
 					klog.Warningf("pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, schedulerName)
 					continue
 				}
 			}
-			Expect(allFailed).To(BeTrue(), "some pods are running, but we expect all of them to fail")
+			Expect(succeededPods).To(BeEmpty(), "some pods are running, but we expect all of them to fail")
 
 			By("Verifying NRTs had no updates because the pods failed to be scheduled on any node")
 			nrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Second*10)
