@@ -59,7 +59,7 @@ export E2E_TOPOLOGY_MANAGER_POLICY="${E2E_TOPOLOGY_MANAGER_POLICY:-SingleNUMANod
 # --failFast: ginkgo will stop the suite right after the first spec failure
 # --flakeAttempts: rerun the test if it fails
 # -requireSuite: fail if tests are not executed because of missing suite
-${BIN_DIR}/e2e-nrop-rte.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.flakeAttempts=2 --ginkgo.reportFile=/tmp/artifacts/nrop/e2e --ginkgo.skip='\[Disruptive\]|\[StateDirectories\]'
+${BIN_DIR}/e2e-nrop-rte.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.flakeAttempts=2 --ginkgo.reportFile=/tmp/artifacts/nrop/e2e --ginkgo.skip='\[Disruptive\]|\[StateDirectories\]|\[NodeRefresh\]'
 
 
 if [ "$ENABLE_SCHED_TESTS" = true ]; then
