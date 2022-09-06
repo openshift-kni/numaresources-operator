@@ -70,6 +70,9 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 	if idx := sliceIndex(ds.Spec.Template.Spec.Containers[0].Args, "--pods-fingerprint"); idx == -1 {
 		t.Errorf("pods-fingerprint option missing from %v", ds.Spec.Template.Spec.Containers[0].Args)
 	}
+	if idx := sliceIndex(ds.Spec.Template.Spec.Containers[0].Args, "--refresh-node-resources"); idx == -1 {
+		t.Errorf("refresh-node-resources option missing from %v", ds.Spec.Template.Spec.Containers[0].Args)
+	}
 	if !reflect.DeepEqual(origDs.Spec.Template.Spec.Containers[0].Command, ds.Spec.Template.Spec.Containers[0].Command) {
 		t.Errorf("unexpected change on command: %v", ds.Spec.Template.Spec.Containers[0].Command)
 	}

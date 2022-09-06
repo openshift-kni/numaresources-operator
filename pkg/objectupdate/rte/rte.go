@@ -122,6 +122,7 @@ func DaemonSetArgs(ds *appsv1.DaemonSet) error {
 		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
 	}
 	flags.SetToggle("--pods-fingerprint")
+	flags.SetToggle("--refresh-node-resources")
 	cnt.Args = flags.Argv()
 	return nil
 }
