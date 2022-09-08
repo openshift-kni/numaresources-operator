@@ -395,12 +395,6 @@ func DaemonSet(component, subComponent string, plat platform.Platform, namespace
 				}
 
 				if plat == platform.OpenShift {
-					c.Args = append(
-						c.Args,
-						// TODO: we should fetch the policy from the KubeletConfig CR
-						"--topology-manager-policy=single-numa-node",
-					)
-
 					// this is needed to put watches in the kubelet state dirs AND
 					// to open the podresources socket in R/W mode
 					if c.SecurityContext == nil {
