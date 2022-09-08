@@ -204,6 +204,10 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	if pArgs.RTE.TopologyManagerScope == "" {
 		pArgs.RTE.TopologyManagerScope = conf.TopologyManagerScope
 	}
+	klog.Infof("using Topology Manager scope %q (conf=%s) policy %q (conf=%s)",
+		pArgs.RTE.TopologyManagerScope, conf.TopologyManagerScope,
+		pArgs.RTE.TopologyManagerPolicy, conf.TopologyManagerPolicy,
+	)
 
 	return pArgs, nil
 }
