@@ -161,7 +161,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			var replicas int32 = 1
 			podLabels := map[string]string{
-				"test": "test-dp",
+				"test": "test-dp-47591",
 			}
 			nodeSelector := map[string]string{
 				serialconfig.MultiNUMALabel: "2",
@@ -177,7 +177,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				SchedulerName: serialconfig.Config.SchedulerName,
 				Containers: []corev1.Container{
 					{
-						Name:    "testdp-cnt",
+						Name:    "test-dp-47591-cnt-1",
 						Image:   objects.PauseImage,
 						Command: []string{objects.PauseCommand},
 						Resources: corev1.ResourceRequirements{
@@ -186,7 +186,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 						},
 					},
 					{
-						Name:    "testdp-cnt2",
+						Name:    "test-dp-47591-cnt-2",
 						Image:   objects.PauseImage,
 						Command: []string{objects.PauseCommand},
 						Resources: corev1.ResourceRequirements{
@@ -199,7 +199,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			By(fmt.Sprintf("creating a deployment with a guaranteed pod with two containers requiring total %s", e2ereslist.ToString(e2ereslist.FromContainers(podSpec.Containers))))
-			dp := objects.NewTestDeploymentWithPodSpec(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp", *podSpec)
+			dp := objects.NewTestDeploymentWithPodSpec(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp47591", *podSpec)
 
 			err = fxt.Client.Create(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
@@ -728,7 +728,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			By(fmt.Sprintf("creating a deployment with a deployment pod with two replicas requiring %s", e2ereslist.ToString(reqResources)))
-			dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp", objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp48746", objects.PauseImage, []string{objects.PauseCommand}, []string{})
 			dp.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			dp.Spec.Template.Spec.Containers[0].Resources.Limits = reqResources
 
