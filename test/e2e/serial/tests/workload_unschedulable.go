@@ -609,14 +609,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 	// other than the other tests, here we expect all the worker nodes (including none-bm hosts) to be padded
 	Context("with zero suitable nodes", func() {
 		It("[test_id:47615][tier2][unsched] a deployment with multiple guaranteed pods resources that doesn't fit at the NUMA level", func() {
-			requiredNUMAZones := 2
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
-			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
-
 			neededNodes := 1
-			numOfnrtCandidates := len(nrtCandidates)
+			numOfnrtCandidates := len(nrts)
 			if numOfnrtCandidates < neededNodes {
-				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes))
+				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", numOfnrtCandidates, neededNodes))
 			}
 
 			By("padding all the nodes")
@@ -640,12 +636,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
 
+			nodesNameSet := e2enrt.AccumulateNames(nrts)
+
 			By("creating a deployment")
-			dpName := "test-dp"
+			dpName := "test-dp-47615"
 			schedulerName := nrosched.GetNROSchedulerName(fxt.Client, nrosched.NROSchedObjectName)
 			replicas := int32(6)
 			podLabels := map[string]string{
-				"test": "test-dp",
+				"test": dpName,
+			}
+
+			nodeSelector := map[string]string{
+				serialconfig.MultiNUMALabel: "2",
 			}
 
 			podSpec := corev1.PodSpec{
@@ -663,7 +665,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				},
 				RestartPolicy: corev1.RestartPolicyAlways,
 			}
-			dp := objects.NewTestDeploymentWithPodSpec(replicas, podLabels, map[string]string{}, fxt.Namespace.Name, dpName, podSpec)
+			dp := objects.NewTestDeploymentWithPodSpec(replicas, podLabels, nodeSelector, fxt.Namespace.Name, dpName, podSpec)
 
 			err = fxt.Client.Create(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
@@ -692,6 +694,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred())
 
 			for _, initialNrt := range nrtInitialList.Items {
+				if !nodesNameSet.Has(initialNrt.Name) {
+					klog.Infof("skipping uninteresting (unpadded) node: %q", initialNrt.Name)
+					continue
+				}
+
 				nrtCurrent, err := e2enrt.FindFromList(nrtListCurrent.Items, initialNrt.Name)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -744,6 +751,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred())
 
 			for _, initialNrt := range nrtInitialList.Items {
+				if !nodesNameSet.Has(initialNrt.Name) {
+					klog.Infof("skipping uninteresting (unpadded) node: %q", initialNrt.Name)
+					continue
+				}
+
 				nrtPostDpCreate, err := e2enrt.FindFromList(nrtPostDpCreateList.Items, initialNrt.Name)
 				Expect(err).ToNot(HaveOccurred())
 
