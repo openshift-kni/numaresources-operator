@@ -116,8 +116,6 @@ func (r *NUMAResourcesSchedulerReconciler) SetupWithManager(mgr ctrl.Manager) er
 }
 
 func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context, instance *nrsv1alpha1.NUMAResourcesScheduler) (reconcile.Result, string, error) {
-	klog.Info("SchedulerSync start")
-
 	deploymentInfo, schedulerName, err := r.syncNUMASchedulerResources(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedSchedulerSync")
@@ -154,6 +152,9 @@ func isDeploymentRunning(ctx context.Context, c client.Client, key nrsv1alpha1.N
 }
 
 func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nrsv1alpha1.NUMAResourcesScheduler) (nrsv1alpha1.NamespacedName, string, error) {
+	klog.V(4).Info("SchedulerSync start")
+	defer klog.V(4).Info("SchedulerSync stop")
+
 	var deploymentNName nrsv1alpha1.NamespacedName
 	schedulerName := instance.Spec.SchedulerName
 
