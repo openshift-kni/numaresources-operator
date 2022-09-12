@@ -216,8 +216,11 @@ build-e2e-all: fmt vet binary-e2e-all
 
 build-must-gather-e2e: fmt vet binary-must-gather-e2e
 
-build-pause:
+build-pause: bin-dir
 	install -m 755 hack/pause bin/
+
+bin-dir:
+	@mkdir -p bin || :
 
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
