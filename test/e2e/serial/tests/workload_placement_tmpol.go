@@ -1538,7 +1538,8 @@ func makeInitTestContainers(pod *corev1.Pod, initCnt []corev1.ResourceList) *cor
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, corev1.Container{
 			Name:    fmt.Sprintf("inittestcnt-%d", i),
 			Image:   images.GetPauseImage(),
-			Command: []string{objects.PauseCommand},
+			Command: []string{"/bin/sleep"},
+			Args:    []string{"1s"},
 			Resources: corev1.ResourceRequirements{
 				Limits: initCnt[i],
 			},
