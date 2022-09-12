@@ -96,16 +96,29 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	// and will we want to start lean and mean.
 
 	Context("cluster has at least one suitable node", func() {
+		hostsRequired := 2
 		timeout := 5 * time.Minute
 		// will be called at the end of the test to make sure we're not polluting the cluster
 		var cleanFuncs []func() error
 
 		BeforeEach(func() {
-			tmPolicy := nrtv1alpha1.SingleNUMANodeContainerLevel
-			nrts = e2enrt.FilterTopologyManagerPolicy(nrtList.Items, tmPolicy)
-			if len(nrts) < 2 {
-				Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
+			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
+			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
+			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
+			if len(nrtCandidates) < hostsRequired {
+				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates)))
 			}
+			klog.Infof("Found node with 2 NUMA zones: %d", len(nrtCandidates))
+
+			policies := []nrtv1alpha1.TopologyManagerPolicy{
+				nrtv1alpha1.SingleNUMANodeContainerLevel,
+				nrtv1alpha1.SingleNUMANodePodLevel,
+			}
+			nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
+			if len(nrts) < hostsRequired {
+				Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
+			}
+			klog.Infof("Found node with 2 NUMA zones: %d", len(nrts))
 
 			numOfNodeToBePadded := len(nrts) - 1
 
@@ -114,7 +127,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				corev1.ResourceMemory: resource.MustParse("8G"),
 			}
 			By("padding the nodes before test start")
-			err := padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{})
+			labSel, err := labels.Parse(serialconfig.MultiNUMALabel + "=2")
+			Expect(err).ToNot(HaveOccurred())
+
+			err = padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{
+				LabelSelector: labSel,
+			})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -128,37 +146,30 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 			}
 		})
+
 		It("[test_id:47591][tier1] should modify workload post scheduling while keeping the resource requests available", func() {
-			hostsRequired := 2
-			paddedNodes := padder.GetPaddedNodes()
-			paddedNodesSet := sets.NewString(paddedNodes...)
-
-			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
-			Expect(err).ToNot(HaveOccurred())
-
-			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
-			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtInitialList.Items, 2)
-			if len(nrtCandidates) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates)))
-			}
-
-			singleNUMAPolicyNrts := e2enrt.FilterByPolicies(nrtInitialList.Items, []nrtv1alpha1.TopologyManagerPolicy{nrtv1alpha1.SingleNUMANodePodLevel, nrtv1alpha1.SingleNUMANodeContainerLevel})
-			nodesNameSet := e2enrt.AccumulateNames(singleNUMAPolicyNrts)
-
+			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
+			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
 			// since we know exactly how the test setup looks like we expect only targeted node here
-			targetNodeNameSet := nodesNameSet.Difference(paddedNodesSet)
+			targetNodeNameSet := nodesNameSet.Difference(paddedNodeNames)
 			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
 
 			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
 
+			klog.Infof("target node will be %q", targetNodeName)
+
+			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+			Expect(err).ToNot(HaveOccurred())
+
 			var replicas int32 = 1
 			podLabels := map[string]string{
-				"test": "test-dp",
+				"test": "test-dp-47591",
 			}
-			nodeSelector := map[string]string{}
+			nodeSelector := map[string]string{
+				serialconfig.MultiNUMALabel: "2",
+			}
 
 			// the pod is asking for 4 CPUS and 200Mi in total
 			requiredRes := corev1.ResourceList{
@@ -170,7 +181,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				SchedulerName: serialconfig.Config.SchedulerName,
 				Containers: []corev1.Container{
 					{
-						Name:    "testdp-cnt",
+						Name:    "test-dp-47591-cnt-1",
 						Image:   objects.PauseImage,
 						Command: []string{objects.PauseCommand},
 						Resources: corev1.ResourceRequirements{
@@ -179,7 +190,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 						},
 					},
 					{
-						Name:    "testdp-cnt2",
+						Name:    "test-dp-47591-cnt-2",
 						Image:   objects.PauseImage,
 						Command: []string{objects.PauseCommand},
 						Resources: corev1.ResourceRequirements{
@@ -192,7 +203,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			By(fmt.Sprintf("creating a deployment with a guaranteed pod with two containers requiring total %s", e2ereslist.ToString(e2ereslist.FromContainers(podSpec.Containers))))
-			dp := objects.NewTestDeploymentWithPodSpec(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp", *podSpec)
+			dp := objects.NewTestDeploymentWithPodSpec(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp47591", *podSpec)
 
 			err = fxt.Client.Create(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
@@ -426,30 +437,20 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:47628][tier2] should schedule a workload (with TAS) and then keep a subsequent one (with default scheduler) pending ", func() {
-			hostsRequired := 2
-			paddedNodes := padder.GetPaddedNodes()
-			paddedNodesSet := sets.NewString(paddedNodes...)
-
-			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
-			Expect(err).ToNot(HaveOccurred())
-
-			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
-			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtInitialList.Items, 2)
-			if len(nrtCandidates) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates)))
-			}
-
-			singleNUMAPolicyNrts := e2enrt.FilterByPolicies(nrtCandidates, []nrtv1alpha1.TopologyManagerPolicy{nrtv1alpha1.SingleNUMANodePodLevel, nrtv1alpha1.SingleNUMANodeContainerLevel})
-			nodesNameSet := e2enrt.AccumulateNames(singleNUMAPolicyNrts)
-
+			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
+			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
 			// since we know exactly how the test setup looks like we expect only targeted node here
-			targetNodeNameSet := nodesNameSet.Difference(paddedNodesSet)
+			targetNodeNameSet := nodesNameSet.Difference(paddedNodeNames)
 			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
 
 			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
+
+			klog.Infof("target node will be %q", targetNodeName)
+
+			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+			Expect(err).ToNot(HaveOccurred())
 
 			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, targetNodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -628,20 +629,31 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		})
 	})
+
 	Context("cluster has at least one suitable node with Topology Manager single numa policy (both container and pod scope acceptable)", func() {
+		hostsRequired := 2
 		timeout := 5 * time.Minute
 		// will be called at the end of the test to make sure we're not polluting the cluster
 		var cleanFuncs []func() error
 
 		BeforeEach(func() {
+			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
+			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
+			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
+			if len(nrtCandidates) < hostsRequired {
+				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates)))
+			}
+			klog.Infof("Found node with 2 NUMA zones: %d", len(nrtCandidates))
+
 			policies := []nrtv1alpha1.TopologyManagerPolicy{
 				nrtv1alpha1.SingleNUMANodeContainerLevel,
 				nrtv1alpha1.SingleNUMANodePodLevel,
 			}
-			nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
-			if len(nrts) < 2 {
+			nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
+			if len(nrts) < hostsRequired {
 				Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
 			}
+			klog.Infof("Found node with 2 NUMA zones: %d", len(nrts))
 
 			numOfNodeToBePadded := len(nrts) - 1
 
@@ -650,7 +662,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				corev1.ResourceMemory: resource.MustParse("8G"),
 			}
 			By("padding the nodes before test start")
-			err := padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{})
+			labSel, err := labels.Parse(serialconfig.MultiNUMALabel + "=2")
+			Expect(err).ToNot(HaveOccurred())
+
+			err = padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{
+				LabelSelector: labSel,
+			})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -664,33 +681,24 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 			}
 		})
+
 		It("[test_id:48746][tier2] should modify workload post scheduling while keeping the resource requests available across all NUMA node", func() {
-
-			hostsRequired := 2
-			paddedNodes := padder.GetPaddedNodes()
-			paddedNodesSet := sets.NewString(paddedNodes...)
-
-			err := fxt.Client.List(context.TODO(), &nrtList)
-			Expect(err).ToNot(HaveOccurred())
-
-			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
-			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
-			if len(nrtCandidates) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates)))
-			}
-
+			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
-
 			// the only node which was not padded is the targetedNode
 			// since we know exactly how the test setup looks like we expect only targeted node here
-			targetNodeNameSet := nodesNameSet.Difference(paddedNodesSet)
+			targetNodeNameSet := nodesNameSet.Difference(paddedNodeNames)
 			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
 
 			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
 
-			targetNrtInitial, err := e2enrt.FindFromList(nrtList.Items, targetNodeName)
+			klog.Infof("target node will be %q", targetNodeName)
+
+			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+			Expect(err).ToNot(HaveOccurred())
+
+			targetNrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
 
 			var replicas int32 = 2
@@ -721,7 +729,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			By(fmt.Sprintf("creating a deployment with a deployment pod with two replicas requiring %s", e2ereslist.ToString(reqResources)))
-			dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp", objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp48746", objects.PauseImage, []string{objects.PauseCommand}, []string{})
 			dp.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			dp.Spec.Template.Spec.Containers[0].Resources.Limits = reqResources
 
@@ -860,17 +868,29 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", targetNodeName)
 		})
 	})
+
 	Context("cluster with at least two available nodes", func() {
+		hostsRequired := 2
 		timeout := 5 * time.Minute
+
 		BeforeEach(func() {
+			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
+			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
+			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
+			if len(nrtCandidates) < hostsRequired {
+				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates)))
+			}
+			klog.Infof("Found node with 2 NUMA zones: %d", len(nrtCandidates))
+
 			policies := []nrtv1alpha1.TopologyManagerPolicy{
 				nrtv1alpha1.SingleNUMANodeContainerLevel,
 				nrtv1alpha1.SingleNUMANodePodLevel,
 			}
-			nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
-			if len(nrts) < 2 {
+			nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
+			if len(nrts) < hostsRequired {
 				Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
 			}
+			klog.Infof("Found node with 2 NUMA zones: %d", len(nrts))
 
 			numOfNodeToBePadded := len(nrts) - 1
 
@@ -879,7 +899,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				corev1.ResourceMemory: resource.MustParse("4G"),
 			}
 			By("padding the nodes before test start")
-			err := padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{})
+			labSel, err := labels.Parse(serialconfig.MultiNUMALabel + "=2")
+			Expect(err).ToNot(HaveOccurred())
+
+			err = padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{
+				LabelSelector: labSel,
+			})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -887,8 +912,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("unpadding the nodes after test finish")
 			err := padder.Clean()
 			Expect(err).ToNot(HaveOccurred())
-
 		})
+
 		It("[test_id:47627] should be able to schedule many replicas with performance time equals to the default scheduler", func() {
 			nrtInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, timeout)
 			Expect(err).ToNot(HaveOccurred())
@@ -923,6 +948,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 							},
 						},
 					},
+				},
+				NodeSelector: map[string]string{
+					serialconfig.MultiNUMALabel: "2",
 				},
 			})
 

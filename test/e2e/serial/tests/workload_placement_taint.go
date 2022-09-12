@@ -28,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/util/taints"
@@ -68,16 +69,24 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		err = fxt.Client.List(context.TODO(), &nrtList)
 		Expect(err).ToNot(HaveOccurred())
 
+		// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
+		nrtCandidates := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
+		if len(nrtCandidates) < 2 {
+			Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates)))
+		}
+		klog.Infof("Found node with 2 NUMA zones: %d", len(nrtCandidates))
+
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
 		policies := []nrtv1alpha1.TopologyManagerPolicy{
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			nrtv1alpha1.SingleNUMANodePodLevel,
 		}
-		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
+		nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
 		if len(nrts) < 2 {
 			Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
 		}
+		klog.Infof("Found node with 2 NUMA zones: %d", len(nrts))
 
 		// Note that this test, being part of "serial", expects NO OTHER POD being scheduled
 		// in between, so we consider this information current and valid when the It()s run.
@@ -107,7 +116,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				corev1.ResourceMemory: resource.MustParse("8G"),
 			}
 			By("padding the nodes before test start")
-			err := padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{})
+			labSel, err := labels.Parse(serialconfig.MultiNUMALabel + "=2")
+			Expect(err).ToNot(HaveOccurred())
+
+			err = padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{
+				LabelSelector: labSel,
+			})
 			Expect(err).ToNot(HaveOccurred())
 
 			nodes, err := nodes.GetWorkerNodes(fxt.Client)
@@ -163,30 +177,20 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:47594][tier1] should make a pod with a toleration land on a node with enough resources on a specific NUMA zone", func() {
-			hostsRequired := 2
-			paddedNodes := padder.GetPaddedNodes()
-			paddedNodesSet := sets.NewString(paddedNodes...)
-
-			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
-			Expect(err).ToNot(HaveOccurred())
-
-			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
-			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtInitialList.Items, 2)
-			if len(nrtCandidates) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates)))
-			}
-
-			singleNUMAPolicyNrts := e2enrt.FilterByPolicies(nrtInitialList.Items, []nrtv1alpha1.TopologyManagerPolicy{nrtv1alpha1.SingleNUMANodePodLevel, nrtv1alpha1.SingleNUMANodeContainerLevel})
-			nodesNameSet := e2enrt.AccumulateNames(singleNUMAPolicyNrts)
-
+			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
+			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
 			// since we know exactly how the test setup looks like we expect only targeted node here
-			targetNodeNameSet := nodesNameSet.Difference(paddedNodesSet)
-			Expect(targetNodeNameSet.Len()).To(Equal(1))
+			targetNodeNameSet := nodesNameSet.Difference(paddedNodeNames)
+			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
 
 			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
+
+			klog.Infof("target node will be %q", targetNodeName)
+
+			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+			Expect(err).ToNot(HaveOccurred())
 
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pSpec := &testPod.Spec

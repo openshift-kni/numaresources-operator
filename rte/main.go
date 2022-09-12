@@ -64,15 +64,14 @@ func main() {
 		os.Exit(0)
 	}
 
-	// only for debug purposes
-	// printing the header so early includes any debug message from the sysinfo package
-	klog.Infof("=== System information ===\n")
 	sysInfo, err := sysinfo.NewSysinfo(parsedArgs.LocalArgs.SysConf)
 	if err != nil {
 		klog.Fatalf("failed to query system info: %w", err)
 	}
-	klog.Infof("\n%s", sysInfo)
-	klog.Infof("==========================\n")
+	klog.Infof(`
+=== System information ===
+%s
+==========================`, sysInfo)
 
 	if parsedArgs.SysinfoOnly {
 		os.Exit(0)
@@ -201,11 +200,13 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	if pArgs.RTE.TopologyManagerPolicy == "" {
 		pArgs.RTE.TopologyManagerPolicy = conf.TopologyManagerPolicy
 	}
-
-	// overwrite if explicitly mentioned in conf
-	if conf.TopologyManagerScope != "" {
+	if pArgs.RTE.TopologyManagerScope == "" {
 		pArgs.RTE.TopologyManagerScope = conf.TopologyManagerScope
 	}
+	klog.Infof("using Topology Manager scope %q (conf=%s) policy %q (conf=%s)",
+		pArgs.RTE.TopologyManagerScope, conf.TopologyManagerScope,
+		pArgs.RTE.TopologyManagerPolicy, conf.TopologyManagerPolicy,
+	)
 
 	return pArgs, nil
 }

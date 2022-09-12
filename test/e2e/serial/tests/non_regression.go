@@ -26,6 +26,7 @@ import (
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
@@ -63,16 +64,25 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		err = fxt.Client.List(context.TODO(), &nrtList)
 		Expect(err).ToNot(HaveOccurred())
 
+		// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
+		By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
+		nrtCandidates := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
+		if len(nrtCandidates) < 2 {
+			Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates)))
+		}
+		klog.Infof("Found node with 2 NUMA zones: %d", len(nrtCandidates))
+
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
 		policies := []nrtv1alpha1.TopologyManagerPolicy{
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			nrtv1alpha1.SingleNUMANodePodLevel,
 		}
-		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
+		nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
 		if len(nrts) < 2 {
 			Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
 		}
+		klog.Infof("Found node with 2 NUMA zones: %d", len(nrts))
 
 		// Note that this test, being part of "serial", expects NO OTHER POD being scheduled
 		// in between, so we consider this information current and valid when the It()s run.
@@ -102,7 +112,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				corev1.ResourceMemory: resource.MustParse("8G"),
 			}
 			By("padding the nodes before test start")
-			err := padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{})
+			labSel, err := labels.Parse(serialconfig.MultiNUMALabel + "=2")
+			Expect(err).ToNot(HaveOccurred())
+
+			err = padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{
+				LabelSelector: labSel,
+			})
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -118,16 +133,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:47584][tier2] should be able to schedule guaranteed pod in selective way", func() {
-			nrtList := nrtv1alpha1.NodeResourceTopologyList{}
-			nrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
+			nrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
-			workers, err := nodes.GetWorkerNodes(fxt.Client)
-			Expect(err).ToNot(HaveOccurred())
-
-			targetIdx, ok := e2efixture.PickNodeIndex(workers)
+			nodesNameSet := e2enrt.AccumulateNames(nrts)
+			targetedNodeName, ok := e2efixture.PopNodeName(nodesNameSet)
 			Expect(ok).To(BeTrue())
-			targetedNodeName := workers[targetIdx].Name
 
 			nrtInitial, err := e2enrt.FindFromList(nrtListInitial.Items, targetedNodeName)
 			Expect(err).ToNot(HaveOccurred())
