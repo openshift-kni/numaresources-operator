@@ -5,14 +5,14 @@ go 1.18
 require (
 	github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a
 	github.com/drone/envsubst v1.0.3
-	github.com/fsnotify/fsnotify v1.5.1
 	github.com/ghodss/yaml v1.0.0
 	github.com/google/go-cmp v0.5.6
 	github.com/jaypipes/ghw v0.9.0
 	github.com/jaypipes/pcidb v1.0.0
 	github.com/k8stopologyawareschedwg/deployer v0.7.1-0.20220718095602-ea39f76b1222
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.6.1-0.20220615154701-bffcbc84fc3b
+	github.com/k8stopologyawareschedwg/podfingerprint v0.0.2
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.6.1-0.20220711155932-040caf11fd48
 	github.com/kubevirt/device-plugin-manager v1.18.8
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo v1.16.5
@@ -64,6 +64,7 @@ require (
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/felixge/httpsnoop v1.0.1 // indirect
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
+	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/go-logr/logr v1.2.0 // indirect
 	github.com/go-logr/zapr v1.2.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
@@ -82,7 +83,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/k8stopologyawareschedwg/podfingerprint v0.0.2 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
