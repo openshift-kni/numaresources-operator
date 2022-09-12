@@ -190,7 +190,10 @@ binary-e2e-tools:
 binary-must-gather-e2e:
 	go test -c -v -o bin/e2e-nrop-must-gather.test ./test/e2e/must-gather
 
-binary-e2e-all: goversion binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial binary-e2e-tools runner-e2e-serial build-pause
+binary-e2e-all: goversion \
+	binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial binary-e2e-tools \
+	runner-e2e-serial \
+	build-pause
 
 runner-e2e-serial: bin/envsubst
 	hack/render-e2e-runner.sh
