@@ -63,7 +63,7 @@ podman run -ti \
 
 The E2E suite depends on few extra images. These images are very stable, lightweight and little concern most of times:
 - `quay.io/openshift-kni/numacell-device-plugin:test-ci`
-- `gcr.io/google_containers/pause-amd64:3.0`
+- `quay.io/openshift-kni/pause:test-ci`
 
 However, in some cases it may be unpractical to depend on third party images.
 The E2E test image can act as replacement for all its dependencies, providing either the same code or replacements suitables for its use case.
