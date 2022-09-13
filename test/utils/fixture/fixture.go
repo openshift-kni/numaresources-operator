@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"os"
 	"strconv"
 	"time"
 
@@ -43,6 +44,10 @@ type Fixture struct {
 	K8sClient *kubernetes.Clientset
 	Namespace corev1.Namespace
 }
+
+const (
+	defaultCooldownTime = 30 * time.Second
+)
 
 type Options uint
 
@@ -81,11 +86,14 @@ func Teardown(ft *Fixture) error {
 		klog.Errorf("cannot teardown namespace %q: %s", ft.Namespace.Name, err)
 		return err
 	}
-	// TODO
-	cooldown := 30 * time.Second
+	Cooldown()
+	return nil
+}
+
+func Cooldown() {
+	cooldown := getCooldownTime()
 	klog.Warningf("cooling down for %v", cooldown)
 	time.Sleep(cooldown)
-	return nil
 }
 
 func setupNamespace(cli client.Client, baseName string, randomize bool) (corev1.Namespace, error) {
@@ -143,6 +151,19 @@ func teardownNamespace(cli client.Client, ns corev1.Namespace) error {
 		}
 		return false, nil
 	})
+}
+
+func getCooldownTime() time.Duration {
+	raw, ok := os.LookupEnv("E2E_NROP_TEST_COOLDOWN")
+	if !ok {
+		return defaultCooldownTime
+	}
+	val, err := time.ParseDuration(raw)
+	if err != nil {
+		klog.Errorf("cannot parse the provided test cooldown time (fallback to default: %v): %v", defaultCooldownTime, err)
+		return defaultCooldownTime
+	}
+	return val
 }
 
 func RandomizeName(baseName string) string {
