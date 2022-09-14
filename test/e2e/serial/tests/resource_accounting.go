@@ -52,6 +52,10 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
 	var nrts []nrtv1alpha1.NodeResourceTopology
+	tmPolicyFuncsHandler := tmPolicyFuncsHandler{
+		nrtv1alpha1.SingleNUMANodePodLevel:       newPodScopeTMPolicyFuncs(),
+		nrtv1alpha1.SingleNUMANodeContainerLevel: newContainerScopeTMPolicyFuncs(),
+	}
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
@@ -644,13 +648,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			rl := e2ereslist.FromGuaranteedPod(*updatedPod2)
 			klog.Infof("post-create pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainers(podGuanranteed.Spec.Containers)), e2ereslist.ToString(rl))
 
-			var checkConsumedRes checkConsumedResFunc
-			if targetNrtInitial.TopologyPolicies[0] == string(nrtv1alpha1.SingleNUMANodePodLevel) {
-				// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
-				checkConsumedRes = e2enrt.CheckZoneConsumedResourcesAtLeast
-			} else {
-				checkConsumedRes = e2enrt.CheckNodeConsumedResourcesAtLeast
-			}
+			policyFuncs := tmPolicyFuncsHandler[nrtv1alpha1.TopologyManagerPolicy(targetNrtInitial.TopologyPolicies[0])]
 
 			By(fmt.Sprintf("checking post-update NRT for target node %q updated correctly", targetNodeName))
 			// it's simpler (no resource substraction/difference) to check against initial than compute
@@ -659,7 +657,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err := yaml.Marshal(nrtPostCreate)
 			Expect(err).ToNot(HaveOccurred())
-			match, err := checkConsumedRes(*targetNrtInitial, *nrtPostCreate, rl)
+			match, err := policyFuncs.checkConsumedRes(*targetNrtInitial, *nrtPostCreate, rl)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfter, e2ereslist.ToString(rl))
 
