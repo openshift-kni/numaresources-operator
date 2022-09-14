@@ -297,6 +297,28 @@ func FilterAnyZoneMatchingResources(nrts []nrtv1alpha1.NodeResourceTopology, req
 	return ret
 }
 
+func FilterAnyNodeMatchingResources(nrts []nrtv1alpha1.NodeResourceTopology, requests corev1.ResourceList) []nrtv1alpha1.NodeResourceTopology {
+	reqStr := e2ereslist.ToString(requests)
+	ret := []nrtv1alpha1.NodeResourceTopology{}
+	for _, nrt := range nrts {
+		nodeRes, err := accumulateNodeAvailableResources(nrt, "initial")
+		if err != nil {
+			klog.Errorf("ERROR: %v", err)
+			continue
+		}
+		klog.Infof(" ----> node %q provides %s request %s", nrt.Name, e2ereslist.ToString(ResourceInfoListToResourceList(nodeRes)), reqStr)
+		// abuse the ZoneResourcesMatchesRequest for checking the complete node's resources
+		if !ZoneResourcesMatchesRequest(nodeRes, requests) {
+			klog.Warningf("SKIP: node %q can't provide %s", nrt.Name, reqStr)
+			continue
+		}
+
+		klog.Infof("ADD : node %q provides at least %s", nrt.Name, reqStr)
+		ret = append(ret, nrt)
+	}
+	return ret
+}
+
 func FindFromList(nrts []nrtv1alpha1.NodeResourceTopology, name string) (*nrtv1alpha1.NodeResourceTopology, error) {
 	for idx := 0; idx < len(nrts); idx++ {
 		if nrts[idx].Name == name {
@@ -381,6 +403,15 @@ func GetMaxAllocatableResourceNumaLevel(nrtInfo nrtv1alpha1.NodeResourceTopology
 		}
 	}
 	return maxAllocatable
+}
+
+func ResourceInfoListToResourceList(ri nrtv1alpha1.ResourceInfoList) corev1.ResourceList {
+	rl := corev1.ResourceList{}
+
+	for _, res := range ri {
+		rl[corev1.ResourceName(res.Name)] = res.Available
+	}
+	return rl
 }
 
 func contains(items []string, st string) bool {

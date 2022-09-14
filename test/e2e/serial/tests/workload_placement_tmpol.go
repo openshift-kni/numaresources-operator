@@ -66,6 +66,7 @@ type podResourcesRequest struct {
 
 type setupPaddingFunc func(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod
 type checkConsumedResFunc func(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourceTopology, required corev1.ResourceList) (string, error)
+type filterMatchingResourcesFunc func(nrts []nrtv1alpha1.NodeResourceTopology, requests corev1.ResourceList) []nrtv1alpha1.NodeResourceTopology
 
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering TM policy", func() {
 	var fxt *e2efixture.Fixture
@@ -374,7 +375,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	})
 
 	DescribeTable("[placement] cluster with multiple worker nodes suitable",
-		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, checkConsumedRes checkConsumedResFunc, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
+		func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, setupPadding setupPaddingFunc, filterMatchingResources filterMatchingResourcesFunc, checkConsumedRes checkConsumedResFunc, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
 
 			hostsRequired := 2
 
@@ -410,7 +411,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Skip(fmt.Sprintf("not enough nodes with %d NUMA Zones: found %d", numaZonesRequired, len(nrtCandidates)))
 			}
 			By("filtering available nodes with allocatable resources on each NUMA zone that can match request")
-			nrtCandidates = e2enrt.FilterAnyZoneMatchingResources(nrtCandidates, requiredRes)
+			nrtCandidates = filterMatchingResources(nrtCandidates, requiredRes)
 			if len(nrtCandidates) < hostsRequired {
 				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d", len(nrtCandidates)))
 			}
@@ -530,6 +531,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Entry("[test_id:47575][tmscope:cnt][tier1] should make a pod with two gu cnt land on a node with enough resources on a specific NUMA zone, each cnt on a different zone",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
+			e2enrt.FilterAnyNodeMatchingResources,
 			e2enrt.CheckNodeConsumedResourcesAtLeast,
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -561,6 +563,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Entry("[test_id:47577][tmscope:pod][tier1] should make a pod with two gu cnt land on a node with enough resources on a specific NUMA zone, all cnt on the same zone",
 			nrtv1alpha1.SingleNUMANodePodLevel,
 			setupPaddingPodLevel,
+			e2enrt.FilterAnyZoneMatchingResources,
 			e2enrt.CheckZoneConsumedResourcesAtLeast,
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -589,6 +592,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Entry("[test_id:50183][tmscope:cnt][hugepages] should make a pod with two gu cnt land on a node with enough resources with hugepages on a specific NUMA zone, each cnt on a different zone",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
+			e2enrt.FilterAnyNodeMatchingResources,
 			e2enrt.CheckNodeConsumedResourcesAtLeast,
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -623,6 +627,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Entry("[test_id:50184][tmscope:pod][hugepages] should make a pod with two gu cnt land on a node with enough resources with hugepages on a specific NUMA zone, all cnt on the same zone",
 			nrtv1alpha1.SingleNUMANodePodLevel,
 			setupPaddingPodLevel,
+			e2enrt.FilterAnyZoneMatchingResources,
 			e2enrt.CheckZoneConsumedResourcesAtLeast,
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -655,6 +660,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Entry("[tier1][testtype4][tmscope:container] should make a pod with three gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
+			e2enrt.FilterAnyNodeMatchingResources,
 			e2enrt.CheckNodeConsumedResourcesAtLeast,
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -700,6 +706,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Entry("[tier1][testtype4][tmscope:container][cpu] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
+			e2enrt.FilterAnyNodeMatchingResources,
 			e2enrt.CheckNodeConsumedResourcesAtLeast,
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -753,6 +760,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Entry("[tier1][testtype4][tmscope:container][memory] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
+			e2enrt.FilterAnyNodeMatchingResources,
 			e2enrt.CheckNodeConsumedResourcesAtLeast,
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -806,6 +814,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Entry("[tier1][testtype4][tmscope:container][hugepages2Mi] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
+			e2enrt.FilterAnyNodeMatchingResources,
 			e2enrt.CheckNodeConsumedResourcesAtLeast,
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -859,6 +868,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Entry("[tier1][testtype4][tmscope:container][hugepages1Gi] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
+			e2enrt.FilterAnyNodeMatchingResources,
 			e2enrt.CheckNodeConsumedResourcesAtLeast,
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -911,6 +921,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Entry("[tier1][testtype11][tmscope:container] should make a pod with one init cnt and three gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
+			e2enrt.FilterAnyNodeMatchingResources,
 			e2enrt.CheckNodeConsumedResourcesAtLeast,
 			podResourcesRequest{
 				initCnt: []corev1.ResourceList{
@@ -962,6 +973,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Entry("[tier1][testtype29][tmscope:container] should make a pod with 3 gu cnt and 3 init cnt land on a node with enough resources, when sum of init and app cnt resources are more than node resources",
 			nrtv1alpha1.SingleNUMANodeContainerLevel,
 			setupPaddingContainerLevel,
+			e2enrt.FilterAnyNodeMatchingResources,
 			e2enrt.CheckNodeConsumedResourcesAtLeast,
 			podResourcesRequest{
 				initCnt: []corev1.ResourceList{
