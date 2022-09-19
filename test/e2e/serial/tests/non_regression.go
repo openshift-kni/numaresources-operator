@@ -49,6 +49,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
 	var nrts []nrtv1alpha1.NodeResourceTopology
+	tmPolicyFuncsHandler := tmPolicyFuncsHandler{
+		nrtv1alpha1.SingleNUMANodePodLevel:       newPodScopeTMPolicyFuncs(),
+		nrtv1alpha1.SingleNUMANodeContainerLevel: newContainerScopeTMPolicyFuncs(),
+	}
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
@@ -295,20 +299,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			var checkConsumedRes checkConsumedResFunc
-			if nrtInitial.TopologyPolicies[0] == string(nrtv1alpha1.SingleNUMANodePodLevel) {
-				// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
-				checkConsumedRes = e2enrt.CheckZoneConsumedResourcesAtLeast
-			} else {
-				checkConsumedRes = e2enrt.CheckNodeConsumedResourcesAtLeast
-			}
+			policyFuncs := tmPolicyFuncsHandler[nrtv1alpha1.TopologyManagerPolicy(nrtInitial.TopologyPolicies[0])]
 
 			By(fmt.Sprintf("checking post-create NRT for target node %q updated correctly", targetNodeName))
 			dataBefore, err := yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err := yaml.Marshal(nrtPostCreate)
 			Expect(err).ToNot(HaveOccurred())
-			match, err := checkConsumedRes(*nrtInitial, *nrtPostCreate, rl)
+			match, err := policyFuncs.checkConsumedRes(*nrtInitial, *nrtPostCreate, rl)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfter, e2ereslist.ToString(rl))
 
