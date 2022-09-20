@@ -54,6 +54,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
@@ -186,7 +187,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Containers: []corev1.Container{
 					{
 						Name:    "test-dp-47591-cnt-1",
-						Image:   objects.PauseImage,
+						Image:   images.GetPauseImage(),
 						Command: []string{objects.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits:   requiredRes,
@@ -195,7 +196,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					},
 					{
 						Name:    "test-dp-47591-cnt-2",
-						Image:   objects.PauseImage,
+						Image:   images.GetPauseImage(),
 						Command: []string{objects.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits:   requiredRes,
@@ -482,7 +483,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Containers: []corev1.Container{
 					{
 						Name:    "testpod-cnt",
-						Image:   objects.PauseImage,
+						Image:   images.GetPauseImage(),
 						Command: []string{objects.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits:   reqResPerNUMA[0],
@@ -491,7 +492,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					},
 					{
 						Name:    "testpod-cnt2",
-						Image:   objects.PauseImage,
+						Image:   images.GetPauseImage(),
 						Command: []string{objects.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits:   reqResPerNUMA[1],
@@ -714,7 +715,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			By(fmt.Sprintf("creating a deployment with a deployment pod with two replicas requiring %s", e2ereslist.ToString(reqResources)))
-			dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp48746", objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp48746", images.GetPauseImage(), []string{objects.PauseCommand}, []string{})
 			dp.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			dp.Spec.Template.Spec.Containers[0].Resources.Limits = reqResources
 
@@ -913,7 +914,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Containers: []corev1.Container{
 					{
 						Name:    "c0",
-						Image:   objects.PauseImage,
+						Image:   images.GetPauseImage(),
 						Command: []string{objects.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits: corev1.ResourceList{
@@ -924,7 +925,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					},
 					{
 						Name:    "c1",
-						Image:   objects.PauseImage,
+						Image:   images.GetPauseImage(),
 						Command: []string{objects.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits: corev1.ResourceList{
@@ -1028,7 +1029,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Containers: []corev1.Container{
 					{
 						Name:    "c0",
-						Image:   objects.PauseImage,
+						Image:   images.GetPauseImage(),
 						Command: []string{objects.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits: corev1.ResourceList{
@@ -1039,7 +1040,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					},
 					{
 						Name:    "c1",
-						Image:   objects.PauseImage,
+						Image:   images.GetPauseImage(),
 						Command: []string{objects.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits: corev1.ResourceList{
@@ -1161,7 +1162,7 @@ func newPaddingPod(nodeName, zoneName, namespace string, resourceReqs corev1.Res
 			Containers: []corev1.Container{
 				{
 					Name:    "padpod-cnt-0",
-					Image:   objects.PauseImage,
+					Image:   images.GetPauseImage(),
 					Command: []string{objects.PauseCommand},
 					Resources: corev1.ResourceRequirements{
 						Limits: resourceReqs,

@@ -34,6 +34,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 
@@ -213,7 +214,7 @@ func createDeployment(fxt *e2efixture.Fixture, name, schedulerName string) *apps
 		"test": "test-dp",
 	}
 	nodeSelector := map[string]string{}
-	dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, name, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+	dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, name, images.GetPauseImage(), []string{objects.PauseCommand}, []string{})
 	dp.Spec.Template.Spec.SchedulerName = schedulerName
 
 	By(fmt.Sprintf("creating a test deployment %q", name))

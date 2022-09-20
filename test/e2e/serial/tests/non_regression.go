@@ -38,6 +38,7 @@ import (
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
@@ -250,7 +251,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Containers: []corev1.Container{
 					{
 						Name:    "testdp-cnt",
-						Image:   objects.PauseImage,
+						Image:   images.GetPauseImage(),
 						Command: []string{objects.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits:   requiredRes,
