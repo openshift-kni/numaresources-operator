@@ -900,6 +900,55 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
+		Entry("[test_id:54021][tier1][testtype4][tmscope:container][devices] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"example.com/deviceA": resource.MustParse("2"),
+						"example.com/deviceC": resource.MustParse("1"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"example.com/deviceB": resource.MustParse("2"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"example.com/deviceA": resource.MustParse("1"),
+					"example.com/deviceC": resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"example.com/deviceA": resource.MustParse("1"),
+					"example.com/deviceB": resource.MustParse("2"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"example.com/deviceA": resource.MustParse("2"),
+					"example.com/deviceC": resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"example.com/deviceB": resource.MustParse("2"),
+				},
+			},
+		),
 		Entry("[tier1][testtype11][tmscope:container] should make a pod with one init cnt and three gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
 			podResourcesRequest{
