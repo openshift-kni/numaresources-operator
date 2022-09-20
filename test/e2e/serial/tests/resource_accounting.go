@@ -458,7 +458,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 				"test": "test-dp",
 			}
 			nodeSelector := map[string]string{}
-			deployment = objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, images.GetPauseImage(), []string{objects.PauseCommand}, []string{})
+			deployment = objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 			deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			// make it burstable
 			deployment.Spec.Template.Spec.Containers[0].Resources.Requests = reqResources
@@ -694,7 +694,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			nodeSelector := map[string]string{
 				"kubernetes.io/hostname": targetNodeName,
 			}
-			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, images.GetPauseImage(), []string{objects.PauseCommand}, []string{})
+			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 
 			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			// make it burstable

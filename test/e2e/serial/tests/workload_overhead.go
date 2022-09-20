@@ -226,7 +226,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					"test": "test-dp",
 				}
 				nodeSelector := map[string]string{}
-				deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, images.GetPauseImage(), []string{objects.PauseCommand}, []string{})
+				deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 				deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 				deployment.Spec.Template.Spec.Containers[0].Resources.Limits = podResources
 				deployment.Spec.Template.Spec.RuntimeClassName = &rtClass.Name
@@ -411,7 +411,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					"test": "test-dp",
 				}
 				nodeSelector := map[string]string{}
-				deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, images.GetPauseImage(), []string{objects.PauseCommand}, []string{})
+				deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 				podSpec := &deployment.Spec.Template.Spec
 				podSpec.SchedulerName = serialconfig.Config.SchedulerName
 				podSpec.Containers[0].Resources.Limits = podResources

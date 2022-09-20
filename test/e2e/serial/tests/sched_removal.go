@@ -214,7 +214,7 @@ func createDeployment(fxt *e2efixture.Fixture, name, schedulerName string) *apps
 		"test": "test-dp",
 	}
 	nodeSelector := map[string]string{}
-	dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, name, images.GetPauseImage(), []string{objects.PauseCommand}, []string{})
+	dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, name, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 	dp.Spec.Template.Spec.SchedulerName = schedulerName
 
 	By(fmt.Sprintf("creating a test deployment %q", name))

@@ -252,7 +252,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					{
 						Name:    "testdp-cnt",
 						Image:   images.GetPauseImage(),
-						Command: []string{objects.PauseCommand},
+						Command: []string{images.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits:   requiredRes,
 							Requests: requiredRes,

@@ -44,7 +44,7 @@ func NewTestPodPause(namespace, name string) *corev1.Pod {
 				{
 					Name:    name + "-cnt",
 					Image:   images.GetPauseImage(),
-					Command: []string{PauseCommand},
+					Command: []string{images.PauseCommand},
 				},
 			},
 		},

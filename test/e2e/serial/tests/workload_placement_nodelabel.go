@@ -287,7 +287,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					podLabels := map[string]string{
 						"test": "test-dp",
 					}
-					deployment := objects.NewTestDeployment(replicas, podLabels, nil, fxt.Namespace.Name, deploymentName, images.GetPauseImage(), []string{objects.PauseCommand}, []string{})
+					deployment := objects.NewTestDeployment(replicas, podLabels, nil, fxt.Namespace.Name, deploymentName, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 					deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 					deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 					deployment.Spec.Template.Spec.Affinity = affinity

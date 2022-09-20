@@ -188,7 +188,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					{
 						Name:    "test-dp-47591-cnt-1",
 						Image:   images.GetPauseImage(),
-						Command: []string{objects.PauseCommand},
+						Command: []string{images.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits:   requiredRes,
 							Requests: requiredRes,
@@ -197,7 +197,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					{
 						Name:    "test-dp-47591-cnt-2",
 						Image:   images.GetPauseImage(),
-						Command: []string{objects.PauseCommand},
+						Command: []string{images.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits:   requiredRes,
 							Requests: requiredRes,
@@ -484,7 +484,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					{
 						Name:    "testpod-cnt",
 						Image:   images.GetPauseImage(),
-						Command: []string{objects.PauseCommand},
+						Command: []string{images.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits:   reqResPerNUMA[0],
 							Requests: reqResPerNUMA[0],
@@ -493,7 +493,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					{
 						Name:    "testpod-cnt2",
 						Image:   images.GetPauseImage(),
-						Command: []string{objects.PauseCommand},
+						Command: []string{images.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits:   reqResPerNUMA[1],
 							Requests: reqResPerNUMA[1],
@@ -715,7 +715,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			By(fmt.Sprintf("creating a deployment with a deployment pod with two replicas requiring %s", e2ereslist.ToString(reqResources)))
-			dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp48746", images.GetPauseImage(), []string{objects.PauseCommand}, []string{})
+			dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp48746", images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 			dp.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			dp.Spec.Template.Spec.Containers[0].Resources.Limits = reqResources
 
@@ -915,7 +915,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					{
 						Name:    "c0",
 						Image:   images.GetPauseImage(),
-						Command: []string{objects.PauseCommand},
+						Command: []string{images.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("2"),
@@ -926,7 +926,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					{
 						Name:    "c1",
 						Image:   images.GetPauseImage(),
-						Command: []string{objects.PauseCommand},
+						Command: []string{images.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("2"),
@@ -1030,7 +1030,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					{
 						Name:    "c0",
 						Image:   images.GetPauseImage(),
-						Command: []string{objects.PauseCommand},
+						Command: []string{images.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("2"),
@@ -1041,7 +1041,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					{
 						Name:    "c1",
 						Image:   images.GetPauseImage(),
-						Command: []string{objects.PauseCommand},
+						Command: []string{images.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Limits: corev1.ResourceList{
 								corev1.ResourceCPU:    resource.MustParse("2"),
@@ -1163,7 +1163,7 @@ func newPaddingPod(nodeName, zoneName, namespace string, resourceReqs corev1.Res
 				{
 					Name:    "padpod-cnt-0",
 					Image:   images.GetPauseImage(),
-					Command: []string{objects.PauseCommand},
+					Command: []string{images.PauseCommand},
 					Resources: corev1.ResourceRequirements{
 						Limits: resourceReqs,
 					},
