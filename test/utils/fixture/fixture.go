@@ -140,14 +140,19 @@ func teardownNamespace(cli client.Client, ns corev1.Namespace) error {
 		return nil
 	}
 
-	var updatedNs corev1.Namespace
-	return wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
+	iterations := 0
+	updatedNs := corev1.Namespace{}
+	return wait.PollImmediate(1*time.Second, 120*time.Second, func() (bool, error) {
+		iterations++
 		err := cli.Get(context.TODO(), client.ObjectKeyFromObject(&ns), &updatedNs)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
 			}
 			return false, err
+		}
+		if iterations%10 == 0 {
+			klog.InfoS("tearing down namespace: still not gone", "namespace", ns.Name, "error", err)
 		}
 		return false, nil
 	})
