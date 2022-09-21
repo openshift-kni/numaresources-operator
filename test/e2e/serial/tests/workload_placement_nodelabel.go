@@ -39,6 +39,7 @@ import (
 
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
@@ -286,7 +287,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					podLabels := map[string]string{
 						"test": "test-dp",
 					}
-					deployment := objects.NewTestDeployment(replicas, podLabels, nil, fxt.Namespace.Name, deploymentName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+					deployment := objects.NewTestDeployment(replicas, podLabels, nil, fxt.Namespace.Name, deploymentName, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 					deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 					deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 					deployment.Spec.Template.Spec.Affinity = affinity

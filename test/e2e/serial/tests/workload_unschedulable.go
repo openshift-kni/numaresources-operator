@@ -39,6 +39,7 @@ import (
 
 	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
@@ -222,7 +223,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				"test": "test-deployment",
 			}
 			nodeSelector := map[string]string{}
-			deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 			deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 
@@ -254,7 +255,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			nodeSelector := map[string]string{
 				serialconfig.MultiNUMALabel: "2",
 			}
-			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			ds.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 
@@ -285,7 +286,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				"test": "test-deployment-with-default-sched",
 			}
 			nodeSelector := map[string]string{}
-			deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 			// deployment is scheduled with the default scheduler
 			deployment.Spec.Template.Spec.SchedulerName = corev1.DefaultSchedulerName
 			deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
@@ -384,7 +385,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			nodeSelector := map[string]string{
 				serialconfig.MultiNUMALabel: "2",
 			}
-			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			ds.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 
@@ -655,8 +656,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				Containers: []corev1.Container{
 					{
 						Name:    dpName + "-cnt1",
-						Image:   objects.PauseImage,
-						Command: []string{objects.PauseCommand},
+						Image:   images.GetPauseImage(),
+						Command: []string{images.PauseCommand},
 						Resources: corev1.ResourceRequirements{
 							Requests: requiredRes,
 							Limits:   requiredRes,
@@ -890,7 +891,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				"test": "test-deployment",
 			}
 			nodeSelector := map[string]string{}
-			deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, deploymentName, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 			deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 
@@ -921,7 +922,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			nodeSelector := map[string]string{
 				serialconfig.MultiNUMALabel: "2",
 			}
-			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, objects.PauseImage, []string{objects.PauseCommand}, []string{})
+			ds := objects.NewTestDaemonset(podLabels, nodeSelector, fxt.Namespace.Name, dsName, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 			ds.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			ds.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 

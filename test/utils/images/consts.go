@@ -24,5 +24,6 @@ const (
 	NUMACellDevicePluginTestImageCI = "quay.io/openshift-kni/numacell-device-plugin:test-ci"
 
 	// the default image used for test pods
-	PauseImage = "quay.io/openshift-kni/pause:test-ci"
+	PauseImage   = "quay.io/openshift-kni/pause:test-ci"
+	PauseCommand = "/pause"
 )
