@@ -101,9 +101,10 @@ func ForPodDeleted(cli client.Client, podNamespace, podName string, timeout time
 	})
 }
 
-func ForPodListAllRunning(cli client.Client, pods []*corev1.Pod) []*corev1.Pod {
-	var failedLock sync.Mutex
+func ForPodListAllRunning(cli client.Client, pods []*corev1.Pod) ([]*corev1.Pod, []*corev1.Pod) {
+	var lock sync.Mutex
 	var failed []*corev1.Pod
+	var updated []*corev1.Pod
 
 	var wg sync.WaitGroup
 	for _, pod := range pods {
@@ -113,15 +114,18 @@ func ForPodListAllRunning(cli client.Client, pods []*corev1.Pod) []*corev1.Pod {
 
 			klog.Infof("waiting for pod %q to be ready", pod.Name)
 
-			_, err := ForPodPhase(cli, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod, err := ForPodPhase(cli, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
+
+			// TODO: channels would be nicer
+			lock.Lock()
 			if err != nil {
-				// TODO: channels would be nicer
-				failedLock.Lock()
-				failed = append(failed, pod)
-				failedLock.Unlock()
+				failed = append(failed, updatedPod)
+			} else {
+				updated = append(updated, updatedPod)
 			}
+			lock.Unlock()
 		}(pod)
 	}
 	wg.Wait()
-	return failed
+	return failed, updated
 }

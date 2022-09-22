@@ -19,6 +19,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -26,12 +27,14 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/klog/v2"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
+	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 
@@ -149,4 +152,79 @@ var _ = Describe("[serial][fundamentals][scheduler] numaresources fundamentals n
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 		})
 	})
+
+	Context("using the NUMA-aware scheduler with NRT data", func() {
+		It("[tier1][nonreg] should scheduler a burst of guaranteed pods", func() {
+			nrts := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
+			if len(nrts) < 1 {
+				Skip("Not enough nodes found with at least 2 NUMA zones")
+			}
+
+			nodesNames := e2enrt.AccumulateNames(nrts)
+			targetNodeName, ok := e2efixture.PopNodeName(nodesNames)
+			Expect(ok).To(BeTrue())
+
+			klog.Infof("selected target node name: %q", targetNodeName)
+
+			nrtInfo, err := e2enrt.FindFromList(nrts, targetNodeName)
+			Expect(err).ToNot(HaveOccurred())
+
+			// we still are in the serial suite, so we assume;
+			// - even number of CPUs per NUMA zone
+			// - unloaded node - so available == allocatable
+			// - identical NUMA zones
+			// - at most 1/4 of the node resources took by baseload (!!!)
+			// we use cpus as unit because it's the easiest thing to consider
+			resQty := e2enrt.GetMaxAllocatableResourceNumaLevel(*nrtInfo, corev1.ResourceCPU)
+			resVal, ok := resQty.AsInt64()
+			Expect(ok).To(BeTrue(), "cannot convert allocatable CPU resource as int")
+
+			cpusVal := (3 * resVal) / 2
+			numPods := int(cpusVal / 2) // unlikely we will need more than a billion pods (!!)
+
+			klog.Infof("creating %d pods consuming %d cpus each (found %d per NUMA zone)", numPods, cpusVal, resVal)
+
+			var testPods []*corev1.Pod
+			for idx := 0; idx < numPods; idx++ {
+				testPod := objects.NewTestPodPause(fxt.Namespace.Name, fmt.Sprintf("testpod-%d", idx))
+				testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
+				testPod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("64Mi"),
+				}
+
+				_, err := pinPodToNode(testPod, targetNodeName)
+				Expect(err).ToNot(HaveOccurred())
+
+				By(fmt.Sprintf("creating pod %s/%s", testPod.Namespace, testPod.Name))
+				err = fxt.Client.Create(context.TODO(), testPod)
+				Expect(err).ToNot(HaveOccurred())
+
+				testPods = append(testPods, testPod)
+			}
+
+			failedPods, updatedPods := wait.ForPodListAllRunning(fxt.Client, testPods)
+
+			for _, failedPod := range failedPods {
+				_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
+			}
+			Expect(failedPods).To(BeEmpty(), "pods failed to go running: %s", accumulatePodNamespacedNames(failedPods))
+
+			for _, updatedPod := range updatedPods {
+				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+			}
+		})
+
+		// TODO: burstable, best-effort, mixed
+	})
 })
+
+func accumulatePodNamespacedNames(pods []*corev1.Pod) string {
+	podNames := []string{}
+	for _, pod := range pods {
+		podNames = append(podNames, pod.Namespace+"/"+pod.Name)
+	}
+	return strings.Join(podNames, ",")
+}
