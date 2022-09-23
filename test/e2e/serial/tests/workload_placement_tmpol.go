@@ -1071,8 +1071,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			for _, nrt := range nrts {
 				for _, zone := range nrt.Zones {
 					avail := e2enrt.AvailableFromZone(zone)
-					if !isHugePageInAvailable(avail) {
-						Skip(fmt.Sprintf("no hugepages found under node: %q", nrt.Name))
+					if !isHugePageInAvailable(avail) && isRequestingHugepages(podRes) {
+						Skip(fmt.Sprintf("hugepages requested but not found under node: %q", nrt.Name))
 					}
 				}
 			}
@@ -1432,6 +1432,58 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
+		Entry("[test_id:54020][tier2][negative][tmscope:container][devices] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
+			"cannot align container: testcnt-1",
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"example.com/deviceB": resource.MustParse("2"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"example.com/deviceA": resource.MustParse("2"),
+						"example.com/deviceC": resource.MustParse("2"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+			},
+			// the free resources that should be left on the target node should not depend that there will be some baseload added upon padding the node,
+			// those free resources should match the pod requests in total. The reason behind that is that Noderesourcesfit plugin (the plugin that is
+			// responsible for accepting/rejecting compute nodes as candidates for placing the pod) actually accounts for the baseload, it compares the
+			// actual available resources on node with the pod requested resources, if the available resources can accommodate the pod resources then it
+			// will mark the node as a possible candidate, if not it will reject it.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"example.com/deviceA": resource.MustParse("1"),
+					"example.com/deviceC": resource.MustParse("2"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					"example.com/deviceA": resource.MustParse("1"),
+					"example.com/deviceB": resource.MustParse("2"),
+				},
+			},
+		),
 	)
 })
 
@@ -1584,6 +1636,21 @@ func makeInitTestContainers(pod *corev1.Pod, initCnt []corev1.ResourceList) *cor
 func isHugePageInAvailable(rl corev1.ResourceList) bool {
 	for name, quan := range rl {
 		if helper.IsHugePageResourceName(core.ResourceName(name)) && !quan.IsZero() {
+			return true
+		}
+	}
+	return false
+}
+
+func isRequestingHugepages(podRes podResourcesRequest) bool {
+	for _, appContainer := range podRes.appCnt {
+		if isHugePageInAvailable(appContainer) {
+			return true
+		}
+	}
+
+	for _, initContainer := range podRes.initCnt {
+		if isHugePageInAvailable(initContainer) {
 			return true
 		}
 	}
