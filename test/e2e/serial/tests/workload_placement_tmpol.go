@@ -905,15 +905,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
 					{
-						corev1.ResourceCPU:                            resource.MustParse("4"),
-						corev1.ResourceMemory:                         resource.MustParse("4Gi"),
-						corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("2"),
-						corev1.ResourceName(devices.GetDeviceCName()): resource.MustParse("1"),
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("2"),
+						corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("1"),
 					},
 					{
-						corev1.ResourceCPU:                            resource.MustParse("4"),
-						corev1.ResourceMemory:                         resource.MustParse("4Gi"),
-						corev1.ResourceName(devices.GetDeviceBName()): resource.MustParse("2"),
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
 					},
 				},
 			},
@@ -923,29 +923,29 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// and then the pod might land on the unsuitable node.
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:                            resource.MustParse("1"),
-					corev1.ResourceMemory:                         resource.MustParse("4Gi"),
-					corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("1"),
-					corev1.ResourceName(devices.GetDeviceCName()): resource.MustParse("1"),
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("1"),
 				},
 				{
-					corev1.ResourceCPU:                            resource.MustParse("7"),
-					corev1.ResourceMemory:                         resource.MustParse("4Gi"),
-					corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("1"),
-					corev1.ResourceName(devices.GetDeviceBName()): resource.MustParse("2"),
+					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
 				},
 			},
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:                            resource.MustParse("4"),
-					corev1.ResourceMemory:                         resource.MustParse("4Gi"),
-					corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("2"),
-					corev1.ResourceName(devices.GetDeviceCName()): resource.MustParse("1"),
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("2"),
+					corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("1"),
 				},
 				{
-					corev1.ResourceCPU:                            resource.MustParse("4"),
-					corev1.ResourceMemory:                         resource.MustParse("4Gi"),
-					corev1.ResourceName(devices.GetDeviceBName()): resource.MustParse("2"),
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
 				},
 			},
 		),
@@ -1145,7 +1145,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			for _, nrt := range nrts {
 				for _, zone := range nrt.Zones {
 					avail := e2enrt.AvailableFromZone(zone)
-					if !isHugePageInAvailable(avail) && isRequestingHugepages(podRes) {
+					if !isHugePageInAvailable(avail) && isHugepageNeeded(podRes) {
 						Skip(fmt.Sprintf("hugepages requested but not found under node: %q", nrt.Name))
 					}
 				}
@@ -1512,15 +1512,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
 					{
-						corev1.ResourceCPU:                            resource.MustParse("4"),
-						corev1.ResourceMemory:                         resource.MustParse("4Gi"),
-						corev1.ResourceName(devices.GetDeviceBName()): resource.MustParse("2"),
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
 					},
 					{
-						corev1.ResourceCPU:                            resource.MustParse("4"),
-						corev1.ResourceMemory:                         resource.MustParse("4Gi"),
-						corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("2"),
-						corev1.ResourceName(devices.GetDeviceCName()): resource.MustParse("2"),
+						corev1.ResourceCPU:    resource.MustParse("4"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("2"),
+						corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("2"),
 					},
 				},
 			},
@@ -1545,16 +1545,16 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// will mark the node as a possible candidate, if not it will reject it.
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:                            resource.MustParse("4"),
-					corev1.ResourceMemory:                         resource.MustParse("4Gi"),
-					corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("1"),
-					corev1.ResourceName(devices.GetDeviceCName()): resource.MustParse("2"),
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("2"),
 				},
 				{
-					corev1.ResourceCPU:                            resource.MustParse("4"),
-					corev1.ResourceMemory:                         resource.MustParse("4Gi"),
-					corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("1"),
-					corev1.ResourceName(devices.GetDeviceBName()): resource.MustParse("2"),
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
 				},
 			},
 		),
@@ -1760,7 +1760,7 @@ func isHugePageInAvailable(rl corev1.ResourceList) bool {
 	return false
 }
 
-func isRequestingHugepages(podRes podResourcesRequest) bool {
+func isHugepageNeeded(podRes podResourcesRequest) bool {
 	for _, appContainer := range podRes.appCnt {
 		if isHugePageInAvailable(appContainer) {
 			return true
