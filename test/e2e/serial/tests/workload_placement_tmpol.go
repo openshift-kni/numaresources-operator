@@ -905,15 +905,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
 					{
-						corev1.ResourceCPU:    resource.MustParse("4"),
-						corev1.ResourceMemory: resource.MustParse("4Gi"),
-						"example.com/deviceA": resource.MustParse("2"),
-						"example.com/deviceC": resource.MustParse("1"),
+						corev1.ResourceCPU:                            resource.MustParse("4"),
+						corev1.ResourceMemory:                         resource.MustParse("4Gi"),
+						corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("2"),
+						corev1.ResourceName(devices.GetDeviceCName()): resource.MustParse("1"),
 					},
 					{
-						corev1.ResourceCPU:    resource.MustParse("4"),
-						corev1.ResourceMemory: resource.MustParse("4Gi"),
-						"example.com/deviceB": resource.MustParse("2"),
+						corev1.ResourceCPU:                            resource.MustParse("4"),
+						corev1.ResourceMemory:                         resource.MustParse("4Gi"),
+						corev1.ResourceName(devices.GetDeviceBName()): resource.MustParse("2"),
 					},
 				},
 			},
@@ -923,29 +923,29 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// and then the pod might land on the unsuitable node.
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    resource.MustParse("1"),
-					corev1.ResourceMemory: resource.MustParse("4Gi"),
-					"example.com/deviceA": resource.MustParse("1"),
-					"example.com/deviceC": resource.MustParse("1"),
+					corev1.ResourceCPU:                            resource.MustParse("1"),
+					corev1.ResourceMemory:                         resource.MustParse("4Gi"),
+					corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("1"),
+					corev1.ResourceName(devices.GetDeviceCName()): resource.MustParse("1"),
 				},
 				{
-					corev1.ResourceCPU:    resource.MustParse("7"),
-					corev1.ResourceMemory: resource.MustParse("4Gi"),
-					"example.com/deviceA": resource.MustParse("1"),
-					"example.com/deviceB": resource.MustParse("2"),
+					corev1.ResourceCPU:                            resource.MustParse("7"),
+					corev1.ResourceMemory:                         resource.MustParse("4Gi"),
+					corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("1"),
+					corev1.ResourceName(devices.GetDeviceBName()): resource.MustParse("2"),
 				},
 			},
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    resource.MustParse("4"),
-					corev1.ResourceMemory: resource.MustParse("4Gi"),
-					"example.com/deviceA": resource.MustParse("2"),
-					"example.com/deviceC": resource.MustParse("1"),
+					corev1.ResourceCPU:                            resource.MustParse("4"),
+					corev1.ResourceMemory:                         resource.MustParse("4Gi"),
+					corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("2"),
+					corev1.ResourceName(devices.GetDeviceCName()): resource.MustParse("1"),
 				},
 				{
-					corev1.ResourceCPU:    resource.MustParse("4"),
-					corev1.ResourceMemory: resource.MustParse("4Gi"),
-					"example.com/deviceB": resource.MustParse("2"),
+					corev1.ResourceCPU:                            resource.MustParse("4"),
+					corev1.ResourceMemory:                         resource.MustParse("4Gi"),
+					corev1.ResourceName(devices.GetDeviceBName()): resource.MustParse("2"),
 				},
 			},
 		),
@@ -1512,15 +1512,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
 					{
-						corev1.ResourceCPU:    resource.MustParse("4"),
-						corev1.ResourceMemory: resource.MustParse("4Gi"),
-						"example.com/deviceB": resource.MustParse("2"),
+						corev1.ResourceCPU:                            resource.MustParse("4"),
+						corev1.ResourceMemory:                         resource.MustParse("4Gi"),
+						corev1.ResourceName(devices.GetDeviceBName()): resource.MustParse("2"),
 					},
 					{
-						corev1.ResourceCPU:    resource.MustParse("4"),
-						corev1.ResourceMemory: resource.MustParse("4Gi"),
-						"example.com/deviceA": resource.MustParse("2"),
-						"example.com/deviceC": resource.MustParse("2"),
+						corev1.ResourceCPU:                            resource.MustParse("4"),
+						corev1.ResourceMemory:                         resource.MustParse("4Gi"),
+						corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("2"),
+						corev1.ResourceName(devices.GetDeviceCName()): resource.MustParse("2"),
 					},
 				},
 			},
@@ -1545,16 +1545,16 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// will mark the node as a possible candidate, if not it will reject it.
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    resource.MustParse("4"),
-					corev1.ResourceMemory: resource.MustParse("4Gi"),
-					"example.com/deviceA": resource.MustParse("1"),
-					"example.com/deviceC": resource.MustParse("2"),
+					corev1.ResourceCPU:                            resource.MustParse("4"),
+					corev1.ResourceMemory:                         resource.MustParse("4Gi"),
+					corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("1"),
+					corev1.ResourceName(devices.GetDeviceCName()): resource.MustParse("2"),
 				},
 				{
-					corev1.ResourceCPU:    resource.MustParse("4"),
-					corev1.ResourceMemory: resource.MustParse("4Gi"),
-					"example.com/deviceA": resource.MustParse("1"),
-					"example.com/deviceB": resource.MustParse("2"),
+					corev1.ResourceCPU:                            resource.MustParse("4"),
+					corev1.ResourceMemory:                         resource.MustParse("4Gi"),
+					corev1.ResourceName(devices.GetDeviceAName()): resource.MustParse("1"),
+					corev1.ResourceName(devices.GetDeviceBName()): resource.MustParse("2"),
 				},
 			},
 		),
