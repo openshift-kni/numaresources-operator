@@ -46,6 +46,7 @@ type Fixture struct {
 }
 
 const (
+	defaultTeardownTime = 180 * time.Second
 	defaultCooldownTime = 30 * time.Second
 )
 
@@ -140,9 +141,12 @@ func teardownNamespace(cli client.Client, ns corev1.Namespace) error {
 		return nil
 	}
 
+	teardownTimeout := getTeardownTime()
+	klog.Warningf("tearing down up to %v", teardownTimeout)
+
 	iterations := 0
 	updatedNs := corev1.Namespace{}
-	return wait.PollImmediate(1*time.Second, 120*time.Second, func() (bool, error) {
+	return wait.PollImmediate(1*time.Second, teardownTimeout, func() (bool, error) {
 		iterations++
 		err := cli.Get(context.TODO(), client.ObjectKeyFromObject(&ns), &updatedNs)
 		if err != nil {
@@ -158,6 +162,10 @@ func teardownNamespace(cli client.Client, ns corev1.Namespace) error {
 	})
 }
 
+func RandomizeName(baseName string) string {
+	return fmt.Sprintf("%s-%s", baseName, strconv.Itoa(rand.Intn(10000)))
+}
+
 func getCooldownTime() time.Duration {
 	raw, ok := os.LookupEnv("E2E_NROP_TEST_COOLDOWN")
 	if !ok {
@@ -171,6 +179,15 @@ func getCooldownTime() time.Duration {
 	return val
 }
 
-func RandomizeName(baseName string) string {
-	return fmt.Sprintf("%s-%s", baseName, strconv.Itoa(rand.Intn(10000)))
+func getTeardownTime() time.Duration {
+	raw, ok := os.LookupEnv("E2E_NROP_TEST_TEARDOWN")
+	if !ok {
+		return defaultTeardownTime
+	}
+	val, err := time.ParseDuration(raw)
+	if err != nil {
+		klog.Errorf("cannot parse the provided test teardown time (fallback to default: %v): %v", defaultTeardownTime, err)
+		return defaultTeardownTime
+	}
+	return val
 }

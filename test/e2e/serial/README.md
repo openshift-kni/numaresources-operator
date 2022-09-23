@@ -34,5 +34,7 @@ they found it before they run.
   failed unexpectedly on standard output, alongside (not replacing) the logging of the said events.
 - `E2E_NROP_TARGET_NODE` (accepts string, e.g. `node-0.my-cluster.io`) instructs the suite to always pick the
   node matching the given name when a random node is needed.
-- `E2E_NROP_TEST_COOLDOWN` (accepts string expressing time unit, e.g. `30s`) instructs the suite to wait for
-  the specified amount of time after each spec, to give tome to the cluster to settle up.
+- `E2E_NROP_TEST_COOLDOWN` (accepts string expressing time unit, e.g. `30s`) instructs the suite to wait
+  for the specified amount of time after each spec, to give time to the cluster to settle up.
+- `E2E_NROP_TEST_TEARDOWN` (accepts string expressing time unit, e.g. `30s`) instructs the suite to wait
+  *up* to the specified amount of time while tearing down the resources needed by each spec.
