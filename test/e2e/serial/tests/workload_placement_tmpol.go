@@ -1055,6 +1055,80 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
+		Entry("[test_id:54018][tmscope:cnt][devices] should make a pod with two gu cnt land on a node with enough resources with devices on a specific NUMA zone,  containers should be spread on a different zone",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("6"),
+						corev1.ResourceMemory: resource.MustParse("6Gi"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("3"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("12"),
+						corev1.ResourceMemory: resource.MustParse("8Gi"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("4"),
+					},
+				},
+			},
+			// make sure the sum is equal to the sum of the requirement of the test pod,
+			// so the *node* total free resources are equal between the target node and
+			// the unsuitable nodes
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("12"),
+					corev1.ResourceMemory: resource.MustParse("12Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("8"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("6Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("3"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("12"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("4"),
+				},
+			},
+		),
+		Entry("[test_id:54016][tmscope:pod][tier1][devices] should make a pod with one gu cnt requesting devices land on a node with enough resources on a specific NUMA zone",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodePodLevel],
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("6"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("5"),
+					},
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("3"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("3"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("5"),
+				},
+			},
+		),
 	)
 	DescribeTable("[placement][negative] cluster with one worker nodes suitable",
 		func(policyFuncs tmPolicyFuncs, errMsg string, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
@@ -1432,7 +1506,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[test_id:54020][tier2][negative][tmscope:container][devices] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+		Entry("[test_id:54020][tier2][negative][tmscope:container][devices] pod with two gu cnt requesting multiple device types keep on pending because cannot align the second container to a single numa node",
 			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
 			"cannot align container: testcnt-1",
 			podResourcesRequest{
@@ -1481,6 +1555,50 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					"example.com/deviceA": resource.MustParse("1"),
 					"example.com/deviceB": resource.MustParse("2"),
+				},
+			},
+		),
+		Entry("[test_id:54019][tier1][negative][tmscope:container][devices] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
+			"cannot align container: testcnt-1",
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("5"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("3"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("5"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("2"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("5"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("5"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("4"),
 				},
 			},
 		),
