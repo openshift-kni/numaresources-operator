@@ -595,26 +595,27 @@ func validateMachineConfigLabels(mc client.Object, trees []machineconfigpools.No
 	return nil
 }
 
-func daemonsetUpdater(gdm *rtestate.GeneratedDesiredManifest) error {
+func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) error {
 	// on kubernetes we can just mount the kubeletconfig (no SCC/Selinux),
 	// so handling the kubeletconfig configmap is not needed at all.
 	// We cannot do this at GetManifests time because we need to mount
 	// a specific configmap for each daemonset, whose name we know only
 	// when we instantiate the daemonset from the MCP.
 	if gdm.ClusterPlatform != platform.OpenShift {
-		klog.V(5).InfoS("DaemonSet update: unsupported platform", "platform", gdm.ClusterPlatform)
+		klog.V(5).InfoS("DaemonSet update: unsupported platform", "mcp", mcpName, "platform", gdm.ClusterPlatform)
 		// nothing to do!
 		return nil
 	}
 	err := rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
 	if err != nil {
 		// intentionally info because we want to keep going
-		klog.V(5).InfoS("DaemonSet update: cannot update config", "daemonset", gdm.DaemonSet.Name, "error", err)
+		klog.V(5).InfoS("DaemonSet update: cannot update config", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
 		return err
 	}
 
-	if !isPodFingerprintEnabled(gdm.NodeGroup) {
-		klog.V(5).InfoS("DaemonSet update: pod fingerprinting not enabled", "daemonset", gdm.DaemonSet.Name)
+	pfpEnabled := isPodFingerprintEnabled(gdm.NodeGroup)
+	klog.V(2).InfoS("DaemonSet update: pod fingerprinting status", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "enabled", pfpEnabled)
+	if !pfpEnabled {
 		return nil
 	}
 	return rteupdate.DaemonSetArgs(gdm.DaemonSet)
@@ -627,7 +628,8 @@ func isPodFingerprintEnabled(ng *nropv1alpha1.NodeGroup) bool {
 		return false
 	}
 	if ng.DisablePodsFingerprinting == nil {
-		return false
+		// not specified -> use defaults -> enabled
+		return true
 	}
 	if *ng.DisablePodsFingerprinting {
 		return false
