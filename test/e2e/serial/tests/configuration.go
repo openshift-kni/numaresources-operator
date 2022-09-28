@@ -55,14 +55,12 @@ import (
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
 var _ = Describe("[serial][disruptive][slow] numaresources configuration management", func() {
 	var fxt *e2efixture.Fixture
-	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
 	var nrts []nrtv1alpha1.NodeResourceTopology
 
@@ -73,9 +71,6 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 		var err error
 		fxt, err = e2efixture.Setup("e2e-test-configuration")
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
-
-		padder, err = e2epadder.New(fxt.Client, fxt.Namespace.Name)
-		Expect(err).ToNot(HaveOccurred())
 
 		err = fxt.Client.List(context.TODO(), &nrtList)
 		Expect(err).ToNot(HaveOccurred())
@@ -96,9 +91,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 	})
 
 	AfterEach(func() {
-		err := padder.Clean()
-		Expect(err).NotTo(HaveOccurred())
-		err = e2efixture.Teardown(fxt)
+		err := e2efixture.Teardown(fxt)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -107,42 +100,12 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 	// and will we want to start lean and mean.
 
 	Context("cluster has at least one suitable node", func() {
-		timeout := 5 * time.Minute
-		// will be called at the end of the test to make sure we're not polluting the cluster
-		var cleanFuncs []func() error
+		timeout := 3 * time.Minute
 
-		BeforeEach(func() {
-			numOfNodeToBePadded := len(nrts) - 1
-
-			rl := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("8G"),
-			}
-			By("padding the nodes before test start")
-			err := padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{})
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			By("unpadding the nodes after test finish")
-			err := padder.Clean()
-			Expect(err).ToNot(HaveOccurred())
-
-			for _, f := range cleanFuncs {
-				err := f()
-				Expect(err).ToNot(HaveOccurred())
-			}
-		})
-
-		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator and NUMAResourcesScheduler CR", func() {
-
-			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
-			initialNroSchedObj := nroSchedObj.DeepCopy()
-
+		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator CR", func() {
+			By("Get NUMAResourcesOperator CR from the cluster")
 			nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
-			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: objects.NROName()}, nroOperObj)
+			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: objects.NROName()}, nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", objects.NROName())
 			initialNroOperObj := nroOperObj.DeepCopy()
 
@@ -152,30 +115,52 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			targetIdx, ok := e2efixture.PickNodeIndex(workers)
 			Expect(ok).To(BeTrue())
 			targetedNode := workers[targetIdx]
+			klog.InfoS("selected target node is ", targetedNode.Name)
 
+			By(fmt.Sprintf("Label the target node with %q and unlabel it with %q", nodes.GetLabelRoleMCPTest(), nodes.GetLabelRoleWorker()))
 			unlabelFunc, err := labelNode(fxt.Client, nodes.GetLabelRoleMCPTest(), targetedNode.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			labelFunc, err := unlabelNode(fxt.Client, nodes.GetLabelRoleWorker(), "", targetedNode.Name)
 			Expect(err).ToNot(HaveOccurred())
 
-			defer func() {
-				By(fmt.Sprintf("unlabeling node: %q", targetedNode.Name))
-				err = unlabelFunc()
-				Expect(err).ToNot(HaveOccurred())
+			mcp := objects.TestMCP()
+			By(fmt.Sprintf("creating new MCP: %q", mcp.Name))
+			// we must have this label in order to match other machine configs that are necessary for proper functionality
+			mcp.Labels = map[string]string{fmt.Sprintf("pools.operator.machineconfiguration.openshift.io/%s", mcp.Name): "", "cnf-worker-tuning": "enabled"}
+			//to match the kubeletconfig label
+			mcp.Spec.MachineConfigSelector = &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "machineconfiguration.openshift.io/role",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{nodes.RoleWorker, nodes.RoleMCPTest},
+					},
+				},
+			}
+			mcp.Spec.NodeSelector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{nodes.GetLabelRoleMCPTest(): ""},
+			}
 
-				By(fmt.Sprintf("labeling node: %q", targetedNode.Name))
+			err = fxt.Client.Create(context.TODO(), mcp)
+			Expect(err).ToNot(HaveOccurred())
+
+			defer func() {
+				/*
+					because defer functions are executed as in LIFO, we try to avoid deviding the cleanup into multiple defers,
+					especially because the modifications are dependent on each other do it in highly important to reverse them in the correct order.
+					By arriving to this state, we know for sure that the test mcp was created, and that the labeling was already applied to the nodes.
+					In order to avoid a case where MCO cannot handle like deleting mcp before unlabeling the nodes first,
+					we unlabel the nodes first then we delete the test mcp.
+				*/
+				By(fmt.Sprintf("Restore initial labels of node %q", targetedNode.Name))
+
+				By(fmt.Sprintf("labeling node: %q with %q", targetedNode.Name, nodes.GetLabelRoleWorker()))
 				err = labelFunc()
 				Expect(err).ToNot(HaveOccurred())
 
-				By("reverting the changes under the NUMAResourcesScheduler object")
-				// we need that for the current ResourceVersion
-				nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroSchedObj), nroSchedObj)
-				Expect(err).ToNot(HaveOccurred())
-
-				nroSchedObj.Spec = initialNroSchedObj.Spec
-				err = fxt.Client.Update(context.TODO(), nroSchedObj)
+				By(fmt.Sprintf("unlabeling node: %q with %q", targetedNode.Name, nodes.GetLabelRoleMCPTest()))
+				err = unlabelFunc()
 				Expect(err).ToNot(HaveOccurred())
 
 				By("reverting the changes under the NUMAResourcesOperator object")
@@ -203,38 +188,17 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				}
 				wg.Wait()
 
-				testMcp := objects.TestMCP()
-				By(fmt.Sprintf("deleting mcp: %q", testMcp.Name))
-				err = fxt.Client.Delete(context.TODO(), testMcp)
+				By(fmt.Sprintf("deleting mcp: %q", mcp.Name))
+				err = fxt.Client.Delete(context.TODO(), mcp)
 				Expect(err).ToNot(HaveOccurred())
 
-				err = wait.ForMachineConfigPoolDeleted(fxt.Client, testMcp, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
+				err = wait.ForMachineConfigPoolDeleted(fxt.Client, mcp, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
 				Expect(err).ToNot(HaveOccurred())
-			}() // end of defer
+			}()
 
-			mcp := objects.TestMCP()
-			By(fmt.Sprintf("creating new MCP: %q", mcp.Name))
-			// we must have this label in order to match other machine configs that are necessary for proper functionality
-			mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": nodes.RoleMCPTest}
-			mcp.Spec.MachineConfigSelector = &metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      "machineconfiguration.openshift.io/role",
-						Operator: metav1.LabelSelectorOpIn,
-						Values:   []string{nodes.RoleWorker, nodes.RoleMCPTest},
-					},
-				},
-			}
-			mcp.Spec.NodeSelector = &metav1.LabelSelector{
-				MatchLabels: map[string]string{nodes.GetLabelRoleMCPTest(): ""},
-			}
-
-			err = fxt.Client.Create(context.TODO(), mcp)
-			Expect(err).ToNot(HaveOccurred())
-
-			By(fmt.Sprintf("modifing the NUMAResourcesOperator nodeGroups filed to match new mcp: %q labels %q", mcp.Name, mcp.Labels))
+			By(fmt.Sprintf("modifying the NUMAResourcesOperator nodeGroups field to match new mcp: %q labels %q", mcp.Name, mcp.Labels))
 			for i := range nroOperObj.Spec.NodeGroups {
-				nroOperObj.Spec.NodeGroups[i].MachineConfigPoolSelector.MatchLabels = mcp.Labels
+				nroOperObj.Spec.NodeGroups[i].MachineConfigPoolSelector.MatchLabels = map[string]string{fmt.Sprintf("pools.operator.machineconfiguration.openshift.io/%s", mcp.Name): ""}
 			}
 
 			err = fxt.Client.Update(context.TODO(), nroOperObj)
@@ -256,6 +220,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			}
 			wg.Wait()
 
+			By("verify that the NRO's deamonset is recreated with the new mcp labels")
 			Eventually(func() (bool, error) {
 				dss, err := objects.GetDaemonSetsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
 				Expect(err).ToNot(HaveOccurred())
@@ -271,10 +236,12 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 						return false, nil
 					}
 				}
+				klog.Info("all daemonsets have a matching node selector label")
 				return true, nil
-			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(BeTrue())
+			}).WithTimeout(timeout).WithPolling(30 * time.Second).Should(BeTrue())
 
-			By(fmt.Sprintf("modifing the NUMAResourcesOperator ExporterImage filed to %q", serialconfig.NropTestCIImage))
+			//TODO: replace the used exporter test image with one that is passed via env var to support pulling it in disconnected cluster
+			By(fmt.Sprintf("modifying the NUMAResourcesOperator ExporterImage field to %q", serialconfig.NropTestCIImage))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -300,10 +267,11 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 						return false, nil
 					}
 				}
+				klog.Info("RTE image is updated in all the containers")
 				return true, nil
-			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with image %q", serialconfig.NropTestCIImage)
+			}).WithTimeout(timeout).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with image %q", serialconfig.NropTestCIImage)
 
-			By(fmt.Sprintf("modifing the NUMAResourcesOperator LogLevel filed to %q", operatorv1.Trace))
+			By(fmt.Sprintf("modifying the NUMAResourcesOperator LogLevel field to %q", operatorv1.Trace))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -331,20 +299,41 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					}
 
 					if !match {
-						klog.Warningf("LogLevel %s doesn't match the existing --v flag in container: %q managed by DaemonSet: %q", nroOperObj.Spec.LogLevel, cnt.Name, ds.Name)
+						klog.Warningf("LogLevel %s still doesn't match the existing --v flag in container: %q managed by DaemonSet: %q", nroOperObj.Spec.LogLevel, cnt.Name, ds.Name)
 						return false, nil
 					}
 				}
+				klog.Infof("NROP object LogLevel %s matched the existing --v flag all the daemonsets owned by nrop object", nroOperObj.Spec.LogLevel)
 				return true, nil
-			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with LogLevel %q", operatorv1.Trace)
+			}).WithTimeout(timeout).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with LogLevel %q", operatorv1.Trace)
 
-			By(fmt.Sprintf("modifing the NUMAResourcesScheduler SchedulerName Filed to %q", serialconfig.SchedulerTestName))
+		})
+
+		It("[test_id:54916][tier2] should be able to modify the configurable values under the NUMAResourcesScheduler CR", func() {
+
+			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
+			initialNroSchedObj := nroSchedObj.DeepCopy()
+
+			By(fmt.Sprintf("modifying the NUMAResourcesScheduler SchedulerName field to %q", serialconfig.SchedulerTestName))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			nroSchedObj.Spec.SchedulerName = serialconfig.SchedulerTestName
 			err = fxt.Client.Update(context.TODO(), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
+
+			defer func() {
+				By("restore initial nro scheduler")
+				currentSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+				err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, currentSchedObj)
+				Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
+
+				currentSchedObj.Spec = initialNroSchedObj.Spec
+				err = fxt.Client.Update(context.TODO(), currentSchedObj)
+				Expect(err).ToNot(HaveOccurred())
+			}()
 
 			By("schedule pod using the new scheduler name")
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomizeName("testpod"))
@@ -353,7 +342,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, 5*time.Minute)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -370,7 +359,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", objects.NROName())
 
 			initialNrtList := nrtv1alpha1.NodeResourceTopologyList{}
-			initialNrtList, err = e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
+			initialNrtList, err = e2enrt.GetUpdated(fxt.Client, initialNrtList, time.Minute)
 			Expect(err).ToNot(HaveOccurred(), "cannot get any NodeResourceTopology object from the cluster")
 
 			mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), fxt.Client, nroOperObj.Spec.NodeGroups)
@@ -390,6 +379,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					if kcMcpSel.Matches(labels.Set(mcp.Labels)) {
 						// pick the first one you find
 						targetedKC = kc
+						break
 					}
 				}
 			}
@@ -458,23 +448,16 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			}).WithTimeout(timeout).WithPolling(time.Second * 30).Should(BeTrue())
 
 			By("schedule another workload requesting resources")
-			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
-			schedulerName := nroSchedObj.Spec.SchedulerName
-
-			nrtPreCreatePodList, err := e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
+			nrtPreCreatePodList, err := e2enrt.GetUpdated(fxt.Client, initialNrtList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomizeName("testpod"))
-			testPod.Spec.SchedulerName = schedulerName
+			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			rl := corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("1"),
 				corev1.ResourceMemory: resource.MustParse("100M"),
 			}
 			testPod.Spec.Containers[0].Resources.Limits = rl
-			testPod.Spec.Containers[0].Resources.Requests = rl
-
 			err = fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -484,17 +467,17 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			}
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, testPod.Namespace, testPod.Name, schedulerName)
+			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, testPod.Namespace, testPod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", testPod.Namespace, testPod.Name, schedulerName)
+			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", testPod.Namespace, testPod.Name, serialconfig.Config.SchedulerName)
 
 			rl = e2ereslist.FromGuaranteedPod(*testPod)
 
 			nrtPreCreate, err := e2enrt.FindFromList(nrtPreCreatePodList.Items, testPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			nrtPostCreatePodList, err := e2enrt.GetUpdated(fxt.Client, nrtPreCreatePodList, timeout)
+			nrtPostCreatePodList, err := e2enrt.GetUpdated(fxt.Client, nrtPreCreatePodList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreatePodList.Items, testPod.Spec.NodeName)
