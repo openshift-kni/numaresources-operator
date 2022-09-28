@@ -590,7 +590,16 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceMemory: resource.MustParse("20Gi"),
 				},
 			},
-			[]corev1.ResourceList{},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("14"),
+					corev1.ResourceMemory: resource.MustParse("16Gi"),
+				},
+			},
 		),
 		Entry("[test_id:50183][tmscope:cnt][hugepages] should make a pod with two gu cnt land on a node with enough resources with hugepages on a specific NUMA zone, each cnt on a different zone",
 			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
@@ -652,7 +661,17 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("144Mi"),
 				},
 			},
-			[]corev1.ResourceList{},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+				{
+					corev1.ResourceCPU:                   resource.MustParse("14"),
+					corev1.ResourceMemory:                resource.MustParse("16Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("160Mi"),
+				},
+			},
 		),
 		Entry("[tier1][testtype4][tmscope:container] should make a pod with three gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
@@ -1103,7 +1122,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
 					{
-						corev1.ResourceCPU:    resource.MustParse("6"),
+						corev1.ResourceCPU:    resource.MustParse("8"),
 						corev1.ResourceMemory: resource.MustParse("4Gi"),
 						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("5"),
 					},
@@ -1123,7 +1142,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("5"),
 				},
@@ -1605,62 +1628,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	)
 })
 
-func setupPaddingPodLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod {
-	baseload, err := nodes.GetLoad(fxt.K8sClient, padInfo.targetNodeName)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", padInfo.targetNodeName)
-	By(fmt.Sprintf("computed base load: %s", baseload))
-
-	By(fmt.Sprintf("preparing target node %q to fit the test case", padInfo.targetNodeName))
-	// first, let's make sure that ONLY the required res can fit in either zone on the target node
-	nrtInfo, err := e2enrt.FindFromList(nrtList.Items, padInfo.targetNodeName)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing NRT info for %q", padInfo.targetNodeName)
-
-	// if we get this far we can now depend on the fact that len(nrt.Zones) == len(pod.Spec.Containers) == 2
-
-	paddingPods := []*corev1.Pod{}
-
-	// as low as you can get, that's why it's hardcoded
-	targetUnsuitableRes := corev1.ResourceList{
-		corev1.ResourceCPU:    resource.MustParse("2"),
-		corev1.ResourceMemory: resource.MustParse("2Gi"),
-	}
-
-	var zone nrtv1alpha1.Zone
-	// fix target node
-	zone = nrtInfo.Zones[0]
-	By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(targetUnsuitableRes)))
-	padPod, err := makePaddingPod(fxt.Namespace.Name, "target", zone, targetUnsuitableRes)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-
-	padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-
-	err = fxt.Client.Create(context.TODO(), padPod)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-	paddingPods = append(paddingPods, padPod)
-
-	podTotRes := e2ereslist.FromGuaranteedPod(*padInfo.pod)
-	By(fmt.Sprintf("testpod resource requests (vanilla): %s", e2ereslist.ToString(podTotRes)))
-	baseload.Apply(podTotRes)
-	By(fmt.Sprintf("testpod resource requests (adjusted): %s", e2ereslist.ToString(podTotRes)))
-
-	zone = nrtInfo.Zones[1]
-	By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(podTotRes)))
-	padPod, err = makePaddingPod(fxt.Namespace.Name, "target", zone, podTotRes)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-
-	padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-
-	err = fxt.Client.Create(context.TODO(), padPod)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-	paddingPods = append(paddingPods, padPod)
-
-	paddingPodsUnsuitable := setupPaddingForUnsuitableNodes(2, fxt, nrtList, padInfo)
-	return append(paddingPods, paddingPodsUnsuitable...)
-}
-
-func setupPaddingContainerLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod {
+func setupPadding(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod {
 	baseload, err := nodes.GetLoad(fxt.K8sClient, padInfo.targetNodeName)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", padInfo.targetNodeName)
 	By(fmt.Sprintf("computed base load: %s", baseload))
@@ -1778,7 +1746,7 @@ func isHugepageNeeded(podRes podResourcesRequest) bool {
 func newPodScopeTMPolicyFuncs() tmPolicyFuncs {
 	return tmPolicyFuncs{
 		name:                    func() nrtv1alpha1.TopologyManagerPolicy { return nrtv1alpha1.SingleNUMANodePodLevel },
-		setupPadding:            setupPaddingPodLevel,
+		setupPadding:            setupPadding,
 		checkConsumedRes:        e2enrt.CheckZoneConsumedResourcesAtLeast,
 		filterMatchingResources: e2enrt.FilterAnyZoneMatchingResources,
 	}
@@ -1787,7 +1755,7 @@ func newPodScopeTMPolicyFuncs() tmPolicyFuncs {
 func newContainerScopeTMPolicyFuncs() tmPolicyFuncs {
 	return tmPolicyFuncs{
 		name:                    func() nrtv1alpha1.TopologyManagerPolicy { return nrtv1alpha1.SingleNUMANodeContainerLevel },
-		setupPadding:            setupPaddingContainerLevel,
+		setupPadding:            setupPadding,
 		checkConsumedRes:        e2enrt.CheckNodeConsumedResourcesAtLeast,
 		filterMatchingResources: e2enrt.FilterAnyNodeMatchingResources,
 	}
