@@ -907,13 +907,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					{
 						corev1.ResourceCPU:    resource.MustParse("4"),
 						corev1.ResourceMemory: resource.MustParse("4Gi"),
-						"example.com/deviceA": resource.MustParse("2"),
-						"example.com/deviceC": resource.MustParse("1"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("2"),
+						corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("1"),
 					},
 					{
 						corev1.ResourceCPU:    resource.MustParse("4"),
 						corev1.ResourceMemory: resource.MustParse("4Gi"),
-						"example.com/deviceB": resource.MustParse("2"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
 					},
 				},
 			},
@@ -925,27 +925,27 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				{
 					corev1.ResourceCPU:    resource.MustParse("1"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
-					"example.com/deviceA": resource.MustParse("1"),
-					"example.com/deviceC": resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("1"),
 				},
 				{
 					corev1.ResourceCPU:    resource.MustParse("7"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
-					"example.com/deviceA": resource.MustParse("1"),
-					"example.com/deviceB": resource.MustParse("2"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
 				},
 			},
 			[]corev1.ResourceList{
 				{
 					corev1.ResourceCPU:    resource.MustParse("4"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
-					"example.com/deviceA": resource.MustParse("2"),
-					"example.com/deviceC": resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("2"),
+					corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("1"),
 				},
 				{
 					corev1.ResourceCPU:    resource.MustParse("4"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
-					"example.com/deviceB": resource.MustParse("2"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
 				},
 			},
 		),
@@ -1145,7 +1145,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			for _, nrt := range nrts {
 				for _, zone := range nrt.Zones {
 					avail := e2enrt.AvailableFromZone(zone)
-					if !isHugePageInAvailable(avail) && isRequestingHugepages(podRes) {
+					if !isHugePageInAvailable(avail) && isHugepageNeeded(podRes) {
 						Skip(fmt.Sprintf("hugepages requested but not found under node: %q", nrt.Name))
 					}
 				}
@@ -1514,13 +1514,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					{
 						corev1.ResourceCPU:    resource.MustParse("4"),
 						corev1.ResourceMemory: resource.MustParse("4Gi"),
-						"example.com/deviceB": resource.MustParse("2"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
 					},
 					{
 						corev1.ResourceCPU:    resource.MustParse("4"),
 						corev1.ResourceMemory: resource.MustParse("4Gi"),
-						"example.com/deviceA": resource.MustParse("2"),
-						"example.com/deviceC": resource.MustParse("2"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("2"),
+						corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("2"),
 					},
 				},
 			},
@@ -1547,14 +1547,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				{
 					corev1.ResourceCPU:    resource.MustParse("4"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
-					"example.com/deviceA": resource.MustParse("1"),
-					"example.com/deviceC": resource.MustParse("2"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("2"),
 				},
 				{
 					corev1.ResourceCPU:    resource.MustParse("4"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
-					"example.com/deviceA": resource.MustParse("1"),
-					"example.com/deviceB": resource.MustParse("2"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
 				},
 			},
 		),
@@ -1760,7 +1760,7 @@ func isHugePageInAvailable(rl corev1.ResourceList) bool {
 	return false
 }
 
-func isRequestingHugepages(podRes podResourcesRequest) bool {
+func isHugepageNeeded(podRes podResourcesRequest) bool {
 	for _, appContainer := range podRes.appCnt {
 		if isHugePageInAvailable(appContainer) {
 			return true
