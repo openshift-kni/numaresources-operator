@@ -1625,6 +1625,50 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
+		Entry("[test_id:54017][tier1][negative][tmscope:pod][devices] pod with two gu cnt keep on pending because cannot align the both containers on single numa",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodePodLevel],
+			"cannot align pod",
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("8"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("3"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("8"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("3Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("3"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+				},
+			},
+		),
 	)
 })
 
