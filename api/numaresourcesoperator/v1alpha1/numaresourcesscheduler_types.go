@@ -36,6 +36,10 @@ type NUMAResourcesSchedulerSpec struct {
 	// +kubebuilder:default=Normal
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler log verbosity"
 	LogLevel operatorv1.LogLevel `json:"logLevel,omitempty"`
+	// Set the cache resync period. Use explicit 0 to disable.
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler cache resync period setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	CacheResyncPeriod *metav1.Duration `json:"cacheResyncPeriod,omitEmpty"`
 }
 
 // NUMAResourcesSchedulerStatus defines the observed state of NUMAResourcesScheduler
