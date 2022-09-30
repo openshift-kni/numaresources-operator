@@ -77,6 +77,17 @@ func (fl *Flags) recordFlag(name string) {
 	}
 }
 
+func (fl *Flags) forgetFlag(name string) {
+	var keys []string
+	for _, k := range fl.keys {
+		if k == name {
+			continue
+		}
+		keys = append(keys, k)
+	}
+	fl.keys = keys
+}
+
 func (fl *Flags) SetToggle(name string) {
 	fl.recordFlag(name)
 	fl.args[name] = Val{
@@ -90,6 +101,11 @@ func (fl *Flags) SetOption(name, data string) {
 		Kind: FlagOption,
 		Data: data,
 	}
+}
+
+func (fl *Flags) Delete(name string) {
+	fl.forgetFlag(name)
+	delete(fl.args, name)
 }
 
 func (fl *Flags) Command() string {

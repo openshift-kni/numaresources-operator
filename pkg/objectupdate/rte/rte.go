@@ -25,6 +25,8 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
+	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 )
@@ -112,7 +114,7 @@ func DaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
 }
 
-func DaemonSetArgs(ds *appsv1.DaemonSet) error {
+func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1alpha1.NodeGroupConfig) error {
 	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
 	if err != nil {
 		return err
@@ -121,7 +123,26 @@ func DaemonSetArgs(ds *appsv1.DaemonSet) error {
 	if flags == nil {
 		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
 	}
-	flags.SetToggle("--pods-fingerprint")
+
+	notifEnabled := isNotifyFileEnabled(&conf)
+	klog.V(2).InfoS("DaemonSet update: event notification", "daemonset", ds.Name, "enabled", notifEnabled)
+	if !notifEnabled {
+		flags.Delete("--notify-file")
+	}
+
+	pfpEnabled := isPodFingerprintEnabled(&conf)
+	klog.V(2).InfoS("DaemonSet update: pod fingerprinting status", "daemonset", ds.Name, "enabled", pfpEnabled)
+	if pfpEnabled {
+		flags.SetToggle("--pods-fingerprint")
+	}
+
+	needsPeriodic := isPeriodicUpdateRequired(&conf)
+	refreshPeriod := findRefreshPeriod(&conf)
+	klog.V(2).InfoS("DaemonSet update: periodic update", "daemonset", ds.Name, "enabled", needsPeriodic, "period", refreshPeriod)
+	if needsPeriodic {
+		flags.SetOption("--sleep-interval", refreshPeriod)
+	}
+
 	flags.SetToggle("--refresh-node-resources")
 	cnt.Args = flags.Argv()
 	return nil
@@ -144,4 +165,42 @@ func FindContainerByName(podSpec *corev1.PodSpec, containerName string) (*corev1
 		}
 	}
 	return nil, fmt.Errorf("container %q not found - defaulting to the first", containerName)
+}
+
+func isPodFingerprintEnabled(conf *nropv1alpha1.NodeGroupConfig) bool {
+	cfg := nropv1alpha1.DefaultNodeGroupConfig()
+	if conf == nil || conf.PodsFingerprinting == nil {
+		// not specified -> use defaults
+		conf = &cfg
+	}
+	return *conf.PodsFingerprinting == nropv1alpha1.PodsFingerprintingEnabled
+}
+
+func isNotifyFileEnabled(conf *nropv1alpha1.NodeGroupConfig) bool {
+	cfg := nropv1alpha1.DefaultNodeGroupConfig()
+	if conf == nil || conf.InfoRefreshMode == nil {
+		// not specified -> use defaults
+		conf = &cfg
+	}
+	return *conf.InfoRefreshMode != nropv1alpha1.InfoRefreshPeriodic
+}
+
+func isPeriodicUpdateRequired(conf *nropv1alpha1.NodeGroupConfig) bool {
+	cfg := nropv1alpha1.DefaultNodeGroupConfig()
+	if conf == nil || conf.InfoRefreshMode == nil {
+		// not specified -> use defaults
+		conf = &cfg
+	}
+	return *conf.InfoRefreshMode != nropv1alpha1.InfoRefreshEvents
+}
+
+func findRefreshPeriod(conf *nropv1alpha1.NodeGroupConfig) string {
+	cfg := nropv1alpha1.DefaultNodeGroupConfig()
+	if conf == nil || conf.InfoRefreshPeriod == nil {
+		// not specified -> use defaults
+		conf = &cfg
+	}
+	// TODO ensure we overwrite - and possibly find a less ugly stringification code
+	// TODO: what if sleep-interval is set and is 0 ?
+	return conf.InfoRefreshPeriod.Duration.String()
 }

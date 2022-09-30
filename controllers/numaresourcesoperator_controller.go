@@ -57,6 +57,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -171,6 +172,7 @@ func updateStatus(ctx context.Context, cli client.Client, rte *nropv1alpha1.NUMA
 		return false, nil
 	}
 	rte.Status.Conditions = conditions
+	rte.Status.DefaultNodeGroupConfig = nropv1alpha1.DefaultNodeGroupConfig()
 
 	if err := cli.Status().Update(ctx, rte); err != nil {
 		return false, errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(rte))
@@ -622,32 +624,30 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 		return err
 	}
 
-	pfpEnabled := isPodFingerprintEnabled(gdm.NodeGroup)
-	klog.V(2).InfoS("DaemonSet update: pod fingerprinting status", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "enabled", pfpEnabled)
-	if !pfpEnabled {
-		return nil
+	conf := nropv1alpha1.DefaultNodeGroupConfig()
+	if gdm.NodeGroup.DisablePodsFingerprinting != nil {
+		// handle the bool added in 4.11. We will deprecate once we move out from v1alpha1.
+		setNodeGroupConfigFromNodeGroup(&conf, *gdm.NodeGroup)
 	}
-	return rteupdate.DaemonSetArgs(gdm.DaemonSet)
-}
+	if gdm.NodeGroup.Config != nil {
+		conf = merge.NodeGroupConfig(conf, *gdm.NodeGroup.Config)
+	}
 
-func isPodFingerprintEnabled(ng *nropv1alpha1.NodeGroup) bool {
-	// this feature is supposed to be enabled most of the times,
-	// so we turn on by default and we offer a way to disable it.
-	if ng == nil {
-		return false
-	}
-	if ng.DisablePodsFingerprinting == nil {
-		// not specified -> use defaults -> enabled
-		return true
-	}
-	if *ng.DisablePodsFingerprinting {
-		return false
-	}
-	return true
+	return rteupdate.DaemonSetArgs(gdm.DaemonSet, conf)
 }
 
 func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
 	ok := (ds.Status.DesiredNumberScheduled > 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberReady)
 	klog.V(5).InfoS("daemonset", "namespace", ds.Namespace, "name", ds.Name, "desired", ds.Status.DesiredNumberScheduled, "current", ds.Status.CurrentNumberScheduled, "ready", ds.Status.NumberReady)
 	return ok
+}
+
+func setNodeGroupConfigFromNodeGroup(conf *nropv1alpha1.NodeGroupConfig, ng nropv1alpha1.NodeGroup) {
+	var podsFp nropv1alpha1.PodsFingerprintingMode
+	if *ng.DisablePodsFingerprinting {
+		podsFp = nropv1alpha1.PodsFingerprintingDisabled
+	} else {
+		podsFp = nropv1alpha1.PodsFingerprintingEnabled
+	}
+	conf.PodsFingerprinting = &podsFp
 }

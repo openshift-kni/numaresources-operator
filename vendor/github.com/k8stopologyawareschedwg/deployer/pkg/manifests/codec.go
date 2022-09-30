@@ -17,6 +17,7 @@
 package manifests
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 
@@ -47,7 +48,13 @@ func SerializeObject(obj runtime.Object, out io.Writer) error {
 	return srz.Encode(&r, out)
 }
 
-func deserializeObjectFromData(data []byte) (runtime.Object, error) {
+func SerializeObjectToData(obj runtime.Object) ([]byte, error) {
+	var buf bytes.Buffer
+	err := SerializeObject(obj, &buf)
+	return buf.Bytes(), err
+}
+
+func DeserializeObjectFromData(data []byte) (runtime.Object, error) {
 	decode := scheme.Codecs.UniversalDeserializer().Decode
 	obj, _, err := decode(data, nil, nil)
 	if err != nil {
@@ -61,5 +68,5 @@ func loadObject(path string) (runtime.Object, error) {
 	if err != nil {
 		return nil, err
 	}
-	return deserializeObjectFromData(data)
+	return DeserializeObjectFromData(data)
 }
