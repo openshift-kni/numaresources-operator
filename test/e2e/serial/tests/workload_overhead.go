@@ -276,7 +276,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 
 			})
 
-			It("[test_id:53819][tier2] Pod pending when resources requested + pod overhead don't fit on the target node; NRT objects are not updated", func() {
+			It("[test_id:53819][tier2][unsched] Pod pending when resources requested + pod overhead don't fit on the target node; NRT objects are not updated", func() {
 				var targetNodeName string
 				var targetNrtInitial *nrtv1alpha1.NodeResourceTopology
 				var targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList
