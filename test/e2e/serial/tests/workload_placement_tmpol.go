@@ -482,6 +482,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 2*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+				dumpNRTForNode(fxt.Client, targetNodeName, "target")
 			}
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1257,6 +1258,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 5)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+				dumpNRTForNode(fxt.Client, targetNodeName, "target")
 			}
 			Expect(err).ToNot(HaveOccurred())
 			updatedPod := &corev1.Pod{}
