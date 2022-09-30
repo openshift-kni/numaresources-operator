@@ -18,7 +18,11 @@ package sched
 
 import (
 	"fmt"
+	"os"
 	"testing"
+	"time"
+
+	"github.com/sergi/go-diff/diffmatchpatch"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -39,6 +43,9 @@ profiles:
       filter:
         enabled:
           - name: NodeResourceTopologyMatch
+      reserve:
+        enabled:
+          - name: NodeResourceTopologyMatch
       score:
         enabled:
           - name: NodeResourceTopologyMatch
@@ -46,7 +53,63 @@ profiles:
     pluginConfig:
     - name: NodeResourceTopologyMatch
       args:
-        kubeconfigpath: "" # needs to be empty string`
+        scoringStrategy:
+          type: LeastAllocated`
+
+	schedConfigWithParams = `apiVersion: kubescheduler.config.k8s.io/v1beta2
+kind: KubeSchedulerConfiguration
+leaderElection:
+  leaderElect: false
+profiles:
+  - schedulerName: test-topo-aware-sched
+    plugins:
+      filter:
+        enabled:
+          - name: NodeResourceTopologyMatch
+      reserve:
+        enabled:
+          - name: NodeResourceTopologyMatch
+      score:
+        enabled:
+          - name: NodeResourceTopologyMatch
+    # optional plugin configs
+    pluginConfig:
+    - name: NodeResourceTopologyMatch
+      args:
+        apiVersion: kubescheduler.config.k8s.io/v1beta2
+        cacheResyncPeriodSeconds: 3
+        kind: NodeResourceTopologyMatchArgs
+        scoringStrategy:
+          resources:
+          - name: cpu
+            weight: 1
+          - name: memory
+            weight: 1
+          type: LeastAllocated`
+
+	schedConfigWithPeriod = `apiVersion: kubescheduler.config.k8s.io/v1beta2
+kind: KubeSchedulerConfiguration
+leaderElection:
+  leaderElect: false
+profiles:
+  - schedulerName: test-topo-aware-sched
+    plugins:
+      filter:
+        enabled:
+          - name: NodeResourceTopologyMatch
+      reserve:
+        enabled:
+          - name: NodeResourceTopologyMatch
+      score:
+        enabled:
+          - name: NodeResourceTopologyMatch
+    # optional plugin configs
+    pluginConfig:
+    - name: NodeResourceTopologyMatch
+      args:
+        cacheResyncPeriodSeconds: 10
+        scoringStrategy:
+          type: LeastAllocated`
 )
 
 var dp = &appsv1.Deployment{
@@ -179,7 +242,7 @@ func TestUpdateSchedulerName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := SchedulerName(&tc.configMap, tc.schedulerName); err != nil {
+			if err := SchedulerConfig(&tc.configMap, tc.schedulerName, 0); err != nil {
 				if !tc.isErrExpected {
 					t.Errorf("test %q: failed with error: %v", tc.name, err)
 				}
@@ -194,3 +257,505 @@ func TestUpdateSchedulerName(t *testing.T) {
 		})
 	}
 }
+
+func TestUpdateSchedulerConfig(t *testing.T) {
+	type testCase struct {
+		name              string
+		cacheResyncPeriod time.Duration
+		isErrExpected     bool
+		configMap         corev1.ConfigMap
+		expectedYAML      string
+	}
+
+	testCases := []testCase{
+		{
+			name:              "enable-reserve",
+			cacheResyncPeriod: 3 * time.Second,
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"config.yaml": schedConfig,
+				},
+			},
+			expectedYAML: expectedYAMLWithReconcilePeriod,
+		},
+		{
+			name:              "tune-reserve",
+			cacheResyncPeriod: 3 * time.Second,
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"config.yaml": schedConfigWithPeriod,
+				},
+			},
+			expectedYAML: expectedYAMLWithReconcilePeriod,
+		},
+		{
+			name:              "keep-reserve-enabled",
+			cacheResyncPeriod: 3 * time.Second,
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"config.yaml": schedConfigWithParams,
+				},
+			},
+			expectedYAML: expectedYAMLWithReconcilePeriod,
+		},
+		{
+			name: "keep-reserve-disabled",
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"config.yaml": schedConfig,
+				},
+			},
+			expectedYAML: expectedYAMLWithoutReconcile,
+		},
+		{
+			name: "disable-reconcile",
+			configMap: corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cm",
+					Namespace: "test-ns",
+				},
+				Data: map[string]string{
+					"config.yaml": schedConfigWithParams,
+				},
+			},
+			expectedYAML: expectedYAMLWithoutReconcile,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := SchedulerConfig(&tc.configMap, "", tc.cacheResyncPeriod); err != nil {
+				if !tc.isErrExpected {
+					t.Errorf("test %q: failed with error: %v", tc.name, err)
+				}
+			}
+
+			gotYAML, ok := tc.configMap.Data[schedstate.SchedulerConfigFileName]
+			if !ok {
+				t.Fatalf("test %q failed: malformed config map", tc.name)
+			}
+
+			yamlCompare(t, tc.name, gotYAML, tc.expectedYAML)
+		})
+	}
+}
+
+func yamlCompare(t *testing.T, testName, got, expected string) {
+	dmp := diffmatchpatch.New()
+	diffs := dmp.DiffMain(got, expected, true)
+	diffCount := 0
+	for idx, hunk := range diffs {
+		if hunk.Type == diffmatchpatch.DiffEqual {
+			continue
+		}
+		t.Errorf("test %q diff %d: op=%s text=%q\n", testName, idx, hunk.Type.String(), hunk.Text)
+	}
+	if diffCount > 0 {
+		var err error
+		err = os.WriteFile("got.yaml", []byte(got), 0644)
+		if err != nil {
+			t.Fatalf("cannot write got.yaml")
+		}
+		err = os.WriteFile("exp.yaml", []byte(expected), 0644)
+		if err != nil {
+			t.Fatalf("cannot write exp.yaml")
+		}
+	}
+}
+
+const (
+	expectedYAMLWithReconcilePeriod = `apiVersion: kubescheduler.config.k8s.io/v1beta2
+clientConnection:
+  acceptContentTypes: ""
+  burst: 100
+  contentType: application/vnd.kubernetes.protobuf
+  kubeconfig: ""
+  qps: 50
+enableContentionProfiling: true
+enableProfiling: true
+healthzBindAddress: ""
+kind: KubeSchedulerConfiguration
+leaderElection:
+  leaderElect: false
+  leaseDuration: 15s
+  renewDeadline: 10s
+  resourceLock: leases
+  resourceName: kube-scheduler
+  resourceNamespace: kube-system
+  retryPeriod: 2s
+metricsBindAddress: ""
+parallelism: 16
+percentageOfNodesToScore: 0
+podInitialBackoffSeconds: 1
+podMaxBackoffSeconds: 10
+profiles:
+- pluginConfig:
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      cacheResyncPeriodSeconds: 3
+      kind: NodeResourceTopologyMatchArgs
+      scoringStrategy:
+        resources:
+        - name: cpu
+          weight: 1
+        - name: memory
+          weight: 1
+        type: LeastAllocated
+    name: NodeResourceTopologyMatch
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      kind: DefaultPreemptionArgs
+      minCandidateNodesAbsolute: 100
+      minCandidateNodesPercentage: 10
+    name: DefaultPreemption
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      hardPodAffinityWeight: 1
+      kind: InterPodAffinityArgs
+    name: InterPodAffinity
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      kind: NodeAffinityArgs
+    name: NodeAffinity
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      kind: NodeResourcesBalancedAllocationArgs
+      resources:
+      - name: cpu
+        weight: 1
+      - name: memory
+        weight: 1
+    name: NodeResourcesBalancedAllocation
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      kind: NodeResourcesFitArgs
+      scoringStrategy:
+        resources:
+        - name: cpu
+          weight: 1
+        - name: memory
+          weight: 1
+        type: LeastAllocated
+    name: NodeResourcesFit
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      defaultingType: System
+      kind: PodTopologySpreadArgs
+    name: PodTopologySpread
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      bindTimeoutSeconds: 600
+      kind: VolumeBindingArgs
+    name: VolumeBinding
+  plugins:
+    bind:
+      enabled:
+      - name: DefaultBinder
+        weight: 0
+    filter:
+      enabled:
+      - name: NodeUnschedulable
+        weight: 0
+      - name: NodeName
+        weight: 0
+      - name: TaintToleration
+        weight: 0
+      - name: NodeAffinity
+        weight: 0
+      - name: NodePorts
+        weight: 0
+      - name: NodeResourcesFit
+        weight: 0
+      - name: VolumeRestrictions
+        weight: 0
+      - name: EBSLimits
+        weight: 0
+      - name: GCEPDLimits
+        weight: 0
+      - name: NodeVolumeLimits
+        weight: 0
+      - name: AzureDiskLimits
+        weight: 0
+      - name: VolumeBinding
+        weight: 0
+      - name: VolumeZone
+        weight: 0
+      - name: PodTopologySpread
+        weight: 0
+      - name: InterPodAffinity
+        weight: 0
+      - name: NodeResourceTopologyMatch
+        weight: 0
+    multiPoint: {}
+    permit: {}
+    postBind: {}
+    postFilter:
+      enabled:
+      - name: DefaultPreemption
+        weight: 0
+    preBind:
+      enabled:
+      - name: VolumeBinding
+        weight: 0
+    preFilter:
+      enabled:
+      - name: NodeResourcesFit
+        weight: 0
+      - name: NodePorts
+        weight: 0
+      - name: VolumeRestrictions
+        weight: 0
+      - name: PodTopologySpread
+        weight: 0
+      - name: InterPodAffinity
+        weight: 0
+      - name: VolumeBinding
+        weight: 0
+      - name: NodeAffinity
+        weight: 0
+    preScore:
+      enabled:
+      - name: InterPodAffinity
+        weight: 0
+      - name: PodTopologySpread
+        weight: 0
+      - name: TaintToleration
+        weight: 0
+      - name: NodeAffinity
+        weight: 0
+    queueSort:
+      enabled:
+      - name: PrioritySort
+        weight: 0
+    reserve:
+      enabled:
+      - name: VolumeBinding
+        weight: 0
+      - name: NodeResourceTopologyMatch
+        weight: 0
+    score:
+      enabled:
+      - name: NodeResourcesBalancedAllocation
+        weight: 1
+      - name: ImageLocality
+        weight: 1
+      - name: InterPodAffinity
+        weight: 1
+      - name: NodeResourcesFit
+        weight: 1
+      - name: NodeAffinity
+        weight: 1
+      - name: PodTopologySpread
+        weight: 2
+      - name: TaintToleration
+        weight: 1
+      - name: NodeResourceTopologyMatch
+        weight: 0
+  schedulerName: test-topo-aware-sched
+`
+	expectedYAMLWithoutReconcile = `apiVersion: kubescheduler.config.k8s.io/v1beta2
+clientConnection:
+  acceptContentTypes: ""
+  burst: 100
+  contentType: application/vnd.kubernetes.protobuf
+  kubeconfig: ""
+  qps: 50
+enableContentionProfiling: true
+enableProfiling: true
+healthzBindAddress: ""
+kind: KubeSchedulerConfiguration
+leaderElection:
+  leaderElect: false
+  leaseDuration: 15s
+  renewDeadline: 10s
+  resourceLock: leases
+  resourceName: kube-scheduler
+  resourceNamespace: kube-system
+  retryPeriod: 2s
+metricsBindAddress: ""
+parallelism: 16
+percentageOfNodesToScore: 0
+podInitialBackoffSeconds: 1
+podMaxBackoffSeconds: 10
+profiles:
+- pluginConfig:
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      cacheResyncPeriodSeconds: 0
+      kind: NodeResourceTopologyMatchArgs
+      scoringStrategy:
+        resources:
+        - name: cpu
+          weight: 1
+        - name: memory
+          weight: 1
+        type: LeastAllocated
+    name: NodeResourceTopologyMatch
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      kind: DefaultPreemptionArgs
+      minCandidateNodesAbsolute: 100
+      minCandidateNodesPercentage: 10
+    name: DefaultPreemption
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      hardPodAffinityWeight: 1
+      kind: InterPodAffinityArgs
+    name: InterPodAffinity
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      kind: NodeAffinityArgs
+    name: NodeAffinity
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      kind: NodeResourcesBalancedAllocationArgs
+      resources:
+      - name: cpu
+        weight: 1
+      - name: memory
+        weight: 1
+    name: NodeResourcesBalancedAllocation
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      kind: NodeResourcesFitArgs
+      scoringStrategy:
+        resources:
+        - name: cpu
+          weight: 1
+        - name: memory
+          weight: 1
+        type: LeastAllocated
+    name: NodeResourcesFit
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      defaultingType: System
+      kind: PodTopologySpreadArgs
+    name: PodTopologySpread
+  - args:
+      apiVersion: kubescheduler.config.k8s.io/v1beta2
+      bindTimeoutSeconds: 600
+      kind: VolumeBindingArgs
+    name: VolumeBinding
+  plugins:
+    bind:
+      enabled:
+      - name: DefaultBinder
+        weight: 0
+    filter:
+      enabled:
+      - name: NodeUnschedulable
+        weight: 0
+      - name: NodeName
+        weight: 0
+      - name: TaintToleration
+        weight: 0
+      - name: NodeAffinity
+        weight: 0
+      - name: NodePorts
+        weight: 0
+      - name: NodeResourcesFit
+        weight: 0
+      - name: VolumeRestrictions
+        weight: 0
+      - name: EBSLimits
+        weight: 0
+      - name: GCEPDLimits
+        weight: 0
+      - name: NodeVolumeLimits
+        weight: 0
+      - name: AzureDiskLimits
+        weight: 0
+      - name: VolumeBinding
+        weight: 0
+      - name: VolumeZone
+        weight: 0
+      - name: PodTopologySpread
+        weight: 0
+      - name: InterPodAffinity
+        weight: 0
+      - name: NodeResourceTopologyMatch
+        weight: 0
+    multiPoint: {}
+    permit: {}
+    postBind: {}
+    postFilter:
+      enabled:
+      - name: DefaultPreemption
+        weight: 0
+    preBind:
+      enabled:
+      - name: VolumeBinding
+        weight: 0
+    preFilter:
+      enabled:
+      - name: NodeResourcesFit
+        weight: 0
+      - name: NodePorts
+        weight: 0
+      - name: VolumeRestrictions
+        weight: 0
+      - name: PodTopologySpread
+        weight: 0
+      - name: InterPodAffinity
+        weight: 0
+      - name: VolumeBinding
+        weight: 0
+      - name: NodeAffinity
+        weight: 0
+    preScore:
+      enabled:
+      - name: InterPodAffinity
+        weight: 0
+      - name: PodTopologySpread
+        weight: 0
+      - name: TaintToleration
+        weight: 0
+      - name: NodeAffinity
+        weight: 0
+    queueSort:
+      enabled:
+      - name: PrioritySort
+        weight: 0
+    reserve:
+      enabled:
+      - name: VolumeBinding
+        weight: 0
+      - name: NodeResourceTopologyMatch
+        weight: 0
+    score:
+      enabled:
+      - name: NodeResourcesBalancedAllocation
+        weight: 1
+      - name: ImageLocality
+        weight: 1
+      - name: InterPodAffinity
+        weight: 1
+      - name: NodeResourcesFit
+        weight: 1
+      - name: NodeAffinity
+        weight: 1
+      - name: PodTopologySpread
+        weight: 2
+      - name: TaintToleration
+        weight: 1
+      - name: NodeResourceTopologyMatch
+        weight: 0
+  schedulerName: test-topo-aware-sched
+`
+)
