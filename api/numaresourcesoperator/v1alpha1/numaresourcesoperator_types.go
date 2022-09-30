@@ -39,13 +39,56 @@ type NUMAResourcesOperatorSpec struct {
 	LogLevel operatorv1.LogLevel `json:"logLevel,omitempty"`
 }
 
+// +kubebuilder:validation:Enum=Enabled;Disabled
+type PodsFingerprintingMode string
+
+var (
+	// PodsFingerprintingEnabled is the default.
+	PodsFingerprintingEnabled PodsFingerprintingMode = "Enabled"
+
+	// PodsFingerprintingDisabled is ...
+	PodsFingerprintingDisabled PodsFingerprintingMode = "Disabled"
+)
+
+// +kubebuilder:validation:Enum=Periodic;Events;PeriodicAndEvents
+type InfoRefreshMode string
+
+var (
+	// InfoRefreshPeriodic is the default. Periodically polls the state and reports it.
+	InfoRefreshPeriodic InfoRefreshMode = "Periodic"
+
+	// InfoRefreshEvents reports a new state each time a pod lifecycle event is received.
+	InfoRefreshEvents InfoRefreshMode = "Events"
+
+	// InfoRefreshPeriodicAndEvents enables both periodic and event-based reporting.
+	InfoRefreshPeriodicAndEvents InfoRefreshMode = "PeriodicAndEvents"
+)
+
+// NodeGroupConfig exposes topology info reporting setting per node group
+type NodeGroupConfig struct {
+	// PodsFingerprinting defines if pod fingerprint should be reported for the machines belonging to this group
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Enable or disable the pods fingerprinting setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	PodsFingerprinting *PodsFingerprintingMode `json:"podsFingerprinting,omitempty"`
+	// InfoRefreshMode sets the mechanism which will be used to refresh the topology info.
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Topology info mechanism setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	InfoRefreshMode *InfoRefreshMode `json:"infoRefreshMode,omitempty"`
+	// InfoRefreshPeriod sets the topology info refresh period. Use explicit 0 to disable.
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Topology info refresh period setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	InfoRefreshPeriod *metav1.Duration `json:"infoRefreshPeriod,omitEmpty"`
+}
+
 // NodeGroup defines group of nodes that will run resource topology exporter daemon set
 // You can choose the group of node by MachineConfigPoolSelector or by NodeSelector
 type NodeGroup struct {
 	// MachineConfigPoolSelector defines label selector for the machine config pool
 	MachineConfigPoolSelector *metav1.LabelSelector `json:"machineConfigPoolSelector,omitempty"`
-	// DisablePodsFingerprinting defines if pod fingerprint should be omitted for the machines belonging to this group
+	// DisablePodsFingerprinting defines if pod fingerprint should be omitted for the machines belonging to this group (DEPRECATED: use Config instead)
 	DisablePodsFingerprinting *bool `json:"disablePodsFingerprinting,omitempty"`
+	// Config defines the RTE behaviour for this NodeGroup
+	Config *NodeGroupConfig `json:"config,omitempty"`
 }
 
 // NUMAResourcesOperatorStatus defines the observed state of NUMAResourcesOperator
@@ -57,7 +100,8 @@ type NUMAResourcesOperatorStatus struct {
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="RTE MCPs from node groups"
 	MachineConfigPools []MachineConfigPool `json:"machineconfigpools,omitempty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	Conditions             []metav1.Condition `json:"conditions,omitempty"`
+	DefaultNodeGroupConfig NodeGroupConfig    `json:"defaultNodeGroupConfig,omitempty"`
 }
 
 // MachineConfigPool defines the observed state of each MachineConfigPool selected by node groups
