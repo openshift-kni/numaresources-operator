@@ -33,6 +33,7 @@ require (
 	k8s.io/kubernetes v1.25.4
 	kubevirt.io/qe-tools v0.1.8
 	sigs.k8s.io/controller-runtime v0.13.1
+	sigs.k8s.io/scheduler-plugins v0.24.9
 	sigs.k8s.io/yaml v1.3.0
 )
 
@@ -144,7 +145,6 @@ require (
 	k8s.io/utils v0.0.0-20220823124924-e9cbc92d1a73 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
-	sigs.k8s.io/scheduler-plugins v0.24.9 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 )
 

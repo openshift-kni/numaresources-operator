@@ -24,7 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	schedconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	pluginconfig "sigs.k8s.io/scheduler-plugins/apis/config"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
@@ -60,11 +61,52 @@ func SchedulerConfig(cm *corev1.ConfigMap, name string, cacheResyncPeriod time.D
 		return fmt.Errorf("no data key named: %s found in ConfigMap: %s/%s", schedstate.SchedulerConfigFileName, cm.Namespace, cm.Name)
 	}
 
-	newData, err := manifests.RenderSchedulerConfig(data, name, cacheResyncPeriod)
+	schedCfg, err := DecodeSchedulerConfigFromData([]byte(data))
+	if err != nil {
+		return err
+	}
+
+	schedProf, pluginConf := findKubeSchedulerProfileByName(schedCfg, schedstate.SchedulerPluginName)
+	if schedProf == nil || pluginConf == nil {
+		return fmt.Errorf("no profile or plugin configuration found for %q", schedstate.SchedulerPluginName)
+	}
+
+	if name != "" {
+		schedProf.SchedulerName = name
+		klog.V(3).InfoS("scheduler config update", "name", name)
+	}
+
+	confObj := pluginConf.Args.DeepCopyObject()
+	cfg, ok := confObj.(*pluginconfig.NodeResourceTopologyMatchArgs)
+	if !ok {
+		return fmt.Errorf("unsupported plugin config type: %T", confObj)
+	}
+
+	period := int64(cacheResyncPeriod.Seconds())
+	cfg.CacheResyncPeriodSeconds = period
+	klog.V(3).InfoS("scheduler config update", "cacheResyncPeriodSeconds", period)
+
+	pluginConf.Args = cfg
+
+	newData, err := EncodeSchedulerConfigToData(schedCfg)
 	if err != nil {
 		return err
 	}
 
 	cm.Data[schedstate.SchedulerConfigFileName] = string(newData)
 	return nil
+}
+
+func findKubeSchedulerProfileByName(sc *schedconfig.KubeSchedulerConfiguration, name string) (*schedconfig.KubeSchedulerProfile, *schedconfig.PluginConfig) {
+	for i := range sc.Profiles {
+		// if we have a configuration for the NodeResourceTopologyMatch
+		// this is a valid profile
+		for j := range sc.Profiles[i].PluginConfig {
+			if sc.Profiles[i].PluginConfig[j].Name == name {
+				return &sc.Profiles[i], &sc.Profiles[i].PluginConfig[j]
+			}
+		}
+	}
+
+	return nil, nil
 }
