@@ -53,15 +53,15 @@ func TestRequested(t *testing.T) {
 			expectedValue: available,
 		},
 		{
-			what:          "k8scfg,nrt",
+			what:          "k8scfg,podst,nrt",
 			expectedValue: available,
 		},
 		{
-			what:          "nrt,k8scfg",
+			what:          "nrt,k8scfg,podst",
 			expectedValue: available,
 		},
 		{
-			what:          " nrt,  k8scfg ",
+			what:          " nrt,  k8scfg ,   podst ",
 			expectedValue: available,
 		},
 	}
