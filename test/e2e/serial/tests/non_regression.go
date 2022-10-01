@@ -334,7 +334,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	})
 
 	Context("Requesting resources that are greater than allocatable at numa level", func() {
-		It("[test_id:47613][tier3][nonreg] should not schedule a pod requesting resources that are not allocatable at numa level", func() {
+		It("[test_id:47613][tier3][nonreg][unsched] should not schedule a pod requesting resources that are not allocatable at numa level", func() {
 			//the test can run on node with any numa number, so no need to filter the nrts
 			nrtNames := e2enrt.AccumulateNames(nrts)
 

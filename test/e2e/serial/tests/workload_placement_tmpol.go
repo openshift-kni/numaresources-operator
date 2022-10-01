@@ -482,6 +482,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 2*time.Minute)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+				dumpNRTForNode(fxt.Client, targetNodeName, "target")
 			}
 			Expect(err).ToNot(HaveOccurred())
 
@@ -590,7 +591,16 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceMemory: resource.MustParse("20Gi"),
 				},
 			},
-			[]corev1.ResourceList{},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("14"),
+					corev1.ResourceMemory: resource.MustParse("16Gi"),
+				},
+			},
 		),
 		Entry("[test_id:50183][tmscope:cnt][hugepages] should make a pod with two gu cnt land on a node with enough resources with hugepages on a specific NUMA zone, each cnt on a different zone",
 			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
@@ -652,7 +662,17 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("144Mi"),
 				},
 			},
-			[]corev1.ResourceList{},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+				{
+					corev1.ResourceCPU:                   resource.MustParse("14"),
+					corev1.ResourceMemory:                resource.MustParse("16Gi"),
+					corev1.ResourceName("hugepages-2Mi"): resource.MustParse("160Mi"),
+				},
+			},
 		),
 		Entry("[tier1][testtype4][tmscope:container] should make a pod with three gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
@@ -1103,7 +1123,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
 					{
-						corev1.ResourceCPU:    resource.MustParse("6"),
+						corev1.ResourceCPU:    resource.MustParse("8"),
 						corev1.ResourceMemory: resource.MustParse("4Gi"),
 						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("5"),
 					},
@@ -1123,14 +1143,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 			[]corev1.ResourceList{
 				{
-					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("5"),
 				},
 			},
 		),
 	)
-	DescribeTable("[placement][negative] cluster with one worker nodes suitable",
+	DescribeTable("[placement][unsched] cluster with one worker nodes suitable",
 		func(policyFuncs tmPolicyFuncs, errMsg string, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
 
 			hostsRequired := 2
@@ -1234,6 +1258,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 5)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+				dumpNRTForNode(fxt.Client, targetNodeName, "target")
 			}
 			Expect(err).ToNot(HaveOccurred())
 			updatedPod := &corev1.Pod{}
@@ -1275,7 +1300,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		// but only one container can be aligned to a single numa node while the second container cannot. Because of that, the pod should keep on pending and we expect
 		// to see the reason for not scheduling the pod on that target node as "cannot align container: testcnt-1", because the other worker nodes have insufficient
 		// free resources to accommodate the pod thus they will be rejected as candidates at earlier stage
-		Entry("[tier1][negative][tmscope:container][cpu] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+		Entry("[tier1][unsched][tmscope:container][cpu] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
 			"cannot align container: testcnt-1",
 			podResourcesRequest{
@@ -1335,7 +1360,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[tier1][negative][tmscope:container][memory] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+		Entry("[tier1][unsched][tmscope:container][memory] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
 			"cannot align container: testcnt-1",
 			podResourcesRequest{
@@ -1393,7 +1418,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[tier1][negative][tmscope:container][hugepages2Mi] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+		Entry("[tier1][unsched][tmscope:container][hugepages2Mi] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
 			"cannot align container: testcnt-1",
 			podResourcesRequest{
@@ -1450,7 +1475,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[tier1][negative][tmscope:container][hugepages1Gi] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+		Entry("[tier1][unsched][tmscope:container][hugepages1Gi] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
 			"cannot align container: testcnt-1",
 			podResourcesRequest{
@@ -1506,7 +1531,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[test_id:54020][tier2][negative][tmscope:container][devices] pod with two gu cnt requesting multiple device types keep on pending because cannot align the second container to a single numa node",
+		Entry("[test_id:54020][tier2][unsched][tmscope:container][devices] pod with two gu cnt requesting multiple device types keep on pending because cannot align the second container to a single numa node",
 			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
 			"cannot align container: testcnt-1",
 			podResourcesRequest{
@@ -1558,7 +1583,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[test_id:54019][tier1][negative][tmscope:container][devices] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+		Entry("[test_id:54019][tier1][unsched][tmscope:container][devices] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
 			"cannot align container: testcnt-1",
 			podResourcesRequest{
@@ -1602,65 +1627,54 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
+		Entry("[test_id:54017][tier1][unsched][tmscope:pod][devices] pod with two gu cnt keep on pending because cannot align the both containers on single numa",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodePodLevel],
+			"cannot align pod",
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("8"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("3"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("8"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("2Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("3Gi"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("3"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+				},
+			},
+		),
 	)
 })
 
-func setupPaddingPodLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod {
-	baseload, err := nodes.GetLoad(fxt.K8sClient, padInfo.targetNodeName)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", padInfo.targetNodeName)
-	By(fmt.Sprintf("computed base load: %s", baseload))
-
-	By(fmt.Sprintf("preparing target node %q to fit the test case", padInfo.targetNodeName))
-	// first, let's make sure that ONLY the required res can fit in either zone on the target node
-	nrtInfo, err := e2enrt.FindFromList(nrtList.Items, padInfo.targetNodeName)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing NRT info for %q", padInfo.targetNodeName)
-
-	// if we get this far we can now depend on the fact that len(nrt.Zones) == len(pod.Spec.Containers) == 2
-
-	paddingPods := []*corev1.Pod{}
-
-	// as low as you can get, that's why it's hardcoded
-	targetUnsuitableRes := corev1.ResourceList{
-		corev1.ResourceCPU:    resource.MustParse("2"),
-		corev1.ResourceMemory: resource.MustParse("2Gi"),
-	}
-
-	var zone nrtv1alpha1.Zone
-	// fix target node
-	zone = nrtInfo.Zones[0]
-	By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(targetUnsuitableRes)))
-	padPod, err := makePaddingPod(fxt.Namespace.Name, "target", zone, targetUnsuitableRes)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-
-	padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-
-	err = fxt.Client.Create(context.TODO(), padPod)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-	paddingPods = append(paddingPods, padPod)
-
-	podTotRes := e2ereslist.FromGuaranteedPod(*padInfo.pod)
-	By(fmt.Sprintf("testpod resource requests (vanilla): %s", e2ereslist.ToString(podTotRes)))
-	baseload.Apply(podTotRes)
-	By(fmt.Sprintf("testpod resource requests (adjusted): %s", e2ereslist.ToString(podTotRes)))
-
-	zone = nrtInfo.Zones[1]
-	By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(podTotRes)))
-	padPod, err = makePaddingPod(fxt.Namespace.Name, "target", zone, podTotRes)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-
-	padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-
-	err = fxt.Client.Create(context.TODO(), padPod)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-	paddingPods = append(paddingPods, padPod)
-
-	paddingPodsUnsuitable := setupPaddingForUnsuitableNodes(2, fxt, nrtList, padInfo)
-	return append(paddingPods, paddingPodsUnsuitable...)
-}
-
-func setupPaddingContainerLevel(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod {
+func setupPadding(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod {
 	baseload, err := nodes.GetLoad(fxt.K8sClient, padInfo.targetNodeName)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", padInfo.targetNodeName)
 	By(fmt.Sprintf("computed base load: %s", baseload))
@@ -1778,7 +1792,7 @@ func isHugepageNeeded(podRes podResourcesRequest) bool {
 func newPodScopeTMPolicyFuncs() tmPolicyFuncs {
 	return tmPolicyFuncs{
 		name:                    func() nrtv1alpha1.TopologyManagerPolicy { return nrtv1alpha1.SingleNUMANodePodLevel },
-		setupPadding:            setupPaddingPodLevel,
+		setupPadding:            setupPadding,
 		checkConsumedRes:        e2enrt.CheckZoneConsumedResourcesAtLeast,
 		filterMatchingResources: e2enrt.FilterAnyZoneMatchingResources,
 	}
@@ -1787,7 +1801,7 @@ func newPodScopeTMPolicyFuncs() tmPolicyFuncs {
 func newContainerScopeTMPolicyFuncs() tmPolicyFuncs {
 	return tmPolicyFuncs{
 		name:                    func() nrtv1alpha1.TopologyManagerPolicy { return nrtv1alpha1.SingleNUMANodeContainerLevel },
-		setupPadding:            setupPaddingContainerLevel,
+		setupPadding:            setupPadding,
 		checkConsumedRes:        e2enrt.CheckNodeConsumedResourcesAtLeast,
 		filterMatchingResources: e2enrt.FilterAnyNodeMatchingResources,
 	}

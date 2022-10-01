@@ -87,7 +87,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler remova
 			}
 		})
 
-		It("[case:2][test_id:49093][tier1] should keep new scheduled workloads pending", func() {
+		It("[case:2][test_id:49093][tier1][unsched] should keep new scheduled workloads pending", func() {
 			var err error
 
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name))
