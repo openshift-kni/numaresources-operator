@@ -77,16 +77,18 @@ func Available() sets.String {
 	return sets.NewString(
 		ValidatorKubeletConfig,
 		ValidatorNodeResourceTopologies,
+		ValidatorPodStatus,
 	)
 }
 
 type ValidatorData struct {
-	tasEnabledNodeNames sets.String
-	kConfigs            map[string]*kubeletconfigv1beta1.KubeletConfiguration
-	nrtCrdMissing       bool
-	nrtList             *nrtv1alpha1.NodeResourceTopologyList
-	versionInfo         *version.Info
-	what                sets.String
+	tasEnabledNodeNames  sets.String
+	nonRunningPodsByNode map[string]map[string]corev1.PodPhase
+	kConfigs             map[string]*kubeletconfigv1beta1.KubeletConfiguration
+	nrtCrdMissing        bool
+	nrtList              *nrtv1alpha1.NodeResourceTopologyList
+	versionInfo          *version.Info
+	what                 sets.String
 }
 
 type CollectFunc func(ctx context.Context, cli client.Client, data *ValidatorData) error
@@ -95,6 +97,7 @@ func Collectors() map[string]CollectFunc {
 	return map[string]CollectFunc{
 		ValidatorKubeletConfig:          CollectKubeletConfig,
 		ValidatorNodeResourceTopologies: CollectNodeResourceTopologies,
+		ValidatorPodStatus:              CollectPodStatus,
 	}
 }
 
@@ -193,6 +196,7 @@ func Validators() map[string]ValidateFunc {
 	return map[string]ValidateFunc{
 		ValidatorKubeletConfig:          ValidateKubeletConfig,
 		ValidatorNodeResourceTopologies: ValidateNodeResourceTopologies,
+		ValidatorPodStatus:              ValidatePodStatus,
 	}
 }
 
