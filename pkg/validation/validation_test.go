@@ -1,8 +1,25 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Copyright 2021 Red Hat, Inc.
+ */
+
 package validation
 
 import (
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"strings"
+	"testing"
+
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -12,133 +29,160 @@ import (
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
-var _ = Describe("Validation", func() {
-	Describe("MachineConfigPoolDuplicates", func() {
-		Context("with duplicates", func() {
-			It("should return an error", func() {
-				trees := []machineconfigpools.NodeGroupTree{
-					{
-						MachineConfigPools: []*machineconfigv1.MachineConfigPool{
-							testobjs.NewMachineConfigPool("test", nil, nil, nil),
-							testobjs.NewMachineConfigPool("test", nil, nil, nil),
+func TestMachineConfigPoolDuplicates(t *testing.T) {
+	type testCase struct {
+		name                 string
+		trees                []machineconfigpools.NodeGroupTree
+		expectedError        bool
+		expectedErrorMessage string
+	}
+
+	testCases := []testCase{
+		{
+			name: "duplicate MCP name",
+			trees: []machineconfigpools.NodeGroupTree{
+				{
+					MachineConfigPools: []*machineconfigv1.MachineConfigPool{
+						testobjs.NewMachineConfigPool("test", nil, nil, nil),
+						testobjs.NewMachineConfigPool("test", nil, nil, nil),
+					},
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "selected by at least two node groups",
+		},
+		{
+			name: "no duplicates",
+			trees: []machineconfigpools.NodeGroupTree{
+				{
+					MachineConfigPools: []*machineconfigv1.MachineConfigPool{
+						testobjs.NewMachineConfigPool("test", nil, nil, nil),
+						testobjs.NewMachineConfigPool("test1", nil, nil, nil),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := MachineConfigPoolDuplicates(tc.trees)
+			if err == nil && tc.expectedError {
+				t.Errorf("expected error, succeeded")
+			}
+			if err != nil && !tc.expectedError {
+				t.Errorf("expected success, failed")
+			}
+			if tc.expectedErrorMessage != "" {
+				if !strings.Contains(err.Error(), tc.expectedErrorMessage) {
+					t.Errorf("unexpected error: %v (expected %q)", err, tc.expectedErrorMessage)
+				}
+			}
+		})
+	}
+}
+
+func TestNodeGroupsSanity(t *testing.T) {
+	type testCase struct {
+		name                 string
+		nodeGroups           []nropv1alpha1.NodeGroup
+		expectedError        bool
+		expectedErrorMessage string
+	}
+
+	testCases := []testCase{
+		{
+			name: "nil MCP selector",
+			nodeGroups: []nropv1alpha1.NodeGroup{
+				{
+					MachineConfigPoolSelector: nil,
+				},
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "test",
 						},
 					},
-				}
-
-				err := MachineConfigPoolDuplicates(trees)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("selected by at least two node groups"))
-			})
-		})
-
-		Context("without duplicates", func() {
-			It("should not return any error", func() {
-				trees := []machineconfigpools.NodeGroupTree{
-					{
-						MachineConfigPools: []*machineconfigv1.MachineConfigPool{
-							testobjs.NewMachineConfigPool("test", nil, nil, nil),
-							testobjs.NewMachineConfigPool("test1", nil, nil, nil),
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "one of the node groups does not have machineConfigPoolSelector",
+		},
+		{
+			name: "with duplicates",
+			nodeGroups: []nropv1alpha1.NodeGroup{
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "test",
 						},
 					},
-				}
-
-				err := MachineConfigPoolDuplicates(trees)
-				Expect(err).ToNot(HaveOccurred())
-			})
-		})
-	})
-
-	Describe("NodeGroups", func() {
-		Context("with nil machineConfigPoolSelector", func() {
-			It("should return an error", func() {
-				nodeGroups := []nropv1alpha1.NodeGroup{
-					{
-						MachineConfigPoolSelector: nil,
+				},
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "test",
+						},
 					},
-					{
-						MachineConfigPoolSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"test": "test",
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "has duplicates",
+		},
+		{
+			name: "bad MCP selector",
+			nodeGroups: []nropv1alpha1.NodeGroup{
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "test",
+								Operator: "bad-operator",
+								Values:   []string{"test"},
 							},
 						},
 					},
+				},
+			},
+
+			expectedError:        true,
+			expectedErrorMessage: "not a valid pod selector operator",
+		},
+		{
+			name: "correct values",
+			nodeGroups: []nropv1alpha1.NodeGroup{
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "test",
+						},
+					},
+				},
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test1": "test1",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := NodeGroups(tc.nodeGroups)
+			if err == nil && tc.expectedError {
+				t.Errorf("expected error, succeeded")
+			}
+			if err != nil && !tc.expectedError {
+				t.Errorf("expected success, failed")
+			}
+			if tc.expectedErrorMessage != "" {
+				if !strings.Contains(err.Error(), tc.expectedErrorMessage) {
+					t.Errorf("unexpected error: %v (expected %q)", err, tc.expectedErrorMessage)
 				}
-
-				err := NodeGroups(nodeGroups)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("one of the node groups does not have machineConfigPoolSelector"))
-			})
+			}
 		})
-
-		Context("with duplicates", func() {
-			It("should return an error", func() {
-				nodeGroups := []nropv1alpha1.NodeGroup{
-					{
-						MachineConfigPoolSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"test": "test",
-							},
-						},
-					},
-					{
-						MachineConfigPoolSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"test": "test",
-							},
-						},
-					},
-				}
-
-				err := NodeGroups(nodeGroups)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("has duplicates"))
-			})
-		})
-
-		Context("with bad machine config pool selector", func() {
-			It("should return an error", func() {
-				nodeGroups := []nropv1alpha1.NodeGroup{
-					{
-						MachineConfigPoolSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
-								{
-									Key:      "test",
-									Operator: "bad-operator",
-									Values:   []string{"test"},
-								},
-							},
-						},
-					},
-				}
-
-				err := NodeGroups(nodeGroups)
-				Expect(err).To(HaveOccurred())
-				Expect(err.Error()).To(ContainSubstring("not a valid pod selector operator"))
-			})
-		})
-
-		Context("with correct values", func() {
-			It("should not return any error", func() {
-				nodeGroups := []nropv1alpha1.NodeGroup{
-					{
-						MachineConfigPoolSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"test": "test",
-							},
-						},
-					},
-					{
-						MachineConfigPoolSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"test1": "test1",
-							},
-						},
-					},
-				}
-
-				err := NodeGroups(nodeGroups)
-				Expect(err).ToNot(HaveOccurred())
-			})
-		})
-	})
-})
+	}
+}
