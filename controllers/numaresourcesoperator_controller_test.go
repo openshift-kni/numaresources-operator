@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"reflect"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -561,6 +563,194 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			})
 		})
 	})
+
+	Context("with NodeGroupConfig", func() {
+		var labels map[string]string
+		var labSel metav1.LabelSelector
+		var mcp *machineconfigv1.MachineConfigPool
+
+		BeforeEach(func() {
+			labels = map[string]string{
+				"test": "test",
+			}
+
+			labSel = metav1.LabelSelector{
+				MatchLabels: labels,
+			}
+
+			mcp = testobjs.NewMachineConfigPool("test", labels, &metav1.LabelSelector{MatchLabels: labels}, &metav1.LabelSelector{MatchLabels: labels})
+		})
+
+		It("should report the defaults", func() {
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, nil)
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			nroUpdated := &nrov1alpha1.NUMAResourcesOperator{}
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
+
+			conf := nrov1alpha1.DefaultNodeGroupConfig()
+
+			Expect(reflect.DeepEqual(conf, nroUpdated.Status.DefaultNodeGroupConfig)).To(BeTrue(), "expected defaults %s got %s",
+				nodeGroupConfigToString(conf),
+				nodeGroupConfigToString(nroUpdated.Status.DefaultNodeGroupConfig),
+			)
+		})
+
+		It("should set defaults in the DS objects", func() {
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, nil)
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			mcpDSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+
+			args := ds.Spec.Template.Spec.Containers[0].Args
+			Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
+			Expect(args).To(ContainElement(ContainSubstring("--notify-file=")), "malformed args: %v", args)
+			Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
+		})
+
+		It("should allow to alter all the settings of the DS objects", func() {
+			d, err := time.ParseDuration("33s")
+			Expect(err).ToNot(HaveOccurred())
+
+			period := metav1.Duration{
+				Duration: d,
+			}
+			pfpMode := nrov1alpha1.PodsFingerprintingEnabled
+			refMode := nrov1alpha1.InfoRefreshPeriodic
+			conf := nrov1alpha1.NodeGroupConfig{
+				PodsFingerprinting: &pfpMode,
+				InfoRefreshPeriod:  &period,
+				InfoRefreshMode:    &refMode,
+			}
+
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			mcpDSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+
+			args := ds.Spec.Template.Spec.Containers[0].Args
+			Expect(args).To(ContainElement("--sleep-interval=33s"), "malformed args: %v", args)
+			Expect(args).ToNot(ContainElement(ContainSubstring("--notify-file=")), "malformed args: %v", args)
+			Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
+		})
+
+		It("should allow to disable pods fingerprinting", func() {
+			pfpMode := nrov1alpha1.PodsFingerprintingDisabled
+			conf := nrov1alpha1.NodeGroupConfig{
+				PodsFingerprinting: &pfpMode,
+			}
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			mcpDSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+
+			args := ds.Spec.Template.Spec.Containers[0].Args
+			Expect(args).ToNot(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
+		})
+
+		It("should honor the legacy bool pods fingerprinting", func() {
+			pfpMode := false
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, nil)
+			nro.Spec.NodeGroups[0].DisablePodsFingerprinting = &pfpMode
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			mcpDSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+
+			args := ds.Spec.Template.Spec.Containers[0].Args
+			Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
+		})
+
+		It("should allow to disable pods fingerprinting using the legacy bool", func() {
+			pfpMode := true
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, nil)
+			nro.Spec.NodeGroups[0].DisablePodsFingerprinting = &pfpMode
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			mcpDSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+
+			args := ds.Spec.Template.Spec.Containers[0].Args
+			Expect(args).ToNot(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
+		})
+
+		It("should allow to tune the update period", func() {
+			d, err := time.ParseDuration("42s")
+			Expect(err).ToNot(HaveOccurred())
+
+			period := metav1.Duration{
+				Duration: d,
+			}
+			conf := nrov1alpha1.NodeGroupConfig{
+				InfoRefreshPeriod: &period,
+			}
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			mcpDSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+
+			args := ds.Spec.Template.Spec.Containers[0].Args
+			Expect(args).To(ContainElement("--sleep-interval=42s"), "malformed args: %v", args)
+		})
+
+		It("should allow to tune the update mechanism", func() {
+			refMode := nrov1alpha1.InfoRefreshPeriodic
+			conf := nrov1alpha1.NodeGroupConfig{
+				InfoRefreshMode: &refMode,
+			}
+
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			mcpDSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+
+			args := ds.Spec.Template.Spec.Containers[0].Args
+			Expect(args).ToNot(ContainElement(ContainSubstring("--notify-file")), "malformed args: %v", args)
+		})
+
+	})
+
 })
 
 func getConditionByType(conditions []metav1.Condition, conditionType string) *metav1.Condition {
@@ -572,4 +762,45 @@ func getConditionByType(conditions []metav1.Condition, conditionType string) *me
 	}
 
 	return nil
+}
+
+func reconcileObjects(nro *nrov1alpha1.NUMAResourcesOperator, mcp *machineconfigv1.MachineConfigPool) *NUMAResourcesOperatorReconciler {
+	reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
+	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+
+	key := client.ObjectKeyFromObject(nro)
+
+	// we need to do the first iteration here because the DS object is created in the second
+	_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+
+	By("Ensure MachineConfigPools is ready")
+	ExpectWithOffset(1, reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp), mcp)).ToNot(HaveOccurred())
+	mcp.Status.Configuration.Source = []corev1.ObjectReference{
+		{
+			Name: objectnames.GetMachineConfigName(nro.Name, mcp.Name),
+		},
+	}
+	mcp.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+		{
+			Type:   machineconfigv1.MachineConfigPoolUpdated,
+			Status: corev1.ConditionTrue,
+		},
+	}
+	ExpectWithOffset(1, reconciler.Client.Status().Update(context.TODO(), mcp))
+
+	var secondLoopResult reconcile.Result
+	secondLoopResult, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+
+	ExpectWithOffset(1, secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+	return reconciler
+}
+
+func nodeGroupConfigToString(conf nrov1alpha1.NodeGroupConfig) string {
+	data, err := json.Marshal(conf)
+	if err != nil {
+		return "<ERROR>"
+	}
+	return string(data)
 }
