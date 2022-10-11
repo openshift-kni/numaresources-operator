@@ -274,11 +274,11 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				return true, nil
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(BeTrue())
 
-			By(fmt.Sprintf("modifing the NUMAResourcesOperator ExporterImage filed to %q", serialconfig.NropTestCIImage))
+			By(fmt.Sprintf("modifying the NUMAResourcesOperator ExporterImage field to %q", serialconfig.GetRteCiImage()))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
-			nroOperObj.Spec.ExporterImage = serialconfig.NropTestCIImage
+			nroOperObj.Spec.ExporterImage = serialconfig.GetRteCiImage()
 			err = fxt.Client.Update(context.TODO(), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -295,13 +295,13 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				for _, ds := range dss {
 					// RTE container shortcut
 					cnt := ds.Spec.Template.Spec.Containers[0]
-					if cnt.Image != serialconfig.NropTestCIImage {
-						klog.Warningf("container: %q image not updated yet. expected %q actual %q", cnt.Name, serialconfig.NropTestCIImage, cnt.Image)
+					if cnt.Image != serialconfig.GetRteCiImage() {
+						klog.Warningf("container: %q image not updated yet. expected %q actual %q", cnt.Name, serialconfig.GetRteCiImage(), cnt.Image)
 						return false, nil
 					}
 				}
 				return true, nil
-			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with image %q", serialconfig.NropTestCIImage)
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with image %q", serialconfig.GetRteCiImage())
 
 			By(fmt.Sprintf("modifing the NUMAResourcesOperator LogLevel filed to %q", operatorv1.Trace))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
