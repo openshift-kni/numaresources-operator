@@ -33,6 +33,24 @@ spec:
       - description: Group of Nodes to enable RTE on
         displayName: Group of nodes to enable RTE on
         path: nodeGroups
+      - description: InfoRefreshMode sets the mechanism which will be used to refresh
+          the topology info.
+        displayName: Topology info mechanism setting
+        path: nodeGroups[0].config.infoRefreshMode
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: InfoRefreshPeriod sets the topology info refresh period. Use
+          explicit 0 to disable.
+        displayName: Topology info refresh period setting
+        path: nodeGroups[0].config.infoRefreshPeriod
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: PodsFingerprinting defines if pod fingerprint should be reported
+          for the machines belonging to this group
+        displayName: Enable or disable the pods fingerprinting setting
+        path: nodeGroups[0].config.podsFingerprinting
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       statusDescriptors:
       - description: DaemonSets of the configured RTEs, one per node group
         displayName: RTE DaemonSets

@@ -49,6 +49,26 @@ func NewNUMAResourcesOperator(name string, labelSelectors []*metav1.LabelSelecto
 	}
 }
 
+func NewNUMAResourcesOperatorWithNodeGroupConfig(name string, selector *metav1.LabelSelector, conf *nrov1alpha1.NodeGroupConfig) *nrov1alpha1.NUMAResourcesOperator {
+	return &nrov1alpha1.NUMAResourcesOperator{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "NUMAResourcesOperator",
+			APIVersion: nrov1alpha1.GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: nrov1alpha1.NUMAResourcesOperatorSpec{
+			NodeGroups: []nrov1alpha1.NodeGroup{
+				{
+					MachineConfigPoolSelector: selector,
+					Config:                    conf,
+				},
+			},
+		},
+	}
+}
+
 func NewNUMAResourcesScheduler(name, imageSpec, schedulerName string) *nrov1alpha1.NUMAResourcesScheduler {
 	return &nrov1alpha1.NUMAResourcesScheduler{
 		TypeMeta: metav1.TypeMeta{
