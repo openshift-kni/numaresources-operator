@@ -111,7 +111,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
 			if len(nrtCandidates) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates)))
+				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
 			}
 			klog.Infof("Found node with 2 NUMA zones: %d", len(nrtCandidates))
 
@@ -121,7 +121,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
 			if len(nrts) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
+				e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 			}
 			klog.Infof("Found node with 2 NUMA zones: %d", len(nrts))
 
@@ -627,7 +627,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
 			if len(nrtCandidates) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates)))
+				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
 			}
 			klog.Infof("Found node with 2 NUMA zones: %d", len(nrtCandidates))
 
@@ -637,7 +637,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
 			if len(nrts) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
+				e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 			}
 			klog.Infof("Found node with 2 NUMA zones: %d", len(nrts))
 
@@ -864,7 +864,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
 			if len(nrtCandidates) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates)))
+				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
 			}
 			klog.Infof("Found node with 2 NUMA zones: %d", len(nrtCandidates))
 
@@ -874,7 +874,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
 			if len(nrts) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
+				e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 			}
 			klog.Infof("Found node with 2 NUMA zones: %d", len(nrts))
 
