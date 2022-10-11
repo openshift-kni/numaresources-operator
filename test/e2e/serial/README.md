@@ -16,7 +16,7 @@ run in isolation with any other workload, and in isolation to each other.
 
 IOW, the suite expects to run against a pristine, unloaded cluster to validate it.
 
-It is responsability of the tests in this suite to clean up properly and to restore the cluster state as
+It is responsibility of the tests in this suite to clean up properly and to restore the cluster state as
 they found it before they run.
 
 ### configuring using the environment variables
@@ -44,4 +44,6 @@ they found it before they run.
   the cluster and will be used as a resource of type `device-b` in the tests.
 - `E2E_NROP_DEVICE_C` (accepts string, e.g `example.com/deviceC`) declares name of a device type that exists on
   the cluster and will be used as a resource of type `device-c` in the tests.
+- `E2E_RTE_CI_IMAGE` (accepts string, e.g `quay.io/openshift-kni/resource-topology-exporter:test-ci`) sets the 
+  RTE image to be used for testing purposes particularly for modifying the operator object.
   

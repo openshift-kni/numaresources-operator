@@ -24,7 +24,7 @@ import (
 
 const (
 	MultiNUMALabel    = "numa.hardware.openshift-kni.io/cell-count"
-	NropTestCIImage   = "quay.io/openshift-kni/resource-topology-exporter:test-ci"
+	nropTestCIImage   = "quay.io/openshift-kni/resource-topology-exporter:test-ci"
 	SchedulerTestName = "test-topology-scheduler"
 )
 
@@ -59,4 +59,11 @@ func Teardown() {
 	// numacell daemonset automatically cleaned up when we remove the namespace
 	err := TeardownFixture()
 	Expect(err).NotTo(HaveOccurred())
+}
+
+func GetRteCiImage() string {
+	if pullSpec, ok := os.LookupEnv("E2E_RTE_CI_IMAGE"); ok {
+		return pullSpec
+	}
+	return nropTestCIImage
 }
