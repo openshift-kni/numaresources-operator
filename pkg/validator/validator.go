@@ -78,6 +78,7 @@ func Available() sets.String {
 		ValidatorKubeletConfig,
 		ValidatorNodeResourceTopologies,
 		ValidatorPodStatus,
+		ValidatorSchedCache,
 	)
 }
 
@@ -85,6 +86,7 @@ type ValidatorData struct {
 	tasEnabledNodeNames  sets.String
 	nonRunningPodsByNode map[string]map[string]corev1.PodPhase
 	kConfigs             map[string]*kubeletconfigv1beta1.KubeletConfiguration
+	unsynchedCaches      map[string]sets.String
 	nrtCrdMissing        bool
 	nrtList              *nrtv1alpha1.NodeResourceTopologyList
 	versionInfo          *version.Info
@@ -98,6 +100,7 @@ func Collectors() map[string]CollectFunc {
 		ValidatorKubeletConfig:          CollectKubeletConfig,
 		ValidatorNodeResourceTopologies: CollectNodeResourceTopologies,
 		ValidatorPodStatus:              CollectPodStatus,
+		ValidatorSchedCache:             CollectSchedCache,
 	}
 }
 
@@ -197,6 +200,7 @@ func Validators() map[string]ValidateFunc {
 		ValidatorKubeletConfig:          ValidateKubeletConfig,
 		ValidatorNodeResourceTopologies: ValidateNodeResourceTopologies,
 		ValidatorPodStatus:              ValidatePodStatus,
+		ValidatorSchedCache:             ValidateSchedCache,
 	}
 }
 
