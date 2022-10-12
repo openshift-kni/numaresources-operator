@@ -64,7 +64,7 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 
 		BeforeEach(func() {
 			if len(nrtList.Items) > 0 {
-				Skip("this test require empty NRT data")
+				e2efixture.Skip(fxt, "this test require empty NRT data")
 			}
 		})
 

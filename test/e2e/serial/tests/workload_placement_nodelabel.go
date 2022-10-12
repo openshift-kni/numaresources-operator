@@ -78,7 +78,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		}
 		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
 		if len(nrts) < 2 {
-			Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
+			e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 		}
 
 		// Note that this test, being part of "serial", expects NO OTHER POD being scheduled
@@ -111,7 +111,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			neededNodes := 2
 			if len(nrtCandidates) < neededNodes {
-				Skip(fmt.Sprintf("not enough nodes with %d NUMA Zones: found %d, needed %d", requiredNUMAZones, len(nrtCandidates), neededNodes))
+				e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d, needed %d", requiredNUMAZones, len(nrtCandidates), neededNodes)
 			}
 
 			// TODO: this should be >= 5x baseload
@@ -128,7 +128,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
 			nrtCandidates = e2enrt.FilterAnyZoneMatchingResources(nrtCandidates, requiredRes)
 			if len(nrtCandidates) < neededNodes {
-				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d, needed: %d, request: %v", len(nrtCandidates), neededNodes, requiredRes))
+				e2efixture.Skipf(fxt, "not enough nodes with NUMA zones each of them can match requests: found %d, needed: %d, request: %v", len(nrtCandidates), neededNodes, requiredRes)
 			}
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 

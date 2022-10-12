@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -43,6 +43,7 @@ type Fixture struct {
 	// K8sClient defines k8s client to run subresource operations, for example you should use it to get pod logs
 	K8sClient *kubernetes.Clientset
 	Namespace corev1.Namespace
+	Skipped   bool
 }
 
 const (
@@ -67,7 +68,7 @@ func SetupWithOptions(name string, options Options) (*Fixture, error) {
 		klog.Errorf("cannot setup namespace %q: %v", name, err)
 		return nil, err
 	}
-	By(fmt.Sprintf("set up the test namespace %q", ns.Name))
+	ginkgo.By(fmt.Sprintf("set up the test namespace %q", ns.Name))
 	return &Fixture{
 		Client:    e2eclient.Client,
 		K8sClient: e2eclient.K8sClient,
@@ -81,14 +82,30 @@ func Setup(baseName string) (*Fixture, error) {
 }
 
 func Teardown(ft *Fixture) error {
-	By(fmt.Sprintf("tearing down the test namespace %q", ft.Namespace.Name))
+	ginkgo.By(fmt.Sprintf("tearing down the test namespace %q", ft.Namespace.Name))
 	err := teardownNamespace(ft.Client, ft.Namespace)
 	if err != nil {
 		klog.Errorf("cannot teardown namespace %q: %s", ft.Namespace.Name, err)
 		return err
 	}
+
+	if ft.Skipped {
+		ft.Skipped = false
+		ginkgo.By(fmt.Sprintf("skipped - nothing to cool down"))
+		return nil
+	}
+
 	Cooldown()
 	return nil
+}
+
+func Skip(ft *Fixture, message string) {
+	ft.Skipped = true
+	ginkgo.Skip(message)
+}
+
+func Skipf(ft *Fixture, format string, args ...interface{}) {
+	Skip(ft, fmt.Sprintf(format, args...))
 }
 
 func Cooldown() {

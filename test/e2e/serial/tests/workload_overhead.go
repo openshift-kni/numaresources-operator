@@ -75,7 +75,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 		}
 		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
 		if len(nrts) < 2 {
-			Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
+			e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 		}
 
 		// Note that this test, being part of "serial", expects NO OTHER POD being scheduled
@@ -103,7 +103,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNumaZones))
 			nrtTwoZoneCandidates = e2enrt.FilterZoneCountEqual(nrts, requiredNumaZones)
 			if len(nrtTwoZoneCandidates) < requiredNodeNumber {
-				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtTwoZoneCandidates)))
+				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtTwoZoneCandidates))
 			}
 		})
 
@@ -173,7 +173,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				nrtCandidates := e2enrt.FilterAnyZoneMatchingResources(nrtTwoZoneCandidates, zoneRequiredResources)
 				minCandidates := 1
 				if len(nrtCandidates) < minCandidates {
-					Skip(fmt.Sprintf("There should be at least %d nodes with at least %s resources: found %d", minCandidates, resStr, len(nrtCandidates)))
+					e2efixture.Skipf(fxt, "There should be at least %d nodes with at least %s resources: found %d", minCandidates, resStr, len(nrtCandidates))
 				}
 
 				candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)

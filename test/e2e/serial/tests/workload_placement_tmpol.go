@@ -116,13 +116,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			neededNodes := 2
 			if len(nrtCandidates) < neededNodes {
-				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes))
+				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes)
 			}
 
 			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
 			nrtCandidates = e2enrt.FilterAnyZoneMatchingResources(nrtCandidates, requiredRes)
 			if len(nrtCandidates) < neededNodes {
-				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d, needed: %d", len(nrtCandidates), neededNodes))
+				e2efixture.Skipf(fxt, "not enough nodes with NUMA zones each of them can match requests: found %d, needed: %d", len(nrtCandidates), neededNodes)
 			}
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
@@ -172,7 +172,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 				nrts := e2enrt.FilterTopologyManagerPolicy(nrtCandidates, tmPolicy)
 				if len(nrts) != len(nrtCandidates) {
-					Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
+					e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts))
 				}
 
 				targetNrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
@@ -277,7 +277,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 				nrts := e2enrt.FilterTopologyManagerPolicy(nrtCandidates, tmPolicy)
 				if len(nrts) != len(nrtCandidates) {
-					Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
+					e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts))
 				}
 
 				targetNrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
@@ -390,7 +390,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			nrts := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, policyFuncs.name())
 			if len(nrts) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(policyFuncs.name()), len(nrts)))
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(policyFuncs.name()), len(nrts))
 			}
 
 			Expect(len(unsuitableFreeRes)).To(Equal(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
@@ -417,12 +417,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", numaZonesRequired))
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, numaZonesRequired)
 			if len(nrtCandidates) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with %d NUMA Zones: found %d", numaZonesRequired, len(nrtCandidates)))
+				e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", numaZonesRequired, len(nrtCandidates))
 			}
 			By("filtering available nodes with allocatable resources on each NUMA zone that can match request")
 			nrtCandidates = policyFuncs.filterMatchingResources(nrtCandidates, requiredRes)
 			if len(nrtCandidates) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d", len(nrtCandidates)))
+				e2efixture.Skipf(fxt, "not enough nodes with NUMA zones each of them can match requests: found %d", len(nrtCandidates))
 			}
 
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
@@ -1161,7 +1161,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			nrts := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, policyFuncs.name())
 			if len(nrts) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(policyFuncs.name()), len(nrts)))
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(policyFuncs.name()), len(nrts))
 			}
 
 			Expect(len(unsuitableFreeRes)).To(Equal(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
@@ -1170,7 +1170,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				for _, zone := range nrt.Zones {
 					avail := e2enrt.AvailableFromZone(zone)
 					if !isHugePageInAvailable(avail) && isHugepageNeeded(podRes) {
-						Skip(fmt.Sprintf("hugepages requested but not found under node: %q", nrt.Name))
+						e2efixture.Skipf(fxt, "hugepages requested but not found under node: %q", nrt.Name)
 					}
 				}
 			}
@@ -1197,12 +1197,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", numaZonesRequired))
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, numaZonesRequired)
 			if len(nrtCandidates) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with %d NUMA Zones: found %d", numaZonesRequired, len(nrtCandidates)))
+				e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", numaZonesRequired, len(nrtCandidates))
 			}
 			By("filtering available nodes with allocatable resources on each NUMA zone that can match request")
 			nrtCandidates = e2enrt.FilterAnyZoneMatchingResources(nrtCandidates, requiredRes)
 			if len(nrtCandidates) < hostsRequired {
-				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d", len(nrtCandidates)))
+				e2efixture.Skipf(fxt, "not enough nodes with NUMA zones each of them can match requests: found %d", len(nrtCandidates))
 			}
 
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)

@@ -95,7 +95,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 
 				nrts := e2enrt.FilterTopologyManagerPolicy(nrtCandidates, tmPolicy)
 				if len(nrts) != len(nrtCandidates) {
-					Skip(fmt.Sprintf("not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts)))
+					e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts))
 				}
 
 				By("Scheduling the testing pod")
@@ -174,13 +174,13 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 	nrtCandidates := e2enrt.FilterZoneCountEqual(nodesState.NRTList.Items, nodesState.RequiredNUMAZones)
 
 	if len(nrtCandidates) < nodesState.RequiredNodes {
-		Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), nodesState.RequiredNodes))
+		e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), nodesState.RequiredNodes)
 	}
 
 	By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
 	nrtCandidates = e2enrt.FilterAnyZoneMatchingResources(nrtCandidates, nodesState.RequiredResources)
 	if len(nrtCandidates) < nodesState.RequiredNodes {
-		Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d, needed: %d", len(nrtCandidates), nodesState.RequiredNodes))
+		e2efixture.Skipf(fxt, "not enough nodes with NUMA zones each of them can match requests: found %d, needed: %d", len(nrtCandidates), nodesState.RequiredNodes)
 	}
 	nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 

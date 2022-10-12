@@ -80,7 +80,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 		}
 		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
 		if len(nrts) < 2 {
-			Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
+			e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 		}
 
 		// Note that this test, being part of "serial", expects NO OTHER POD being scheduled
@@ -108,7 +108,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNumaZones))
 			nrtTwoZoneCandidates = e2enrt.FilterZoneCountEqual(nrts, requiredNumaZones)
 			if len(nrtTwoZoneCandidates) < requiredNodeNumber {
-				Skip(fmt.Sprintf("not enough nodes with 2 NUMA Zones: found %d", len(nrtTwoZoneCandidates)))
+				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtTwoZoneCandidates))
 			}
 		})
 
@@ -129,7 +129,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			By("filtering available nodes with allocatable resources on each NUMA zone that can match request")
 			nrtCandidates := e2enrt.FilterAnyZoneMatchingResources(nrtTwoZoneCandidates, requiredRes)
 			if len(nrtCandidates) < 1 {
-				Skip(fmt.Sprintf("not enough nodes with NUMA zones each of them can match requests: found %d", len(nrtCandidates)))
+				e2efixture.Skipf(fxt, "not enough nodes with NUMA zones each of them can match requests: found %d", len(nrtCandidates))
 			}
 
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
@@ -321,7 +321,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			const neededNodes = 1
 			if len(nrtCandidates) < neededNodes {
-				Skip(fmt.Sprintf("not enough nodes with at least %d NUMA Zones: found %d, needed %d", requiredNUMAZones, len(nrtCandidates), neededNodes))
+				e2efixture.Skipf(fxt, "not enough nodes with at least %d NUMA Zones: found %d, needed %d", requiredNUMAZones, len(nrtCandidates), neededNodes)
 			}
 
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
