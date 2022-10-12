@@ -17,11 +17,6 @@
 package clients
 
 import (
-	"context"
-	"time"
-
-	. "github.com/onsi/gomega"
-
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
@@ -101,16 +96,4 @@ func NewK8s() (*kubernetes.Clientset, error) {
 		klog.Exit(err.Error())
 	}
 	return clientset, nil
-}
-
-func GetWithRetry(ctx context.Context, key client.ObjectKey, obj client.Object) error {
-	var err error
-	EventuallyWithOffset(1, func() error {
-		err = Client.Get(ctx, key, obj)
-		if err != nil {
-			klog.Infof("Getting %s failed, retrying: %v", key.Name, err)
-		}
-		return err
-	}, 1*time.Minute, 10*time.Second).ShouldNot(HaveOccurred(), "Max numbers of retries getting %v reached", key)
-	return err
 }
