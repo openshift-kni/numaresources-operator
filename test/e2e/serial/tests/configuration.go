@@ -111,6 +111,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(ok).To(BeTrue())
 			targetedNode := workers[targetIdx]
 
+			By(fmt.Sprintf("Label node %q with %q and remove the label %q from it", targetedNode.Name, nodes.GetLabelRoleMCPTest(), nodes.GetLabelRoleWorker()))
 			unlabelFunc, err := labelNode(fxt.Client, nodes.GetLabelRoleMCPTest(), targetedNode.Name)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -118,11 +119,10 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			defer func() {
-				By(fmt.Sprintf("unlabeling node: %q", targetedNode.Name))
+				By(fmt.Sprintf("Restore initial labels of node %q with %q", targetedNode.Name, nodes.GetLabelRoleWorker()))
 				err = unlabelFunc()
 				Expect(err).ToNot(HaveOccurred())
 
-				By(fmt.Sprintf("labeling node: %q", targetedNode.Name))
 				err = labelFunc()
 				Expect(err).ToNot(HaveOccurred())
 
@@ -251,7 +251,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				return true, nil
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with image %q", serialconfig.GetRteCiImage())
 
-			By(fmt.Sprintf("modifing the NUMAResourcesOperator LogLevel filed to %q", operatorv1.Trace))
+			By(fmt.Sprintf("modifying the NUMAResourcesOperator LogLevel field to %q", operatorv1.Trace))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
