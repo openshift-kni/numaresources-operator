@@ -55,14 +55,12 @@ import (
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
 var _ = Describe("[serial][disruptive][slow] numaresources configuration management", func() {
 	var fxt *e2efixture.Fixture
-	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
 	var nrts []nrtv1alpha1.NodeResourceTopology
 
@@ -73,9 +71,6 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 		var err error
 		fxt, err = e2efixture.Setup("e2e-test-configuration")
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
-
-		padder, err = e2epadder.New(fxt.Client, fxt.Namespace.Name)
-		Expect(err).ToNot(HaveOccurred())
 
 		err = fxt.Client.List(context.TODO(), &nrtList)
 		Expect(err).ToNot(HaveOccurred())
@@ -96,43 +91,12 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 	})
 
 	AfterEach(func() {
-		err := padder.Clean()
-		Expect(err).NotTo(HaveOccurred())
-		err = e2efixture.Teardown(fxt)
+		err := e2efixture.Teardown(fxt)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	// note we hardcode the values we need here and when we pad node.
-	// This is ugly, but automatically computing the values is not straightforward
-	// and will we want to start lean and mean.
-
 	Context("cluster has at least one suitable node", func() {
 		timeout := 5 * time.Minute
-		// will be called at the end of the test to make sure we're not polluting the cluster
-		var cleanFuncs []func() error
-
-		BeforeEach(func() {
-			numOfNodeToBePadded := len(nrts) - 1
-
-			rl := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("8G"),
-			}
-			By("padding the nodes before test start")
-			err := padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{})
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			By("unpadding the nodes after test finish")
-			err := padder.Clean()
-			Expect(err).ToNot(HaveOccurred())
-
-			for _, f := range cleanFuncs {
-				err := f()
-				Expect(err).ToNot(HaveOccurred())
-			}
-		})
 
 		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator and NUMAResourcesScheduler CR", func() {
 
