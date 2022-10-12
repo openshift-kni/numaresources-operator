@@ -98,15 +98,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 	Context("cluster has at least one suitable node", func() {
 		timeout := 5 * time.Minute
 
-		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator and NUMAResourcesScheduler CR", func() {
-
-			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
-			initialNroSchedObj := nroSchedObj.DeepCopy()
-
+		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator CR", func() {
 			nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
-			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: objects.NROName()}, nroOperObj)
+			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: objects.NROName()}, nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", objects.NROName())
 			initialNroOperObj := nroOperObj.DeepCopy()
 
@@ -130,16 +124,6 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 				By(fmt.Sprintf("labeling node: %q", targetedNode.Name))
 				err = labelFunc()
-				Expect(err).ToNot(HaveOccurred())
-
-				By("reverting the changes under the NUMAResourcesScheduler object")
-				// we need that for the current ResourceVersion
-				nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroSchedObj), nroSchedObj)
-				Expect(err).ToNot(HaveOccurred())
-
-				nroSchedObj.Spec = initialNroSchedObj.Spec
-				err = fxt.Client.Update(context.TODO(), nroSchedObj)
 				Expect(err).ToNot(HaveOccurred())
 
 				By("reverting the changes under the NUMAResourcesOperator object")
@@ -302,13 +286,32 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				return true, nil
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with LogLevel %q", operatorv1.Trace)
 
-			By(fmt.Sprintf("modifing the NUMAResourcesScheduler SchedulerName Filed to %q", serialconfig.SchedulerTestName))
+		})
+
+		It("[test_id:54916][tier2] should be able to modify the configurable values under the NUMAResourcesScheduler CR", func() {
+			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
+			initialNroSchedObj := nroSchedObj.DeepCopy()
+
+			By(fmt.Sprintf("modifying the NUMAResourcesScheduler SchedulerName field to %q", serialconfig.SchedulerTestName))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			nroSchedObj.Spec.SchedulerName = serialconfig.SchedulerTestName
 			err = fxt.Client.Update(context.TODO(), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
+
+			defer func() {
+				By("reverting the changes under the NUMAResourcesScheduler object")
+				currentSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+				err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, currentSchedObj)
+				Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
+
+				currentSchedObj.Spec = initialNroSchedObj.Spec
+				err = fxt.Client.Update(context.TODO(), currentSchedObj)
+				Expect(err).ToNot(HaveOccurred())
+			}()
 
 			By("schedule pod using the new scheduler name")
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomizeName("testpod"))
@@ -317,7 +320,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, 5*time.Minute)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
