@@ -34,10 +34,10 @@ import (
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
+	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
-	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
@@ -231,7 +231,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
 			By(fmt.Sprintf("checking deployment pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
-			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
+			pods, err := podlist.ByDeployment(fxt.Client, *deployment)
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 
 			for _, pod := range pods {
@@ -263,7 +263,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", ds.Name)
 
 			By(fmt.Sprintf("checking daemonset pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
-			pods, err := schedutils.ListPodsByDaemonset(fxt.Client, *ds)
+			pods, err := podlist.ByDaemonset(fxt.Client, *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 
 			for _, pod := range pods {
@@ -295,7 +295,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
 			By(fmt.Sprintf("checking deployment pods have been handled by the default scheduler %q but failed to be scheduled", corev1.DefaultSchedulerName))
-			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
+			pods, err := podlist.ByDeployment(fxt.Client, *deployment)
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 
 			for _, pod := range pods {
@@ -393,7 +393,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", ds.Name)
 
 			By(fmt.Sprintf("checking daemonset pods have been scheduled with the topology aware scheduler %q ", serialconfig.Config.SchedulerName))
-			pods, err := schedutils.ListPodsByDaemonset(fxt.Client, *ds)
+			pods, err := podlist.ByDaemonset(fxt.Client, *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 
 			//TODO: should wait until ds pods have at least been scheduled.
@@ -672,7 +672,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q ", schedulerName))
-			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *dp)
+			pods, err := podlist.ByDeployment(fxt.Client, *dp)
 			Expect(err).ToNot(HaveOccurred(), "unable to get pods from deployment %q:  %v", dp.Name, err)
 
 			var succeededPods []string
@@ -899,7 +899,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
 			By("check the deployment pod is still pending")
-			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *deployment)
+			pods, err := podlist.ByDeployment(fxt.Client, *deployment)
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 
 			for _, pod := range pods {
@@ -930,7 +930,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", ds.Name)
 
 			By("check the daemonset pods are still pending")
-			pods, err := schedutils.ListPodsByDaemonset(fxt.Client, *ds)
+			pods, err := podlist.ByDaemonset(fxt.Client, *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 
 			for _, pod := range pods {

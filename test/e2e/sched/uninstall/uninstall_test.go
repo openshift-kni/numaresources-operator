@@ -27,8 +27,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
-	"github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
@@ -47,7 +47,7 @@ var _ = Describe("[Scheduler] uninstall", func() {
 				return
 			}
 
-			deploy, err := utils.GetDeploymentByOwnerReference(nroSchedObj.GetUID())
+			deploy, err := podlist.GetDeploymentByOwnerReference(e2eclient.Client, nroSchedObj.GetUID())
 			Expect(err).ToNot(HaveOccurred())
 
 			err = e2eclient.Client.Delete(context.TODO(), nroSchedObj)

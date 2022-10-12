@@ -30,9 +30,11 @@ import (
 	. "github.com/onsi/gomega"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	"github.com/openshift-kni/numaresources-operator/internal/nodes"
+	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
-	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
+	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/crds"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
@@ -78,7 +80,7 @@ var _ = Describe("[Scheduler] install", func() {
 			const deploymentCheckPollPeriod = 10 * time.Second
 			deployment := &appsv1.Deployment{}
 			Eventually(func() bool {
-				deployment, err = schedutils.GetDeploymentByOwnerReference(nroSchedObj.UID)
+				deployment, err = podlist.GetDeploymentByOwnerReference(e2eclient.Client, nroSchedObj.UID)
 				if err != nil {
 					klog.Warningf("unable to get deployment by owner reference: %v", err)
 					return false
@@ -92,14 +94,14 @@ var _ = Describe("[Scheduler] install", func() {
 			}).WithTimeout(deploymentCheckTimeout).WithPolling(deploymentCheckPollPeriod).Should(BeTrue(), "Deployment Status not OK")
 
 			By("Check secondary scheduler pod is scheduled on a control-plane node")
-			podList, err := schedutils.ListPodsByDeployment(e2eclient.Client, *deployment)
+			podList, err := podlist.ByDeployment(e2eclient.Client, *deployment)
 			Expect(err).NotTo(HaveOccurred())
 
-			nodeList, err := schedutils.ListMasterNodes(e2eclient.Client)
+			nodeList, err := nodes.GetControlPlane(e2eclient.Client, configuration.Plat)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(nodeList).ToNot(BeEmpty())
 
-			nodeNames := schedutils.GetNodeNames(nodeList)
+			nodeNames := nodes.GetNames(nodeList)
 			for _, pod := range podList {
 				Expect(pod.Spec.NodeName).To(BeElementOf(nodeNames), "pod: %q landed on node: %q, which is not part of the master nodes group: %v", pod.Name, pod.Spec.NodeName, nodeNames)
 			}

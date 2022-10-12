@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package utils
+package podlist
 
 import (
 	"context"
@@ -25,14 +25,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ListPodsByDaemonset(cli client.Client, ds appsv1.DaemonSet) ([]corev1.Pod, error) {
+func ByReplicaSet(cli client.Client, rs appsv1.ReplicaSet) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
-	sel, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+	sel, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 
-	err = cli.List(context.TODO(), podList, &client.ListOptions{LabelSelector: sel})
+	err = cli.List(context.TODO(), podList, &client.ListOptions{Namespace: rs.Namespace, LabelSelector: sel})
 	if err != nil {
 		return nil, err
 	}

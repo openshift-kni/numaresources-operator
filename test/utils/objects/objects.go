@@ -50,7 +50,7 @@ func TestNROScheduler() *nropv1alpha1.NUMAResourcesScheduler {
 			APIVersion: nropv1alpha1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "numaresourcesscheduler",
+			Name: NROSchedName(),
 		},
 		Spec: nropv1alpha1.NUMAResourcesSchedulerSpec{
 			SchedulerImage: "quay.io/openshift-kni/scheduler-plugins:4.12-snapshot",
@@ -64,6 +64,14 @@ func NROName() string {
 
 func NROObjectKey() client.ObjectKey {
 	return client.ObjectKey{Name: NROName()}
+}
+
+func NROSchedName() string {
+	return "numaresourcesscheduler"
+}
+
+func NROSchedObjectKey() client.ObjectKey {
+	return client.ObjectKey{Name: NROSchedName()}
 }
 
 func TestNRO(matchLabels map[string]string) *nropv1alpha1.NUMAResourcesOperator {
