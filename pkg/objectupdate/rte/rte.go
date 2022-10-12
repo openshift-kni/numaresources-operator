@@ -18,9 +18,11 @@ package rte
 
 import (
 	"fmt"
+	"path/filepath"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
@@ -35,6 +37,9 @@ import (
 const (
 	MainContainerName   = "resource-topology-exporter"
 	HelperContainerName = "shared-pool-container"
+
+	pfpStatusMountName = "run-pfpstatus"
+	pfpStatusDir       = "/run/pfpstatus"
 )
 
 func DaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImageSpec string, builtinPullPolicy corev1.PullPolicy) error {
@@ -114,6 +119,8 @@ func DaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
 }
 
+const _MiB = 1024 * 1024
+
 func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1alpha1.NodeGroupConfig) error {
 	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
 	if err != nil {
@@ -124,16 +131,12 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1alpha1.NodeGroupConfig) erro
 		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
 	}
 
+	flags.SetToggle("--refresh-node-resources")
+
 	notifEnabled := isNotifyFileEnabled(&conf)
 	klog.V(2).InfoS("DaemonSet update: event notification", "daemonset", ds.Name, "enabled", notifEnabled)
 	if !notifEnabled {
 		flags.Delete("--notify-file")
-	}
-
-	pfpEnabled := isPodFingerprintEnabled(&conf)
-	klog.V(2).InfoS("DaemonSet update: pod fingerprinting status", "daemonset", ds.Name, "enabled", pfpEnabled)
-	if pfpEnabled {
-		flags.SetToggle("--pods-fingerprint")
 	}
 
 	needsPeriodic := isPeriodicUpdateRequired(&conf)
@@ -143,7 +146,18 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1alpha1.NodeGroupConfig) erro
 		flags.SetOption("--sleep-interval", refreshPeriod)
 	}
 
-	flags.SetToggle("--refresh-node-resources")
+	pfpEnabled := isPodFingerprintEnabled(&conf)
+	klog.V(2).InfoS("DaemonSet update: pod fingerprinting status", "daemonset", ds.Name, "enabled", pfpEnabled)
+	if pfpEnabled {
+		flags.SetToggle("--pods-fingerprint")
+		flags.SetOption("--pods-fingerprint-status-file", filepath.Join(pfpStatusDir, "dump.json"))
+
+		podSpec := &ds.Spec.Template.Spec
+		// TODO: this doesn't really belong here, but OTOH adding the status file without having set
+		// the volume doesn't work either. We need a deeper refactoring in this area.
+		AddVolumeMountMemory(podSpec, cnt, pfpStatusMountName, pfpStatusDir, 8*_MiB)
+	}
+
 	cnt.Args = flags.Argv()
 	return nil
 }
@@ -155,6 +169,26 @@ func ContainerConfig(ds *appsv1.DaemonSet, name string) error {
 	}
 	manifests.UpdateResourceTopologyExporterContainerConfig(&ds.Spec.Template.Spec, cnt, name)
 	return nil
+}
+
+func AddVolumeMountMemory(podSpec *corev1.PodSpec, cnt *corev1.Container, mountName, dirName string, sizeMiB int64) {
+	cnt.VolumeMounts = append(cnt.VolumeMounts,
+		corev1.VolumeMount{
+			Name:      mountName,
+			MountPath: dirName,
+		},
+	)
+	podSpec.Volumes = append(podSpec.Volumes,
+		corev1.Volume{
+			Name: mountName,
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{
+					Medium:    corev1.StorageMediumMemory,
+					SizeLimit: resource.NewQuantity(sizeMiB, resource.BinarySI),
+				},
+			},
+		},
+	)
 }
 
 func FindContainerByName(podSpec *corev1.PodSpec, containerName string) (*corev1.Container, error) {

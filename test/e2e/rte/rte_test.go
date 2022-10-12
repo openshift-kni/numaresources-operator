@@ -277,6 +277,53 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			gomega.Expect(seemsValid).To(gomega.BeTrue(), "malformed podfingerprint %q from NRT %q", pfp, nrt.Name)
 		}
 	})
+
+	ginkgo.It("[rte][podfingerprint] should expose the pod set fingerprint status on each worker", func() {
+		nropObj, err := nropcli.NUMAResourcesOperators().Get(context.TODO(), objectnames.DefaultNUMAResourcesOperatorCrName, metav1.GetOptions{})
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+		rteDss, err := getOwnedDss(f, nropObj.ObjectMeta)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Expect(rteDss).ToNot(gomega.BeEmpty(), "no RTE DS found")
+
+		for _, rteDs := range rteDss {
+			ginkgo.By(fmt.Sprintf("checking DS: %s/%s", rteDs.Namespace, rteDs.Name))
+
+			rtePods, err := podlistByDaemonset(f, rteDs)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(rtePods).ToNot(gomega.BeEmpty(), "no RTE pods found for %s/%s", rteDs.Namespace, rteDs.Name)
+
+			for _, rtePod := range rtePods {
+				ginkgo.By(fmt.Sprintf("checking DS: %s/%s POD %s/%s", rteDs.Namespace, rteDs.Name, rtePod.Namespace, rtePod.Name))
+
+				rteCnt, err := rteupdate.FindContainerByName(&rtePod.Spec, rteupdate.MainContainerName)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// TODO: hardcoded path. Any smarter option?
+				cmd := []string{"/bin/cat", "/run/pfpstatus/dump.json"}
+				stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+					Command:            cmd,
+					Namespace:          rtePod.Namespace,
+					PodName:            rtePod.Name,
+					ContainerName:      rteCnt.Name,
+					Stdin:              nil,
+					CaptureStdout:      true,
+					CaptureStderr:      true,
+					PreserveWhitespace: false,
+				})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred(), "err=%v stderr=%s", err, stderr)
+
+				var st podfingerprint.Status
+				err = json.Unmarshal([]byte(stdout), &st)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				klog.Infof("got status from %s/%s/%s -> %q (%d pods)", rtePod.Namespace, rtePod.Name, rteCnt.Name, st.FingerprintComputed, len(st.Pods))
+
+				gomega.Expect(st.FingerprintComputed).ToNot(gomega.BeEmpty(), "missing fingerprint - should always be reported")
+				gomega.Expect(st.Pods).ToNot(gomega.BeEmpty(), "missing pods - at least RTE itself should be there")
+			}
+		}
+	})
 })
 
 func getOwnedDss(f *framework.Framework, owner metav1.ObjectMeta) ([]appsv1.DaemonSet, error) {
@@ -314,4 +361,18 @@ func rteConfigMapToRTEConfig(cm *corev1.ConfigMap) (*rteconfig.Config, error) {
 	// TODO constant
 	err := yaml.Unmarshal([]byte(cm.Data["config.yaml"]), rc)
 	return rc, err
+}
+
+func podlistByDaemonset(f *framework.Framework, ds appsv1.DaemonSet) ([]corev1.Pod, error) {
+	sel, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+
+	podList, err := f.ClientSet.CoreV1().Pods(ds.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: sel.String()})
+	if err != nil {
+		return nil, err
+	}
+
+	return podList.Items, nil
 }
