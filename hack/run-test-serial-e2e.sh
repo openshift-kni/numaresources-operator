@@ -56,12 +56,12 @@ while [[ $# -gt 0 ]]; do
 			shift
 			;;
 		--focus)
-			FOCUS="-ginkgo.focus=$2"
+			FOCUS="-ginkgo.focus='$2'"
 			shift
 			shift
 			;;
 		--skip)
-			SKIP="-ginkgo.skip=$2"
+			SKIP="-ginkgo.skip='$2'"
 			shift
 			shift
 			;;
