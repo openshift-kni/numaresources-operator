@@ -28,9 +28,9 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
-	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	e2eimages "github.com/openshift-kni/numaresources-operator/test/utils/images"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
@@ -65,7 +65,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 
 			Eventually(func() bool {
 				// find deployment by the ownerReference
-				deploy, err := schedutils.GetDeploymentByOwnerReference(uid)
+				deploy, err := podlist.GetDeploymentByOwnerReference(e2eclient.Client, uid)
 				if err != nil {
 					klog.Warningf("%w", err)
 					return false
@@ -89,7 +89,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(BeTrue())
 
 			// find deployment by the ownerReference
-			dp, err := schedutils.GetDeploymentByOwnerReference(nroSchedObj.GetUID())
+			dp, err := podlist.GetDeploymentByOwnerReference(e2eclient.Client, nroSchedObj.GetUID())
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = wait.ForDeploymentComplete(e2eclient.Client, dp, time.Second*30, time.Minute*2)
@@ -141,7 +141,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 				return true
 			}).WithTimeout(time.Minute * 2).WithPolling(time.Second * 30).Should(BeTrue())
 
-			dp, err := schedutils.GetDeploymentByOwnerReference(nroSchedObj.GetUID())
+			dp, err := podlist.GetDeploymentByOwnerReference(e2eclient.Client, nroSchedObj.GetUID())
 			Expect(err).ToNot(HaveOccurred())
 
 			initialDP := dp.DeepCopy()

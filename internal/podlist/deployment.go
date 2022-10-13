@@ -14,25 +14,23 @@
  * limitations under the License.
  */
 
-package utils
+package podlist
 
 import (
 	"context"
 	"fmt"
 
-	v1 "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 )
 
-func GetDeploymentByOwnerReference(uid types.UID) (*v1.Deployment, error) {
-	deployList := &v1.DeploymentList{}
+func GetDeploymentByOwnerReference(cli client.Client, uid types.UID) (*appsv1.Deployment, error) {
+	deployList := &appsv1.DeploymentList{}
 
-	if err := e2eclient.Client.List(context.TODO(), deployList); err != nil {
+	if err := cli.List(context.TODO(), deployList); err != nil {
 		return nil, fmt.Errorf("failed to get deployment: %w", err)
 	}
 
@@ -46,14 +44,14 @@ func GetDeploymentByOwnerReference(uid types.UID) (*v1.Deployment, error) {
 	return nil, fmt.Errorf("failed to get deployment with uid: %s", uid)
 }
 
-func ListPodsByDeployment(aclient client.Client, deployment v1.Deployment) ([]corev1.Pod, error) {
+func ByDeployment(cli client.Client, deployment appsv1.Deployment) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	sel, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 
-	err = aclient.List(context.TODO(), podList, &client.ListOptions{Namespace: deployment.Namespace, LabelSelector: sel})
+	err = cli.List(context.TODO(), podList, &client.ListOptions{Namespace: deployment.Namespace, LabelSelector: sel})
 	if err != nil {
 		return nil, err
 	}

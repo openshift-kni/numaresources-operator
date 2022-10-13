@@ -32,10 +32,10 @@ import (
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
+	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
-	schedutils "github.com/openshift-kni/numaresources-operator/test/e2e/sched/utils"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/images"
@@ -276,7 +276,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
-			pods, err := schedutils.ListPodsByDeployment(fxt.Client, *updatedDp)
+			pods, err := podlist.ByDeployment(fxt.Client, *updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(pods)).To(Equal(1))
 

@@ -26,6 +26,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+
 	"github.com/openshift-kni/numaresources-operator/internal/baseload"
 )
 
@@ -33,6 +35,12 @@ const (
 	LabelRole   = "node-role.kubernetes.io"
 	RoleWorker  = "worker"
 	RoleMCPTest = "mcp-test"
+
+	// LabelMasterRole contains the key for the role label
+	LabelMasterRole = "node-role.kubernetes.io/master"
+
+	// LabelControlPlane contains the key for the control-plane role label
+	LabelControlPlane = "node-role.kubernetes.io/control-plane"
 )
 
 func GetWorkerNodes(cli client.Client) ([]corev1.Node, error) {
@@ -70,4 +78,35 @@ func GetLoad(k8sCli *kubernetes.Clientset, nodeName string) (baseload.Load, erro
 	}
 
 	return baseload.FromPods(nodeName, pods.Items), nil
+}
+
+func GetControlPlane(cli client.Client, plat platform.Platform) ([]corev1.Node, error) {
+	nodeList := &corev1.NodeList{}
+	labels := metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			LabelMasterRole: "",
+		},
+	}
+	if plat == platform.Kubernetes {
+		labels.MatchLabels[LabelControlPlane] = ""
+	}
+
+	selNodes, err := metav1.LabelSelectorAsSelector(&labels)
+	if err != nil {
+		return nil, err
+	}
+
+	err = cli.List(context.TODO(), nodeList, &client.ListOptions{LabelSelector: selNodes})
+	if err != nil {
+		return nil, err
+	}
+	return nodeList.Items, nil
+}
+
+func GetNames(nodes []corev1.Node) []string {
+	var nodeNames []string
+	for _, node := range nodes {
+		nodeNames = append(nodeNames, node.Name)
+	}
+	return nodeNames
 }
