@@ -55,14 +55,12 @@ import (
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
 var _ = Describe("[serial][disruptive][slow] numaresources configuration management", func() {
 	var fxt *e2efixture.Fixture
-	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
 	var nrts []nrtv1alpha1.NodeResourceTopology
 
@@ -73,9 +71,6 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 		var err error
 		fxt, err = e2efixture.Setup("e2e-test-configuration")
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
-
-		padder, err = e2epadder.New(fxt.Client, fxt.Namespace.Name)
-		Expect(err).ToNot(HaveOccurred())
 
 		err = fxt.Client.List(context.TODO(), &nrtList)
 		Expect(err).ToNot(HaveOccurred())
@@ -96,53 +91,16 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 	})
 
 	AfterEach(func() {
-		err := padder.Clean()
-		Expect(err).NotTo(HaveOccurred())
-		err = e2efixture.Teardown(fxt)
+		err := e2efixture.Teardown(fxt)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	// note we hardcode the values we need here and when we pad node.
-	// This is ugly, but automatically computing the values is not straightforward
-	// and will we want to start lean and mean.
-
 	Context("cluster has at least one suitable node", func() {
 		timeout := 5 * time.Minute
-		// will be called at the end of the test to make sure we're not polluting the cluster
-		var cleanFuncs []func() error
 
-		BeforeEach(func() {
-			numOfNodeToBePadded := len(nrts) - 1
-
-			rl := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("8G"),
-			}
-			By("padding the nodes before test start")
-			err := padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{})
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			By("unpadding the nodes after test finish")
-			err := padder.Clean()
-			Expect(err).ToNot(HaveOccurred())
-
-			for _, f := range cleanFuncs {
-				err := f()
-				Expect(err).ToNot(HaveOccurred())
-			}
-		})
-
-		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator and NUMAResourcesScheduler CR", func() {
-
-			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
-			initialNroSchedObj := nroSchedObj.DeepCopy()
-
+		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator CR", func() {
 			nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
-			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: objects.NROName()}, nroOperObj)
+			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: objects.NROName()}, nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", objects.NROName())
 			initialNroOperObj := nroOperObj.DeepCopy()
 
@@ -153,6 +111,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(ok).To(BeTrue())
 			targetedNode := workers[targetIdx]
 
+			By(fmt.Sprintf("Label node %q with %q and remove the label %q from it", targetedNode.Name, nodes.GetLabelRoleMCPTest(), nodes.GetLabelRoleWorker()))
 			unlabelFunc, err := labelNode(fxt.Client, nodes.GetLabelRoleMCPTest(), targetedNode.Name)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -160,22 +119,11 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			defer func() {
-				By(fmt.Sprintf("unlabeling node: %q", targetedNode.Name))
+				By(fmt.Sprintf("Restore initial labels of node %q with %q", targetedNode.Name, nodes.GetLabelRoleWorker()))
 				err = unlabelFunc()
 				Expect(err).ToNot(HaveOccurred())
 
-				By(fmt.Sprintf("labeling node: %q", targetedNode.Name))
 				err = labelFunc()
-				Expect(err).ToNot(HaveOccurred())
-
-				By("reverting the changes under the NUMAResourcesScheduler object")
-				// we need that for the current ResourceVersion
-				nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroSchedObj), nroSchedObj)
-				Expect(err).ToNot(HaveOccurred())
-
-				nroSchedObj.Spec = initialNroSchedObj.Spec
-				err = fxt.Client.Update(context.TODO(), nroSchedObj)
 				Expect(err).ToNot(HaveOccurred())
 
 				By("reverting the changes under the NUMAResourcesOperator object")
@@ -303,7 +251,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				return true, nil
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with image %q", serialconfig.GetRteCiImage())
 
-			By(fmt.Sprintf("modifing the NUMAResourcesOperator LogLevel filed to %q", operatorv1.Trace))
+			By(fmt.Sprintf("modifying the NUMAResourcesOperator LogLevel field to %q", operatorv1.Trace))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -338,13 +286,32 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				return true, nil
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with LogLevel %q", operatorv1.Trace)
 
-			By(fmt.Sprintf("modifing the NUMAResourcesScheduler SchedulerName Filed to %q", serialconfig.SchedulerTestName))
+		})
+
+		It("[test_id:54916][tier2] should be able to modify the configurable values under the NUMAResourcesScheduler CR", func() {
+			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
+			initialNroSchedObj := nroSchedObj.DeepCopy()
+
+			By(fmt.Sprintf("modifying the NUMAResourcesScheduler SchedulerName field to %q", serialconfig.SchedulerTestName))
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			nroSchedObj.Spec.SchedulerName = serialconfig.SchedulerTestName
 			err = fxt.Client.Update(context.TODO(), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
+
+			defer func() {
+				By("reverting the changes under the NUMAResourcesScheduler object")
+				currentSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+				err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, currentSchedObj)
+				Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
+
+				currentSchedObj.Spec = initialNroSchedObj.Spec
+				err = fxt.Client.Update(context.TODO(), currentSchedObj)
+				Expect(err).ToNot(HaveOccurred())
+			}()
 
 			By("schedule pod using the new scheduler name")
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomizeName("testpod"))
@@ -353,7 +320,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, 5*time.Minute)
+			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
