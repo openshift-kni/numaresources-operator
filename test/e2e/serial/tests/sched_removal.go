@@ -41,7 +41,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler removal on a live cluster", func() {
+var _ = Describe("[serial][disruptive][scheduler][rmsched] numaresources scheduler removal on a live cluster", func() {
 	var fxt *e2efixture.Fixture
 
 	BeforeEach(func() {
