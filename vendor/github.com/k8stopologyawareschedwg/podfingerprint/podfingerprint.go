@@ -87,11 +87,23 @@ type Fingerprint struct {
 // The size parameter is a hint for the expected size of the pod set. Use 0 if you don't know.
 // Values of size < 0 are ignored.
 func NewFingerprint(size int) *Fingerprint {
+	fp := &Fingerprint{}
+	fp.Reset(size)
+	return fp
+}
+
+// Reset clears the internal state of the Fingerprint to empty (pristine) state.
+// The size parameter is a hint for the expected size of the pod set. Use 0 if you don't know.
+// Values of size < 0 are ignored.
+// Explicit usage of this function is not recommended. Client code should not recycle Fingerprint
+// objects, but rather discarded them after they are used - even though calling multiple times
+// Sign() or Check() once reached steady state is perfectly fine.
+func (fp *Fingerprint) Reset(size int) {
 	data := []uint64{}
 	if size > 0 {
 		data = make([]uint64, 0, size)
 	}
-	return &Fingerprint{hashes: data}
+	fp.hashes = data
 }
 
 // AddPod adds a pod to the pod set.
@@ -124,7 +136,8 @@ func (fp *Fingerprint) Sum() []byte {
 // The string should be considered a opaque identifier and checked only for
 // equality, or fed into Check
 func (fp *Fingerprint) Sign() string {
-	return Prefix + Version + hex.EncodeToString(fp.Sum())
+	sign := Prefix + Version + hex.EncodeToString(fp.Sum())
+	return sign
 }
 
 // Check verifies if the provided fingerprint matches the current pod set.
