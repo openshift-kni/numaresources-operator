@@ -146,11 +146,13 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 
 	generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
 	klog.V(3).InfoS("generated configMap name", "generatedName", generatedName)
-	return r.syncConfigMap(ctx, mcoKc, kubeletConfig, generatedName)
+
+	klog.V(5).InfoS("using podExcludes", "podExcludes", instance.Spec.PodExcludes)
+	return r.syncConfigMap(ctx, mcoKc, kubeletConfig, generatedName, instance.Spec.PodExcludes)
 }
 
-func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov1.KubeletConfig, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, name string) (*corev1.ConfigMap, error) {
-	rendered, err := renderRTEConfig(r.Namespace, name, kubeletConfig)
+func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov1.KubeletConfig, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, name string, podExcludes map[string]string) (*corev1.ConfigMap, error) {
+	rendered, err := renderRTEConfig(r.Namespace, name, kubeletConfig, podExcludes)
 	if err != nil {
 		klog.ErrorS(err, "rendering config", "namespace", r.Namespace, "name", name)
 		return nil, err
@@ -173,7 +175,7 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov
 	return rendered, nil
 }
 
-func renderRTEConfig(namespace, name string, klConfig *kubeletconfigv1beta1.KubeletConfiguration) (*corev1.ConfigMap, error) {
+func renderRTEConfig(namespace, name string, klConfig *kubeletconfigv1beta1.KubeletConfiguration, podExcludes map[string]string) (*corev1.ConfigMap, error) {
 	conf := rteconfig.Config{
 		Resources: sysinfo.Config{
 			ReservedCPUs:   klConfig.ReservedSystemCPUs,
@@ -181,6 +183,9 @@ func renderRTEConfig(namespace, name string, klConfig *kubeletconfigv1beta1.Kube
 		},
 		TopologyManagerPolicy: klConfig.TopologyManagerPolicy,
 		TopologyManagerScope:  klConfig.TopologyManagerScope,
+	}
+	if len(podExcludes) > 0 {
+		conf.PodExcludes = podExcludes
 	}
 	data, err := yaml.Marshal(conf)
 	if err != nil {
