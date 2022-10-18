@@ -32,7 +32,7 @@ type Config struct {
 	TopologyManagerScope  string              `json:"topologyManagerScope,omitempty"`
 }
 
-func ReadConfig(configPath string) (Config, error) {
+func ReadFile(configPath string) (Config, error) {
 	conf := Config{}
 	// TODO modernize using os.ReadFile
 	data, err := ioutil.ReadFile(configPath)

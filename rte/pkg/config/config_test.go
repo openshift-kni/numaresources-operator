@@ -21,7 +21,7 @@ import (
 )
 
 func TestReadNonExistent(t *testing.T) {
-	cfg, err := ReadConfig("/does/not/exist")
+	cfg, err := ReadFile("/does/not/exist")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -31,7 +31,7 @@ func TestReadNonExistent(t *testing.T) {
 }
 
 func TestReadMalformed(t *testing.T) {
-	_, err := ReadConfig("/etc/services")
+	_, err := ReadFile("/etc/services")
 	if err == nil {
 		t.Errorf("unexpected success reading unrelated data")
 	}
@@ -51,7 +51,7 @@ func TestReadValidData(t *testing.T) {
 	if err := tmpfile.Close(); err != nil {
 		t.Errorf("closing the tempfile: %v", err)
 	}
-	cfg, err := ReadConfig(tmpfile.Name())
+	cfg, err := ReadFile(tmpfile.Name())
 	if err != nil {
 		t.Errorf("unexpected error reading back the config: %v", err)
 	}
