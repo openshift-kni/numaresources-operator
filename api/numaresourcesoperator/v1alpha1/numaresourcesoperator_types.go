@@ -37,6 +37,10 @@ type NUMAResourcesOperatorSpec struct {
 	// +kubebuilder:default=Normal
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="RTE log verbosity"
 	LogLevel operatorv1.LogLevel `json:"logLevel,omitempty"`
+	// Optional Namespace/Name glob patterns of pod to ignore at node level
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Optional ignore pod namespace/name glob patterns"
+	PodExcludes map[string]string `json:"podExcludes,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=Enabled;Disabled
