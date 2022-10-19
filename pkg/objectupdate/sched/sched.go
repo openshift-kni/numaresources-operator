@@ -46,6 +46,19 @@ func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
 		template.Annotations = map[string]string{}
 	}
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
+
+}
+func DeploymentContainerEnviron(dp *appsv1.Deployment, schedulerName string) {
+	// There is only a single container
+	cnt := &dp.Spec.Template.Spec.Containers[0]
+	ev := corev1.EnvVar{
+		Name:  "SCHEDULER_NAME",
+		Value: schedulerName,
+	}
+	cnt.Env = []corev1.EnvVar{
+		ev,
+	}
+	klog.V(3).InfoS("Scheduler environ", ev.Name, ev.Value)
 }
 
 func SchedulerName(cm *corev1.ConfigMap, name string) error {
