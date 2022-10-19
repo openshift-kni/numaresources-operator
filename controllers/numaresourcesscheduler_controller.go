@@ -178,6 +178,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	schedulerName := instance.Spec.SchedulerName
 
 	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, instance.Spec.SchedulerImage)
+	schedupdate.DeploymentContainerEnviron(r.SchedulerManifests.Deployment, schedulerName)
 	cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.SchedulerManifests.ConfigMap)
 	if err != nil {
 		return deploymentNName, schedulerName, err

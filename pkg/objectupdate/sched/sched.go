@@ -33,16 +33,32 @@ func DeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) {
 	// There is only a single container
 	cnt := &dp.Spec.Template.Spec.Containers[0]
 	cnt.Image = userImageSpec
-	klog.V(3).InfoS("Exporter image", "reason", "user-provided", "pullSpec", userImageSpec)
+	klog.V(3).InfoS("Scheduler image", "reason", "user-provided", "pullSpec", userImageSpec)
 }
 
 func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
 	template := &dp.Spec.Template // shortcut
+	// CAUTION HERE! the deployment template has a placeholder for volumes[0].
+	// we should clean up and clarify what we expect from the deployment template
+	// and what we manage programmatically, because there's hidden context here.
 	template.Spec.Volumes[0] = schedstate.NewSchedConfigVolume(schedstate.SchedulerConfigMapVolumeName, cmName)
 	if template.Annotations == nil {
 		template.Annotations = map[string]string{}
 	}
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
+
+}
+func DeploymentContainerEnviron(dp *appsv1.Deployment, schedulerName string) {
+	// There is only a single container
+	cnt := &dp.Spec.Template.Spec.Containers[0]
+	ev := corev1.EnvVar{
+		Name:  "SCHEDULER_NAME",
+		Value: schedulerName,
+	}
+	cnt.Env = []corev1.EnvVar{
+		ev,
+	}
+	klog.V(3).InfoS("Scheduler environ", ev.Name, ev.Value)
 }
 
 func SchedulerName(cm *corev1.ConfigMap, name string) error {

@@ -174,7 +174,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 		pArgs.RTE.ReferenceContainer = podrescli.ContainerIdentFromEnv()
 	}
 
-	conf, err := config.ReadConfig(pArgs.LocalArgs.ConfigPath)
+	conf, err := config.ReadFile(pArgs.LocalArgs.ConfigPath)
 	if err != nil {
 		return pArgs, fmt.Errorf("error getting exclude list from the configuration: %v", err)
 	}
