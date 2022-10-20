@@ -169,7 +169,11 @@ func (dpi *NUMACellDevicePlugin) Allocate(ctx context.Context, r *pluginapi.Allo
 // GetDevicePluginOptions returns options to be communicated with Device
 // Manager
 func (NUMACellDevicePlugin) GetDevicePluginOptions(context.Context, *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
-	return nil, nil
+	options := &pluginapi.DevicePluginOptions{
+		PreStartRequired:                false,
+		GetPreferredAllocationAvailable: false,
+	}
+	return options, nil
 }
 
 // GetPreferredAllocation returns a preferred set of devices to allocate
