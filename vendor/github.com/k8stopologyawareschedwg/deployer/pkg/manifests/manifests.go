@@ -576,7 +576,7 @@ func SecurityContextConstraint(component string) (*securityv1.SecurityContextCon
 }
 
 func KubeSchedulerConfigurationFromData(data []byte) (*kubeschedulerconfigv1beta2.KubeSchedulerConfiguration, error) {
-	obj, err := deserializeObjectFromData(data)
+	obj, err := DeserializeObjectFromData(data)
 	if err != nil {
 		return nil, err
 	}
@@ -589,9 +589,7 @@ func KubeSchedulerConfigurationFromData(data []byte) (*kubeschedulerconfigv1beta
 }
 
 func KubeSchedulerConfigurationToData(sc *kubeschedulerconfigv1beta2.KubeSchedulerConfiguration) ([]byte, error) {
-	var buf bytes.Buffer
-	err := SerializeObject(sc, &buf)
-	return buf.Bytes(), err
+	return SerializeObjectToData(sc)
 }
 
 func validateComponent(component string) error {
