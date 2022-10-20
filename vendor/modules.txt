@@ -263,7 +263,7 @@ github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pod
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods/rtepod
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testconsts
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testenv
-# github.com/kubevirt/device-plugin-manager v1.19.3
+# github.com/kubevirt/device-plugin-manager v1.19.4
 ## explicit; go 1.14
 github.com/kubevirt/device-plugin-manager/pkg/dpm
 # github.com/mailru/easyjson v0.7.6

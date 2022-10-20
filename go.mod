@@ -13,7 +13,7 @@ require (
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12
 	github.com/k8stopologyawareschedwg/podfingerprint v0.1.1
 	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.7.6
-	github.com/kubevirt/device-plugin-manager v1.19.3
+	github.com/kubevirt/device-plugin-manager v1.19.4
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
