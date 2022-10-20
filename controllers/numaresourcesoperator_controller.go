@@ -22,7 +22,6 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
@@ -73,7 +72,6 @@ type NUMAResourcesOperatorReconciler struct {
 	Platform        platform.Platform
 	APIManifests    apimanifests.Manifests
 	RTEManifests    rtemanifests.Manifests
-	Helper          *deployer.Helper
 	Namespace       string
 	ImageSpec       string
 	ImagePullPolicy corev1.PullPolicy
@@ -226,14 +224,19 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 
 	instance.Status.DaemonSets = []nropv1alpha1.NamespacedName{}
 	for _, nname := range daemonSetsInfo {
-		ok, err := r.Helper.IsDaemonSetRunning(nname.Namespace, nname.Name)
+		ds := appsv1.DaemonSet{}
+		dsKey := client.ObjectKey{
+			Namespace: nname.Namespace,
+			Name:      nname.Name,
+		}
+		err = r.Client.Get(ctx, dsKey, &ds)
 		if err != nil {
 			return ctrl.Result{}, status.ConditionDegraded, err
 		}
-		if !ok {
+
+		if !isDaemonSetReady(&ds) {
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
 		}
-
 		instance.Status.DaemonSets = append(instance.Status.DaemonSets, nname)
 	}
 
@@ -241,7 +244,8 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI() error {
-	klog.Info("APISync start")
+	klog.V(4).Info("APISync start")
+	defer klog.V(4).Info("APISync stop")
 
 	existing := apistate.FromClient(context.TODO(), r.Client, r.Platform, r.APIManifests)
 
@@ -254,7 +258,8 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI() error {
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree) error {
-	klog.Info("Machine Config Sync start")
+	klog.V(4).Info("Machine Config Sync start")
+	defer klog.V(4).Info("Machine Config Sync stop")
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
 
@@ -278,6 +283,9 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree) bool {
+	klog.V(4).Info("Machine Config Status Sync start")
+	defer klog.V(4).Info("Machine Config Status Sync stop")
+
 	instance.Status.MachineConfigPools = []nropv1alpha1.MachineConfigPool{}
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
@@ -299,7 +307,8 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instanc
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree) ([]nropv1alpha1.NamespacedName, error) {
-	klog.Info("RTESync start")
+	klog.V(4).Info("RTESync start")
+	defer klog.V(4).Info("RTESync stop")
 
 	errorList := r.deleteUnusedDaemonSets(ctx, instance, trees)
 	if len(errorList) > 0 {
@@ -635,4 +644,10 @@ func isPodFingerprintEnabled(ng *nropv1alpha1.NodeGroup) bool {
 		return false
 	}
 	return true
+}
+
+func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
+	ok := (ds.Status.DesiredNumberScheduled > 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberReady)
+	klog.V(5).InfoS("daemonset", "namespace", ds.Namespace, "name", ds.Name, "desired", ds.Status.DesiredNumberScheduled, "current", ds.Status.CurrentNumberScheduled, "ready", ds.Status.NumberReady)
+	return ok
 }
