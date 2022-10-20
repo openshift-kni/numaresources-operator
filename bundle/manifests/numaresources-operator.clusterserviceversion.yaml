@@ -309,6 +309,7 @@ spec:
                         operator: Exists
               containers:
               - args:
+                - --v=4
                 - --leader-elect
                 - --enable-scheduler
                 command:

@@ -131,7 +131,7 @@ type GeneratedDesiredManifest struct {
 	DaemonSet *appsv1.DaemonSet
 }
 
-type GenerateDesiredManifestUpdater func(gdm *GeneratedDesiredManifest) error
+type GenerateDesiredManifestUpdater func(mcpName string, gdm *GeneratedDesiredManifest) error
 
 func SkipManifestUpdate(gdm *GeneratedDesiredManifest) error {
 	return nil
@@ -207,10 +207,11 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 				gdm := GeneratedDesiredManifest{
 					ClusterPlatform:   em.plat,
 					MachineConfigPool: mcp.DeepCopy(),
+					NodeGroup:         tree.NodeGroup.DeepCopy(),
 					DaemonSet:         desiredDaemonSet,
 				}
 
-				err := updater(&gdm)
+				err := updater(mcp.Name, &gdm)
 				if err != nil {
 					klog.Warningf("skipped daemonset for MCP %q: update failed: %v", mcp.Name, err)
 					continue
