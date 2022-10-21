@@ -18,8 +18,10 @@ package rte
 
 import (
 	"flag"
+	"fmt"
 	"math/rand"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -28,6 +30,8 @@ import (
 
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
+
+	"github.com/openshift-kni/numaresources-operator/test/utils/runtime"
 
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte"
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater"
@@ -48,4 +52,28 @@ func TestMain(m *testing.M) {
 func TestRTE(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "RTE Test Suite")
+}
+
+var BinariesPath string
+
+var _ = BeforeSuite(func() {
+	By("Finding the binaries path")
+
+	binPath, err := runtime.GetBinariesPath()
+	Expect(err).ToNot(HaveOccurred())
+	BinariesPath = binPath
+
+	By(fmt.Sprintf("Using the binaries path %q", BinariesPath))
+})
+
+func expectExecutableExists(path string) {
+	cmdline := []string{
+		path,
+		"-h",
+	}
+
+	cmd := exec.Command(cmdline[0], cmdline[1:]...)
+	out, err := cmd.CombinedOutput()
+	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+	ExpectWithOffset(1, out).ToNot(BeEmpty())
 }

@@ -15,6 +15,7 @@ limitations under the License.
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -37,6 +38,13 @@ import (
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/sysinfo"
 )
 
+const (
+	// k8s 1.25 https://kubernetes.io/docs/tasks/administer-cluster/topology-manager/#topology-manager-policies
+	defaultTopologyManagerPolicy = "none"
+	// k8s 1.25 https://kubernetes.io/docs/tasks/administer-cluster/topology-manager/#topology-manager-scopes
+	defaultTopologyManagerScope = "container"
+)
+
 type localArgs struct {
 	SysConf    sysinfo.Config
 	ConfigPath string
@@ -49,6 +57,7 @@ type ProgArgs struct {
 	LocalArgs       localArgs
 	Version         bool
 	SysinfoOnly     bool
+	DumpConfig      bool
 }
 
 func main() {
@@ -61,6 +70,15 @@ func main() {
 
 	if parsedArgs.Version {
 		fmt.Printf("%s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
+		os.Exit(0)
+	}
+
+	if parsedArgs.DumpConfig {
+		data, err := json.Marshal(parsedArgs)
+		if err != nil {
+			klog.Fatalf("encoding the configuration to JSON")
+		}
+		fmt.Printf("%s\n", string(data))
 		os.Exit(0)
 	}
 
@@ -128,8 +146,8 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.StringVar(&pArgs.LocalArgs.ConfigPath, "config", "/etc/resource-topology-exporter/config.yaml", "Configuration file path. Use this to set the exclude list.")
 
 	flags.BoolVar(&pArgs.RTE.Debug, "debug", false, " Enable debug output.")
-	flags.StringVar(&pArgs.RTE.TopologyManagerPolicy, "topology-manager-policy", defaultTopologyManagerPolicy(), "Explicitly set the topology manager policy instead of reading from the kubelet.")
-	flags.StringVar(&pArgs.RTE.TopologyManagerScope, "topology-manager-scope", defaultTopologyManagerScope(), "Explicitly set the topology manager scope instead of reading from the kubelet.")
+	flags.StringVar(&pArgs.RTE.TopologyManagerPolicy, "topology-manager-policy", "", "Explicitly set the topology manager policy instead of reading from the kubelet.")
+	flags.StringVar(&pArgs.RTE.TopologyManagerScope, "topology-manager-scope", "", "Explicitly set the topology manager scope instead of reading from the kubelet.")
 	flags.DurationVar(&pArgs.RTE.SleepInterval, "sleep-interval", 60*time.Second, "Time to sleep between podresources API polls.")
 	flags.StringVar(&pArgs.RTE.KubeletConfigFile, "kubelet-config-file", "/podresources/config.yaml", "Kubelet config file path.")
 	flags.StringVar(&pArgs.RTE.PodResourcesSocketPath, "podresources-socket", "unix:///podresources/kubelet.sock", "Pod Resource Socket path to use.")
@@ -149,7 +167,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.StringVar(&sysReservedMemory, "system-info-reserved-memory", "", "kubelet reserved memory: comma-separated 'numaID=amount' (example: '0=16Gi,1=8192Mi,3=1Gi')")
 	flags.StringVar(&sysResourceMapping, "system-info-resource-mapping", "", "kubelet resource mapping: comma-separated 'vendor:device=resourcename'")
 	flags.BoolVar(&pArgs.SysinfoOnly, "system-info", false, "Output detected system info and exit")
-
+	flags.BoolVar(&pArgs.DumpConfig, "dump-config", false, "Output the configuration settings and exit - the output format is JSON, subjected to change without notice.")
 	flags.BoolVar(&pArgs.Version, "version", false, "Output version and exit")
 
 	err := flags.Parse(args)
@@ -197,17 +215,10 @@ func parseArgs(args ...string) (ProgArgs, error) {
 
 	klog.Infof("using sysinfo:\n%s", pArgs.LocalArgs.SysConf.ToYAMLString())
 
-	// do not overwrite with empty an existing value (e.g. from opts)
-	if pArgs.RTE.TopologyManagerPolicy == "" {
-		pArgs.RTE.TopologyManagerPolicy = conf.TopologyManagerPolicy
+	err = setupTopologyManagerConfig(&pArgs, conf)
+	if err != nil {
+		return pArgs, err
 	}
-	if pArgs.RTE.TopologyManagerScope == "" {
-		pArgs.RTE.TopologyManagerScope = conf.TopologyManagerScope
-	}
-	klog.Infof("using Topology Manager scope %q (conf=%s) policy %q (conf=%s)",
-		pArgs.RTE.TopologyManagerScope, conf.TopologyManagerScope,
-		pArgs.RTE.TopologyManagerPolicy, conf.TopologyManagerPolicy,
-	)
 
 	return pArgs, nil
 }
@@ -225,20 +236,77 @@ func defaultHostName() string {
 	return val
 }
 
-func defaultTopologyManagerPolicy() string {
-	if val, ok := os.LookupEnv("TOPOLOGY_MANAGER_POLICY"); ok {
-		return val
-	}
-	// empty string is a valid value here, so just keep going
-	return ""
-}
+func setupTopologyManagerConfig(pArgs *ProgArgs, conf config.Config) error {
+	// general flow: do not overwrite with empty an existing value (e.g. from opts)
+	// precedence order:
+	// - args, which overrides
+	// - env var, which overrides
+	// - config file, which overrides
+	// - defaults (hardcoded)
 
-func defaultTopologyManagerScope() string {
-	if val, ok := os.LookupEnv("TOPOLOGY_MANAGER_SCOPE"); ok {
-		return val
+	type choice struct {
+		value  string
+		origin string
 	}
-	//https://kubernetes.io/docs/tasks/administer-cluster/topology-manager/#topology-manager-scopes
-	return "container"
+
+	pickFirstNonEmpty := func(choices []choice) choice {
+		for _, ch := range choices {
+			if ch.value != "" {
+				return ch
+			}
+		}
+		return choice{}
+	}
+
+	policy := pickFirstNonEmpty([]choice{
+		{
+			value:  pArgs.RTE.TopologyManagerPolicy,
+			origin: "args",
+		},
+		{
+			value:  os.Getenv("TOPOLOGY_MANAGER_POLICY"),
+			origin: "env",
+		},
+		{
+			value:  conf.TopologyManagerPolicy,
+			origin: "conf",
+		},
+		{
+			value:  defaultTopologyManagerPolicy,
+			origin: "default",
+		},
+	})
+	pArgs.RTE.TopologyManagerPolicy = policy.value
+
+	scope := pickFirstNonEmpty([]choice{
+		{
+			value:  pArgs.RTE.TopologyManagerScope,
+			origin: "args",
+		},
+		{
+			value:  os.Getenv("TOPOLOGY_MANAGER_SCOPE"),
+			origin: "env",
+		},
+		{
+			value:  conf.TopologyManagerScope,
+			origin: "conf",
+		},
+		{
+			value:  defaultTopologyManagerScope,
+			origin: "default",
+		},
+	})
+	pArgs.RTE.TopologyManagerScope = scope.value
+
+	klog.Infof("using Topology Manager scope %q from %q (conf=%s) policy %q from %q (conf=%s)",
+		pArgs.RTE.TopologyManagerScope, scope.origin, conf.TopologyManagerScope,
+		pArgs.RTE.TopologyManagerPolicy, policy.origin, conf.TopologyManagerPolicy,
+	)
+
+	if pArgs.RTE.TopologyManagerPolicy == "" || pArgs.RTE.TopologyManagerScope == "" {
+		return fmt.Errorf("incomplete Topology Manager configuration")
+	}
+	return nil
 }
 
 func setKubeletStateDirs(value string) ([]string, error) {
