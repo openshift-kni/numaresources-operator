@@ -15,6 +15,7 @@ limitations under the License.
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -56,6 +57,7 @@ type ProgArgs struct {
 	LocalArgs       localArgs
 	Version         bool
 	SysinfoOnly     bool
+	DumpConfig      bool
 }
 
 func main() {
@@ -68,6 +70,15 @@ func main() {
 
 	if parsedArgs.Version {
 		fmt.Printf("%s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
+		os.Exit(0)
+	}
+
+	if parsedArgs.DumpConfig {
+		data, err := json.Marshal(parsedArgs)
+		if err != nil {
+			klog.Fatalf("encoding the configuration to JSON")
+		}
+		fmt.Printf("%s\n", string(data))
 		os.Exit(0)
 	}
 
@@ -156,7 +167,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.StringVar(&sysReservedMemory, "system-info-reserved-memory", "", "kubelet reserved memory: comma-separated 'numaID=amount' (example: '0=16Gi,1=8192Mi,3=1Gi')")
 	flags.StringVar(&sysResourceMapping, "system-info-resource-mapping", "", "kubelet resource mapping: comma-separated 'vendor:device=resourcename'")
 	flags.BoolVar(&pArgs.SysinfoOnly, "system-info", false, "Output detected system info and exit")
-
+	flags.BoolVar(&pArgs.DumpConfig, "dump-config", false, "Output the configuration settings and exit - the output format is JSON, subjected to change without notice.")
 	flags.BoolVar(&pArgs.Version, "version", false, "Output version and exit")
 
 	err := flags.Parse(args)
