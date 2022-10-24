@@ -18,15 +18,55 @@ package runtime
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	goruntime "runtime"
 )
 
-func GetBinariesPath() (string, error) {
+func GetRootPath() (string, error) {
 	_, file, _, ok := goruntime.Caller(0)
 	if !ok {
 		return "", fmt.Errorf("cannot retrieve tests directory")
 	}
 	basedir := filepath.Dir(file)
-	return filepath.Abs(filepath.Join(basedir, "..", "..", "..", "bin"))
+	return filepath.Abs(filepath.Join(basedir, "..", "..", ".."))
+}
+
+func GetBinariesPath() (string, error) {
+	root, err := GetRootPath()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(root, "bin"), nil
+}
+
+func FindBinaryPath(exe string) (string, error) {
+	root, err := GetRootPath()
+	if err != nil {
+		return "", err
+	}
+	binpaths := []string{
+		// source tree
+		filepath.Join(root, "bin"),
+		// prow CI
+		root,
+	}
+	for _, binpath := range binpaths {
+		fullpath := filepath.Join(binpath, exe)
+		info, err := os.Stat(fullpath)
+		if err != nil {
+			// TODO: log
+			continue
+		}
+
+		if IsExecOwner(info.Mode()) {
+			return fullpath, nil
+		}
+	}
+
+	return "", fmt.Errorf("cannot find %q in candidate paths", exe)
+}
+
+func IsExecOwner(mode os.FileMode) bool {
+	return mode&0100 != 0
 }
