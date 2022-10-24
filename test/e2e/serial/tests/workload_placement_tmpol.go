@@ -1098,11 +1098,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				{
 					corev1.ResourceCPU:    resource.MustParse("6"),
 					corev1.ResourceMemory: resource.MustParse("2Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("2"),
 				},
 				{
 					corev1.ResourceCPU:    resource.MustParse("12"),
 					corev1.ResourceMemory: resource.MustParse("12Gi"),
-					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("8"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("3"),
 				},
 			},
 			[]corev1.ResourceList{
