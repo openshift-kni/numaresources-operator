@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	. "github.com/onsi/ginkgo"
@@ -81,7 +80,7 @@ var _ = Describe("[rte][local][config] RTE configuration", func() {
 
 func runConfig(argv []string, env map[string]string) ProgArgs {
 	cmdline := []string{
-		filepath.Join(BinariesPath, "exporter"),
+		BinaryPath,
 		"--dump-config",
 	}
 	cmdline = append(cmdline, argv...)

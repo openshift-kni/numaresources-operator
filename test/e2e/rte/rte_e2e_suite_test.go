@@ -54,16 +54,16 @@ func TestRTE(t *testing.T) {
 	RunSpecs(t, "RTE Test Suite")
 }
 
-var BinariesPath string
+var BinaryPath string
 
 var _ = BeforeSuite(func() {
 	By("Finding the binaries path")
 
-	binPath, err := runtime.GetBinariesPath()
+	binPath, err := runtime.FindBinaryPath("exporter")
 	Expect(err).ToNot(HaveOccurred())
-	BinariesPath = binPath
+	BinaryPath = binPath
 
-	By(fmt.Sprintf("Using the binaries path %q", BinariesPath))
+	By(fmt.Sprintf("Using the binary at %q", BinaryPath))
 })
 
 func expectExecutableExists(path string) {
