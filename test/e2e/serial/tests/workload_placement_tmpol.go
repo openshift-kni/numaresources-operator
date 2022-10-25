@@ -1154,7 +1154,77 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
+		Entry("[test_id:54025][tmscope:cnt][tier2][devices] should make a besteffort pod requesting devices land on a node with enough resources on a specific NUMA zone, containers should be spread on a different zone",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("5"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+					},
+					{
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+						corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("3"),
+					},
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("3"),
+				},
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("5"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+				},
+			},
+		),
+		Entry("[test_id:55431][tmscope:pod][tier1][devices] should make a besteffort pod requesting devices land on a node with enough resources on a specific NUMA zone",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodePodLevel],
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("5"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+					},
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("5"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+				},
+			},
+		),
 	)
+
 	DescribeTable("[placement][unsched] cluster with one worker nodes suitable",
 		func(policyFuncs tmPolicyFuncs, errMsg string, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
 
@@ -1668,6 +1738,194 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				{
 					corev1.ResourceCPU:    resource.MustParse("8"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+				},
+			},
+		),
+		Entry("[test_id:55430][tier2][unsched][tmscope:pod][devices] besteffort pod requesting multiple device types keep on pending because cannot align the container to a single numa node",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodePodLevel],
+			"cannot align pod",
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("3"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("4"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+				},
+			},
+			// the free resources that should be left on the target node should not depend that there will be some baseload added upon padding the node,
+			// those free resources should match the pod requests in total. The reason behind that is that Noderesourcesfit plugin (the plugin that is
+			// responsible for accepting/rejecting compute nodes as candidates for placing the pod) actually accounts for the baseload, it compares the
+			// actual available resources on node with the pod requested resources, if the available resources can accommodate the pod resources then it
+			// will mark the node as a possible candidate, if not it will reject it.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+				},
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("2"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+				},
+			},
+		),
+		Entry("[test_id:55429][tier2][unsched][tmscope:pod][devices] burstable pod requesting multiple device types keep on pending because cannot align the container to a single numa node",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodePodLevel],
+			"cannot align pod",
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU: resource.MustParse("1"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("3"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("4"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+				},
+			},
+			// the free resources that should be left on the target node should not depend that there will be some baseload added upon padding the node,
+			// those free resources should match the pod requests in total. The reason behind that is that Noderesourcesfit plugin (the plugin that is
+			// responsible for accepting/rejecting compute nodes as candidates for placing the pod) actually accounts for the baseload, it compares the
+			// actual available resources on node with the pod requested resources, if the available resources can accommodate the pod resources then it
+			// will mark the node as a possible candidate, if not it will reject it.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("2"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+				},
+			},
+		),
+		Entry("[test_id:54023][tier2][unsched][tmscope:container][devices] besteffort pod requesting multiple device types keep on pending because cannot align the container to a single numa node",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
+			"cannot align container: testcnt-1",
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+					},
+					{
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("2"),
+						corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("2"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+				},
+			},
+			// the free resources that should be left on the target node should not depend that there will be some baseload added upon padding the node,
+			// those free resources should match the pod requests in total. The reason behind that is that Noderesourcesfit plugin (the plugin that is
+			// responsible for accepting/rejecting compute nodes as candidates for placing the pod) actually accounts for the baseload, it compares the
+			// actual available resources on node with the pod requested resources, if the available resources can accommodate the pod resources then it
+			// will mark the node as a possible candidate, if not it will reject it.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("2"),
+				},
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+				},
+			},
+		),
+		Entry("[test_id:54022][tier2][unsched][tmscope:container][devices] burstable pod requesting multiple device types keep on pending because cannot align the container to a single numa node",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
+			"cannot align container: testcnt-1",
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU: resource.MustParse("4"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+					},
+					{
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("2"),
+						corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("2"),
+					},
+				},
+			},
+			// we need keep the gap between Node level fit and NUMA level fit wide enough.
+			// for example if only 2 cpus are separating unsuitable node from becoming suitable,
+			// it's not good because the baseload should be added as well (which is around 2 cpus)
+			// and then the pod might land on the unsuitable node.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+				},
+			},
+			// the free resources that should be left on the target node should not depend that there will be some baseload added upon padding the node,
+			// those free resources should match the pod requests in total. The reason behind that is that Noderesourcesfit plugin (the plugin that is
+			// responsible for accepting/rejecting compute nodes as candidates for placing the pod) actually accounts for the baseload, it compares the
+			// actual available resources on node with the pod requested resources, if the available resources can accommodate the pod resources then it
+			// will mark the node as a possible candidate, if not it will reject it.
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("2"),
+				},
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
 					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
 				},
 			},
