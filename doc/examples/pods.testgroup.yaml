@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: testpod1
+spec:
+  schedulerName: topo-aware-scheduler
+  containers:
+  - name: testcnt1
+    command: ["/usr/local/bin/numalign"]
+    env:
+      - name: NUMALIGN_SLEEP_HOURS
+        value: "127"
+    image: quay.io/fromani/numalign
+    resources:
+      limits:
+        cpu: '32'
+        memory: 1000Mi
+        example.com/deviceA: 1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: testpod2
+spec:
+  schedulerName: topo-aware-scheduler
+  containers:
+  - name: testcnt2
+    command: ["/usr/local/bin/numalign"]
+    env:
+      - name: NUMALIGN_SLEEP_HOURS
+        value: "127"
+    image: quay.io/fromani/numalign
+    resources:
+      limits:
+        cpu: '32'
+        memory: 1000Mi
+        example.com/deviceA: 1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: testpod3
+spec:
+  schedulerName: topo-aware-scheduler
+  containers:
+  - name: testcnt3
+    command: ["/usr/local/bin/numalign"]
+    env:
+      - name: NUMALIGN_SLEEP_HOURS
+        value: "127"
+    image: quay.io/fromani/numalign
+    resources:
+      limits:
+        cpu: '32'
+        memory: 1000Mi
+        example.com/deviceA: 1
