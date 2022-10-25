@@ -1,4 +1,4 @@
-apiVersion: nodetopology.openshift.io/v1
+apiVersion: nodetopology.openshift.io/v1alpha1
 kind: NUMAResourcesScheduler
 metadata:
   name: numaresourcesscheduler
