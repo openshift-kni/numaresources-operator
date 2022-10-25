@@ -21,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 	goruntime "runtime"
+
+	"k8s.io/klog/v2"
 )
 
 func GetRootPath() (string, error) {
@@ -53,15 +55,21 @@ func FindBinaryPath(exe string) (string, error) {
 	}
 	for _, binpath := range binpaths {
 		fullpath := filepath.Join(binpath, exe)
+		klog.Infof("trying path %q", fullpath)
+
 		info, err := os.Stat(fullpath)
 		if err != nil {
-			// TODO: log
+			klog.Warningf("skipping path %q (does not exist err=%v)", fullpath, err)
 			continue
 		}
 
-		if IsExecOwner(info.Mode()) {
-			return fullpath, nil
+		if !IsExecOwner(info.Mode()) {
+			klog.Warningf("skipping path %q (not executable mode=%v)", fullpath, info.Mode())
+			continue
 		}
+
+		klog.Infof("found path %q", fullpath)
+		return fullpath, nil
 	}
 
 	return "", fmt.Errorf("cannot find %q in candidate paths", exe)
