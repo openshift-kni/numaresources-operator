@@ -1,8 +1,6 @@
 name: CI E2E - for tools
 
 on:
-  push:
-    branches: [ main ]
   pull_request:
     branches:
       - main
