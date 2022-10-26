@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"encoding/json"
-	"reflect"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -581,22 +580,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			mcp = testobjs.NewMachineConfigPool("test", labels, &metav1.LabelSelector{MatchLabels: labels}, &metav1.LabelSelector{MatchLabels: labels})
 		})
 
-		It("should report the defaults", func() {
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, nil)
-
-			reconciler := reconcileObjects(nro, mcp)
-
-			nroUpdated := &nrov1alpha1.NUMAResourcesOperator{}
-			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-
-			conf := nrov1alpha1.DefaultNodeGroupConfig()
-
-			Expect(reflect.DeepEqual(conf, nroUpdated.Status.DefaultNodeGroupConfig)).To(BeTrue(), "expected defaults %s got %s",
-				nodeGroupConfigToString(conf),
-				nodeGroupConfigToString(nroUpdated.Status.DefaultNodeGroupConfig),
-			)
-		})
-
 		It("should set defaults in the DS objects", func() {
 			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, nil)
 
@@ -613,6 +596,33 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
 			Expect(args).To(ContainElement(ContainSubstring("--notify-file=")), "malformed args: %v", args)
 			Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
+		})
+
+		It("should report the observed values per-MCP in status", func() {
+			d, err := time.ParseDuration("33s")
+			Expect(err).ToNot(HaveOccurred())
+
+			period := metav1.Duration{
+				Duration: d,
+			}
+			pfpMode := nrov1alpha1.PodsFingerprintingEnabled
+			refMode := nrov1alpha1.InfoRefreshPeriodic
+			conf := nrov1alpha1.NodeGroupConfig{
+				PodsFingerprinting: &pfpMode,
+				InfoRefreshPeriod:  &period,
+				InfoRefreshMode:    &refMode,
+			}
+
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			nroUpdated := &nrov1alpha1.NUMAResourcesOperator{}
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
+
+			Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(1))
+			Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(mcp.Name))
+			Expect(nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(conf))
 		})
 
 		It("should allow to alter all the settings of the DS objects", func() {

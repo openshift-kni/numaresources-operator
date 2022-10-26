@@ -100,8 +100,7 @@ type NUMAResourcesOperatorStatus struct {
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="RTE MCPs from node groups"
 	MachineConfigPools []MachineConfigPool `json:"machineconfigpools,omitempty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
-	Conditions             []metav1.Condition `json:"conditions,omitempty"`
-	DefaultNodeGroupConfig NodeGroupConfig    `json:"defaultNodeGroupConfig,omitempty"`
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 // MachineConfigPool defines the observed state of each MachineConfigPool selected by node groups
@@ -112,6 +111,8 @@ type MachineConfigPool struct {
 	// Conditions represents the latest available observations of MachineConfigPool current state.
 	// +optional
 	Conditions []mcov1.MachineConfigPoolCondition `json:"conditions,omitempty"`
+	// NodeGroupConfig represents the latest available configuration applied to this MachineConfigPool
+	Config NodeGroupConfig `json:"defaultNodeGroupConfig,omitempty"`
 }
 
 //+genclient
