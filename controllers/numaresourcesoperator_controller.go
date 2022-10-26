@@ -172,7 +172,6 @@ func updateStatus(ctx context.Context, cli client.Client, rte *nropv1alpha1.NUMA
 		return false, nil
 	}
 	rte.Status.Conditions = conditions
-	rte.Status.DefaultNodeGroupConfig = nropv1alpha1.DefaultNodeGroupConfig()
 
 	if err := cli.Status().Update(ctx, rte); err != nil {
 		return false, errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(rte))
@@ -292,10 +291,14 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instanc
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
 			// update MCP conditions under the NRO
-			instance.Status.MachineConfigPools = append(instance.Status.MachineConfigPools, nropv1alpha1.MachineConfigPool{
+			mcpStatus := nropv1alpha1.MachineConfigPool{
 				Name:       mcp.Name,
 				Conditions: mcp.Status.Conditions,
-			})
+			}
+			if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
+				mcpStatus.Config = *tree.NodeGroup.Config
+			}
+			instance.Status.MachineConfigPools = append(instance.Status.MachineConfigPools, mcpStatus)
 
 			isUpdated := IsMachineConfigPoolUpdated(instance.Name, mcp)
 			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instance.Name, "updated", isUpdated)
