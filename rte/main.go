@@ -35,6 +35,7 @@ import (
 
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/podrescompat"
+	"github.com/openshift-kni/numaresources-operator/rte/pkg/podresfilter"
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/sysinfo"
 )
 
@@ -46,8 +47,9 @@ const (
 )
 
 type localArgs struct {
-	SysConf    sysinfo.Config
-	ConfigPath string
+	SysConf     sysinfo.Config
+	ConfigPath  string
+	PodExcludes map[string]string
 }
 
 type ProgArgs struct {
@@ -115,6 +117,8 @@ func main() {
 		klog.Fatalf("failed to start prometheus server: %v", err)
 	}
 
+	// TODO: recycled flag (no big deal, but still)
+	cli = podresfilter.NewFromLister(cli, parsedArgs.RTE.Debug, parsedArgs.LocalArgs.PodExcludes)
 	err = resourcetopologyexporter.Execute(cli, parsedArgs.NRTupdater, parsedArgs.Resourcemonitor, parsedArgs.RTE)
 	// must never execute; if it does, we want to know
 	klog.Fatalf("failed to execute: %v", err)
@@ -201,6 +205,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 		klog.V(2).Infof("using exclude list:\n%s", pArgs.Resourcemonitor.ExcludeList.String())
 	}
 	pArgs.LocalArgs.SysConf = conf.Resources
+	pArgs.LocalArgs.PodExcludes = conf.PodExcludes
 
 	// override from the command line
 	if sysReservedCPUs != "" {
