@@ -210,7 +210,9 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 
 		// MCO need to update SELinux context and other stuff, and need to trigger a reboot.
 		// It can take a while.
-		if allMCPsUpdated := r.syncMachineConfigPoolsStatuses(instance, trees); !allMCPsUpdated {
+		mcpStatuses, allMCPsUpdated := syncMachineConfigPoolsStatuses(instance.Name, trees)
+		instance.Status.MachineConfigPools = mcpStatuses
+		if !allMCPsUpdated {
 			// the Machine Config Pool still did not apply the machine config, wait for one minute
 			return ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, status.ConditionProgressing, nil
 		}
@@ -223,7 +225,8 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	}
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
 
-	allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, instance, daemonSetsInfo)
+	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, instance, daemonSetsInfo)
+	instance.Status.DaemonSets = dsStatuses
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, err
 	}
@@ -233,8 +236,8 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	return ctrl.Result{}, status.ConditionAvailable, nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, instance *nropv1alpha1.NUMAResourcesOperator, daemonSetsInfo []nropv1alpha1.NamespacedName) (bool, error) {
-	instance.Status.DaemonSets = []nropv1alpha1.NamespacedName{}
+func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, instance *nropv1alpha1.NUMAResourcesOperator, daemonSetsInfo []nropv1alpha1.NamespacedName) ([]nropv1alpha1.NamespacedName, bool, error) {
+	dsStatuses := []nropv1alpha1.NamespacedName{}
 	for _, nname := range daemonSetsInfo {
 		ds := appsv1.DaemonSet{}
 		dsKey := client.ObjectKey{
@@ -243,15 +246,15 @@ func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Con
 		}
 		err := rd.Get(ctx, dsKey, &ds)
 		if err != nil {
-			return false, err
+			return dsStatuses, false, err
 		}
 
 		if !isDaemonSetReady(&ds) {
-			return false, nil
+			return dsStatuses, false, nil
 		}
-		instance.Status.DaemonSets = append(instance.Status.DaemonSets, nname)
+		dsStatuses = append(dsStatuses, nname)
 	}
-	return true, nil
+	return dsStatuses, true, nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI() error {
@@ -293,11 +296,11 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	return nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree) bool {
+func syncMachineConfigPoolsStatuses(instanceName string, trees []machineconfigpools.NodeGroupTree) ([]nropv1alpha1.MachineConfigPool, bool) {
 	klog.V(4).Info("Machine Config Status Sync start")
 	defer klog.V(4).Info("Machine Config Status Sync stop")
 
-	instance.Status.MachineConfigPools = []nropv1alpha1.MachineConfigPool{}
+	mcpStatuses := []nropv1alpha1.MachineConfigPool{}
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
 			// update MCP conditions under the NRO
@@ -305,20 +308,24 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instanc
 				Name:       mcp.Name,
 				Conditions: mcp.Status.Conditions,
 			}
+
 			if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
 				mcpStatus.Config = *tree.NodeGroup.Config
+			} else {
+				mcpStatus.Config = nropv1alpha1.DefaultNodeGroupConfig()
 			}
-			instance.Status.MachineConfigPools = append(instance.Status.MachineConfigPools, mcpStatus)
 
-			isUpdated := IsMachineConfigPoolUpdated(instance.Name, mcp)
-			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instance.Name, "updated", isUpdated)
+			mcpStatuses = append(mcpStatuses, mcpStatus)
+
+			isUpdated := IsMachineConfigPoolUpdated(instanceName, mcp)
+			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instanceName, "updated", isUpdated)
 
 			if !isUpdated {
-				return false
+				return mcpStatuses, false
 			}
 		}
 	}
-	return true
+	return mcpStatuses, true
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree) ([]nropv1alpha1.NamespacedName, error) {
