@@ -298,7 +298,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
-			nroSchedObj.Spec.SchedulerName = serialconfig.SchedulerTestName
+			nroSchedObj.Status.SchedulerName = serialconfig.SchedulerTestName
 			err = fxt.Client.Update(context.TODO(), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -308,7 +308,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, currentSchedObj)
 				Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
 
-				currentSchedObj.Spec = initialNroSchedObj.Spec
+				currentSchedObj.Status = initialNroSchedObj.Status
 				err = fxt.Client.Update(context.TODO(), currentSchedObj)
 				Expect(err).ToNot(HaveOccurred())
 			}()
@@ -428,7 +428,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
 			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
-			schedulerName := nroSchedObj.Spec.SchedulerName
+			schedulerName := nroSchedObj.Status.SchedulerName
 
 			nrtPreCreatePodList, err := e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
 			Expect(err).ToNot(HaveOccurred())
