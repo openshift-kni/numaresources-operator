@@ -55,9 +55,9 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	"github.com/openshift-kni/numaresources-operator/pkg/normalize"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -143,6 +143,8 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	if err := validation.MachineConfigPoolDuplicates(trees); err != nil {
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}
+
+	normalize.NodeGroupTreesConfig(trees)
 
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
 	if condition != "" {
@@ -644,30 +646,11 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 		return err
 	}
 
-	conf := nropv1alpha1.DefaultNodeGroupConfig()
-	if gdm.NodeGroup.DisablePodsFingerprinting != nil {
-		// handle the bool added in 4.11. We will deprecate once we move out from v1alpha1.
-		setNodeGroupConfigFromNodeGroup(&conf, *gdm.NodeGroup)
-	}
-	if gdm.NodeGroup.Config != nil {
-		conf = merge.NodeGroupConfig(conf, *gdm.NodeGroup.Config)
-	}
-
-	return rteupdate.DaemonSetArgs(gdm.DaemonSet, conf)
+	return rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config)
 }
 
 func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
 	ok := (ds.Status.DesiredNumberScheduled > 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberReady)
 	klog.V(5).InfoS("daemonset", "namespace", ds.Namespace, "name", ds.Name, "desired", ds.Status.DesiredNumberScheduled, "current", ds.Status.CurrentNumberScheduled, "ready", ds.Status.NumberReady)
 	return ok
-}
-
-func setNodeGroupConfigFromNodeGroup(conf *nropv1alpha1.NodeGroupConfig, ng nropv1alpha1.NodeGroup) {
-	var podsFp nropv1alpha1.PodsFingerprintingMode
-	if *ng.DisablePodsFingerprinting {
-		podsFp = nropv1alpha1.PodsFingerprintingDisabled
-	} else {
-		podsFp = nropv1alpha1.PodsFingerprintingEnabled
-	}
-	conf.PodsFingerprinting = &podsFp
 }

@@ -36,6 +36,17 @@ type NodeGroupTree struct {
 	MachineConfigPools []*mcov1.MachineConfigPool
 }
 
+func (ngt NodeGroupTree) Clone() NodeGroupTree {
+	ret := NodeGroupTree{
+		NodeGroup:          ngt.NodeGroup.DeepCopy(),
+		MachineConfigPools: make([]*mcov1.MachineConfigPool, 0, len(ngt.MachineConfigPools)),
+	}
+	for _, mcp := range ngt.MachineConfigPools {
+		ret.MachineConfigPools = append(ret.MachineConfigPools, mcp.DeepCopy())
+	}
+	return ret
+}
+
 func GetTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nropv1alpha1.NodeGroup) ([]NodeGroupTree, error) {
 	mcps := &mcov1.MachineConfigPoolList{}
 	if err := cli.List(ctx, mcps); err != nil {
