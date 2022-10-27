@@ -43,6 +43,7 @@ import (
 
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	nropmcp "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
@@ -504,6 +505,33 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				}
 				wg.Wait()
 			}()
+		})
+
+		It("should report the NodeGroupConfig in the status", func() {
+			nroKey := objects.NROObjectKey()
+			nroOperObj := nropv1alpha1.NUMAResourcesOperator{}
+			err := fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
+
+			if len(nroOperObj.Spec.NodeGroups) != 1 {
+				// TODO: this is the simplest case, there is no hard requirement really
+				// but we took the simplest option atm
+				e2efixture.Skipf(fxt, "more than one NodeGroup not yet supported, found %d", len(nroOperObj.Spec.NodeGroups))
+			}
+
+			Expect(len(nroOperObj.Status.MachineConfigPools)).To(Equal(len(nroOperObj.Spec.NodeGroups)),
+				"MCP Status mismatch: found %d, expected %d",
+				len(nroOperObj.Status.MachineConfigPools), len(nroOperObj.Spec.NodeGroups),
+			)
+
+			// normalize config to handle unspecified defaults
+			specConf := merge.NodeGroupConfig(
+				nropv1alpha1.DefaultNodeGroupConfig(),
+				*nroOperObj.Spec.NodeGroups[0].Config,
+			)
+			statusConf := nroOperObj.Status.MachineConfigPools[0].Config // shortcut
+			Expect(statusConf).To(Equal(specConf))
+
 		})
 	})
 })
