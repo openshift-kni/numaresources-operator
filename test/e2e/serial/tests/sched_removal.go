@@ -123,8 +123,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restar
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
 		nroSchedObj = &nropv1alpha1.NUMAResourcesScheduler{}
-		err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
-		Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
+		nroSchedKey := objects.NROSchedObjectKey()
+		err = fxt.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
+		Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
 
 		schedulerName = nroSchedObj.Status.SchedulerName
 		Expect(schedulerName).ToNot(BeEmpty(), "cannot autodetect the TAS scheduler name from the cluster")

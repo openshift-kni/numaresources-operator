@@ -102,8 +102,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator CR", func() {
 			nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
-			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: objects.NROName()}, nroOperObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", objects.NROName())
+			nroKey := objects.NROObjectKey()
+			err := fxt.Client.Get(context.TODO(), nroKey, nroOperObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 			initialNroOperObj := nroOperObj.DeepCopy()
 
 			workers, err := nodes.GetWorkerNodes(fxt.Client)
@@ -292,8 +293,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 		It("[test_id:54916][tier2] should be able to modify the configurable values under the NUMAResourcesScheduler CR", func() {
 			initialNroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, initialNroSchedObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
+			nroSchedKey := objects.NROSchedObjectKey()
+			err := fxt.Client.Get(context.TODO(), nroSchedKey, initialNroSchedObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
 			nroSchedObj := initialNroSchedObj.DeepCopy()
 
 			By(fmt.Sprintf("modifying the NUMAResourcesScheduler SchedulerName field to %q", serialconfig.SchedulerTestName))
@@ -313,8 +315,8 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			defer func() {
 				By("reverting the changes under the NUMAResourcesScheduler object")
 				currentSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-				err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, currentSchedObj)
-				Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
+				err := fxt.Client.Get(context.TODO(), nroSchedKey, currentSchedObj)
+				Expect(err).ToNot(HaveOccurred(), "cannot get current %q in the cluster", nroSchedKey.String())
 
 				currentSchedObj.Spec.SchedulerName = initialNroSchedObj.Status.SchedulerName
 				err = fxt.Client.Update(context.TODO(), currentSchedObj)
@@ -349,8 +351,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 		It("[test_id:47585][reboot_required][slow] can change kubeletconfig and controller should adapt", func() {
 			nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
-			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: objects.NROName()}, nroOperObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", objects.NROName())
+			nroKey := objects.NROObjectKey()
+			err := fxt.Client.Get(context.TODO(), nroKey, nroOperObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 
 			initialNrtList := nrtv1alpha1.NodeResourceTopologyList{}
 			initialNrtList, err = e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
@@ -442,9 +445,10 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 			By("schedule another workload requesting resources")
 			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
-			schedulerName := nroSchedObj.Status.SchedulerName
+			nroSchedKey := objects.NROSchedObjectKey()
+			err = fxt.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
+			schedulerName := nroSchedObj.Spec.SchedulerName
 
 			nrtPreCreatePodList, err := e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
 			Expect(err).ToNot(HaveOccurred())
