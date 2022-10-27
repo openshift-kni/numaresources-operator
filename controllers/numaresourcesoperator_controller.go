@@ -227,6 +227,8 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	}
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
 
+	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Name, instance.Status.MachineConfigPools, trees)
+
 	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, instance, daemonSetsInfo)
 	instance.Status.DaemonSets = dsStatuses
 	if err != nil {
@@ -235,6 +237,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	if !allDSsUpdated {
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
 	}
+
 	return ctrl.Result{}, status.ConditionAvailable, nil
 }
 
@@ -306,18 +309,10 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []machineconfigpo
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
 			// update MCP conditions under the NRO
-			mcpStatus := nropv1alpha1.MachineConfigPool{
+			mcpStatuses = append(mcpStatuses, nropv1alpha1.MachineConfigPool{
 				Name:       mcp.Name,
 				Conditions: mcp.Status.Conditions,
-			}
-
-			if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
-				mcpStatus.Config = *tree.NodeGroup.Config
-			} else {
-				mcpStatus.Config = nropv1alpha1.DefaultNodeGroupConfig()
-			}
-
-			mcpStatuses = append(mcpStatuses, mcpStatus)
+			})
 
 			isUpdated := IsMachineConfigPoolUpdated(instanceName, mcp)
 			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instanceName, "updated", isUpdated)
@@ -328,6 +323,33 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []machineconfigpo
 		}
 	}
 	return mcpStatuses, true
+}
+
+func syncMachineConfigPoolNodeGroupConfigStatuses(instanceName string, mcpStatuses []nropv1alpha1.MachineConfigPool, trees []machineconfigpools.NodeGroupTree) []nropv1alpha1.MachineConfigPool {
+	updatedMcpStatuses := []nropv1alpha1.MachineConfigPool{}
+	for _, tree := range trees {
+		for _, mcp := range tree.MachineConfigPools {
+			mcpStatus := getMachineConfigPoolStatusByName(mcpStatuses, mcp.Name)
+
+			if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
+				mcpStatus.Config = *tree.NodeGroup.Config
+			} else {
+				mcpStatus.Config = nropv1alpha1.DefaultNodeGroupConfig()
+			}
+
+			updatedMcpStatuses = append(updatedMcpStatuses, mcpStatus)
+		}
+	}
+	return updatedMcpStatuses
+}
+
+func getMachineConfigPoolStatusByName(mcpStatuses []nropv1alpha1.MachineConfigPool, name string) nropv1alpha1.MachineConfigPool {
+	for _, mcpStatus := range mcpStatuses {
+		if mcpStatus.Name == name {
+			return mcpStatus
+		}
+	}
+	return nropv1alpha1.MachineConfigPool{Name: name}
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree) ([]nropv1alpha1.NamespacedName, error) {
