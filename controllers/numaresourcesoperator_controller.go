@@ -223,6 +223,17 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	}
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
 
+	allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, instance, daemonSetsInfo)
+	if err != nil {
+		return ctrl.Result{}, status.ConditionDegraded, err
+	}
+	if !allDSsUpdated {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
+	}
+	return ctrl.Result{}, status.ConditionAvailable, nil
+}
+
+func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, instance *nropv1alpha1.NUMAResourcesOperator, daemonSetsInfo []nropv1alpha1.NamespacedName) (bool, error) {
 	instance.Status.DaemonSets = []nropv1alpha1.NamespacedName{}
 	for _, nname := range daemonSetsInfo {
 		ds := appsv1.DaemonSet{}
@@ -230,18 +241,17 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 			Namespace: nname.Namespace,
 			Name:      nname.Name,
 		}
-		err = r.Client.Get(ctx, dsKey, &ds)
+		err := rd.Get(ctx, dsKey, &ds)
 		if err != nil {
-			return ctrl.Result{}, status.ConditionDegraded, err
+			return false, err
 		}
 
 		if !isDaemonSetReady(&ds) {
-			return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
+			return false, nil
 		}
 		instance.Status.DaemonSets = append(instance.Status.DaemonSets, nname)
 	}
-
-	return ctrl.Result{}, status.ConditionAvailable, nil
+	return true, nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI() error {
