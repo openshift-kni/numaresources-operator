@@ -87,7 +87,7 @@ func CheckEqualAvailableResources(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourc
 	return true, nil
 }
 
-func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourceTopology, required corev1.ResourceList) (string, error) {
+func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourceTopology, required corev1.ResourceList, podQoS corev1.PodQOSClass) (string, error) {
 	for idx := 0; idx < len(nrtInitial.Zones); idx++ {
 		zoneInitial := &nrtInitial.Zones[idx] // shortcut
 		zoneUpdated, err := findZoneByName(nrtUpdated, zoneInitial.Name)
@@ -95,7 +95,7 @@ func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeRe
 			klog.Errorf("missing updated zone %q: %v", zoneInitial.Name, err)
 			return "", err
 		}
-		ok, err := checkConsumedResourcesAtLeast(zoneInitial.Resources, zoneUpdated.Resources, required)
+		ok, err := checkConsumedResourcesAtLeast(zoneInitial.Resources, zoneUpdated.Resources, required, podQoS)
 		if err != nil {
 			klog.Errorf("error checking zone %q: %v", zoneInitial.Name, err)
 			return "", err
@@ -108,7 +108,7 @@ func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeRe
 	return "", nil
 }
 
-func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourceTopology, required corev1.ResourceList) (string, error) {
+func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourceTopology, required corev1.ResourceList, podQoS corev1.PodQOSClass) (string, error) {
 	nodeResInitialInfo, err := accumulateNodeAvailableResources(nrtInitial, "initial")
 	if err != nil {
 		return "", err
@@ -117,7 +117,7 @@ func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeRe
 	if err != nil {
 		return "", err
 	}
-	ok, err := checkConsumedResourcesAtLeast(nodeResInitialInfo, nodeResUpdatedInfo, required)
+	ok, err := checkConsumedResourcesAtLeast(nodeResInitialInfo, nodeResUpdatedInfo, required, podQoS)
 	if err != nil {
 		klog.Errorf("error checking node %q: %v", nrtInitial.Name, err)
 		return "", err
@@ -220,8 +220,12 @@ func checkEqualResourcesInfo(nodeName, zoneName string, resourcesInitial, resour
 	return true, "", nil
 }
 
-func checkConsumedResourcesAtLeast(resourcesInitial, resourcesUpdated []nrtv1alpha1.ResourceInfo, required corev1.ResourceList) (bool, error) {
+func checkConsumedResourcesAtLeast(resourcesInitial, resourcesUpdated []nrtv1alpha1.ResourceInfo, required corev1.ResourceList, podQoS corev1.PodQOSClass) (bool, error) {
 	for resName, resQty := range required {
+		if podQoS != corev1.PodQOSGuaranteed && (resName == corev1.ResourceCPU || resName == corev1.ResourceMemory) {
+			klog.Infof("skip accounting for resource %q as consumed resource in NRT because the pod is of QoS %q", resName, podQoS)
+			continue
+		}
 		initialQty, ok := FindResourceAvailableByName(resourcesInitial, string(resName))
 		if !ok {
 			return false, fmt.Errorf("resource %q not found in the initial set", string(resName))

@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	corev1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/ghodss/yaml"
@@ -67,7 +68,7 @@ type podResourcesRequest struct {
 type tmPolicyFuncs struct {
 	name                    func() nrtv1alpha1.TopologyManagerPolicy
 	setupPadding            func(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod
-	checkConsumedRes        func(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourceTopology, required corev1.ResourceList) (string, error)
+	checkConsumedRes        func(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourceTopology, required corev1.ResourceList, podQoS corev1.PodQOSClass) (string, error)
 	filterMatchingResources func(nrts []nrtv1alpha1.NodeResourceTopology, requests corev1.ResourceList) []nrtv1alpha1.NodeResourceTopology
 }
 
@@ -215,7 +216,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				dataAfter, err := yaml.Marshal(targetNrtCurrent)
 				Expect(err).ToNot(HaveOccurred())
 
-				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtInitial, *targetNrtCurrent, requiredRes)
+				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtInitial, *targetNrtCurrent, requiredRes, corev1qos.GetPodQOS(updatedPod))
 				Expect(err).ToNot(HaveOccurred())
 				Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 			},
@@ -328,7 +329,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				dataAfter, err := yaml.Marshal(targetNrtCurrent)
 				Expect(err).ToNot(HaveOccurred())
 
-				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtInitial, *targetNrtCurrent, requiredRes)
+				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtInitial, *targetNrtCurrent, requiredRes, corev1qos.GetPodQOS(&pods[0]))
 				Expect(err).ToNot(HaveOccurred())
 				Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 			},
@@ -509,7 +510,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err := yaml.Marshal(nrtPostCreate)
 			Expect(err).ToNot(HaveOccurred())
-			match, err := policyFuncs.checkConsumedRes(*nrtInitial, *nrtPostCreate, requiredRes)
+			match, err := policyFuncs.checkConsumedRes(*nrtInitial, *nrtPostCreate, requiredRes, corev1qos.GetPodQOS(updatedPod))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 

@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
+	corev1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 
 	"github.com/ghodss/yaml"
 	"github.com/google/go-cmp/cmp"
@@ -473,7 +474,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err := yaml.Marshal(nrtPostCreate)
 			Expect(err).ToNot(HaveOccurred())
-			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPreCreate, *nrtPostCreate, rl)
+			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPreCreate, *nrtPostCreate, rl, corev1qos.GetPodQOS(testPod))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
 

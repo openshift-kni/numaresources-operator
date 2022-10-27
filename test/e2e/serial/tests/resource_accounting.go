@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
+	corev1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
@@ -294,7 +295,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err := yaml.Marshal(targetNrtAfter)
 			Expect(err).ToNot(HaveOccurred())
-			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtBefore, *targetNrtAfter, requiredRes)
+			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtBefore, *targetNrtAfter, requiredRes, corev1qos.GetPodQOS(updatedPod))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 		})
@@ -658,7 +659,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err := yaml.Marshal(nrtPostCreate)
 			Expect(err).ToNot(HaveOccurred())
-			match, err := policyFuncs.checkConsumedRes(*targetNrtInitial, *nrtPostCreate, rl)
+			match, err := policyFuncs.checkConsumedRes(*targetNrtInitial, *nrtPostCreate, rl, corev1qos.GetPodQOS(updatedPod2))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfter, e2ereslist.ToString(rl))
 

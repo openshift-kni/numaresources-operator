@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+	corev1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
@@ -262,12 +263,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					nrtPostCreate, err := e2enrt.FindFromList(nrtListPostCreate.Items, pod.Spec.NodeName)
 					Expect(err).ToNot(HaveOccurred())
 
-					match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, podResources)
+					match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, podResources, corev1qos.GetPodQOS(&pod))
 					Expect(err).ToNot(HaveOccurred())
 					// If the pods are running, and they are because we reached this far, then the resources must have been accounted SOMEWHERE!
 					Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by deployment running")
 
-					matchWithOverhead, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, podResourcesWithOverhead)
+					matchWithOverhead, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, podResourcesWithOverhead, corev1qos.GetPodQOS(&pod))
 					Expect(err).ToNot(HaveOccurred())
 					// OTOH if we add the overhead no zone is expected to have allocated the EXTRA resources - exactly because the overhead
 					// should not be taken into account!
