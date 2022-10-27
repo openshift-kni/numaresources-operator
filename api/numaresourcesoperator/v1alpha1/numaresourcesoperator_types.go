@@ -116,7 +116,7 @@ type MachineConfigPool struct {
 	// +optional
 	Conditions []mcov1.MachineConfigPoolCondition `json:"conditions,omitempty"`
 	// NodeGroupConfig represents the latest available configuration applied to this MachineConfigPool
-	Config NodeGroupConfig `json:"defaultNodeGroupConfig,omitempty"`
+	Config NodeGroupConfig `json:"config,omitempty"`
 }
 
 //+genclient

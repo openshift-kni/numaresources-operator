@@ -273,7 +273,7 @@ spec:
                         - type
                         type: object
                       type: array
-                    defaultNodeGroupConfig:
+                    config:
                       description: NodeGroupConfig represents the latest available
                         configuration applied to this MachineConfigPool
                       properties:
