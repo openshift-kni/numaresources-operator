@@ -38,7 +38,7 @@ func (fc *filteringClient) FilterListResponse(resp *podresourcesapi.ListPodResou
 		PodResources: make([]*podresourcesapi.PodResources, 0, len(resp.GetPodResources())),
 	}
 	for _, podRes := range resp.GetPodResources() {
-		if shouldExclude(fc.podExcludes, podRes.GetNamespace(), podRes.GetName(), fc.debug) {
+		if ShouldExclude(fc.podExcludes, podRes.GetNamespace(), podRes.GetName(), fc.debug) {
 			continue
 		}
 		retResp.PodResources = append(retResp.PodResources, podRes)
@@ -77,7 +77,7 @@ func NewFromLister(cli podresourcesapi.PodResourcesListerClient, debug bool, pod
 	}
 }
 
-func shouldExclude(podExcludes map[string]string, namespace, name string, debug bool) bool {
+func ShouldExclude(podExcludes map[string]string, namespace, name string, debug bool) bool {
 	for namespaceGlob, nameGlob := range podExcludes {
 		nsMatch, err := filepath.Match(namespaceGlob, namespace)
 		if err != nil && debug {
