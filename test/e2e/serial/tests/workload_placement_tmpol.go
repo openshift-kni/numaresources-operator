@@ -1224,6 +1224,77 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
+		Entry("[test_id:55450][tmscope:pod][tier2][devices] should make a burstable pod requesting devices land on a node with enough resources on a specific NUMA zone",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodePodLevel],
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU: resource.MustParse("1"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+						corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("3"),
+					},
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+					corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("3"),
+				},
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+				},
+			},
+		),
+		Entry("[test_id:54024][tmscope:cnt][tier2][devices] should make a burstable pod requesting devices land on a node with enough resources on a specific NUMA zone, containers should be spread on a different zone",
+			tmPolicyFuncsHandler[nrtv1alpha1.SingleNUMANodeContainerLevel],
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU: resource.MustParse("1"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("5"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+					},
+					{
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+						corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("3"),
+					},
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+				},
+			},
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+					corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("3"),
+				},
+				{
+					corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("5"),
+					corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+				},
+			},
+		),
 	)
 
 	DescribeTable("[placement][unsched] cluster with one worker nodes suitable",
