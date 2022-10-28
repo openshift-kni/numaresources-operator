@@ -478,38 +478,30 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred(), "failed deducting resources from baseload: %v", err)
 				reqResPerNUMA = append(reqResPerNUMA, numaRes)
 			}
+			//get the topology manager policy + scope of the NRT
+			tmPolicy := nrtv1alpha1.TopologyManagerPolicy(nrtInitial.TopologyPolicies[0])
+			if tmPolicy == nrtv1alpha1.SingleNUMANodePodLevel {
+				paddingPodName := "padding-pod-on-target"
+				By("Pad target node to fit only the pod with TAS scheduler")
+				zeroRl := corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("0"),
+					corev1.ResourceMemory: resource.MustParse("0"),
+				}
+				padPod, err := makePaddingPod(fxt.Namespace.Name, paddingPodName, nrtInitial.Zones[1], zeroRl)
+				ExpectWithOffset(1, err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", paddingPodName, nrtInitial.Zones[1].Name)
 
-			podSpec := &corev1.PodSpec{
-				SchedulerName: serialconfig.Config.SchedulerName,
-				Containers: []corev1.Container{
-					{
-						Name:    "testpod-cnt",
-						Image:   images.GetPauseImage(),
-						Command: []string{images.PauseCommand},
-						Resources: corev1.ResourceRequirements{
-							Limits:   reqResPerNUMA[0],
-							Requests: reqResPerNUMA[0],
-						},
-					},
-					{
-						Name:    "testpod-cnt2",
-						Image:   images.GetPauseImage(),
-						Command: []string{images.PauseCommand},
-						Resources: corev1.ResourceRequirements{
-							Limits:   reqResPerNUMA[1],
-							Requests: reqResPerNUMA[1],
-						},
-					},
-				},
-				RestartPolicy: corev1.RestartPolicyAlways,
-				NodeSelector: map[string]string{
-					serialconfig.MultiNUMALabel: "2",
-				},
+				padPod, err = pinPodTo(padPod, targetNodeName, nrtInitial.Zones[1].Name)
+				ExpectWithOffset(1, err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", paddingPodName, nrtInitial.Zones[1].Name)
+
+				err = fxt.Client.Create(context.TODO(), padPod)
+				ExpectWithOffset(1, err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", paddingPodName, nrtInitial.Zones[1].Name)
+				failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, []*corev1.Pod{padPod})
+				ExpectWithOffset(1, failedPodIds).To(BeEmpty(), "padding pod of the target node have failed to run")
 			}
 
-			By(fmt.Sprintf("creating a guaranteed pod with two containers requiring total %s; scheduled by topology aware scheduler", e2ereslist.ToString(e2ereslist.FromContainers(pod.Spec.Containers))))
-			pod.Spec = *podSpec
+			pod.Spec = getPodSpec(tmPolicy, reqResPerNUMA)
 
+			By(fmt.Sprintf("creating a guaranteed pod with two containers requiring total %s; scheduled by topology aware scheduler", e2ereslist.ToString(e2ereslist.FromContainers(pod.Spec.Containers))))
 			err = fxt.Client.Create(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -537,7 +529,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostCreatePod1, err := e2enrt.FindFromList(nrtPostCreatePodList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			policyFuncs := tmPolicyFuncsHandler[nrtv1alpha1.TopologyManagerPolicy(nrtInitial.TopologyPolicies[0])]
+			policyFuncs := tmPolicyFuncsHandler[tmPolicy]
 
 			By(fmt.Sprintf("checking post-create NRT for target node %q updated correctly", targetNodeName))
 			dataBeforeDeployment1, err := yaml.Marshal(nrtInitial)
@@ -1406,4 +1398,49 @@ func checkReplica(pod corev1.Pod, targetNodeName string, K8sClient *kubernetes.C
 	schedOK, err := nrosched.CheckPODWasScheduledWith(K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+}
+
+func getPodSpec(tmPolicy nrtv1alpha1.TopologyManagerPolicy, rlPerNuma []corev1.ResourceList) corev1.PodSpec {
+	podSpec := corev1.PodSpec{
+		SchedulerName: serialconfig.Config.SchedulerName,
+		Containers: []corev1.Container{
+			{
+				Name:    "testpod-cnt",
+				Image:   images.GetPauseImage(),
+				Command: []string{images.PauseCommand},
+				Resources: corev1.ResourceRequirements{
+					Limits:   rlPerNuma[0],
+					Requests: rlPerNuma[0],
+				},
+			},
+			{
+				Name:    "testpod-cnt2",
+				Image:   images.GetPauseImage(),
+				Command: []string{images.PauseCommand},
+				Resources: corev1.ResourceRequirements{
+					Limits:   rlPerNuma[1],
+					Requests: rlPerNuma[1],
+				},
+			},
+		},
+		RestartPolicy: corev1.RestartPolicyAlways,
+		NodeSelector: map[string]string{
+			serialconfig.MultiNUMALabel: "2",
+		},
+	}
+
+	if tmPolicy == nrtv1alpha1.SingleNUMANodePodLevel {
+		podSpec.Containers = []corev1.Container{
+			{
+				Name:    "testpod-cnt",
+				Image:   images.GetPauseImage(),
+				Command: []string{images.PauseCommand},
+				Resources: corev1.ResourceRequirements{
+					Limits:   rlPerNuma[0],
+					Requests: rlPerNuma[0],
+				},
+			},
+		}
+	}
+	return podSpec
 }
