@@ -533,13 +533,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			policyFuncs := tmPolicyFuncsHandler[tmPolicy]
 
 			By(fmt.Sprintf("checking post-create NRT for target node %q updated correctly", targetNodeName))
-			dataBeforeDeployment1, err := yaml.Marshal(nrtInitial)
+			dataBeforePod1, err := yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
-			dataAfterDeployment1, err := yaml.Marshal(nrtPostCreatePod1)
+			dataAfterPod1, err := yaml.Marshal(nrtPostCreatePod1)
 			Expect(err).ToNot(HaveOccurred())
 			match, err := policyFuncs.checkConsumedRes(*nrtInitial, *nrtPostCreatePod1, rl, corev1qos.GetPodQOS(updatedPod))
 			Expect(err).ToNot(HaveOccurred())
-			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBeforeDeployment1, dataAfterDeployment1, e2ereslist.ToString(rl))
+			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBeforePod1, dataAfterPod1, e2ereslist.ToString(rl))
 
 			By(fmt.Sprintf("creating another guaranteed pod with two containers requiring total %s ; scheduled by default scheduler ", e2ereslist.ToString(e2ereslist.FromContainers(pod.Spec.Containers))))
 			pod2 := objects.NewTestPodPause(fxt.Namespace.Name, "testpod-gu-with-default-sched")
@@ -578,13 +578,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
 			By(fmt.Sprintf("checking the resources haven't changed in NRTs of node %q after deleting the pending pod %s/%s", targetNodeName, pod2.Namespace, pod2.Name))
 			Eventually(func() bool {
-				nrtListPostDeleteDeployment2, err := e2enrt.GetUpdated(fxt.Client, nrtPostCreatePod2List, 1*time.Minute)
+				nrtListPostDeletePod2, err := e2enrt.GetUpdated(fxt.Client, nrtPostCreatePod2List, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
 
-				nrtPostDeleteDeployment2, err := e2enrt.FindFromList(nrtListPostDeleteDeployment2.Items, updatedPod.Spec.NodeName)
+				nrtPostDeletePod2, err := e2enrt.FindFromList(nrtListPostDeletePod2.Items, updatedPod.Spec.NodeName)
 				Expect(err).ToNot(HaveOccurred())
 
-				ok, err := e2enrt.CheckEqualAvailableResources(*nrtPostCreatePod1, *nrtPostDeleteDeployment2)
+				ok, err := e2enrt.CheckEqualAvailableResources(*nrtPostCreatePod1, *nrtPostDeletePod2)
 				Expect(err).ToNot(HaveOccurred())
 				if !ok {
 					klog.Infof("NRT of node %q is not as expected yet: expected it to be similar after deleting pending pod, but it reflects a change", targetNodeName)
@@ -598,13 +598,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			By(fmt.Sprintf("checking the resources are restored as expected on node %q after deleting the running pod %s/%s", updatedPod.Spec.NodeName, updatedPod.Namespace, updatedPod.Name))
 			Eventually(func() bool {
-				nrtListPostDelete, err := e2enrt.GetUpdated(fxt.Client, nrtPostCreatePod2List, 1*time.Minute)
+				nrtListPostDeletePod1, err := e2enrt.GetUpdated(fxt.Client, nrtPostCreatePod2List, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
 
-				nrtPostDeleteDeployment2, err := e2enrt.FindFromList(nrtListPostDelete.Items, updatedPod.Spec.NodeName)
+				nrtPostDeletePod1, err := e2enrt.FindFromList(nrtListPostDeletePod1.Items, updatedPod.Spec.NodeName)
 				Expect(err).ToNot(HaveOccurred())
 
-				ok, err := e2enrt.CheckEqualAvailableResources(*nrtInitial, *nrtPostDeleteDeployment2)
+				ok, err := e2enrt.CheckEqualAvailableResources(*nrtInitial, *nrtPostDeletePod1)
 				Expect(err).ToNot(HaveOccurred())
 				if !ok {
 					klog.Infof("NRT of node %q is not as expected yet: expected the resources to be restored after deleting a running pod but NRT doesn't reflect a change", targetNodeName)
