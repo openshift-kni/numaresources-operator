@@ -574,6 +574,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Delete(context.TODO(), pod2)
 			Expect(err).ToNot(HaveOccurred())
 
+			By(fmt.Sprintf("verify the pod %s/%s is removed", pod2.Namespace, pod2.Name))
+			err = wait.ForPodDeleted(fxt.Client, pod2.Namespace, pod2.Name, 3*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
 			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
 			By(fmt.Sprintf("checking the resources haven't changed in NRTs of node %q after deleting the pending pod %s/%s", targetNodeName, pod2.Namespace, pod2.Name))
@@ -594,6 +598,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			By(fmt.Sprintf("deleting the first pod %s/%s", updatedPod.Namespace, updatedPod.Name))
 			err = fxt.Client.Delete(context.TODO(), updatedPod)
+			Expect(err).ToNot(HaveOccurred())
+
+			By(fmt.Sprintf("verify the pod %s/%s is removed", updatedPod.Namespace, updatedPod.Name))
+			err = wait.ForPodDeleted(fxt.Client, updatedPod.Namespace, updatedPod.Name, 3*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking the resources are restored as expected on node %q after deleting the running pod %s/%s", updatedPod.Spec.NodeName, updatedPod.Namespace, updatedPod.Name))
