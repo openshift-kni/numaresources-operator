@@ -505,6 +505,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
 
+			By(fmt.Sprintf("Verify the first pod %s/%s scheduled with TAS scheduler is running", pod.Namespace, pod.Name))
 			// 3 minutes is plenty, should never timeout
 			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
 			if err != nil {
@@ -549,7 +550,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), pod2)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("check the second pod is still pending")
+			By(fmt.Sprintf("Verify the second pod %s/%s scheduled with default-scheduler keeps being pending", pod2.Namespace, pod2.Name))
 			// TODO: lacking better ways, let's monitor the pod "long enough" and let's check it stays Pending
 			// if it stays Pending "long enough" it still means little, but OTOH if it goes Running or Failed we
 			// can tell for sure something's wrong
@@ -569,15 +570,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			ExpectWithOffset(1, err).NotTo(HaveOccurred())
 			ExpectWithOffset(1, isEqual).To(BeTrue(), "new resources are accounted on %q in NRT (%s)", targetNodeName)
 
-			By("deleting the pod 2")
+			By(fmt.Sprintf("deleting the second pod %s/%s", pod2.Namespace, pod2.Name))
 			err = fxt.Client.Delete(context.TODO(), pod2)
 			Expect(err).ToNot(HaveOccurred())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
 			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
+			By(fmt.Sprintf("checking the resources haven't changed in NRTs of node %q after deleting the pending pod %s/%s", targetNodeName, pod2.Namespace, pod2.Name))
 			Eventually(func() bool {
-				By(fmt.Sprintf("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName))
-
 				nrtListPostDeleteDeployment2, err := e2enrt.GetUpdated(fxt.Client, nrtPostCreatePod2List, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -586,16 +586,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 				ok, err := e2enrt.CheckEqualAvailableResources(*nrtPostCreatePod1, *nrtPostDeleteDeployment2)
 				Expect(err).ToNot(HaveOccurred())
+				if !ok {
+					klog.Infof("NRT of node %q is not as expected yet: expected it to be similar after deleting pending pod, but it reflects a change", targetNodeName)
+				}
 				return ok
-			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
+			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(BeTrue(), "resources have changed on %q but expected to stay the same after deleting a pending pod", targetNodeName)
 
-			By("deleting the pod 1")
+			By(fmt.Sprintf("deleting the first pod %s/%s", updatedPod.Namespace, updatedPod.Name))
 			err = fxt.Client.Delete(context.TODO(), updatedPod)
 			Expect(err).ToNot(HaveOccurred())
 
+			By(fmt.Sprintf("checking the resources are restored as expected on node %q after deleting the running pod %s/%s", updatedPod.Spec.NodeName, updatedPod.Namespace, updatedPod.Name))
 			Eventually(func() bool {
-				By(fmt.Sprintf("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName))
-
 				nrtListPostDelete, err := e2enrt.GetUpdated(fxt.Client, nrtPostCreatePod2List, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -604,6 +606,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 				ok, err := e2enrt.CheckEqualAvailableResources(*nrtInitial, *nrtPostDeleteDeployment2)
 				Expect(err).ToNot(HaveOccurred())
+				if !ok {
+					klog.Infof("NRT of node %q is not as expected yet: expected the resources to be restored after deleting a running pod but NRT doesn't reflect a change", targetNodeName)
+				}
 				return ok
 			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		})
