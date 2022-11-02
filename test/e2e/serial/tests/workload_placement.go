@@ -1019,7 +1019,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 				dataAfter, err := yaml.Marshal(updatedTargetNrt)
 				Expect(err).ToNot(HaveOccurred())
-				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitialTarget, *updatedTargetNrt, rl, podQoS)
+				match, err := e2enrt.CheckNodeConsumedResourcesAtLeast(*nrtInitialTarget, *updatedTargetNrt, rl, podQoS)
 				Expect(err).ToNot(HaveOccurred())
 
 				if match == "" {
@@ -1123,7 +1123,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 				dataAfter, err := yaml.Marshal(updatedTargetNrt)
 				Expect(err).ToNot(HaveOccurred())
-				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitialTarget, *updatedTargetNrt, rl, podQoS)
+				match, err := e2enrt.CheckNodeConsumedResourcesAtLeast(*nrtInitialTarget, *updatedTargetNrt, rl, podQoS)
 				Expect(err).ToNot(HaveOccurred())
 
 				if match == "" {
