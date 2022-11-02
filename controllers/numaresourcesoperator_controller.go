@@ -55,9 +55,9 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	"github.com/openshift-kni/numaresources-operator/pkg/normalize"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -144,6 +144,8 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}
 
+	normalize.NodeGroupTreesConfig(trees)
+
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
 	if condition != "" {
 		// TODO: use proper reason
@@ -210,7 +212,9 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 
 		// MCO need to update SELinux context and other stuff, and need to trigger a reboot.
 		// It can take a while.
-		if allMCPsUpdated := r.syncMachineConfigPoolsStatuses(instance, trees); !allMCPsUpdated {
+		mcpStatuses, allMCPsUpdated := syncMachineConfigPoolsStatuses(instance.Name, trees)
+		instance.Status.MachineConfigPools = mcpStatuses
+		if !allMCPsUpdated {
 			// the Machine Config Pool still did not apply the machine config, wait for one minute
 			return ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, status.ConditionProgressing, nil
 		}
@@ -223,25 +227,39 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	}
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
 
-	instance.Status.DaemonSets = []nropv1alpha1.NamespacedName{}
+	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Name, instance.Status.MachineConfigPools, trees)
+
+	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, instance, daemonSetsInfo)
+	instance.Status.DaemonSets = dsStatuses
+	if err != nil {
+		return ctrl.Result{}, status.ConditionDegraded, err
+	}
+	if !allDSsUpdated {
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
+	}
+
+	return ctrl.Result{}, status.ConditionAvailable, nil
+}
+
+func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, instance *nropv1alpha1.NUMAResourcesOperator, daemonSetsInfo []nropv1alpha1.NamespacedName) ([]nropv1alpha1.NamespacedName, bool, error) {
+	dsStatuses := []nropv1alpha1.NamespacedName{}
 	for _, nname := range daemonSetsInfo {
 		ds := appsv1.DaemonSet{}
 		dsKey := client.ObjectKey{
 			Namespace: nname.Namespace,
 			Name:      nname.Name,
 		}
-		err = r.Client.Get(ctx, dsKey, &ds)
+		err := rd.Get(ctx, dsKey, &ds)
 		if err != nil {
-			return ctrl.Result{}, status.ConditionDegraded, err
+			return dsStatuses, false, err
 		}
 
 		if !isDaemonSetReady(&ds) {
-			return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
+			return dsStatuses, false, nil
 		}
-		instance.Status.DaemonSets = append(instance.Status.DaemonSets, nname)
+		dsStatuses = append(dsStatuses, nname)
 	}
-
-	return ctrl.Result{}, status.ConditionAvailable, nil
+	return dsStatuses, true, nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI() error {
@@ -283,32 +301,55 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	return nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncMachineConfigPoolsStatuses(instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree) bool {
+func syncMachineConfigPoolsStatuses(instanceName string, trees []machineconfigpools.NodeGroupTree) ([]nropv1alpha1.MachineConfigPool, bool) {
 	klog.V(4).Info("Machine Config Status Sync start")
 	defer klog.V(4).Info("Machine Config Status Sync stop")
 
-	instance.Status.MachineConfigPools = []nropv1alpha1.MachineConfigPool{}
+	mcpStatuses := []nropv1alpha1.MachineConfigPool{}
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
 			// update MCP conditions under the NRO
-			mcpStatus := nropv1alpha1.MachineConfigPool{
+			mcpStatuses = append(mcpStatuses, nropv1alpha1.MachineConfigPool{
 				Name:       mcp.Name,
 				Conditions: mcp.Status.Conditions,
-			}
-			if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
-				mcpStatus.Config = *tree.NodeGroup.Config
-			}
-			instance.Status.MachineConfigPools = append(instance.Status.MachineConfigPools, mcpStatus)
+			})
 
-			isUpdated := IsMachineConfigPoolUpdated(instance.Name, mcp)
-			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instance.Name, "updated", isUpdated)
+			isUpdated := IsMachineConfigPoolUpdated(instanceName, mcp)
+			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instanceName, "updated", isUpdated)
 
 			if !isUpdated {
-				return false
+				return mcpStatuses, false
 			}
 		}
 	}
-	return true
+	return mcpStatuses, true
+}
+
+func syncMachineConfigPoolNodeGroupConfigStatuses(instanceName string, mcpStatuses []nropv1alpha1.MachineConfigPool, trees []machineconfigpools.NodeGroupTree) []nropv1alpha1.MachineConfigPool {
+	updatedMcpStatuses := []nropv1alpha1.MachineConfigPool{}
+	for _, tree := range trees {
+		for _, mcp := range tree.MachineConfigPools {
+			mcpStatus := getMachineConfigPoolStatusByName(mcpStatuses, mcp.Name)
+
+			if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
+				mcpStatus.Config = *tree.NodeGroup.Config
+			} else {
+				mcpStatus.Config = nropv1alpha1.DefaultNodeGroupConfig()
+			}
+
+			updatedMcpStatuses = append(updatedMcpStatuses, mcpStatus)
+		}
+	}
+	return updatedMcpStatuses
+}
+
+func getMachineConfigPoolStatusByName(mcpStatuses []nropv1alpha1.MachineConfigPool, name string) nropv1alpha1.MachineConfigPool {
+	for _, mcpStatus := range mcpStatuses {
+		if mcpStatus.Name == name {
+			return mcpStatus
+		}
+	}
+	return nropv1alpha1.MachineConfigPool{Name: name}
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree) ([]nropv1alpha1.NamespacedName, error) {
@@ -627,30 +668,11 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 		return err
 	}
 
-	conf := nropv1alpha1.DefaultNodeGroupConfig()
-	if gdm.NodeGroup.DisablePodsFingerprinting != nil {
-		// handle the bool added in 4.11. We will deprecate once we move out from v1alpha1.
-		setNodeGroupConfigFromNodeGroup(&conf, *gdm.NodeGroup)
-	}
-	if gdm.NodeGroup.Config != nil {
-		conf = merge.NodeGroupConfig(conf, *gdm.NodeGroup.Config)
-	}
-
-	return rteupdate.DaemonSetArgs(gdm.DaemonSet, conf)
+	return rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config)
 }
 
 func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
 	ok := (ds.Status.DesiredNumberScheduled > 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberReady)
 	klog.V(5).InfoS("daemonset", "namespace", ds.Namespace, "name", ds.Name, "desired", ds.Status.DesiredNumberScheduled, "current", ds.Status.CurrentNumberScheduled, "ready", ds.Status.NumberReady)
 	return ok
-}
-
-func setNodeGroupConfigFromNodeGroup(conf *nropv1alpha1.NodeGroupConfig, ng nropv1alpha1.NodeGroup) {
-	var podsFp nropv1alpha1.PodsFingerprintingMode
-	if *ng.DisablePodsFingerprinting {
-		podsFp = nropv1alpha1.PodsFingerprintingDisabled
-	} else {
-		podsFp = nropv1alpha1.PodsFingerprintingEnabled
-	}
-	conf.PodsFingerprinting = &podsFp
 }
