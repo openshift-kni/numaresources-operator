@@ -962,7 +962,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("wait for replicaset to be up and running with all its replicas")
-			rs, err = wait.ForReplicaSetComplete(fxt.Client, rs, time.Second*10, 2*time.Minute)
+			rs, err = wait.ForReplicaSetComplete(fxt.Client, rs, time.Second, 2*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedRsName := client.ObjectKeyFromObject(rs)
@@ -981,7 +981,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				return true
-			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
+			}, time.Minute, time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
 			schedTimeWithDefaultScheduler := time.Now().Sub(rsCreateStart)
 
 			By(fmt.Sprintf("checking the pods were scheduled with scheduler %q", corev1.DefaultSchedulerName))
@@ -1092,7 +1092,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("wait for replicaset to be up and running with all its replicas")
-			rs, err = wait.ForReplicaSetComplete(fxt.Client, rs, time.Second*10, 2*time.Minute)
+			rs, err = wait.ForReplicaSetComplete(fxt.Client, rs, time.Second, 2*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedRsName = client.ObjectKeyFromObject(rs)
@@ -1110,7 +1110,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				return true
-			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
+			}, time.Minute, time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
 			schedTimeWithTopologyScheduler := time.Now().Sub(rsCreateStart)
 
 			By(fmt.Sprintf("checking the pods were scheduled on the target node %q", targetNodeName))
