@@ -907,6 +907,16 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:47627] should be able to schedule many replicas with TAS scheduler with performance time equals to the default scheduler", func() {
+			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
+			nodesNameSet := e2enrt.AccumulateNames(nrts)
+			// the only node which was not padded is the targetedNode
+			// since we know exactly how the test setup looks like we expect only targeted node here
+			targetNodeNameSet := nodesNameSet.Difference(paddedNodeNames)
+			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
+			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
+			Expect(ok).To(BeTrue())
+			klog.Infof("target node will be %q", targetNodeName)
+
 			nrtInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, timeout)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -951,6 +961,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
 
+			//TODO wait for replicaset to be up and running with all its replicas, this will save checking if the pods are running
+
 			namespacedRsName := client.ObjectKeyFromObject(rs)
 			err = fxt.Client.Get(context.TODO(), namespacedRsName, rs)
 			Expect(err).ToNot(HaveOccurred())
@@ -977,8 +989,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, corev1.DefaultSchedulerName)
 			}
 
-			// all pods should land on same node
-			targetNodeName := pods[0].Spec.NodeName
+			//TODO checking the pods were scheduled on the target node
+
 			By(fmt.Sprintf("verifying resources allocation correctness for NRT target: %q", targetNodeName))
 			var nrtAfterRSCreation nrtv1alpha1.NodeResourceTopologyList
 			podQoS := corev1qos.GetPodQOS(&pods[0])
@@ -1013,6 +1025,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By(fmt.Sprintf("deleting replicaset %s/%s", fxt.Namespace.Name, rsName))
 			err = fxt.Client.Delete(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
+
+			//TODO verify replicaset's pods are deleted
 
 			Eventually(func() bool {
 				By(fmt.Sprintf("checking the resources are restored as expected on %q", targetNodeName))
@@ -1066,6 +1080,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
 
+			//TODO wait for replicaset to be up and running with all its replicas
+
 			namespacedRsName = client.ObjectKeyFromObject(rs)
 			err = fxt.Client.Get(context.TODO(), namespacedRsName, rs)
 			Expect(err).ToNot(HaveOccurred())
@@ -1084,6 +1100,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
 			schedTimeWithTopologyScheduler := time.Now().Sub(rsCreateStart)
 
+			//TODO checking the pods were scheduled on the target node
+
 			By(fmt.Sprintf("checking the pods were scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
 			for _, pod := range pods {
 				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
@@ -1091,8 +1109,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 			}
 
-			// all pods should land on same node
-			targetNodeName = pods[0].Spec.NodeName
 			By(fmt.Sprintf("verifying resources allocation correctness for NRT target: %q", targetNodeName))
 			podQoS = corev1qos.GetPodQOS(&pods[0])
 			Eventually(func() bool {
