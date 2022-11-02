@@ -961,7 +961,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
 
-			//TODO wait for replicaset to be up and running with all its replicas, this will save checking if the pods are running
+			By("wait for replicaset to be up and running with all its replicas")
+			rs, err = wait.ForReplicaSetComplete(fxt.Client, rs, time.Second*10, 2*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
 
 			namespacedRsName := client.ObjectKeyFromObject(rs)
 			err = fxt.Client.Get(context.TODO(), namespacedRsName, rs)
@@ -987,9 +989,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, corev1.DefaultSchedulerName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, corev1.DefaultSchedulerName)
+
 			}
 
-			//TODO checking the pods were scheduled on the target node
+			By(fmt.Sprintf("checking the pods were scheduled on the target node %q", targetNodeName))
+			for _, pod := range pods {
+				Expect(pod.Spec.NodeName).To(Equal(targetNodeName), "pod landed on %q instead of on %v", pod.Spec.NodeName, targetNodeName)
+			}
 
 			By(fmt.Sprintf("verifying resources allocation correctness for NRT target: %q", targetNodeName))
 			var nrtAfterRSCreation nrtv1alpha1.NodeResourceTopologyList
@@ -1026,7 +1032,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Delete(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
 
-			//TODO verify replicaset's pods are deleted
+			By("verify replicaset's pods are deleted")
+			for _, pod := range pods {
+				klog.Infof("waiting for pod %s/%s to get deleted", pod.Namespace, pod.Name)
+				err := wait.ForPodDeleted(fxt.Client, pod.Namespace, pod.Name, 2*time.Minute)
+				Expect(err).ToNot(HaveOccurred(), "pod %s/%s still exists", pod.Namespace, pod.Name)
+			}
 
 			Eventually(func() bool {
 				By(fmt.Sprintf("checking the resources are restored as expected on %q", targetNodeName))
@@ -1080,7 +1091,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
 
-			//TODO wait for replicaset to be up and running with all its replicas
+			By("wait for replicaset to be up and running with all its replicas")
+			rs, err = wait.ForReplicaSetComplete(fxt.Client, rs, time.Second*10, 2*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
 
 			namespacedRsName = client.ObjectKeyFromObject(rs)
 			err = fxt.Client.Get(context.TODO(), namespacedRsName, rs)
@@ -1100,7 +1113,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
 			schedTimeWithTopologyScheduler := time.Now().Sub(rsCreateStart)
 
-			//TODO checking the pods were scheduled on the target node
+			By(fmt.Sprintf("checking the pods were scheduled on the target node %q", targetNodeName))
+			for _, pod := range pods {
+				Expect(pod.Spec.NodeName).To(Equal(targetNodeName), "pod landed on %q instead of on %v", pod.Spec.NodeName, targetNodeName)
+			}
 
 			By(fmt.Sprintf("checking the pods were scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
 			for _, pod := range pods {
