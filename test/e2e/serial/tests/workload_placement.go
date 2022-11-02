@@ -925,32 +925,33 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podLabels := map[string]string{
 				"test": "test-rs",
 			}
-
-			rs := objects.NewTestReplicaSetWithPodSpec(replicaNumber, podLabels, map[string]string{}, fxt.Namespace.Name, rsName, corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name:    "c0",
-						Image:   images.GetPauseImage(),
-						Command: []string{images.PauseCommand},
-						Resources: corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("2"),
-								corev1.ResourceMemory: resource.MustParse("200Mi"),
-							},
-						},
-					},
-					{
-						Name:    "c1",
-						Image:   images.GetPauseImage(),
-						Command: []string{images.PauseCommand},
-						Resources: corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("2"),
-								corev1.ResourceMemory: resource.MustParse("100Mi"),
-							},
+			rsContainers := []corev1.Container{
+				{
+					Name:    "c0",
+					Image:   images.GetPauseImage(),
+					Command: []string{images.PauseCommand},
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("2"),
+							corev1.ResourceMemory: resource.MustParse("200Mi"),
 						},
 					},
 				},
+				{
+					Name:    "c1",
+					Image:   images.GetPauseImage(),
+					Command: []string{images.PauseCommand},
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("2"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+				},
+			}
+
+			rs := objects.NewTestReplicaSetWithPodSpec(replicaNumber, podLabels, map[string]string{}, fxt.Namespace.Name, rsName, corev1.PodSpec{
+				Containers: rsContainers,
 				NodeSelector: map[string]string{
 					serialconfig.MultiNUMALabel: "2",
 				},
@@ -1058,30 +1059,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			rs = objects.NewTestReplicaSetWithPodSpec(replicaNumber, podLabels, map[string]string{}, fxt.Namespace.Name, rsName, corev1.PodSpec{
 				SchedulerName: serialconfig.Config.SchedulerName,
-				Containers: []corev1.Container{
-					{
-						Name:    "c0",
-						Image:   images.GetPauseImage(),
-						Command: []string{images.PauseCommand},
-						Resources: corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("2"),
-								corev1.ResourceMemory: resource.MustParse("200Mi"),
-							},
-						},
-					},
-					{
-						Name:    "c1",
-						Image:   images.GetPauseImage(),
-						Command: []string{images.PauseCommand},
-						Resources: corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("2"),
-								corev1.ResourceMemory: resource.MustParse("100Mi"),
-							},
-						},
-					},
-				},
+				Containers:    rsContainers,
 			})
 			nrtInitial, err = e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, timeout)
 			Expect(err).ToNot(HaveOccurred())
