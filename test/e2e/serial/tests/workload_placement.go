@@ -906,7 +906,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("[test_id:47627] should be able to schedule many replicas with performance time equals to the default scheduler", func() {
+		It("[test_id:47627] should be able to schedule many replicas with TAS scheduler with performance time equals to the default scheduler", func() {
 			nrtInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, timeout)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -947,7 +947,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			})
 
 			dpCreateStart := time.Now()
-			By(fmt.Sprintf("creating a replicaset %s/%s with %d replicas scheduling with: %s", fxt.Namespace.Name, rsName, replicaNumber, corev1.DefaultSchedulerName))
+			By(fmt.Sprintf("creating a replicaset %s/%s with %d replicas scheduling with scheduler: %s", fxt.Namespace.Name, rsName, replicaNumber, corev1.DefaultSchedulerName))
 			err = fxt.Client.Create(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -967,10 +967,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				return true
-			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be %d pods under deployment: %q", replicaNumber, namespacedRsName.String())
+			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
 			schedTimeWithDefaultScheduler := time.Now().Sub(dpCreateStart)
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", corev1.DefaultSchedulerName))
+			By(fmt.Sprintf("checking the pods were scheduled with scheduler %q", corev1.DefaultSchedulerName))
 			for _, pod := range pods {
 				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, corev1.DefaultSchedulerName)
 				Expect(err).ToNot(HaveOccurred())
@@ -1004,7 +1004,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 
 				if match == "" {
-					klog.Warningf("inconsistent accounting: no resources consumed by the running pod,\nNRT before test deployment: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
+					klog.Warningf("inconsistent accounting: no resources consumed by the running pod,\nNRT before test replicaset: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
 					return false
 				}
 				return true
@@ -1081,10 +1081,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				return true
-			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be %d pods under deployment: %q", replicaNumber, namespacedRsName.String())
+			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
 			schedTimeWithTopologyScheduler := time.Now().Sub(dpCreateStart)
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			By(fmt.Sprintf("checking the pods were scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
 			for _, pod := range pods {
 				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 				Expect(err).ToNot(HaveOccurred())
@@ -1117,7 +1117,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 
 				if match == "" {
-					klog.Warningf("inconsistent accounting: no resources consumed by the running pod,\nNRT before test deployment: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
+					klog.Warningf("inconsistent accounting: no resources consumed by the running pod,\nNRT before test replicaset: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
 					return false
 				}
 				return true
