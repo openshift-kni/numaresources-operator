@@ -906,7 +906,17 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("[test_id:47627] should be able to schedule many replicas with performance time equals to the default scheduler", func() {
+		It("[test_id:47627] should be able to schedule many replicas with TAS scheduler with performance time equals to the default scheduler", func() {
+			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
+			nodesNameSet := e2enrt.AccumulateNames(nrts)
+			// the only node which was not padded is the targetedNode
+			// since we know exactly how the test setup looks like we expect only targeted node here
+			targetNodeNameSet := nodesNameSet.Difference(paddedNodeNames)
+			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
+			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
+			Expect(ok).To(BeTrue())
+			klog.Infof("target node will be %q", targetNodeName)
+
 			nrtInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, timeout)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -915,40 +925,45 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podLabels := map[string]string{
 				"test": "test-rs",
 			}
-
-			rs := objects.NewTestReplicaSetWithPodSpec(replicaNumber, podLabels, map[string]string{}, fxt.Namespace.Name, rsName, corev1.PodSpec{
-				Containers: []corev1.Container{
-					{
-						Name:    "c0",
-						Image:   images.GetPauseImage(),
-						Command: []string{images.PauseCommand},
-						Resources: corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("2"),
-								corev1.ResourceMemory: resource.MustParse("200Mi"),
-							},
-						},
-					},
-					{
-						Name:    "c1",
-						Image:   images.GetPauseImage(),
-						Command: []string{images.PauseCommand},
-						Resources: corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("2"),
-								corev1.ResourceMemory: resource.MustParse("100Mi"),
-							},
+			rsContainers := []corev1.Container{
+				{
+					Name:    "c0",
+					Image:   images.GetPauseImage(),
+					Command: []string{images.PauseCommand},
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("2"),
+							corev1.ResourceMemory: resource.MustParse("200Mi"),
 						},
 					},
 				},
+				{
+					Name:    "c1",
+					Image:   images.GetPauseImage(),
+					Command: []string{images.PauseCommand},
+					Resources: corev1.ResourceRequirements{
+						Limits: corev1.ResourceList{
+							corev1.ResourceCPU:    resource.MustParse("2"),
+							corev1.ResourceMemory: resource.MustParse("100Mi"),
+						},
+					},
+				},
+			}
+
+			rs := objects.NewTestReplicaSetWithPodSpec(replicaNumber, podLabels, map[string]string{}, fxt.Namespace.Name, rsName, corev1.PodSpec{
+				Containers: rsContainers,
 				NodeSelector: map[string]string{
 					serialconfig.MultiNUMALabel: "2",
 				},
 			})
 
-			dpCreateStart := time.Now()
-			By(fmt.Sprintf("creating a replicaset %s/%s with %d replicas scheduling with: %s", fxt.Namespace.Name, rsName, replicaNumber, corev1.DefaultSchedulerName))
+			rsCreateStart := time.Now()
+			By(fmt.Sprintf("creating a replicaset %s/%s with %d replicas scheduling with scheduler: %s", fxt.Namespace.Name, rsName, replicaNumber, corev1.DefaultSchedulerName))
 			err = fxt.Client.Create(context.TODO(), rs)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("wait for replicaset to be up and running with all its replicas")
+			rs, err = wait.ForReplicaSetComplete(fxt.Client, rs, time.Second, 2*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedRsName := client.ObjectKeyFromObject(rs)
@@ -967,30 +982,34 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				return true
-			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be %d pods under deployment: %q", replicaNumber, namespacedRsName.String())
-			schedTimeWithDefaultScheduler := time.Now().Sub(dpCreateStart)
+			}, time.Minute, time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
+			schedTimeWithDefaultScheduler := time.Now().Sub(rsCreateStart)
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", corev1.DefaultSchedulerName))
+			By(fmt.Sprintf("checking the pods were scheduled with scheduler %q", corev1.DefaultSchedulerName))
 			for _, pod := range pods {
 				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, corev1.DefaultSchedulerName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, corev1.DefaultSchedulerName)
+
 			}
 
-			// all pods should land on same node
-			targetNodeName := pods[0].Spec.NodeName
+			By(fmt.Sprintf("checking the pods were scheduled on the target node %q", targetNodeName))
+			for _, pod := range pods {
+				Expect(pod.Spec.NodeName).To(Equal(targetNodeName), "pod landed on %q instead of on %v", pod.Spec.NodeName, targetNodeName)
+			}
+
 			By(fmt.Sprintf("verifying resources allocation correctness for NRT target: %q", targetNodeName))
-			var nrtAfterDPCreation nrtv1alpha1.NodeResourceTopologyList
+			var nrtAfterRSCreation nrtv1alpha1.NodeResourceTopologyList
 			podQoS := corev1qos.GetPodQOS(&pods[0])
 			Eventually(func() bool {
-				nrtAfterDPCreation, err := e2enrt.GetUpdated(fxt.Client, nrtInitial, timeout)
+				nrtAfterRSCreation, err := e2enrt.GetUpdated(fxt.Client, nrtInitial, timeout)
 				Expect(err).ToNot(HaveOccurred())
 
 				nrtInitialTarget, err := e2enrt.FindFromList(nrtInitial.Items, targetNodeName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(nrtInitialTarget.Name).To(Equal(targetNodeName), "expected targetNrt to be equal to %q", targetNodeName)
 
-				updatedTargetNrt, err := e2enrt.FindFromList(nrtAfterDPCreation.Items, targetNodeName)
+				updatedTargetNrt, err := e2enrt.FindFromList(nrtAfterRSCreation.Items, targetNodeName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(updatedTargetNrt.Name).To(Equal(targetNodeName), "expected targetNrt to be equal to %q", targetNodeName)
 
@@ -1000,11 +1019,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 				dataAfter, err := yaml.Marshal(updatedTargetNrt)
 				Expect(err).ToNot(HaveOccurred())
-				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitialTarget, *updatedTargetNrt, rl, podQoS)
+				match, err := e2enrt.CheckNodeConsumedResourcesAtLeast(*nrtInitialTarget, *updatedTargetNrt, rl, podQoS)
 				Expect(err).ToNot(HaveOccurred())
 
 				if match == "" {
-					klog.Warningf("inconsistent accounting: no resources consumed by the running pod,\nNRT before test deployment: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
+					klog.Warningf("inconsistent accounting: no resources consumed by the running pod,\nNRT before test replicaset: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
 					return false
 				}
 				return true
@@ -1014,10 +1033,17 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Delete(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
 
+			By("verify replicaset's pods are deleted")
+			for _, pod := range pods {
+				klog.Infof("waiting for pod %s/%s to get deleted", pod.Namespace, pod.Name)
+				err := wait.ForPodDeleted(fxt.Client, pod.Namespace, pod.Name, 2*time.Minute)
+				Expect(err).ToNot(HaveOccurred(), "pod %s/%s still exists", pod.Namespace, pod.Name)
+			}
+
 			Eventually(func() bool {
 				By(fmt.Sprintf("checking the resources are restored as expected on %q", targetNodeName))
 
-				nrtListPostDelete, err := e2enrt.GetUpdated(fxt.Client, nrtAfterDPCreation, 1*time.Minute)
+				nrtListPostDelete, err := e2enrt.GetUpdated(fxt.Client, nrtAfterRSCreation, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
 
 				nrtPostDelete, err := e2enrt.FindFromList(nrtListPostDelete.Items, targetNodeName)
@@ -1033,37 +1059,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			rs = objects.NewTestReplicaSetWithPodSpec(replicaNumber, podLabels, map[string]string{}, fxt.Namespace.Name, rsName, corev1.PodSpec{
 				SchedulerName: serialconfig.Config.SchedulerName,
-				Containers: []corev1.Container{
-					{
-						Name:    "c0",
-						Image:   images.GetPauseImage(),
-						Command: []string{images.PauseCommand},
-						Resources: corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("2"),
-								corev1.ResourceMemory: resource.MustParse("200Mi"),
-							},
-						},
-					},
-					{
-						Name:    "c1",
-						Image:   images.GetPauseImage(),
-						Command: []string{images.PauseCommand},
-						Resources: corev1.ResourceRequirements{
-							Limits: corev1.ResourceList{
-								corev1.ResourceCPU:    resource.MustParse("2"),
-								corev1.ResourceMemory: resource.MustParse("100Mi"),
-							},
-						},
-					},
-				},
+				Containers:    rsContainers,
 			})
 			nrtInitial, err = e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, timeout)
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("creating a replicaset %s/%s with %d replicas scheduling with: %s", fxt.Namespace.Name, rsName, replicaNumber, serialconfig.Config.SchedulerName))
-			dpCreateStart = time.Now()
+			rsCreateStart = time.Now()
 			err = fxt.Client.Create(context.TODO(), rs)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("wait for replicaset to be up and running with all its replicas")
+			rs, err = wait.ForReplicaSetComplete(fxt.Client, rs, time.Second, 2*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedRsName = client.ObjectKeyFromObject(rs)
@@ -1081,18 +1088,21 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				return true
-			}, time.Minute, 5*time.Second).Should(BeTrue(), "there should be %d pods under deployment: %q", replicaNumber, namespacedRsName.String())
-			schedTimeWithTopologyScheduler := time.Now().Sub(dpCreateStart)
+			}, time.Minute, time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
+			schedTimeWithTopologyScheduler := time.Now().Sub(rsCreateStart)
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			By(fmt.Sprintf("checking the pods were scheduled on the target node %q", targetNodeName))
+			for _, pod := range pods {
+				Expect(pod.Spec.NodeName).To(Equal(targetNodeName), "pod landed on %q instead of on %v", pod.Spec.NodeName, targetNodeName)
+			}
+
+			By(fmt.Sprintf("checking the pods were scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
 			for _, pod := range pods {
 				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 			}
 
-			// all pods should land on same node
-			targetNodeName = pods[0].Spec.NodeName
 			By(fmt.Sprintf("verifying resources allocation correctness for NRT target: %q", targetNodeName))
 			podQoS = corev1qos.GetPodQOS(&pods[0])
 			Eventually(func() bool {
@@ -1113,11 +1123,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 				dataAfter, err := yaml.Marshal(updatedTargetNrt)
 				Expect(err).ToNot(HaveOccurred())
-				match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitialTarget, *updatedTargetNrt, rl, podQoS)
+				match, err := e2enrt.CheckNodeConsumedResourcesAtLeast(*nrtInitialTarget, *updatedTargetNrt, rl, podQoS)
 				Expect(err).ToNot(HaveOccurred())
 
 				if match == "" {
-					klog.Warningf("inconsistent accounting: no resources consumed by the running pod,\nNRT before test deployment: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
+					klog.Warningf("inconsistent accounting: no resources consumed by the running pod,\nNRT before test replicaset: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
 					return false
 				}
 				return true
