@@ -37,7 +37,7 @@ func ForReplicaSetComplete(cli client.Client, rs *appsv1.ReplicaSet, pollInterva
 			return false, err
 		}
 
-		if !IsReplicasetComplete(rs, &updatedRs.Status) {
+		if !isReplicasetComplete(rs, &updatedRs.Status) {
 			klog.Warningf("replicaset %s not yet complete", key.String())
 			return false, nil
 		}
@@ -48,13 +48,10 @@ func ForReplicaSetComplete(cli client.Client, rs *appsv1.ReplicaSet, pollInterva
 	return updatedRs, err
 }
 
-func AreReplicasAvailable(newStatus *appsv1.ReplicaSetStatus, replicas int32) bool {
-	return newStatus.ReadyReplicas == replicas &&
+func isReplicasetComplete(rs *appsv1.ReplicaSet, newStatus *appsv1.ReplicaSetStatus) bool {
+	replicas := *(rs.Spec.Replicas)
+	areReplicasAvailable := newStatus.ReadyReplicas == replicas &&
 		newStatus.Replicas == replicas &&
 		newStatus.AvailableReplicas == replicas
-}
-
-func IsReplicasetComplete(rs *appsv1.ReplicaSet, newStatus *appsv1.ReplicaSetStatus) bool {
-	return AreReplicasAvailable(newStatus, *(rs.Spec.Replicas)) &&
-		newStatus.ObservedGeneration >= rs.Generation
+	return areReplicasAvailable && newStatus.ObservedGeneration >= rs.Generation
 }
