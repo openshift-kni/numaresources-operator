@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ForReplicaSetComplete(cli client.Client, rs *appsv1.ReplicaSet, pollInterval, pollTimeout time.Duration) (*appsv1.ReplicaSet, error) {
+func ForReplicasetComplete(cli client.Client, rs *appsv1.ReplicaSet, pollInterval, pollTimeout time.Duration) (*appsv1.ReplicaSet, error) {
 	key := ObjectKeyFromObject(rs)
 	updatedRs := &appsv1.ReplicaSet{}
 	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
