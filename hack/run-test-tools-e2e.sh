@@ -85,7 +85,6 @@ fi
 echo "Running Tools, mostly local, E2E Tests"
 runcmd ${BIN_DIR}/e2e-nrop-tools.test \
 	--ginkgo.v \
-	--test.parallel=1 \
 	--ginkgo.reportFile=${REPORT_FILE} \
 	${NO_COLOR} \
 	${SKIP} \
