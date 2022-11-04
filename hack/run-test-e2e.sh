@@ -8,7 +8,7 @@ NO_TEARDOWN="${NO_TEARDOWN:-false}"
 function test_sched() {
   # Run install test suite
   echo "Running NROScheduler install test suite"
-  ${BIN_DIR}/e2e-nrop-sched-install.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.reportFile=/tmp/artifacts/nrop/sched-install
+  ${BIN_DIR}/e2e-nrop-sched-install.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.reportFile=/tmp/artifacts/nrop/sched-install
 
   # The install failed, no taste to continue
   if [ $? -ne 0 ]; then
@@ -19,16 +19,16 @@ function test_sched() {
   echo "Running Functional Tests: ${GINKGO_SUITS}"
   # -v: print out the text and location for each spec before running it and flush output to stdout in realtime
   # -r: run suites recursively
-  # --failFast: ginkgo will stop the suite right after the first spec failure
-  # --flakeAttempts: rerun the test if it fails
+  # --fail-fast: ginkgo will stop the suite right after the first spec failure
+  # --flake-attempts: rerun the test if it fails
   # -requireSuite: fail if tests are not executed because of missing suite
-  ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.flakeAttempts=2 --ginkgo.reportFile=/tmp/artifacts/nrop/e2e-sched
+  ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.flake-attempts=2 --ginkgo.reportFile=/tmp/artifacts/nrop/e2e-sched
 }
 
 NO_COLOR=""
 if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
   echo "Terminal does not seem to support colored output, disabling it"
-  NO_COLOR="-ginkgo.noColor"
+  NO_COLOR="-ginkgo.no-color"
 fi
 
 # Make sure that we always properly clean the environment
@@ -43,7 +43,7 @@ trap '{ if [ "${NO_TEARDOWN}" = false ]; then
 
 # Run install test suite
 echo "Running NRO install test suite"
-${BIN_DIR}/e2e-nrop-install.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.reportFile=/tmp/artifacts/nrop/install --ginkgo.focus='\[Install\] continuousIntegration'
+${BIN_DIR}/e2e-nrop-install.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.reportFile=/tmp/artifacts/nrop/install --ginkgo.focus='\[Install\] continuousIntegration'
 
 # The install failed, no taste to continue
 if [ $? -ne 0 ]; then
@@ -56,10 +56,10 @@ echo "Running Functional Tests: ${GINKGO_SUITS}"
 export E2E_TOPOLOGY_MANAGER_POLICY="${E2E_TOPOLOGY_MANAGER_POLICY:-SingleNUMANodePodLevel}"
 # -v: print out the text and location for each spec before running it and flush output to stdout in realtime
 # -r: run suites recursively
-# --failFast: ginkgo will stop the suite right after the first spec failure
-# --flakeAttempts: rerun the test if it fails
+# --fail-fast: ginkgo will stop the suite right after the first spec failure
+# --flake-attempts: rerun the test if it fails
 # -requireSuite: fail if tests are not executed because of missing suite
-${BIN_DIR}/e2e-nrop-rte.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.flakeAttempts=2 --ginkgo.reportFile=/tmp/artifacts/nrop/e2e --ginkgo.skip='\[Disruptive\]|\[StateDirectories\]|\[NodeRefresh\]|\[local\]'
+${BIN_DIR}/e2e-nrop-rte.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.flake-attempts=2 --ginkgo.reportFile=/tmp/artifacts/nrop/e2e --ginkgo.skip='\[Disruptive\]|\[StateDirectories\]|\[NodeRefresh\]|\[local\]'
 
 
 if [ "$ENABLE_SCHED_TESTS" = true ]; then

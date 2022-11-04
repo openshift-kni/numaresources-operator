@@ -5,7 +5,7 @@ source hack/common.sh
 NO_COLOR=""
 if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
   echo "Terminal does not seem to support colored output, disabling it" 1>&2
-  NO_COLOR="-ginkgo.noColor"
+  NO_COLOR="-ginkgo.no-color"
 fi
 
 if [ -n "${E2E_TOOLS_FOCUS}" ]; then
@@ -23,7 +23,7 @@ REPORT_FILE=""
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		--no-color)
-			NO_COLOR="-ginkgo.noColor"
+			NO_COLOR="-ginkgo.no-color"
 			shift
 			;;
 		--dry-run)
