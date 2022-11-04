@@ -48,13 +48,13 @@ func ForDeploymentComplete(cli client.Client, dp *appsv1.Deployment, pollInterva
 	return updatedDp, err
 }
 
-func AreDeploymentReplicasAvailable(newStatus *appsv1.DeploymentStatus, replicas int32) bool {
+func areDeploymentReplicasAvailable(newStatus *appsv1.DeploymentStatus, replicas int32) bool {
 	return newStatus.UpdatedReplicas == replicas &&
 		newStatus.Replicas == replicas &&
 		newStatus.AvailableReplicas == replicas
 }
 
 func IsDeploymentComplete(dp *appsv1.Deployment, newStatus *appsv1.DeploymentStatus) bool {
-	return AreDeploymentReplicasAvailable(newStatus, *(dp.Spec.Replicas)) &&
+	return areDeploymentReplicasAvailable(newStatus, *(dp.Spec.Replicas)) &&
 		newStatus.ObservedGeneration >= dp.Generation
 }

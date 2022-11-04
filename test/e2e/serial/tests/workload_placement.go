@@ -963,7 +963,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("wait for replicaset to be up and running with all its replicas")
-			rs, err = wait.ForReplicaSetComplete(fxt.Client, rs, time.Second, 2*time.Minute)
+			rs, err = wait.ForReplicasetComplete(fxt.Client, rs, time.Second, 2*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedRsName := client.ObjectKeyFromObject(rs)
@@ -1070,7 +1070,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("wait for replicaset to be up and running with all its replicas")
-			rs, err = wait.ForReplicaSetComplete(fxt.Client, rs, time.Second, 2*time.Minute)
+			rs, err = wait.ForReplicasetComplete(fxt.Client, rs, time.Second, 2*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedRsName = client.ObjectKeyFromObject(rs)
