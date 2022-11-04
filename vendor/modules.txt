@@ -1297,10 +1297,6 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# kubevirt.io/qe-tools v0.1.6
-## explicit
-kubevirt.io/qe-tools/pkg/ginkgo-reporters
-kubevirt.io/qe-tools/pkg/polarion-xml
 # sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33
 ## explicit; go 1.17
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client

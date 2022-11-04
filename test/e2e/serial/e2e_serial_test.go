@@ -24,8 +24,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	ginkgo_reporters "kubevirt.io/qe-tools/pkg/ginkgo-reporters"
-
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	_ "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
 )
