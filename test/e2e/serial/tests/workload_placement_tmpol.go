@@ -73,7 +73,7 @@ type tmPolicyFuncs struct {
 
 type tmPolicyFuncsHandler map[nrtv1alpha1.TopologyManagerPolicy]tmPolicyFuncs
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering TM policy", func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering TM policy", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
 	tmPolicyFuncsHandler := tmPolicyFuncsHandler{

@@ -61,7 +61,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive][slow] numaresources configuration management", func() {
+var _ = Describe("[serial][disruptive][slow] numaresources configuration management", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
 	var nrts []nrtv1alpha1.NodeResourceTopology
