@@ -15,7 +15,7 @@ require (
 	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.9.0
 	github.com/kubevirt/device-plugin-manager v1.19.4
 	github.com/mdomke/git-semver v1.0.0
-	github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/ginkgo/v2 v2.4.0
 	github.com/onsi/gomega v1.22.1
 	github.com/openshift/api v0.0.0-20221021112143-4226c2167e40
 	github.com/openshift/machine-config-operator v0.0.1-0.20221101091906-fa5e7ae3f0e9
@@ -91,7 +91,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
-	github.com/onsi/ginkgo/v2 v2.4.0 // indirect
+	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/openshift/client-go v0.0.0-20221019143426-16aed247da5c // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -182,7 +182,5 @@ replace (
 
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
-	github.com/onsi/ginkgo => github.com/onsi/ginkgo v1.16.5
-	github.com/onsi/gomega => github.com/onsi/gomega v1.17.0
 	github.com/openshift/machine-config-operator => github.com/openshift/machine-config-operator v0.0.1-0.20221101091906-fa5e7ae3f0e9 // release-4.12
 )
