@@ -42,8 +42,7 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
 
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
-# Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
-CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
+CRD_OPTIONS ?= "crd"
 # Specify the URL link to the machine config pool CRD
 CRD_MACHINE_CONFIG_POOL_URL ?= "https://raw.githubusercontent.com/openshift/machine-config-operator/master/install/0000_80_machine-config-operator_01_machineconfigpool.crd.yaml"
 # Specify the URL link to the kubeletconfig CRD
@@ -65,7 +64,7 @@ CONTAINER_ENGINE ?= docker
 
 BIN_DIR="bin"
 
-OPERATOR_SDK_VERSION="v1.13.0"
+OPERATOR_SDK_VERSION="v1.25.0"
 OPERATOR_SDK_BIN="operator-sdk_$(GOOS)_$(GOARCH)"
 OPERATOR_SDK="$(BIN_DIR)/$(OPERATOR_SDK_BIN)"
 
@@ -259,7 +258,7 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.1)
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.10.0)
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.

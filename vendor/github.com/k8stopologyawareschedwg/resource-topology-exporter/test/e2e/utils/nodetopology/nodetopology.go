@@ -31,6 +31,10 @@ import (
 )
 
 func GetNodeTopology(topologyClient *topologyclientset.Clientset, nodeName string) *v1alpha1.NodeResourceTopology {
+	return GetNodeTopologyWithResource(topologyClient, nodeName, "")
+}
+
+func GetNodeTopologyWithResource(topologyClient *topologyclientset.Clientset, nodeName, resName string) *v1alpha1.NodeResourceTopology {
 	var nodeTopology *v1alpha1.NodeResourceTopology
 	var err error
 	gomega.EventuallyWithOffset(1, func() bool {
@@ -39,7 +43,10 @@ func GetNodeTopology(topologyClient *topologyclientset.Clientset, nodeName strin
 			framework.Logf("failed to get the node topology resource: %v", err)
 			return false
 		}
-		return true
+		if resName == "" {
+			return true
+		}
+		return containsResource(nodeTopology, resName)
 	}, time.Minute, 5*time.Second).Should(gomega.BeTrue())
 	return nodeTopology
 }
@@ -211,4 +218,28 @@ func CmpAvailableCPUs(expected, got map[string]v1.ResourceList) (string, int, bo
 		return "", quan.Cmp(expResList[v1.ResourceCPU]), true
 	}
 	return "", 0, true
+}
+
+func containsResource(nrt *v1alpha1.NodeResourceTopology, resName string) bool {
+	if nrt.Zones == nil || len(nrt.Zones) == 0 {
+		framework.Logf("failed to get topology zones from the node topology resource")
+		return false
+	}
+
+	foundNodes := 0
+	for _, zone := range nrt.Zones {
+		// TODO constant not in the APIs
+		if !strings.HasPrefix(strings.ToUpper(zone.Type), "NODE") {
+			continue
+		}
+
+		for _, res := range zone.Resources {
+			if res.Name == resName {
+				framework.Logf("found resource %q in zone %q node %q", resName, zone.Name, nrt.Name)
+				foundNodes++
+			}
+		}
+	}
+
+	return foundNodes > 0
 }

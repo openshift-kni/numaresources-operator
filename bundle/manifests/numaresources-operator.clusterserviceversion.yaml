@@ -35,7 +35,7 @@ metadata:
       ]
     capabilities: Basic Install
     olm.skipRange: '>=4.11.0 <4.12.0'
-    operators.operatorframework.io/builder: operator-sdk-v1.12.0+git
+    operators.operatorframework.io/builder: operator-sdk-v1.25.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: numaresources-operator.v4.12.999-snapshot
   namespace: placeholder
@@ -308,7 +308,9 @@ spec:
           - update
         serviceAccountName: numaresources-controller-manager
       deployments:
-      - name: numaresources-controller-manager
+      - label:
+          control-plane: controller-manager
+        name: numaresources-controller-manager
         spec:
           replicas: 1
           selector:
