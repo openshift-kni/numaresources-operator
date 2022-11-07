@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -121,6 +122,24 @@ func NewKubeletConfigWithData(name string, labels map[string]string, machineConf
 			MachineConfigPoolSelector: machineConfigSelector,
 			KubeletConfig: &runtime.RawExtension{
 				Raw: data,
+			},
+		},
+	}
+}
+
+func NewNamespace(name string) *corev1.Namespace {
+	return &corev1.Namespace{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Namespace",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"pod-security.kubernetes.io/audit":               "privileged",
+				"pod-security.kubernetes.io/enforce":             "privileged",
+				"pod-security.kubernetes.io/warn":                "privileged",
+				"security.openshift.io/scc.podSecurityLabelSync": "false",
 			},
 		},
 	}

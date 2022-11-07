@@ -65,3 +65,26 @@ func TestNewNUMAResourcesScheduler(t *testing.T) {
 		t.Errorf("unexpected scheduler name %q should be %q", obj.Spec.SchedulerName, schedulerName)
 	}
 }
+
+func TestNewNamespace(t *testing.T) {
+	name := "test-ns"
+	obj := NewNamespace(name)
+
+	if obj == nil {
+		t.Fatalf("null object")
+	}
+	expectedLabels := map[string]string{
+		"pod-security.kubernetes.io/audit":   "privileged",
+		"pod-security.kubernetes.io/enforce": "privileged",
+		"pod-security.kubernetes.io/warn":    "privileged",
+	}
+	for key, value := range expectedLabels {
+		gotValue, ok := obj.Labels[key]
+		if !ok {
+			t.Errorf("missing label: %q", key)
+		}
+		if gotValue != value {
+			t.Errorf("unexpected value for %q: got %q expectdd %q", key, gotValue, value)
+		}
+	}
+}
