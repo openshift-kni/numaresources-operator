@@ -8,7 +8,8 @@ if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
   NO_COLOR="-ginkgo.no-color"
 fi
 
+setupreport
 
 # Run must-gather test suite
 echo "Running NRO must-gather test suite"
-${BIN_DIR}/e2e-nrop-must-gather.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.junit-report=/tmp/artifacts/nrop/must-gather.xml --ginkgo.focus='\[must-gather\]'
+${BIN_DIR}/e2e-nrop-must-gather.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.junit-report=${REPORT_DIR}/must-gather.xml --ginkgo.focus='\[must-gather\]'

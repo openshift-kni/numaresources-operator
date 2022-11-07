@@ -29,7 +29,6 @@ if [ -n "${E2E_SERIAL_SKIP}" ]; then
 fi
 
 DRY_RUN="false"
-REPORT_DIR="/tmp/artifacts/nrop"
 REPORT_FILE=""
 
 # so few arguments is no bother enough for getopt
@@ -48,7 +47,7 @@ while [[ $# -gt 0 ]]; do
 			shift
 			;;
 		--no-color)
-			NO_COLOR="-ginkgo.no-color"
+			NO_COLOR="--ginkgo.no-color"
 			shift
 			;;
 		--dry-run)
@@ -62,11 +61,6 @@ while [[ $# -gt 0 ]]; do
 			;;
 		--skip)
 			SKIP="-ginkgo.skip='$2'"
-			shift
-			shift
-			;;
-		--report-dir)
-			REPORT_DIR="$2"
 			shift
 			shift
 			;;
@@ -86,7 +80,6 @@ while [[ $# -gt 0 ]]; do
 			echo "--dry-run             logs what about to do, but don't actually do it"
 			echo "--focus <regex>       only run cases matching <regex> (passed to -ginkgo.focus)"
 			echo "--skip <regex>        skip cases matching <regex> (passed to -ginkgo.skip)"
-			echo "--report-dir <dir>    write report artifacts on <dir>"
 			echo "--report-file <file>  write report file for this suite on <file>"
 			echo "--help                shows this message and helps correctly"
 			exit 0
@@ -99,14 +92,8 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-# mandatory
-if [ -z "${REPORT_FILE}" ] && [ -z "${REPORT_DIR}" ]; then
-	echo "invalid report directory"
-	exit 1
-fi
-
 if [ -z "${REPORT_FILE}" ]; then
-	REPORT_FILE="${REPORT_DIR}/e2e-serial-run"
+	REPORT_FILE="${REPORT_DIR}/e2e-serial-run.xml"
 fi
 
 function setup() {
@@ -175,6 +162,7 @@ function runtests() {
 # Make sure that we always properly clean the environment
 trap 'teardown' EXIT SIGINT SIGTERM SIGSTOP
 
+setupreport
 setup
 if [ $? -ne 0 ]; then
     echo "Failed to install NRO"
