@@ -38,12 +38,12 @@ they found it before they run.
   for the specified amount of time after each spec, to give time to the cluster to settle up.
 - `E2E_NROP_TEST_TEARDOWN` (accepts string expressing time unit, e.g. `30s`) instructs the suite to wait
   *up* to the specified amount of time while tearing down the resources needed by each spec.
-- `E2E_NROP_DEVICE_A` (accepts string, e.g `example.com/deviceA`) declares name of a device type that exists on
-  the cluster and will be used as a resource of type `device-a` in the tests.
-- `E2E_NROP_DEVICE_B` (accepts string, e.g `example.com/deviceB`) declares name of a device type that exists on
-  the cluster and will be used as a resource of type `device-b` in the tests.
-- `E2E_NROP_DEVICE_C` (accepts string, e.g `example.com/deviceC`) declares name of a device type that exists on
-  the cluster and will be used as a resource of type `device-c` in the tests.
+- `E2E_NROP_DEVICE_TYPE_1` (accepts string, e.g `example.com/deviceA`) declares name of a device type that exists on
+  the cluster and will be used as a resource of type `device-type-1` in the tests.
+- `E2E_NROP_DEVICE_TYPE_2` (accepts string, e.g `example.com/deviceB`) declares name of a device type that exists on
+  the cluster and will be used as a resource of type `device-type-2` in the tests.
+- `E2E_NROP_DEVICE_TYPE_3` (accepts string, e.g `example.com/deviceC`) declares name of a device type that exists on
+  the cluster and will be used as a resource of type `device-type-3` in the tests.
 - `E2E_RTE_CI_IMAGE` (accepts string, e.g `quay.io/openshift-kni/resource-topology-exporter:test-ci`) sets the 
   RTE image to be used for testing purposes particularly for modifying the operator object.
   
