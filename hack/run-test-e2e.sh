@@ -8,7 +8,7 @@ NO_TEARDOWN="${NO_TEARDOWN:-false}"
 function test_sched() {
   # Run install test suite
   echo "Running NROScheduler install test suite"
-  ${BIN_DIR}/e2e-nrop-sched-install.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.reportFile=/tmp/artifacts/nrop/sched-install
+  ${BIN_DIR}/e2e-nrop-sched-install.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.junit-report=/tmp/artifacts/nrop/sched-install.xml
 
   # The install failed, no taste to continue
   if [ $? -ne 0 ]; then
@@ -22,7 +22,7 @@ function test_sched() {
   # --fail-fast: ginkgo will stop the suite right after the first spec failure
   # --flake-attempts: rerun the test if it fails
   # -requireSuite: fail if tests are not executed because of missing suite
-  ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.flake-attempts=2 --ginkgo.reportFile=/tmp/artifacts/nrop/e2e-sched
+  ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.flake-attempts=2 --ginkgo.junit-report=/tmp/artifacts/nrop/e2e-sched.xml
 }
 
 NO_COLOR=""
@@ -35,15 +35,15 @@ fi
 trap '{ if [ "${NO_TEARDOWN}" = false ]; then
           if [ "${ENABLE_SCHED_TESTS}" = true ]; then
              echo "Running NROScheduler uninstall test suite";
-             ${BIN_DIR}/e2e-nrop-sched-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.reportFile=/tmp/artifacts/nrop/sched-uninstall;
+             ${BIN_DIR}/e2e-nrop-sched-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.junit-report=/tmp/artifacts/nrop/sched-uninstall.xml
           fi
           echo "Running NRO uninstall test suite";
-          ${BIN_DIR}/e2e-nrop-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.reportFile=/tmp/artifacts/nrop/uninstall;
+          ${BIN_DIR}/e2e-nrop-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.junit-report=/tmp/artifacts/nrop/uninstall.xml
         fi }' EXIT SIGINT SIGTERM SIGSTOP
 
 # Run install test suite
 echo "Running NRO install test suite"
-${BIN_DIR}/e2e-nrop-install.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.reportFile=/tmp/artifacts/nrop/install --ginkgo.focus='\[Install\] continuousIntegration'
+${BIN_DIR}/e2e-nrop-install.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.junit-report=/tmp/artifacts/nrop/install.xml --ginkgo.focus='\[Install\] continuousIntegration'
 
 # The install failed, no taste to continue
 if [ $? -ne 0 ]; then
@@ -59,7 +59,7 @@ export E2E_TOPOLOGY_MANAGER_POLICY="${E2E_TOPOLOGY_MANAGER_POLICY:-SingleNUMANod
 # --fail-fast: ginkgo will stop the suite right after the first spec failure
 # --flake-attempts: rerun the test if it fails
 # -requireSuite: fail if tests are not executed because of missing suite
-${BIN_DIR}/e2e-nrop-rte.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.flake-attempts=2 --ginkgo.reportFile=/tmp/artifacts/nrop/e2e --ginkgo.skip='\[Disruptive\]|\[StateDirectories\]|\[NodeRefresh\]|\[local\]'
+${BIN_DIR}/e2e-nrop-rte.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.flake-attempts=2 --ginkgo.junit-report=/tmp/artifacts/nrop/e2e.xml --ginkgo.skip='\[Disruptive\]|\[StateDirectories\]|\[NodeRefresh\]|\[local\]'
 
 
 if [ "$ENABLE_SCHED_TESTS" = true ]; then

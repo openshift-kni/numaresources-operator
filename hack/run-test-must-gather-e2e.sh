@@ -11,4 +11,4 @@ fi
 
 # Run must-gather test suite
 echo "Running NRO must-gather test suite"
-${BIN_DIR}/e2e-nrop-must-gather.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.reportFile=/tmp/artifacts/nrop/must-gather --ginkgo.focus='\[must-gather\]'
+${BIN_DIR}/e2e-nrop-must-gather.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.junit-report=/tmp/artifacts/nrop/must-gather.xml --ginkgo.focus='\[must-gather\]'
