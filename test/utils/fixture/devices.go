@@ -28,26 +28,36 @@ const (
 	devType3EnvVar = "E2E_NROP_DEVICE_TYPE_3"
 )
 
-func GetDeviceType1Name() string {
-	if devType1, ok := os.LookupEnv(devType1EnvVar); ok {
-		return devType1
+var (
+	devType1 = ""
+	devType2 = ""
+	devType3 = ""
+)
+
+func init() {
+	var ok bool
+	devType1, ok = os.LookupEnv(devType1EnvVar)
+	if !ok {
+		klog.Errorf("%q environment variable is not set", devType1EnvVar)
 	}
-	klog.Errorf("%q environment variable is not set", devType1EnvVar)
-	return ""
+	devType2, ok = os.LookupEnv(devType2EnvVar)
+	if !ok {
+		klog.Errorf("%q environment variable is not set", devType2EnvVar)
+	}
+	devType3, ok = os.LookupEnv(devType3EnvVar)
+	if !ok {
+		klog.Errorf("%q environment variable is not set", devType3EnvVar)
+	}
+}
+
+func GetDeviceType1Name() string {
+	return devType1
 }
 
 func GetDeviceType2Name() string {
-	if devType2, ok := os.LookupEnv(devType2EnvVar); ok {
-		return devType2
-	}
-	klog.Errorf("%q environment variable is not set", devType2EnvVar)
-	return ""
+	return devType2
 }
 
 func GetDeviceType3Name() string {
-	if devType3, ok := os.LookupEnv(devType3EnvVar); ok {
-		return devType3
-	}
-	klog.Errorf("%q environment variable is not set", devType3EnvVar)
-	return ""
+	return devType3
 }
