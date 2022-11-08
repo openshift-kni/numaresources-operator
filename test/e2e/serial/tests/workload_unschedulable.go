@@ -436,7 +436,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			dataAfter, err := yaml.Marshal(targetNrtAfter)
 			Expect(err).ToNot(HaveOccurred())
 
-			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtBefore, *targetNrtAfter, requiredRes, corev1qos.GetPodQOS(&pods[0]))
+			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtBefore, *targetNrtAfter, requiredRes, corev1qos.GetPodQOS(&(pods[0])))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
 		})
@@ -752,7 +752,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			nrtPostDpCreateList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
 
-			podQoS := corev1qos.GetPodQOS(&pods[0])
+			podQoS := corev1qos.GetPodQOS(&(pods[0]))
 			for _, initialNrt := range nrtInitialList.Items {
 				if !nodesNameSet.Has(initialNrt.Name) {
 					klog.Infof("skipping uninteresting (unpadded) node: %q", initialNrt.Name)
