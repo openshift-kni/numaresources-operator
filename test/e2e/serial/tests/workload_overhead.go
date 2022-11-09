@@ -247,6 +247,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
 				pods, err := podlist.ByDeployment(fxt.Client, *deployment)
 				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+				Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
 				podResourcesWithOverhead := podResources.DeepCopy()
 				resourcelist.AddCoreResources(podResourcesWithOverhead, podFixedOverhead)
@@ -424,6 +425,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				By("check the deployment pod is still pending")
 				pods, err := podlist.ByDeployment(fxt.Client, *deployment)
 				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+				Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
 				for _, pod := range pods {
 					err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)

@@ -233,7 +233,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			By(fmt.Sprintf("checking deployment pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
 			pods, err := podlist.ByDeployment(fxt.Client, *deployment)
-			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
 			for _, pod := range pods {
 				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
@@ -266,6 +267,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			By(fmt.Sprintf("checking daemonset pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
 			pods, err := podlist.ByDaemonset(fxt.Client, *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
+			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
 
 			for _, pod := range pods {
 				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
@@ -297,7 +299,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			By(fmt.Sprintf("checking deployment pods have been handled by the default scheduler %q but failed to be scheduled", corev1.DefaultSchedulerName))
 			pods, err := podlist.ByDeployment(fxt.Client, *deployment)
-			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
 			for _, pod := range pods {
 				isFailed, err := nrosched.CheckPODKubeletRejectWithTopologyAffinityError(fxt.K8sClient, pod.Namespace, pod.Name)
@@ -396,6 +399,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			By(fmt.Sprintf("checking daemonset pods have been scheduled with the topology aware scheduler %q ", serialconfig.Config.SchedulerName))
 			pods, err := podlist.ByDaemonset(fxt.Client, *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
+			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
 
 			//TODO: should wait until ds pods have at least been scheduled.
 			time.Sleep(2 * time.Minute)
@@ -675,6 +679,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q ", schedulerName))
 			pods, err := podlist.ByDeployment(fxt.Client, *dp)
 			Expect(err).ToNot(HaveOccurred(), "unable to get pods from deployment %q:  %v", dp.Name, err)
+			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", dp.Namespace, dp.Name)
 
 			var succeededPods []string
 			for _, pod := range pods {
@@ -903,6 +908,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			By("check the deployment pod is still pending")
 			pods, err := podlist.ByDeployment(fxt.Client, *deployment)
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
 			for _, pod := range pods {
 				err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
@@ -934,6 +940,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			By("check the daemonset pods are still pending")
 			pods, err := podlist.ByDaemonset(fxt.Client, *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
+			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
 
 			for _, pod := range pods {
 				err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)

@@ -96,6 +96,7 @@ var _ = Describe("[Scheduler] install", func() {
 			By("Check secondary scheduler pod is scheduled on a control-plane node")
 			podList, err := podlist.ByDeployment(e2eclient.Client, *deployment)
 			Expect(err).NotTo(HaveOccurred())
+			Expect(podList).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
 			nodeList, err := nodes.GetControlPlane(e2eclient.Client, configuration.Plat)
 			Expect(err).NotTo(HaveOccurred())

@@ -309,6 +309,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
 				pods, err := podlist.ByDeployment(fxt.Client, *deployment)
 				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
+				Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
 				for _, pod := range pods {
 					Expect(pod.Spec.NodeName).To(Equal(targetNodeName))
