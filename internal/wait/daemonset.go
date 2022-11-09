@@ -59,3 +59,24 @@ func AreDaemonSetPodsReady(newStatus *appsv1.DaemonSetStatus) bool {
 	return newStatus.DesiredNumberScheduled > 0 &&
 		newStatus.DesiredNumberScheduled == newStatus.NumberReady
 }
+
+func ForDaemonsetPodsCreation(cli client.Client, ds *appsv1.DaemonSet, expectedPods int, pollInterval, pollTimeout time.Duration) (*appsv1.DaemonSet, error) {
+	key := ObjectKeyFromObject(ds)
+	updatedDs := &appsv1.DaemonSet{}
+	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		err := cli.Get(context.TODO(), key.AsKey(), updatedDs)
+		if err != nil {
+			klog.Warningf("failed to get the daemonset %s: %v", key.String(), err)
+			return false, err
+		}
+
+		if int(updatedDs.Status.DesiredNumberScheduled) != expectedPods {
+			klog.Warningf("Waiting for daemonset: %q to have %d pods, current number of created pods: %d", key.String(), expectedPods, updatedDs.Status.DesiredNumberScheduled)
+			return false, nil
+		}
+
+		klog.Infof("pods of daemonset %q are all created", key.String())
+		return true, nil
+	})
+	return updatedDs, err
+}

@@ -422,6 +422,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				err = fxt.Client.Create(context.TODO(), deployment)
 				Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
+				By("wait for the deployment to be up with its pod created")
+				deployment, err = wait.ForDeploymentReplicasCreation(fxt.Client, deployment, replicas, time.Second, time.Minute)
+				Expect(err).NotTo(HaveOccurred())
+
 				By("check the deployment pod is still pending")
 				pods, err := podlist.ByDeployment(fxt.Client, *deployment)
 				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
