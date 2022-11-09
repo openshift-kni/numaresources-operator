@@ -5,10 +5,11 @@ source hack/common.sh
 NO_COLOR=""
 if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
   echo "Terminal does not seem to support colored output, disabling it"
-  NO_COLOR="-ginkgo.noColor"
+  NO_COLOR="-ginkgo.no-color"
 fi
 
+setupreport
 
 # Run must-gather test suite
 echo "Running NRO must-gather test suite"
-${BIN_DIR}/e2e-nrop-must-gather.test ${NO_COLOR} --ginkgo.v --ginkgo.failFast --ginkgo.reportFile=/tmp/artifacts/nrop/must-gather --ginkgo.focus='\[must-gather\]'
+${BIN_DIR}/e2e-nrop-must-gather.test ${NO_COLOR} --ginkgo.v --ginkgo.fail-fast --ginkgo.junit-report=${REPORT_DIR}/must-gather.xml --ginkgo.focus='\[must-gather\]'

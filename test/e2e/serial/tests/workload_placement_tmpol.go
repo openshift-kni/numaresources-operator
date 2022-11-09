@@ -28,8 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/ghodss/yaml"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/ginkgo/extensions/table"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
@@ -74,7 +73,7 @@ type tmPolicyFuncs struct {
 
 type tmPolicyFuncsHandler map[nrtv1alpha1.TopologyManagerPolicy]tmPolicyFuncs
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering TM policy", func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering TM policy", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
 	tmPolicyFuncsHandler := tmPolicyFuncsHandler{

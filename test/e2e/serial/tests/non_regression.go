@@ -22,8 +22,9 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
@@ -46,7 +47,7 @@ import (
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
 )
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement", func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha1.NodeResourceTopologyList

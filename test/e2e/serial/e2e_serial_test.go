@@ -21,25 +21,25 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/reporters"
+	. "github.com/onsi/ginkgo/v2"
+	ginkgo_reporters "github.com/onsi/ginkgo/v2/reporters"
 	. "github.com/onsi/gomega"
 
-	ginkgo_reporters "kubevirt.io/qe-tools/pkg/ginkgo-reporters"
+	qe_reporters "kubevirt.io/qe-tools/pkg/ginkgo-reporters"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	_ "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
 )
 
-func TestSerial(t *testing.T) {
-	RegisterFailHandler(Fail)
+var afterSuiteReporters = []Reporter{}
 
-	rr := []Reporter{}
-	if ginkgo_reporters.Polarion.Run {
-		rr = append(rr, &ginkgo_reporters.Polarion)
+func TestSerial(t *testing.T) {
+	if qe_reporters.Polarion.Run {
+		afterSuiteReporters = append(afterSuiteReporters, &qe_reporters.Polarion)
 	}
-	rr = append(rr, reporters.NewJUnitReporter("numaresources"))
-	RunSpecsWithDefaultAndCustomReporters(t, "NUMAResources serial e2e tests", rr)
+
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "NUMAResources serial e2e tests")
 }
 
 var _ = BeforeSuite(func() {
@@ -49,3 +49,9 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(serialconfig.Teardown)
+
+var _ = ReportAfterSuite("TestTests", func(report Report) {
+	for _, reporter := range afterSuiteReporters {
+		ginkgo_reporters.ReportViaDeprecatedReporter(reporter, report)
+	}
+})

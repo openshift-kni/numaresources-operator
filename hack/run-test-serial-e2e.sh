@@ -18,7 +18,7 @@ fi
 NO_COLOR=""
 if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
   echo "Terminal does not seem to support colored output, disabling it" 1>&2
-  NO_COLOR="-ginkgo.noColor"
+  NO_COLOR="-ginkgo.no-color"
 fi
 
 if [ -n "${E2E_SERIAL_FOCUS}" ]; then
@@ -29,7 +29,6 @@ if [ -n "${E2E_SERIAL_SKIP}" ]; then
 fi
 
 DRY_RUN="false"
-REPORT_DIR="/tmp/artifacts/nrop"
 REPORT_FILE=""
 
 # so few arguments is no bother enough for getopt
@@ -48,7 +47,7 @@ while [[ $# -gt 0 ]]; do
 			shift
 			;;
 		--no-color)
-			NO_COLOR="-ginkgo.noColor"
+			NO_COLOR="--ginkgo.no-color"
 			shift
 			;;
 		--dry-run)
@@ -62,11 +61,6 @@ while [[ $# -gt 0 ]]; do
 			;;
 		--skip)
 			SKIP="-ginkgo.skip='$2'"
-			shift
-			shift
-			;;
-		--report-dir)
-			REPORT_DIR="$2"
 			shift
 			shift
 			;;
@@ -86,7 +80,6 @@ while [[ $# -gt 0 ]]; do
 			echo "--dry-run             logs what about to do, but don't actually do it"
 			echo "--focus <regex>       only run cases matching <regex> (passed to -ginkgo.focus)"
 			echo "--skip <regex>        skip cases matching <regex> (passed to -ginkgo.skip)"
-			echo "--report-dir <dir>    write report artifacts on <dir>"
 			echo "--report-file <file>  write report file for this suite on <file>"
 			echo "--help                shows this message and helps correctly"
 			exit 0
@@ -99,14 +92,8 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-# mandatory
-if [ -z "${REPORT_FILE}" ] && [ -z "${REPORT_DIR}" ]; then
-	echo "invalid report directory"
-	exit 1
-fi
-
 if [ -z "${REPORT_FILE}" ]; then
-	REPORT_FILE="${REPORT_DIR}/e2e-serial-run"
+	REPORT_FILE="${REPORT_DIR}/e2e-serial-run.xml"
 fi
 
 function setup() {
@@ -117,9 +104,8 @@ function setup() {
 	echo "Running NRO install test suite"
 	runcmd ${BIN_DIR}/e2e-nrop-install.test \
 		--ginkgo.v \
-		--ginkgo.failFast \
-		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-install \
-		--test.parallel=1 \
+		--ginkgo.fail-fast \
+		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-install.xml \
 		--ginkgo.focus='\[Install\] continuousIntegration' \
 		${NO_COLOR}
 
@@ -131,9 +117,8 @@ function setup() {
 	echo "Running NROScheduler install test suite"
 	runcmd ${BIN_DIR}/e2e-nrop-sched-install.test \
 		--ginkgo.v \
-		--ginkgo.failFast \
-		--test.parallel=1 \
-		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-install-sched \
+		--ginkgo.fail-fast \
+		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-install-sched.xml \
 		${NO_COLOR}
 }
 
@@ -145,8 +130,7 @@ function teardown() {
 	echo "Running NROScheduler uninstall test suite";
 	runcmd ${BIN_DIR}/e2e-nrop-sched-uninstall.test \
 		--ginkgo.v \
-		--test.parallel=1 \
-		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-uninstall-sched \
+		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-uninstall-sched.xml \
 		${NO_COLOR}
 
 	RC="$?"
@@ -157,8 +141,7 @@ function teardown() {
 	echo "Running NRO uninstall test suite";
 	runcmd ${BIN_DIR}/e2e-nrop-uninstall.test \
 		--ginkgo.v \
-		--test.parallel=1 \
-		--ginkgo.reportFile=${REPORT_DIR}/e2e-serial-uninstall \
+		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-uninstall.xml \
 		${NO_COLOR}
 }
 
@@ -170,8 +153,7 @@ function runtests() {
 	echo "Running Serial, disruptive E2E Tests"
 	runcmd ${BIN_DIR}/e2e-nrop-serial.test \
 		--ginkgo.v \
-		--test.parallel=1 \
-		--ginkgo.reportFile=${REPORT_FILE} \
+		--ginkgo.junit-report=${REPORT_FILE} \
 		${NO_COLOR} \
 		${SKIP} \
 		${FOCUS}
@@ -180,6 +162,7 @@ function runtests() {
 # Make sure that we always properly clean the environment
 trap 'teardown' EXIT SIGINT SIGTERM SIGSTOP
 
+setupreport
 setup
 if [ $? -ne 0 ]; then
     echo "Failed to install NRO"

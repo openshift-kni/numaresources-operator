@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -41,7 +41,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive][scheduler][rmsched] numaresources scheduler removal on a live cluster", func() {
+var _ = Describe("[serial][disruptive][scheduler][rmsched] numaresources scheduler removal on a live cluster", Serial, func() {
 	var fxt *e2efixture.Fixture
 
 	BeforeEach(func() {
@@ -112,7 +112,7 @@ var _ = Describe("[serial][disruptive][scheduler][rmsched] numaresources schedul
 	})
 })
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restart on a live cluster", func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restart on a live cluster", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var nroSchedObj *nropv1alpha1.NUMAResourcesScheduler
 	var schedulerName string

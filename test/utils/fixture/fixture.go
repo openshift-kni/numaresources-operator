@@ -24,15 +24,15 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
+	"github.com/openshift-kni/numaresources-operator/internal/objects"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -120,31 +120,16 @@ func setupNamespace(cli client.Client, baseName string, randomize bool) (corev1.
 		// intentionally avoid GenerateName like the k8s e2e framework does
 		name = RandomizeName(baseName)
 	}
-	ns := corev1.Namespace{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Namespace",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"pod-security.kubernetes.io/audit":               "privileged",
-				"pod-security.kubernetes.io/enforce":             "privileged",
-				"pod-security.kubernetes.io/warn":                "privileged",
-				"security.openshift.io/scc.podSecurityLabelSync": "false",
-			},
-		},
-	}
-
-	err := cli.Create(context.TODO(), &ns)
+	ns := objects.NewNamespace(name)
+	err := cli.Create(context.TODO(), ns)
 	if err != nil {
-		return ns, err
+		return *ns, err
 	}
 
 	// again we do like the k8s e2e framework does and we try to be robust
 	var updatedNs corev1.Namespace
 	err = wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
-		err := cli.Get(context.TODO(), client.ObjectKeyFromObject(&ns), &updatedNs)
+		err := cli.Get(context.TODO(), client.ObjectKeyFromObject(ns), &updatedNs)
 		if err != nil {
 			return false, err
 		}

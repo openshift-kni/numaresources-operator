@@ -5,7 +5,7 @@ source hack/common.sh
 NO_COLOR=""
 if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
   echo "Terminal does not seem to support colored output, disabling it" 1>&2
-  NO_COLOR="-ginkgo.noColor"
+  NO_COLOR="-ginkgo.no-color"
 fi
 
 if [ -n "${E2E_TOOLS_FOCUS}" ]; then
@@ -16,14 +16,13 @@ if [ -n "${E2E_TOOLS_SKIP}" ]; then
 fi
 
 DRY_RUN="false"
-REPORT_DIR="/tmp/artifacts/nrop"
 REPORT_FILE=""
 
 # so few arguments is no bother enough for getopt
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		--no-color)
-			NO_COLOR="-ginkgo.noColor"
+			NO_COLOR="-ginkgo.no-color"
 			shift
 			;;
 		--dry-run)
@@ -40,11 +39,6 @@ while [[ $# -gt 0 ]]; do
 			shift
 			shift
 			;;
-		--report-dir)
-			REPORT_DIR="$2"
-			shift
-			shift
-			;;
 		--report-file)
 			REPORT_FILE="$2"
 			shift
@@ -58,7 +52,6 @@ while [[ $# -gt 0 ]]; do
 			echo "--dry-run             logs what about to do, but don't actually do it"
 			echo "--focus <regex>       only run cases matching <regex> (passed to -ginkgo.focus)"
 			echo "--skip <regex>        skip cases matching <regex> (passed to -ginkgo.skip)"
-			echo "--report-dir <dir>    write report artifacts on <dir>"
 			echo "--report-file <file>  write report file for this suite on <file>"
 			echo "--help                shows this message and helps correctly"
 			exit 0
@@ -72,21 +65,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 # mandatory
-if [ -z "${REPORT_FILE}" ] && [ -z "${REPORT_DIR}" ]; then
-	echo "invalid report directory"
-	exit 1
-fi
-
 if [ -z "${REPORT_FILE}" ]; then
-	REPORT_FILE="${REPORT_DIR}/e2e-tools-run"
+	REPORT_FILE="${REPORT_DIR}/e2e-tools-run.xml"
 fi
 
+setupreport
 
 echo "Running Tools, mostly local, E2E Tests"
 runcmd ${BIN_DIR}/e2e-nrop-tools.test \
 	--ginkgo.v \
-	--test.parallel=1 \
-	--ginkgo.reportFile=${REPORT_FILE} \
+	--ginkgo.junit-report=${REPORT_FILE} \
 	${NO_COLOR} \
 	${SKIP} \
 	${FOCUS} \
