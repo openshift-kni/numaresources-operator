@@ -182,7 +182,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.Create(context.TODO(), mcp)
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("modifing the NUMAResourcesOperator nodeGroups filed to match new mcp: %q labels %q", mcp.Name, mcp.Labels))
+			By(fmt.Sprintf("modifying the NUMAResourcesOperator nodeGroups field to match new mcp: %q labels %q", mcp.Name, mcp.Labels))
 			for i := range nroOperObj.Spec.NodeGroups {
 				nroOperObj.Spec.NodeGroups[i].MachineConfigPoolSelector.MatchLabels = mcp.Labels
 			}
@@ -291,18 +291,24 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 		})
 
 		It("[test_id:54916][tier2] should be able to modify the configurable values under the NUMAResourcesScheduler CR", func() {
-			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, nroSchedObj)
+			initialNroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, initialNroSchedObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
-			initialNroSchedObj := nroSchedObj.DeepCopy()
+			nroSchedObj := initialNroSchedObj.DeepCopy()
 
 			By(fmt.Sprintf("modifying the NUMAResourcesScheduler SchedulerName field to %q", serialconfig.SchedulerTestName))
-			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			nroSchedObj.Status.SchedulerName = serialconfig.SchedulerTestName
+			//updates must be done on object.Spec and active values should be fetched from object.Status
+			nroSchedObj.Spec.SchedulerName = serialconfig.SchedulerTestName
 			err = fxt.Client.Update(context.TODO(), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
+
+			By(fmt.Sprintf("Verify the scheduler object was updated properly with the new scheduler name %q", serialconfig.SchedulerTestName))
+			updatedSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+			Eventually(func() string {
+				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), updatedSchedObj)
+				Expect(err).ToNot(HaveOccurred())
+				return updatedSchedObj.Status.SchedulerName
+			}).WithTimeout(time.Minute).WithPolling(time.Second*15).Should(Equal(serialconfig.SchedulerTestName), "failed to update the schedulerName field,expected %q but found %q", serialconfig.SchedulerTestName, updatedSchedObj.Status.SchedulerName)
 
 			defer func() {
 				By("reverting the changes under the NUMAResourcesScheduler object")
@@ -310,9 +316,17 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, currentSchedObj)
 				Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
 
-				currentSchedObj.Status = initialNroSchedObj.Status
+				currentSchedObj.Spec.SchedulerName = initialNroSchedObj.Status.SchedulerName
 				err = fxt.Client.Update(context.TODO(), currentSchedObj)
 				Expect(err).ToNot(HaveOccurred())
+
+				updatedSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+				Eventually(func() string {
+					err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroSchedObj), updatedSchedObj)
+					Expect(err).ToNot(HaveOccurred())
+					return updatedSchedObj.Status.SchedulerName
+				}).WithTimeout(time.Minute).WithPolling(time.Second*15).Should(Equal(initialNroSchedObj.Status.SchedulerName), "failed to revert the schedulerName field,expected %q but found %q", initialNroSchedObj.Status.SchedulerName, updatedSchedObj.Status.SchedulerName)
+
 			}()
 
 			By("schedule pod using the new scheduler name")
