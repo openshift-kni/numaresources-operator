@@ -297,7 +297,8 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			nroSchedObj := initialNroSchedObj.DeepCopy()
 
 			By(fmt.Sprintf("modifying the NUMAResourcesScheduler SchedulerName field to %q", serialconfig.SchedulerTestName))
-			nroSchedObj.Status.SchedulerName = serialconfig.SchedulerTestName
+			//updates must be done on object.Spec and active values should be fetched from object.Status
+			nroSchedObj.Spec.SchedulerName = serialconfig.SchedulerTestName
 			err = fxt.Client.Update(context.TODO(), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -307,7 +308,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, currentSchedObj)
 				Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nrosched.NROSchedObjectName)
 
-				currentSchedObj.Status = initialNroSchedObj.Status
+				currentSchedObj.Spec.SchedulerName = initialNroSchedObj.Status.SchedulerName
 				err = fxt.Client.Update(context.TODO(), currentSchedObj)
 				Expect(err).ToNot(HaveOccurred())
 			}()
