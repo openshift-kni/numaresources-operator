@@ -104,6 +104,7 @@ function setup() {
 	echo "Running NRO install test suite"
 	runcmd ${BIN_DIR}/e2e-nrop-install.test \
 		--ginkgo.v \
+		--ginkgo.timeout="5h" \
 		--ginkgo.fail-fast \
 		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-install.xml \
 		--ginkgo.focus='\[Install\] continuousIntegration' \
@@ -117,6 +118,7 @@ function setup() {
 	echo "Running NROScheduler install test suite"
 	runcmd ${BIN_DIR}/e2e-nrop-sched-install.test \
 		--ginkgo.v \
+		--ginkgo.timeout="5h" \
 		--ginkgo.fail-fast \
 		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-install-sched.xml \
 		${NO_COLOR}
@@ -130,6 +132,7 @@ function teardown() {
 	echo "Running NROScheduler uninstall test suite";
 	runcmd ${BIN_DIR}/e2e-nrop-sched-uninstall.test \
 		--ginkgo.v \
+		--ginkgo.timeout="5h" \
 		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-uninstall-sched.xml \
 		${NO_COLOR}
 
@@ -141,6 +144,7 @@ function teardown() {
 	echo "Running NRO uninstall test suite";
 	runcmd ${BIN_DIR}/e2e-nrop-uninstall.test \
 		--ginkgo.v \
+		--ginkgo.timeout="5h" \
 		--ginkgo.junit-report=${REPORT_DIR}/e2e-serial-uninstall.xml \
 		${NO_COLOR}
 }
@@ -153,6 +157,7 @@ function runtests() {
 	echo "Running Serial, disruptive E2E Tests"
 	runcmd ${BIN_DIR}/e2e-nrop-serial.test \
 		--ginkgo.v \
+		--ginkgo.timeout="5h" \
 		--ginkgo.junit-report=${REPORT_FILE} \
 		${NO_COLOR} \
 		${SKIP} \
