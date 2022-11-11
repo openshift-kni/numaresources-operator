@@ -28,7 +28,7 @@ echo "[TEST] --dry-run produces expected output"
 GOT=$( $RUNNER --dry-run --no-color)
 EXPECTED="Ensuring: /tmp/artifacts/nrop
 Running Serial, disruptive E2E Tests
-Running: /usr/local/bin/e2e-nrop-serial.test --ginkgo.v --ginkgo.junit-report=/tmp/artifacts/nrop/e2e-serial-run.xml --ginkgo.no-color"
+Running: /usr/local/bin/e2e-nrop-serial.test --ginkgo.v --ginkgo.timeout=5h --ginkgo.junit-report=/tmp/artifacts/nrop/e2e-serial-run.xml --ginkgo.no-color"
 if [ "${GOT}" != "${EXPECTED}" ]; then
 	echo -e "[FAIL] --dry-run unexpected output:\n${GOT}"
 	echo -e "[FAIL] --dry-run expected output:\n${EXPECTED}"
