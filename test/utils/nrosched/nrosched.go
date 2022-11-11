@@ -34,11 +34,10 @@ import (
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
+	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
 const (
-	NROSchedObjectName = "numaresourcesscheduler"
-
 	// scheduler
 	ReasonScheduled        = "Scheduled"
 	ReasonFailedScheduling = "FailedScheduling"
@@ -149,7 +148,7 @@ func CheckNROSchedulerAvailable(cli client.Client, NUMAResourcesSchedObjName str
 	Eventually(func() bool {
 		By(fmt.Sprintf("checking %q for the condition Available=true", NUMAResourcesSchedObjName))
 
-		err := cli.Get(context.TODO(), client.ObjectKey{Name: NROSchedObjectName}, nroSchedObj)
+		err := cli.Get(context.TODO(), objects.NROSchedObjectKey(), nroSchedObj)
 		if err != nil {
 			klog.Warningf("failed to get the scheduler resource: %v", err)
 			return false

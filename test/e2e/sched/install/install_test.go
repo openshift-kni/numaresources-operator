@@ -68,6 +68,7 @@ var _ = Describe("[Scheduler] install", func() {
 				}
 
 				klog.Infof("condition: %v", cond)
+				klog.Infof("conditions: %v", updatedNROObj.Status.Conditions)
 
 				return cond.Status == metav1.ConditionTrue
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "NRO Scheduler condition did not become available")
@@ -76,8 +77,6 @@ var _ = Describe("[Scheduler] install", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking the NumaResourcesScheduler Deployment is correctly deployed")
-			const deploymentCheckTimeout = 5 * time.Minute
-			const deploymentCheckPollPeriod = 10 * time.Second
 			deployment := &appsv1.Deployment{}
 			Eventually(func() bool {
 				deployment, err = podlist.GetDeploymentByOwnerReference(e2eclient.Client, nroSchedObj.UID)
@@ -91,7 +90,7 @@ var _ = Describe("[Scheduler] install", func() {
 					return false
 				}
 				return true
-			}).WithTimeout(deploymentCheckTimeout).WithPolling(deploymentCheckPollPeriod).Should(BeTrue(), "Deployment Status not OK")
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "Deployment Status not OK: %v", deployment.Status)
 
 			By("Check secondary scheduler pod is scheduled on a control-plane node")
 			podList, err := podlist.ByDeployment(e2eclient.Client, *deployment)

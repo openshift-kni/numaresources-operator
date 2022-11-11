@@ -21,13 +21,10 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
-	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
@@ -81,12 +78,12 @@ func NewFixtureWithOptions(nsName string, options e2efixture.Options) (*E2EConfi
 		return nil, err
 	}
 
-	err = cfg.Fixture.Client.Get(context.TODO(), client.ObjectKey{Name: objects.NROName()}, cfg.NROOperObj)
+	err = cfg.Fixture.Client.Get(context.TODO(), objects.NROObjectKey(), cfg.NROOperObj)
 	if err != nil {
 		return nil, err
 	}
 
-	err = cfg.Fixture.Client.Get(context.TODO(), client.ObjectKey{Name: nrosched.NROSchedObjectName}, cfg.NROSchedObj)
+	err = cfg.Fixture.Client.Get(context.TODO(), objects.NROSchedObjectKey(), cfg.NROSchedObj)
 	if err != nil {
 		return nil, err
 	}

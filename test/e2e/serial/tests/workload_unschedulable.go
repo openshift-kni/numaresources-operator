@@ -38,6 +38,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/images"
@@ -646,7 +647,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			By("creating a deployment")
 			dpName := "test-dp-47615"
-			schedulerName := nrosched.GetNROSchedulerName(fxt.Client, nrosched.NROSchedObjectName)
+			schedulerName := nrosched.GetNROSchedulerName(fxt.Client, objectnames.DefaultNUMAResourcesSchedulerCrName)
 			replicas := int32(6)
 			podLabels := map[string]string{
 				"test": dpName,
