@@ -316,12 +316,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
 			for _, pod := range pods {
-				isFailed, err := nrosched.CheckPODKubeletRejectWithTopologyAffinityError(fxt.K8sClient, pod.Namespace, pod.Name)
-				if err != nil {
-					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
-				}
-				Expect(err).ToNot(HaveOccurred())
-				Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, corev1.DefaultSchedulerName)
+				Eventually(func(g Gomega) {
+					isFailed, err := nrosched.CheckPODKubeletRejectWithTopologyAffinityError(fxt.K8sClient, pod.Namespace, pod.Name)
+					if err != nil {
+						_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+					}
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(isFailed).To(BeTrue())
+				}).WithTimeout(time.Minute).WithPolling(time.Second).Should(Succeed(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, corev1.DefaultSchedulerName)
 			}
 		})
 	})
