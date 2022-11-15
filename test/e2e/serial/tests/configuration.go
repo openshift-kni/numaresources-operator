@@ -529,6 +529,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 		It("should report the NodeGroupConfig in the status", func() {
 			nroKey := objects.NROObjectKey()
 			nroOperObj := nropv1alpha1.NUMAResourcesOperator{}
+
 			err := fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 
@@ -538,19 +539,29 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				e2efixture.Skipf(fxt, "more than one NodeGroup not yet supported, found %d", len(nroOperObj.Spec.NodeGroups))
 			}
 
-			Expect(len(nroOperObj.Status.MachineConfigPools)).To(Equal(len(nroOperObj.Spec.NodeGroups)),
-				"MCP Status mismatch: found %d, expected %d",
-				len(nroOperObj.Status.MachineConfigPools), len(nroOperObj.Spec.NodeGroups),
-			)
+			Eventually(func(g Gomega) {
+				// getting the same object twice is awkward, but still it seems better better than skipping inside a Eventually.
+				err := fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
+				g.Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
+				g.Expect(len(nroOperObj.Status.MachineConfigPools)).To(Equal(len(nroOperObj.Spec.NodeGroups)),
+					"MCP Status mismatch: found %d, expected %d",
+					len(nroOperObj.Status.MachineConfigPools), len(nroOperObj.Spec.NodeGroups),
+				)
 
-			// normalize config to handle unspecified defaults
-			specConf := merge.NodeGroupConfig(
-				nropv1alpha1.DefaultNodeGroupConfig(),
-				*nroOperObj.Spec.NodeGroups[0].Config,
-			)
-			statusConf := nroOperObj.Status.MachineConfigPools[0].Config // shortcut
-			Expect(statusConf).To(Equal(specConf))
+				// normalize config to handle unspecified defaults
+				specConf := nropv1alpha1.DefaultNodeGroupConfig()
+				if nroOperObj.Spec.NodeGroups[0].Config != nil {
+					specConf = merge.NodeGroupConfig(specConf, *nroOperObj.Spec.NodeGroups[0].Config)
+				}
 
+				// the status must be always populated by the operator.
+				// If the user-provided spec is missing, the status must reflect the compiled-in defaults.
+				// This is wrapped in a Eventually because even in functional, well-behaving clusters,
+				// the operator may take nonzero time to populate the status, and this is still fine.
+				statusConf := nroOperObj.Status.MachineConfigPools[0].Config // shortcut
+				g.Expect(statusConf).ToNot(BeNil())
+				g.Expect(statusConf).To(Equal(specConf))
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to check the NodeGroupConfig status for %q", nroKey.String())
 		})
 	})
 })
