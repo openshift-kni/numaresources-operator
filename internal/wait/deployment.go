@@ -58,3 +58,24 @@ func IsDeploymentComplete(dp *appsv1.Deployment, newStatus *appsv1.DeploymentSta
 	return areDeploymentReplicasAvailable(newStatus, *(dp.Spec.Replicas)) &&
 		newStatus.ObservedGeneration >= dp.Generation
 }
+
+func ForDeploymentReplicasCreation(cli client.Client, dp *appsv1.Deployment, expectedReplicas int32, pollInterval, pollTimeout time.Duration) (*appsv1.Deployment, error) {
+	key := ObjectKeyFromObject(dp)
+	updatedDp := &appsv1.Deployment{}
+	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
+		err := cli.Get(context.TODO(), key.AsKey(), updatedDp)
+		if err != nil {
+			klog.Warningf("failed to get the deployment %s: %v", key.String(), err)
+			return false, err
+		}
+
+		if updatedDp.Status.Replicas != expectedReplicas {
+			klog.Warningf("Waiting for deployment: %q to have %d replicas, current number of replicas: %d", key.String(), expectedReplicas, updatedDp.Status.Replicas)
+			return false, nil
+		}
+
+		klog.Infof("replicas of deployment %q are all created", key.String())
+		return true, nil
+	})
+	return updatedDp, err
+}
