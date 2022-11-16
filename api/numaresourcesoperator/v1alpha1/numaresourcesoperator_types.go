@@ -126,7 +126,7 @@ type MachineConfigPool struct {
 //+kubebuilder:resource:shortName=numaresop,path=numaresourcesoperators,scope=Cluster
 
 // NUMAResourcesOperator is the Schema for the numaresourcesoperators API
-//+operator-sdk:csv:customresourcedefinitions:displayName="NUMA Resources Operator",resources={{DaemonSet,v1,rte-daemonset,ConfigMap,v1,rte-configmap}}
+// +operator-sdk:csv:customresourcedefinitions:displayName="NUMA Resources Operator",resources={{DaemonSet,v1,rte-daemonset,ConfigMap,v1,rte-configmap}}
 type NUMAResourcesOperator struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

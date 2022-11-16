@@ -57,7 +57,7 @@ type NUMAResourcesSchedulerStatus struct {
 //+kubebuilder:resource:shortName=numaressched,path=numaresourcesschedulers,scope=Cluster
 
 // NUMAResourcesScheduler is the Schema for the numaresourcesschedulers API
-//+operator-sdk:csv:customresourcedefinitions:displayName="NUMA Aware Scheduler",resources={{Deployment,v1,secondary-scheduler-deployment}}
+// +operator-sdk:csv:customresourcedefinitions:displayName="NUMA Aware Scheduler",resources={{Deployment,v1,secondary-scheduler-deployment}}
 type NUMAResourcesScheduler struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
