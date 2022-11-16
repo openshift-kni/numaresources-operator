@@ -7,7 +7,7 @@ ENV GOPATH=/go
 ENV GOBIN=${GOPATH}/bin
 ENV PATH=${PATH}:${GOROOT}/bin:${GOBIN}
 
-ARG GO_PACKAGE_PATH=github.com/openshift-kni/performance-addon-operators
+ARG GO_PACKAGE_PATH=github.com/openshift-kni/numaresources-operator
 
 # rpms required for building and running test suites
 RUN yum --setopt=install_weak_deps=False -y install \
