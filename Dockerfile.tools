@@ -2,12 +2,12 @@ FROM registry.access.redhat.com/ubi8/ubi
 
 ENV HOME=/home/ci
 ENV GOROOT=/usr/local/go
-ENV GOVERSION=1.18.1
+ENV GOVERSION=1.19.3
 ENV GOPATH=/go
 ENV GOBIN=${GOPATH}/bin
 ENV PATH=${PATH}:${GOROOT}/bin:${GOBIN}
 
-ARG GO_PACKAGE_PATH=github.com/openshift-kni/performance-addon-operators
+ARG GO_PACKAGE_PATH=github.com/openshift-kni/numaresources-operator
 
 # rpms required for building and running test suites
 RUN yum --setopt=install_weak_deps=False -y install \
