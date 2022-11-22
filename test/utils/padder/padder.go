@@ -161,7 +161,7 @@ func (p *Padder) Pad(timeout time.Duration, options PaddingOptions) error {
 
 		for _, zone := range nrt.Zones {
 			// check that zone has at least the amount of allocationTarget that needed
-			if nrtutil.ZoneResourcesMatchesRequest(zone.Resources, p.allocationTarget) {
+			if nrtutil.ResourceInfoMatchesRequest(zone.Resources, p.allocationTarget) {
 				availResList := nrtutil.AvailableFromZone(zone)
 				diffList, err := diffAvailableToExpected(availResList, p.allocationTarget)
 				if err != nil {
