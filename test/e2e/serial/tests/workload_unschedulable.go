@@ -1005,8 +1005,8 @@ func nrtCanAccomodateEachRequestOnADifferentZone(nrt nrtv1alpha1.NodeResourceTop
 
 // returns true if r1 fits on z1 AND r2 on z2 or the other way around
 func eachRequestFitsOnADifferentZone(z1, z2 nrtv1alpha1.Zone, r1, r2 corev1.ResourceList) bool {
-	return (e2enrt.ZoneResourcesMatchesRequest(z1.Resources, r1) && e2enrt.ZoneResourcesMatchesRequest(z2.Resources, r2)) ||
-		(e2enrt.ZoneResourcesMatchesRequest(z1.Resources, r2) && e2enrt.ZoneResourcesMatchesRequest(z2.Resources, r1))
+	return (e2enrt.ResourceInfoMatchesRequest(z1.Resources, r1) && e2enrt.ResourceInfoMatchesRequest(z2.Resources, r2)) ||
+		(e2enrt.ResourceInfoMatchesRequest(z1.Resources, r2) && e2enrt.ResourceInfoMatchesRequest(z2.Resources, r1))
 }
 
 func calcExpectedReadyReplicas(numOfMultiNUMACandidates, numOfSingleNUMACandidates int) int32 {

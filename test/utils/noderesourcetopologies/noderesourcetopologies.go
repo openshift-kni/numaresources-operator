@@ -288,7 +288,7 @@ func FilterAnyZoneMatchingResources(nrts []nrtv1alpha1.NodeResourceTopology, req
 		matches := 0
 		for _, zone := range nrt.Zones {
 			klog.Infof(" ----> node %q zone %q provides %s request %s", nrt.Name, zone.Name, e2ereslist.ToString(AvailableFromZone(zone)), reqStr)
-			if !ZoneResourcesMatchesRequest(zone.Resources, requests) {
+			if !ResourceInfoMatchesRequest(zone.Resources, requests) {
 				continue
 			}
 			matches++
@@ -313,8 +313,8 @@ func FilterAnyNodeMatchingResources(nrts []nrtv1alpha1.NodeResourceTopology, req
 			continue
 		}
 		klog.Infof(" ----> node %q provides %s request %s", nrt.Name, e2ereslist.ToString(ResourceInfoListToResourceList(nodeRes)), reqStr)
-		// abuse the ZoneResourcesMatchesRequest for checking the complete node's resources
-		if !ZoneResourcesMatchesRequest(nodeRes, requests) {
+		// abuse the ResourceInfoMatchesRequest for checking the complete node's resources
+		if !ResourceInfoMatchesRequest(nodeRes, requests) {
 			klog.Warningf("SKIP: node %q can't provide %s", nrt.Name, reqStr)
 			continue
 		}
@@ -344,15 +344,26 @@ func AvailableFromZone(z nrtv1alpha1.Zone) corev1.ResourceList {
 	return rl
 }
 
-func ZoneResourcesMatchesRequest(resources []nrtv1alpha1.ResourceInfo, requests corev1.ResourceList) bool {
+func ResourceInfoMatchesRequest(resources []nrtv1alpha1.ResourceInfo, requests corev1.ResourceList) bool {
 	for resName, resQty := range requests {
-		zoneQty, ok := FindResourceAvailableByName(resources, string(resName))
-		if !ok {
+		if !ResourceInfoProviding(resources, string(resName), resQty, true) {
 			return false
 		}
-		if zoneQty.Cmp(resQty) < 0 {
-			return false
-		}
+	}
+	return true
+}
+
+func ResourceInfoProviding(resources []nrtv1alpha1.ResourceInfo, resName string, resQty resource.Quantity, onEqual bool) bool {
+	zoneQty, ok := FindResourceAvailableByName(resources, string(resName))
+	if !ok {
+		return false
+	}
+	cmpRes := zoneQty.Cmp(resQty)
+	if cmpRes < 0 {
+		return false
+	}
+	if cmpRes == 0 {
+		return onEqual
 	}
 	return true
 }
