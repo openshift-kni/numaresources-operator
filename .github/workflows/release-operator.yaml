@@ -64,7 +64,7 @@ jobs:
           image: numaresources-operator-bundle
           tags: ${{ env.RELEASE_VERSION}}
           dockerfiles: |
-            ./bundle.Dockerfile
+            ./Dockerfile.bundle
 
       - name: Push to quay
         id: bundle-push-to-quay
