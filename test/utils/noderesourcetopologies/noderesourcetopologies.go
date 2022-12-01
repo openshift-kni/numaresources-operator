@@ -144,8 +144,10 @@ func accumulateNodeAvailableResources(nrt nrtv1alpha1.NodeResourceTopology, reas
 	var resInfoList []nrtv1alpha1.ResourceInfo
 	for r, q := range resList {
 		resInfo := nrtv1alpha1.ResourceInfo{
-			Name:      string(r),
-			Available: q,
+			Name:        string(r),
+			Capacity:    q, // not required, added for consistency
+			Allocatable: q, // not required, added for consistency
+			Available:   q, // required
 		}
 		resInfoList = append(resInfoList, resInfo)
 	}
