@@ -132,14 +132,17 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				Expect(err).ToNot(HaveOccurred())
 
 				By("reverting the changes under the NUMAResourcesOperator object")
-				// we need that for the current ResourceVersion
-				nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
-				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
-				Expect(err).ToNot(HaveOccurred())
+				// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3
+				Eventually(func(g Gomega) {
+					// we need that for the current ResourceVersion
+					nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
+					err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
+					g.Expect(err).ToNot(HaveOccurred())
 
-				nroOperObj.Spec = initialNroOperObj.Spec
-				err = fxt.Client.Update(context.TODO(), nroOperObj)
-				Expect(err).ToNot(HaveOccurred())
+					nroOperObj.Spec = initialNroOperObj.Spec
+					err = fxt.Client.Update(context.TODO(), nroOperObj)
+					g.Expect(err).ToNot(HaveOccurred())
+				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 				mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
 				Expect(err).ToNot(HaveOccurred())
@@ -316,13 +319,16 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 			defer func() {
 				By("reverting the changes under the NUMAResourcesScheduler object")
-				currentSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
-				err := fxt.Client.Get(context.TODO(), nroSchedKey, currentSchedObj)
-				Expect(err).ToNot(HaveOccurred(), "cannot get current %q in the cluster", nroSchedKey.String())
+				// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3
+				Eventually(func(g Gomega) {
+					currentSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+					err := fxt.Client.Get(context.TODO(), nroSchedKey, currentSchedObj)
+					g.Expect(err).ToNot(HaveOccurred(), "cannot get current %q in the cluster", nroSchedKey.String())
 
-				currentSchedObj.Spec.SchedulerName = initialNroSchedObj.Status.SchedulerName
-				err = fxt.Client.Update(context.TODO(), currentSchedObj)
-				Expect(err).ToNot(HaveOccurred())
+					currentSchedObj.Spec.SchedulerName = initialNroSchedObj.Status.SchedulerName
+					err = fxt.Client.Update(context.TODO(), currentSchedObj)
+					g.Expect(err).ToNot(HaveOccurred())
+				}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to revert changes the changes to the NRO scheduler object")
 
 				updatedSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
 				Eventually(func() string {
