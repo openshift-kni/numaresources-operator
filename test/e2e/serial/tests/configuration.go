@@ -134,7 +134,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3
 				Eventually(func(g Gomega) {
 					// we need that for the current ResourceVersion
-					nroOperObj := &nropv1.NUMAResourcesOperator{}
+					nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
 					err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
 					g.Expect(err).ToNot(HaveOccurred())
 
@@ -324,7 +324,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				By("reverting the changes under the NUMAResourcesScheduler object")
 				// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3
 				Eventually(func(g Gomega) {
-					currentSchedObj := &nropv1.NUMAResourcesScheduler{}
+					currentSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
 					err := fxt.Client.Get(context.TODO(), nroSchedKey, currentSchedObj)
 					g.Expect(err).ToNot(HaveOccurred(), "cannot get current %q in the cluster", nroSchedKey.String())
 
