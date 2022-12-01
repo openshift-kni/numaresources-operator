@@ -152,7 +152,7 @@ func accumulateNodeAvailableResources(nrt nrtv1alpha1.NodeResourceTopology, reas
 	if len(resInfoList) < 1 {
 		return resInfoList, fmt.Errorf("failed to accumulate resources for node %q", nrt.Name)
 	}
-	klog.Infof("resInfoList %s: %s", reason, e2enrt.ListToString(resInfoList))
+	klog.Infof("resInfoList %s: %s", reason, e2enrt.ResourceInfoListToString(resInfoList))
 	return resInfoList, nil
 }
 func SaturateZoneUntilLeft(zone nrtv1alpha1.Zone, requiredRes corev1.ResourceList) (corev1.ResourceList, error) {
