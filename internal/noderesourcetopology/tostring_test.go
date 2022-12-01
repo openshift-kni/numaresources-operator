@@ -20,11 +20,12 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 )
 
-func TestToString(t *testing.T) {
+func TestResourceInfoToString(t *testing.T) {
 	testCases := []struct {
 		name     string
 		resInfo  nrtv1alpha1.ResourceInfo
@@ -55,15 +56,15 @@ func TestToString(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ToString(tt.resInfo)
+			got := ResourceInfoToString(tt.resInfo)
 			if got != tt.expected {
-				t.Errorf("ToString error: got=%q expected=%q", got, tt.expected)
+				t.Errorf("ResourceInfoToString error: got=%q expected=%q", got, tt.expected)
 			}
 		})
 	}
 }
 
-func TestListToString(t *testing.T) {
+func TestResourceInfoListToString(t *testing.T) {
 	testCases := []struct {
 		name     string
 		resInfos []nrtv1alpha1.ResourceInfo
@@ -111,9 +112,109 @@ func TestListToString(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ListToString(tt.resInfos)
+			got := ResourceInfoListToString(tt.resInfos)
 			if got != tt.expected {
-				t.Errorf("ToString error: got=%q expected=%q", got, tt.expected)
+				t.Errorf("ResourceInfoListToString error: got=%q expected=%q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestZoneToString(t *testing.T) {
+	testCases := []struct {
+		name     string
+		zone     nrtv1alpha1.Zone
+		expected string
+	}{
+		{
+			name:     "empty",
+			expected: "<MISSING> [N/A]: N/A",
+		},
+		{
+			name: "only-one",
+			zone: nrtv1alpha1.Zone{
+				Name:   "test-zone",
+				Type:   "testable",
+				Parent: "will-not-be-stringified",
+				Resources: []nrtv1alpha1.ResourceInfo{
+					{
+						Name:        "dev1",
+						Capacity:    resource.MustParse("10"),
+						Allocatable: resource.MustParse("9"),
+						Available:   resource.MustParse("4"),
+					},
+				},
+			},
+			expected: "test-zone [testable]: dev1=10/9/4",
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ZoneToString(tt.zone)
+			if got != tt.expected {
+				t.Errorf("ZoneToString error: got=%q expected=%q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestToString(t *testing.T) {
+	testCases := []struct {
+		name     string
+		nrt      nrtv1alpha1.NodeResourceTopology
+		expected string
+	}{
+		{
+			name:     "empty",
+			expected: "<MISSING> policy=N/A\n",
+		},
+		{
+			name: "only-one",
+			nrt: nrtv1alpha1.NodeResourceTopology{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-nrt",
+				},
+				TopologyPolicies: []string{
+					"restricted",
+					"ignored-from-the-second-onwards",
+				},
+				Zones: []nrtv1alpha1.Zone{
+					{
+						Name:   "zone-0",
+						Type:   "zoneTypeA",
+						Parent: "will-not-be-stringified",
+						Resources: []nrtv1alpha1.ResourceInfo{
+							{
+								Name:        "dev1",
+								Capacity:    resource.MustParse("10"),
+								Allocatable: resource.MustParse("9"),
+								Available:   resource.MustParse("4"),
+							},
+						},
+					},
+					{
+						Name:   "zone-1",
+						Type:   "zoneTypeA",
+						Parent: "will-not-be-stringified",
+						Resources: []nrtv1alpha1.ResourceInfo{
+							{
+								Name:        "dev1",
+								Capacity:    resource.MustParse("10"),
+								Allocatable: resource.MustParse("10"),
+								Available:   resource.MustParse("8"),
+							},
+						},
+					},
+				},
+			},
+			expected: "test-nrt policy=restricted\n- zone: zone-0 [zoneTypeA]: dev1=10/9/4\n- zone: zone-1 [zoneTypeA]: dev1=10/10/8\n",
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ToString(tt.nrt)
+			if got != tt.expected {
+				t.Errorf("ZoneToString error: got=%q expected=%q", got, tt.expected)
 			}
 		})
 	}
