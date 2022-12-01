@@ -142,6 +142,7 @@ func LabelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyList)
 		node.Labels[MultiNUMALabel] = labelValue
 
 		klog.Infof("labeling node %q with %s: %s", nrt.Name, MultiNUMALabel, labelValue)
+		// TODO: this should be retried
 		err = cli.Update(context.TODO(), &node)
 		Expect(err).ToNot(HaveOccurred())
 	}
