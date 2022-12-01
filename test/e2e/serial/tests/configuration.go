@@ -193,6 +193,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				nroOperObj.Spec.NodeGroups[i].MachineConfigPoolSelector.MatchLabels = mcp.Labels
 			}
 
+			// TODO: this shoould be retried
 			err = fxt.Client.Update(context.TODO(), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -235,6 +236,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			nroOperObj.Spec.ExporterImage = serialconfig.GetRteCiImage()
+			// TODO: this should be retried
 			err = fxt.Client.Update(context.TODO(), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -264,6 +266,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			nroOperObj.Spec.LogLevel = operatorv1.Trace
+			// TODO: this should be retried
 			err = fxt.Client.Update(context.TODO(), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -306,6 +309,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			By(fmt.Sprintf("modifying the NUMAResourcesScheduler SchedulerName field to %q", serialconfig.SchedulerTestName))
 			//updates must be done on object.Spec and active values should be fetched from object.Status
 			nroSchedObj.Spec.SchedulerName = serialconfig.SchedulerTestName
+			// TODO: this should be retried
 			err = fxt.Client.Update(context.TODO(), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -398,6 +402,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
 			Expect(err).ToNot(HaveOccurred())
 
+			// TODO: this should be retried
 			err = fxt.Client.Update(context.TODO(), targetedKC)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -517,6 +522,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
 				Expect(err).ToNot(HaveOccurred())
 
+				// TODO: this should be retried
 				err = fxt.Client.Update(context.TODO(), targetedKC)
 				Expect(err).ToNot(HaveOccurred())
 
