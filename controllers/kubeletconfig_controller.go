@@ -147,8 +147,10 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 	generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
 	klog.V(3).InfoS("generated configMap name", "generatedName", generatedName)
 
-	klog.V(5).InfoS("using podExcludes", "podExcludes", instance.Spec.PodExcludes)
-	return r.syncConfigMap(ctx, mcoKc, kubeletConfig, generatedName, instance.Spec.PodExcludes)
+	podExcludes := podExcludesListToMap(instance.Spec.PodExcludes)
+
+	klog.V(5).InfoS("using podExcludes", "podExcludes", podExcludes)
+	return r.syncConfigMap(ctx, mcoKc, kubeletConfig, generatedName, podExcludes)
 }
 
 func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov1.KubeletConfig, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, name string, podExcludes map[string]string) (*corev1.ConfigMap, error) {
@@ -211,4 +213,12 @@ func findReservedMemoryFromKubelet(klMemRes []kubeletconfigv1beta1.MemoryReserva
 		}
 	}
 	return res
+}
+
+func podExcludesListToMap(podExcludes []nropv1alpha1.NamespacedName) map[string]string {
+	ret := make(map[string]string)
+	for _, pe := range podExcludes {
+		ret[pe.Namespace] = pe.Name
+	}
+	return ret
 }
