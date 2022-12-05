@@ -332,9 +332,10 @@ func syncMachineConfigPoolNodeGroupConfigStatuses(instanceName string, mcpStatus
 			mcpStatus := getMachineConfigPoolStatusByName(mcpStatuses, mcp.Name)
 
 			if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
-				mcpStatus.Config = *tree.NodeGroup.Config
+				mcpStatus.Config = tree.NodeGroup.Config.DeepCopy()
 			} else {
-				mcpStatus.Config = nropv1alpha1.DefaultNodeGroupConfig()
+				ngc := nropv1alpha1.DefaultNodeGroupConfig()
+				mcpStatus.Config = &ngc
 			}
 
 			updatedMcpStatuses = append(updatedMcpStatuses, mcpStatus)
