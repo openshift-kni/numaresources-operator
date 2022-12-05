@@ -224,30 +224,6 @@ spec:
                       type: string
                   type: object
                 type: array
-              defaultNodeGroupConfig:
-                description: NodeGroupConfig exposes topology info reporting setting
-                  per node group
-                properties:
-                  infoRefreshMode:
-                    description: InfoRefreshMode sets the mechanism which will be
-                      used to refresh the topology info.
-                    enum:
-                    - Periodic
-                    - Events
-                    - PeriodicAndEvents
-                    type: string
-                  infoRefreshPeriod:
-                    description: InfoRefreshPeriod sets the topology info refresh
-                      period. Use explicit 0 to disable.
-                    type: string
-                  podsFingerprinting:
-                    description: PodsFingerprinting defines if pod fingerprint should
-                      be reported for the machines belonging to this group
-                    enum:
-                    - Enabled
-                    - Disabled
-                    type: string
-                type: object
               machineconfigpools:
                 description: MachineConfigPools resolved from configured node groups
                 items:
@@ -291,6 +267,31 @@ spec:
                         - type
                         type: object
                       type: array
+                    defaultNodeGroupConfig:
+                      description: NodeGroupConfig represents the latest available
+                        configuration applied to this MachineConfigPool
+                      properties:
+                        infoRefreshMode:
+                          description: InfoRefreshMode sets the mechanism which will
+                            be used to refresh the topology info.
+                          enum:
+                          - Periodic
+                          - Events
+                          - PeriodicAndEvents
+                          type: string
+                        infoRefreshPeriod:
+                          description: InfoRefreshPeriod sets the topology info refresh
+                            period. Use explicit 0 to disable.
+                          type: string
+                        podsFingerprinting:
+                          description: PodsFingerprinting defines if pod fingerprint
+                            should be reported for the machines belonging to this
+                            group
+                          enum:
+                          - Enabled
+                          - Disabled
+                          type: string
+                      type: object
                     name:
                       description: Name the name of the machine config pool
                       type: string
