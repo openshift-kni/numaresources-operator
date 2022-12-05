@@ -88,10 +88,13 @@ type NodeGroupConfig struct {
 // You can choose the group of node by MachineConfigPoolSelector or by NodeSelector
 type NodeGroup struct {
 	// MachineConfigPoolSelector defines label selector for the machine config pool
+	// +optional
 	MachineConfigPoolSelector *metav1.LabelSelector `json:"machineConfigPoolSelector,omitempty"`
 	// DisablePodsFingerprinting defines if pod fingerprint should be omitted for the machines belonging to this group (DEPRECATED: use Config instead)
+	// +optional
 	DisablePodsFingerprinting *bool `json:"disablePodsFingerprinting,omitempty"`
 	// Config defines the RTE behaviour for this NodeGroup
+	// +optional
 	Config *NodeGroupConfig `json:"config,omitempty"`
 }
 
@@ -104,6 +107,7 @@ type NUMAResourcesOperatorStatus struct {
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="RTE MCPs from node groups"
 	MachineConfigPools []MachineConfigPool `json:"machineconfigpools,omitempty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Condition reported"
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
@@ -111,11 +115,13 @@ type NUMAResourcesOperatorStatus struct {
 type MachineConfigPool struct {
 	// Name the name of the machine config pool
 	Name string `json:"name"`
-
 	// Conditions represents the latest available observations of MachineConfigPool current state.
 	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Optional conditions reported for this NodeGroup"
 	Conditions []mcov1.MachineConfigPoolCondition `json:"conditions,omitempty"`
 	// NodeGroupConfig represents the latest available configuration applied to this MachineConfigPool
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Optional configuration enforced on this NodeGroup"
 	Config *NodeGroupConfig `json:"config,omitempty"`
 }
 
