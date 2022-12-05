@@ -23,7 +23,7 @@ jobs:
         uses: redhat-actions/buildah-build@v2
         with:
           image: numaresources-operator-tests
-          tags: 4.12.999-snapshot
+          tags: 4.13.999-snapshot
           dockerfiles: |
             ./Dockerfile.tests
 
