@@ -135,11 +135,18 @@ spec:
                   type: object
                 type: array
               podExcludes:
-                additionalProperties:
-                  type: string
                 description: Optional Namespace/Name glob patterns of pod to ignore
                   at node level
-                type: object
+                items:
+                  description: NamespacedName comprises a resource name, with a mandatory
+                    namespace, rendered as "<namespace>/<name>".
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                  type: object
+                type: array
             type: object
           status:
             description: NUMAResourcesOperatorStatus defines the observed state of

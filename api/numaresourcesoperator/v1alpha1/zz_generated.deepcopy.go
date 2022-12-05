@@ -121,10 +121,8 @@ func (in *NUMAResourcesOperatorSpec) DeepCopyInto(out *NUMAResourcesOperatorSpec
 	}
 	if in.PodExcludes != nil {
 		in, out := &in.PodExcludes, &out.PodExcludes
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
-		}
+		*out = make([]NamespacedName, len(*in))
+		copy(*out, *in)
 	}
 }
 

@@ -40,7 +40,7 @@ type NUMAResourcesOperatorSpec struct {
 	// Optional Namespace/Name glob patterns of pod to ignore at node level
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Optional ignore pod namespace/name glob patterns"
-	PodExcludes map[string]string `json:"podExcludes,omitempty"`
+	PodExcludes []NamespacedName `json:"podExcludes,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=Enabled;Disabled
