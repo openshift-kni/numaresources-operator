@@ -136,6 +136,12 @@ spec:
                       type: object
                   type: object
                 type: array
+              podExcludes:
+                additionalProperties:
+                  type: string
+                description: Optional Namespace/Name glob patterns of pod to ignore
+                  at node level
+                type: object
             type: object
           status:
             description: NUMAResourcesOperatorStatus defines the observed state of

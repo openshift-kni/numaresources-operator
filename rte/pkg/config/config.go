@@ -30,6 +30,7 @@ type Config struct {
 	Resources             sysinfo.Config      `json:"resources,omitempty"`
 	TopologyManagerPolicy string              `json:"topologyManagerPolicy,omitempty"`
 	TopologyManagerScope  string              `json:"topologyManagerScope,omitempty"`
+	PodExcludes           map[string]string   `json:"podExcludes"`
 }
 
 func ReadConfig(configPath string) (Config, error) {
