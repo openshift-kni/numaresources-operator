@@ -56,12 +56,24 @@ spec:
         displayName: Optional ignore pod namespace/name glob patterns
         path: podExcludes
       statusDescriptors:
+      - description: Conditions show the current state of the NUMAResourcesOperator
+          Operator
+        displayName: Condition reported
+        path: conditions
       - description: DaemonSets of the configured RTEs, one per node group
         displayName: RTE DaemonSets
         path: daemonsets
       - description: MachineConfigPools resolved from configured node groups
         displayName: RTE MCPs from node groups
         path: machineconfigpools
+      - description: Conditions represents the latest available observations of MachineConfigPool
+          current state.
+        displayName: Optional conditions reported for this NodeGroup
+        path: machineconfigpools[0].conditions
+      - description: NodeGroupConfig represents the latest available configuration
+          applied to this MachineConfigPool
+        displayName: Optional configuration enforced on this NodeGroup
+        path: machineconfigpools[0].config
       version: v1alpha1
     - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
         API
