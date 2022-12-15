@@ -479,7 +479,7 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.1.0
+# golang.org/x/net v0.3.1-0.20221206200815-1e63c2f08a10
 ## explicit; go 1.17
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -503,7 +503,7 @@ golang.org/x/oauth2/google/internal/externalaccount
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
-# golang.org/x/sys v0.1.0
+# golang.org/x/sys v0.3.0
 ## explicit; go 1.17
 golang.org/x/sys/cpu
 golang.org/x/sys/execabs
@@ -511,10 +511,10 @@ golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/term v0.1.0
+# golang.org/x/term v0.3.0
 ## explicit; go 1.17
 golang.org/x/term
-# golang.org/x/text v0.4.0 => golang.org/x/text v0.3.5
+# golang.org/x/text v0.5.0 => golang.org/x/text v0.3.5
 ## explicit; go 1.11
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
@@ -1327,7 +1327,7 @@ sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics
 ## explicit; go 1.18
 sigs.k8s.io/json
 sigs.k8s.io/json/internal/golang/encoding/json
-# sigs.k8s.io/scheduler-plugins v0.22.7-0.20220314165158-277b6bdec18f
+# sigs.k8s.io/scheduler-plugins v0.23.10-0.20221215222735-4f56158ab986
 ## explicit; go 1.17
 sigs.k8s.io/scheduler-plugins/apis/config
 sigs.k8s.io/scheduler-plugins/apis/config/v1beta2
