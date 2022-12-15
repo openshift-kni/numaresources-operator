@@ -48,7 +48,7 @@ CRD_MACHINE_CONFIG_POOL_URL ?= "https://raw.githubusercontent.com/openshift/mach
 # Specify the URL link to the kubeletconfig CRD
 CRD_KUBELET_CONFIG_URL ?= https://raw.githubusercontent.com/openshift/machine-config-operator/master/install/0000_80_machine-config-operator_01_kubeletconfig.crd.yaml
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.21
+ENVTEST_K8S_VERSION = 1.24
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
