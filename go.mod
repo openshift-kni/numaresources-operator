@@ -20,6 +20,7 @@ require (
 	github.com/openshift/api v0.0.0-20221021112143-4226c2167e40
 	github.com/openshift/machine-config-operator v0.0.1-0.20221101091906-fa5e7ae3f0e9
 	github.com/pkg/errors v0.9.1
+	github.com/sergi/go-diff v1.1.0
 	github.com/stretchr/testify v1.8.0
 	google.golang.org/grpc v1.47.0
 	k8s.io/api v0.25.4
@@ -32,6 +33,7 @@ require (
 	k8s.io/kubernetes v1.25.4
 	kubevirt.io/qe-tools v0.1.8
 	sigs.k8s.io/controller-runtime v0.13.1
+	sigs.k8s.io/scheduler-plugins v0.23.10-0.20221215222735-4f56158ab986
 	sigs.k8s.io/yaml v1.3.0
 )
 
@@ -116,11 +118,11 @@ require (
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/mod v0.6.0 // indirect
-	golang.org/x/net v0.1.0 // indirect
+	golang.org/x/net v0.3.1-0.20221206200815-1e63c2f08a10 // indirect
 	golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2 // indirect
-	golang.org/x/sys v0.1.0 // indirect
-	golang.org/x/term v0.1.0 // indirect
-	golang.org/x/text v0.4.0 // indirect
+	golang.org/x/sys v0.3.0 // indirect
+	golang.org/x/term v0.3.0 // indirect
+	golang.org/x/text v0.5.0 // indirect
 	golang.org/x/time v0.0.0-20220609170525-579cf78fd858 // indirect
 	golang.org/x/tools v0.2.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
@@ -143,7 +145,6 @@ require (
 	k8s.io/utils v0.0.0-20220823124924-e9cbc92d1a73 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.33 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
-	sigs.k8s.io/scheduler-plugins v0.22.7-0.20220314165158-277b6bdec18f // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 )
 

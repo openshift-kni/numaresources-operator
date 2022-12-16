@@ -326,7 +326,6 @@ func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec
 	// empty string is fine. Will be handled as "disabled".
 	// We only care about setting the environ variable to declare it exists,
 	// the best setting is "present, but disabled" vs "missing, thus implicitly disabled"
-	schedupdate.DeploymentContainerEnviron(mf.Deployment, "")
 	schedupdate.DeploymentConfigMapSettings(mf.Deployment, schedManifests.ConfigMap.Name, hash.ConfigMapData(schedManifests.ConfigMap))
 	return mf
 }

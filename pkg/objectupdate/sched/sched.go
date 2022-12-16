@@ -18,12 +18,14 @@ package sched
 
 import (
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	schedconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	pluginconfig "sigs.k8s.io/scheduler-plugins/apis/config"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
@@ -48,24 +50,8 @@ func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
 
 }
-func DeploymentContainerEnviron(dp *appsv1.Deployment, schedulerName string) {
-	// There is only a single container
-	cnt := &dp.Spec.Template.Spec.Containers[0]
-	ev := corev1.EnvVar{
-		Name:  "SCHEDULER_NAME",
-		Value: schedulerName,
-	}
-	cnt.Env = []corev1.EnvVar{
-		ev,
-	}
-	klog.V(3).InfoS("Scheduler environ", ev.Name, ev.Value)
-}
 
-func SchedulerName(cm *corev1.ConfigMap, name string) error {
-	if name == "" {
-		return fmt.Errorf("not allow to set an empty name for scheduler in ConfigMap: %s/%s", cm.Namespace, cm.Name)
-	}
-
+func SchedulerConfig(cm *corev1.ConfigMap, name string, cacheResyncPeriod time.Duration) error {
 	if cm.Data == nil {
 		return fmt.Errorf("no data found in ConfigMap: %s/%s", cm.Namespace, cm.Name)
 	}
@@ -75,27 +61,52 @@ func SchedulerName(cm *corev1.ConfigMap, name string) error {
 		return fmt.Errorf("no data key named: %s found in ConfigMap: %s/%s", schedstate.SchedulerConfigFileName, cm.Namespace, cm.Name)
 	}
 
-	schedCfg, err := manifests.KubeSchedulerConfigurationFromData([]byte(data))
+	schedCfg, err := DecodeSchedulerConfigFromData([]byte(data))
 	if err != nil {
 		return err
 	}
 
-	for i, schedProf := range schedCfg.Profiles {
+	schedProf, pluginConf := findKubeSchedulerProfileByName(schedCfg, schedstate.SchedulerPluginName)
+	if schedProf == nil || pluginConf == nil {
+		return fmt.Errorf("no profile or plugin configuration found for %q", schedstate.SchedulerPluginName)
+	}
+
+	if name != "" {
+		schedProf.SchedulerName = name
+		klog.V(3).InfoS("scheduler config update", "name", name)
+	}
+
+	confObj := pluginConf.Args.DeepCopyObject()
+	cfg, ok := confObj.(*pluginconfig.NodeResourceTopologyMatchArgs)
+	if !ok {
+		return fmt.Errorf("unsupported plugin config type: %T", confObj)
+	}
+
+	period := int64(cacheResyncPeriod.Seconds())
+	cfg.CacheResyncPeriodSeconds = period
+	klog.V(3).InfoS("scheduler config update", "cacheResyncPeriodSeconds", period)
+
+	pluginConf.Args = cfg
+
+	newData, err := EncodeSchedulerConfigToData(schedCfg)
+	if err != nil {
+		return err
+	}
+
+	cm.Data[schedstate.SchedulerConfigFileName] = string(newData)
+	return nil
+}
+
+func findKubeSchedulerProfileByName(sc *schedconfig.KubeSchedulerConfiguration, name string) (*schedconfig.KubeSchedulerProfile, *schedconfig.PluginConfig) {
+	for i := range sc.Profiles {
 		// if we have a configuration for the NodeResourceTopologyMatch
 		// this is a valid profile
-		for _, plugin := range schedProf.PluginConfig {
-			if plugin.Name == schedstate.SchedulerPluginName {
-				schedCfg.Profiles[i].SchedulerName = &name
+		for j := range sc.Profiles[i].PluginConfig {
+			if sc.Profiles[i].PluginConfig[j].Name == name {
+				return &sc.Profiles[i], &sc.Profiles[i].PluginConfig[j]
 			}
 		}
 	}
 
-	byteData, err := manifests.KubeSchedulerConfigurationToData(schedCfg)
-	if err != nil {
-		return err
-	}
-
-	cm.Data[schedstate.SchedulerConfigFileName] = string(byteData)
-	return nil
-
+	return nil, nil
 }

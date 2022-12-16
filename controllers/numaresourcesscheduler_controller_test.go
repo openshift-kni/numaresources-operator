@@ -18,11 +18,12 @@ package controllers
 
 import (
 	"context"
-	"k8s.io/klog/v2"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	"github.com/google/go-cmp/cmp"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -30,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -38,6 +40,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
+	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
@@ -78,7 +81,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 	ginkgo.Context("with unexpected NRS CR name", func() {
 		ginkgo.It("should updated the CR condition to degraded", func() {
-			nrs := testobjs.NewNUMAResourcesScheduler("test", "some/url:latest", testSchedulerName)
+			nrs := testobjs.NewNUMAResourcesScheduler("test", "some/url:latest", testSchedulerName, 9*time.Second)
 			verifyDegradedCondition(nrs, conditionTypeIncorrectNUMAResourcesSchedulerResourceName)
 		})
 	})
@@ -89,7 +92,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 		ginkgo.BeforeEach(func() {
 			var err error
-			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName)
+			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
 			reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(nrs)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
@@ -209,7 +212,14 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			key = client.ObjectKeyFromObject(cm)
 			err = reconciler.Client.Get(context.TODO(), key, cm)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			conf := pop(cm.Data, sched.SchedulerConfigFileName)
+			initialConf := pop(initialCM.Data, sched.SchedulerConfigFileName)
 			gomega.Expect(cm.Data).To(gomega.Equal(initialCM.Data))
+
+			delta, err := diffYAML(initialConf, conf)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			gomega.Expect(delta).To(gomega.BeEmpty())
 
 			key = client.ObjectKeyFromObject(dp)
 			err = reconciler.Client.Get(context.TODO(), key, dp)
@@ -219,3 +229,21 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 		})
 	})
 })
+
+func pop(m map[string]string, k string) string {
+	v := m[k]
+	delete(m, k)
+	return v
+}
+
+func diffYAML(want, got string) (string, error) {
+	cfgWant, err := schedupdate.DecodeSchedulerConfigFromData([]byte(want))
+	if err != nil {
+		return "", err
+	}
+	cfgGot, err := schedupdate.DecodeSchedulerConfigFromData([]byte(got))
+	if err != nil {
+		return "", err
+	}
+	return cmp.Diff(cfgWant, cfgGot), nil
+}
