@@ -18,11 +18,11 @@ package validator
 
 import (
 	"fmt"
-	"log"
 
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 
+	"github.com/go-logr/logr"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
 )
 
@@ -32,13 +32,13 @@ const (
 )
 
 type Validator struct {
-	Log *log.Logger
+	Log logr.Logger
 
 	results       []ValidationResult
 	serverVersion *version.Info
 }
 
-func NewValidatorWithDiscoveryClient(logger *log.Logger, cli *discovery.DiscoveryClient) (*Validator, error) {
+func NewValidatorWithDiscoveryClient(logger logr.Logger, cli *discovery.DiscoveryClient) (*Validator, error) {
 	vd := &Validator{
 		Log: logger,
 	}
@@ -49,7 +49,7 @@ func NewValidatorWithDiscoveryClient(logger *log.Logger, cli *discovery.Discover
 	return vd, nil
 }
 
-func NewValidator(logger *log.Logger) (*Validator, error) {
+func NewValidator(logger logr.Logger) (*Validator, error) {
 	cli, err := clientutil.NewDiscoveryClient()
 	if err != nil {
 		return nil, err

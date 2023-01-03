@@ -17,6 +17,9 @@
 package detect
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 )
 
@@ -35,6 +38,18 @@ type VersionInfo struct {
 type ClusterInfo struct {
 	Platform PlatformInfo `json:"platform"`
 	Version  VersionInfo  `json:"version"`
+}
+
+func (ci ClusterInfo) String() string {
+	return fmt.Sprintf("%s:%s", ci.Platform.Discovered, ci.Version.Discovered)
+}
+
+func (ci ClusterInfo) ToJSON() string {
+	data, err := json.Marshal(ci)
+	if err != nil {
+		return `{"error":` + fmt.Sprintf("%q", err) + `}`
+	}
+	return string(data)
 }
 
 const (

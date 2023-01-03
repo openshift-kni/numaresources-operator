@@ -93,7 +93,7 @@ func (vd *Validator) ValidateNodeKubeletConfig(nodeName string, nodeVersion *ver
 	if len(vrs) > 0 {
 		result = fmt.Sprintf("%d issues found", len(vrs))
 	}
-	vd.Log.Printf("validated node %q: %s", nodeName, result)
+	vd.Log.Info("validated", "node", nodeName, "result", result)
 	return vrs
 }
 
