@@ -19,12 +19,17 @@ package manifests
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sjson "k8s.io/apimachinery/pkg/runtime/serializer/json"
-	"k8s.io/client-go/kubernetes/scheme"
+	k8sscheme "k8s.io/client-go/kubernetes/scheme"
+
+	schedconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedscheme "sigs.k8s.io/scheduler-plugins/apis/config/scheme"
+	"sigs.k8s.io/scheduler-plugins/apis/config/v1beta2"
 )
 
 func SerializeObject(obj runtime.Object, out io.Writer) error {
@@ -44,7 +49,7 @@ func SerializeObject(obj runtime.Object, out io.Writer) error {
 	unstructured.RemoveNestedField(r.Object, "spec", "template", "metadata", "creationTimestamp")
 	unstructured.RemoveNestedField(r.Object, "status")
 
-	srz := k8sjson.NewYAMLSerializer(k8sjson.DefaultMetaFactory, scheme.Scheme, scheme.Scheme)
+	srz := k8sjson.NewYAMLSerializer(k8sjson.DefaultMetaFactory, k8sscheme.Scheme, k8sscheme.Scheme)
 	return srz.Encode(&r, out)
 }
 
@@ -55,7 +60,7 @@ func SerializeObjectToData(obj runtime.Object) ([]byte, error) {
 }
 
 func DeserializeObjectFromData(data []byte) (runtime.Object, error) {
-	decode := scheme.Codecs.UniversalDeserializer().Decode
+	decode := k8sscheme.Codecs.UniversalDeserializer().Decode
 	obj, _, err := decode(data, nil, nil)
 	if err != nil {
 		return nil, err
@@ -69,4 +74,36 @@ func loadObject(path string) (runtime.Object, error) {
 		return nil, err
 	}
 	return DeserializeObjectFromData(data)
+}
+
+func DecodeSchedulerConfigFromData(data []byte) (*schedconfig.KubeSchedulerConfiguration, error) {
+	decoder := schedscheme.Codecs.UniversalDecoder()
+	obj, gvk, err := decoder.Decode(data, nil, nil)
+
+	if err != nil {
+		return nil, err
+	}
+
+	schedCfg, ok := obj.(*schedconfig.KubeSchedulerConfiguration)
+	if !ok {
+		return nil, fmt.Errorf("decoded unsupported type: %T gvk=%s", obj, gvk)
+	}
+	return schedCfg, nil
+}
+
+func EncodeSchedulerConfigToData(schedCfg *schedconfig.KubeSchedulerConfiguration) ([]byte, error) {
+	yamlInfo, ok := runtime.SerializerInfoForMediaType(schedscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeYAML)
+	if !ok {
+		return nil, fmt.Errorf("unable to locate encoder -- %q is not a supported media type", runtime.ContentTypeYAML)
+	}
+
+	encoder := schedscheme.Codecs.EncoderForVersion(yamlInfo.Serializer, v1beta2.SchemeGroupVersion)
+
+	var buf bytes.Buffer
+	err := encoder.Encode(schedCfg, &buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
 }

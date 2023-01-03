@@ -19,10 +19,11 @@ package kubeletconfig
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/go-logr/logr"
 
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -32,14 +33,14 @@ const (
 )
 
 type Kubectl struct {
-	logger      *log.Logger
+	logger      logr.Logger
 	kubectlPath string
 	kubeConfig  string
 	apiserver   string
 	namespace   string
 }
 
-func NewKubectl(logger *log.Logger, kubectlPath, kubeConfig string) *Kubectl {
+func NewKubectl(logger logr.Logger, kubectlPath, kubeConfig string) *Kubectl {
 	return &Kubectl{
 		logger:      logger,
 		kubectlPath: kubectlPath,
@@ -47,21 +48,21 @@ func NewKubectl(logger *log.Logger, kubectlPath, kubeConfig string) *Kubectl {
 	}
 }
 
-func NewKubectlFromEnv(logger *log.Logger) *Kubectl {
+func NewKubectlFromEnv(logger logr.Logger) *Kubectl {
 	kubeConfig, ok := os.LookupEnv("KUBECONFIG")
 	if !ok {
 		kubeConfig = filepath.Join(os.Getenv("HOME"), ".kube", "config")
-		logger.Printf("using default kubeconfig path: %q", kubeConfig)
+		logger.Info("using default kubeconfig", "path", kubeConfig)
 	}
 	kubectlPath, ok := os.LookupEnv("KUBECTL")
 	if !ok {
 		var err error
 		kubectlPath, err = exec.LookPath("kubectl")
 		if err != nil {
-			logger.Printf("kubectl not found (%v), falling back to hardcoded default", err)
+			logger.Info("kubectl not found, falling back to hardcoded default", "error", err)
 			kubectlPath = DefaultKubectlPath
 		}
-		logger.Printf("using kubectl path: %q", kubectlPath)
+		logger.Info("using kubectl", "path", kubectlPath)
 	}
 	return NewKubectl(logger, kubectlPath, kubeConfig)
 }
@@ -109,7 +110,7 @@ func (kc *Kubectl) Arguments(args ...string) []string {
 
 func (kc *Kubectl) Command(args ...string) *exec.Cmd {
 	kubectlArgs := kc.Arguments(args...)
-	kc.logger.Printf("running: %s %v", kc.kubectlPath, kubectlArgs)
+	kc.logger.Info("running", "path", kc.kubectlPath, "args", kubectlArgs)
 	return exec.Command(kc.kubectlPath, kubectlArgs...)
 }
 

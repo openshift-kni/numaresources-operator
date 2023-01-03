@@ -17,6 +17,8 @@
 package rte
 
 import (
+	"github.com/go-logr/logr"
+
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -29,7 +31,6 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/wait"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/tlog"
 )
 
 const (
@@ -90,7 +91,7 @@ type RenderOptions struct {
 	Name      string
 }
 
-func (mf Manifests) Render(options RenderOptions) Manifests {
+func (mf Manifests) Render(options RenderOptions) (Manifests, error) {
 	ret := mf.Clone()
 	if ret.plat == platform.Kubernetes {
 		if options.Namespace != "" {
@@ -128,7 +129,7 @@ func (mf Manifests) Render(options RenderOptions) Manifests {
 		manifests.UpdateSecurityContextConstraint(ret.SecurityContextConstraint, ret.ServiceAccount)
 	}
 
-	return ret
+	return ret, nil
 }
 
 func CreateConfigMap(namespace, name, configData string) *corev1.ConfigMap {
@@ -174,7 +175,7 @@ func (mf Manifests) ToObjects() []client.Object {
 	)
 }
 
-func (mf Manifests) ToCreatableObjects(hp *deployer.Helper, log tlog.Logger) []deployer.WaitableObject {
+func (mf Manifests) ToCreatableObjects(cli client.Client, log logr.Logger) []deployer.WaitableObject {
 	var objs []deployer.WaitableObject
 	if mf.ConfigMap != nil {
 		objs = append(objs, deployer.WaitableObject{
@@ -195,6 +196,11 @@ func (mf Manifests) ToCreatableObjects(hp *deployer.Helper, log tlog.Logger) []d
 		})
 	}
 
+	key := wait.ObjectKey{
+		Namespace: mf.DaemonSet.Namespace,
+		Name:      mf.DaemonSet.Name,
+	}
+
 	return append(objs,
 		deployer.WaitableObject{Obj: mf.Role},
 		deployer.WaitableObject{Obj: mf.RoleBinding},
@@ -202,17 +208,22 @@ func (mf Manifests) ToCreatableObjects(hp *deployer.Helper, log tlog.Logger) []d
 		deployer.WaitableObject{Obj: mf.ClusterRoleBinding},
 		deployer.WaitableObject{Obj: mf.ServiceAccount},
 		deployer.WaitableObject{
-			Obj:  mf.DaemonSet,
-			Wait: func() error { return wait.DaemonSetToBeRunning(hp, log, mf.DaemonSet.Namespace, mf.DaemonSet.Name) },
+			Obj: mf.DaemonSet,
+			Wait: func() error {
+				_, err := wait.ForDaemonSetReadyByKey(cli, log, key, wait.DefaultPollInterval, wait.DefaultPollTimeout)
+				return err
+			},
 		},
 	)
 }
 
-func (mf Manifests) ToDeletableObjects(hp *deployer.Helper, log tlog.Logger) []deployer.WaitableObject {
+func (mf Manifests) ToDeletableObjects(cli client.Client, log logr.Logger) []deployer.WaitableObject {
 	objs := []deployer.WaitableObject{
 		{
-			Obj:  mf.DaemonSet,
-			Wait: func() error { return wait.DaemonSetToBeGone(hp, log, mf.DaemonSet.Namespace, mf.DaemonSet.Name) },
+			Obj: mf.DaemonSet,
+			Wait: func() error {
+				return wait.ForDaemonSetDeleted(cli, log, mf.DaemonSet.Namespace, mf.DaemonSet.Name, wait.DefaultPollTimeout)
+			},
 		},
 		{Obj: mf.Role},
 		{Obj: mf.RoleBinding},

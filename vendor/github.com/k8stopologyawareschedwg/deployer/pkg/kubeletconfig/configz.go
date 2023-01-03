@@ -22,15 +22,16 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"regexp"
 	"strconv"
 
+	"github.com/go-logr/logr"
+
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 )
 
-func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger *log.Logger) (map[string]*kubeletconfigv1beta1.KubeletConfiguration, error) {
+func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger logr.Logger) (map[string]*kubeletconfigv1beta1.KubeletConfiguration, error) {
 	cmd := kc.Command("proxy", "-p", "0")
 	stdout, stderr, err := StartWithStreamOutput(cmd)
 	defer stdout.Close()
@@ -41,7 +42,7 @@ func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger *log.Logge
 	if err != nil {
 		return nil, err
 	}
-	logger.Printf("proxy port: %d", port)
+	logger.Info("using proxy", "port", port)
 
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -52,26 +53,26 @@ func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger *log.Logge
 	for _, nodeName := range nodeNames {
 		endpoint := fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
 
-		logger.Printf("querying endpoint: %q", endpoint)
+		logger.Info("requesting to proxy", "endpoint", endpoint)
 		req, err := http.NewRequest("GET", endpoint, nil)
 		if err != nil {
-			logger.Printf("request creation failed for %q: %v - skipped", endpoint, err)
+			logger.Info("request creation failed - skipped", "endpoint", endpoint, "error", err)
 			continue
 		}
 		req.Header.Add("Accept", "application/json")
 		resp, err := client.Do(req)
 		if err != nil {
-			logger.Printf("request execution failed for %q: %v - skipped", endpoint, err)
+			logger.Info("request creation failed - skipped", "endpoint", endpoint, "error", err)
 			continue
 		}
 		if resp.StatusCode != 200 {
-			logger.Printf("unexpected response status code for %q: %d - skipped", endpoint, resp.StatusCode)
+			logger.Info("unexpected response status code - skipped", "endpoint", endpoint, "statusCode", resp.StatusCode)
 			continue
 		}
 
 		conf, err := decodeConfigz(resp)
 		if err != nil {
-			logger.Printf("response decode failed for %q: %v - skipped", endpoint, err)
+			logger.Info("response decode failed - skipped", "endpoint", endpoint, "error", err)
 			continue
 		}
 

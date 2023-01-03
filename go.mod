@@ -9,7 +9,7 @@ require (
 	github.com/google/go-cmp v0.5.8
 	github.com/jaypipes/ghw v0.9.0
 	github.com/jaypipes/pcidb v1.0.0
-	github.com/k8stopologyawareschedwg/deployer v0.9.0
+	github.com/k8stopologyawareschedwg/deployer v0.10.1
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12
 	github.com/k8stopologyawareschedwg/podfingerprint v0.1.1
 	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.9.1-0.20221116094504-e3d2ea60f7cb
@@ -33,7 +33,7 @@ require (
 	k8s.io/kubernetes v1.25.4
 	kubevirt.io/qe-tools v0.1.8
 	sigs.k8s.io/controller-runtime v0.13.1
-	sigs.k8s.io/scheduler-plugins v0.23.10-0.20221215222735-4f56158ab986
+	sigs.k8s.io/scheduler-plugins v0.24.9
 	sigs.k8s.io/yaml v1.3.0
 )
 

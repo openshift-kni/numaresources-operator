@@ -17,6 +17,8 @@
 package api
 
 import (
+	"github.com/go-logr/logr"
+
 	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -24,7 +26,6 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/tlog"
 )
 
 type Manifests struct {
@@ -39,13 +40,13 @@ func (mf Manifests) ToObjects() []client.Object {
 	}
 }
 
-func (mf Manifests) ToCreatableObjects(hp *deployer.Helper, log tlog.Logger) []deployer.WaitableObject {
+func (mf Manifests) ToCreatableObjects(cli client.Client, log logr.Logger) []deployer.WaitableObject {
 	return []deployer.WaitableObject{
 		{Obj: mf.Crd},
 	}
 }
 
-func (mf Manifests) ToDeletableObjects(hp *deployer.Helper, log tlog.Logger) []deployer.WaitableObject {
+func (mf Manifests) ToDeletableObjects(cli client.Client, log logr.Logger) []deployer.WaitableObject {
 	return []deployer.WaitableObject{
 		{Obj: mf.Crd},
 	}
@@ -59,10 +60,10 @@ func (mf Manifests) Clone() Manifests {
 	}
 }
 
-func (mf Manifests) Render() Manifests {
+func (mf Manifests) Render() (Manifests, error) {
 	ret := mf.Clone()
 	// nothing to do atm
-	return ret
+	return ret, nil
 }
 
 func New(plat platform.Platform) Manifests {
