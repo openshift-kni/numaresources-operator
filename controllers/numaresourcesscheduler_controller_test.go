@@ -36,11 +36,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	depmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
-	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
@@ -237,11 +237,11 @@ func pop(m map[string]string, k string) string {
 }
 
 func diffYAML(want, got string) (string, error) {
-	cfgWant, err := schedupdate.DecodeSchedulerConfigFromData([]byte(want))
+	cfgWant, err := depmanifests.DecodeSchedulerConfigFromData([]byte(want))
 	if err != nil {
 		return "", err
 	}
-	cfgGot, err := schedupdate.DecodeSchedulerConfigFromData([]byte(got))
+	cfgGot, err := depmanifests.DecodeSchedulerConfigFromData([]byte(got))
 	if err != nil {
 		return "", err
 	}
