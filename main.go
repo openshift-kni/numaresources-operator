@@ -197,12 +197,18 @@ func main() {
 	}
 	klog.InfoS("using RTE image", "spec", imageSpec)
 
+	rteManifestsRendered, err := renderRTEManifests(rteManifests, namespace, imageSpec)
+	if err != nil {
+		klog.ErrorS(err, "unable to render RTE manifests", "controller", "NUMAResourcesOperator")
+		os.Exit(1)
+	}
+
 	if err = (&controllers.NUMAResourcesOperatorReconciler{
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
 		Recorder:        mgr.GetEventRecorderFor("numaresources-controller"),
 		APIManifests:    apiManifests,
-		RTEManifests:    renderRTEManifests(rteManifests, namespace, imageSpec),
+		RTEManifests:    rteManifestsRendered,
 		Platform:        clusterPlatform,
 		ImageSpec:       imageSpec,
 		ImagePullPolicy: pullPolicy,
@@ -283,7 +289,11 @@ func manageRendering(render RenderParams, clusterPlatform platform.Platform, api
 		objs = append(objs, mf.ToObjects()...)
 	}
 
-	mf := renderRTEManifests(rteMf, render.Namespace, render.Image)
+	mf, err := renderRTEManifests(rteMf, render.Namespace, render.Image)
+	if err != nil {
+		klog.ErrorS(err, "unable to render RTE manifests")
+		return 1
+	}
 	objs = append(objs, mf.ToObjects()...)
 
 	if err := renderObjects(objs); err != nil {
@@ -306,17 +316,20 @@ func renderObjects(objs []client.Object) error {
 }
 
 // renderRTEManifests renders the reconciler manifests so they can be deployed on the cluster.
-func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, imageSpec string) rtemanifests.Manifests {
+func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, imageSpec string) (rtemanifests.Manifests, error) {
 	klog.InfoS("Updating RTE manifests")
-	mf := rteManifests.Render(rtemanifests.RenderOptions{
+	mf, err := rteManifests.Render(rtemanifests.RenderOptions{
 		Namespace: namespace,
 	})
+	if err != nil {
+		return mf, err
+	}
 	_ = rteupdate.DaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
 	rteupdate.DaemonSetPauseContainerSettings(mf.DaemonSet)
 	if mf.ConfigMap != nil {
 		rteupdate.DaemonSetHashAnnotation(mf.DaemonSet, hash.ConfigMapData(mf.ConfigMap))
 	}
-	return mf
+	return mf, err
 }
 
 func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec string) schedmanifests.Manifests {
