@@ -45,7 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	nrov1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -86,7 +86,7 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 }
 
 var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
-	verifyDegradedCondition := func(nro *nrov1alpha1.NUMAResourcesOperator, reason string) {
+	verifyDegradedCondition := func(nro *nropv1alpha1.NUMAResourcesOperator, reason string) {
 		reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -127,7 +127,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 	})
 
 	Context("with correct NRO and more than one NodeGroup", func() {
-		var nro *nrov1alpha1.NUMAResourcesOperator
+		var nro *nropv1alpha1.NUMAResourcesOperator
 		var mcp1 *machineconfigv1.MachineConfigPool
 		var mcp2 *machineconfigv1.MachineConfigPool
 
@@ -214,10 +214,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 				By("Update NRO to have just one NodeGroup")
 				key := client.ObjectKeyFromObject(nro)
-				nro := &nrov1alpha1.NUMAResourcesOperator{}
+				nro := &nropv1alpha1.NUMAResourcesOperator{}
 				Expect(reconciler.Client.Get(context.TODO(), key, nro)).NotTo(HaveOccurred())
 
-				nro.Spec.NodeGroups = []nrov1alpha1.NodeGroup{{
+				nro.Spec.NodeGroups = []nropv1alpha1.NodeGroup{{
 					MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: label1},
 				}}
 				Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
@@ -297,7 +297,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		})
 	})
 	Context("with correct NRO CR", func() {
-		var nro *nrov1alpha1.NUMAResourcesOperator
+		var nro *nropv1alpha1.NUMAResourcesOperator
 		var mcp1 *machineconfigv1.MachineConfigPool
 		var mcp2 *machineconfigv1.MachineConfigPool
 
@@ -484,7 +484,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					&metav1.LabelSelector{MatchLabels: label3},
 					&metav1.LabelSelector{MatchLabels: label3},
 				)
-				nro.Spec.NodeGroups = []nrov1alpha1.NodeGroup{
+				nro.Spec.NodeGroups = []nropv1alpha1.NodeGroup{
 					{
 						MachineConfigPoolSelector: &metav1.LabelSelector{
 							MatchLabels: label3,
@@ -605,9 +605,9 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			period := metav1.Duration{
 				Duration: d,
 			}
-			pfpMode := nrov1alpha1.PodsFingerprintingEnabled
-			refMode := nrov1alpha1.InfoRefreshPeriodic
-			conf := nrov1alpha1.NodeGroupConfig{
+			pfpMode := nropv1alpha1.PodsFingerprintingEnabled
+			refMode := nropv1alpha1.InfoRefreshPeriodic
+			conf := nropv1alpha1.NodeGroupConfig{
 				PodsFingerprinting: &pfpMode,
 				InfoRefreshPeriod:  &period,
 				InfoRefreshMode:    &refMode,
@@ -617,7 +617,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			reconciler := reconcileObjects(nro, mcp)
 
-			nroUpdated := &nrov1alpha1.NUMAResourcesOperator{}
+			nroUpdated := &nropv1alpha1.NUMAResourcesOperator{}
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
 
 			Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(1))
@@ -632,9 +632,9 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			period := metav1.Duration{
 				Duration: d,
 			}
-			pfpMode := nrov1alpha1.PodsFingerprintingEnabled
-			refMode := nrov1alpha1.InfoRefreshPeriodic
-			conf := nrov1alpha1.NodeGroupConfig{
+			pfpMode := nropv1alpha1.PodsFingerprintingEnabled
+			refMode := nropv1alpha1.InfoRefreshPeriodic
+			conf := nropv1alpha1.NodeGroupConfig{
 				PodsFingerprinting: &pfpMode,
 				InfoRefreshPeriod:  &period,
 				InfoRefreshMode:    &refMode,
@@ -658,8 +658,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		})
 
 		It("should allow to disable pods fingerprinting", func() {
-			pfpMode := nrov1alpha1.PodsFingerprintingDisabled
-			conf := nrov1alpha1.NodeGroupConfig{
+			pfpMode := nropv1alpha1.PodsFingerprintingDisabled
+			conf := nropv1alpha1.NodeGroupConfig{
 				PodsFingerprinting: &pfpMode,
 			}
 			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
@@ -720,7 +720,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			period := metav1.Duration{
 				Duration: d,
 			}
-			conf := nrov1alpha1.NodeGroupConfig{
+			conf := nropv1alpha1.NodeGroupConfig{
 				InfoRefreshPeriod: &period,
 			}
 			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
@@ -739,8 +739,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		})
 
 		It("should allow to tune the update mechanism", func() {
-			refMode := nrov1alpha1.InfoRefreshPeriodic
-			conf := nrov1alpha1.NodeGroupConfig{
+			refMode := nropv1alpha1.InfoRefreshPeriodic
+			conf := nropv1alpha1.NodeGroupConfig{
 				InfoRefreshMode: &refMode,
 			}
 
@@ -774,7 +774,7 @@ func getConditionByType(conditions []metav1.Condition, conditionType string) *me
 	return nil
 }
 
-func reconcileObjects(nro *nrov1alpha1.NUMAResourcesOperator, mcp *machineconfigv1.MachineConfigPool) *NUMAResourcesOperatorReconciler {
+func reconcileObjects(nro *nropv1alpha1.NUMAResourcesOperator, mcp *machineconfigv1.MachineConfigPool) *NUMAResourcesOperatorReconciler {
 	reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred())
 
@@ -807,7 +807,7 @@ func reconcileObjects(nro *nrov1alpha1.NUMAResourcesOperator, mcp *machineconfig
 	return reconciler
 }
 
-func nodeGroupConfigToString(conf nrov1alpha1.NodeGroupConfig) string {
+func nodeGroupConfigToString(conf nropv1alpha1.NodeGroupConfig) string {
 	data, err := json.Marshal(conf)
 	if err != nil {
 		return "<ERROR>"
