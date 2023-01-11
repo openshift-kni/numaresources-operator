@@ -46,14 +46,6 @@ func (ngt NodeGroupTree) Clone() NodeGroupTree {
 	return ret
 }
 
-func GetTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nropv1alpha1.NodeGroup) ([]NodeGroupTree, error) {
-	mcps := &mcov1.MachineConfigPoolList{}
-	if err := cli.List(ctx, mcps); err != nil {
-		return nil, err
-	}
-	return FindTreesByNodeGroups(mcps, nodeGroups)
-}
-
 func FindTreesByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1alpha1.NodeGroup) ([]NodeGroupTree, error) {
 	var result []NodeGroupTree
 	for idx := range nodeGroups {
