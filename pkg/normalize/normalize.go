@@ -18,11 +18,11 @@ package normalize
 
 import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 )
 
-func NodeGroupTreesConfig(trees []machineconfigpools.NodeGroupTree) {
+func NodeGroupTreesConfig(trees []nodegroupv1alpha1.Tree) {
 	for idx := range trees {
 		tree := &trees[idx]
 		NodeGroupConfig(tree.NodeGroup)
