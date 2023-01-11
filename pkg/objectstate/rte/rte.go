@@ -31,7 +31,7 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -64,7 +64,7 @@ type ExistingManifests struct {
 	// internal helpers
 	plat      platform.Platform
 	instance  *nropv1alpha1.NUMAResourcesOperator
-	trees     []machineconfigpools.NodeGroupTree
+	trees     []nodegroupv1alpha1.Tree
 	namespace string
 }
 
@@ -238,7 +238,7 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 	return ret
 }
 
-func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, trees []machineconfigpools.NodeGroupTree, namespace string) ExistingManifests {
+func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, trees []nodegroupv1alpha1.Tree, namespace string) ExistingManifests {
 	ret := ExistingManifests{
 		existing:   rtemanifests.New(plat),
 		daemonSets: make(map[string]daemonSetManifest),

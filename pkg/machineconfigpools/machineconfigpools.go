@@ -22,92 +22,20 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
 )
-
-type NodeGroupTree struct {
-	NodeGroup          *nropv1alpha1.NodeGroup
-	MachineConfigPools []*mcov1.MachineConfigPool
-}
-
-func (ngt NodeGroupTree) Clone() NodeGroupTree {
-	ret := NodeGroupTree{
-		NodeGroup:          ngt.NodeGroup.DeepCopy(),
-		MachineConfigPools: make([]*mcov1.MachineConfigPool, 0, len(ngt.MachineConfigPools)),
-	}
-	for _, mcp := range ngt.MachineConfigPools {
-		ret.MachineConfigPools = append(ret.MachineConfigPools, mcp.DeepCopy())
-	}
-	return ret
-}
-
-func FindTreesByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1alpha1.NodeGroup) ([]NodeGroupTree, error) {
-	var result []NodeGroupTree
-	for idx := range nodeGroups {
-		nodeGroup := &nodeGroups[idx]
-
-		// handled by validation
-		if nodeGroup.MachineConfigPoolSelector == nil {
-			continue
-		}
-
-		tree := NodeGroupTree{
-			NodeGroup: nodeGroup,
-		}
-
-		for i := range mcps.Items {
-			mcp := &mcps.Items[i]
-
-			selector, err := metav1.LabelSelectorAsSelector(nodeGroup.MachineConfigPoolSelector)
-			// handled by validation
-			if err != nil {
-				klog.Errorf("bad node group machine config pool selector %q", nodeGroup.MachineConfigPoolSelector.String())
-				continue
-			}
-
-			mcpLabels := labels.Set(mcp.Labels)
-			if selector.Matches(mcpLabels) {
-				tree.MachineConfigPools = append(tree.MachineConfigPools, mcp)
-			}
-		}
-
-		if len(tree.MachineConfigPools) == 0 {
-			return nil, fmt.Errorf("failed to find MachineConfigPool for the node group with the selector %q", nodeGroup.MachineConfigPoolSelector.String())
-		}
-
-		result = append(result, tree)
-	}
-
-	return result, nil
-}
 
 func GetListByNodeGroups(ctx context.Context, cli client.Client, nodeGroups []nropv1alpha1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
 	mcps := &mcov1.MachineConfigPoolList{}
 	if err := cli.List(ctx, mcps); err != nil {
 		return nil, err
 	}
-	return FindListByNodeGroups(mcps, nodeGroups)
-}
-
-func FindListByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1alpha1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
-	trees, err := FindTreesByNodeGroups(mcps, nodeGroups)
-	if err != nil {
-		return nil, err
-	}
-	return flattenTrees(trees), nil
-}
-
-func flattenTrees(trees []NodeGroupTree) []*mcov1.MachineConfigPool {
-	var result []*mcov1.MachineConfigPool
-	for _, tree := range trees {
-		result = append(result, tree.MachineConfigPools...)
-	}
-	return result
+	return nodegroupv1alpha1.FindMachineConfigPools(mcps, nodeGroups)
 }
 
 func FindBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelector) (*mcov1.MachineConfigPool, error) {

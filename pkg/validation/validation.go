@@ -23,8 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-
-	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
 )
 
 const (
@@ -34,7 +33,7 @@ const (
 
 // MachineConfigPoolDuplicates selected MCPs for duplicates
 // TODO: move it under the validation webhook once we will have one
-func MachineConfigPoolDuplicates(trees []machineconfigpools.NodeGroupTree) error {
+func MachineConfigPoolDuplicates(trees []nodegroupv1alpha1.Tree) error {
 	duplicates := map[string]int{}
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {

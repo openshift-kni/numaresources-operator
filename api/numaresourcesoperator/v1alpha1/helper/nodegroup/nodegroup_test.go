@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package machineconfigpools
+package nodegroup
 
 import (
 	"fmt"
@@ -30,7 +30,7 @@ import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 )
 
-func TestFindTreesByNodeGroups(t *testing.T) {
+func TestFindTrees(t *testing.T) {
 	mcpList := mcov1.MachineConfigPoolList{
 		Items: []mcov1.MachineConfigPool{
 			{
@@ -81,7 +81,7 @@ func TestFindTreesByNodeGroups(t *testing.T) {
 		name     string
 		mcps     *mcov1.MachineConfigPoolList
 		ngs      []nropv1alpha1.NodeGroup
-		expected []NodeGroupTree
+		expected []Tree
 	}{
 		{
 			name: "no-node-groups",
@@ -99,7 +99,7 @@ func TestFindTreesByNodeGroups(t *testing.T) {
 					},
 				},
 			},
-			expected: []NodeGroupTree{
+			expected: []Tree{
 				{
 					MachineConfigPools: []*mcov1.MachineConfigPool{
 						{
@@ -123,7 +123,7 @@ func TestFindTreesByNodeGroups(t *testing.T) {
 					},
 				},
 			},
-			expected: []NodeGroupTree{
+			expected: []Tree{
 				{
 					MachineConfigPools: []*mcov1.MachineConfigPool{
 						{
@@ -159,7 +159,7 @@ func TestFindTreesByNodeGroups(t *testing.T) {
 					},
 				},
 			},
-			expected: []NodeGroupTree{
+			expected: []Tree{
 				{
 					MachineConfigPools: []*mcov1.MachineConfigPool{
 						{
@@ -188,14 +188,14 @@ func TestFindTreesByNodeGroups(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := FindTreesByNodeGroups(tt.mcps, tt.ngs)
+			got, err := FindTrees(tt.mcps, tt.ngs)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 			gotNames := mcpNamesFromTrees(got)
 			expectedNames := mcpNamesFromTrees(tt.expected)
 			if !reflect.DeepEqual(gotNames, expectedNames) {
-				t.Errorf("NodeGroupTrees mismatch: got=%v expected=%v", gotNames, expectedNames)
+				t.Errorf("Trees mismatch: got=%v expected=%v", gotNames, expectedNames)
 			}
 
 			// backward compat
@@ -205,13 +205,13 @@ func TestFindTreesByNodeGroups(t *testing.T) {
 			}
 			compatNames := mcpNamesFromList(gotMcps)
 			if !reflect.DeepEqual(gotNames, compatNames) {
-				t.Errorf("NodeGroupTrees mismatch (non backward compatible): got=%v compat=%v", gotNames, compatNames)
+				t.Errorf("Trees mismatch (non backward compatible): got=%v compat=%v", gotNames, compatNames)
 			}
 		})
 	}
 }
 
-func TestFindListByNodeGroups(t *testing.T) {
+func TestFindMachineConfigPools(t *testing.T) {
 	mcpList := mcov1.MachineConfigPoolList{
 		Items: []mcov1.MachineConfigPool{
 			{
@@ -353,20 +353,20 @@ func TestFindListByNodeGroups(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := FindListByNodeGroups(tt.mcps, tt.ngs)
+			got, err := FindMachineConfigPools(tt.mcps, tt.ngs)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 			gotNames := mcpNamesFromList(got)
 			expectedNames := mcpNamesFromList(tt.expected)
 			if !reflect.DeepEqual(gotNames, expectedNames) {
-				t.Errorf("NodeGroupTrees mismatch: got=%v expected=%v", gotNames, expectedNames)
+				t.Errorf("Trees mismatch: got=%v expected=%v", gotNames, expectedNames)
 			}
 		})
 	}
 }
 
-func mcpNamesFromTrees(trees []NodeGroupTree) []string {
+func mcpNamesFromTrees(trees []Tree) []string {
 	var result []string
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
