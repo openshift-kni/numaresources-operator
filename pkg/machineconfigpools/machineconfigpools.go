@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
@@ -136,41 +135,4 @@ func FindBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelector) 
 		}
 	}
 	return nil, fmt.Errorf("cannot find MCP related to the selector %v", sel)
-}
-
-func GetNodeListFromMachineConfigPool(ctx context.Context, cli client.Client, mcp mcov1.MachineConfigPool) ([]corev1.Node, error) {
-	sel, err := metav1.LabelSelectorAsSelector(mcp.Spec.NodeSelector)
-	if err != nil {
-		return nil, err
-	}
-
-	nodeList := &corev1.NodeList{}
-	err = cli.List(ctx, nodeList, &client.ListOptions{LabelSelector: sel})
-	if err != nil {
-		return nil, err
-	}
-
-	return nodeList.Items, nil
-}
-
-func GetListFromMCOKubeletConfig(ctx context.Context, cli client.Client, mcoKubeletConfig mcov1.KubeletConfig) ([]*mcov1.MachineConfigPool, error) {
-	mcps := &mcov1.MachineConfigPoolList{}
-	var result []*mcov1.MachineConfigPool
-	if err := cli.List(ctx, mcps); err != nil {
-		return nil, err
-	}
-	for index := range mcps.Items {
-		mcp := &mcps.Items[index]
-
-		sel, err := metav1.LabelSelectorAsSelector(mcoKubeletConfig.Spec.MachineConfigPoolSelector)
-		if err != nil {
-			return nil, err
-		}
-		mcpLabels := labels.Set(mcp.Labels)
-		if sel.Matches(mcpLabels) {
-			result = append(result, mcp)
-		}
-
-	}
-	return result, nil
 }

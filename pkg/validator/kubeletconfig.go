@@ -26,8 +26,6 @@ import (
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-
-	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 )
 
 const (
@@ -47,13 +45,13 @@ func CollectKubeletConfig(ctx context.Context, cli client.Client, data *Validato
 			return err
 		}
 
-		machineConfigPools, err := machineconfigpools.GetListFromMCOKubeletConfig(ctx, cli, mcoKubeletConfig)
+		machineConfigPools, err := getMachineConfigPoolListFromMCOKubeletConfig(ctx, cli, mcoKubeletConfig)
 		if err != nil {
 			return err
 		}
 		for _, mcp := range machineConfigPools {
 
-			nodes, err := machineconfigpools.GetNodeListFromMachineConfigPool(ctx, cli, *mcp)
+			nodes, err := getNodeListFromMachineConfigPool(ctx, cli, *mcp)
 			if err != nil {
 				return err
 			}
