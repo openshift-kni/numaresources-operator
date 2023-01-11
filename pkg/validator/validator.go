@@ -174,7 +174,7 @@ func GetNodesByNRO(ctx context.Context, cli client.Client) (sets.String, error) 
 		return enabledNodeNames, err
 	}
 
-	nroMcps, err := machineconfigpools.GetListByNodeGroups(ctx, cli, nroInstance.Spec.NodeGroups)
+	nroMcps, err := machineconfigpools.GetListByNodeGroupsV1Alpha1(ctx, cli, nroInstance.Spec.NodeGroups)
 	if err != nil {
 		return enabledNodeNames, err
 	}

@@ -141,7 +141,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				err = fxt.Client.Update(context.TODO(), nroOperObj)
 				Expect(err).ToNot(HaveOccurred())
 
-				mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
+				mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
 				Expect(err).ToNot(HaveOccurred())
 
 				var wg sync.WaitGroup
@@ -193,7 +193,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.Update(context.TODO(), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
-			mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
+			mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for mcps to get updated")
@@ -361,7 +361,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			initialNrtList, err = e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
 			Expect(err).ToNot(HaveOccurred(), "cannot get any NodeResourceTopology object from the cluster")
 
-			mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), fxt.Client, nroOperObj.Spec.NodeGroups)
+			mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), fxt.Client, nroOperObj.Spec.NodeGroups)
 			Expect(err).ToNot(HaveOccurred(), "cannot get MCPs associated with NUMAResourcesOperator %q", nroOperObj.Name)
 
 			kcList := &machineconfigv1.KubeletConfigList{}
