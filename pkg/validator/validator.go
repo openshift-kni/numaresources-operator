@@ -180,7 +180,7 @@ func GetNodesByNRO(ctx context.Context, cli client.Client) (sets.String, error) 
 	}
 
 	for _, mcp := range nroMcps {
-		nodes, err := machineconfigpools.GetNodeListFromMachineConfigPool(ctx, cli, *mcp)
+		nodes, err := getNodeListFromMachineConfigPool(ctx, cli, *mcp)
 		if err != nil {
 			return enabledNodeNames, err
 		}
