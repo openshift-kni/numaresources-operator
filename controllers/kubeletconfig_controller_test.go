@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	nrov1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
@@ -54,7 +54,7 @@ func NewFakeKubeletConfigReconciler(initObjects ...runtime.Object) (*KubeletConf
 
 var _ = Describe("Test KubeletConfig Reconcile", func() {
 	Context("with KubeletConfig objects already present in the cluster", func() {
-		var nro *nrov1alpha1.NUMAResourcesOperator
+		var nro *nropv1alpha1.NUMAResourcesOperator
 		var mcp1 *machineconfigv1.MachineConfigPool
 		var mcoKc1 *machineconfigv1.KubeletConfig
 		var label1 map[string]string
