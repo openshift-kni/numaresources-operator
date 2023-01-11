@@ -35,7 +35,7 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
-	nropmcp "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
 	"github.com/openshift-kni/numaresources-operator/internal/wait"

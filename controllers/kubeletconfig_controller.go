@@ -42,9 +42,9 @@ import (
 
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
-	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	cfgstate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/cfg"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
