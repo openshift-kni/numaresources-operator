@@ -132,7 +132,7 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 		return nil, err
 	}
 
-	mcps, err := machineconfigpools.GetListByNodeGroups(ctx, r.Client, instance.Spec.NodeGroups)
+	mcps, err := machineconfigpools.GetListByNodeGroupsV1Alpha1(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
 		return nil, err
 	}
