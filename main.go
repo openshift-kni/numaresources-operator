@@ -46,6 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
@@ -67,6 +68,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
+	utilruntime.Must(nropv1.AddToScheme(scheme))
 	utilruntime.Must(nropv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(machineconfigv1.Install(scheme))
 	utilruntime.Must(securityv1.Install(scheme))
@@ -244,6 +246,14 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
+	if err = SetupOperatorWebhookWithManager(mgr, &nropv1.NUMAResourcesOperator{}); err != nil {
+		klog.Exitf("unable to create NUMAResourcesOperator v1 webhook : %v", err)
+	}
+	if err = SetupSchedulerWebhookWithManager(mgr, &nropv1.NUMAResourcesScheduler{}); err != nil {
+		klog.Exitf("unable to create NUMAResourcesScheduler v1 webhook : %v", err)
+	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -341,4 +351,18 @@ func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec
 	// the best setting is "present, but disabled" vs "missing, thus implicitly disabled"
 	schedupdate.DeploymentConfigMapSettings(mf.Deployment, schedManifests.ConfigMap.Name, hash.ConfigMapData(schedManifests.ConfigMap))
 	return mf
+}
+
+// SetupWebhookWithManager enables Webhooks - needed for version conversion
+func SetupOperatorWebhookWithManager(mgr ctrl.Manager, r *nropv1.NUMAResourcesOperator) error {
+	return ctrl.NewWebhookManagedBy(mgr).
+		For(r).
+		Complete()
+}
+
+// SetupWebhookWithManager enables Webhooks - needed for version conversion
+func SetupSchedulerWebhookWithManager(mgr ctrl.Manager, r *nropv1.NUMAResourcesScheduler) error {
+	return ctrl.NewWebhookManagedBy(mgr).
+		For(r).
+		Complete()
 }

@@ -5,6 +5,34 @@ metadata:
     alm-examples: |-
       [
         {
+          "apiVersion": "nodetopology.openshift.io/v1",
+          "kind": "NUMAResourcesOperator",
+          "metadata": {
+            "name": "numaresourcesoperator"
+          },
+          "spec": {
+            "nodeGroups": [
+              {
+                "machineConfigPoolSelector": {
+                  "matchLabels": {
+                    "pools.operator.machineconfiguration.openshift.io/worker": ""
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "apiVersion": "nodetopology.openshift.io/v1",
+          "kind": "NUMAResourcesScheduler",
+          "metadata": {
+            "name": "numaresourcesscheduler"
+          },
+          "spec": {
+            "imageSpec": "quay.io/openshift-kni/scheduler-plugins:4.13-snapshot"
+          }
+        },
+        {
           "apiVersion": "nodetopology.openshift.io/v1alpha1",
           "kind": "NUMAResourcesOperator",
           "metadata": {
@@ -43,6 +71,9 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - kind: NUMAResourcesOperator
+      name: numaresourcesoperators.nodetopology.openshift.io
+      version: v1
     - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
         API
       displayName: NUMA Resources Operator
@@ -107,6 +138,9 @@ spec:
         displayName: Optional configuration enforced on this NodeGroup
         path: machineconfigpools[0].config
       version: v1alpha1
+    - kind: NUMAResourcesScheduler
+      name: numaresourcesschedulers.nodetopology.openshift.io
+      version: v1
     - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
         API
       displayName: NUMA Aware Scheduler
