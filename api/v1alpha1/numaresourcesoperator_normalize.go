@@ -23,7 +23,7 @@ func (nodeGroup NodeGroup) NormalizeConfig() NodeGroupConfig {
 		conf.ResetFromNodeGroup(nodeGroup)
 	}
 	if nodeGroup.Config != nil {
-		conf = mergeNodeGroupConfig(conf, *nodeGroup.Config)
+		conf = conf.Merge(*nodeGroup.Config)
 	}
 	return conf
 }
@@ -38,7 +38,7 @@ func (conf *NodeGroupConfig) ResetFromNodeGroup(ng NodeGroup) {
 	conf.PodsFingerprinting = &podsFp
 }
 
-func mergeNodeGroupConfig(current, updated NodeGroupConfig) NodeGroupConfig {
+func (current NodeGroupConfig) Merge(updated NodeGroupConfig) NodeGroupConfig {
 	conf := NodeGroupConfig{}
 	current.DeepCopyInto(&conf)
 
