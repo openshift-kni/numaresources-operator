@@ -44,8 +44,8 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
+	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
-	nropmcp "github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
@@ -144,7 +144,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					g.Expect(err).ToNot(HaveOccurred())
 				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-				mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
+				mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
 				Expect(err).ToNot(HaveOccurred())
 
 				var wg sync.WaitGroup
@@ -197,7 +197,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.Update(context.TODO(), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
-			mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
+			mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for mcps to get updated")
@@ -371,7 +371,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			initialNrtList, err = e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
 			Expect(err).ToNot(HaveOccurred(), "cannot get any NodeResourceTopology object from the cluster")
 
-			mcps, err := nropmcp.GetListByNodeGroups(context.TODO(), fxt.Client, nroOperObj.Spec.NodeGroups)
+			mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), fxt.Client, nroOperObj.Spec.NodeGroups)
 			Expect(err).ToNot(HaveOccurred(), "cannot get MCPs associated with NUMAResourcesOperator %q", nroOperObj.Name)
 
 			kcList := &machineconfigv1.KubeletConfigList{}
