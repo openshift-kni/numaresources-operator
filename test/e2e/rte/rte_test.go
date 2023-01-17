@@ -42,10 +42,11 @@ import (
 	nrtv1alpha1cli "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
+	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	nropv1alpha1cli "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
-	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
@@ -182,7 +183,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				kc, err := mcoKubeletConfToKubeletConf(&mcoKc)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				mcps, err := machineconfigpools.FindListByNodeGroups(mcpList, nroObj.Spec.NodeGroups)
+				mcps, err := nodegroupv1alpha1.FindMachineConfigPools(mcpList, nroObj.Spec.NodeGroups)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
@@ -231,7 +232,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			mcoKc := mcoKcList.Items[0]
 			ginkgo.By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
 
-			mcps, err := machineconfigpools.FindListByNodeGroups(mcpList, nroObj.Spec.NodeGroups)
+			mcps, err := nodegroupv1alpha1.FindMachineConfigPools(mcpList, nroObj.Spec.NodeGroups)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)

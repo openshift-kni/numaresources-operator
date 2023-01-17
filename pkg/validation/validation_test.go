@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
 
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
@@ -32,7 +32,7 @@ import (
 func TestMachineConfigPoolDuplicates(t *testing.T) {
 	type testCase struct {
 		name                 string
-		trees                []machineconfigpools.NodeGroupTree
+		trees                []nodegroupv1alpha1.Tree
 		expectedError        bool
 		expectedErrorMessage string
 	}
@@ -40,7 +40,7 @@ func TestMachineConfigPoolDuplicates(t *testing.T) {
 	testCases := []testCase{
 		{
 			name: "duplicate MCP name",
-			trees: []machineconfigpools.NodeGroupTree{
+			trees: []nodegroupv1alpha1.Tree{
 				{
 					MachineConfigPools: []*machineconfigv1.MachineConfigPool{
 						testobjs.NewMachineConfigPool("test", nil, nil, nil),
@@ -53,7 +53,7 @@ func TestMachineConfigPoolDuplicates(t *testing.T) {
 		},
 		{
 			name: "no duplicates",
-			trees: []machineconfigpools.NodeGroupTree{
+			trees: []nodegroupv1alpha1.Tree{
 				{
 					MachineConfigPools: []*machineconfigv1.MachineConfigPool{
 						testobjs.NewMachineConfigPool("test", nil, nil, nil),

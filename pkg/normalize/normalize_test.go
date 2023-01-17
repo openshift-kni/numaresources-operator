@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	"github.com/openshift-kni/numaresources-operator/pkg/machineconfigpools"
+	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
 )
 
 func TestNormalizeNodeGroupConfig(t *testing.T) {
@@ -113,14 +113,14 @@ func TestNormalizeNodeGroupConfig(t *testing.T) {
 func TestNormalizeNodeGroupConfigTree(t *testing.T) {
 	type testCase struct {
 		name          string
-		trees         []machineconfigpools.NodeGroupTree
+		trees         []nodegroupv1alpha1.Tree
 		expectedConfs []nropv1alpha1.NodeGroupConfig
 	}
 
 	testcases := []testCase{
 		{
 			name: "set defaults - full",
-			trees: []machineconfigpools.NodeGroupTree{
+			trees: []nodegroupv1alpha1.Tree{
 				{
 					NodeGroup: &nropv1alpha1.NodeGroup{},
 				},
@@ -135,7 +135,7 @@ func TestNormalizeNodeGroupConfigTree(t *testing.T) {
 		},
 		{
 			name: "partial 4.11 disable PFP",
-			trees: []machineconfigpools.NodeGroupTree{
+			trees: []nodegroupv1alpha1.Tree{
 				{
 					NodeGroup: &nropv1alpha1.NodeGroup{
 						DisablePodsFingerprinting: boolPtr(true),
@@ -156,7 +156,7 @@ func TestNormalizeNodeGroupConfigTree(t *testing.T) {
 		},
 		{
 			name: "partial defaults passthrough",
-			trees: []machineconfigpools.NodeGroupTree{
+			trees: []nodegroupv1alpha1.Tree{
 				{
 					NodeGroup: &nropv1alpha1.NodeGroup{},
 				},
@@ -177,7 +177,7 @@ func TestNormalizeNodeGroupConfigTree(t *testing.T) {
 		},
 		{
 			name: "total defaults passthrough",
-			trees: []machineconfigpools.NodeGroupTree{
+			trees: []nodegroupv1alpha1.Tree{
 				{
 					NodeGroup: &nropv1alpha1.NodeGroup{
 						Config: makeNodeGroupConfigPtr(
@@ -204,7 +204,7 @@ func TestNormalizeNodeGroupConfigTree(t *testing.T) {
 		},
 		{
 			name: "partial tuning",
-			trees: []machineconfigpools.NodeGroupTree{
+			trees: []nodegroupv1alpha1.Tree{
 				{
 					NodeGroup: &nropv1alpha1.NodeGroup{},
 				},
@@ -229,7 +229,7 @@ func TestNormalizeNodeGroupConfigTree(t *testing.T) {
 		},
 		{
 			name: "totall tuning",
-			trees: []machineconfigpools.NodeGroupTree{
+			trees: []nodegroupv1alpha1.Tree{
 				{
 					NodeGroup: &nropv1alpha1.NodeGroup{
 						Config: makeNodeGroupConfigPtr(
@@ -297,8 +297,8 @@ func jsonDump(v interface{}) string {
 	return string(data)
 }
 
-func cloneTrees(trees []machineconfigpools.NodeGroupTree) []machineconfigpools.NodeGroupTree {
-	ret := make([]machineconfigpools.NodeGroupTree, 0, len(trees))
+func cloneTrees(trees []nodegroupv1alpha1.Tree) []nodegroupv1alpha1.Tree {
+	ret := make([]nodegroupv1alpha1.Tree, 0, len(trees))
 	for _, ngt := range trees {
 		ret = append(ret, ngt.Clone())
 	}
