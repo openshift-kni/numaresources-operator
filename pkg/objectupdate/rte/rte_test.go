@@ -25,7 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )
 
 var testDs = &appsv1.DaemonSet{
@@ -65,21 +65,21 @@ var testDs = &appsv1.DaemonSet{
 func TestUpdateDaemonSetArgs(t *testing.T) {
 	type testCase struct {
 		name         string
-		conf         nropv1alpha1.NodeGroupConfig
+		conf         nropv1.NodeGroupConfig
 		expectedArgs []string
 	}
 
 	testCases := []testCase{
 		{
 			name: "defaults",
-			conf: nropv1alpha1.DefaultNodeGroupConfig(),
+			conf: nropv1.DefaultNodeGroupConfig(),
 			expectedArgs: []string{
 				"--pods-fingerprint", "--refresh-node-resources", "--sleep-interval=10s", "--notify-file=/run/rte/notify",
 			},
 		},
 		{
 			name: "override interval",
-			conf: nropv1alpha1.NodeGroupConfig{
+			conf: nropv1.NodeGroupConfig{
 				InfoRefreshPeriod: &metav1.Duration{
 					Duration: 32 * time.Second,
 				},
@@ -90,8 +90,8 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 		},
 		{
 			name: "disable fingerprint",
-			conf: nropv1alpha1.NodeGroupConfig{
-				PodsFingerprinting: &nropv1alpha1.PodsFingerprintingDisabled,
+			conf: nropv1.NodeGroupConfig{
+				PodsFingerprinting: &nropv1.PodsFingerprintingDisabled,
 			},
 			expectedArgs: []string{
 				"--refresh-node-resources", "--sleep-interval=10s", "--notify-file=/run/rte/notify",
@@ -99,8 +99,8 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 		},
 		{
 			name: "disable periodic update",
-			conf: nropv1alpha1.NodeGroupConfig{
-				InfoRefreshMode: &nropv1alpha1.InfoRefreshEvents,
+			conf: nropv1.NodeGroupConfig{
+				InfoRefreshMode: &nropv1.InfoRefreshEvents,
 			},
 			expectedArgs: []string{
 				"--pods-fingerprint", "--refresh-node-resources", "--notify-file=/run/rte/notify",
@@ -108,8 +108,8 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 		},
 		{
 			name: "disable events for update",
-			conf: nropv1alpha1.NodeGroupConfig{
-				InfoRefreshMode: &nropv1alpha1.InfoRefreshPeriodic,
+			conf: nropv1.NodeGroupConfig{
+				InfoRefreshMode: &nropv1.InfoRefreshPeriodic,
 			},
 			expectedArgs: []string{
 				"--pods-fingerprint", "--refresh-node-resources", "--sleep-interval=10s",

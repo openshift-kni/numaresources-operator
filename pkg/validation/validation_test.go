@@ -23,8 +23,8 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
-	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1/helper/nodegroup"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
@@ -32,7 +32,7 @@ import (
 func TestMachineConfigPoolDuplicates(t *testing.T) {
 	type testCase struct {
 		name                 string
-		trees                []nodegroupv1alpha1.Tree
+		trees                []nodegroupv1.Tree
 		expectedError        bool
 		expectedErrorMessage string
 	}
@@ -40,7 +40,7 @@ func TestMachineConfigPoolDuplicates(t *testing.T) {
 	testCases := []testCase{
 		{
 			name: "duplicate MCP name",
-			trees: []nodegroupv1alpha1.Tree{
+			trees: []nodegroupv1.Tree{
 				{
 					MachineConfigPools: []*machineconfigv1.MachineConfigPool{
 						testobjs.NewMachineConfigPool("test", nil, nil, nil),
@@ -53,7 +53,7 @@ func TestMachineConfigPoolDuplicates(t *testing.T) {
 		},
 		{
 			name: "no duplicates",
-			trees: []nodegroupv1alpha1.Tree{
+			trees: []nodegroupv1.Tree{
 				{
 					MachineConfigPools: []*machineconfigv1.MachineConfigPool{
 						testobjs.NewMachineConfigPool("test", nil, nil, nil),
@@ -85,7 +85,7 @@ func TestMachineConfigPoolDuplicates(t *testing.T) {
 func TestNodeGroupsSanity(t *testing.T) {
 	type testCase struct {
 		name                 string
-		nodeGroups           []nropv1alpha1.NodeGroup
+		nodeGroups           []nropv1.NodeGroup
 		expectedError        bool
 		expectedErrorMessage string
 	}
@@ -93,7 +93,7 @@ func TestNodeGroupsSanity(t *testing.T) {
 	testCases := []testCase{
 		{
 			name: "nil MCP selector",
-			nodeGroups: []nropv1alpha1.NodeGroup{
+			nodeGroups: []nropv1.NodeGroup{
 				{
 					MachineConfigPoolSelector: nil,
 				},
@@ -110,7 +110,7 @@ func TestNodeGroupsSanity(t *testing.T) {
 		},
 		{
 			name: "with duplicates",
-			nodeGroups: []nropv1alpha1.NodeGroup{
+			nodeGroups: []nropv1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -131,7 +131,7 @@ func TestNodeGroupsSanity(t *testing.T) {
 		},
 		{
 			name: "bad MCP selector",
-			nodeGroups: []nropv1alpha1.NodeGroup{
+			nodeGroups: []nropv1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -150,7 +150,7 @@ func TestNodeGroupsSanity(t *testing.T) {
 		},
 		{
 			name: "correct values",
-			nodeGroups: []nropv1alpha1.NodeGroup{
+			nodeGroups: []nropv1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{

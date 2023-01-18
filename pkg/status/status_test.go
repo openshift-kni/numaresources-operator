@@ -25,15 +25,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
 func TestUpdate(t *testing.T) {
-	err := nropv1alpha1.AddToScheme(scheme.Scheme)
+	err := nropv1.AddToScheme(scheme.Scheme)
 	if err != nil {
-		t.Errorf("nropv1alpha1.AddToScheme() failed with: %v", err)
+		t.Errorf("nropv1.AddToScheme() failed with: %v", err)
 	}
 
 	nro := testobjs.NewNUMAResourcesOperator("test-nro", nil)
@@ -45,7 +45,7 @@ func TestUpdate(t *testing.T) {
 		t.Errorf("Update() failed with: %v", err)
 	}
 
-	updatedNro := &nropv1alpha1.NUMAResourcesOperator{}
+	updatedNro := &nropv1.NUMAResourcesOperator{}
 	err = fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(nro), updatedNro)
 	if err != nil {
 		t.Errorf("failed to get NUMAResourcesOperator object: %v", err)
@@ -59,9 +59,9 @@ func TestUpdate(t *testing.T) {
 }
 
 func TestUpdateIfNeeded(t *testing.T) {
-	err := nropv1alpha1.AddToScheme(scheme.Scheme)
+	err := nropv1.AddToScheme(scheme.Scheme)
 	if err != nil {
-		t.Errorf("nropv1alpha1.AddToScheme() failed with: %v", err)
+		t.Errorf("nropv1.AddToScheme() failed with: %v", err)
 	}
 
 	nro := testobjs.NewNUMAResourcesOperator("test-nro", nil)

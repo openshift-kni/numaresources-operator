@@ -26,42 +26,42 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )
 
-func NewNUMAResourcesOperator(name string, labelSelectors []*metav1.LabelSelector) *nropv1alpha1.NUMAResourcesOperator {
-	var nodeGroups []nropv1alpha1.NodeGroup
+func NewNUMAResourcesOperator(name string, labelSelectors []*metav1.LabelSelector) *nropv1.NUMAResourcesOperator {
+	var nodeGroups []nropv1.NodeGroup
 	for _, selector := range labelSelectors {
-		nodeGroups = append(nodeGroups, nropv1alpha1.NodeGroup{
+		nodeGroups = append(nodeGroups, nropv1.NodeGroup{
 			MachineConfigPoolSelector: selector,
 		})
 	}
 
-	return &nropv1alpha1.NUMAResourcesOperator{
+	return &nropv1.NUMAResourcesOperator{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NUMAResourcesOperator",
-			APIVersion: nropv1alpha1.GroupVersion.String(),
+			APIVersion: nropv1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: nropv1alpha1.NUMAResourcesOperatorSpec{
+		Spec: nropv1.NUMAResourcesOperatorSpec{
 			NodeGroups: nodeGroups,
 		},
 	}
 }
 
-func NewNUMAResourcesOperatorWithNodeGroupConfig(name string, selector *metav1.LabelSelector, conf *nropv1alpha1.NodeGroupConfig) *nropv1alpha1.NUMAResourcesOperator {
-	return &nropv1alpha1.NUMAResourcesOperator{
+func NewNUMAResourcesOperatorWithNodeGroupConfig(name string, selector *metav1.LabelSelector, conf *nropv1.NodeGroupConfig) *nropv1.NUMAResourcesOperator {
+	return &nropv1.NUMAResourcesOperator{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NUMAResourcesOperator",
-			APIVersion: nropv1alpha1.GroupVersion.String(),
+			APIVersion: nropv1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: nropv1alpha1.NUMAResourcesOperatorSpec{
-			NodeGroups: []nropv1alpha1.NodeGroup{
+		Spec: nropv1.NUMAResourcesOperatorSpec{
+			NodeGroups: []nropv1.NodeGroup{
 				{
 					MachineConfigPoolSelector: selector,
 					Config:                    conf,
@@ -71,16 +71,16 @@ func NewNUMAResourcesOperatorWithNodeGroupConfig(name string, selector *metav1.L
 	}
 }
 
-func NewNUMAResourcesScheduler(name, imageSpec, schedulerName string, resyncPeriod time.Duration) *nropv1alpha1.NUMAResourcesScheduler {
-	return &nropv1alpha1.NUMAResourcesScheduler{
+func NewNUMAResourcesScheduler(name, imageSpec, schedulerName string, resyncPeriod time.Duration) *nropv1.NUMAResourcesScheduler {
+	return &nropv1.NUMAResourcesScheduler{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NUMAResourcesScheduler",
-			APIVersion: nropv1alpha1.GroupVersion.String(),
+			APIVersion: nropv1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: nropv1alpha1.NUMAResourcesSchedulerSpec{
+		Spec: nropv1.NUMAResourcesSchedulerSpec{
 			SchedulerImage: imageSpec,
 			SchedulerName:  schedulerName,
 			CacheResyncPeriod: &metav1.Duration{

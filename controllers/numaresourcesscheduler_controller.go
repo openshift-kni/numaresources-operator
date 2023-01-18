@@ -7,12 +7,12 @@
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
+  Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
+*/
 
 package controllers
 
@@ -39,7 +39,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
@@ -84,7 +84,7 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	klog.V(3).InfoS("Starting NUMAResourcesScheduler reconcile loop", "object", req.NamespacedName)
 	defer klog.V(3).InfoS("Finish NUMAResourcesScheduler reconcile loop", "object", req.NamespacedName)
 
-	instance := &nropv1alpha1.NUMAResourcesScheduler{}
+	instance := &nropv1.NUMAResourcesScheduler{}
 	err := r.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -126,7 +126,7 @@ func (r *NUMAResourcesSchedulerReconciler) SetupWithManager(mgr ctrl.Manager) er
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&nropv1alpha1.NUMAResourcesScheduler{}).
+		For(&nropv1.NUMAResourcesScheduler{}).
 		Owns(&rbacv1.ClusterRole{}, builder.WithPredicates(p)).
 		Owns(&rbacv1.ClusterRoleBinding{}, builder.WithPredicates(p)).
 		Owns(&corev1.ServiceAccount{}, builder.WithPredicates(p)).
@@ -135,13 +135,13 @@ func (r *NUMAResourcesSchedulerReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Complete(r)
 }
 
-func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context, instance *nropv1alpha1.NUMAResourcesScheduler) (reconcile.Result, string, error) {
+func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (reconcile.Result, string, error) {
 	deploymentInfo, schedulerName, err := r.syncNUMASchedulerResources(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedSchedulerSync")
 	}
 
-	instance.Status.Deployment = nropv1alpha1.NamespacedName{}
+	instance.Status.Deployment = nropv1.NamespacedName{}
 	ok, err := isDeploymentRunning(ctx, r.Client, deploymentInfo)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, err
@@ -157,7 +157,7 @@ func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context
 
 }
 
-func isDeploymentRunning(ctx context.Context, c client.Client, key nropv1alpha1.NamespacedName) (bool, error) {
+func isDeploymentRunning(ctx context.Context, c client.Client, key nropv1.NamespacedName) (bool, error) {
 	dp := &appsv1.Deployment{}
 	if err := c.Get(ctx, client.ObjectKey(key), dp); err != nil {
 		return false, err
@@ -171,11 +171,11 @@ func isDeploymentRunning(ctx context.Context, c client.Client, key nropv1alpha1.
 	return false, nil
 }
 
-func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nropv1alpha1.NUMAResourcesScheduler) (nropv1alpha1.NamespacedName, string, error) {
+func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (nropv1.NamespacedName, string, error) {
 	klog.V(4).Info("SchedulerSync start")
 	defer klog.V(4).Info("SchedulerSync stop")
 
-	var deploymentNName nropv1alpha1.NamespacedName
+	var deploymentNName nropv1.NamespacedName
 
 	schedulerName := instance.Spec.SchedulerName
 	cacheResyncPeriod := unpackAPIResyncPeriod(instance.Spec.CacheResyncPeriod)
@@ -210,7 +210,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	return deploymentNName, schedulerName, nil
 }
 
-func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nropv1alpha1.NUMAResourcesScheduler, condition string, reason string, message string) error {
+func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
 	sched.Status.Conditions, _ = status.GetUpdatedConditions(sched.Status.Conditions, condition, reason, message)
 	if err := r.Client.Status().Update(ctx, sched); err != nil {
 		return errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(sched))

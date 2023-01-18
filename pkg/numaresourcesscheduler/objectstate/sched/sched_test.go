@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )
 
 var dp = &appsv1.Deployment{
@@ -55,7 +55,7 @@ func TestDeploymentNamespacedNameFromObject(t *testing.T) {
 	if !ok {
 		t.Errorf("failed to cast object to deployment type")
 	}
-	if !reflect.DeepEqual(nropv1alpha1.NamespacedName(objKey), nname) {
+	if !reflect.DeepEqual(nropv1.NamespacedName(objKey), nname) {
 		t.Errorf("expected %v to be equal %v", objKey, nname)
 	}
 }

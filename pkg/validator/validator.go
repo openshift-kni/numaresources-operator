@@ -34,7 +34,7 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
@@ -168,13 +168,13 @@ func GetNodesByNRO(ctx context.Context, cli client.Client) (sets.String, error) 
 	nroNamespacedName := types.NamespacedName{
 		Name: objectnames.DefaultNUMAResourcesOperatorCrName,
 	}
-	nroInstance := &nropv1alpha1.NUMAResourcesOperator{}
+	nroInstance := &nropv1.NUMAResourcesOperator{}
 	err := cli.Get(ctx, nroNamespacedName, nroInstance)
 	if err != nil {
 		return enabledNodeNames, err
 	}
 
-	nroMcps, err := machineconfigpools.GetListByNodeGroupsV1Alpha1(ctx, cli, nroInstance.Spec.NodeGroups)
+	nroMcps, err := machineconfigpools.GetListByNodeGroupsV1(ctx, cli, nroInstance.Spec.NodeGroups)
 	if err != nil {
 		return enabledNodeNames, err
 	}
