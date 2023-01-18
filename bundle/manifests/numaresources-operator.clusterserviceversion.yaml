@@ -71,8 +71,69 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - kind: NUMAResourcesOperator
+    - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
+        API
+      displayName: NUMA Resources Operator
+      kind: NUMAResourcesOperator
       name: numaresourcesoperators.nodetopology.openshift.io
+      resources:
+      - kind: DaemonSet
+        name: ""
+        version: v1
+      specDescriptors:
+      - description: Optional Resource Topology Exporter image URL
+        displayName: Optional RTE image URL
+        path: imageSpec
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll". Defaults
+          to "Normal".'
+        displayName: RTE log verbosity
+        path: logLevel
+      - description: Group of Nodes to enable RTE on
+        displayName: Group of nodes to enable RTE on
+        path: nodeGroups
+      - description: InfoRefreshMode sets the mechanism which will be used to refresh
+          the topology info.
+        displayName: Topology info mechanism setting
+        path: nodeGroups[0].config.infoRefreshMode
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: InfoRefreshPeriod sets the topology info refresh period. Use
+          explicit 0 to disable.
+        displayName: Topology info refresh period setting
+        path: nodeGroups[0].config.infoRefreshPeriod
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: PodsFingerprinting defines if pod fingerprint should be reported
+          for the machines belonging to this group
+        displayName: Enable or disable the pods fingerprinting setting
+        path: nodeGroups[0].config.podsFingerprinting
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Optional Namespace/Name glob patterns of pod to ignore at node
+          level
+        displayName: Optional ignore pod namespace/name glob patterns
+        path: podExcludes
+      statusDescriptors:
+      - description: Conditions show the current state of the NUMAResourcesOperator
+          Operator
+        displayName: Condition reported
+        path: conditions
+      - description: DaemonSets of the configured RTEs, one per node group
+        displayName: RTE DaemonSets
+        path: daemonsets
+      - description: MachineConfigPools resolved from configured node groups
+        displayName: RTE MCPs from node groups
+        path: machineconfigpools
+      - description: Conditions represents the latest available observations of MachineConfigPool
+          current state.
+        displayName: Optional conditions reported for this NodeGroup
+        path: machineconfigpools[0].conditions
+      - description: NodeGroupConfig represents the latest available configuration
+          applied to this MachineConfigPool
+        displayName: Optional configuration enforced on this NodeGroup
+        path: machineconfigpools[0].config
       version: v1
     - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
         API
@@ -138,8 +199,42 @@ spec:
         displayName: Optional configuration enforced on this NodeGroup
         path: machineconfigpools[0].config
       version: v1alpha1
-    - kind: NUMAResourcesScheduler
+    - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
+        API
+      displayName: NUMA Aware Scheduler
+      kind: NUMAResourcesScheduler
       name: numaresourcesschedulers.nodetopology.openshift.io
+      resources:
+      - kind: Deployment
+        name: secondary-scheduler-deployment
+        version: v1
+      specDescriptors:
+      - description: Set the cache resync period. Use explicit 0 to disable.
+        displayName: Scheduler cache resync period setting
+        path: cacheResyncPeriod
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Scheduler container image URL
+        displayName: Scheduler container image URL
+        path: imageSpec
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll". Defaults
+          to "Normal".'
+        displayName: Scheduler log verbosity
+        path: logLevel
+      - description: Scheduler name to be used in pod templates
+        displayName: Scheduler name
+        path: schedulerName
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      statusDescriptors:
+      - description: Deployment of the secondary scheduler, namespaced name
+        displayName: Scheduler deployment
+        path: deployment
+      - description: Scheduler name to be used in pod templates
+        displayName: Scheduler name
+        path: schedulerName
       version: v1
     - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
         API
@@ -406,6 +501,10 @@ spec:
                   initialDelaySeconds: 15
                   periodSeconds: 20
                 name: manager
+                ports:
+                - containerPort: 9443
+                  name: webhook-server
+                  protocol: TCP
                 readinessProbe:
                   httpGet:
                     path: /readyz
@@ -418,6 +517,10 @@ spec:
                     memory: 20Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+                volumeMounts:
+                - mountPath: /tmp/k8s-webhook-server/serving-certs
+                  name: cert
+                  readOnly: true
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: numaresources-controller-manager
@@ -425,6 +528,11 @@ spec:
               tolerations:
               - effect: NoSchedule
                 key: node-role.kubernetes.io/master
+              volumes:
+              - name: cert
+                secret:
+                  defaultMode: 420
+                  secretName: webhook-server-cert
       permissions:
       - rules:
         - apiGroups:
@@ -461,13 +569,13 @@ spec:
         serviceAccountName: numaresources-controller-manager
     strategy: deployment
   installModes:
-  - supported: true
+  - supported: false
     type: OwnNamespace
-  - supported: true
+  - supported: false
     type: SingleNamespace
   - supported: false
     type: MultiNamespace
-  - supported: false
+  - supported: true
     type: AllNamespaces
   keywords:
   - RTE
@@ -483,3 +591,16 @@ spec:
   provider:
     name: Red Hat
   version: 4.13.999-snapshot
+  webhookdefinitions:
+  - admissionReviewVersions:
+    - v1
+    containerPort: 443
+    conversionCRDs:
+    - numaresourcesoperators.nodetopology.openshift.io
+    - numaresourcesschedulers.nodetopology.openshift.io
+    deploymentName: numaresources-controller-manager
+    generateName: cnumaresourcesoperatorsnumaresourcesschedulers.kb.io
+    sideEffects: None
+    targetPort: 9443
+    type: ConversionWebhook
+    webhookPath: /convert

@@ -57,6 +57,14 @@ import (
 	//+kubebuilder:scaffold:imports
 )
 
+const (
+	// see: https://olm.operatorframework.io/docs/advanced-tasks/adding-admission-and-conversion-webhooks/#certificate-authority-requirements
+	webhookPort     = 9443
+	webhookCertDir  = "/tmp/k8s-webhook-server/serving-certs"
+	webhookCertName = "tls.crt"
+	webhookKeyName  = "tls.key"
+)
+
 var (
 	scheme = k8sruntime.NewScheme()
 
@@ -247,12 +255,22 @@ func main() {
 		}
 	}
 
+	// configure webhook server
+	webHookServer := mgr.GetWebhookServer()
+	webHookServer.Port = webhookPort
+	webHookServer.CertDir = webhookCertDir
+	webHookServer.CertName = webhookCertName
+	webHookServer.KeyName = webhookKeyName
+
 	if err = SetupOperatorWebhookWithManager(mgr, &nropv1.NUMAResourcesOperator{}); err != nil {
 		klog.Exitf("unable to create NUMAResourcesOperator v1 webhook : %v", err)
 	}
+	klog.InfoS("setup webhook", "kind", "NUMAResourcesOperator")
+
 	if err = SetupSchedulerWebhookWithManager(mgr, &nropv1.NUMAResourcesScheduler{}); err != nil {
 		klog.Exitf("unable to create NUMAResourcesScheduler v1 webhook : %v", err)
 	}
+	klog.InfoS("setup webhook", "kind", "NUMAResourcesScheduler")
 
 	//+kubebuilder:scaffold:builder
 

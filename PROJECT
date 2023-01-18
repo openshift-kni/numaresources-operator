@@ -25,6 +25,9 @@ resources:
   kind: NUMAResourcesOperator
   path: github.com/openshift-kni/numaresources-operator/api/v1
   version: v1
+  webhooks:
+    conversion: true
+    webhookVersion: v1
 - api:
     crdVersion: v1
     namespaced: true
@@ -43,4 +46,7 @@ resources:
   kind: NUMAResourcesScheduler
   path: github.com/openshift-kni/numaresources-operator/api/v1
   version: v1
+  webhooks:
+    conversion: true
+    webhookVersion: v1
 version: "3"

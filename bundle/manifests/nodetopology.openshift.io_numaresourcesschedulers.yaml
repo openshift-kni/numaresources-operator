@@ -6,6 +6,16 @@ metadata:
   creationTimestamp: null
   name: numaresourcesschedulers.nodetopology.openshift.io
 spec:
+  conversion:
+    strategy: Webhook
+    webhook:
+      clientConfig:
+        service:
+          name: numaresources-webhook-service
+          namespace: numaresources
+          path: /convert
+      conversionReviewVersions:
+      - v1
   group: nodetopology.openshift.io
   names:
     kind: NUMAResourcesScheduler
