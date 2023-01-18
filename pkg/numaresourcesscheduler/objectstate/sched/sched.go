@@ -26,7 +26,7 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"

@@ -34,7 +34,7 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 

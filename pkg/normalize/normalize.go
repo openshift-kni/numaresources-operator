@@ -17,8 +17,8 @@
 package normalize
 
 import (
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
+	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
+	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 )
 

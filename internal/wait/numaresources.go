@@ -24,7 +24,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
 )
 
 func ForNUMAResourcesOperatorDeleted(cli client.Client, nrop *nropv1alpha1.NUMAResourcesOperator, pollInterval, pollTimeout time.Duration) error {
