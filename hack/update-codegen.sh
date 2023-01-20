@@ -29,7 +29,7 @@ CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-
 bash "${CODEGEN_PKG}"/generate-groups.sh "client" \
   github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated \
   github.com/openshift-kni/numaresources-operator/api \
-  numaresourcesoperator:v1alpha1 \
+  numaresourcesoperator:v1alpha1,v1 \
   --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.." \
   --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt
 
