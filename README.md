@@ -4,6 +4,18 @@ Operator to allow to expose the per-NUMA-zone compute resources, using the [RTE 
 The operator also takes care of deploying the [Node Resource Topology API](https://github.com/k8stopologyawareschedwg/noderesourcetopology-api) on which the resource topology exporter depends to provide the data.
 The operator provides minimal support to deploy [secondary schedulers](https://github.com/openshift-kni/scheduler-plugins).
 
+## deploying using OLM
+
+The currently recommended way of deploying the operator in your cluster is using [OLM](https://github.com/operator-framework/operator-lifecycle-manager/). OLM greatly simplifies webhook management, which the operator requires.
+Assuming you can push container images to a container registry and you are in the root directory of this project, a deployment flow can look like:
+
+1. fix environment variables as per your need. You will most likely need to override `VERSION` `REPO` `CONTAINER_ENGINE`
+1. build and upload the operator container image: `make container-build container-push`
+1. build and upload the manifest bundle container image: `make bundle bundle-build bundle-push`
+1. leverage `operator-sdk` to deploy the container: `operator-sdk run bundle ${REPO}/numaresources-operator-bundle:${VERSION}`. Note the build procedure typically downloads a local copy of `operator-sdk` in `bin/` which you can reuse
+
+For further details, please refer to the [operator-sdk documentation](https://sdk.operatorframework.io/docs/olm-integration/tutorial-bundle/)
+
 ## current limitations
 
 Please check the [issues section](https://github.com/openshift-kni/numaresources-operator/issues) for the known issues and limitations of the NUMA resources operator.
