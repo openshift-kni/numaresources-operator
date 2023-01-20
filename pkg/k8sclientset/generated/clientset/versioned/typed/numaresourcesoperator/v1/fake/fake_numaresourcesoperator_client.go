@@ -19,26 +19,26 @@
 package fake
 
 import (
-	v1alpha1 "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1alpha1"
+	v1 "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeNumaresourcesoperatorV1alpha1 struct {
+type FakeNumaresourcesoperatorV1 struct {
 	*testing.Fake
 }
 
-func (c *FakeNumaresourcesoperatorV1alpha1) NUMAResourcesOperators() v1alpha1.NUMAResourcesOperatorInterface {
+func (c *FakeNumaresourcesoperatorV1) NUMAResourcesOperators() v1.NUMAResourcesOperatorInterface {
 	return &FakeNUMAResourcesOperators{c}
 }
 
-func (c *FakeNumaresourcesoperatorV1alpha1) NUMAResourcesSchedulers() v1alpha1.NUMAResourcesSchedulerInterface {
+func (c *FakeNumaresourcesoperatorV1) NUMAResourcesSchedulers() v1.NUMAResourcesSchedulerInterface {
 	return &FakeNUMAResourcesSchedulers{c}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeNumaresourcesoperatorV1alpha1) RESTClient() rest.Interface {
+func (c *FakeNumaresourcesoperatorV1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }
