@@ -21,6 +21,24 @@ set -o pipefail
 SCRIPT_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../code-generator)}
 
+# prepare paths as expected by generate-groups.sh. There are likely cleaner ways, we should explore them
+function setup() {
+	mkdir ${SCRIPT_ROOT}/api/numaresourcesoperator
+	ln -s ../v1alpha1 ${SCRIPT_ROOT}/api/numaresourcesoperator/v1alpha1
+}
+
+function cleanup() {
+	rm -rf ${SCRIPT_ROOT}/api/numaresourcesoperator
+}
+
+function fix_imports() {
+	find ${SCRIPT_ROOT}/pkg/k8sclientset -name "*.go" -type f -print0 | xargs -0 sed -i 's|github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator|github.com/openshift-kni/numaresources-operator/api|g'
+}
+
+trap 'cleanup' EXIT SIGINT SIGTERM SIGSTOP
+
+setup
+
 # generate the code with:
 # --output-base    because this script should also be able to run inside the vendor dir of
 #                  k8s.io/kubernetes. The output-base is needed for the generators to output into the vendor dir
@@ -33,3 +51,4 @@ bash "${CODEGEN_PKG}"/generate-groups.sh "client" \
   --output-base "$(dirname "${BASH_SOURCE[0]}")/../../../.." \
   --go-header-file "${SCRIPT_ROOT}"/hack/boilerplate.go.txt
 
+fix_imports
