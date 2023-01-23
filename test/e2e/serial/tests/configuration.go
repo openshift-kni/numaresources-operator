@@ -39,7 +39,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -102,7 +102,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 		timeout := 5 * time.Minute
 
 		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator CR", func() {
-			nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
+			nroOperObj := &nropv1.NUMAResourcesOperator{}
 			nroKey := objects.NROObjectKey()
 			err := fxt.Client.Get(context.TODO(), nroKey, nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
@@ -134,7 +134,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3
 				Eventually(func(g Gomega) {
 					// we need that for the current ResourceVersion
-					nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
+					nroOperObj := &nropv1.NUMAResourcesOperator{}
 					err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
 					g.Expect(err).ToNot(HaveOccurred())
 
@@ -143,7 +143,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					g.Expect(err).ToNot(HaveOccurred())
 				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-				mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
+				mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
 				Expect(err).ToNot(HaveOccurred())
 
 				var wg sync.WaitGroup
@@ -196,7 +196,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.Update(context.TODO(), nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 
-			mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
+			mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for mcps to get updated")
@@ -299,7 +299,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 		})
 
 		It("[test_id:54916][tier2] should be able to modify the configurable values under the NUMAResourcesScheduler CR", func() {
-			initialNroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+			initialNroSchedObj := &nropv1.NUMAResourcesScheduler{}
 			nroSchedKey := objects.NROSchedObjectKey()
 			err := fxt.Client.Get(context.TODO(), nroSchedKey, initialNroSchedObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
@@ -313,7 +313,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("Verify the scheduler object was updated properly with the new scheduler name %q", serialconfig.SchedulerTestName))
-			updatedSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+			updatedSchedObj := &nropv1.NUMAResourcesScheduler{}
 			Eventually(func() string {
 				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), updatedSchedObj)
 				Expect(err).ToNot(HaveOccurred())
@@ -324,7 +324,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				By("reverting the changes under the NUMAResourcesScheduler object")
 				// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3
 				Eventually(func(g Gomega) {
-					currentSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+					currentSchedObj := &nropv1.NUMAResourcesScheduler{}
 					err := fxt.Client.Get(context.TODO(), nroSchedKey, currentSchedObj)
 					g.Expect(err).ToNot(HaveOccurred(), "cannot get current %q in the cluster", nroSchedKey.String())
 
@@ -333,7 +333,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					g.Expect(err).ToNot(HaveOccurred())
 				}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to revert changes the changes to the NRO scheduler object")
 
-				updatedSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+				updatedSchedObj := &nropv1.NUMAResourcesScheduler{}
 				Eventually(func() string {
 					err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroSchedObj), updatedSchedObj)
 					Expect(err).ToNot(HaveOccurred())
@@ -361,7 +361,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 		})
 
 		It("[test_id:47585][reboot_required][slow] can change kubeletconfig and controller should adapt", func() {
-			nroOperObj := &nropv1alpha1.NUMAResourcesOperator{}
+			nroOperObj := &nropv1.NUMAResourcesOperator{}
 			nroKey := objects.NROObjectKey()
 			err := fxt.Client.Get(context.TODO(), nroKey, nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
@@ -370,7 +370,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			initialNrtList, err = e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
 			Expect(err).ToNot(HaveOccurred(), "cannot get any NodeResourceTopology object from the cluster")
 
-			mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), fxt.Client, nroOperObj.Spec.NodeGroups)
+			mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), fxt.Client, nroOperObj.Spec.NodeGroups)
 			Expect(err).ToNot(HaveOccurred(), "cannot get MCPs associated with NUMAResourcesOperator %q", nroOperObj.Name)
 
 			kcList := &machineconfigv1.KubeletConfigList{}
@@ -456,7 +456,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			}).WithTimeout(timeout).WithPolling(time.Second * 30).Should(BeTrue())
 
 			By("schedule another workload requesting resources")
-			nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+			nroSchedObj := &nropv1.NUMAResourcesScheduler{}
 			nroSchedKey := objects.NROSchedObjectKey()
 			err = fxt.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
@@ -541,7 +541,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 		It("should report the NodeGroupConfig in the status", func() {
 			nroKey := objects.NROObjectKey()
-			nroOperObj := nropv1alpha1.NUMAResourcesOperator{}
+			nroOperObj := nropv1.NUMAResourcesOperator{}
 
 			err := fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
@@ -577,7 +577,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				seenStatusConf = true
 
 				// normalize config to handle unspecified defaults
-				specConf := nropv1alpha1.DefaultNodeGroupConfig()
+				specConf := nropv1.DefaultNodeGroupConfig()
 				if nroOperObj.Spec.NodeGroups[0].Config != nil {
 					specConf = specConf.Merge(*nroOperObj.Spec.NodeGroups[0].Config)
 				}

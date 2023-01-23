@@ -24,12 +24,12 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
-func ForNUMAResourcesOperatorDeleted(cli client.Client, nrop *nropv1alpha1.NUMAResourcesOperator, pollInterval, pollTimeout time.Duration) error {
+func ForNUMAResourcesOperatorDeleted(cli client.Client, nrop *nropv1.NUMAResourcesOperator, pollInterval, pollTimeout time.Duration) error {
 	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
-		updatedNrop := nropv1alpha1.NUMAResourcesOperator{}
+		updatedNrop := nropv1.NUMAResourcesOperator{}
 		key := ObjectKeyFromObject(nrop)
 		err := cli.Get(context.TODO(), key.AsKey(), &updatedNrop)
 		return deletionStatusFromError("NUMAResourcesOperator", key, err)
@@ -37,9 +37,9 @@ func ForNUMAResourcesOperatorDeleted(cli client.Client, nrop *nropv1alpha1.NUMAR
 	return err
 }
 
-func ForNUMAResourcesSchedulerDeleted(cli client.Client, nrSched *nropv1alpha1.NUMAResourcesScheduler, pollInterval, pollTimeout time.Duration) error {
+func ForNUMAResourcesSchedulerDeleted(cli client.Client, nrSched *nropv1.NUMAResourcesScheduler, pollInterval, pollTimeout time.Duration) error {
 	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
-		updatedNROSched := nropv1alpha1.NUMAResourcesScheduler{}
+		updatedNROSched := nropv1.NUMAResourcesScheduler{}
 		key := ObjectKeyFromObject(nrSched)
 		err := cli.Get(context.TODO(), key.AsKey(), &updatedNROSched)
 		return deletionStatusFromError("NUMAResourcesScheduler", key, err)
@@ -47,8 +47,8 @@ func ForNUMAResourcesSchedulerDeleted(cli client.Client, nrSched *nropv1alpha1.N
 	return err
 }
 
-func ForDaemonsetInNUMAResourcesOperatorStatus(cli client.Client, nroObj *nropv1alpha1.NUMAResourcesOperator, interval time.Duration, timeout time.Duration) (*nropv1alpha1.NUMAResourcesOperator, error) {
-	updatedNRO := nropv1alpha1.NUMAResourcesOperator{}
+func ForDaemonsetInNUMAResourcesOperatorStatus(cli client.Client, nroObj *nropv1.NUMAResourcesOperator, interval time.Duration, timeout time.Duration) (*nropv1.NUMAResourcesOperator, error) {
+	updatedNRO := nropv1.NUMAResourcesOperator{}
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		key := ObjectKeyFromObject(nroObj)
 		err := cli.Get(context.TODO(), key.AsKey(), &updatedNRO)

@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
 	nrowait "github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -69,7 +69,7 @@ var _ = Describe("[Install] continuousIntegration", func() {
 			Expect(nname.Name).ToNot(BeEmpty())
 
 			By("checking that the condition Available=true")
-			updatedNROObj := &nropv1alpha1.NUMAResourcesOperator{}
+			updatedNROObj := &nropv1.NUMAResourcesOperator{}
 			err := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
 				err := e2eclient.Client.Get(context.TODO(), nname, updatedNROObj)
 				if err != nil {
@@ -152,7 +152,7 @@ var _ = Describe("[Install] durability", func() {
 
 			By("checking that the condition Degraded=true")
 			Eventually(func() bool {
-				updatedNROObj := &nropv1alpha1.NUMAResourcesOperator{}
+				updatedNROObj := &nropv1.NUMAResourcesOperator{}
 				err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), updatedNROObj)
 				if err != nil {
 					klog.Warningf("failed to get the  NUMAResourcesOperator CR: %v", err)
@@ -191,7 +191,7 @@ var _ = Describe("[Install] durability", func() {
 			nroKey := client.ObjectKeyFromObject(deployedObj.NroObj)
 			Expect(nroKey.Name).NotTo(BeEmpty())
 
-			nroObj := &nropv1alpha1.NUMAResourcesOperator{}
+			nroObj := &nropv1.NUMAResourcesOperator{}
 			err := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
 				err := e2eclient.Client.Get(context.TODO(), nroKey, nroObj)
 				if err != nil {
@@ -266,7 +266,7 @@ var _ = Describe("[Install] durability", func() {
 			nname := client.ObjectKeyFromObject(deployedObj.NroObj)
 			Expect(nname.Name).NotTo(BeEmpty())
 
-			nroObj := &nropv1alpha1.NUMAResourcesOperator{}
+			nroObj := &nropv1.NUMAResourcesOperator{}
 			err := e2eclient.Client.Get(context.TODO(), nname, nroObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -317,7 +317,7 @@ var _ = Describe("[Install] durability", func() {
 			deploy.WaitForMCPUpdatedAfterNROCreated(1, nroObj)
 
 			Eventually(func() bool {
-				updatedNroObj := &nropv1alpha1.NUMAResourcesOperator{}
+				updatedNroObj := &nropv1.NUMAResourcesOperator{}
 				err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), updatedNroObj)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -355,7 +355,7 @@ func findContainerByName(daemonset appsv1.DaemonSet, containerName string) (*cor
 	return nil, fmt.Errorf("container %q not found in %s/%s", containerName, daemonset.Namespace, daemonset.Name)
 }
 
-func deleteNROPSync(cli client.Client, nropObj *nropv1alpha1.NUMAResourcesOperator) {
+func deleteNROPSync(cli client.Client, nropObj *nropv1.NUMAResourcesOperator) {
 	var err error
 	err = cli.Delete(context.TODO(), nropObj)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred())
@@ -380,7 +380,7 @@ func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {
 	return nil, fmt.Errorf("failed to get daemonset with owner reference uid: %s", uid)
 }
 
-func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context.Context, nroObj *nropv1alpha1.NUMAResourcesOperator, reason string) {
+func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context.Context, nroObj *nropv1.NUMAResourcesOperator, reason string) {
 
 	dss, err := objects.GetDaemonSetsOwnedBy(cli, nroObj.ObjectMeta)
 	if err != nil {

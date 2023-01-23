@@ -41,7 +41,7 @@ import (
 	"github.com/pkg/errors"
 
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
@@ -75,7 +75,7 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	nname := types.NamespacedName{
 		Name: objectnames.DefaultNUMAResourcesOperatorCrName,
 	}
-	instance := &nropv1alpha1.NUMAResourcesOperator{}
+	instance := &nropv1.NUMAResourcesOperator{}
 	err := r.Get(ctx, nname, instance)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -120,7 +120,7 @@ func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, kcKey client.ObjectKey) (*corev1.ConfigMap, error) {
+func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*corev1.ConfigMap, error) {
 	mcoKc := &mcov1.KubeletConfig{}
 	if err := r.Client.Get(ctx, kcKey, mcoKc); err != nil {
 		return nil, err
@@ -132,7 +132,7 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 		return nil, err
 	}
 
-	mcps, err := machineconfigpools.GetListByNodeGroupsV1Alpha1(ctx, r.Client, instance.Spec.NodeGroups)
+	mcps, err := machineconfigpools.GetListByNodeGroupsV1(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +215,7 @@ func findReservedMemoryFromKubelet(klMemRes []kubeletconfigv1beta1.MemoryReserva
 	return res
 }
 
-func podExcludesListToMap(podExcludes []nropv1alpha1.NamespacedName) map[string]string {
+func podExcludesListToMap(podExcludes []nropv1.NamespacedName) map[string]string {
 	ret := make(map[string]string)
 	for _, pe := range podExcludes {
 		ret[pe.Namespace] = pe.Name

@@ -34,7 +34,7 @@ import (
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
@@ -46,7 +46,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 )
 
-func SetupInfra(fxt *e2efixture.Fixture, nroOperObj *nropv1alpha1.NUMAResourcesOperator, nrtList nrtv1alpha1.NodeResourceTopologyList) {
+func SetupInfra(fxt *e2efixture.Fixture, nroOperObj *nropv1.NUMAResourcesOperator, nrtList nrtv1alpha1.NodeResourceTopologyList) {
 	setupNUMACell(fxt, nroOperObj.Spec.NodeGroups, 3*time.Minute)
 	LabelNodes(fxt.Client, nrtList)
 }
@@ -55,12 +55,12 @@ func TeardownInfra(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopo
 	UnlabelNodes(fxt.Client, nrtList)
 }
 
-func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1alpha1.NodeGroup, timeout time.Duration) {
+func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, timeout time.Duration) {
 	klog.Infof("e2e infra setup begin")
 
 	Expect(nodeGroups).ToNot(BeEmpty(), "cannot autodetect the TAS node groups from the cluster")
 
-	mcps, err := machineconfigpools.GetListByNodeGroupsV1Alpha1(context.TODO(), fxt.Client, nodeGroups)
+	mcps, err := machineconfigpools.GetListByNodeGroupsV1(context.TODO(), fxt.Client, nodeGroups)
 	Expect(err).ToNot(HaveOccurred())
 
 	klog.Infof("setting e2e infra for %d MCPs", len(mcps))

@@ -20,13 +20,13 @@ import (
 	"context"
 	"fmt"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 )
 
-func MachineConfigPoolsByNodeGroups(nodeGroups []nropv1alpha1.NodeGroup) (func() error, error) {
-	mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), e2eclient.Client, nodeGroups)
+func MachineConfigPoolsByNodeGroups(nodeGroups []nropv1.NodeGroup) (func() error, error) {
+	mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nodeGroups)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func MachineConfigPoolsByNodeGroups(nodeGroups []nropv1alpha1.NodeGroup) (func()
 	}
 
 	unpause := func() error {
-		mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), e2eclient.Client, nodeGroups)
+		mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nodeGroups)
 		if err != nil {
 			return err
 		}

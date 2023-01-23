@@ -30,7 +30,7 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -44,16 +44,16 @@ func OpenshiftMatchLabels() map[string]string {
 	return map[string]string{"pools.operator.machineconfiguration.openshift.io/worker": ""}
 }
 
-func TestNROScheduler() *nropv1alpha1.NUMAResourcesScheduler {
-	return &nropv1alpha1.NUMAResourcesScheduler{
+func TestNROScheduler() *nropv1.NUMAResourcesScheduler {
+	return &nropv1.NUMAResourcesScheduler{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NUMAResourcesScheduler",
-			APIVersion: nropv1alpha1.GroupVersion.String(),
+			APIVersion: nropv1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: objectnames.DefaultNUMAResourcesSchedulerCrName,
 		},
-		Spec: nropv1alpha1.NUMAResourcesSchedulerSpec{
+		Spec: nropv1.NUMAResourcesSchedulerSpec{
 			SchedulerImage: "quay.io/openshift-kni/scheduler-plugins:4.13-snapshot",
 		},
 	}
@@ -67,17 +67,17 @@ func NROSchedObjectKey() client.ObjectKey {
 	return client.ObjectKey{Name: objectnames.DefaultNUMAResourcesSchedulerCrName}
 }
 
-func TestNRO(matchLabels map[string]string) *nropv1alpha1.NUMAResourcesOperator {
-	return &nropv1alpha1.NUMAResourcesOperator{
+func TestNRO(matchLabels map[string]string) *nropv1.NUMAResourcesOperator {
+	return &nropv1.NUMAResourcesOperator{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NUMAResourcesOperator",
-			APIVersion: nropv1alpha1.GroupVersion.String(),
+			APIVersion: nropv1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: objectnames.DefaultNUMAResourcesOperatorCrName,
 		},
-		Spec: nropv1alpha1.NUMAResourcesOperatorSpec{
-			NodeGroups: []nropv1alpha1.NodeGroup{
+		Spec: nropv1.NUMAResourcesOperatorSpec{
+			NodeGroups: []nropv1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: matchLabels,

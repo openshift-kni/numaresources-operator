@@ -35,7 +35,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 
@@ -51,7 +51,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
-	utilruntime.Must(nropv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(nropv1.AddToScheme(scheme))
 	utilruntime.Must(machineconfigv1.Install(scheme))
 	utilruntime.Must(securityv1.Install(scheme))
 }
