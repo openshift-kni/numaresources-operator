@@ -33,7 +33,7 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -49,7 +49,7 @@ import (
 type NroDeployment struct {
 	McpObj *machineconfigv1.MachineConfigPool
 	KcObj  *machineconfigv1.KubeletConfig
-	NroObj *nropv1alpha1.NUMAResourcesOperator
+	NroObj *nropv1.NUMAResourcesOperator
 }
 
 // OverallDeployment returns a struct containing all the deployed objects,
@@ -139,7 +139,7 @@ func TeardownDeployment(nrod NroDeployment, timeout time.Duration) {
 	err = e2eclient.Client.Delete(context.TODO(), nrod.NroObj)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred())
 	wg.Add(1)
-	go func(nropObj *nropv1alpha1.NUMAResourcesOperator) {
+	go func(nropObj *nropv1.NUMAResourcesOperator) {
 		defer GinkgoRecover()
 		defer wg.Done()
 		klog.Infof("waiting for NROP %q to be gone", nropObj.Name)
@@ -152,7 +152,7 @@ func TeardownDeployment(nrod NroDeployment, timeout time.Duration) {
 	WaitForMCPUpdatedAfterNRODeleted(2, nrod.NroObj)
 }
 
-func WaitForMCPUpdatedAfterNRODeleted(offset int, nroObj *nropv1alpha1.NUMAResourcesOperator) {
+func WaitForMCPUpdatedAfterNRODeleted(offset int, nroObj *nropv1.NUMAResourcesOperator) {
 	if configuration.Plat != platform.OpenShift {
 		// nothing to do
 		return
@@ -169,8 +169,8 @@ func WaitForMCPUpdatedAfterNRODeleted(offset int, nroObj *nropv1alpha1.NUMAResou
 }
 
 // isMachineConfigPoolsUpdated checks if all related to NUMAResourceOperator CR machines config pools have updated status
-func isMachineConfigPoolsUpdated(nro *nropv1alpha1.NUMAResourcesOperator) (bool, error) {
-	mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
+func isMachineConfigPoolsUpdated(nro *nropv1.NUMAResourcesOperator) (bool, error) {
+	mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
 	if err != nil {
 		return false, err
 	}
@@ -186,8 +186,8 @@ func isMachineConfigPoolsUpdated(nro *nropv1alpha1.NUMAResourcesOperator) (bool,
 
 // isMachineConfigPoolsUpdatedAfterDeletion checks if all related to NUMAResourceOperator CR machines config pools have updated status
 // after MachineConfig deletion
-func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1alpha1.NUMAResourcesOperator) (bool, error) {
-	mcps, err := nropmcp.GetListByNodeGroupsV1Alpha1(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
+func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1.NUMAResourcesOperator) (bool, error) {
+	mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
 	if err != nil {
 		return false, err
 	}
@@ -201,7 +201,7 @@ func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1alpha1.NUMAResourcesOpe
 	return true, nil
 }
 
-func WaitForMCPUpdatedAfterNROCreated(offset int, nroObj *nropv1alpha1.NUMAResourcesOperator) {
+func WaitForMCPUpdatedAfterNROCreated(offset int, nroObj *nropv1.NUMAResourcesOperator) {
 	if configuration.Plat != platform.OpenShift {
 		// nothing to do
 		return
@@ -222,7 +222,7 @@ func WaitForMCPUpdatedAfterNROCreated(offset int, nroObj *nropv1alpha1.NUMAResou
 // or a timeout happens (5 min right now).
 //
 // see: `TestNROScheduler` to see the specific object characteristics.
-func DeployNROScheduler() *nropv1alpha1.NUMAResourcesScheduler {
+func DeployNROScheduler() *nropv1.NUMAResourcesScheduler {
 
 	nroSchedObj := objects.TestNROScheduler()
 
@@ -233,7 +233,7 @@ func DeployNROScheduler() *nropv1alpha1.NUMAResourcesScheduler {
 	Expect(err).WithOffset(1).NotTo(HaveOccurred())
 
 	Eventually(func() bool {
-		updatedNROObj := &nropv1alpha1.NUMAResourcesScheduler{}
+		updatedNROObj := &nropv1.NUMAResourcesScheduler{}
 		err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), updatedNROObj)
 		if err != nil {
 			klog.Warningf("failed to get the NRO Scheduler resource: %v", err)
@@ -254,7 +254,7 @@ func DeployNROScheduler() *nropv1alpha1.NUMAResourcesScheduler {
 	return nroSchedObj
 }
 
-func TeardownNROScheduler(nroSched *nropv1alpha1.NUMAResourcesScheduler, timeout time.Duration) {
+func TeardownNROScheduler(nroSched *nropv1.NUMAResourcesScheduler, timeout time.Duration) {
 	if nroSched != nil {
 		err := e2eclient.Client.Delete(context.TODO(), nroSched)
 		ExpectWithOffset(1, err).ToNot(HaveOccurred())
