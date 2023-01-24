@@ -93,6 +93,7 @@ func main() {
 	var enableScheduler bool
 	var renderMode bool
 	var render RenderParams
+	var enableWebhooks bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -108,6 +109,7 @@ func main() {
 	flag.StringVar(&render.ImageScheduler, "render-image-scheduler", "", "outputs the manifests rendered using the given image for the scheduler")
 	flag.BoolVar(&showVersion, "version", false, "outputs the version and exit")
 	flag.BoolVar(&enableScheduler, "enable-scheduler", false, "enable support for the NUMAResourcesScheduler object")
+	flag.BoolVar(&enableWebhooks, "enable-webhooks", false, "enable conversion webhooks")
 
 	opts := zap.Options{
 		Development: true,
@@ -246,6 +248,16 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
+	if enableWebhooks {
+		if err = SetupOperatorWebhookWithManager(mgr, &nropv1.NUMAResourcesOperator{}); err != nil {
+			klog.Exitf("unable to create NUMAResourcesOperator v1 webhook : %v", err)
+		}
+		if err = SetupSchedulerWebhookWithManager(mgr, &nropv1.NUMAResourcesScheduler{}); err != nil {
+			klog.Exitf("unable to create NUMAResourcesScheduler v1 webhook : %v", err)
+		}
+	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -343,4 +355,18 @@ func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec
 	// the best setting is "present, but disabled" vs "missing, thus implicitly disabled"
 	schedupdate.DeploymentConfigMapSettings(mf.Deployment, schedManifests.ConfigMap.Name, hash.ConfigMapData(schedManifests.ConfigMap))
 	return mf
+}
+
+// SetupWebhookWithManager enables Webhooks - needed for version conversion
+func SetupOperatorWebhookWithManager(mgr ctrl.Manager, r *nropv1.NUMAResourcesOperator) error {
+	return ctrl.NewWebhookManagedBy(mgr).
+		For(r).
+		Complete()
+}
+
+// SetupWebhookWithManager enables Webhooks - needed for version conversion
+func SetupSchedulerWebhookWithManager(mgr ctrl.Manager, r *nropv1.NUMAResourcesScheduler) error {
+	return ctrl.NewWebhookManagedBy(mgr).
+		For(r).
+		Complete()
 }
