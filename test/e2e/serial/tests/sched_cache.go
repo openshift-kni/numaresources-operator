@@ -89,8 +89,11 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 			if conf.PodsFingerprinting == nil || *conf.PodsFingerprinting != nropv1.PodsFingerprintingEnabled {
 				e2efixture.Skipf(fxt, "unsupported fingerprint status %v in %q", conf.PodsFingerprinting, mcpName)
 			}
-			if conf.InfoRefreshMode == nil || *conf.InfoRefreshMode != nropv1.InfoRefreshPeriodic {
-				e2efixture.Skipf(fxt, "unsupported refresh mode %v in %q", conf.InfoRefreshMode, mcpName)
+			if conf.InfoRefreshMode == nil {
+				e2efixture.Skipf(fxt, "missing refresh mode in %q", mcpName)
+			}
+			if *conf.InfoRefreshMode != nropv1.InfoRefreshPeriodic {
+				e2efixture.Skipf(fxt, "unsupported refresh mode %v in %q", *conf.InfoRefreshMode, mcpName)
 			}
 			refreshPeriod = conf.InfoRefreshPeriod.Duration
 
