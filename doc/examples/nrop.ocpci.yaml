@@ -1,4 +1,4 @@
-apiVersion: nodetopology.openshift.io/v1alpha1
+apiVersion: nodetopology.openshift.io/v1
 kind: NUMAResourcesOperator
 metadata:
   name: numaresourcesoperator
@@ -9,3 +9,8 @@ spec:
     machineConfigPoolSelector:
       matchLabels:
         pools.operator.machineconfiguration.openshift.io/worker: ""
+  podExcludes:
+  - namespace: "openshift-image-registry"
+    name: "image-pruner-*"
+  - namespace: "openshift-operator-lifecycle-manager"
+    name: "collect-profiles-*"
