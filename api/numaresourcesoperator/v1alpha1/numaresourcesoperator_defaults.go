@@ -23,15 +23,36 @@ import (
 )
 
 func DefaultNodeGroupConfig() NodeGroupConfig {
+	ngc := NodeGroupConfig{}
+	ngc.Default()
+	return ngc
+}
+
+func (ngc *NodeGroupConfig) Default() {
+	if ngc.PodsFingerprinting == nil {
+		ngc.PodsFingerprinting = defaultPodsFingerprinting()
+	}
+	if ngc.InfoRefreshPeriod == nil {
+		ngc.InfoRefreshPeriod = defaultInfoRefreshPeriod()
+	}
+	if ngc.InfoRefreshMode == nil {
+		ngc.InfoRefreshMode = defaultInfoRefreshMode()
+	}
+}
+
+func defaultPodsFingerprinting() *PodsFingerprintingMode {
 	podsFp := PodsFingerprintingEnabled
+	return &podsFp
+}
+
+func defaultInfoRefreshMode() *InfoRefreshMode {
 	refMode := InfoRefreshPeriodicAndEvents
+	return &refMode
+}
+
+func defaultInfoRefreshPeriod() *metav1.Duration {
 	period := metav1.Duration{
 		Duration: 10 * time.Second,
 	}
-
-	return NodeGroupConfig{
-		PodsFingerprinting: &podsFp,
-		InfoRefreshPeriod:  &period,
-		InfoRefreshMode:    &refMode,
-	}
+	return &period
 }
