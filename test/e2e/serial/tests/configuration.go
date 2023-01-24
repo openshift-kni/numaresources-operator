@@ -46,7 +46,6 @@ import (
 
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
@@ -580,7 +579,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				// normalize config to handle unspecified defaults
 				specConf := nropv1alpha1.DefaultNodeGroupConfig()
 				if nroOperObj.Spec.NodeGroups[0].Config != nil {
-					specConf = merge.NodeGroupConfig(specConf, *nroOperObj.Spec.NodeGroups[0].Config)
+					specConf = specConf.Merge(*nroOperObj.Spec.NodeGroups[0].Config)
 				}
 
 				// the status must be always populated by the operator.

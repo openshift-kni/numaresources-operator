@@ -55,7 +55,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
-	"github.com/openshift-kni/numaresources-operator/pkg/normalize"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
@@ -144,7 +143,10 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}
 
-	normalize.NodeGroupTreesConfig(trees)
+	for idx := range trees {
+		conf := trees[idx].NodeGroup.NormalizeConfig()
+		trees[idx].NodeGroup.Config = &conf
+	}
 
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
 	if condition != "" {
