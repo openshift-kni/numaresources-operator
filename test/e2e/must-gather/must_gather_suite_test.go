@@ -23,7 +23,7 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/deploy"
 
@@ -32,7 +32,7 @@ import (
 )
 
 var deployment deploy.NroDeployment
-var nroSchedObj *nropv1alpha1.NUMAResourcesScheduler
+var nroSchedObj *nropv1.NUMAResourcesScheduler
 
 func TestMustGather(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)

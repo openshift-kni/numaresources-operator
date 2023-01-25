@@ -30,7 +30,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
@@ -114,7 +114,7 @@ var _ = Describe("[serial][disruptive][scheduler][rmsched] numaresources schedul
 
 var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restart on a live cluster", Serial, func() {
 	var fxt *e2efixture.Fixture
-	var nroSchedObj *nropv1alpha1.NUMAResourcesScheduler
+	var nroSchedObj *nropv1.NUMAResourcesScheduler
 	var schedulerName string
 
 	BeforeEach(func() {
@@ -122,7 +122,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restar
 		fxt, err = e2efixture.Setup("e2e-test-sched-remove")
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
-		nroSchedObj = &nropv1alpha1.NUMAResourcesScheduler{}
+		nroSchedObj = &nropv1.NUMAResourcesScheduler{}
 		nroSchedKey := objects.NROSchedObjectKey()
 		err = fxt.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
 		Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
@@ -190,12 +190,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restar
 	})
 })
 
-func restoreScheduler(fxt *e2efixture.Fixture, nroSchedObj *nropv1alpha1.NUMAResourcesScheduler) {
+func restoreScheduler(fxt *e2efixture.Fixture, nroSchedObj *nropv1.NUMAResourcesScheduler) {
 	By(fmt.Sprintf("re-creating the NRO Scheduler object: %s", nroSchedObj.Name))
-	nroSched := &nropv1alpha1.NUMAResourcesScheduler{
+	nroSched := &nropv1.NUMAResourcesScheduler{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NUMAResourcesScheduler",
-			APIVersion: nropv1alpha1.GroupVersion.String(),
+			APIVersion: nropv1.GroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nroSchedObj.Name,

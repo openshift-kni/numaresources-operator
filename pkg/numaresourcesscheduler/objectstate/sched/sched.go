@@ -26,7 +26,7 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -132,8 +132,8 @@ func FromClient(ctx context.Context, cli client.Client, mf schedmanifests.Manife
 	return ret
 }
 
-func DeploymentNamespacedNameFromObject(obj client.Object) (nropv1alpha1.NamespacedName, bool) {
-	res := nropv1alpha1.NamespacedName{
+func DeploymentNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName, bool) {
+	res := nropv1.NamespacedName{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}

@@ -1,0 +1,16 @@
+apiVersion: nodetopology.openshift.io/v1
+kind: NUMAResourcesOperator
+metadata:
+  name: numaresourcesoperator
+spec:
+  nodeGroups:
+  - config:
+      infoRefreshMode: Periodic
+    machineConfigPoolSelector:
+      matchLabels:
+        pools.operator.machineconfiguration.openshift.io/worker: ""
+  podExcludes:
+  - namespace: "openshift-image-registry"
+    name: "image-pruner-*"
+  - namespace: "openshift-operator-lifecycle-manager"
+    name: "collect-profiles-*"

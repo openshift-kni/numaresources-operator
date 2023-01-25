@@ -33,7 +33,7 @@ import (
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	e2enrtint "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -68,7 +68,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 
 	Context("using a NodeGroup with periodic unevented updates", Label("periodic_update"), func() {
 		var nroKey client.ObjectKey
-		var nroOperObj nropv1alpha1.NUMAResourcesOperator
+		var nroOperObj nropv1.NUMAResourcesOperator
 		var nrtCandidates []nrtv1alpha1.NodeResourceTopology
 		var refreshPeriod time.Duration
 		var mcpName string
@@ -86,11 +86,14 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 
 			mcpName = nroOperObj.Status.MachineConfigPools[0].Name
 			conf := nroOperObj.Status.MachineConfigPools[0].Config
-			if conf.PodsFingerprinting == nil || *conf.PodsFingerprinting != nropv1alpha1.PodsFingerprintingEnabled {
+			if conf.PodsFingerprinting == nil || *conf.PodsFingerprinting != nropv1.PodsFingerprintingEnabled {
 				e2efixture.Skipf(fxt, "unsupported fingerprint status %v in %q", conf.PodsFingerprinting, mcpName)
 			}
-			if conf.InfoRefreshMode == nil || *conf.InfoRefreshMode != nropv1alpha1.InfoRefreshPeriodic {
-				e2efixture.Skipf(fxt, "unsupported refresh mode %v in %q", conf.InfoRefreshMode, mcpName)
+			if conf.InfoRefreshMode == nil {
+				e2efixture.Skipf(fxt, "missing refresh mode in %q", mcpName)
+			}
+			if *conf.InfoRefreshMode != nropv1.InfoRefreshPeriodic {
+				e2efixture.Skipf(fxt, "unsupported refresh mode %v in %q", *conf.InfoRefreshMode, mcpName)
 			}
 			refreshPeriod = conf.InfoRefreshPeriod.Duration
 

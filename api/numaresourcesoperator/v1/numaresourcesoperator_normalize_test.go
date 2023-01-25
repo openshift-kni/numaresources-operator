@@ -11,10 +11,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright 2022 Red Hat, Inc.
+ * Copyright 2023 Red Hat, Inc.
  */
 
-package merge
+package v1
 
 import (
 	"reflect"
@@ -22,19 +22,17 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 )
 
-func TestNodeGroupConfig(t *testing.T) {
-	podsFp := nropv1alpha1.PodsFingerprintingEnabled
-	refMode := nropv1alpha1.InfoRefreshPeriodicAndEvents
+func TestNodeGroupConfigMerge(t *testing.T) {
+	podsFp := PodsFingerprintingEnabled
+	refMode := InfoRefreshPeriodicAndEvents
 
 	type testCase struct {
 		description string
-		current     nropv1alpha1.NodeGroupConfig
-		updated     nropv1alpha1.NodeGroupConfig
-		expected    nropv1alpha1.NodeGroupConfig
+		current     NodeGroupConfig
+		updated     NodeGroupConfig
+		expected    NodeGroupConfig
 	}
 
 	testCases := []testCase{
@@ -43,17 +41,17 @@ func TestNodeGroupConfig(t *testing.T) {
 		},
 		{
 			description: "empty to default",
-			updated:     nropv1alpha1.DefaultNodeGroupConfig(),
-			expected:    nropv1alpha1.DefaultNodeGroupConfig(),
+			updated:     DefaultNodeGroupConfig(),
+			expected:    DefaultNodeGroupConfig(),
 		},
 		{
 			description: "override interval from empty",
-			updated: nropv1alpha1.NodeGroupConfig{
+			updated: NodeGroupConfig{
 				InfoRefreshPeriod: &metav1.Duration{
 					Duration: 42 * time.Second,
 				},
 			},
-			expected: nropv1alpha1.NodeGroupConfig{
+			expected: NodeGroupConfig{
 				InfoRefreshPeriod: &metav1.Duration{
 					Duration: 42 * time.Second,
 				},
@@ -61,13 +59,13 @@ func TestNodeGroupConfig(t *testing.T) {
 		},
 		{
 			description: "override interval from default",
-			current:     nropv1alpha1.DefaultNodeGroupConfig(),
-			updated: nropv1alpha1.NodeGroupConfig{
+			current:     DefaultNodeGroupConfig(),
+			updated: NodeGroupConfig{
 				InfoRefreshPeriod: &metav1.Duration{
 					Duration: 42 * time.Second,
 				},
 			},
-			expected: nropv1alpha1.NodeGroupConfig{
+			expected: NodeGroupConfig{
 				PodsFingerprinting: &podsFp,
 				InfoRefreshMode:    &refMode,
 				InfoRefreshPeriod: &metav1.Duration{
@@ -79,7 +77,7 @@ func TestNodeGroupConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			got := NodeGroupConfig(tc.current, tc.updated)
+			got := tc.current.Merge(tc.updated)
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got=%+#v expected %#+v", got, tc.expected)
 			}

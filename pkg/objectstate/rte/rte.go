@@ -30,8 +30,8 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -63,8 +63,8 @@ type ExistingManifests struct {
 	clusterRoleBindingError error
 	// internal helpers
 	plat      platform.Platform
-	instance  *nropv1alpha1.NUMAResourcesOperator
-	trees     []nodegroupv1alpha1.Tree
+	instance  *nropv1.NUMAResourcesOperator
+	trees     []nodegroupv1.Tree
 	namespace string
 }
 
@@ -126,7 +126,7 @@ type GeneratedDesiredManifest struct {
 	// context
 	ClusterPlatform   platform.Platform
 	MachineConfigPool *machineconfigv1.MachineConfigPool
-	NodeGroup         *nropv1alpha1.NodeGroup
+	NodeGroup         *nropv1.NodeGroup
 	// generated manifests
 	DaemonSet *appsv1.DaemonSet
 }
@@ -238,7 +238,7 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 	return ret
 }
 
-func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf rtemanifests.Manifests, instance *nropv1alpha1.NUMAResourcesOperator, trees []nodegroupv1alpha1.Tree, namespace string) ExistingManifests {
+func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf rtemanifests.Manifests, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, namespace string) ExistingManifests {
 	ret := ExistingManifests{
 		existing:   rtemanifests.New(plat),
 		daemonSets: make(map[string]daemonSetManifest),
@@ -316,8 +316,8 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 	return ret
 }
 
-func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1alpha1.NamespacedName, bool) {
-	res := nropv1alpha1.NamespacedName{
+func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName, bool) {
+	res := nropv1.NamespacedName{
 		Namespace: obj.GetNamespace(),
 		Name:      obj.GetName(),
 	}

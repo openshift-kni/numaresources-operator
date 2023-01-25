@@ -29,7 +29,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -54,7 +54,7 @@ var _ = Describe("[Scheduler] install", func() {
 
 			By("checking that the condition Available=true")
 			Eventually(func() bool {
-				updatedNROObj := &nropv1alpha1.NUMAResourcesScheduler{}
+				updatedNROObj := &nropv1.NUMAResourcesScheduler{}
 				err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), updatedNROObj)
 				if err != nil {
 					klog.Warningf("failed to get the NRO Scheduler resource: %v", err)
