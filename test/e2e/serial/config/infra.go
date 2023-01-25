@@ -142,20 +142,35 @@ func LabelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyList)
 		node.Labels[MultiNUMALabel] = labelValue
 
 		klog.Infof("labeling node %q with %s: %s", nrt.Name, MultiNUMALabel, labelValue)
+		// TODO: this should be retried
 		err = cli.Update(context.TODO(), &node)
 		Expect(err).ToNot(HaveOccurred())
 	}
 }
 
 func UnlabelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyList) {
+	var wg sync.WaitGroup
 	for _, nrt := range nrtList.Items {
-		node := corev1.Node{}
-		err := cli.Get(context.TODO(), client.ObjectKey{Name: nrt.Name}, &node)
-		Expect(err).ToNot(HaveOccurred())
+		wg.Add(1)
+		go func(nodeName string) {
+			defer wg.Done()
+			unlabelNodeByName(cli, nodeName)
+		}(nrt.Name)
+	}
+	wg.Wait()
+}
 
-		klog.Infof("unlabeling node %q removing label %s", nrt.Name, MultiNUMALabel)
+func unlabelNodeByName(cli client.Client, nodeName string) {
+	var err error
+	// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3
+	Eventually(func(g Gomega) {
+		node := corev1.Node{}
+		err = cli.Get(context.TODO(), client.ObjectKey{Name: nodeName}, &node)
+		g.Expect(err).ToNot(HaveOccurred())
+
+		klog.Infof("unlabeling node %q removing label %s", nodeName, MultiNUMALabel)
 		delete(node.Labels, MultiNUMALabel)
 		err = cli.Update(context.TODO(), &node)
-		Expect(err).ToNot(HaveOccurred())
-	}
+		g.Expect(err).ToNot(HaveOccurred())
+	}).WithTimeout(3*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to unlabel node %q: %v", nodeName, err)
 }
