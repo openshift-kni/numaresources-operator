@@ -17,6 +17,7 @@
 package runtime
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -77,4 +78,17 @@ func FindBinaryPath(exe string) (string, error) {
 
 func IsExecOwner(mode os.FileMode) bool {
 	return mode&0100 != 0
+}
+
+func listDir(path string) {
+	files, err := os.ReadDir(path)
+	if err != nil {
+		klog.Warningf("failed to list %q: %v", path, err)
+		return
+	}
+	var buf bytes.Buffer
+	for _, file := range files {
+		fmt.Fprintf(&buf, "%s: %s\n", file.Name(), file.Type().String())
+	}
+	klog.Infof("listing content of path %q:\n%s", path, buf.String())
 }
