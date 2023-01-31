@@ -3,6 +3,6 @@
 filters:
   ".*":
     reviewers:
-      - performance-reviewers
+      - numaresources-reviewers
     approvers:
-      - performance-approvers
+      - numaresources-approvers
