@@ -38,7 +38,7 @@ import (
 
 	depmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
@@ -65,7 +65,7 @@ func NewFakeNUMAResourcesSchedulerReconciler(initObjects ...runtime.Object) (*NU
 }
 
 var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
-	verifyDegradedCondition := func(nrs *nropv1alpha1.NUMAResourcesScheduler, reason string) {
+	verifyDegradedCondition := func(nrs *nropv1.NUMAResourcesScheduler, reason string) {
 		reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nrs)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -88,7 +88,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 	})
 
 	ginkgo.Context("with correct NRS CR", func() {
-		var nrs *nropv1alpha1.NUMAResourcesScheduler
+		var nrs *nropv1.NUMAResourcesScheduler
 		var reconciler *NUMAResourcesSchedulerReconciler
 
 		ginkgo.BeforeEach(func() {

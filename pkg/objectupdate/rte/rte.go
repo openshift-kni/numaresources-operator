@@ -27,7 +27,7 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
@@ -121,7 +121,7 @@ func DaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
 
 const _MiB = 1024 * 1024
 
-func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1alpha1.NodeGroupConfig) error {
+func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
 	if err != nil {
 		return err
@@ -201,35 +201,35 @@ func FindContainerByName(podSpec *corev1.PodSpec, containerName string) (*corev1
 	return nil, fmt.Errorf("container %q not found - defaulting to the first", containerName)
 }
 
-func isPodFingerprintEnabled(conf *nropv1alpha1.NodeGroupConfig) bool {
-	cfg := nropv1alpha1.DefaultNodeGroupConfig()
+func isPodFingerprintEnabled(conf *nropv1.NodeGroupConfig) bool {
+	cfg := nropv1.DefaultNodeGroupConfig()
 	if conf == nil || conf.PodsFingerprinting == nil {
 		// not specified -> use defaults
 		conf = &cfg
 	}
-	return *conf.PodsFingerprinting == nropv1alpha1.PodsFingerprintingEnabled
+	return *conf.PodsFingerprinting == nropv1.PodsFingerprintingEnabled
 }
 
-func isNotifyFileEnabled(conf *nropv1alpha1.NodeGroupConfig) bool {
-	cfg := nropv1alpha1.DefaultNodeGroupConfig()
+func isNotifyFileEnabled(conf *nropv1.NodeGroupConfig) bool {
+	cfg := nropv1.DefaultNodeGroupConfig()
 	if conf == nil || conf.InfoRefreshMode == nil {
 		// not specified -> use defaults
 		conf = &cfg
 	}
-	return *conf.InfoRefreshMode != nropv1alpha1.InfoRefreshPeriodic
+	return *conf.InfoRefreshMode != nropv1.InfoRefreshPeriodic
 }
 
-func isPeriodicUpdateRequired(conf *nropv1alpha1.NodeGroupConfig) bool {
-	cfg := nropv1alpha1.DefaultNodeGroupConfig()
+func isPeriodicUpdateRequired(conf *nropv1.NodeGroupConfig) bool {
+	cfg := nropv1.DefaultNodeGroupConfig()
 	if conf == nil || conf.InfoRefreshMode == nil {
 		// not specified -> use defaults
 		conf = &cfg
 	}
-	return *conf.InfoRefreshMode != nropv1alpha1.InfoRefreshEvents
+	return *conf.InfoRefreshMode != nropv1.InfoRefreshEvents
 }
 
-func findRefreshPeriod(conf *nropv1alpha1.NodeGroupConfig) string {
-	cfg := nropv1alpha1.DefaultNodeGroupConfig()
+func findRefreshPeriod(conf *nropv1.NodeGroupConfig) string {
+	cfg := nropv1.DefaultNodeGroupConfig()
 	if conf == nil || conf.InfoRefreshPeriod == nil {
 		// not specified -> use defaults
 		conf = &cfg

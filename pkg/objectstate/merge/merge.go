@@ -22,8 +22,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 )
 
 var (
@@ -97,20 +95,4 @@ func Labels(current, updated client.Object) client.Object {
 		updated.SetLabels(curLabels)
 	}
 	return updated
-}
-
-func NodeGroupConfig(current, updated nropv1alpha1.NodeGroupConfig) nropv1alpha1.NodeGroupConfig {
-	conf := nropv1alpha1.NodeGroupConfig{}
-	current.DeepCopyInto(&conf)
-
-	if updated.PodsFingerprinting != nil {
-		conf.PodsFingerprinting = updated.PodsFingerprinting
-	}
-	if updated.InfoRefreshPeriod != nil {
-		conf.InfoRefreshPeriod = updated.InfoRefreshPeriod
-	}
-	if updated.InfoRefreshMode != nil {
-		conf.InfoRefreshMode = updated.InfoRefreshMode
-	}
-	return conf
 }

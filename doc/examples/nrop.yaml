@@ -1,9 +1,11 @@
-apiVersion: nodetopology.openshift.io/v1alpha1
+apiVersion: nodetopology.openshift.io/v1
 kind: NUMAResourcesOperator
 metadata:
   name: numaresourcesoperator
 spec:
   nodeGroups:
-  - machineConfigPoolSelector:
+  - config:
+      infoRefreshMode: Periodic
+    machineConfigPoolSelector:
       matchLabels:
         pools.operator.machineconfiguration.openshift.io/worker: ""

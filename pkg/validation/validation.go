@@ -22,8 +22,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 )
 
 const (
@@ -33,7 +33,7 @@ const (
 
 // MachineConfigPoolDuplicates selected MCPs for duplicates
 // TODO: move it under the validation webhook once we will have one
-func MachineConfigPoolDuplicates(trees []nodegroupv1alpha1.Tree) error {
+func MachineConfigPoolDuplicates(trees []nodegroupv1.Tree) error {
 	duplicates := map[string]int{}
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
@@ -57,7 +57,7 @@ func MachineConfigPoolDuplicates(trees []nodegroupv1alpha1.Tree) error {
 
 // NodeGroups validates the node groups for nil values and duplicates.
 // TODO: move it under the validation webhook once we will have one
-func NodeGroups(nodeGroups []nropv1alpha1.NodeGroup) error {
+func NodeGroups(nodeGroups []nropv1.NodeGroup) error {
 	if err := nodeGroupsMachineConfigPoolSelector(nodeGroups); err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func NodeGroups(nodeGroups []nropv1alpha1.NodeGroup) error {
 }
 
 // TODO: move it under the validation webhook once we will have one
-func nodeGroupsMachineConfigPoolSelector(nodeGroups []nropv1alpha1.NodeGroup) error {
+func nodeGroupsMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
 	for _, nodeGroup := range nodeGroups {
 		if nodeGroup.MachineConfigPoolSelector == nil {
 			return fmt.Errorf("one of the node groups does not have machineConfigPoolSelector")
@@ -85,7 +85,7 @@ func nodeGroupsMachineConfigPoolSelector(nodeGroups []nropv1alpha1.NodeGroup) er
 }
 
 // TODO: move it under the validation webhook once we will have one
-func nodeGroupsDuplicates(nodeGroups []nropv1alpha1.NodeGroup) error {
+func nodeGroupsDuplicates(nodeGroups []nropv1.NodeGroup) error {
 	duplicates := map[string]int{}
 	for _, nodeGroup := range nodeGroups {
 		if nodeGroup.MachineConfigPoolSelector == nil {
@@ -114,7 +114,7 @@ func nodeGroupsDuplicates(nodeGroups []nropv1alpha1.NodeGroup) error {
 }
 
 // TODO: move it under the validation webhook once we will have one
-func nodeGroupMachineConfigPoolSelector(nodeGroups []nropv1alpha1.NodeGroup) error {
+func nodeGroupMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
 	var selectorsErrors []string
 	for _, nodeGroup := range nodeGroups {
 		if nodeGroup.MachineConfigPoolSelector == nil {

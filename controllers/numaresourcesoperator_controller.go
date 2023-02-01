@@ -50,12 +50,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
-	"github.com/openshift-kni/numaresources-operator/pkg/normalize"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
@@ -113,7 +112,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	klog.V(3).InfoS("Starting NUMAResourcesOperator reconcile loop", "object", req.NamespacedName)
 	defer klog.V(3).InfoS("Finish NUMAResourcesOperator reconcile loop", "object", req.NamespacedName)
 
-	instance := &nropv1alpha1.NUMAResourcesOperator{}
+	instance := &nropv1.NUMAResourcesOperator{}
 	err := r.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
@@ -144,7 +143,10 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}
 
-	normalize.NodeGroupTreesConfig(trees)
+	for idx := range trees {
+		conf := trees[idx].NodeGroup.NormalizeConfig()
+		trees[idx].NodeGroup.Config = &conf
+	}
 
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
 	if condition != "" {
@@ -155,7 +157,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	return result, err
 }
 
-func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, condition string, reason string, message string) (ctrl.Result, error) {
+func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (ctrl.Result, error) {
 	klog.InfoS("updateStatus", "condition", condition, "reason", reason, "message", message)
 
 	if _, err := updateStatus(ctx, r.Client, instance, condition, reason, message); err != nil {
@@ -167,7 +169,7 @@ func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, inst
 	return ctrl.Result{}, nil
 }
 
-func updateStatus(ctx context.Context, cli client.Client, rte *nropv1alpha1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
+func updateStatus(ctx context.Context, cli client.Client, rte *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
 
 	conditions, ok := status.GetUpdatedConditions(rte.Status.Conditions, condition, reason, message)
 	if !ok {
@@ -192,7 +194,7 @@ func messageFromError(err error) string {
 	return unwErr.Error()
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, trees []nodegroupv1alpha1.Tree) (ctrl.Result, string, error) {
+func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, string, error) {
 	var err error
 	err = r.syncNodeResourceTopologyAPI()
 	if err != nil {
@@ -241,8 +243,8 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	return ctrl.Result{}, status.ConditionAvailable, nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, instance *nropv1alpha1.NUMAResourcesOperator, daemonSetsInfo []nropv1alpha1.NamespacedName) ([]nropv1alpha1.NamespacedName, bool, error) {
-	dsStatuses := []nropv1alpha1.NamespacedName{}
+func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, instance *nropv1.NUMAResourcesOperator, daemonSetsInfo []nropv1.NamespacedName) ([]nropv1.NamespacedName, bool, error) {
+	dsStatuses := []nropv1.NamespacedName{}
 	for _, nname := range daemonSetsInfo {
 		ds := appsv1.DaemonSet{}
 		dsKey := client.ObjectKey{
@@ -276,7 +278,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI() error {
 	return nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, trees []nodegroupv1alpha1.Tree) error {
+func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) error {
 	klog.V(4).Info("Machine Config Sync start")
 	defer klog.V(4).Info("Machine Config Sync stop")
 
@@ -301,15 +303,15 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	return nil
 }
 
-func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1alpha1.Tree) ([]nropv1alpha1.MachineConfigPool, bool) {
+func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree) ([]nropv1.MachineConfigPool, bool) {
 	klog.V(4).Info("Machine Config Status Sync start")
 	defer klog.V(4).Info("Machine Config Status Sync stop")
 
-	mcpStatuses := []nropv1alpha1.MachineConfigPool{}
+	mcpStatuses := []nropv1.MachineConfigPool{}
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
 			// update MCP conditions under the NRO
-			mcpStatuses = append(mcpStatuses, nropv1alpha1.MachineConfigPool{
+			mcpStatuses = append(mcpStatuses, nropv1.MachineConfigPool{
 				Name:       mcp.Name,
 				Conditions: mcp.Status.Conditions,
 			})
@@ -325,8 +327,8 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1alph
 	return mcpStatuses, true
 }
 
-func syncMachineConfigPoolNodeGroupConfigStatuses(instanceName string, mcpStatuses []nropv1alpha1.MachineConfigPool, trees []nodegroupv1alpha1.Tree) []nropv1alpha1.MachineConfigPool {
-	updatedMcpStatuses := []nropv1alpha1.MachineConfigPool{}
+func syncMachineConfigPoolNodeGroupConfigStatuses(instanceName string, mcpStatuses []nropv1.MachineConfigPool, trees []nodegroupv1.Tree) []nropv1.MachineConfigPool {
+	updatedMcpStatuses := []nropv1.MachineConfigPool{}
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
 			mcpStatus := getMachineConfigPoolStatusByName(mcpStatuses, mcp.Name)
@@ -334,7 +336,7 @@ func syncMachineConfigPoolNodeGroupConfigStatuses(instanceName string, mcpStatus
 			if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
 				mcpStatus.Config = tree.NodeGroup.Config.DeepCopy()
 			} else {
-				ngc := nropv1alpha1.DefaultNodeGroupConfig()
+				ngc := nropv1.DefaultNodeGroupConfig()
 				mcpStatus.Config = &ngc
 			}
 
@@ -344,16 +346,16 @@ func syncMachineConfigPoolNodeGroupConfigStatuses(instanceName string, mcpStatus
 	return updatedMcpStatuses
 }
 
-func getMachineConfigPoolStatusByName(mcpStatuses []nropv1alpha1.MachineConfigPool, name string) nropv1alpha1.MachineConfigPool {
+func getMachineConfigPoolStatusByName(mcpStatuses []nropv1.MachineConfigPool, name string) nropv1.MachineConfigPool {
 	for _, mcpStatus := range mcpStatuses {
 		if mcpStatus.Name == name {
 			return mcpStatus
 		}
 	}
-	return nropv1alpha1.MachineConfigPool{Name: name}
+	return nropv1.MachineConfigPool{Name: name}
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, trees []nodegroupv1alpha1.Tree) ([]nropv1alpha1.NamespacedName, error) {
+func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]nropv1.NamespacedName, error) {
 	klog.V(4).Info("RTESync start")
 	defer klog.V(4).Info("RTESync stop")
 
@@ -368,7 +370,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	}
 
 	var err error
-	var daemonSetsNName []nropv1alpha1.NamespacedName
+	var daemonSetsNName []nropv1.NamespacedName
 
 	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.ImageSpec, r.ImagePullPolicy)
 	if err != nil {
@@ -411,7 +413,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	return daemonSetsNName, nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, trees []nodegroupv1alpha1.Tree) []error {
+func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
 	klog.V(3).Info("Delete Daemonsets start")
 	var errors []error
 	var daemonSetList appsv1.DaemonSetList
@@ -443,7 +445,7 @@ func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Con
 	return errors
 }
 
-func (r *NUMAResourcesOperatorReconciler) deleteUnusedMachineConfigs(ctx context.Context, instance *nropv1alpha1.NUMAResourcesOperator, trees []nodegroupv1alpha1.Tree) []error {
+func (r *NUMAResourcesOperatorReconciler) deleteUnusedMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
 	klog.V(3).Info("Delete Machineconfigs start")
 	var errors []error
 	var machineConfigList machineconfigv1.MachineConfigList
@@ -514,7 +516,7 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 		},
 	}
 
-	b := ctrl.NewControllerManagedBy(mgr).For(&nropv1alpha1.NUMAResourcesOperator{})
+	b := ctrl.NewControllerManagedBy(mgr).For(&nropv1.NUMAResourcesOperator{})
 	if r.Platform == platform.OpenShift {
 		b = b.Owns(&securityv1.SecurityContextConstraints{}).
 			Owns(&machineconfigv1.MachineConfig{}, builder.WithPredicates(p))
@@ -543,7 +545,7 @@ func (r *NUMAResourcesOperatorReconciler) mcpToNUMAResourceOperator(mcpObj clien
 		return nil
 	}
 
-	nros := &nropv1alpha1.NUMAResourcesOperatorList{}
+	nros := &nropv1.NUMAResourcesOperatorList{}
 	if err := r.List(context.TODO(), nros); err != nil {
 		klog.Error("failed to get numa-resources operator")
 		return nil
@@ -622,7 +624,7 @@ func isMachineConfigExists(instanceName string, mcp *machineconfigv1.MachineConf
 	return false
 }
 
-func validateMachineConfigLabels(mc client.Object, trees []nodegroupv1alpha1.Tree) error {
+func validateMachineConfigLabels(mc client.Object, trees []nodegroupv1.Tree) error {
 	mcLabels := mc.GetLabels()
 	v, ok := mcLabels[rtestate.MachineConfigLabelKey]
 	// the machine config does not have generated label, meaning the machine config pool has the matchLabels under
@@ -678,10 +680,10 @@ func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
 	return ok
 }
 
-func getTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nropv1alpha1.NodeGroup) ([]nodegroupv1alpha1.Tree, error) {
+func getTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nropv1.NodeGroup) ([]nodegroupv1.Tree, error) {
 	mcps := &machineconfigv1.MachineConfigPoolList{}
 	if err := cli.List(ctx, mcps); err != nil {
 		return nil, err
 	}
-	return nodegroupv1alpha1.FindTrees(mcps, nodeGroups)
+	return nodegroupv1.FindTrees(mcps, nodeGroups)
 }

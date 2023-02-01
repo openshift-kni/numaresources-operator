@@ -23,7 +23,7 @@ import (
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
@@ -31,8 +31,8 @@ import (
 type E2EConfig struct {
 	Fixture       *e2efixture.Fixture
 	NRTList       nrtv1alpha1.NodeResourceTopologyList
-	NROOperObj    *nropv1alpha1.NUMAResourcesOperator
-	NROSchedObj   *nropv1alpha1.NUMAResourcesScheduler
+	NROOperObj    *nropv1.NUMAResourcesOperator
+	NROSchedObj   *nropv1.NUMAResourcesScheduler
 	SchedulerName string
 }
 
@@ -64,8 +64,8 @@ func TeardownFixture() error {
 func NewFixtureWithOptions(nsName string, options e2efixture.Options) (*E2EConfig, error) {
 	var err error
 	cfg := E2EConfig{
-		NROOperObj:  &nropv1alpha1.NUMAResourcesOperator{},
-		NROSchedObj: &nropv1alpha1.NUMAResourcesScheduler{},
+		NROOperObj:  &nropv1.NUMAResourcesOperator{},
+		NROSchedObj: &nropv1.NUMAResourcesScheduler{},
 	}
 
 	cfg.Fixture, err = e2efixture.SetupWithOptions(nsName, options)

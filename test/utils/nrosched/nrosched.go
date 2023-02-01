@@ -32,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
@@ -143,8 +143,8 @@ func CheckPODWasScheduledWith(k8sCli *kubernetes.Clientset, podNamespace, podNam
 	return checkPODEvents(k8sCli, podNamespace, podName, isScheduledWith)
 }
 
-func CheckNROSchedulerAvailable(cli client.Client, NUMAResourcesSchedObjName string) *nropv1alpha1.NUMAResourcesScheduler {
-	nroSchedObj := &nropv1alpha1.NUMAResourcesScheduler{}
+func CheckNROSchedulerAvailable(cli client.Client, NUMAResourcesSchedObjName string) *nropv1.NUMAResourcesScheduler {
+	nroSchedObj := &nropv1.NUMAResourcesScheduler{}
 	Eventually(func() bool {
 		By(fmt.Sprintf("checking %q for the condition Available=true", NUMAResourcesSchedObjName))
 
