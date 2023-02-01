@@ -37,6 +37,9 @@ spec:
           spec:
             description: NUMAResourcesSchedulerSpec defines the desired state of NUMAResourcesScheduler
             properties:
+              cacheResyncPeriod:
+                description: Set the cache resync period. Use explicit 0 to disable.
+                type: string
               imageSpec:
                 description: Scheduler container image URL
                 type: string

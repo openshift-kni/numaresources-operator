@@ -161,7 +161,7 @@ func (p *Padder) Pad(timeout time.Duration, options PaddingOptions) error {
 
 		for _, zone := range nrt.Zones {
 			// check that zone has at least the amount of allocationTarget that needed
-			if nrtutil.ZoneResourcesMatchesRequest(zone.Resources, p.allocationTarget) {
+			if nrtutil.ResourceInfoMatchesRequest(zone.Resources, p.allocationTarget) {
 				availResList := nrtutil.AvailableFromZone(zone)
 				diffList, err := diffAvailableToExpected(availResList, p.allocationTarget)
 				if err != nil {
@@ -201,7 +201,7 @@ func (p *Padder) Pad(timeout time.Duration, options PaddingOptions) error {
 		}
 	}
 
-	if failedPods := wait.ForPodListAllRunning(p.Client, pods); len(failedPods) > 0 {
+	if failedPods, _ := wait.ForPodListAllRunning(p.Client, pods, wait.DefaultPodRunningTimeout); len(failedPods) > 0 {
 		var asStrings []string
 		for _, pod := range failedPods {
 			asStrings = append(asStrings, fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))

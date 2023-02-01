@@ -18,6 +18,7 @@ package objects
 
 import (
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -49,8 +50,9 @@ func TestNewNUMAResourcesScheduler(t *testing.T) {
 	name := "test-sched"
 	imageSpec := "quay.io/foo/bar:latest"
 	schedulerName := "test-sched-name"
+	resyncPeriod := 42 * time.Second
 
-	obj := NewNUMAResourcesScheduler(name, imageSpec, schedulerName)
+	obj := NewNUMAResourcesScheduler(name, imageSpec, schedulerName, resyncPeriod)
 
 	if obj == nil {
 		t.Fatalf("null object")
@@ -63,6 +65,9 @@ func TestNewNUMAResourcesScheduler(t *testing.T) {
 	}
 	if obj.Spec.SchedulerName != schedulerName {
 		t.Errorf("unexpected scheduler name %q should be %q", obj.Spec.SchedulerName, schedulerName)
+	}
+	if obj.Spec.CacheResyncPeriod == nil || obj.Spec.CacheResyncPeriod.Duration.String() != resyncPeriod.String() {
+		t.Errorf("unexpected cache resync period %v should be %v", obj.Spec.CacheResyncPeriod, resyncPeriod)
 	}
 }
 

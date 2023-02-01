@@ -28,10 +28,8 @@ import (
 type CoschedulingArgs struct {
 	metav1.TypeMeta
 
-	// PermitWaitingTime is the wait timeout in seconds.
+	// PermitWaitingTimeSeconds is the waiting timeout in seconds.
 	PermitWaitingTimeSeconds int64
-	// DeniedPGExpirationTimeSeconds is the expiration time of the denied podgroup store.
-	DeniedPGExpirationTimeSeconds int64
 }
 
 // ModeType is a "string" type.
@@ -82,18 +80,8 @@ type MetricProviderSpec struct {
 	InsecureSkipVerify bool
 }
 
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-
-// TargetLoadPackingArgs holds arguments used to configure TargetLoadPacking plugin.
-type TargetLoadPackingArgs struct {
-	metav1.TypeMeta
-
-	// Default requests to use for best effort QoS
-	DefaultRequests v1.ResourceList
-	// Default requests multiplier for busrtable QoS
-	DefaultRequestsMultiplier string
-	// Node target CPU Utilization for bin packing
-	TargetUtilization int64
+// TrimaranSpec holds common parameters for trimaran plugins
+type TrimaranSpec struct {
 	// Metric Provider to use when using load watcher as a library
 	MetricProvider MetricProviderSpec
 	// Address of load watcher service
@@ -102,14 +90,28 @@ type TargetLoadPackingArgs struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// TargetLoadPackingArgs holds arguments used to configure TargetLoadPacking plugin.
+type TargetLoadPackingArgs struct {
+	metav1.TypeMeta
+
+	// Common parameters for trimaran plugins
+	TrimaranSpec
+	// Default requests to use for best effort QoS
+	DefaultRequests v1.ResourceList
+	// Default requests multiplier for busrtable QoS
+	DefaultRequestsMultiplier string
+	// Node target CPU Utilization for bin packing
+	TargetUtilization int64
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
 // LoadVariationRiskBalancingArgs holds arguments used to configure LoadVariationRiskBalancing plugin.
 type LoadVariationRiskBalancingArgs struct {
 	metav1.TypeMeta
 
-	// Metric Provider to use when using load watcher as a library
-	MetricProvider MetricProviderSpec
-	// Address of load watcher service
-	WatcherAddress string
+	// Common parameters for trimaran plugins
+	TrimaranSpec
 	// Multiplier of standard deviation in risk value
 	SafeVarianceMargin float64
 	// Root power of standard deviation in risk value
@@ -146,9 +148,35 @@ type NodeResourceTopologyMatchArgs struct {
 
 	// ScoringStrategy a scoring model that determine how the plugin will score the nodes.
 	ScoringStrategy ScoringStrategy
+	// If > 0, enables the caching facilities of the reserve plugin - which must be enabled
+	CacheResyncPeriodSeconds int64
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PreemptionTolerationArgs reuses DefaultPluginArgs.
 type PreemptionTolerationArgs schedconfig.DefaultPreemptionArgs
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type TopologicalSortArgs struct {
+	metav1.TypeMeta
+
+	// Namespaces to be considered by TopologySort plugin
+	Namespaces []string
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+type NetworkOverheadArgs struct {
+	metav1.TypeMeta
+
+	// Namespaces to be considered by NetworkMinCost plugin
+	Namespaces []string
+
+	// Preferred weights (Default: UserDefined)
+	WeightsName string
+
+	// The NetworkTopology CRD name
+	NetworkTopologyName string
+}

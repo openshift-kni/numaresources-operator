@@ -26,6 +26,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -177,21 +178,14 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	var deploymentNName nropv1alpha1.NamespacedName
 
 	schedulerName := instance.Spec.SchedulerName
-
-	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, instance.Spec.SchedulerImage)
-	schedupdate.DeploymentContainerEnviron(r.SchedulerManifests.Deployment, schedulerName)
-	cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.SchedulerManifests.ConfigMap)
-	if err != nil {
+	cacheResyncPeriod := unpackAPIResyncPeriod(instance.Spec.CacheResyncPeriod)
+	if err := schedupdate.SchedulerConfig(r.SchedulerManifests.ConfigMap, schedulerName, cacheResyncPeriod); err != nil {
 		return deploymentNName, schedulerName, err
 	}
-	schedupdate.DeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
 
-	if schedulerName != "" {
-		err := schedupdate.SchedulerName(r.SchedulerManifests.ConfigMap, instance.Spec.SchedulerName)
-		if err != nil {
-			return nropv1alpha1.NamespacedName{}, schedulerName, err
-		}
-	}
+	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
+	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, instance.Spec.SchedulerImage)
+	schedupdate.DeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
 	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, instance.Spec.LogLevel); err != nil {
 		return deploymentNName, schedulerName, err
 	}
@@ -222,4 +216,13 @@ func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sch
 		return errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(sched))
 	}
 	return nil
+}
+
+func unpackAPIResyncPeriod(reconcilePeriod *metav1.Duration) time.Duration {
+	if reconcilePeriod == nil {
+		return 0
+	}
+	period := reconcilePeriod.Round(time.Second)
+	klog.InfoS("setting reconcile period", "computed", period, "supplied", reconcilePeriod)
+	return period
 }
