@@ -1,15 +1,14 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 aliases:
-  performance-reviewers:
+  numaresources-reviewers:
     - MarSik
     - ffromani
     - yanirq
     - Tal-or
-    - marioferh
     - jlojosnegros
     - swatisehgal
-  performance-approvers:
+  numaresources-approvers:
     - MarSik
     - ffromani
     - yanirq
