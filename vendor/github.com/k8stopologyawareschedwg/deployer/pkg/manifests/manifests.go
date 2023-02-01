@@ -38,6 +38,10 @@ import (
 	"k8s.io/utils/pointer"
 	apiconfigv1beta2 "sigs.k8s.io/scheduler-plugins/apis/config/v1beta2"
 
+	k8sschedpluginsconf "sigs.k8s.io/scheduler-plugins/apis/config"
+	k8sschedpluginsconfv1beta2 "sigs.k8s.io/scheduler-plugins/apis/config/v1beta2"
+	k8sschedpluginsconfv1beta3 "sigs.k8s.io/scheduler-plugins/apis/config/v1beta3"
+
 	rteassets "github.com/k8stopologyawareschedwg/deployer/pkg/assets/rte"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/images"
@@ -53,7 +57,6 @@ const (
 const (
 	SubComponentSchedulerPluginScheduler            = "scheduler"
 	SubComponentSchedulerPluginController           = "controller"
-	SubComponentNodeFeatureDiscoveryMaster          = "master"
 	SubComponentNodeFeatureDiscoveryTopologyUpdater = "topologyupdater"
 )
 
@@ -73,7 +76,6 @@ const (
 const (
 	containerNameRTE                = "resource-topology-exporter"
 	containerNameNFDTopologyUpdater = "nfd-topology-updater"
-	containerNameNFDMaster          = "nfd-master"
 	rteNotifierVolumeName           = "host-run-rte"
 	rteSysVolumeName                = "host-sys"
 	rtePodresourcesSocketVolumeName = "host-podresources-socket"
@@ -89,6 +91,9 @@ func init() {
 	apiextensionv1.AddToScheme(scheme.Scheme)
 	apiconfigv1beta2.AddToScheme(scheme.Scheme)
 	kubeschedulerconfigv1beta2.AddToScheme(scheme.Scheme)
+	k8sschedpluginsconf.AddToScheme(scheme.Scheme)
+	k8sschedpluginsconfv1beta2.AddToScheme(scheme.Scheme)
+	k8sschedpluginsconfv1beta3.AddToScheme(scheme.Scheme)
 	machineconfigv1.Install(scheme.Scheme)
 	securityv1.Install(scheme.Scheme)
 }
@@ -606,7 +611,7 @@ func validateSubComponent(component, subComponent string) error {
 	if component == ComponentSchedulerPlugin && (subComponent == SubComponentSchedulerPluginController || subComponent == SubComponentSchedulerPluginScheduler) {
 		return nil
 	}
-	if component == ComponentNodeFeatureDiscovery && (subComponent == SubComponentNodeFeatureDiscoveryTopologyUpdater || subComponent == SubComponentNodeFeatureDiscoveryMaster) {
+	if component == ComponentNodeFeatureDiscovery && (subComponent == SubComponentNodeFeatureDiscoveryTopologyUpdater) {
 		return nil
 	}
 	return fmt.Errorf("unknown subComponent %q for component: %q", subComponent, component)

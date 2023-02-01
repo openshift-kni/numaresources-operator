@@ -20,17 +20,20 @@ spec:
       - args:
         - /bin/kube-scheduler
         - --config=/etc/kubernetes/scheduler-config.yaml
-        image: k8s.gcr.io/scheduler-plugins/kube-scheduler:v0.19.9
+        - --v=4
+        image: k8s.gcr.io/scheduler-plugins/kube-scheduler:v0.24.9
         livenessProbe:
           httpGet:
             path: /healthz
-            port: 10251
+            port: 10259
+            scheme: HTTPS
           initialDelaySeconds: 15
         name: topology-aware-scheduler
         readinessProbe:
           httpGet:
             path: /healthz
-            port: 10251
+            port: 10259
+            scheme: HTTPS
         resources:
           requests:
             cpu: '200m'
