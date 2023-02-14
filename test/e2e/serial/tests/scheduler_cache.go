@@ -45,6 +45,10 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
+const (
+	interferenceAnnotation = "e2e.test.openshift-kni.io/scheduler-interference"
+)
+
 var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("scheduler", "cache", "tier1"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha1.NodeResourceTopologyList
@@ -131,7 +135,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				Expect(ok).To(BeTrue(), "invalid CPU resource in zone %q node %q: %v", referenceZone.Name, referenceNode.Name, cpuQty)
 
 				cpuPerPod := int(float64(cpuNum) * 0.6) // anything that consumes > 50% (because overreserve over 2 NUMA zones) is fine
-				memoryPerPod := 8 * 1024 * 1024 * 1024
+				memoryPerPod := 8 * 1024 * 1024 * 1024  // random non-zero amount
 
 				// so we have now:
 				// - because of CPU request > 51% of available, a NUMA zone can run at most 1 pod.
@@ -179,12 +183,10 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 					err := fxt.Client.Create(context.TODO(), testPod)
 					Expect(err).ToNot(HaveOccurred())
 				}
-
 				// note the cleanup is done automatically once the ns on which we run is deleted - the fixture takes care
 
 				// very generous timeout here. It's hard and racy to check we had 2 pods pending (expected phased scheduling),
 				// but that would be the most correct and stricter testing.
-
 				failedPods, updatedPods := wait.ForPodListAllRunning(fxt.Client, testPods, 180*time.Second)
 				if len(failedPods) > 0 {
 					nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Minute)
@@ -197,6 +199,117 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				Expect(len(failedPods)).To(BeZero(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
 
 				for _, updatedPod := range updatedPods {
+					schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+				}
+			})
+
+			It("should keep possibly-fitting pod in pending state until overreserve is corrected by update handling interference", func() {
+
+				hostsRequired := 2
+				NUMAZonesRequired := 2
+				desiredPodsPerNode := 2
+				desiredPods := hostsRequired * desiredPodsPerNode
+				interferenceRatio := 10 // one pod each `interferenceRatio` will NOT use the NUMA-aware scheduler, thus creating interference
+
+				// we use 2 Nodes each with 2 NUMA zones for practicality: this is the simplest scenario needed, which is also good
+				// for HW availability. Adding more nodes is trivial, consuming more NUMA zones is doable but requires careful re-evaluation.
+				// We want to run more pods that can be aligned correctly on nodes, considering pessimistic overreserve
+
+				Expect(desiredPods).To(BeNumerically(">", hostsRequired)) // this is more like a C assert. Should never ever fail.
+
+				By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
+				nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
+				if len(nrtCandidates) < hostsRequired {
+					e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
+				}
+				klog.Infof("Found %d nodes with %d NUMA zones", len(nrtCandidates), NUMAZonesRequired)
+
+				// we can assume now all the zones from all the nodes are equal from cpu/memory resource perspective
+				referenceNode := nrtCandidates[0]
+				referenceZone := referenceNode.Zones[0]
+				cpuQty, ok := e2enrt.FindResourceAvailableByName(referenceZone.Resources, string(corev1.ResourceCPU))
+				Expect(ok).To(BeTrue(), "no CPU resource in zone %q node %q", referenceZone.Name, referenceNode.Name)
+
+				cpuNum, ok := cpuQty.AsInt64()
+				Expect(ok).To(BeTrue(), "invalid CPU resource in zone %q node %q: %v", referenceZone.Name, referenceNode.Name, cpuQty)
+
+				cpuPerPod := int(float64(cpuNum) * 0.6) // anything that consumes > 50% (because overreserve over 2 NUMA zones) is fine
+				memoryPerPod := 8 * 1024 * 1024 * 1024  // random non-zero amount
+
+				// so we have now:
+				// - because of CPU request > 51% of available, a NUMA zone can run at most 1 pod.
+				// - because of the overreservation, a single pod will consume resources on BOTH NUMA zones
+				// - hence at most 1 pod per compute node should be running until reconciliation catches up
+
+				podRequiredRes := corev1.ResourceList{
+					corev1.ResourceMemory: *resource.NewQuantity(int64(memoryPerPod), resource.BinarySI),
+					corev1.ResourceCPU:    *resource.NewQuantity(int64(cpuPerPod), resource.DecimalSI),
+				}
+
+				var zero int64
+				testPods := []*corev1.Pod{}
+				for seqno := 0; seqno < desiredPods; seqno++ {
+					pod := &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Name:      fmt.Sprintf("ovrfix-pod-%d", seqno),
+							Namespace: fxt.Namespace.Name,
+						},
+						Spec: corev1.PodSpec{
+							TerminationGracePeriodSeconds: &zero,
+							Containers: []corev1.Container{
+								{
+									Name:    fmt.Sprintf("ovrfix-cnt-%d", seqno),
+									Image:   images.GetPauseImage(),
+									Command: []string{images.PauseCommand},
+									Resources: corev1.ResourceRequirements{
+										Limits: podRequiredRes,
+									},
+								},
+							},
+						},
+					}
+					// note we need to make sure we have at least one interference pod
+					// independently of how many desiredPods we have
+					if (seqno % interferenceRatio) == 0 {
+						pod.Annotations = map[string]string{
+							interferenceAnnotation: "true",
+						}
+					} else {
+						pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
+					}
+					testPods = append(testPods, pod)
+				}
+
+				// note a compute node can handle exactly 2 pods because how we constructed the requirements.
+				// scheduling 2 pods right off the bat on the same compute node is actually correct (it will work)
+				// but it's not the behavior we expect. A conforming scheduler is expected to send first two pods,
+				// wait for reconciliation, the send the missing two.
+
+				klog.Infof("Creating %d pods each requiring %q", desiredPods, e2ereslist.ToString(podRequiredRes))
+				for _, testPod := range testPods {
+					err := fxt.Client.Create(context.TODO(), testPod)
+					Expect(err).ToNot(HaveOccurred())
+				}
+				// note the cleanup is done automatically once the ns on which we run is deleted - the fixture takes care
+
+				// even more generous timeout here. We need to tolerate more reconciliation time because of the interference
+				failedPods, updatedPods := wait.ForPodListAllRunning(fxt.Client, testPods, 300*time.Second)
+				if len(failedPods) > 0 {
+					nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Minute)
+					klog.Infof("%s", e2enrtint.ListToString(nrtListFailed.Items, "post failure"))
+
+					for _, failedPod := range failedPods {
+						_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
+					}
+				}
+				Expect(len(failedPods)).To(BeZero(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
+
+				for _, updatedPod := range updatedPods {
+					if isInterferencePod(updatedPod) {
+						continue
+					}
 					schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
@@ -514,4 +627,11 @@ func ResourceInfoProvidingAtMost(resources []nrtv1alpha1.ResourceInfo, resName s
 		return false
 	}
 	return true
+}
+
+func isInterferencePod(pod *corev1.Pod) bool {
+	if pod == nil || pod.Annotations == nil {
+		return false
+	}
+	return pod.Annotations[interferenceAnnotation] == "true"
 }
