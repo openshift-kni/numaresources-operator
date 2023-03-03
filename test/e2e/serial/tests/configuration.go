@@ -108,7 +108,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 			initialNroOperObj := nroOperObj.DeepCopy()
 
-			workers, err := nodes.GetWorkerNodes(fxt.Client)
+			workers, err := nodes.GetWorkerNodes(fxt.Client, context.TODO())
 			Expect(err).ToNot(HaveOccurred())
 
 			targetIdx, ok := e2efixture.PickNodeIndex(workers)
