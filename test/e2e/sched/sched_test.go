@@ -92,7 +92,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.GetUID())
 			Expect(err).ToNot(HaveOccurred())
 
-			_, err = wait.ForDeploymentComplete(e2eclient.Client, dp, time.Second*30, time.Minute*2)
+			_, err = wait.With(e2eclient.Client).Interval(30*time.Second).Timeout(2*time.Minute).ForDeploymentComplete(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 		})
 

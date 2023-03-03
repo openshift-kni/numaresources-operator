@@ -17,6 +17,7 @@
 package mustgather
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -110,7 +111,7 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				ginkgo.By("Looking for namespace in NUMAResourcesOperator")
-				updatedNRO, err := wait.ForDaemonsetInNUMAResourcesOperatorStatus(e2eclient.Client, deployment.NroObj, 5*time.Second, 2*time.Minute)
+				updatedNRO, err := wait.With(e2eclient.Client).Interval(5*time.Second).Timeout(2*time.Minute).ForDaemonsetInNUMAResourcesOperatorStatus(context.TODO(), deployment.NroObj)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				namespace := updatedNRO.Status.DaemonSets[0].Namespace
 

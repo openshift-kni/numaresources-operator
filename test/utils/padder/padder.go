@@ -201,7 +201,7 @@ func (p *Padder) Pad(timeout time.Duration, options PaddingOptions) error {
 		}
 	}
 
-	if failedPods, _ := wait.ForPodListAllRunning(p.Client, pods, wait.DefaultPodRunningTimeout); len(failedPods) > 0 {
+	if failedPods, _ := wait.With(p.Client).ForPodListAllRunning(context.TODO(), pods); len(failedPods) > 0 {
 		var asStrings []string
 		for _, pod := range failedPods {
 			asStrings = append(asStrings, fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))
@@ -258,7 +258,7 @@ func (p *Padder) Clean() error {
 			defer wg.Done()
 
 			klog.Infof("waiting for pod %q to get deleted", pod.Name)
-			if err := wait.ForPodDeleted(p.Client, p.namespace, pod.Name, time.Minute); err != nil {
+			if err := wait.With(p.Client).Timeout(time.Minute).ForPodDeleted(context.TODO(), p.namespace, pod.Name); err != nil {
 				errLock.Lock()
 				deletionErrors = append(deletionErrors, err.Error())
 				errLock.Unlock()

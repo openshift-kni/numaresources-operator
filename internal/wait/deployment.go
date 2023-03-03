@@ -18,20 +18,17 @@ package wait
 
 import (
 	"context"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
+	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ForDeploymentComplete(cli client.Client, dp *appsv1.Deployment, pollInterval, pollTimeout time.Duration) (*appsv1.Deployment, error) {
+func (wt Waiter) ForDeploymentComplete(ctx context.Context, dp *appsv1.Deployment) (*appsv1.Deployment, error) {
 	key := ObjectKeyFromObject(dp)
 	updatedDp := &appsv1.Deployment{}
-	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		err := cli.Get(context.TODO(), key.AsKey(), updatedDp)
+	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+		err := wt.Cli.Get(ctx, key.AsKey(), updatedDp)
 		if err != nil {
 			klog.Warningf("failed to get the deployment %s: %v", key.String(), err)
 			return false, err
@@ -59,11 +56,11 @@ func IsDeploymentComplete(dp *appsv1.Deployment, newStatus *appsv1.DeploymentSta
 		newStatus.ObservedGeneration >= dp.Generation
 }
 
-func ForDeploymentReplicasCreation(cli client.Client, dp *appsv1.Deployment, expectedReplicas int32, pollInterval, pollTimeout time.Duration) (*appsv1.Deployment, error) {
+func (wt Waiter) ForDeploymentReplicasCreation(ctx context.Context, dp *appsv1.Deployment, expectedReplicas int32) (*appsv1.Deployment, error) {
 	key := ObjectKeyFromObject(dp)
 	updatedDp := &appsv1.Deployment{}
-	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		err := cli.Get(context.TODO(), key.AsKey(), updatedDp)
+	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+		err := wt.Cli.Get(ctx, key.AsKey(), updatedDp)
 		if err != nil {
 			klog.Warningf("failed to get the deployment %s: %v", key.String(), err)
 			return false, err

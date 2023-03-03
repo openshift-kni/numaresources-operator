@@ -117,7 +117,7 @@ func TeardownDeployment(nrod NroDeployment, timeout time.Duration) {
 			defer GinkgoRecover()
 			defer wg.Done()
 			klog.Infof("waiting for MCP %q to be gone", mcpObj.Name)
-			err := wait.ForMachineConfigPoolDeleted(e2eclient.Client, mcpObj, 10*time.Second, timeout)
+			err := wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(timeout).ForMachineConfigPoolDeleted(context.TODO(), mcpObj)
 			ExpectWithOffset(1, err).ToNot(HaveOccurred(), "MCP %q failed to be deleted", mcpObj.Name)
 		}(nrod.McpObj)
 	}
@@ -131,7 +131,7 @@ func TeardownDeployment(nrod NroDeployment, timeout time.Duration) {
 			defer GinkgoRecover()
 			defer wg.Done()
 			klog.Infof("waiting for KC %q to be gone", kcObj.Name)
-			err := wait.ForKubeletConfigDeleted(e2eclient.Client, kcObj, 10*time.Second, timeout)
+			err := wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(timeout).ForKubeletConfigDeleted(context.TODO(), kcObj)
 			ExpectWithOffset(1, err).ToNot(HaveOccurred(), "KC %q failed to be deleted", kcObj.Name)
 		}(nrod.KcObj)
 	}
@@ -143,7 +143,7 @@ func TeardownDeployment(nrod NroDeployment, timeout time.Duration) {
 		defer GinkgoRecover()
 		defer wg.Done()
 		klog.Infof("waiting for NROP %q to be gone", nropObj.Name)
-		err := wait.ForNUMAResourcesOperatorDeleted(e2eclient.Client, nropObj, 10*time.Second, timeout)
+		err := wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(timeout).ForNUMAResourcesOperatorDeleted(context.TODO(), nropObj)
 		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
 	}(nrod.NroObj)
 
@@ -259,7 +259,7 @@ func TeardownNROScheduler(nroSched *nropv1.NUMAResourcesScheduler, timeout time.
 		err := e2eclient.Client.Delete(context.TODO(), nroSched)
 		ExpectWithOffset(1, err).ToNot(HaveOccurred())
 
-		err = wait.ForNUMAResourcesSchedulerDeleted(e2eclient.Client, nroSched, 10*time.Second, timeout)
+		err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(timeout).ForNUMAResourcesSchedulerDeleted(context.TODO(), nroSched)
 		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "NROScheduler %q failed to be deleted", nroSched.Name)
 	}
 }

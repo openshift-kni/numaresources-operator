@@ -214,7 +214,7 @@ var _ = Describe("[Install] durability", func() {
 			}
 
 			By("waiting for DaemonSet to be ready")
-			ds, err := nrowait.ForDaemonSetReadyByKey(e2eclient.Client, dsKey, 10*time.Second, 3*time.Minute)
+			ds, err := nrowait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(context.TODO(), dsKey)
 			Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
 			By("Update RTE image in NRO")
@@ -359,7 +359,7 @@ func deleteNROPSync(cli client.Client, nropObj *nropv1.NUMAResourcesOperator) {
 	var err error
 	err = cli.Delete(context.TODO(), nropObj)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-	err = nrowait.ForNUMAResourcesOperatorDeleted(cli, nropObj, 10*time.Second, 2*time.Minute)
+	err = nrowait.With(cli).Interval(10*time.Second).Timeout(2*time.Minute).ForNUMAResourcesOperatorDeleted(context.TODO(), nropObj)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
 }
 

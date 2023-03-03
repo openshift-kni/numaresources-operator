@@ -107,7 +107,7 @@ func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, timeo
 			klog.Infof("waiting for daemonset %q to be ready", ds.Name)
 
 			// TODO: what if timeout < period?
-			ds, err := wait.ForDaemonSetReady(fxt.Client, ds, 10*time.Second, timeout)
+			ds, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(timeout).ForDaemonSetReady(context.TODO(), ds)
 			Expect(err).ToNot(HaveOccurred(), "DaemonSet %q failed to go running", ds.Name)
 		}(ds)
 	}
