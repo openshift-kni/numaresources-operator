@@ -65,7 +65,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 
 			Eventually(func() bool {
 				// find deployment by the ownerReference
-				deploy, err := podlist.GetDeploymentByOwnerReference(e2eclient.Client, uid)
+				deploy, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), uid)
 				if err != nil {
 					klog.Warningf("%w", err)
 					return false
@@ -89,7 +89,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(BeTrue())
 
 			// find deployment by the ownerReference
-			dp, err := podlist.GetDeploymentByOwnerReference(e2eclient.Client, nroSchedObj.GetUID())
+			dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.GetUID())
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = wait.ForDeploymentComplete(e2eclient.Client, dp, time.Second*30, time.Minute*2)
@@ -141,7 +141,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 				return true
 			}).WithTimeout(time.Minute * 2).WithPolling(time.Second * 30).Should(BeTrue())
 
-			dp, err := podlist.GetDeploymentByOwnerReference(e2eclient.Client, nroSchedObj.GetUID())
+			dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.GetUID())
 			Expect(err).ToNot(HaveOccurred())
 
 			initialDP := dp.DeepCopy()

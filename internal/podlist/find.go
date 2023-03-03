@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Red Hat, Inc.
+ * Copyright 2023 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,25 +17,13 @@
 package podlist
 
 import (
-	"context"
-
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (fnd Finder) ByReplicaSet(ctx context.Context, rs appsv1.ReplicaSet) ([]corev1.Pod, error) {
-	podList := &corev1.PodList{}
-	sel, err := metav1.LabelSelectorAsSelector(rs.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
+type Finder struct {
+	client.Client
+}
 
-	err = fnd.List(ctx, podList, &client.ListOptions{Namespace: rs.Namespace, LabelSelector: sel})
-	if err != nil {
-		return nil, err
-	}
-
-	return podList.Items, nil
+func With(cli client.Client) Finder {
+	return Finder{Client: cli}
 }

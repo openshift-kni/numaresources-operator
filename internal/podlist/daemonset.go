@@ -25,14 +25,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ByDaemonset(cli client.Client, ds appsv1.DaemonSet) ([]corev1.Pod, error) {
+func (fnd Finder) ByDaemonset(ctx context.Context, ds appsv1.DaemonSet) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	sel, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 
-	err = cli.List(context.TODO(), podList, &client.ListOptions{LabelSelector: sel})
+	err = fnd.List(ctx, podList, &client.ListOptions{LabelSelector: sel})
 	if err != nil {
 		return nil, err
 	}

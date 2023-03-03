@@ -79,7 +79,7 @@ var _ = Describe("[Scheduler] install", func() {
 			By("checking the NumaResourcesScheduler Deployment is correctly deployed")
 			deployment := &appsv1.Deployment{}
 			Eventually(func() bool {
-				deployment, err = podlist.GetDeploymentByOwnerReference(e2eclient.Client, nroSchedObj.UID)
+				deployment, err = podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.UID)
 				if err != nil {
 					klog.Warningf("unable to get deployment by owner reference: %v", err)
 					return false
@@ -93,7 +93,7 @@ var _ = Describe("[Scheduler] install", func() {
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "Deployment Status not OK: %v", deployment.Status)
 
 			By("Check secondary scheduler pod is scheduled on a control-plane node")
-			podList, err := podlist.ByDeployment(e2eclient.Client, *deployment)
+			podList, err := podlist.With(e2eclient.Client).ByDeployment(context.TODO(), *deployment)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(podList).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
