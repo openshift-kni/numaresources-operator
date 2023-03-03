@@ -278,7 +278,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
-			pods, err := podlist.ByDeployment(fxt.Client, *updatedDp)
+			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(pods)).To(Equal(1))
 

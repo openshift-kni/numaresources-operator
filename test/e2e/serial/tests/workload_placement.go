@@ -221,7 +221,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
-			pods, err := podlist.ByDeployment(fxt.Client, *updatedDp)
+			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(pods)).To(Equal(1))
 
@@ -277,7 +277,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			namespacedDpName := fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
 			Eventually(func() bool {
-				pods, err = podlist.ByDeployment(fxt.Client, *updatedDp)
+				pods, err = podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 				if err != nil {
 					klog.Warningf("failed to list the pods of deployment: %q error: %v", namespacedDpName, err)
 					return false
@@ -369,7 +369,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			namespacedDpName = fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
 			Eventually(func() bool {
-				pods, err = podlist.ByDeployment(fxt.Client, *updatedDp)
+				pods, err = podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 				if err != nil {
 					klog.Warningf("failed to list the pods of deployment: %q error: %v", namespacedDpName, err)
 					return false
@@ -741,7 +741,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
-			pods, err := podlist.ByDeployment(fxt.Client, *updatedDp)
+			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(pods)).To(Equal(2))
 
@@ -798,7 +798,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			namespacedDpName := fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
 			Eventually(func() bool {
-				pods, err = podlist.ByDeployment(fxt.Client, *updatedDp)
+				pods, err = podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 				if err != nil {
 					klog.Warningf("failed to list the pods of deployment: %q error: %v", namespacedDpName, err)
 					return false
@@ -973,7 +973,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			var pods []corev1.Pod
 			Eventually(func() bool {
-				pods, err = podlist.ByReplicaSet(fxt.Client, *rs)
+				pods, err = podlist.With(fxt.Client).ByReplicaSet(context.TODO(), *rs)
 				if err != nil {
 					klog.Warningf("failed to list the pods of replicaset: %q error: %v", namespacedRsName.String(), err)
 					return false
@@ -1079,7 +1079,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() bool {
-				pods, err = podlist.ByReplicaSet(fxt.Client, *rs)
+				pods, err = podlist.With(fxt.Client).ByReplicaSet(context.TODO(), *rs)
 				if err != nil {
 					klog.Warningf("failed to list the pods of replicaset: %q error: %v", namespacedRsName.String(), err)
 					return false
@@ -1390,12 +1390,12 @@ func logSchedulerPluginLogs(fxt e2efixture.Fixture) {
 		klog.Warningf("error getting the scheduler plugin CR: %v", err)
 		return
 	}
-	schedDp, err := podlist.GetDeploymentByOwnerReference(fxt.Client, nroSchedObj.GetUID())
+	schedDp, err := podlist.With(fxt.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.GetUID())
 	if err != nil {
 		klog.Warningf("error getting the scheduler deployment: %v", err)
 		return
 	}
-	schedPods, err := podlist.ByDeployment(fxt.Client, *schedDp)
+	schedPods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *schedDp)
 	if err != nil {
 		klog.Warningf("error getting the scheduler pod: %v", err)
 		return

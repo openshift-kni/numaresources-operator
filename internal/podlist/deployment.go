@@ -27,10 +27,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func GetDeploymentByOwnerReference(cli client.Client, uid types.UID) (*appsv1.Deployment, error) {
+func (fnd Finder) DeploymentByOwnerReference(ctx context.Context, uid types.UID) (*appsv1.Deployment, error) {
 	deployList := &appsv1.DeploymentList{}
 
-	if err := cli.List(context.TODO(), deployList); err != nil {
+	if err := fnd.List(ctx, deployList); err != nil {
 		return nil, fmt.Errorf("failed to get deployment: %w", err)
 	}
 
@@ -44,14 +44,14 @@ func GetDeploymentByOwnerReference(cli client.Client, uid types.UID) (*appsv1.De
 	return nil, fmt.Errorf("failed to get deployment with uid: %s", uid)
 }
 
-func ByDeployment(cli client.Client, deployment appsv1.Deployment) ([]corev1.Pod, error) {
+func (fnd Finder) ByDeployment(ctx context.Context, deployment appsv1.Deployment) ([]corev1.Pod, error) {
 	podList := &corev1.PodList{}
 	sel, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
 		return nil, err
 	}
 
-	err = cli.List(context.TODO(), podList, &client.ListOptions{Namespace: deployment.Namespace, LabelSelector: sel})
+	err = fnd.List(ctx, podList, &client.ListOptions{Namespace: deployment.Namespace, LabelSelector: sel})
 	if err != nil {
 		return nil, err
 	}
