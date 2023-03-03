@@ -23,49 +23,21 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
+	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	// DefaultPodRunningTimeout was computed by trial and error, not scientifically,
-	// so it may adjusted in the future any time.
-	DefaultPodRunningTimeout = 3 * time.Minute
-)
-
-type ObjectKey struct {
-	Namespace string
-	Name      string
-}
-
-func ObjectKeyFromObject(obj metav1.Object) ObjectKey {
-	return ObjectKey{Namespace: obj.GetNamespace(), Name: obj.GetName()}
-}
-
-func (ok ObjectKey) AsKey() types.NamespacedName {
-	return types.NamespacedName{
-		Namespace: ok.Namespace,
-		Name:      ok.Name,
-	}
-}
-
-func (ok ObjectKey) String() string {
-	return fmt.Sprintf("%s/%s", ok.Namespace, ok.Name)
-}
-
-func WhileInPodPhase(cli client.Client, podNamespace, podName string, phase corev1.PodPhase, interval time.Duration, steps int) error {
+func (wt Waiter) WhileInPodPhase(ctx context.Context, podNamespace, podName string, phase corev1.PodPhase) error {
 	updatedPod := &corev1.Pod{}
 	key := ObjectKey{Name: podName, Namespace: podNamespace}
-	for step := 0; step < steps; step++ {
-		time.Sleep(interval)
+	for step := 0; step < wt.PollSteps; step++ {
+		time.Sleep(wt.PollInterval)
 
-		klog.Infof("ensuring the pod %s keep being in phase %s %d/%d", key.String(), phase, step+1, steps)
+		klog.Infof("ensuring the pod %s keep being in phase %s %d/%d", key.String(), phase, step+1, wt.PollSteps)
 
-		err := cli.Get(context.TODO(), client.ObjectKey{Namespace: podNamespace, Name: podName}, updatedPod)
+		err := wt.Cli.Get(ctx, client.ObjectKey{Namespace: podNamespace, Name: podName}, updatedPod)
 		if err != nil {
 			return err
 		}
@@ -78,11 +50,11 @@ func WhileInPodPhase(cli client.Client, podNamespace, podName string, phase core
 	return nil
 }
 
-func ForPodPhase(cli client.Client, podNamespace, podName string, phase corev1.PodPhase, timeout time.Duration) (*corev1.Pod, error) {
+func (wt Waiter) ForPodPhase(ctx context.Context, podNamespace, podName string, phase corev1.PodPhase) (*corev1.Pod, error) {
 	updatedPod := &corev1.Pod{}
-	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
+	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
 		objKey := ObjectKey{Name: podName, Namespace: podNamespace}
-		if err := cli.Get(context.TODO(), objKey.AsKey(), updatedPod); err != nil {
+		if err := wt.Cli.Get(ctx, objKey.AsKey(), updatedPod); err != nil {
 			klog.Warningf("failed to get the pod %#v: %v", objKey, err)
 			return false, nil
 		}
@@ -98,16 +70,16 @@ func ForPodPhase(cli client.Client, podNamespace, podName string, phase corev1.P
 	return updatedPod, err
 }
 
-func ForPodDeleted(cli client.Client, podNamespace, podName string, timeout time.Duration) error {
-	return wait.PollImmediate(time.Second, timeout, func() (bool, error) {
+func (wt Waiter) ForPodDeleted(ctx context.Context, podNamespace, podName string) error {
+	return k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
 		pod := &corev1.Pod{}
 		key := ObjectKey{Name: podName, Namespace: podNamespace}
-		err := cli.Get(context.TODO(), key.AsKey(), pod)
+		err := wt.Cli.Get(ctx, key.AsKey(), pod)
 		return deletionStatusFromError("Pod", key, err)
 	})
 }
 
-func ForPodListAllRunning(cli client.Client, pods []*corev1.Pod, timeout time.Duration) ([]*corev1.Pod, []*corev1.Pod) {
+func (wt Waiter) ForPodListAllRunning(ctx context.Context, pods []*corev1.Pod) ([]*corev1.Pod, []*corev1.Pod) {
 	var lock sync.Mutex
 	var failed []*corev1.Pod
 	var updated []*corev1.Pod
@@ -120,7 +92,7 @@ func ForPodListAllRunning(cli client.Client, pods []*corev1.Pod, timeout time.Du
 
 			klog.Infof("waiting for pod %q to be ready", pod.Name)
 
-			updatedPod, err := ForPodPhase(cli, pod.Namespace, pod.Name, corev1.PodRunning, timeout)
+			updatedPod, err := wt.ForPodPhase(ctx, pod.Namespace, pod.Name, corev1.PodRunning)
 
 			// TODO: channels would be nicer
 			lock.Lock()

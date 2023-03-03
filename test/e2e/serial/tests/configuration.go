@@ -152,7 +152,10 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					go func(mcpool *machineconfigv1.MachineConfigPool) {
 						defer GinkgoRecover()
 						defer wg.Done()
-						err = wait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
+						err = wait.With(fxt.Client).
+							Interval(configuration.MachineConfigPoolUpdateInterval).
+							Timeout(configuration.MachineConfigPoolUpdateTimeout).
+							ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
 						Expect(err).ToNot(HaveOccurred())
 					}(mcp)
 				}
@@ -163,7 +166,10 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				err = fxt.Client.Delete(context.TODO(), testMcp)
 				Expect(err).ToNot(HaveOccurred())
 
-				err = wait.ForMachineConfigPoolDeleted(fxt.Client, testMcp, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
+				err = wait.With(fxt.Client).
+					Interval(configuration.MachineConfigPoolUpdateInterval).
+					Timeout(configuration.MachineConfigPoolUpdateTimeout).
+					ForMachineConfigPoolDeleted(context.TODO(), testMcp)
 				Expect(err).ToNot(HaveOccurred())
 			}() // end of defer
 
@@ -206,7 +212,10 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				go func(mcpool *machineconfigv1.MachineConfigPool) {
 					defer GinkgoRecover()
 					defer wg.Done()
-					err = wait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
+					err = wait.With(fxt.Client).
+						Interval(configuration.MachineConfigPoolUpdateInterval).
+						Timeout(configuration.MachineConfigPoolUpdateTimeout).
+						ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
 					Expect(err).ToNot(HaveOccurred())
 				}(mcp)
 			}
@@ -349,7 +358,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			updatedPod, err := wait.With(fxt.Client).Timeout(timeout).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -412,7 +421,10 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				go func(mcpool *machineconfigv1.MachineConfigPool) {
 					defer GinkgoRecover()
 					defer wg.Done()
-					err = wait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
+					err = wait.With(fxt.Client).
+						Interval(configuration.MachineConfigPoolUpdateInterval).
+						Timeout(configuration.MachineConfigPoolUpdateTimeout).
+						ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
 					Expect(err).ToNot(HaveOccurred())
 				}(mcp)
 			}
@@ -477,7 +489,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			testPod, err = wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			testPod, err = wait.With(fxt.Client).Timeout(timeout).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, testPod.Namespace, testPod.Name)
 			}
@@ -531,7 +543,10 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					go func(mcpool *machineconfigv1.MachineConfigPool) {
 						defer GinkgoRecover()
 						defer wg.Done()
-						err = wait.ForMachineConfigPoolCondition(fxt.Client, mcpool, machineconfigv1.MachineConfigPoolUpdated, configuration.MachineConfigPoolUpdateInterval, configuration.MachineConfigPoolUpdateTimeout)
+						err = wait.With(fxt.Client).
+							Interval(configuration.MachineConfigPoolUpdateInterval).
+							Timeout(configuration.MachineConfigPoolUpdateTimeout).
+							ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
 						Expect(err).ToNot(HaveOccurred())
 					}(mcp)
 				}
