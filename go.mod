@@ -119,9 +119,9 @@ require (
 	golang.org/x/mod v0.6.0 // indirect
 	golang.org/x/net v0.3.1-0.20221206200815-1e63c2f08a10 // indirect
 	golang.org/x/oauth2 v0.0.0-20220622183110-fd043fe589d2 // indirect
-	golang.org/x/sys v0.3.0 // indirect
-	golang.org/x/term v0.3.0 // indirect
-	golang.org/x/text v0.5.0 // indirect
+	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/term v0.5.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
 	golang.org/x/time v0.0.0-20220609170525-579cf78fd858 // indirect
 	golang.org/x/tools v0.2.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220517211312-f3a8303e98df // indirect
@@ -185,4 +185,7 @@ replace (
 )
 
 // local deps bump
-replace github.com/coreos/ignition/v2 => github.com/coreos/ignition/v2 v2.14.0
+replace (
+	github.com/coreos/ignition/v2 => github.com/coreos/ignition/v2 v2.14.0
+	golang.org/x/net => golang.org/x/net v0.7.0
+)
