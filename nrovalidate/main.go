@@ -82,7 +82,9 @@ func main() {
 		os.Exit(0)
 	}
 
-	err = validateCluster(parsedArgs)
+	ctx := context.Background()
+
+	err = validateCluster(ctx, parsedArgs)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error while trying to validate cluster: %v\n", err)
 		os.Exit(2)
@@ -112,7 +114,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	return pArgs, err
 }
 
-func validateCluster(args ProgArgs) error {
+func validateCluster(ctx context.Context, args ProgArgs) error {
 	cli, err := NewClientWithScheme(scheme)
 	if err != nil {
 		return err
@@ -122,7 +124,7 @@ func validateCluster(args ProgArgs) error {
 		fmt.Fprintf(os.Stderr, "INFO>>>>: enabled validators: %s\n", strings.Join(args.Validations.List(), ","))
 	}
 
-	data, err := nrovalidator.Collect(context.TODO(), cli, args.Labels, args.Validations)
+	data, err := nrovalidator.Collect(ctx, cli, args.Labels, args.Validations)
 	if err != nil {
 		return err
 	}
