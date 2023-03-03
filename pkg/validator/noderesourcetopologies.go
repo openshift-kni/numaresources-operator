@@ -43,7 +43,7 @@ func CollectNodeResourceTopologies(ctx context.Context, _ client.Client, data *V
 		return err
 	}
 
-	nrtList, err := cli.TopologyV1alpha1().NodeResourceTopologies().List(context.TODO(), metav1.ListOptions{})
+	nrtList, err := cli.TopologyV1alpha1().NodeResourceTopologies().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		if IsNodeResourceTopologyCRDMissing(err) {
 			data.nrtCrdMissing = true
