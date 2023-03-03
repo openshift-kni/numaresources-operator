@@ -460,7 +460,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod-gu-with-tas-sched")
 
 			// calculate base load on the target node
-			baseload, err := nodes.GetLoad(fxt.K8sClient, targetNodeName)
+			baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 			klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 
@@ -700,7 +700,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			// calculate base load on the target node
-			baseload, err := nodes.GetLoad(fxt.K8sClient, targetNodeName)
+			baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 			klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 

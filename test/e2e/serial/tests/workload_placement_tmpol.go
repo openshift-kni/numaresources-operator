@@ -2006,7 +2006,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 })
 
 func setupPadding(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod {
-	baseload, err := nodes.GetLoad(fxt.K8sClient, padInfo.targetNodeName)
+	baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), padInfo.targetNodeName)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", padInfo.targetNodeName)
 	By(fmt.Sprintf("computed base load: %s", baseload))
 
@@ -2052,7 +2052,7 @@ func setupPaddingForUnsuitableNodes(offset int, fxt *e2efixture.Fixture, nrtList
 		nrtInfo, err := e2enrt.FindFromList(nrtList.Items, unsuitableNodeName)
 		ExpectWithOffset(offset, err).ToNot(HaveOccurred(), "missing NRT info for %q", unsuitableNodeName)
 
-		baseload, err := nodes.GetLoad(fxt.K8sClient, unsuitableNodeName)
+		baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), unsuitableNodeName)
 		ExpectWithOffset(offset, err).ToNot(HaveOccurred(), "missing node load info for %q", unsuitableNodeName)
 		By(fmt.Sprintf("computed base load: %s", baseload))
 
