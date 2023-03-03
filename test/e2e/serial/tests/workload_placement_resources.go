@@ -107,12 +107,11 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 				Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
 
 				By("waiting for pod to be up and running")
-				podRunningTimeout := 1 * time.Minute
-				updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
+				updatedPod, err := wait.With(fxt.Client).Timeout(time.Minute).ForPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodRunning)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 				}
-				Expect(err).NotTo(HaveOccurred(), "Pod %q not up&running after %v", pod.Name, podRunningTimeout)
+				Expect(err).NotTo(HaveOccurred(), "Pod %q not up&running after %v", pod.Name, time.Minute)
 
 				By("checking the pod has been scheduled in the proper node")
 				Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName))

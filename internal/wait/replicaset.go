@@ -18,20 +18,17 @@ package wait
 
 import (
 	"context"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
+	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ForReplicasetComplete(cli client.Client, rs *appsv1.ReplicaSet, pollInterval, pollTimeout time.Duration) (*appsv1.ReplicaSet, error) {
+func (wt Waiter) ForReplicasetComplete(ctx context.Context, rs *appsv1.ReplicaSet) (*appsv1.ReplicaSet, error) {
 	key := ObjectKeyFromObject(rs)
 	updatedRs := &appsv1.ReplicaSet{}
-	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		err := cli.Get(context.TODO(), key.AsKey(), updatedRs)
+	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+		err := wt.Cli.Get(ctx, key.AsKey(), updatedRs)
 		if err != nil {
 			klog.Warningf("failed to get the replicaset %s: %v", key.String(), err)
 			return false, err

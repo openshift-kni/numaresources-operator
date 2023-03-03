@@ -236,10 +236,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
 				By("waiting for deployment to be up&running")
-				dpRunningTimeout := 2 * time.Minute
-				dpRunningPollInterval := 10 * time.Second
-				_, err = wait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
-				Expect(err).NotTo(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, dpRunningTimeout)
+				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(2*time.Minute).ForDeploymentComplete(context.TODO(), deployment)
+				Expect(err).NotTo(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, 2*time.Minute)
 
 				nrtListPostCreate, err := e2enrt.GetUpdated(fxt.Client, nrtListInitial, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
@@ -423,7 +421,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
 				By("wait for the deployment to be up with its pod created")
-				deployment, err = wait.ForDeploymentReplicasCreation(fxt.Client, deployment, replicas, time.Second, time.Minute)
+				deployment, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDeploymentReplicasCreation(context.TODO(), deployment, replicas)
 				Expect(err).NotTo(HaveOccurred())
 
 				By("check the deployment pod is still pending")
@@ -432,7 +430,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
 				for _, pod := range pods {
-					err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+					err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
 					if err != nil {
 						_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 					}
