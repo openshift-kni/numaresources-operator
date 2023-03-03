@@ -151,7 +151,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
 				Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", nodeName)
 
 				for zIdx, zone := range nrtInfo.Zones {

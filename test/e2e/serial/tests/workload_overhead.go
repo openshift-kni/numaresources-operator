@@ -188,7 +188,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 					Expect(err).NotTo(HaveOccurred(), "missing NRT Info for node %q", nodeName)
 
-					baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+					baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
 					Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", nodeName)
 
 					for zIdx, zone := range nrtInfo.Zones {
@@ -346,7 +346,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					nrtInfo, err := e2enrt.FindFromList(nrtTwoZoneCandidates, nodeName)
 					Expect(err).NotTo(HaveOccurred(), "missing NRT Info for node %q", nodeName)
 
-					baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+					baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
 					Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", nodeName)
 
 					for zIdx, zone := range nrtInfo.Zones {
@@ -376,7 +376,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				By("padding a NUMA node on the target node")
 				var paddingPodsTargetNode []*corev1.Pod
 
-				baseload, err := nodes.GetLoad(fxt.K8sClient, targetNodeName)
+				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
 				Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", targetNodeName)
 
 				for zIdx, zone := range targetNrtInitial.Zones {

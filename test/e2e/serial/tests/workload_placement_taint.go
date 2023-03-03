@@ -125,7 +125,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			})
 			Expect(err).ToNot(HaveOccurred())
 
-			nodes, err := nodes.GetWorkerNodes(fxt.Client)
+			nodes, err := nodes.GetWorkerNodes(fxt.Client, context.TODO())
 			Expect(err).ToNot(HaveOccurred())
 
 			tnts, _, err := taints.ParseTaints([]string{testTaint()})
@@ -161,7 +161,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			// leaking taints is especially bad AND we had some bugs in the pass, so let's try our very bes
 			// to be really really sure we didn't pollute the cluster.
-			nodes, err := nodes.GetWorkerNodes(fxt.Client)
+			nodes, err := nodes.GetWorkerNodes(fxt.Client, context.TODO())
 			Expect(err).ToNot(HaveOccurred())
 
 			nodeNames := accumulateNodeNames(nodes)
