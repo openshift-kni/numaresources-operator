@@ -99,7 +99,7 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/spf13/cobra v1.5.0 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
+	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace // indirect
 	github.com/vincent-petithory/dataurl v1.0.0 // indirect
 	go.opentelemetry.io/contrib v0.20.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.20.0 // indirect
@@ -178,7 +178,11 @@ replace (
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.25.4
 )
 
+// local pinning
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
 	github.com/openshift/machine-config-operator => github.com/openshift/machine-config-operator v0.0.1-0.20221101091906-fa5e7ae3f0e9 // release-4.12
 )
+
+// local deps bump
+replace github.com/coreos/ignition/v2 => github.com/coreos/ignition/v2 v2.14.0
