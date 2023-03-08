@@ -113,7 +113,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	defer klog.V(3).InfoS("Finish NUMAResourcesOperator reconcile loop", "object", req.NamespacedName)
 
 	instance := &nropv1.NUMAResourcesOperator{}
-	err := r.Get(context.TODO(), req.NamespacedName, instance)
+	err := r.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -196,7 +196,7 @@ func messageFromError(err error) string {
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, string, error) {
 	var err error
-	err = r.syncNodeResourceTopologyAPI()
+	err = r.syncNodeResourceTopologyAPI(ctx)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedCRDInstall", "Failed to install Node Resource Topology CRD: %v", err)
 		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedAPISync")
@@ -264,14 +264,14 @@ func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Con
 	return dsStatuses, true, nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI() error {
+func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx context.Context) error {
 	klog.V(4).Info("APISync start")
 	defer klog.V(4).Info("APISync stop")
 
-	existing := apistate.FromClient(context.TODO(), r.Client, r.Platform, r.APIManifests)
+	existing := apistate.FromClient(ctx, r.Client, r.Platform, r.APIManifests)
 
 	for _, objState := range existing.State(r.APIManifests) {
-		if _, err := apply.ApplyObject(context.TODO(), r.Client, objState); err != nil {
+		if _, err := apply.ApplyObject(ctx, r.Client, objState); err != nil {
 			return errors.Wrapf(err, "could not create %s", objState.Desired.GetObjectKind().GroupVersionKind().String())
 		}
 	}
@@ -540,6 +540,7 @@ func (r *NUMAResourcesOperatorReconciler) mcpToNUMAResourceOperator(mcpObj clien
 		Namespace: mcpObj.GetNamespace(),
 		Name:      mcpObj.GetName(),
 	}
+
 	if err := r.Get(context.TODO(), key, mcp); err != nil {
 		klog.Errorf("failed to get the machine config pool %+v", key)
 		return nil

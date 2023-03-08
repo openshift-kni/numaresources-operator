@@ -201,7 +201,7 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 		nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 		ExpectWithOffset(1, err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-		baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+		baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
 		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 		By(fmt.Sprintf("computed base load: %s", baseload))
 
@@ -218,7 +218,7 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 
 	By("Padding the target node")
 
-	baseload, err := nodes.GetLoad(fxt.K8sClient, targetNodeName)
+	baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 	By(fmt.Sprintf("computed base load: %s", baseload))
 

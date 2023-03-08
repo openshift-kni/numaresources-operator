@@ -97,7 +97,7 @@ var _ = Describe("[Scheduler] install", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(podList).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
-			nodeList, err := nodes.GetControlPlane(e2eclient.Client, configuration.Plat)
+			nodeList, err := nodes.GetControlPlane(e2eclient.Client, context.TODO(), configuration.Plat)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(nodeList).ToNot(BeEmpty())
 
