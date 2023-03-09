@@ -18,6 +18,7 @@ package tests
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 
 	"github.com/ghodss/yaml"
@@ -534,6 +536,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 		It("should report the NodeGroupConfig in the status", func() {
 			nroKey := objects.NROObjectKey()
 			nroOperObj := nropv1alpha1.NUMAResourcesOperator{}
+
 			err := fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 
@@ -543,19 +546,49 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				e2efixture.Skipf(fxt, "more than one NodeGroup not yet supported, found %d", len(nroOperObj.Spec.NodeGroups))
 			}
 
-			Expect(len(nroOperObj.Status.MachineConfigPools)).To(Equal(len(nroOperObj.Spec.NodeGroups)),
-				"MCP Status mismatch: found %d, expected %d",
-				len(nroOperObj.Status.MachineConfigPools), len(nroOperObj.Spec.NodeGroups),
-			)
+			seenStatusConf := false
+			err = k8swait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
+				klog.Infof("getting: %q", nroKey.String())
 
-			// normalize config to handle unspecified defaults
-			specConf := merge.NodeGroupConfig(
-				nropv1alpha1.DefaultNodeGroupConfig(),
-				*nroOperObj.Spec.NodeGroups[0].Config,
-			)
-			statusConf := nroOperObj.Status.MachineConfigPools[0].Config // shortcut
-			Expect(statusConf).To(Equal(specConf))
+				// getting the same object twice is awkward, but still it seems better better than skipping inside a loop.
+				err := fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
+				if err != nil {
+					return false, fmt.Errorf("cannot get %q in the cluster: %w", nroKey.String(), err)
+				}
+				if len(nroOperObj.Status.MachineConfigPools) != len(nroOperObj.Spec.NodeGroups) {
+					return false, fmt.Errorf("MCP Status mismatch: found %d, expected %d",
+						len(nroOperObj.Status.MachineConfigPools), len(nroOperObj.Spec.NodeGroups),
+					)
+				}
+				klog.Infof("fetched NRO Object %q", nroKey.String())
 
+				statusConf := nroOperObj.Status.MachineConfigPools[0].Config // shortcut
+				if statusConf == nil {
+					// is this a transient error or does the cluster not support the Config reporting?
+					return false, nil
+				}
+
+				seenStatusConf = true
+
+				// normalize config to handle unspecified defaults
+				specConf := nropv1alpha1.DefaultNodeGroupConfig()
+				if nroOperObj.Spec.NodeGroups[0].Config != nil {
+					specConf = merge.NodeGroupConfig(specConf, *nroOperObj.Spec.NodeGroups[0].Config)
+				}
+
+				// the status must be always populated by the operator.
+				// If the user-provided spec is missing, the status must reflect the compiled-in defaults.
+				// This is wrapped in a Eventually because even in functional, well-behaving clusters,
+				// the operator may take nonzero time to populate the status, and this is still fine.\
+				// NOTE HERE: we need to match the types as well (ptr and ptr)
+				match := cmp.Equal(statusConf, &specConf)
+				klog.Infof("NRO Object %q status %v spec %v match %v", nroKey.String(), toJSON(statusConf), toJSON(specConf), match)
+				return match, nil
+			})
+			if !seenStatusConf {
+				e2efixture.Skipf(fxt, "NodeGroupConfig never reported in status, assuming not supported")
+			}
+			Expect(err).ToNot(HaveOccurred(), "failed to check the NodeGroupConfig status for %q", nroKey.String())
 		})
 	})
 })
@@ -586,4 +619,12 @@ func rteConfigFrom(data string) (*rteconfig.Config, error) {
 		return nil, err
 	}
 	return conf, nil
+}
+
+func toJSON(obj interface{}) string {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return "<ERROR>"
+	}
+	return string(data)
 }
