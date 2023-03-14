@@ -723,8 +723,58 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(args).ToNot(ContainElement(ContainSubstring("--notify-file")), "malformed args: %v", args)
 		})
 
-	})
+		It("should allow to update all the settings of the DS objects", func() {
+			conf := nropv1.DefaultNodeGroupConfig()
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
 
+			reconciler := reconcileObjects(nro, mcp)
+
+			mcpDSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+
+			args := ds.Spec.Template.Spec.Containers[0].Args
+			Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
+			Expect(args).To(ContainElement(ContainSubstring("--notify-file=")), "malformed args: %v", args)
+			Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
+
+			d, err := time.ParseDuration("12s")
+			Expect(err).ToNot(HaveOccurred())
+
+			period := metav1.Duration{
+				Duration: d,
+			}
+			refMode := nropv1.InfoRefreshPeriodic
+			confUpdated := nropv1.NodeGroupConfig{
+				InfoRefreshPeriod: &period,
+				InfoRefreshMode:   &refMode,
+			}
+
+			key := client.ObjectKeyFromObject(nro)
+
+			Eventually(func() error {
+				nroUpdated := &nropv1.NUMAResourcesOperator{}
+				Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).NotTo(HaveOccurred())
+				nroUpdated.Spec.NodeGroups[0].Config = &confUpdated
+				return reconciler.Client.Update(context.TODO(), nroUpdated)
+			}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
+
+			thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+
+			dsUpdated := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, dsUpdated)).ToNot(HaveOccurred())
+
+			argsUpdated := dsUpdated.Spec.Template.Spec.Containers[0].Args
+			Expect(argsUpdated).To(ContainElement("--sleep-interval=12s"), "malformed updated args: %v", argsUpdated)
+			Expect(argsUpdated).ToNot(ContainElement(ContainSubstring("--notify-file=")), "malformed updated args: %v", argsUpdated)
+			Expect(argsUpdated).To(ContainElement("--pods-fingerprint"), "malformed updated args: %v", argsUpdated)
+		})
+	})
 })
 
 func getConditionByType(conditions []metav1.Condition, conditionType string) *metav1.Condition {
