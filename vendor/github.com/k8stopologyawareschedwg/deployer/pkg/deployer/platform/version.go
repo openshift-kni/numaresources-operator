@@ -43,7 +43,7 @@ func (v Version) AtLeastString(other string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return ser.Compare(ref) >= 0, nil
+	return ser.GreaterThanOrEqual(ref), nil
 }
 
 func (v Version) AtLeast(other Version) (bool, error) {
