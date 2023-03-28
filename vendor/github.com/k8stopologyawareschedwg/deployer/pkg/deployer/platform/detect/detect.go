@@ -27,12 +27,12 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 )
 
-func Platform() (platform.Platform, error) {
+func Platform(ctx context.Context) (platform.Platform, error) {
 	ocpCli, err := clientutil.NewOCPClientSet()
 	if err != nil {
 		return platform.Unknown, err
 	}
-	sccs, err := ocpCli.ConfigV1.ClusterVersions().List(context.TODO(), metav1.ListOptions{})
+	sccs, err := ocpCli.ConfigV1.ClusterVersions().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return platform.Kubernetes, nil
@@ -45,14 +45,15 @@ func Platform() (platform.Platform, error) {
 	return platform.Kubernetes, nil
 }
 
-func Version(plat platform.Platform) (platform.Version, error) {
+func Version(ctx context.Context, plat platform.Platform) (platform.Version, error) {
 	if plat == platform.OpenShift {
-		return OpenshiftVersion()
+		return OpenshiftVersion(ctx)
 	}
-	return KubernetesVersion()
+	return KubernetesVersion(ctx)
 }
 
-func KubernetesVersion() (platform.Version, error) {
+// TODO: we need to wait for the client-go to be fixed to accept a context
+func KubernetesVersion(_ context.Context) (platform.Version, error) {
 	cli, err := clientutil.NewDiscoveryClient()
 	if err != nil {
 		return "", err
@@ -64,12 +65,12 @@ func KubernetesVersion() (platform.Version, error) {
 	return platform.ParseVersion(ver.GitVersion)
 }
 
-func OpenshiftVersion() (platform.Version, error) {
+func OpenshiftVersion(ctx context.Context) (platform.Version, error) {
 	ocpCli, err := clientutil.NewOCPClientSet()
 	if err != nil {
 		return platform.MissingVersion, err
 	}
-	ocpApi, err := ocpCli.ConfigV1.ClusterOperators().Get(context.TODO(), "openshift-apiserver", metav1.GetOptions{})
+	ocpApi, err := ocpCli.ConfigV1.ClusterOperators().Get(ctx, "openshift-apiserver", metav1.GetOptions{})
 	if err != nil {
 		return platform.MissingVersion, err
 	}
