@@ -9,10 +9,10 @@ require (
 	github.com/google/go-cmp v0.5.8
 	github.com/jaypipes/ghw v0.9.0
 	github.com/jaypipes/pcidb v1.0.0
-	github.com/k8stopologyawareschedwg/deployer v0.10.2
-	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.0.12
-	github.com/k8stopologyawareschedwg/podfingerprint v0.1.1
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.9.1-0.20221116094504-e3d2ea60f7cb
+	github.com/k8stopologyawareschedwg/deployer v0.12.1-0.20230322120411-111a4d4522b1
+	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.1
+	github.com/k8stopologyawareschedwg/podfingerprint v0.2.0
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.10.1
 	github.com/kubevirt/device-plugin-manager v1.19.4
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo/v2 v2.4.0

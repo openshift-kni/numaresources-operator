@@ -58,14 +58,40 @@ func (ok ObjectKey) String() string {
 	return fmt.Sprintf("%s/%s", ok.Namespace, ok.Name)
 }
 
-func ForNamespaceDeleted(cli client.Client, log logr.Logger, namespace string) error {
-	log = log.WithValues("namespace", namespace)
+type Waiter struct {
+	Cli          client.Client
+	Log          logr.Logger
+	PollTimeout  time.Duration
+	PollInterval time.Duration
+}
+
+func With(cli client.Client, log logr.Logger) *Waiter {
+	return &Waiter{
+		Cli:          cli,
+		Log:          log,
+		PollTimeout:  DefaultPollTimeout,
+		PollInterval: DefaultPollInterval,
+	}
+}
+
+func (wt *Waiter) Timeout(tt time.Duration) *Waiter {
+	wt.PollTimeout = tt
+	return wt
+}
+
+func (wt *Waiter) Interval(iv time.Duration) *Waiter {
+	wt.PollInterval = iv
+	return wt
+}
+
+func (wt Waiter) ForNamespaceDeleted(ctx context.Context, namespace string) error {
+	log := wt.Log.WithValues("namespace", namespace)
 	log.Info("wait for the namespace to be gone")
-	return k8swait.PollImmediate(1*time.Second, 3*time.Minute, func() (bool, error) {
+	return k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
 		nsKey := ObjectKey{Name: namespace}
 		ns := corev1.Namespace{} // unused
-		err := cli.Get(context.TODO(), nsKey.AsKey(), &ns)
-		return deletionStatusFromError(log, "Namespace", nsKey, err)
+		err := wt.Cli.Get(ctx, nsKey.AsKey(), &ns)
+		return deletionStatusFromError(wt.Log, "Namespace", nsKey, err)
 	})
 }
 

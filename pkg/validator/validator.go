@@ -38,7 +38,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 )
 
 type Report struct {
@@ -86,7 +86,7 @@ type ValidatorData struct {
 	nonRunningPodsByNode map[string]map[string]corev1.PodPhase
 	kConfigs             map[string]*kubeletconfigv1beta1.KubeletConfiguration
 	nrtCrdMissing        bool
-	nrtList              *nrtv1alpha1.NodeResourceTopologyList
+	nrtList              *nrtv1alpha2.NodeResourceTopologyList
 	versionInfo          *version.Info
 	what                 sets.String
 }

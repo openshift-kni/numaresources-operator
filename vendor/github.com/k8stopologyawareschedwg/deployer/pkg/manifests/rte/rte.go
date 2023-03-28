@@ -17,6 +17,8 @@
 package rte
 
 import (
+	"context"
+
 	"github.com/go-logr/logr"
 
 	securityv1 "github.com/openshift/api/security/v1"
@@ -31,6 +33,9 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/wait"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	ocpupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/ocp"
+	rbacupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rbac"
+	rteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 )
 
 const (
@@ -89,6 +94,7 @@ type RenderOptions struct {
 	// General options
 	Namespace string
 	Name      string
+	PFPEnable bool
 }
 
 func (mf Manifests) Render(options RenderOptions) (Manifests, error) {
@@ -108,25 +114,29 @@ func (mf Manifests) Render(options RenderOptions) (Manifests, error) {
 		ret.ClusterRoleBinding.Name = options.Name
 	}
 
-	manifests.UpdateRoleBinding(ret.RoleBinding, mf.ServiceAccount.Name, ret.ServiceAccount.Namespace)
-	manifests.UpdateClusterRoleBinding(ret.ClusterRoleBinding, mf.ServiceAccount.Name, mf.ServiceAccount.Namespace)
+	rbacupdate.RoleBinding(ret.RoleBinding, mf.ServiceAccount.Name, ret.ServiceAccount.Namespace)
+	rbacupdate.ClusterRoleBinding(ret.ClusterRoleBinding, mf.ServiceAccount.Name, mf.ServiceAccount.Namespace)
 
 	ret.DaemonSet.Spec.Template.Spec.ServiceAccountName = mf.ServiceAccount.Name
 
 	rteConfigMapName := ""
 	if len(options.ConfigData) > 0 {
-		ret.ConfigMap = CreateConfigMap(ret.DaemonSet.Namespace, manifests.RTEConfigMapName, options.ConfigData)
+		ret.ConfigMap = CreateConfigMap(ret.DaemonSet.Namespace, rteupdate.RTEConfigMapName, options.ConfigData)
 	}
 
 	if ret.ConfigMap != nil {
 		rteConfigMapName = ret.ConfigMap.Name
 	}
-	manifests.UpdateResourceTopologyExporterDaemonSet(
-		ret.DaemonSet, rteConfigMapName, options.PullIfNotPresent, options.NodeSelector)
+	rteupdate.DaemonSet(ret.DaemonSet, rteConfigMapName, options.PullIfNotPresent, options.PFPEnable, options.NodeSelector)
 
 	if mf.plat == platform.OpenShift {
-		manifests.UpdateMachineConfig(ret.MachineConfig, options.Name, options.MachineConfigPoolSelector)
-		manifests.UpdateSecurityContextConstraint(ret.SecurityContextConstraint, ret.ServiceAccount)
+		if options.Name != "" {
+			ret.MachineConfig.Name = ocpupdate.MakeMachineConfigName(options.Name)
+		}
+		if options.MachineConfigPoolSelector != nil {
+			ret.MachineConfig.Labels = options.MachineConfigPoolSelector.MatchLabels
+		}
+		ocpupdate.SecurityContextConstraint(ret.SecurityContextConstraint, ret.ServiceAccount)
 	}
 
 	return ret, nil
@@ -209,8 +219,8 @@ func (mf Manifests) ToCreatableObjects(cli client.Client, log logr.Logger) []dep
 		deployer.WaitableObject{Obj: mf.ServiceAccount},
 		deployer.WaitableObject{
 			Obj: mf.DaemonSet,
-			Wait: func() error {
-				_, err := wait.ForDaemonSetReadyByKey(cli, log, key, wait.DefaultPollInterval, wait.DefaultPollTimeout)
+			Wait: func(ctx context.Context) error {
+				_, err := wait.With(cli, log).ForDaemonSetReadyByKey(ctx, key)
 				return err
 			},
 		},
@@ -221,8 +231,8 @@ func (mf Manifests) ToDeletableObjects(cli client.Client, log logr.Logger) []dep
 	objs := []deployer.WaitableObject{
 		{
 			Obj: mf.DaemonSet,
-			Wait: func() error {
-				return wait.ForDaemonSetDeleted(cli, log, mf.DaemonSet.Namespace, mf.DaemonSet.Name, wait.DefaultPollTimeout)
+			Wait: func(ctx context.Context) error {
+				return wait.With(cli, log).ForDaemonSetDeleted(ctx, mf.DaemonSet.Namespace, mf.DaemonSet.Name)
 			},
 		},
 		{Obj: mf.Role},

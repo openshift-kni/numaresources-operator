@@ -25,7 +25,7 @@ import (
 
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 )
 
 func TestValidateCRDMissing(t *testing.T) {
@@ -56,7 +56,7 @@ func TestValidateCRDMissing(t *testing.T) {
 
 func TestValidateCRDMissingData(t *testing.T) {
 	vd := ValidatorData{
-		nrtList: &nrtv1alpha1.NodeResourceTopologyList{},
+		nrtList: &nrtv1alpha2.NodeResourceTopologyList{},
 	}
 
 	res, err := ValidateNodeResourceTopologies(vd)
@@ -83,9 +83,9 @@ func TestValidateCRDMissingData(t *testing.T) {
 func TestValidateCRDInconsistentData(t *testing.T) {
 	vd := ValidatorData{
 		tasEnabledNodeNames: sets.NewString("fake-node-0", "fake-node-1"),
-		nrtList: &nrtv1alpha1.NodeResourceTopologyList{
+		nrtList: &nrtv1alpha2.NodeResourceTopologyList{
 			// minimal initialization. Consistency doesn't really matter here
-			Items: []nrtv1alpha1.NodeResourceTopology{
+			Items: []nrtv1alpha2.NodeResourceTopology{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-node-0",

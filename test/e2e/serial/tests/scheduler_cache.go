@@ -31,7 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	e2enrtint "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
@@ -51,7 +51,7 @@ const (
 
 var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("scheduler", "cache", "tier1"), func() {
 	var fxt *e2efixture.Fixture
-	var nrtList nrtv1alpha1.NodeResourceTopologyList
+	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
@@ -73,7 +73,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 	Context("using a NodeGroup with periodic unevented updates", Label("periodic_update"), func() {
 		var nroKey client.ObjectKey
 		var nroOperObj nropv1.NUMAResourcesOperator
-		var nrtCandidates []nrtv1alpha1.NodeResourceTopology
+		var nrtCandidates []nrtv1alpha2.NodeResourceTopology
 		var refreshPeriod time.Duration
 		var mcpName string
 
@@ -189,7 +189,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				// but that would be the most correct and stricter testing.
 				failedPods, updatedPods := wait.ForPodListAllRunning(fxt.Client, testPods, 180*time.Second)
 				if len(failedPods) > 0 {
-					nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Minute)
+					nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
 					klog.Infof("%s", e2enrtint.ListToString(nrtListFailed.Items, "post failure"))
 
 					for _, failedPod := range failedPods {
@@ -297,7 +297,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				// even more generous timeout here. We need to tolerate more reconciliation time because of the interference
 				failedPods, updatedPods := wait.ForPodListAllRunning(fxt.Client, testPods, 300*time.Second)
 				if len(failedPods) > 0 {
-					nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Minute)
+					nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
 					klog.Infof("%s", e2enrtint.ListToString(nrtListFailed.Items, "post failure"))
 
 					for _, failedPod := range failedPods {
@@ -587,9 +587,9 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 	})
 })
 
-func FilterAnyZoneProvidingResourcesAtMost(nrts []nrtv1alpha1.NodeResourceTopology, resourceName string, maxResources int64, maxZones int) []nrtv1alpha1.NodeResourceTopology {
+func FilterAnyZoneProvidingResourcesAtMost(nrts []nrtv1alpha2.NodeResourceTopology, resourceName string, maxResources int64, maxZones int) []nrtv1alpha2.NodeResourceTopology {
 	maxQty := *resource.NewQuantity(maxResources, resource.DecimalSI)
-	ret := []nrtv1alpha1.NodeResourceTopology{}
+	ret := []nrtv1alpha2.NodeResourceTopology{}
 	for _, nrt := range nrts {
 		matches := 0
 		for _, zone := range nrt.Zones {
@@ -613,7 +613,7 @@ func FilterAnyZoneProvidingResourcesAtMost(nrts []nrtv1alpha1.NodeResourceTopolo
 	return ret
 }
 
-func ResourceInfoProvidingAtMost(resources []nrtv1alpha1.ResourceInfo, resName string, resQty resource.Quantity) bool {
+func ResourceInfoProvidingAtMost(resources []nrtv1alpha2.ResourceInfo, resName string, resQty resource.Quantity) bool {
 	zeroQty := resource.MustParse("0")
 	zoneQty, ok := e2enrt.FindResourceAvailableByName(resources, string(resName))
 	klog.Infof("  +--> checking if resources include %q in (0, %s] (zoneQty=%s found=%v)", resName, resQty.String(), zoneQty.String(), ok)

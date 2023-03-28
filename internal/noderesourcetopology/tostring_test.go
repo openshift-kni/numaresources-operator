@@ -22,13 +22,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 )
 
 func TestResourceInfoToString(t *testing.T) {
 	testCases := []struct {
 		name     string
-		resInfo  nrtv1alpha1.ResourceInfo
+		resInfo  nrtv1alpha2.ResourceInfo
 		expected string
 	}{
 		{
@@ -37,7 +37,7 @@ func TestResourceInfoToString(t *testing.T) {
 		},
 		{
 			name: "only-available",
-			resInfo: nrtv1alpha1.ResourceInfo{
+			resInfo: nrtv1alpha2.ResourceInfo{
 				Name:      "dev1",
 				Available: resource.MustParse("3"),
 			},
@@ -45,7 +45,7 @@ func TestResourceInfoToString(t *testing.T) {
 		},
 		{
 			name: "fully-init",
-			resInfo: nrtv1alpha1.ResourceInfo{
+			resInfo: nrtv1alpha2.ResourceInfo{
 				Name:        "dev2",
 				Capacity:    resource.MustParse("10"),
 				Allocatable: resource.MustParse("9"),
@@ -67,7 +67,7 @@ func TestResourceInfoToString(t *testing.T) {
 func TestResourceInfoListToString(t *testing.T) {
 	testCases := []struct {
 		name     string
-		resInfos []nrtv1alpha1.ResourceInfo
+		resInfos []nrtv1alpha2.ResourceInfo
 		expected string
 	}{
 		{
@@ -75,7 +75,7 @@ func TestResourceInfoListToString(t *testing.T) {
 		},
 		{
 			name: "only-one",
-			resInfos: []nrtv1alpha1.ResourceInfo{
+			resInfos: []nrtv1alpha2.ResourceInfo{
 				{
 					Name:        "dev1",
 					Capacity:    resource.MustParse("10"),
@@ -87,7 +87,7 @@ func TestResourceInfoListToString(t *testing.T) {
 		},
 		{
 			name: "proper-list",
-			resInfos: []nrtv1alpha1.ResourceInfo{
+			resInfos: []nrtv1alpha2.ResourceInfo{
 				{
 					Name:        "dev2",
 					Capacity:    resource.MustParse("10"),
@@ -123,7 +123,7 @@ func TestResourceInfoListToString(t *testing.T) {
 func TestZoneToString(t *testing.T) {
 	testCases := []struct {
 		name     string
-		zone     nrtv1alpha1.Zone
+		zone     nrtv1alpha2.Zone
 		expected string
 	}{
 		{
@@ -132,11 +132,11 @@ func TestZoneToString(t *testing.T) {
 		},
 		{
 			name: "only-one",
-			zone: nrtv1alpha1.Zone{
+			zone: nrtv1alpha2.Zone{
 				Name:   "test-zone",
 				Type:   "testable",
 				Parent: "will-not-be-stringified",
-				Resources: []nrtv1alpha1.ResourceInfo{
+				Resources: []nrtv1alpha2.ResourceInfo{
 					{
 						Name:        "dev1",
 						Capacity:    resource.MustParse("10"),
@@ -161,7 +161,7 @@ func TestZoneToString(t *testing.T) {
 func TestToString(t *testing.T) {
 	testCases := []struct {
 		name     string
-		nrt      nrtv1alpha1.NodeResourceTopology
+		nrt      nrtv1alpha2.NodeResourceTopology
 		expected string
 	}{
 		{
@@ -170,7 +170,7 @@ func TestToString(t *testing.T) {
 		},
 		{
 			name: "only-one",
-			nrt: nrtv1alpha1.NodeResourceTopology{
+			nrt: nrtv1alpha2.NodeResourceTopology{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-nrt",
 				},
@@ -178,12 +178,12 @@ func TestToString(t *testing.T) {
 					"restricted",
 					"ignored-from-the-second-onwards",
 				},
-				Zones: []nrtv1alpha1.Zone{
+				Zones: []nrtv1alpha2.Zone{
 					{
 						Name:   "zone-0",
 						Type:   "zoneTypeA",
 						Parent: "will-not-be-stringified",
-						Resources: []nrtv1alpha1.ResourceInfo{
+						Resources: []nrtv1alpha2.ResourceInfo{
 							{
 								Name:        "dev1",
 								Capacity:    resource.MustParse("10"),
@@ -196,7 +196,7 @@ func TestToString(t *testing.T) {
 						Name:   "zone-1",
 						Type:   "zoneTypeA",
 						Parent: "will-not-be-stringified",
-						Resources: []nrtv1alpha1.ResourceInfo{
+						Resources: []nrtv1alpha2.ResourceInfo{
 							{
 								Name:        "dev1",
 								Capacity:    resource.MustParse("10"),
