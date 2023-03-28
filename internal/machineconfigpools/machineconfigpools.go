@@ -28,8 +28,6 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
 )
 
 func GetListByNodeGroupsV1(ctx context.Context, cli client.Client, nodeGroups []nropv1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
@@ -38,14 +36,6 @@ func GetListByNodeGroupsV1(ctx context.Context, cli client.Client, nodeGroups []
 		return nil, err
 	}
 	return nodegroupv1.FindMachineConfigPools(mcps, nodeGroups)
-}
-
-func GetListByNodeGroupsV1Alpha1(ctx context.Context, cli client.Client, nodeGroups []nropv1alpha1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
-	mcps := &mcov1.MachineConfigPoolList{}
-	if err := cli.List(ctx, mcps); err != nil {
-		return nil, err
-	}
-	return nodegroupv1alpha1.FindMachineConfigPools(mcps, nodeGroups)
 }
 
 func FindBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelector) (*mcov1.MachineConfigPool, error) {
