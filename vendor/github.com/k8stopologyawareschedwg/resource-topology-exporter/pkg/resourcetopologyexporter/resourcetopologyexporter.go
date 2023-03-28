@@ -8,7 +8,7 @@ import (
 	"k8s.io/klog/v2"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 
-	v1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	v1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/kubeconf"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/notification"
@@ -35,8 +35,13 @@ type Args struct {
 	TimeUnitToLimitEvents  time.Duration
 }
 
+type tmSettings struct {
+	config  nrtupdater.TMConfig
+	summary v1alpha2.TopologyManagerPolicy
+}
+
 func Execute(cli podresourcesapi.PodResourcesListerClient, nrtupdaterArgs nrtupdater.Args, resourcemonitorArgs resourcemonitor.Args, rteArgs Args) error {
-	tmPolicy, err := getTopologyManagerPolicy(resourcemonitorArgs, rteArgs)
+	tmData, err := getTopologyManagerPolicy(rteArgs)
 	if err != nil {
 		return err
 	}
@@ -62,7 +67,7 @@ func Execute(cli podresourcesapi.PodResourcesListerClient, nrtupdaterArgs nrtupd
 	}
 	go resObs.Run(eventSource.Events(), condChan)
 
-	upd := nrtupdater.NewNRTUpdater(nrtupdaterArgs, string(tmPolicy))
+	upd := nrtupdater.NewNRTUpdater(nrtupdaterArgs, string(tmData.summary), tmData.config)
 	go upd.Run(resObs.Infos, condChan)
 
 	go eventSource.Run()
@@ -75,7 +80,12 @@ func Execute(cli podresourcesapi.PodResourcesListerClient, nrtupdaterArgs nrtupd
 func createEventSource(rteArgs *Args) (notification.EventSource, error) {
 	var es notification.EventSource
 
-	eventSource, err := notification.NewUnlimitedEventSource(rteArgs.SleepInterval)
+	eventSource, err := notification.NewUnlimitedEventSource()
+	if err != nil {
+		return nil, err
+	}
+
+	err = eventSource.SetInterval(rteArgs.SleepInterval)
 	if err != nil {
 		return nil, err
 	}
@@ -103,18 +113,32 @@ func createEventSource(rteArgs *Args) (notification.EventSource, error) {
 	return es, nil
 }
 
-func getTopologyManagerPolicy(resourcemonitorArgs resourcemonitor.Args, rteArgs Args) (v1alpha1.TopologyManagerPolicy, error) {
+func getTopologyManagerPolicy(rteArgs Args) (tmSettings, error) {
 	if rteArgs.TopologyManagerPolicy != "" && rteArgs.TopologyManagerScope != "" {
-		klog.Infof("using given Topology Manager policy %q scope %q", rteArgs.TopologyManagerPolicy, rteArgs.TopologyManagerScope)
-		return topologypolicy.DetectTopologyPolicy(rteArgs.TopologyManagerPolicy, rteArgs.TopologyManagerScope), nil
+		tmData := tmSettings{
+			config: nrtupdater.TMConfig{
+				Policy: rteArgs.TopologyManagerPolicy,
+				Scope:  rteArgs.TopologyManagerScope,
+			},
+		}
+		tmData.summary = topologypolicy.DetectTopologyPolicy(tmData.config.Policy, tmData.config.Scope)
+		klog.Infof("using given Topology Manager policy %q scope %q (%s)", tmData.config.Policy, tmData.config.Scope, tmData.summary)
+		return tmData, nil
 	}
 	if rteArgs.KubeletConfigFile != "" {
 		klConfig, err := kubeconf.GetKubeletConfigFromLocalFile(rteArgs.KubeletConfigFile)
 		if err != nil {
-			return "", fmt.Errorf("error getting topology Manager Policy: %w", err)
+			return tmSettings{}, fmt.Errorf("error getting topology Manager Policy: %w", err)
 		}
-		klog.Infof("detected kubelet Topology Manager policy %q scope %q", klConfig.TopologyManagerPolicy, klConfig.TopologyManagerScope)
-		return topologypolicy.DetectTopologyPolicy(klConfig.TopologyManagerPolicy, klConfig.TopologyManagerScope), nil
+		tmData := tmSettings{
+			config: nrtupdater.TMConfig{
+				Policy: klConfig.TopologyManagerPolicy,
+				Scope:  klConfig.TopologyManagerScope,
+			},
+		}
+		tmData.summary = topologypolicy.DetectTopologyPolicy(tmData.config.Policy, tmData.config.Scope)
+		klog.Infof("using detected Topology Manager policy %q scope %q (%s)", tmData.config.Policy, tmData.config.Scope, tmData.summary)
+		return tmData, nil
 	}
-	return "", fmt.Errorf("cannot find the kubelet Topology Manager policy")
+	return tmSettings{}, fmt.Errorf("cannot find the kubelet Topology Manager policy")
 }
