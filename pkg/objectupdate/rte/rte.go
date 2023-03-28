@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 
@@ -167,7 +167,7 @@ func ContainerConfig(ds *appsv1.DaemonSet, name string) error {
 	if err != nil {
 		return err
 	}
-	manifests.UpdateResourceTopologyExporterContainerConfig(&ds.Spec.Template.Spec, cnt, name)
+	k8swgrteupdate.ContainerConfig(&ds.Spec.Template.Spec, cnt, name)
 	return nil
 }
 

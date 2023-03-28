@@ -20,14 +20,14 @@ import (
 	"fmt"
 	"strings"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 )
 
-func ResourceInfoToString(resInfo nrtv1alpha1.ResourceInfo) string {
+func ResourceInfoToString(resInfo nrtv1alpha2.ResourceInfo) string {
 	return fmt.Sprintf("%s=%s/%s/%s", resInfo.Name, resInfo.Capacity.String(), resInfo.Allocatable.String(), resInfo.Available.String())
 }
 
-func ResourceInfoListToString(resInfoList []nrtv1alpha1.ResourceInfo) string {
+func ResourceInfoListToString(resInfoList []nrtv1alpha2.ResourceInfo) string {
 	items := []string{}
 	for _, resInfo := range resInfoList {
 		items = append(items, ResourceInfoToString(resInfo))
@@ -35,7 +35,7 @@ func ResourceInfoListToString(resInfoList []nrtv1alpha1.ResourceInfo) string {
 	return strings.Join(items, ",")
 }
 
-func ZoneToString(zone nrtv1alpha1.Zone) string {
+func ZoneToString(zone nrtv1alpha2.Zone) string {
 	name := zone.Name
 	if name == "" {
 		name = "<MISSING>"
@@ -51,7 +51,7 @@ func ZoneToString(zone nrtv1alpha1.Zone) string {
 	return fmt.Sprintf("%s [%s]: %s", name, zType, resList)
 }
 
-func ToString(nrt nrtv1alpha1.NodeResourceTopology) string {
+func ToString(nrt nrtv1alpha2.NodeResourceTopology) string {
 	var b strings.Builder
 	name := nrt.Name
 	if name == "" {
@@ -68,7 +68,7 @@ func ToString(nrt nrtv1alpha1.NodeResourceTopology) string {
 	return b.String()
 }
 
-func ListToString(nrts []nrtv1alpha1.NodeResourceTopology, tag string) string {
+func ListToString(nrts []nrtv1alpha2.NodeResourceTopology, tag string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "NRT BEGIN dump")
 	if len(tag) != 0 {

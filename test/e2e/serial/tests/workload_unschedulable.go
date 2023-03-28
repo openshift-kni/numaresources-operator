@@ -32,7 +32,7 @@ import (
 	corev1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
@@ -53,8 +53,8 @@ import (
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload unschedulable", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
-	var nrtList nrtv1alpha1.NodeResourceTopologyList
-	var nrts []nrtv1alpha1.NodeResourceTopology
+	var nrtList nrtv1alpha2.NodeResourceTopologyList
+	var nrts []nrtv1alpha2.NodeResourceTopology
 	var tmPolicy string
 
 	BeforeEach(func() {
@@ -72,9 +72,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
-		policies := []nrtv1alpha1.TopologyManagerPolicy{
-			nrtv1alpha1.SingleNUMANodeContainerLevel,
-			nrtv1alpha1.SingleNUMANodePodLevel,
+		policies := []nrtv1alpha2.TopologyManagerPolicy{
+			nrtv1alpha2.SingleNUMANodeContainerLevel,
+			nrtv1alpha2.SingleNUMANodePodLevel,
 		}
 		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
 		if len(nrts) < 2 {
@@ -106,8 +106,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 	Context("with no suitable node", func() {
 		var requiredRes corev1.ResourceList
-		var nrtListInitial nrtv1alpha1.NodeResourceTopologyList
-		var nrtCandidates []nrtv1alpha1.NodeResourceTopology
+		var nrtListInitial nrtv1alpha2.NodeResourceTopologyList
+		var nrtCandidates []nrtv1alpha2.NodeResourceTopology
 		BeforeEach(func() {
 			neededNodes := 1
 
@@ -471,7 +471,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			// with at least this number of numa zones
 			requiredNUMAZones := 2
 			// and with this policy
-			tmPolicy := nrtv1alpha1.SingleNUMANodePodLevel
+			tmPolicy := nrtv1alpha2.SingleNUMANodePodLevel
 
 			// filter by policy
 			nrtCandidates := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, tmPolicy)
@@ -655,7 +655,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			})
 			Expect(err).ToNot(HaveOccurred())
 
-			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
 
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
@@ -799,10 +799,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 	Context("Requesting allocatable resources on the node", func() {
 		var requiredRes corev1.ResourceList
 		var targetNodeName string
-		var nrtListInitial nrtv1alpha1.NodeResourceTopologyList
-		var nrtCandidates []nrtv1alpha1.NodeResourceTopology
-		var targetNrtInitial *nrtv1alpha1.NodeResourceTopology
-		var targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList
+		var nrtListInitial nrtv1alpha2.NodeResourceTopologyList
+		var nrtCandidates []nrtv1alpha2.NodeResourceTopology
+		var targetNrtInitial *nrtv1alpha2.NodeResourceTopology
+		var targetNrtListInitial nrtv1alpha2.NodeResourceTopologyList
 		var err error
 
 		BeforeEach(func() {
@@ -985,8 +985,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 })
 
 // Return only those NRTs where each request could fit into a different zone.
-func filterNRTsEachRequestOnADifferentZone(nrts []nrtv1alpha1.NodeResourceTopology, r1, r2 corev1.ResourceList) []nrtv1alpha1.NodeResourceTopology {
-	ret := []nrtv1alpha1.NodeResourceTopology{}
+func filterNRTsEachRequestOnADifferentZone(nrts []nrtv1alpha2.NodeResourceTopology, r1, r2 corev1.ResourceList) []nrtv1alpha2.NodeResourceTopology {
+	ret := []nrtv1alpha2.NodeResourceTopology{}
 	for _, nrt := range nrts {
 		if nrtCanAccomodateEachRequestOnADifferentZone(nrt, r1, r2) {
 			ret = append(ret, nrt)
@@ -996,7 +996,7 @@ func filterNRTsEachRequestOnADifferentZone(nrts []nrtv1alpha1.NodeResourceTopolo
 }
 
 // returns true if nrt can accomodate r1 and r2 in one of its two first zones.
-func nrtCanAccomodateEachRequestOnADifferentZone(nrt nrtv1alpha1.NodeResourceTopology, r1, r2 corev1.ResourceList) bool {
+func nrtCanAccomodateEachRequestOnADifferentZone(nrt nrtv1alpha2.NodeResourceTopology, r1, r2 corev1.ResourceList) bool {
 	if len(nrt.Zones) < 2 {
 		return false
 	}
@@ -1004,7 +1004,7 @@ func nrtCanAccomodateEachRequestOnADifferentZone(nrt nrtv1alpha1.NodeResourceTop
 }
 
 // returns true if r1 fits on z1 AND r2 on z2 or the other way around
-func eachRequestFitsOnADifferentZone(z1, z2 nrtv1alpha1.Zone, r1, r2 corev1.ResourceList) bool {
+func eachRequestFitsOnADifferentZone(z1, z2 nrtv1alpha2.Zone, r1, r2 corev1.ResourceList) bool {
 	return (e2enrt.ResourceInfoMatchesRequest(z1.Resources, r1) && e2enrt.ResourceInfoMatchesRequest(z2.Resources, r2)) ||
 		(e2enrt.ResourceInfoMatchesRequest(z1.Resources, r2) && e2enrt.ResourceInfoMatchesRequest(z2.Resources, r1))
 }
