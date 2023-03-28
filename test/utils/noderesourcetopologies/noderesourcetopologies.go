@@ -31,7 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	e2enrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
@@ -52,8 +52,8 @@ func GetZoneIDFromName(zoneName string) (int, error) {
 	return strconv.Atoi(zoneName)
 }
 
-func GetUpdated(cli client.Client, ref nrtv1alpha1.NodeResourceTopologyList, timeout time.Duration) (nrtv1alpha1.NodeResourceTopologyList, error) {
-	var updatedNrtList nrtv1alpha1.NodeResourceTopologyList
+func GetUpdated(cli client.Client, ref nrtv1alpha2.NodeResourceTopologyList, timeout time.Duration) (nrtv1alpha2.NodeResourceTopologyList, error) {
+	var updatedNrtList nrtv1alpha2.NodeResourceTopologyList
 	err := wait.Poll(1*time.Second, timeout, func() (bool, error) {
 		err := cli.List(context.TODO(), &updatedNrtList)
 		if err != nil {
@@ -66,7 +66,7 @@ func GetUpdated(cli client.Client, ref nrtv1alpha1.NodeResourceTopologyList, tim
 	return updatedNrtList, err
 }
 
-func CheckEqualAvailableResources(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourceTopology) (bool, error) {
+func CheckEqualAvailableResources(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourceTopology) (bool, error) {
 	for idx := 0; idx < len(nrtInitial.Zones); idx++ {
 		zoneInitial := &nrtInitial.Zones[idx] // shortcut
 		zoneUpdated, err := findZoneByName(nrtUpdated, zoneInitial.Name)
@@ -87,7 +87,7 @@ func CheckEqualAvailableResources(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourc
 	return true, nil
 }
 
-func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourceTopology, required corev1.ResourceList, podQoS corev1.PodQOSClass) (string, error) {
+func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourceTopology, required corev1.ResourceList, podQoS corev1.PodQOSClass) (string, error) {
 	for idx := 0; idx < len(nrtInitial.Zones); idx++ {
 		zoneInitial := &nrtInitial.Zones[idx] // shortcut
 		zoneUpdated, err := findZoneByName(nrtUpdated, zoneInitial.Name)
@@ -108,7 +108,7 @@ func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeRe
 	return "", nil
 }
 
-func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeResourceTopology, required corev1.ResourceList, podQoS corev1.PodQOSClass) (string, error) {
+func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourceTopology, required corev1.ResourceList, podQoS corev1.PodQOSClass) (string, error) {
 	nodeResInitialInfo, err := accumulateNodeAvailableResources(nrtInitial, "initial")
 	if err != nil {
 		return "", err
@@ -129,7 +129,7 @@ func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha1.NodeRe
 	return "", nil
 }
 
-func accumulateNodeAvailableResources(nrt nrtv1alpha1.NodeResourceTopology, reason string) ([]nrtv1alpha1.ResourceInfo, error) {
+func accumulateNodeAvailableResources(nrt nrtv1alpha2.NodeResourceTopology, reason string) ([]nrtv1alpha2.ResourceInfo, error) {
 	resList := make(corev1.ResourceList, 2)
 	for _, zone := range nrt.Zones {
 		for _, res := range zone.Resources {
@@ -141,9 +141,9 @@ func accumulateNodeAvailableResources(nrt nrtv1alpha1.NodeResourceTopology, reas
 			}
 		}
 	}
-	var resInfoList []nrtv1alpha1.ResourceInfo
+	var resInfoList []nrtv1alpha2.ResourceInfo
 	for r, q := range resList {
-		resInfo := nrtv1alpha1.ResourceInfo{
+		resInfo := nrtv1alpha2.ResourceInfo{
 			Name:        string(r),
 			Capacity:    q, // not required, added for consistency
 			Allocatable: q, // not required, added for consistency
@@ -157,7 +157,7 @@ func accumulateNodeAvailableResources(nrt nrtv1alpha1.NodeResourceTopology, reas
 	klog.Infof("resInfoList %s: %s", reason, e2enrt.ResourceInfoListToString(resInfoList))
 	return resInfoList, nil
 }
-func SaturateZoneUntilLeft(zone nrtv1alpha1.Zone, requiredRes corev1.ResourceList) (corev1.ResourceList, error) {
+func SaturateZoneUntilLeft(zone nrtv1alpha2.Zone, requiredRes corev1.ResourceList) (corev1.ResourceList, error) {
 	paddingRes := make(corev1.ResourceList)
 	for resName, resQty := range requiredRes {
 		zoneQty, ok := FindResourceAvailableByName(zone.Resources, string(resName))
@@ -178,7 +178,7 @@ func SaturateZoneUntilLeft(zone nrtv1alpha1.Zone, requiredRes corev1.ResourceLis
 	return paddingRes, nil
 }
 
-func SaturateNodeUntilLeft(nrtInfo nrtv1alpha1.NodeResourceTopology, requiredRes corev1.ResourceList) (map[string]corev1.ResourceList, error) {
+func SaturateNodeUntilLeft(nrtInfo nrtv1alpha2.NodeResourceTopology, requiredRes corev1.ResourceList) (map[string]corev1.ResourceList, error) {
 	//TODO: support splitting the requiredRes on multiple numas
 	//corrently the function deducts the requiredRes from the first Numa
 
@@ -207,7 +207,7 @@ func SaturateNodeUntilLeft(nrtInfo nrtv1alpha1.NodeResourceTopology, requiredRes
 	return paddingRes, nil
 }
 
-func checkEqualResourcesInfo(nodeName, zoneName string, resourcesInitial, resourcesUpdated []nrtv1alpha1.ResourceInfo) (bool, string, error) {
+func checkEqualResourcesInfo(nodeName, zoneName string, resourcesInitial, resourcesUpdated []nrtv1alpha2.ResourceInfo) (bool, string, error) {
 	for _, res := range resourcesInitial {
 		initialQty := res.Available
 		updatedQty, ok := FindResourceAvailableByName(resourcesUpdated, res.Name)
@@ -222,7 +222,7 @@ func checkEqualResourcesInfo(nodeName, zoneName string, resourcesInitial, resour
 	return true, "", nil
 }
 
-func checkConsumedResourcesAtLeast(resourcesInitial, resourcesUpdated []nrtv1alpha1.ResourceInfo, required corev1.ResourceList, podQoS corev1.PodQOSClass) (bool, error) {
+func checkConsumedResourcesAtLeast(resourcesInitial, resourcesUpdated []nrtv1alpha2.ResourceInfo, required corev1.ResourceList, podQoS corev1.PodQOSClass) (bool, error) {
 	for resName, resQty := range required {
 		if podQoS != corev1.PodQOSGuaranteed && (resName == corev1.ResourceCPU || resName == corev1.ResourceMemory) {
 			klog.Infof("skip accounting for resource %q as consumed resource in NRT because the pod is of QoS %q", resName, podQoS)
@@ -247,7 +247,7 @@ func checkConsumedResourcesAtLeast(resourcesInitial, resourcesUpdated []nrtv1alp
 	return true, nil
 }
 
-func AccumulateNames(nrts []nrtv1alpha1.NodeResourceTopology) sets.String {
+func AccumulateNames(nrts []nrtv1alpha2.NodeResourceTopology) sets.String {
 	nodeNames := sets.NewString()
 	for _, nrt := range nrts {
 		nodeNames.Insert(nrt.Name)
@@ -255,8 +255,8 @@ func AccumulateNames(nrts []nrtv1alpha1.NodeResourceTopology) sets.String {
 	return nodeNames
 }
 
-func FilterTopologyManagerPolicy(nrts []nrtv1alpha1.NodeResourceTopology, tmPolicy nrtv1alpha1.TopologyManagerPolicy) []nrtv1alpha1.NodeResourceTopology {
-	ret := []nrtv1alpha1.NodeResourceTopology{}
+func FilterTopologyManagerPolicy(nrts []nrtv1alpha2.NodeResourceTopology, tmPolicy nrtv1alpha2.TopologyManagerPolicy) []nrtv1alpha2.NodeResourceTopology {
+	ret := []nrtv1alpha2.NodeResourceTopology{}
 	for _, nrt := range nrts {
 		if !contains(nrt.TopologyPolicies, string(tmPolicy)) {
 			klog.Warningf("SKIP: node %q doesn't support topology manager policy %q", nrt.Name, string(tmPolicy))
@@ -268,8 +268,8 @@ func FilterTopologyManagerPolicy(nrts []nrtv1alpha1.NodeResourceTopology, tmPoli
 	return ret
 }
 
-func FilterZoneCountEqual(nrts []nrtv1alpha1.NodeResourceTopology, count int) []nrtv1alpha1.NodeResourceTopology {
-	ret := []nrtv1alpha1.NodeResourceTopology{}
+func FilterZoneCountEqual(nrts []nrtv1alpha2.NodeResourceTopology, count int) []nrtv1alpha2.NodeResourceTopology {
+	ret := []nrtv1alpha2.NodeResourceTopology{}
 	for _, nrt := range nrts {
 		if len(nrt.Zones) != count {
 			klog.Warningf("SKIP: node %q has %d zones (desired %d)", nrt.Name, len(nrt.Zones), count)
@@ -281,9 +281,9 @@ func FilterZoneCountEqual(nrts []nrtv1alpha1.NodeResourceTopology, count int) []
 	return ret
 }
 
-func FilterAnyZoneMatchingResources(nrts []nrtv1alpha1.NodeResourceTopology, requests corev1.ResourceList) []nrtv1alpha1.NodeResourceTopology {
+func FilterAnyZoneMatchingResources(nrts []nrtv1alpha2.NodeResourceTopology, requests corev1.ResourceList) []nrtv1alpha2.NodeResourceTopology {
 	reqStr := e2ereslist.ToString(requests)
-	ret := []nrtv1alpha1.NodeResourceTopology{}
+	ret := []nrtv1alpha2.NodeResourceTopology{}
 	for _, nrt := range nrts {
 		matches := 0
 		for _, zone := range nrt.Zones {
@@ -303,9 +303,9 @@ func FilterAnyZoneMatchingResources(nrts []nrtv1alpha1.NodeResourceTopology, req
 	return ret
 }
 
-func FilterAnyNodeMatchingResources(nrts []nrtv1alpha1.NodeResourceTopology, requests corev1.ResourceList) []nrtv1alpha1.NodeResourceTopology {
+func FilterAnyNodeMatchingResources(nrts []nrtv1alpha2.NodeResourceTopology, requests corev1.ResourceList) []nrtv1alpha2.NodeResourceTopology {
 	reqStr := e2ereslist.ToString(requests)
-	ret := []nrtv1alpha1.NodeResourceTopology{}
+	ret := []nrtv1alpha2.NodeResourceTopology{}
 	for _, nrt := range nrts {
 		nodeRes, err := accumulateNodeAvailableResources(nrt, "initial")
 		if err != nil {
@@ -325,7 +325,7 @@ func FilterAnyNodeMatchingResources(nrts []nrtv1alpha1.NodeResourceTopology, req
 	return ret
 }
 
-func FindFromList(nrts []nrtv1alpha1.NodeResourceTopology, name string) (*nrtv1alpha1.NodeResourceTopology, error) {
+func FindFromList(nrts []nrtv1alpha2.NodeResourceTopology, name string) (*nrtv1alpha2.NodeResourceTopology, error) {
 	for idx := 0; idx < len(nrts); idx++ {
 		if nrts[idx].Name == name {
 			return &nrts[idx], nil
@@ -335,7 +335,7 @@ func FindFromList(nrts []nrtv1alpha1.NodeResourceTopology, name string) (*nrtv1a
 }
 
 // AvailableFromZone returns a ResourceList of all available resources under the zone
-func AvailableFromZone(z nrtv1alpha1.Zone) corev1.ResourceList {
+func AvailableFromZone(z nrtv1alpha2.Zone) corev1.ResourceList {
 	rl := corev1.ResourceList{}
 
 	for _, ri := range z.Resources {
@@ -344,7 +344,7 @@ func AvailableFromZone(z nrtv1alpha1.Zone) corev1.ResourceList {
 	return rl
 }
 
-func ResourceInfoMatchesRequest(resources []nrtv1alpha1.ResourceInfo, requests corev1.ResourceList) bool {
+func ResourceInfoMatchesRequest(resources []nrtv1alpha2.ResourceInfo, requests corev1.ResourceList) bool {
 	for resName, resQty := range requests {
 		if !ResourceInfoProviding(resources, string(resName), resQty, true) {
 			return false
@@ -353,7 +353,7 @@ func ResourceInfoMatchesRequest(resources []nrtv1alpha1.ResourceInfo, requests c
 	return true
 }
 
-func ResourceInfoProviding(resources []nrtv1alpha1.ResourceInfo, resName string, resQty resource.Quantity, onEqual bool) bool {
+func ResourceInfoProviding(resources []nrtv1alpha2.ResourceInfo, resName string, resQty resource.Quantity, onEqual bool) bool {
 	zoneQty, ok := FindResourceAvailableByName(resources, string(resName))
 	if !ok {
 		return false
@@ -368,8 +368,8 @@ func ResourceInfoProviding(resources []nrtv1alpha1.ResourceInfo, resName string,
 	return true
 }
 
-func FilterByPolicies(list []nrtv1alpha1.NodeResourceTopology, policies []nrtv1alpha1.TopologyManagerPolicy) []nrtv1alpha1.NodeResourceTopology {
-	var filteredNrts []nrtv1alpha1.NodeResourceTopology
+func FilterByPolicies(list []nrtv1alpha2.NodeResourceTopology, policies []nrtv1alpha2.TopologyManagerPolicy) []nrtv1alpha2.NodeResourceTopology {
+	var filteredNrts []nrtv1alpha2.NodeResourceTopology
 	for _, policy := range policies {
 		nrts := FilterTopologyManagerPolicy(list, policy)
 		filteredNrts = append(filteredNrts, nrts...)
@@ -377,7 +377,7 @@ func FilterByPolicies(list []nrtv1alpha1.NodeResourceTopology, policies []nrtv1a
 	return filteredNrts
 }
 
-func findZoneByName(nrt nrtv1alpha1.NodeResourceTopology, zoneName string) (*nrtv1alpha1.Zone, error) {
+func findZoneByName(nrt nrtv1alpha2.NodeResourceTopology, zoneName string) (*nrtv1alpha2.Zone, error) {
 	for idx := 0; idx < len(nrt.Zones); idx++ {
 		if nrt.Zones[idx].Name == zoneName {
 			return &nrt.Zones[idx], nil
@@ -386,7 +386,7 @@ func findZoneByName(nrt nrtv1alpha1.NodeResourceTopology, zoneName string) (*nrt
 	return nil, fmt.Errorf("cannot find zone %q", zoneName)
 }
 
-func FindResourceAvailableByName(resources []nrtv1alpha1.ResourceInfo, name string) (resource.Quantity, bool) {
+func FindResourceAvailableByName(resources []nrtv1alpha2.ResourceInfo, name string) (resource.Quantity, bool) {
 	for _, resource := range resources {
 		if resource.Name != name {
 			continue
@@ -396,7 +396,7 @@ func FindResourceAvailableByName(resources []nrtv1alpha1.ResourceInfo, name stri
 	return *resource.NewQuantity(0, resource.DecimalSI), false
 }
 
-func FindResourceAllocatableByName(resources []nrtv1alpha1.ResourceInfo, name string) (resource.Quantity, bool) {
+func FindResourceAllocatableByName(resources []nrtv1alpha2.ResourceInfo, name string) (resource.Quantity, bool) {
 	for _, resource := range resources {
 		if resource.Name != name {
 			continue
@@ -406,7 +406,7 @@ func FindResourceAllocatableByName(resources []nrtv1alpha1.ResourceInfo, name st
 	return *resource.NewQuantity(0, resource.DecimalSI), false
 }
 
-func GetMaxAllocatableResourceNumaLevel(nrtInfo nrtv1alpha1.NodeResourceTopology, resName corev1.ResourceName) resource.Quantity {
+func GetMaxAllocatableResourceNumaLevel(nrtInfo nrtv1alpha2.NodeResourceTopology, resName corev1.ResourceName) resource.Quantity {
 	var maxAllocatable resource.Quantity
 
 	// Finding the maximum allocatable resources of a resource type across all zones
@@ -422,7 +422,7 @@ func GetMaxAllocatableResourceNumaLevel(nrtInfo nrtv1alpha1.NodeResourceTopology
 	return maxAllocatable
 }
 
-func ResourceInfoListToResourceList(ri nrtv1alpha1.ResourceInfoList) corev1.ResourceList {
+func ResourceInfoListToResourceList(ri nrtv1alpha2.ResourceInfoList) corev1.ResourceList {
 	rl := corev1.ResourceList{}
 
 	for _, res := range ri {

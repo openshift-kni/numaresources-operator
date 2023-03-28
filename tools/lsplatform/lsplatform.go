@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -15,7 +16,7 @@ func main() {
 	flag.StringVar(&platformName, "is-platform", "", "check if the detected platform matches the given one")
 	flag.Parse()
 
-	clusterPlatform, err := detect.Platform()
+	clusterPlatform, err := detect.Platform(context.Background())
 	if err != nil {
 		log.Fatalf("error detecting the platform: %v", err)
 	}
