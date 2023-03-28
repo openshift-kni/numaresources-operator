@@ -18,26 +18,22 @@ package wait
 
 import (
 	"context"
-	"time"
 
-	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ForDaemonSetReadyByKey(cli client.Client, logger logr.Logger, key ObjectKey, pollInterval, pollTimeout time.Duration) (*appsv1.DaemonSet, error) {
+func (wt Waiter) ForDaemonSetReadyByKey(ctx context.Context, key ObjectKey) (*appsv1.DaemonSet, error) {
 	updatedDs := &appsv1.DaemonSet{}
-	err := k8swait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		err := cli.Get(context.TODO(), key.AsKey(), updatedDs)
+	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+		err := wt.Cli.Get(ctx, key.AsKey(), updatedDs)
 		if err != nil {
-			logger.Info("failed to get the daemonset", "key", key.String(), "error", err)
+			wt.Log.Info("failed to get the daemonset", "key", key.String(), "error", err)
 			return false, err
 		}
 
 		if !AreDaemonSetPodsReady(&updatedDs.Status) {
-			logger.Info("daemonset not ready",
+			wt.Log.Info("daemonset not ready",
 				"key", key.String(),
 				"desired", updatedDs.Status.DesiredNumberScheduled,
 				"current", updatedDs.Status.CurrentNumberScheduled,
@@ -45,14 +41,14 @@ func ForDaemonSetReadyByKey(cli client.Client, logger logr.Logger, key ObjectKey
 			return false, nil
 		}
 
-		logger.Info("daemonset ready", "key", key.String())
+		wt.Log.Info("daemonset ready", "key", key.String())
 		return true, nil
 	})
 	return updatedDs, err
 }
 
-func ForDaemonSetReady(cli client.Client, logger logr.Logger, ds *appsv1.DaemonSet, pollInterval, pollTimeout time.Duration) (*appsv1.DaemonSet, error) {
-	return ForDaemonSetReadyByKey(cli, logger, ObjectKeyFromObject(ds), pollInterval, pollTimeout)
+func (wt Waiter) ForDaemonSetReady(ctx context.Context, ds *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
+	return wt.ForDaemonSetReadyByKey(ctx, ObjectKeyFromObject(ds))
 }
 
 func AreDaemonSetPodsReady(newStatus *appsv1.DaemonSetStatus) bool {
@@ -60,11 +56,11 @@ func AreDaemonSetPodsReady(newStatus *appsv1.DaemonSetStatus) bool {
 		newStatus.DesiredNumberScheduled == newStatus.NumberReady
 }
 
-func ForDaemonSetDeleted(cli client.Client, logger logr.Logger, namespace, name string, pollTimeout time.Duration) error {
-	return k8swait.PollImmediate(time.Second, pollTimeout, func() (bool, error) {
+func (wt Waiter) ForDaemonSetDeleted(ctx context.Context, namespace, name string) error {
+	return k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
 		obj := appsv1.DaemonSet{}
 		key := ObjectKey{Name: name, Namespace: namespace}
-		err := cli.Get(context.TODO(), key.AsKey(), &obj)
-		return deletionStatusFromError(logger, "DaemonSet", key, err)
+		err := wt.Cli.Get(ctx, key.AsKey(), &obj)
+		return deletionStatusFromError(wt.Log, "DaemonSet", key, err)
 	})
 }

@@ -26,7 +26,7 @@ import (
 
 type WaitableObject struct {
 	Obj  client.Object
-	Wait func() error
+	Wait func(ctx context.Context) error
 }
 
 type Environment struct {
