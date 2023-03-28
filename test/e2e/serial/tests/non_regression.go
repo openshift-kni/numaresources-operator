@@ -226,7 +226,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err := fxt.Client.List(context.TODO(), &nrtInitialList)
 			Expect(err).ToNot(HaveOccurred())
 
-			workers, err := nodes.GetWorkerNodes(fxt.Client)
+			workers, err := nodes.GetWorkerNodes(fxt.Client, context.TODO())
 			Expect(err).ToNot(HaveOccurred())
 
 			targetIdx, ok := e2efixture.PickNodeIndex(workers)
@@ -351,7 +351,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			for _, nodeName := range nrtNames.List() {
 
 				//calculate base load on the node
-				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 				klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 
