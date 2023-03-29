@@ -40,7 +40,7 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
@@ -66,11 +66,11 @@ import (
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
-	var nrtList nrtv1alpha1.NodeResourceTopologyList
-	var nrts []nrtv1alpha1.NodeResourceTopology
+	var nrtList nrtv1alpha2.NodeResourceTopologyList
+	var nrts []nrtv1alpha2.NodeResourceTopology
 	tmPolicyFuncsHandler := tmPolicyFuncsHandler{
-		nrtv1alpha1.SingleNUMANodePodLevel:       newPodScopeTMPolicyFuncs(),
-		nrtv1alpha1.SingleNUMANodeContainerLevel: newContainerScopeTMPolicyFuncs(),
+		nrtv1alpha2.SingleNUMANodePodLevel:       newPodScopeTMPolicyFuncs(),
+		nrtv1alpha2.SingleNUMANodeContainerLevel: newContainerScopeTMPolicyFuncs(),
 	}
 
 	BeforeEach(func() {
@@ -117,9 +117,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			klog.Infof("Found node with 2 NUMA zones: %d", len(nrtCandidates))
 
-			policies := []nrtv1alpha1.TopologyManagerPolicy{
-				nrtv1alpha1.SingleNUMANodeContainerLevel,
-				nrtv1alpha1.SingleNUMANodePodLevel,
+			policies := []nrtv1alpha2.TopologyManagerPolicy{
+				nrtv1alpha2.SingleNUMANodeContainerLevel,
+				nrtv1alpha2.SingleNUMANodePodLevel,
 			}
 			nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
 			if len(nrts) < hostsRequired {
@@ -167,7 +167,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			klog.Infof("target node will be %q", targetNodeName)
 
-			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
 
 			var replicas int32 = 1
@@ -244,7 +244,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			policyFuncs := tmPolicyFuncsHandler[nrtv1alpha1.TopologyManagerPolicy(nrtInitial.TopologyPolicies[0])]
+			policyFuncs := tmPolicyFuncsHandler[nrtv1alpha2.TopologyManagerPolicy(nrtInitial.TopologyPolicies[0])]
 
 			By(fmt.Sprintf("checking post-create NRT for target node %q updated correctly", targetNodeName))
 			dataBefore, err := yaml.Marshal(nrtInitial)
@@ -450,7 +450,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			klog.Infof("target node will be %q", targetNodeName)
 
-			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
 
 			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, targetNodeName)
@@ -480,8 +480,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				reqResPerNUMA = append(reqResPerNUMA, numaRes)
 			}
 			//get the topology manager policy + scope of the NRT
-			tmPolicy := nrtv1alpha1.TopologyManagerPolicy(nrtInitial.TopologyPolicies[0])
-			if tmPolicy == nrtv1alpha1.SingleNUMANodePodLevel {
+			tmPolicy := nrtv1alpha2.TopologyManagerPolicy(nrtInitial.TopologyPolicies[0])
+			if tmPolicy == nrtv1alpha2.SingleNUMANodePodLevel {
 				paddingPodName := "padding-pod-on-target"
 				By("Pad target node to fit only the pod with TAS scheduler")
 				zeroRl := corev1.ResourceList{
@@ -638,9 +638,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			klog.Infof("Found node with 2 NUMA zones: %d", len(nrtCandidates))
 
-			policies := []nrtv1alpha1.TopologyManagerPolicy{
-				nrtv1alpha1.SingleNUMANodeContainerLevel,
-				nrtv1alpha1.SingleNUMANodePodLevel,
+			policies := []nrtv1alpha2.TopologyManagerPolicy{
+				nrtv1alpha2.SingleNUMANodeContainerLevel,
+				nrtv1alpha2.SingleNUMANodePodLevel,
 			}
 			nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
 			if len(nrts) < hostsRequired {
@@ -688,7 +688,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			klog.Infof("target node will be %q", targetNodeName)
 
-			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
 
 			targetNrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, targetNodeName)
@@ -875,9 +875,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			klog.Infof("Found node with 2 NUMA zones: %d", len(nrtCandidates))
 
-			policies := []nrtv1alpha1.TopologyManagerPolicy{
-				nrtv1alpha1.SingleNUMANodeContainerLevel,
-				nrtv1alpha1.SingleNUMANodePodLevel,
+			policies := []nrtv1alpha2.TopologyManagerPolicy{
+				nrtv1alpha2.SingleNUMANodeContainerLevel,
+				nrtv1alpha2.SingleNUMANodePodLevel,
 			}
 			nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
 			if len(nrts) < hostsRequired {
@@ -1000,7 +1000,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			By(fmt.Sprintf("verifying resources allocation correctness for NRT target: %q", targetNodeName))
-			var nrtAfterRSCreation nrtv1alpha1.NodeResourceTopologyList
+			var nrtAfterRSCreation nrtv1alpha2.NodeResourceTopologyList
 			podQoS := corev1qos.GetPodQOS(&pods[0])
 			Eventually(func() bool {
 				nrtAfterRSCreation, err := e2enrt.GetUpdated(fxt.Client, nrtInitial, timeout)
@@ -1062,7 +1062,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				SchedulerName: serialconfig.Config.SchedulerName,
 				Containers:    rsContainers,
 			})
-			nrtInitial, err = e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, timeout)
+			nrtInitial, err = e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, timeout)
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("creating a replicaset %s/%s with %d replicas scheduling with: %s", fxt.Namespace.Name, rsName, replicaNumber, serialconfig.Config.SchedulerName))
@@ -1147,7 +1147,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	})
 })
 
-func makePaddingPod(namespace, nodeName string, zone nrtv1alpha1.Zone, podReqs corev1.ResourceList) (*corev1.Pod, error) {
+func makePaddingPod(namespace, nodeName string, zone nrtv1alpha2.Zone, podReqs corev1.ResourceList) (*corev1.Pod, error) {
 	klog.Infof("want to have zone %q with allocatable: %s", zone.Name, e2ereslist.ToString(podReqs))
 
 	paddingReqs, err := e2enrt.SaturateZoneUntilLeft(zone, podReqs)
@@ -1221,7 +1221,7 @@ func pinPodToNode(pod *corev1.Pod, nodeName string) (*corev1.Pod, error) {
 }
 
 func dumpNRTForNode(cli client.Client, nodeName, tag string) {
-	nrt := nrtv1alpha1.NodeResourceTopology{}
+	nrt := nrtv1alpha2.NodeResourceTopology{}
 	err := cli.Get(context.TODO(), client.ObjectKey{Name: nodeName}, &nrt)
 	Expect(err).ToNot(HaveOccurred())
 	data, err := yaml.Marshal(nrt)
@@ -1302,7 +1302,7 @@ func unlabelNode(cli client.Client, key, val, nodeName string) (func() error, er
 	return labelFunc, nil
 }
 
-func availableResourceType(nrtInfo nrtv1alpha1.NodeResourceTopology, resName corev1.ResourceName) resource.Quantity {
+func availableResourceType(nrtInfo nrtv1alpha2.NodeResourceTopology, resName corev1.ResourceName) resource.Quantity {
 	var res resource.Quantity
 
 	for _, zone := range nrtInfo.Zones {
@@ -1316,7 +1316,7 @@ func availableResourceType(nrtInfo nrtv1alpha1.NodeResourceTopology, resName cor
 	return res.DeepCopy()
 }
 
-func allocatableResourceType(nrtInfo nrtv1alpha1.NodeResourceTopology, resName corev1.ResourceName) resource.Quantity {
+func allocatableResourceType(nrtInfo nrtv1alpha2.NodeResourceTopology, resName corev1.ResourceName) resource.Quantity {
 	var res resource.Quantity
 
 	for _, zone := range nrtInfo.Zones {
@@ -1337,12 +1337,12 @@ func allocatableResourceType(nrtInfo nrtv1alpha1.NodeResourceTopology, resName c
 // deployment where the number of replicas is the same as the number of
 // NUMA nodes so that all the replicas can successfully obtain resources
 // from all the NUMA nodes.
-func leastAvailableResourceQtyInAllZone(nrtInfo nrtv1alpha1.NodeResourceTopology, baseload baseload.Load, resName corev1.ResourceName) resource.Quantity {
+func leastAvailableResourceQtyInAllZone(nrtInfo nrtv1alpha2.NodeResourceTopology, baseload baseload.Load, resName corev1.ResourceName) resource.Quantity {
 	maxResAllocatable := e2enrt.GetMaxAllocatableResourceNumaLevel(nrtInfo, resName)
 	return getLeastAvailableResourceQty(maxResAllocatable, nrtInfo.Zones, resName, baseload)
 }
 
-func getLeastAvailableResourceQty(res resource.Quantity, zones nrtv1alpha1.ZoneList, resName corev1.ResourceName, baseload baseload.Load) resource.Quantity {
+func getLeastAvailableResourceQty(res resource.Quantity, zones nrtv1alpha2.ZoneList, resName corev1.ResourceName, baseload baseload.Load) resource.Quantity {
 	var zeroVal resource.Quantity
 
 	// We need to take baseload into consideration here. There is no way to
@@ -1424,7 +1424,7 @@ func checkReplica(pod corev1.Pod, targetNodeName string, K8sClient *kubernetes.C
 	Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 }
 
-func getPodSpec(tmPolicy nrtv1alpha1.TopologyManagerPolicy, rlPerNuma []corev1.ResourceList) corev1.PodSpec {
+func getPodSpec(tmPolicy nrtv1alpha2.TopologyManagerPolicy, rlPerNuma []corev1.ResourceList) corev1.PodSpec {
 	podSpec := corev1.PodSpec{
 		SchedulerName: serialconfig.Config.SchedulerName,
 		Containers: []corev1.Container{
@@ -1453,7 +1453,7 @@ func getPodSpec(tmPolicy nrtv1alpha1.TopologyManagerPolicy, rlPerNuma []corev1.R
 		},
 	}
 
-	if tmPolicy == nrtv1alpha1.SingleNUMANodePodLevel {
+	if tmPolicy == nrtv1alpha2.SingleNUMANodePodLevel {
 		podSpec.Containers = []corev1.Container{
 			{
 				Name:    "testpod-cnt",

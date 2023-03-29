@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/taints"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
@@ -53,8 +53,8 @@ import (
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering taints", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
-	var nrtList nrtv1alpha1.NodeResourceTopologyList
-	var nrts []nrtv1alpha1.NodeResourceTopology
+	var nrtList nrtv1alpha2.NodeResourceTopologyList
+	var nrts []nrtv1alpha2.NodeResourceTopology
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
@@ -79,9 +79,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
-		policies := []nrtv1alpha1.TopologyManagerPolicy{
-			nrtv1alpha1.SingleNUMANodeContainerLevel,
-			nrtv1alpha1.SingleNUMANodePodLevel,
+		policies := []nrtv1alpha2.TopologyManagerPolicy{
+			nrtv1alpha2.SingleNUMANodeContainerLevel,
+			nrtv1alpha2.SingleNUMANodePodLevel,
 		}
 		nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
 		if len(nrts) < 2 {
@@ -190,7 +190,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			klog.Infof("target node will be %q", targetNodeName)
 
-			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
 
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")

@@ -17,6 +17,7 @@
 package configuration
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -51,6 +52,8 @@ var (
 func init() {
 	var err error
 
+	ctx := context.Background()
+
 	MachineConfigPoolUpdateTimeout, err = getMachineConfigPoolUpdateValueFromEnv(envVarMCPUpdateTimeout, defaultMCPUpdateTimeout)
 	if err != nil {
 		panic(fmt.Errorf("failed to parse machine config pool update timeout: %w", err))
@@ -61,7 +64,7 @@ func init() {
 		panic(fmt.Errorf("failed to parse machine config pool update interval: %w", err))
 	}
 
-	Plat, err = detect.Platform()
+	Plat, err = detect.Platform(ctx)
 	if err != nil {
 		Plat = getPlatformFromEnv(envVarPlatform)
 	}
@@ -70,7 +73,7 @@ func init() {
 		klog.Infof("forced to %q: failed to detect a platform: %w", Plat, err)
 	}
 
-	PlatVersion, err = detect.Version(Plat)
+	PlatVersion, err = detect.Version(ctx, Plat)
 	if err != nil {
 		PlatVersion, err = getPlatformVersionFromEnv(envVarPlatform)
 		if err != nil {

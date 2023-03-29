@@ -17,15 +17,15 @@
 package images
 
 const (
-	SchedulerPluginSchedulerDefaultImageTag  = "registry.k8s.io/scheduler-plugins/kube-scheduler:v0.24.9"
-	SchedulerPluginControllerDefaultImageTag = "registry.k8s.io/scheduler-plugins/controller:v0.24.9"
-	NodeFeatureDiscoveryDefaultImageTag      = "registry.k8s.io/nfd/node-feature-discovery:v0.12.0"
-	ResourceTopologyExporterDefaultImageTag  = "quay.io/k8stopologyawareschedwg/resource-topology-exporter:v0.9.0"
+	SchedulerPluginSchedulerDefaultImageTag  = "quay.io/k8stopologyawareschedwg/scheduler-plugins-kube-scheduler:v0.0.2023031503"
+	SchedulerPluginControllerDefaultImageTag = "quay.io/k8stopologyawareschedwg/scheduler-plugins-controller:v0.0.2023031503"
+	NodeFeatureDiscoveryDefaultImageTag      = "quay.io/k8stopologyawareschedwg/node-feature-discovery:v0.0.2023031605"
+	ResourceTopologyExporterDefaultImageTag  = "quay.io/k8stopologyawareschedwg/resource-topology-exporter:v0.10.1"
 )
 
 const (
-	SchedulerPluginSchedulerDefaultImageSHA  = "registry.k8s.io/scheduler-plugins/kube-scheduler@sha256:7e5681d6ee55da2a371111401fafd1ba371df83c4f1da088a0a7b20a2951eb72"
-	SchedulerPluginControllerDefaultImageSHA = "registry.k8s.io/scheduler-plugins/controller@sha256:28ade406054565a06a7585acd839c420e1a0b8969f5bbe81ca7f0d97a4a483f3"
-	NodeFeatureDiscoveryDefaultImageSHA      = "registry.k8s.io/nfd/node-feature-discovery@sha256:c116b6498cc3281342b74e22eeb9e98b58f902dac90360c2abdeb2baa485e8c3"
-	ResourceTopologyExporterDefaultImageSHA  = "quay.io/k8stopologyawareschedwg/resource-topology-exporter@sha256:fe556f871ceec7497e6216b08719d3aab1643ee465b78590e36e0357a7ce07d3"
+	SchedulerPluginSchedulerDefaultImageSHA  = "quay.io/k8stopologyawareschedwg/scheduler-plugins-kube-scheduler@sha256:7c75900ae5eb94f7d8ea89e2fc640a03731b2f17960e23cdf50ea99258b0beeb"
+	SchedulerPluginControllerDefaultImageSHA = "quay.io/k8stopologyawareschedwg/scheduler-plugins-controller@sha256:ac030bb933bfe0c9b11a0192bd81d1bb2d27e80f9dc356c69f865d9395bfe007"
+	NodeFeatureDiscoveryDefaultImageSHA      = "quay.io/k8stopologyawareschedwg/node-feature-discovery@sha256:984c9b12ff32bab1716da12d898d058c57b932dcc38b42ebc16234a26cb234aa"
+	ResourceTopologyExporterDefaultImageSHA  = "quay.io/k8stopologyawareschedwg/resource-topology-exporter@sha256:633b1975b746238a9a3ec5b5db5eaac046dac2189508068810978cd323de94f5"
 )

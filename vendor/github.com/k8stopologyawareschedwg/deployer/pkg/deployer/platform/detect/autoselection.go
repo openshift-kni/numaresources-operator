@@ -17,6 +17,7 @@
 package detect
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -58,7 +59,7 @@ const (
 	DetectedFailure     string = "autodetection failed"
 )
 
-func FindPlatform(userSupplied platform.Platform) (PlatformInfo, string, error) {
+func FindPlatform(ctx context.Context, userSupplied platform.Platform) (PlatformInfo, string, error) {
 	do := PlatformInfo{
 		AutoDetected: platform.Unknown,
 		UserSupplied: userSupplied,
@@ -70,7 +71,7 @@ func FindPlatform(userSupplied platform.Platform) (PlatformInfo, string, error) 
 		return do, DetectedFromUser, nil
 	}
 
-	dp, err := Platform()
+	dp, err := Platform(ctx)
 	if err != nil {
 		return do, DetectedFailure, err
 	}
@@ -80,7 +81,7 @@ func FindPlatform(userSupplied platform.Platform) (PlatformInfo, string, error) 
 	return do, DetectedFromCluster, nil
 }
 
-func FindVersion(plat platform.Platform, userSupplied platform.Version) (VersionInfo, string, error) {
+func FindVersion(ctx context.Context, plat platform.Platform, userSupplied platform.Version) (VersionInfo, string, error) {
 	do := VersionInfo{
 		AutoDetected: platform.MissingVersion,
 		UserSupplied: userSupplied,
@@ -92,7 +93,7 @@ func FindVersion(plat platform.Platform, userSupplied platform.Version) (Version
 		return do, DetectedFromUser, nil
 	}
 
-	dv, err := Version(plat)
+	dv, err := Version(ctx, plat)
 	if err != nil {
 		return do, DetectedFailure, err
 	}
