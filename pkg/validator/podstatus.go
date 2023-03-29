@@ -67,7 +67,7 @@ func ValidatePodStatus(data ValidatorData) ([]deployervalidator.ValidationResult
 	for nodeName, pods := range data.nonRunningPodsByNode {
 		for nname, phase := range pods {
 			ret = append(ret, deployervalidator.ValidationResult{
-				Area:      deployervalidator.AreaCluster,
+				Area:      deployervalidator.AreaKubelet, // TODO use AreaNode when available
 				Component: "pod",
 				Node:      nodeName,
 				Setting:   nname,
