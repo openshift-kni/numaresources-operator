@@ -42,10 +42,10 @@ import (
 	nrtv1alpha2cli "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
-	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
+	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
-	nropv1alpha1cli "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1alpha1"
+	nropv1cli "github.com/openshift-kni/numaresources-operator/pkg/k8sclientset/generated/clientset/versioned/typed/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
@@ -57,7 +57,7 @@ import (
 var _ = ginkgo.Describe("with a running cluster with all the components", func() {
 	var (
 		initialized bool
-		nropcli     *nropv1alpha1cli.NumaresourcesoperatorV1alpha1Client
+		nropcli     *nropv1cli.NumaresourcesoperatorV1Client
 		mcocli      *mcov1cli.MachineconfigurationV1Client
 		nrtcli      *nrtv1alpha2cli.Clientset
 	)
@@ -70,7 +70,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		}
 		var err error
 
-		nropcli, err = nropv1alpha1cli.NewForConfig(f.ClientConfig())
+		nropcli, err = nropv1cli.NewForConfig(f.ClientConfig())
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		mcocli, err = mcov1cli.NewForConfig(f.ClientConfig())
@@ -183,7 +183,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				kc, err := mcoKubeletConfToKubeletConf(&mcoKc)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				mcps, err := nodegroupv1alpha1.FindMachineConfigPools(mcpList, nroObj.Spec.NodeGroups)
+				mcps, err := nodegroupv1.FindMachineConfigPools(mcpList, nroObj.Spec.NodeGroups)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
@@ -232,7 +232,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			mcoKc := mcoKcList.Items[0]
 			ginkgo.By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
 
-			mcps, err := nodegroupv1alpha1.FindMachineConfigPools(mcpList, nroObj.Spec.NodeGroups)
+			mcps, err := nodegroupv1.FindMachineConfigPools(mcpList, nroObj.Spec.NodeGroups)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
