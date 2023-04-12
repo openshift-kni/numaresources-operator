@@ -41,9 +41,12 @@ spec:
               drop: ["ALL"]
           image: ${IMAGE}
           resources:
+            limits:
+              cpu: "600m"
+              memory: "1200Mi"
             requests:
-              cpu: "100m"
-              memory: "500Mi"
+              cpu: "600m"
+              memory: "1200Mi"
           command:
             - /bin/kube-scheduler
           args:
