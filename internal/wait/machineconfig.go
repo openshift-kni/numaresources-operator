@@ -18,41 +18,40 @@ package wait
 
 import (
 	"context"
-	"time"
+
+	"k8s.io/klog/v2"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	k8swait "k8s.io/apimachinery/pkg/util/wait"
 
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
-func ForMachineConfigPoolDeleted(cli client.Client, mcp *machineconfigv1.MachineConfigPool, pollInterval, pollTimeout time.Duration) error {
-	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
+func (wt Waiter) ForMachineConfigPoolDeleted(ctx context.Context, mcp *machineconfigv1.MachineConfigPool) error {
+	err := k8swait.Poll(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
 		updatedMcp := machineconfigv1.MachineConfigPool{}
 		key := ObjectKeyFromObject(mcp)
-		err := cli.Get(context.TODO(), key.AsKey(), &updatedMcp)
+		err := wt.Cli.Get(ctx, key.AsKey(), &updatedMcp)
 		return deletionStatusFromError("MachineConfigPool", key, err)
 	})
 	return err
 }
 
-func ForKubeletConfigDeleted(cli client.Client, kc *machineconfigv1.KubeletConfig, pollInterval, pollTimeout time.Duration) error {
-	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
+func (wt Waiter) ForKubeletConfigDeleted(ctx context.Context, kc *machineconfigv1.KubeletConfig) error {
+	err := k8swait.Poll(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
 		updatedKc := machineconfigv1.KubeletConfig{}
 		key := ObjectKeyFromObject(kc)
-		err := cli.Get(context.TODO(), key.AsKey(), &updatedKc)
+		err := wt.Cli.Get(ctx, key.AsKey(), &updatedKc)
 		return deletionStatusFromError("KubeletConfig", key, err)
 	})
 	return err
 }
 
-func ForMachineConfigPoolCondition(cli client.Client, mcp *machineconfigv1.MachineConfigPool, condType machineconfigv1.MachineConfigPoolConditionType, pollInterval, pollTimeout time.Duration) error {
-	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
+func (wt Waiter) ForMachineConfigPoolCondition(ctx context.Context, mcp *machineconfigv1.MachineConfigPool, condType machineconfigv1.MachineConfigPoolConditionType) error {
+	err := k8swait.Poll(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
 		updatedMcp := machineconfigv1.MachineConfigPool{}
 		key := ObjectKeyFromObject(mcp)
-		err := cli.Get(context.TODO(), key.AsKey(), &updatedMcp)
+		err := wt.Cli.Get(ctx, key.AsKey(), &updatedMcp)
 		if err != nil {
 			return false, err
 		}

@@ -17,6 +17,7 @@
 package fixture
 
 import (
+	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,7 +33,7 @@ import (
 // WaitPodsRunning waits for all padding pods to be up and running ( or fail)
 func WaitForPaddingPodsRunning(fxt *Fixture, paddingPods []*corev1.Pod) []string {
 	var failedPodIds []string
-	failedPods, _ := wait.ForPodListAllRunning(fxt.Client, paddingPods, wait.DefaultPodRunningTimeout)
+	failedPods, _ := wait.With(fxt.Client).ForPodListAllRunning(context.TODO(), paddingPods)
 	for _, failedPod := range failedPods {
 		_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
 		//note that this test does not use podOverhead thus pod req and lim would be the pod's resources as set upon creating

@@ -246,7 +246,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			// TODO: lacking better ways, let's monitor the pod "long enough" and let's check it stays Pending
 			// if it stays Pending "long enough" it still means little, but OTOH if it goes Running or Failed we
 			// can tell for sure something's wrong
-			err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+			err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
@@ -262,14 +262,14 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the test pod is removed")
-			err = wait.ForPodDeleted(fxt.Client, targetPaddingPod.Namespace, targetPaddingPod.Name, 3*time.Minute)
+			err = wait.With(fxt.Client).Timeout(3*time.Minute).ForPodDeleted(context.TODO(), targetPaddingPod.Namespace, targetPaddingPod.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			// the status of the test pod moving from pending to running expected to be fast after new resources are released,
 			// thus it is fragile to verify the NRT before make the pending pod running, so let's check
 			// that after the test pod start running
 			By("waiting for the pod to be scheduled")
-			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod, err := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -405,7 +405,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By("waiting for the pod to be scheduled")
 			// 3 minutes is plenty, should never timeout
-			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod, err := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -435,7 +435,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By("waiting for the pod to be scheduled")
 			// 3 minutes is plenty, should never timeout
-			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod, err := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -469,13 +469,11 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
 			By("waiting for deployment to be up & running")
-			dpRunningTimeout := 1 * time.Minute
-			dpRunningPollInterval := 10 * time.Second
-			_, err = wait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
-			Expect(err).NotTo(HaveOccurred(), "Deployment %q not up & running after %v", deployment.Name, dpRunningTimeout)
+			_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDeploymentComplete(context.TODO(), deployment)
+			Expect(err).NotTo(HaveOccurred(), "Deployment %q not up & running after %v", deployment.Name, 1*time.Minute)
 
 			By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
-			pods, err := podlist.ByDeployment(fxt.Client, *deployment)
+			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *deployment)
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q: %v", deployment.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 			for _, pod := range pods {
@@ -540,7 +538,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By("waiting for the pod to be scheduled")
 			// 3 minutes is plenty, should never timeout
-			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod, err := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -570,7 +568,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By("waiting for the pod to be scheduled")
 			// 3 minutes is plenty, should never timeout
-			updatedPod, err := wait.ForPodPhase(fxt.Client, podBurstable.Namespace, podBurstable.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod, err := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodPhase(context.TODO(), podBurstable.Namespace, podBurstable.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -615,7 +613,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By("check the pod is still pending")
 
-			err = wait.WhileInPodPhase(fxt.Client, podGuanranteed.Namespace, podGuanranteed.Name, corev1.PodPending, 10*time.Second, 3)
+			err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), podGuanranteed.Namespace, podGuanranteed.Name, corev1.PodPending)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, podGuanranteed.Namespace, podGuanranteed.Name)
 			}
@@ -631,7 +629,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By("waiting for the guaranteed pod to be scheduled")
 			// 3 minutes is plenty, should never timeout
-			updatedPod2, err := wait.ForPodPhase(fxt.Client, podGuanranteed.Namespace, podGuanranteed.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod2, err := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodPhase(context.TODO(), podGuanranteed.Namespace, podGuanranteed.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod2.Namespace, updatedPod2.Name)
 			}
@@ -707,14 +705,11 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).NotTo(HaveOccurred(), "unable to create daemonset %q", ds.Name)
 
 			By("waiting for daemoneset to be up & running")
-			dsRunningTimeout := 1 * time.Minute
-			dsRunningPollInterval := 10 * time.Second
-
-			_, err = wait.ForDaemonSetReady(fxt.Client, ds, dsRunningPollInterval, dsRunningTimeout)
-			Expect(err).NotTo(HaveOccurred(), "Daemonset %q not up & running after %v", ds.Name, dsRunningTimeout)
+			_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetReady(context.TODO(), ds)
+			Expect(err).NotTo(HaveOccurred(), "Daemonset %q not up & running after %v", ds.Name, 1*time.Minute)
 
 			By(fmt.Sprintf("checking Daemonset pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
-			pods, err := podlist.ByDaemonset(fxt.Client, *ds)
+			pods, err := podlist.With(fxt.Client).ByDaemonset(context.TODO(), *ds)
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Daemonset %q: %v", ds.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
 			for _, pod := range pods {

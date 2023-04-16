@@ -187,7 +187,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 
 				// very generous timeout here. It's hard and racy to check we had 2 pods pending (expected phased scheduling),
 				// but that would be the most correct and stricter testing.
-				failedPods, updatedPods := wait.ForPodListAllRunning(fxt.Client, testPods, 180*time.Second)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodListAllRunning(context.TODO(), testPods)
 				if len(failedPods) > 0 {
 					nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
 					klog.Infof("%s", e2enrtint.ListToString(nrtListFailed.Items, "post failure"))
@@ -295,7 +295,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				// note the cleanup is done automatically once the ns on which we run is deleted - the fixture takes care
 
 				// even more generous timeout here. We need to tolerate more reconciliation time because of the interference
-				failedPods, updatedPods := wait.ForPodListAllRunning(fxt.Client, testPods, 300*time.Second)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(5*time.Minute).ForPodListAllRunning(context.TODO(), testPods)
 				if len(failedPods) > 0 {
 					nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
 					klog.Infof("%s", e2enrtint.ListToString(nrtListFailed.Items, "post failure"))
@@ -411,7 +411,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				// this is a slight abuse. We want to wait for hostsRequired < desiredPods to be running. Other pod(s) must be pending.
 				// So we wait a bit too much unnecessarily, but wetake this chance to ensure the pod(s) which are supposed to be pending
 				// stay pending at least up until timeout
-				failedPods, updatedPods := wait.ForPodListAllRunning(fxt.Client, testPods, 60*time.Second)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodListAllRunning(context.TODO(), testPods)
 				Expect(len(updatedPods)).To(Equal(hostsRequired))
 				Expect(len(failedPods)).To(Equal(expectedPending))
 				Expect(len(updatedPods) + len(failedPods)).To(Equal(desiredPods))
@@ -532,7 +532,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				// this is a slight abuse. We want to wait for hostsRequired < desiredPods to be running. Other pod(s) must be pending.
 				// So we wait a bit too much unnecessarily, but wetake this chance to ensure the pod(s) which are supposed to be pending
 				// stay pending at least up until timeout
-				failedPods, updatedPods := wait.ForPodListAllRunning(fxt.Client, testPods, 60*time.Second)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodListAllRunning(context.TODO(), testPods)
 				Expect(len(updatedPods)).To(Equal(hostsRequired))
 				Expect(len(failedPods)).To(Equal(expectedPending))
 
@@ -573,13 +573,13 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				err := fxt.Client.Delete(context.TODO(), targetPod)
 				Expect(err).ToNot(HaveOccurred())
 				// VERY generous timeout, we expect the delete to be much faster
-				err = wait.ForPodDeleted(fxt.Client, targetPod.Namespace, targetPod.Name, 300*time.Second)
+				err = wait.With(fxt.Client).Timeout(5*time.Minute).ForPodDeleted(context.TODO(), targetPod.Namespace, targetPod.Name)
 				Expect(err).ToNot(HaveOccurred())
 
 				// here we really need a quite long timeout. Still 300s is a bit of overshot (expected so).
 				// The reason to be supercareful here is the potentially long interplay between
 				// NRT updater, resync loop, scheduler retry loop.
-				failedPods, updatedPods = wait.ForPodListAllRunning(fxt.Client, expectedRunningPods, 300*time.Second)
+				failedPods, updatedPods = wait.With(fxt.Client).Timeout(5*time.Minute).ForPodListAllRunning(context.TODO(), expectedRunningPods)
 				Expect(len(updatedPods)).To(Equal(hostsRequired))
 				Expect(failedPods).To(BeEmpty())
 			})

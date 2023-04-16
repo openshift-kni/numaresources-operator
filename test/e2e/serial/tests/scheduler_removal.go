@@ -184,7 +184,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restar
 			nrosched.CheckNROSchedulerAvailable(fxt.Client, nroSchedObj.Name)
 
 			By(fmt.Sprintf("waiting for the test deployment %q to become complete and ready", updatedDp.Name))
-			_, err = wait.ForDeploymentComplete(fxt.Client, updatedDp, 2*time.Second, 30*time.Second)
+			_, err = wait.With(fxt.Client).Interval(2*time.Second).Interval(30*time.Second).ForDeploymentComplete(context.TODO(), updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -226,13 +226,10 @@ func createDeployment(fxt *e2efixture.Fixture, name, schedulerName string) *apps
 }
 
 func createDeploymentSync(fxt *e2efixture.Fixture, name, schedulerName string) *appsv1.Deployment {
-	dpRunningTimeout := time.Minute
-	dpRunningPollInterval := 10 * time.Second
 	dp := createDeployment(fxt, name, schedulerName)
 	By(fmt.Sprintf("waiting for the test deployment %q to be complete and ready", name))
-
-	_, err := wait.ForDeploymentComplete(fxt.Client, dp, dpRunningPollInterval, dpRunningTimeout)
-	Expect(err).ToNot(HaveOccurred(), "Deployment %q is not up & running after %v", dp.Name, dpRunningTimeout)
+	_, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(context.TODO(), dp)
+	Expect(err).ToNot(HaveOccurred(), "Deployment %q is not up & running after %v", dp.Name, time.Minute)
 	return dp
 }
 

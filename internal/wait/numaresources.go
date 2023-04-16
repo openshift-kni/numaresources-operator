@@ -18,40 +18,38 @@ package wait
 
 import (
 	"context"
-	"time"
 
-	"k8s.io/apimachinery/pkg/util/wait"
+	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
-func ForNUMAResourcesOperatorDeleted(cli client.Client, nrop *nropv1.NUMAResourcesOperator, pollInterval, pollTimeout time.Duration) error {
-	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
+func (wt Waiter) ForNUMAResourcesOperatorDeleted(ctx context.Context, nrop *nropv1.NUMAResourcesOperator) error {
+	err := k8swait.Poll(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
 		updatedNrop := nropv1.NUMAResourcesOperator{}
 		key := ObjectKeyFromObject(nrop)
-		err := cli.Get(context.TODO(), key.AsKey(), &updatedNrop)
+		err := wt.Cli.Get(ctx, key.AsKey(), &updatedNrop)
 		return deletionStatusFromError("NUMAResourcesOperator", key, err)
 	})
 	return err
 }
 
-func ForNUMAResourcesSchedulerDeleted(cli client.Client, nrSched *nropv1.NUMAResourcesScheduler, pollInterval, pollTimeout time.Duration) error {
-	err := wait.Poll(pollInterval, pollTimeout, func() (bool, error) {
+func (wt Waiter) ForNUMAResourcesSchedulerDeleted(ctx context.Context, nrSched *nropv1.NUMAResourcesScheduler) error {
+	err := k8swait.Poll(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
 		updatedNROSched := nropv1.NUMAResourcesScheduler{}
 		key := ObjectKeyFromObject(nrSched)
-		err := cli.Get(context.TODO(), key.AsKey(), &updatedNROSched)
+		err := wt.Cli.Get(ctx, key.AsKey(), &updatedNROSched)
 		return deletionStatusFromError("NUMAResourcesScheduler", key, err)
 	})
 	return err
 }
 
-func ForDaemonsetInNUMAResourcesOperatorStatus(cli client.Client, nroObj *nropv1.NUMAResourcesOperator, interval time.Duration, timeout time.Duration) (*nropv1.NUMAResourcesOperator, error) {
+func (wt Waiter) ForDaemonsetInNUMAResourcesOperatorStatus(ctx context.Context, nroObj *nropv1.NUMAResourcesOperator) (*nropv1.NUMAResourcesOperator, error) {
 	updatedNRO := nropv1.NUMAResourcesOperator{}
-	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
 		key := ObjectKeyFromObject(nroObj)
-		err := cli.Get(context.TODO(), key.AsKey(), &updatedNRO)
+		err := wt.Cli.Get(ctx, key.AsKey(), &updatedNRO)
 		if err != nil {
 			klog.Warningf("failed to get the NUMAResourcesOperator %s: %v", key.String(), err)
 			return false, err

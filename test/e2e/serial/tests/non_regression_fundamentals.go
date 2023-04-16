@@ -81,7 +81,7 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the test pod is removed")
-			err = wait.ForPodDeleted(fxt.Client, testPod.Namespace, testPod.Name, 3*time.Minute)
+			err = wait.With(fxt.Client).Timeout(3*time.Minute).ForPodDeleted(context.TODO(), testPod.Namespace, testPod.Name)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -93,8 +93,7 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 			err := fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			timeout := 5 * time.Minute
-			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			updatedPod, err := wait.With(fxt.Client).Timeout(5*time.Minute).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -117,8 +116,7 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 			err := fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			timeout := 5 * time.Minute
-			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			updatedPod, err := wait.With(fxt.Client).Timeout(5*time.Minute).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -141,8 +139,7 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 			err := fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			timeout := 5 * time.Minute
-			updatedPod, err := wait.ForPodPhase(fxt.Client, testPod.Namespace, testPod.Name, corev1.PodRunning, timeout)
+			updatedPod, err := wait.With(fxt.Client).Timeout(5*time.Minute).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -225,7 +222,7 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 					testPods = append(testPods, testPod)
 				}
 
-				failedPods, updatedPods := wait.ForPodListAllRunning(fxt.Client, testPods, timeout)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodListAllRunning(context.TODO(), testPods)
 
 				for _, failedPod := range failedPods {
 					_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
@@ -321,7 +318,7 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 					testPods = append(testPods, testPod)
 				}
 
-				failedPods, updatedPods := wait.ForPodListAllRunning(fxt.Client, testPods, timeout)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodListAllRunning(context.TODO(), testPods)
 
 				for _, failedPod := range failedPods {
 					_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
