@@ -27,8 +27,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
@@ -59,8 +61,12 @@ type eventChecker func(ev corev1.Event) bool
 func checkPODEvents(k8sCli *kubernetes.Clientset, podNamespace, podName string, evCheck eventChecker) (bool, error) {
 	By(fmt.Sprintf("checking events for pod %s/%s", podNamespace, podName))
 	opts := metav1.ListOptions{
-		FieldSelector: fmt.Sprintf("involvedObject.name=%s", podName),
-		TypeMeta:      metav1.TypeMeta{Kind: "Pod"},
+		FieldSelector: fields.SelectorFromSet(map[string]string{
+			"involvedObject.name":      podName,
+			"involvedObject.namespace": podNamespace,
+			// TODO: use uid
+		}).String(),
+		TypeMeta: metav1.TypeMeta{Kind: "Pod"},
 	}
 	events, err := k8sCli.CoreV1().Events(podNamespace).List(context.TODO(), opts)
 	if err != nil {
