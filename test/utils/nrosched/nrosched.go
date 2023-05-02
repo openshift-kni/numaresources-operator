@@ -72,9 +72,10 @@ func checkPODEvents(k8sCli *kubernetes.Clientset, podNamespace, podName string, 
 	}
 
 	for _, item := range events.Items {
-		klog.Infof("checking event: %s/%s [%s: %s - %s]", podNamespace, podName, item.ReportingController, item.Reason, item.Message)
+		evStr := eventToString(item)
+		klog.Infof("checking event: %s/%s [%s]", podNamespace, podName, evStr)
 		if evCheck(item) {
-			klog.Infof("-> found relevant scheduling event for pod %s/%s: %v", podNamespace, podName, item)
+			klog.Infof("-> found relevant scheduling event for pod %s/%s: [%s]", podNamespace, podName, evStr)
 			return true, nil
 		}
 	}
@@ -170,4 +171,28 @@ func CheckNROSchedulerAvailable(cli client.Client, NUMAResourcesSchedObjName str
 func GetNROSchedulerName(cli client.Client, NUMAResourcesSchedObjName string) string {
 	nroSchedObj := CheckNROSchedulerAvailable(cli, NUMAResourcesSchedObjName)
 	return nroSchedObj.Status.SchedulerName
+}
+
+func eventToString(ev corev1.Event) string {
+	evSrc := eventSourceToString(ev.Source)
+	evSrcSep := ""
+	if evSrc != "" {
+		evSrcSep = " "
+	}
+	return fmt.Sprintf("type=%q action=%q message=%q reason=%q reportedBy={%s/%s}",
+		ev.Type, ev.Action, ev.Message, ev.Reason, ev.ReportingController, ev.ReportingInstance,
+	) + evSrcSep + evSrc
+}
+
+func eventSourceToString(evs corev1.EventSource) string {
+	if evs.Host != "" && evs.Component != "" {
+		return "from={" + evs.Host + "/" + evs.Component + "}"
+	}
+	if evs.Host != "" {
+		return "from={" + evs.Host + "}"
+	}
+	if evs.Component != "" {
+		return "from={" + evs.Component + "}"
+	}
+	return ""
 }
