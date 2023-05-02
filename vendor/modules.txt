@@ -242,10 +242,10 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/client
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/scheme
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/typed/topology/v1alpha1
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/typed/topology/v1alpha2
-# github.com/k8stopologyawareschedwg/podfingerprint v0.2.0
+# github.com/k8stopologyawareschedwg/podfingerprint v0.2.1
 ## explicit; go 1.17
 github.com/k8stopologyawareschedwg/podfingerprint
-# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.10.1
+# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.11.1
 ## explicit; go 1.19
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/dump
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8sannotations
@@ -254,7 +254,11 @@ github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/kubeconf
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/notification
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podreadiness
-github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podrescli
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/filter
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/filter/numalocality
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/sharedcpuspool
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/prometheus
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/ratelimiter
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor
@@ -381,9 +385,13 @@ github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace
 ## explicit; go 1.12
 github.com/spf13/pflag
+# github.com/stretchr/objx v0.4.0
+## explicit; go 1.12
+github.com/stretchr/objx
 # github.com/stretchr/testify v1.8.0
 ## explicit; go 1.13
 github.com/stretchr/testify/assert
+github.com/stretchr/testify/mock
 # github.com/vincent-petithory/dataurl v1.0.0
 ## explicit
 github.com/vincent-petithory/dataurl

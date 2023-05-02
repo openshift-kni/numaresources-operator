@@ -11,8 +11,8 @@ require (
 	github.com/jaypipes/pcidb v1.0.0
 	github.com/k8stopologyawareschedwg/deployer v0.12.1-0.20230322120411-111a4d4522b1
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.1
-	github.com/k8stopologyawareschedwg/podfingerprint v0.2.0
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.10.1
+	github.com/k8stopologyawareschedwg/podfingerprint v0.2.1
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.11.1
 	github.com/kubevirt/device-plugin-manager v1.19.4
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo/v2 v2.4.0
@@ -100,6 +100,7 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/spf13/cobra v1.5.0 // indirect
 	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace // indirect
+	github.com/stretchr/objx v0.4.0 // indirect
 	github.com/vincent-petithory/dataurl v1.0.0 // indirect
 	go.opentelemetry.io/contrib v0.20.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.20.0 // indirect
