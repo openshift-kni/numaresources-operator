@@ -26,7 +26,8 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
-	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podrescli"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/sharedcpuspool"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/prometheus"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter"
@@ -97,7 +98,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	k8sCli, err := podrescli.NewK8SClient(parsedArgs.RTE.PodResourcesSocketPath)
+	k8sCli, err := podres.GetClient(parsedArgs.RTE.PodResourcesSocketPath)
 	if err != nil {
 		klog.Fatalf("failed to start prometheus server: %v", err)
 	}
@@ -107,10 +108,7 @@ func main() {
 		sysCli = podrescompat.NewSysinfoClientFromLister(k8sCli, parsedArgs.LocalArgs.SysConf)
 	}
 
-	cli, err := podrescli.NewFilteringClientFromLister(sysCli, parsedArgs.RTE.Debug, parsedArgs.RTE.ReferenceContainer)
-	if err != nil {
-		klog.Fatalf("failed to get podresources filtering client: %v", err)
-	}
+	cli := sharedcpuspool.NewFromLister(sysCli, parsedArgs.RTE.Debug, parsedArgs.RTE.ReferenceContainer)
 
 	err = prometheus.InitPrometheus()
 	if err != nil {
@@ -146,6 +144,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.BoolVar(&pArgs.Resourcemonitor.ExposeTiming, "expose-timing", false, "If enable, expose expected and actual sleep interval as annotations.")
 	flags.BoolVar(&pArgs.Resourcemonitor.RefreshNodeResources, "refresh-node-resources", false, "If enable, track changes in node's resources")
 	flags.StringVar(&pArgs.Resourcemonitor.PodSetFingerprintStatusFile, "pods-fingerprint-status-file", "", "File to dump the pods fingerprint status. Use \"\" to disable.")
+	flags.BoolVar(&pArgs.Resourcemonitor.PodSetFingerprintUnrestricted, "pods-fingerprint-unrestricted", false, "If enable, compute the pod set fingerprint using all pods, not just the ones with NUMA-pinned resources.")
 
 	flags.StringVar(&pArgs.LocalArgs.ConfigPath, "config", "/etc/resource-topology-exporter/config.yaml", "Configuration file path. Use this to set the exclude list.")
 
@@ -193,7 +192,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 		return pArgs, err
 	}
 	if pArgs.RTE.ReferenceContainer.IsEmpty() {
-		pArgs.RTE.ReferenceContainer = podrescli.ContainerIdentFromEnv()
+		pArgs.RTE.ReferenceContainer = sharedcpuspool.ContainerIdentFromEnv()
 	}
 
 	conf, err := config.ReadFile(pArgs.LocalArgs.ConfigPath)
@@ -201,8 +200,8 @@ func parseArgs(args ...string) (ProgArgs, error) {
 		return pArgs, fmt.Errorf("error getting exclude list from the configuration: %v", err)
 	}
 	if len(conf.ExcludeList) != 0 {
-		pArgs.Resourcemonitor.ExcludeList = conf.ExcludeList
-		klog.V(2).Infof("using exclude list:\n%s", pArgs.Resourcemonitor.ExcludeList.String())
+		pArgs.Resourcemonitor.ResourceExclude = conf.ExcludeList
+		klog.V(2).Infof("using exclude list:\n%s", pArgs.Resourcemonitor.ResourceExclude.String())
 	}
 	pArgs.LocalArgs.SysConf = conf.Resources
 	pArgs.LocalArgs.PodExcludes = conf.PodExcludes
@@ -318,14 +317,14 @@ func setKubeletStateDirs(value string) ([]string, error) {
 	return append([]string{}, strings.Split(value, " ")...), nil
 }
 
-func setContainerIdent(value string) (*podrescli.ContainerIdent, error) {
-	ci, err := podrescli.ContainerIdentFromString(value)
+func setContainerIdent(value string) (*sharedcpuspool.ContainerIdent, error) {
+	ci, err := sharedcpuspool.ContainerIdentFromString(value)
 	if err != nil {
 		return nil, err
 	}
 
 	if ci == nil {
-		return &podrescli.ContainerIdent{}, nil
+		return &sharedcpuspool.ContainerIdent{}, nil
 	}
 
 	return ci, nil
