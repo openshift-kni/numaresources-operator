@@ -27,8 +27,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
@@ -59,8 +61,12 @@ type eventChecker func(ev corev1.Event) bool
 func checkPODEvents(k8sCli *kubernetes.Clientset, podNamespace, podName string, evCheck eventChecker) (bool, error) {
 	By(fmt.Sprintf("checking events for pod %s/%s", podNamespace, podName))
 	opts := metav1.ListOptions{
-		FieldSelector: fmt.Sprintf("involvedObject.name=%s", podName),
-		TypeMeta:      metav1.TypeMeta{Kind: "Pod"},
+		FieldSelector: fields.SelectorFromSet(map[string]string{
+			"involvedObject.name":      podName,
+			"involvedObject.namespace": podNamespace,
+			// TODO: use uid
+		}).String(),
+		TypeMeta: metav1.TypeMeta{Kind: "Pod"},
 	}
 	events, err := k8sCli.CoreV1().Events(podNamespace).List(context.TODO(), opts)
 	if err != nil {
@@ -72,9 +78,10 @@ func checkPODEvents(k8sCli *kubernetes.Clientset, podNamespace, podName string, 
 	}
 
 	for _, item := range events.Items {
-		klog.Infof("checking event: %s/%s [%s: %s - %s]", podNamespace, podName, item.ReportingController, item.Reason, item.Message)
+		evStr := eventToString(item)
+		klog.Infof("checking event: %s/%s [%s]", podNamespace, podName, evStr)
 		if evCheck(item) {
-			klog.Infof("-> found relevant scheduling event for pod %s/%s: %v", podNamespace, podName, item)
+			klog.Infof("-> found relevant scheduling event for pod %s/%s: [%s]", podNamespace, podName, evStr)
 			return true, nil
 		}
 	}
@@ -170,4 +177,28 @@ func CheckNROSchedulerAvailable(cli client.Client, NUMAResourcesSchedObjName str
 func GetNROSchedulerName(cli client.Client, NUMAResourcesSchedObjName string) string {
 	nroSchedObj := CheckNROSchedulerAvailable(cli, NUMAResourcesSchedObjName)
 	return nroSchedObj.Status.SchedulerName
+}
+
+func eventToString(ev corev1.Event) string {
+	evSrc := eventSourceToString(ev.Source)
+	evSrcSep := ""
+	if evSrc != "" {
+		evSrcSep = " "
+	}
+	return fmt.Sprintf("type=%q action=%q message=%q reason=%q reportedBy={%s/%s}",
+		ev.Type, ev.Action, ev.Message, ev.Reason, ev.ReportingController, ev.ReportingInstance,
+	) + evSrcSep + evSrc
+}
+
+func eventSourceToString(evs corev1.EventSource) string {
+	if evs.Host != "" && evs.Component != "" {
+		return "from={" + evs.Host + "/" + evs.Component + "}"
+	}
+	if evs.Host != "" {
+		return "from={" + evs.Host + "}"
+	}
+	if evs.Component != "" {
+		return "from={" + evs.Component + "}"
+	}
+	return ""
 }
