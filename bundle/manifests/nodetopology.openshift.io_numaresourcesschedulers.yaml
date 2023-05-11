@@ -64,6 +64,9 @@ spec:
             description: NUMAResourcesSchedulerStatus defines the observed state of
               NUMAResourcesScheduler
             properties:
+              cacheResyncPeriod:
+                description: CacheResyncPeriod shows the current cache resync period
+                type: string
               conditions:
                 description: Conditions show the current state of the NUMAResourcesOperator
                   Operator
