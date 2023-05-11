@@ -103,15 +103,13 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	}
 
 	result, condition, err := r.reconcileResource(ctx, instance)
-	if condition != "" {
-		// TODO: use proper reason
-		reason, message := condition, messageFromError(err)
-		if err := r.updateStatus(ctx, instance, condition, reason, message); err != nil {
-			klog.InfoS("Failed to update numaresourcesscheduler status", "Desired condition", condition, "error", err)
-		}
-	}
-	return result, err
 
+	reason := condition // TODO: use proper reason
+	if err := r.updateStatus(ctx, instance, condition, reason, messageFromError(err)); err != nil {
+		klog.InfoS("Failed to update numaresourcesscheduler status", "Desired condition", condition, "error", err)
+	}
+
+	return result, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -136,22 +134,20 @@ func (r *NUMAResourcesSchedulerReconciler) SetupWithManager(mgr ctrl.Manager) er
 }
 
 func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (reconcile.Result, string, error) {
-	deploymentInfo, schedulerName, err := r.syncNUMASchedulerResources(ctx, instance)
+	schedStatus, err := r.syncNUMASchedulerResources(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedSchedulerSync")
 	}
 
-	instance.Status.Deployment = nropv1.NamespacedName{}
-	ok, err := isDeploymentRunning(ctx, r.Client, deploymentInfo)
+	instance.Status = schedStatus
+
+	ok, err := isDeploymentRunning(ctx, r.Client, schedStatus.Deployment)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, err
 	}
 	if !ok {
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
 	}
-
-	instance.Status.Deployment = deploymentInfo
-	instance.Status.SchedulerName = schedulerName
 
 	return ctrl.Result{}, status.ConditionAvailable, nil
 
@@ -171,43 +167,47 @@ func isDeploymentRunning(ctx context.Context, c client.Client, key nropv1.Namesp
 	return false, nil
 }
 
-func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (nropv1.NamespacedName, string, error) {
+func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (nropv1.NUMAResourcesSchedulerStatus, error) {
 	klog.V(4).Info("SchedulerSync start")
 	defer klog.V(4).Info("SchedulerSync stop")
 
-	var deploymentNName nropv1.NamespacedName
-
-	schedulerName := instance.Spec.SchedulerName
 	cacheResyncPeriod := unpackAPIResyncPeriod(instance.Spec.CacheResyncPeriod)
-	if err := schedupdate.SchedulerConfig(r.SchedulerManifests.ConfigMap, schedulerName, cacheResyncPeriod); err != nil {
-		return deploymentNName, schedulerName, err
+	if err := schedupdate.SchedulerConfig(r.SchedulerManifests.ConfigMap, instance.Spec.SchedulerName, cacheResyncPeriod); err != nil {
+		return nropv1.NUMAResourcesSchedulerStatus{}, err
+	}
+
+	schedStatus := nropv1.NUMAResourcesSchedulerStatus{
+		SchedulerName: instance.Spec.SchedulerName,
+		CacheResyncPeriod: &metav1.Duration{
+			Duration: cacheResyncPeriod,
+		},
 	}
 
 	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
 	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, instance.Spec.SchedulerImage)
 	schedupdate.DeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
 	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, instance.Spec.LogLevel); err != nil {
-		return deploymentNName, schedulerName, err
+		return schedStatus, err
 	}
 
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
 	for _, objState := range existing.State(r.SchedulerManifests) {
 		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
-			return deploymentNName, schedulerName, errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
+			return schedStatus, errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
 		obj, err := apply.ApplyObject(ctx, r.Client, objState)
 		if err != nil {
-			return deploymentNName, schedulerName, errors.Wrapf(err, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
+			return schedStatus, errors.Wrapf(err, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
 
 		if nname, ok := schedstate.DeploymentNamespacedNameFromObject(obj); ok {
-			deploymentNName = nname
+			schedStatus.Deployment = nname
 		}
 		if schedName, ok := schedstate.SchedulerNameFromObject(obj); ok {
-			schedulerName = schedName
+			schedStatus.SchedulerName = schedName
 		}
 	}
-	return deploymentNName, schedulerName, nil
+	return schedStatus, nil
 }
 
 func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
