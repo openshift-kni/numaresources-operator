@@ -240,7 +240,7 @@ spec:
   maintainers:
   - email: fromani@redhat.com
     name: fromani
-  maturity: alpha
+  maturity: stable
   minKubeVersion: 1.23.0
   provider:
     name: Red Hat
