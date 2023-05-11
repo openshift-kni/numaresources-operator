@@ -50,6 +50,10 @@ type NUMAResourcesSchedulerStatus struct {
 	// Scheduler name to be used in pod templates
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Scheduler name"
 	SchedulerName string `json:"schedulerName,omitempty"`
+	// CacheResyncPeriod shows the current cache resync period
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Scheduler cache resync period"
+	CacheResyncPeriod *metav1.Duration `json:"cacheResyncPeriod,omitEmpty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
