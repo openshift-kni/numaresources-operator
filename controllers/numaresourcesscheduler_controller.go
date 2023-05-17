@@ -172,7 +172,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	defer klog.V(4).Info("SchedulerSync stop")
 
 	cacheResyncPeriod := unpackAPIResyncPeriod(instance.Spec.CacheResyncPeriod)
-	if err := schedupdate.SchedulerConfig(r.SchedulerManifests.ConfigMap, instance.Spec.SchedulerName, cacheResyncPeriod); err != nil {
+	if err := schedupdate.SchedulerConfigWithFilter(r.SchedulerManifests.ConfigMap, instance.Spec.SchedulerName, schedupdate.CleanSchedulerConfig, cacheResyncPeriod); err != nil {
 		return nropv1.NUMAResourcesSchedulerStatus{}, err
 	}
 
