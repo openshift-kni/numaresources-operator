@@ -51,6 +51,10 @@ import (
 )
 
 const (
+	defaultCacheResyncPeriod = 5 * time.Second
+)
+
+const (
 	conditionTypeIncorrectNUMAResourcesSchedulerResourceName = "IncorrectNUMAResourcesSchedulerResourceName"
 )
 
@@ -220,7 +224,7 @@ func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sch
 
 func unpackAPIResyncPeriod(reconcilePeriod *metav1.Duration) time.Duration {
 	if reconcilePeriod == nil {
-		return 0
+		return defaultCacheResyncPeriod
 	}
 	period := reconcilePeriod.Round(time.Second)
 	klog.InfoS("setting reconcile period", "computed", period, "supplied", reconcilePeriod)
