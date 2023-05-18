@@ -257,6 +257,11 @@ func (in *NUMAResourcesSchedulerSpec) DeepCopy() *NUMAResourcesSchedulerSpec {
 func (in *NUMAResourcesSchedulerStatus) DeepCopyInto(out *NUMAResourcesSchedulerStatus) {
 	*out = *in
 	out.Deployment = in.Deployment
+	if in.CacheResyncPeriod != nil {
+		in, out := &in.CacheResyncPeriod, &out.CacheResyncPeriod
+		*out = new(metav1.Duration)
+		**out = **in
+	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]metav1.Condition, len(*in))
