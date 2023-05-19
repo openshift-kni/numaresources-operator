@@ -146,6 +146,40 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(name).To(gomega.BeEquivalentTo(testSchedulerName))
 		})
 
+		ginkgo.It("should expose the resync period in status", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(gomega.HaveOccurred())
+			gomega.Expect(nrs.Status.CacheResyncPeriod).ToNot(gomega.BeNil())
+			gomega.Expect(*nrs.Status.CacheResyncPeriod).To(gomega.Equal(*nrs.Spec.CacheResyncPeriod))
+		})
+
+		ginkgo.It("should update the resync period in status", func() {
+			resyncPeriod := 7 * time.Second
+			nrs := nrs.DeepCopy()
+			nrs.Spec.CacheResyncPeriod = &metav1.Duration{
+				Duration: resyncPeriod,
+			}
+
+			gomega.Eventually(func() bool {
+				if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+					klog.Warningf("failed to update the scheduler object; err: %v", err)
+					return false
+				}
+				return true
+			}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(gomega.HaveOccurred())
+			gomega.Expect(nrs.Status.CacheResyncPeriod).ToNot(gomega.BeNil())
+			gomega.Expect(nrs.Status.CacheResyncPeriod.Seconds()).To(gomega.Equal(resyncPeriod.Seconds()))
+		})
+
 		ginkgo.It("should have a config hash annotation under deployment", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
@@ -225,7 +259,37 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			err = reconciler.Client.Get(context.TODO(), key, dp)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(dp.Spec.Template.Spec).To(gomega.Equal(initialDP.Spec.Template.Spec))
+		})
 
+		ginkgo.It("should allow to disable the resync period in the configmap", func() {
+			resyncPeriod := 0 * time.Second
+			nrs := nrs.DeepCopy()
+			nrs.Spec.CacheResyncPeriod = &metav1.Duration{
+				Duration: resyncPeriod,
+			}
+
+			gomega.Eventually(func() bool {
+				if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+					klog.Warningf("failed to update the scheduler object; err: %v", err)
+					return false
+				}
+				return true
+			}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			key = client.ObjectKey{
+				Name:      "topo-aware-scheduler-config",
+				Namespace: testNamespace,
+			}
+
+			cm := &corev1.ConfigMap{}
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, cm)).ToNot(gomega.HaveOccurred())
+			conf := pop(cm.Data, sched.SchedulerConfigFileName)
+
+			gomega.Expect(conf).ToNot(gomega.ContainSubstring("cacheResyncPeriodSeconds"))
 		})
 	})
 })
