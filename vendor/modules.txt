@@ -62,7 +62,7 @@ github.com/coreos/go-semver/semver
 # github.com/coreos/go-systemd/v22 v22.3.2
 ## explicit; go 1.12
 github.com/coreos/go-systemd/v22/unit
-# github.com/coreos/ignition/v2 v2.13.0 => github.com/coreos/ignition/v2 v2.14.0
+# github.com/coreos/ignition/v2 v2.14.0
 ## explicit; go 1.15
 github.com/coreos/ignition/v2/config/shared/errors
 github.com/coreos/ignition/v2/config/shared/validations
@@ -487,7 +487,7 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.3.1-0.20221206200815-1e63c2f08a10 => golang.org/x/net v0.7.0
+# golang.org/x/net v0.7.0
 ## explicit; go 1.17
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -1384,5 +1384,3 @@ sigs.k8s.io/yaml
 # k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.25.4
 # github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
 # github.com/openshift/machine-config-operator => github.com/openshift/machine-config-operator v0.0.1-0.20221101091906-fa5e7ae3f0e9
-# github.com/coreos/ignition/v2 => github.com/coreos/ignition/v2 v2.14.0
-# golang.org/x/net => golang.org/x/net v0.7.0
