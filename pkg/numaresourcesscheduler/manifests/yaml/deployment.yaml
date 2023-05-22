@@ -54,15 +54,15 @@ spec:
           volumeMounts:
             - mountPath: "/etc/kubernetes"
               name: "etckubernetes"
-            - mountPath: "/run/nrtcache"
-              name: "runnrtcache"
+            - mountPath: "/run/pfpstatus"
+              name: "runpfpstatus"
       serviceAccountName: "secondary-scheduler"
       tolerations:
         - effect: NoSchedule
           key: node-role.kubernetes.io/master
       volumes:
       - name: "etckubernetes" # placeholder
-      - name: "runnrtcache"
+      - name: "runpfpstatus"
         emptyDir:
           medium: Memory
           sizeLimit: 64Mi

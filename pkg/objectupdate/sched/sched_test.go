@@ -39,6 +39,7 @@ var dp = &appsv1.Deployment{
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{
 					{
+						Name:  "secondary-scheduler",
 						Image: "quay.io/bar/image:v1",
 					},
 				},
