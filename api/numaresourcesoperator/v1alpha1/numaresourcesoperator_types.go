@@ -47,11 +47,11 @@ type NUMAResourcesOperatorSpec struct {
 type PodsFingerprintingMode string
 
 var (
-	// PodsFingerprintingEnabled is the default.
-	PodsFingerprintingEnabled PodsFingerprintingMode = "Enabled"
-
-	// PodsFingerprintingDisabled is ...
+	// PodsFingerprintingDisabled disables the pod fingerprinting reporting.
 	PodsFingerprintingDisabled PodsFingerprintingMode = "Disabled"
+
+	// PodsFingerprintingEnabled enables the pod fingerprint considering all the pods running on nodes. It is the default.
+	PodsFingerprintingEnabled PodsFingerprintingMode = "Enabled"
 )
 
 // +kubebuilder:validation:Enum=Periodic;Events;PeriodicAndEvents
