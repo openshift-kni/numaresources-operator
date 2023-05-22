@@ -132,9 +132,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 				By("reverting the changes under the NUMAResourcesOperator object")
 				// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3
+				nroOperObj := &nropv1.NUMAResourcesOperator{}
 				Eventually(func(g Gomega) {
 					// we need that for the current ResourceVersion
-					nroOperObj := &nropv1.NUMAResourcesOperator{}
 					err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
 					g.Expect(err).ToNot(HaveOccurred())
 
