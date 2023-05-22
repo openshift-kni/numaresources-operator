@@ -207,7 +207,8 @@ func isPodFingerprintEnabled(conf *nropv1.NodeGroupConfig) bool {
 		// not specified -> use defaults
 		conf = &cfg
 	}
-	return *conf.PodsFingerprinting == nropv1.PodsFingerprintingEnabled
+	return (*conf.PodsFingerprinting == nropv1.PodsFingerprintingEnabled ||
+		*conf.PodsFingerprinting == nropv1.PodsFingerprintingEnabledExclusiveResources)
 }
 
 func isNotifyFileEnabled(conf *nropv1.NodeGroupConfig) bool {
