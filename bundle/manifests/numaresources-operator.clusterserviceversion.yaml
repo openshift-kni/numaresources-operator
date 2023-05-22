@@ -209,6 +209,11 @@ spec:
         name: secondary-scheduler-deployment
         version: v1
       specDescriptors:
+      - description: Set the cache resync debug options. Defaults to disable.
+        displayName: Scheduler cache resync debug setting
+        path: cacheResyncDebug
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: Set the cache resync period. Use explicit 0 to disable.
         displayName: Scheduler cache resync period setting
         path: cacheResyncPeriod
