@@ -22,6 +22,17 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
+// +kubebuilder:validation:Enum=Disabled;DumpJSONFile
+type CacheResyncDebugMode string
+
+var (
+	// CacheResyncDisabled is the default
+	CacheResyncDebugDisabled CacheResyncDebugMode = "Disabled"
+
+	// CacheResyncDumpJSONFile is the default
+	CacheResyncDebugDumpJSONFile CacheResyncDebugMode = "DumpJSONFile"
+)
+
 // NUMAResourcesSchedulerSpec defines the desired state of NUMAResourcesScheduler
 type NUMAResourcesSchedulerSpec struct {
 	// Scheduler container image URL
@@ -40,6 +51,10 @@ type NUMAResourcesSchedulerSpec struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler cache resync period setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	CacheResyncPeriod *metav1.Duration `json:"cacheResyncPeriod,omitEmpty"`
+	// Set the cache resync debug options. Defaults to disable.
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler cache resync debug setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	CacheResyncDebug *CacheResyncDebugMode `json:"cacheResyncDebug,omitempty"`
 }
 
 // NUMAResourcesSchedulerStatus defines the observed state of NUMAResourcesScheduler
