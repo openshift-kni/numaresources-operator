@@ -25,7 +25,7 @@ import (
 )
 
 func TestNodeGroupConfigMerge(t *testing.T) {
-	podsFp := PodsFingerprintingEnabled
+	podsFp := PodsFingerprintingEnabledExclusiveResources
 	refMode := InfoRefreshPeriodicAndEvents
 
 	type testCase struct {
