@@ -199,6 +199,8 @@ func convertNodeGroupConfigV1ToV1Alpha1(src nropv1.NodeGroupConfig) *NodeGroupCo
 	dst := NodeGroupConfig{}
 	if src.PodsFingerprinting != nil {
 		switch *src.PodsFingerprinting {
+		case nropv1.PodsFingerprintingEnabledExclusiveResources:
+			fallthrough
 		case nropv1.PodsFingerprintingEnabled:
 			dst.PodsFingerprinting = ptrToPodsFingerPrintEnabledV1Alpha1(PodsFingerprintingEnabled)
 		case nropv1.PodsFingerprintingDisabled:
