@@ -78,8 +78,9 @@ spec:
                             should be reported for the machines belonging to this
                             group
                           enum:
-                          - Enabled
                           - Disabled
+                          - Enabled
+                          - EnabledExclusiveResources
                           type: string
                       type: object
                     machineConfigPoolSelector:
@@ -294,8 +295,9 @@ spec:
                             should be reported for the machines belonging to this
                             group
                           enum:
-                          - Enabled
                           - Disabled
+                          - Enabled
+                          - EnabledExclusiveResources
                           type: string
                       type: object
                     name:

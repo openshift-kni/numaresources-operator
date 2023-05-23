@@ -90,7 +90,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 
 			mcpName = nroOperObj.Status.MachineConfigPools[0].Name
 			conf := nroOperObj.Status.MachineConfigPools[0].Config
-			if conf.PodsFingerprinting == nil || *conf.PodsFingerprinting != nropv1.PodsFingerprintingEnabled {
+			if conf.PodsFingerprinting == nil || (*conf.PodsFingerprinting != nropv1.PodsFingerprintingEnabled || *conf.PodsFingerprinting != nropv1.PodsFingerprintingEnabledExclusiveResources) {
 				e2efixture.Skipf(fxt, "unsupported fingerprint status %v in %q", conf.PodsFingerprinting, mcpName)
 			}
 			if conf.InfoRefreshMode == nil {
