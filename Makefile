@@ -166,7 +166,17 @@ binary-nrovalidate: build-tools
 		-ldflags "$$LDFLAGS" \
 		nrovalidate/main.go
 
-binary-all: binary binary-rte
+binary-nrtcacheck: build-tools
+	LDFLAGS="-s -w "; \
+	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
+	CGO_ENABLED=0 go build \
+		-mod=vendor \
+		-o bin/nrtcacheck \
+		-ldflags "$$LDFLAGS" \
+		nrtcacheck/main.go
+
+
+binary-all: binary binary-rte binary-nrovalidate binary-nrtcacheck
 
 binary-e2e-rte:
 	go test -c -v -o bin/e2e-nrop-rte.test ./test/e2e/rte

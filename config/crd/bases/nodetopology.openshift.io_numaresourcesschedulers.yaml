@@ -38,6 +38,12 @@ spec:
           spec:
             description: NUMAResourcesSchedulerSpec defines the desired state of NUMAResourcesScheduler
             properties:
+              cacheResyncDebug:
+                description: Set the cache resync debug options. Defaults to disable.
+                enum:
+                - Disabled
+                - DumpJSONFile
+                type: string
               cacheResyncPeriod:
                 description: Set the cache resync period. Use explicit 0 to disable.
                 type: string

@@ -26,15 +26,70 @@ import (
 
 	k8swgschedupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/sched"
 
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 )
 
+// these should be provided by a deployer API
+
+const (
+	MainContainerName = "secondary-scheduler"
+)
+
+const (
+	pfpStatusDumpEnvVar = "PFP_STATUS_DUMP"
+
+	pfpStatusDir = "/run/pfpstatus"
+)
+
+// TODO: we should inject also the mount point. As it is now, the information is split between the manifest
+// and the updating logic, causing unnecessary friction. This code needs to know too much what's in the manifest.
+
 func DeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) {
-	// There is only a single container
-	cnt := &dp.Spec.Template.Spec.Containers[0]
+	cnt, err := FindContainerByName(&dp.Spec.Template.Spec, MainContainerName)
+	if err != nil {
+		klog.ErrorS(err, "cannot update deployment image settings")
+		return
+	}
 	cnt.Image = userImageSpec
 	klog.V(3).InfoS("Scheduler image", "reason", "user-provided", "pullSpec", userImageSpec)
+}
+
+func DeploymentEnvVarSettings(dp *appsv1.Deployment, cacheResyncDebug nropv1.CacheResyncDebugMode) {
+	if cacheResyncDebug == nropv1.CacheResyncDebugDisabled {
+		return // nothing to do
+	}
+	if cacheResyncDebug != nropv1.CacheResyncDebugDumpJSONFile {
+		return // because it's the only mode we support atm, so we keep the happy path simple
+	}
+
+	cnt, err := FindContainerByName(&dp.Spec.Template.Spec, MainContainerName)
+	if err != nil {
+		klog.ErrorS(err, "cannot update deployment env var settings")
+		return
+	}
+
+	if env := findEnvVarByName(cnt.Env, pfpStatusDumpEnvVar); env != nil {
+		klog.V(2).InfoS("overriding existing environment variable", "name", pfpStatusDumpEnvVar, "oldValue", env.Value, "newValue", pfpStatusDir)
+		env.Value = pfpStatusDir
+		return
+	}
+
+	cnt.Env = append(cnt.Env, corev1.EnvVar{
+		Name:  pfpStatusDumpEnvVar,
+		Value: pfpStatusDir,
+	})
+}
+
+func findEnvVarByName(envs []corev1.EnvVar, name string) *corev1.EnvVar {
+	for idx := range envs {
+		env := &envs[idx]
+		if env.Name == name {
+			return env
+		}
+	}
+	return nil
 }
 
 func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
@@ -75,4 +130,14 @@ func SchedulerConfigWithFilter(cm *corev1.ConfigMap, name string, filterFunc fun
 
 func Passthrough(data []byte) []byte {
 	return data
+}
+
+func FindContainerByName(podSpec *corev1.PodSpec, containerName string) (*corev1.Container, error) {
+	for idx := 0; idx < len(podSpec.Containers); idx++ {
+		cnt := &podSpec.Containers[idx]
+		if cnt.Name == containerName {
+			return cnt, nil
+		}
+	}
+	return nil, fmt.Errorf("container %q not found - defaulting to the first", containerName)
 }
