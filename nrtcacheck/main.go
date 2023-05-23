@@ -65,6 +65,7 @@ func init() {
 
 type ProgArgs struct {
 	Version   bool
+	DumpNodes bool
 	NodeNames sets.String
 }
 
@@ -125,6 +126,29 @@ func main() {
 		}
 		nodeNames = nodes.GetNames(workers)
 		klog.V(2).Infof("using autodetected node list with %d items", len(nodeNames))
+	}
+
+	if parsedArgs.DumpNodes {
+		for _, nodeName := range nodeNames {
+			podnn, ok := rtePodsByNode[nodeName]
+			if !ok {
+				klog.Warningf("no RTE pod on %q?", nodeName)
+				continue
+			}
+
+			st, err := schedcache.GetUpdaterFingerprintStatus(&env, podnn.Namespace, podnn.Name, rteupdate.MainContainerName)
+			if err != nil {
+				klog.V(1).ErrorS(err, "cannot get RTE pfp status from %q %s", nodeName, podnn.String())
+				continue
+			}
+
+			fmt.Printf("pods detected by RTE on %q (%d items):\n[\n", nodeName, len(st.Pods))
+			for _, nn := range st.Pods {
+				fmt.Printf("  %s,\n", nn.String())
+			}
+			fmt.Printf("]\n")
+		}
+		os.Exit(0)
 	}
 
 	ok, unsynced, err := schedcache.HasSynced(&env, nodeNames)
@@ -209,6 +233,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags := flag.NewFlagSet(version.ProgramName(), flag.ExitOnError)
 
 	flags.BoolVar(&pArgs.Version, "version", false, "Output version and exit")
+	flags.BoolVar(&pArgs.DumpNodes, "dump-nodes", false, "Force node PFP status dump")
 	flags.Usage = func() {
 		fmt.Fprintf(flags.Output(), "Usage: %s [options] [node0 [node1] ... [nodeN]]\noptions:\n", os.Args[0])
 		flags.PrintDefaults()
