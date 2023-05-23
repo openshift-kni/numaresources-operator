@@ -169,16 +169,16 @@ func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, inst
 	return ctrl.Result{}, nil
 }
 
-func updateStatus(ctx context.Context, cli client.Client, rte *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
+func updateStatus(ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
 
-	conditions, ok := status.GetUpdatedConditions(rte.Status.Conditions, condition, reason, message)
+	conditions, ok := status.GetUpdatedConditions(instance.Status.Conditions, condition, reason, message)
 	if !ok {
 		return false, nil
 	}
-	rte.Status.Conditions = conditions
+	instance.Status.Conditions = conditions
 
-	if err := cli.Status().Update(ctx, rte); err != nil {
-		return false, errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(rte))
+	if err := cli.Status().Update(ctx, instance); err != nil {
+		return false, errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(instance))
 	}
 	return true, nil
 }
