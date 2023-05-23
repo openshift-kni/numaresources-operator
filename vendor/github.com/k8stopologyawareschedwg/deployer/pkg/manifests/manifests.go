@@ -61,6 +61,11 @@ const (
 )
 
 const (
+	ContainerNameRTE                = "resource-topology-exporter"
+	ContainerNameNFDTopologyUpdater = "nfd-topology-updater"
+)
+
+const (
 	defaultIgnitionVersion       = "3.2.0"
 	defaultIgnitionContentSource = "data:text/plain;charset=utf-8;base64"
 	defaultOCIHooksDir           = "/etc/containers/oci/hooks.d"
@@ -74,8 +79,6 @@ const (
 )
 
 const (
-	containerNameRTE                = "resource-topology-exporter"
-	containerNameNFDTopologyUpdater = "nfd-topology-updater"
 	rteNotifierVolumeName           = "host-run-rte"
 	rteSysVolumeName                = "host-sys"
 	rtePodresourcesSocketVolumeName = "host-podresources-socket"
@@ -386,12 +389,9 @@ func DaemonSet(component, subComponent string, plat platform.Platform, namespace
 
 		for i := range ds.Spec.Template.Spec.Containers {
 			c := &ds.Spec.Template.Spec.Containers[i]
-			if c.Name == containerNameRTE {
+			if c.Name == ContainerNameRTE {
 				c.Image = images.ResourceTopologyExporterImage
-				// we do this explicitely, but should be already OK from the YAML manifest
-				c.Command = []string{
-					"/bin/resource-topology-exporter",
-				}
+
 				c.Args = []string{
 					"--sleep-interval=10s",
 					fmt.Sprintf("--sysfs=%s", containerHostSysDir),

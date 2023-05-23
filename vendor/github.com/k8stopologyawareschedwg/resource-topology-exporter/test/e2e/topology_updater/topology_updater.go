@@ -31,10 +31,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	topologyclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
 	e2enodes "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes"
 	e2enodetopology "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodetopology"
@@ -100,10 +101,10 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 			ginkgo.By("creating a pod consuming resources from the shared, non-exclusive CPU pool (best-effort QoS)")
 			sleeperPod := e2epods.MakeBestEffortSleeperPod()
 
-			podMap := make(map[string]*corev1.Pod)
 			pod := f.PodClient().CreateSync(sleeperPod)
-			podMap[pod.Name] = pod
-			defer e2epods.DeletePodsAsync(f, podMap)
+			ginkgo.DeferCleanup(func(cs clientset.Interface, podNamespace, podName string) error {
+				return e2epods.DeletePodSyncByName(cs, podNamespace, podName)
+			}, f.ClientSet, pod.Namespace, pod.Name)
 
 			cooldown := 3 * timeout
 			ginkgo.By(fmt.Sprintf("getting the updated topology - sleeping for %v", cooldown))
@@ -139,12 +140,11 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 			initialNodeTopo := e2enodetopology.GetNodeTopology(topologyClient, topologyUpdaterNode.Name)
 			ginkgo.By("creating a pod consuming resources from the shared, non-exclusive CPU pool (guaranteed QoS, nonintegral request)")
 			sleeperPod := e2epods.MakeGuaranteedSleeperPod("500m")
-			defer e2epods.Cooldown(f)
 
-			podMap := make(map[string]*corev1.Pod)
 			pod := f.PodClient().CreateSync(sleeperPod)
-			podMap[pod.Name] = pod
-			defer e2epods.DeletePodsAsync(f, podMap)
+			ginkgo.DeferCleanup(func(cs clientset.Interface, podNamespace, podName string) error {
+				return e2epods.DeletePodSyncByName(cs, podNamespace, podName)
+			}, f.ClientSet, pod.Namespace, pod.Name)
 
 			cooldown := 3 * timeout
 			ginkgo.By(fmt.Sprintf("getting the updated topology - sleeping for %v", cooldown))
@@ -188,17 +188,16 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 
 			ginkgo.By("creating a pod consuming exclusive CPUs")
 			sleeperPod := e2epods.MakeGuaranteedSleeperPod("1000m")
-			defer e2epods.Cooldown(f)
 
-			podMap := make(map[string]*corev1.Pod)
 			pod := f.PodClient().CreateSync(sleeperPod)
-			podMap[pod.Name] = pod
-			defer e2epods.DeletePodsAsync(f, podMap)
+			ginkgo.DeferCleanup(func(cs clientset.Interface, podNamespace, podName string) error {
+				return e2epods.DeletePodSyncByName(cs, podNamespace, podName)
+			}, f.ClientSet, pod.Namespace, pod.Name)
 
 			ginkgo.By("getting the updated topology")
-			var finalNodeTopo *v1alpha1.NodeResourceTopology
+			var finalNodeTopo *v1alpha2.NodeResourceTopology
 			gomega.Eventually(func() bool {
-				finalNodeTopo, err = topologyClient.TopologyV1alpha1().NodeResourceTopologies().Get(context.TODO(), topologyUpdaterNode.Name, metav1.GetOptions{})
+				finalNodeTopo, err = topologyClient.TopologyV1alpha2().NodeResourceTopologies().Get(context.TODO(), topologyUpdaterNode.Name, metav1.GetOptions{})
 				if err != nil {
 					framework.Logf("failed to get the node topology resource: %v", err)
 					return false

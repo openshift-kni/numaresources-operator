@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -53,8 +53,8 @@ type getNodeAffinityFunc func(labelName string, labelValue []string, selectOpera
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering node selector", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
-	var nrtList nrtv1alpha1.NodeResourceTopologyList
-	var nrts []nrtv1alpha1.NodeResourceTopology
+	var nrtList nrtv1alpha2.NodeResourceTopologyList
+	var nrts []nrtv1alpha2.NodeResourceTopology
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
@@ -72,9 +72,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
-		policies := []nrtv1alpha1.TopologyManagerPolicy{
-			nrtv1alpha1.SingleNUMANodeContainerLevel,
-			nrtv1alpha1.SingleNUMANodePodLevel,
+		policies := []nrtv1alpha2.TopologyManagerPolicy{
+			nrtv1alpha2.SingleNUMANodeContainerLevel,
+			nrtv1alpha2.SingleNUMANodePodLevel,
 		}
 		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
 		if len(nrts) < 2 {
@@ -101,9 +101,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		labelValueLarge := "large"
 		var targetNodeName, alternativeNodeName string
 		var requiredRes corev1.ResourceList
-		var nrtCandidates []nrtv1alpha1.NodeResourceTopology
-		var targetNrtInitial *nrtv1alpha1.NodeResourceTopology
-		var targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList
+		var nrtCandidates []nrtv1alpha2.NodeResourceTopology
+		var targetNrtInitial *nrtv1alpha2.NodeResourceTopology
+		var targetNrtListInitial nrtv1alpha2.NodeResourceTopologyList
 		BeforeEach(func() {
 			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
@@ -151,7 +151,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
 				Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", nodeName)
 
 				for zIdx, zone := range nrtInfo.Zones {

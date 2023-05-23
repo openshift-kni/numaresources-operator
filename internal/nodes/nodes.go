@@ -43,14 +43,14 @@ const (
 	LabelControlPlane = "node-role.kubernetes.io/control-plane"
 )
 
-func GetWorkerNodes(cli client.Client) ([]corev1.Node, error) {
+func GetWorkerNodes(cli client.Client, ctx context.Context) ([]corev1.Node, error) {
 	nodes := &corev1.NodeList{}
 	selector, err := labels.Parse(fmt.Sprintf("%s/%s=", LabelRole, RoleWorker))
 	if err != nil {
 		return nil, err
 	}
 
-	err = cli.List(context.TODO(), nodes, &client.ListOptions{LabelSelector: selector})
+	err = cli.List(ctx, nodes, &client.ListOptions{LabelSelector: selector})
 	if err != nil {
 		return nil, err
 	}
@@ -58,29 +58,7 @@ func GetWorkerNodes(cli client.Client) ([]corev1.Node, error) {
 	return nodes.Items, nil
 }
 
-func GetLabelRoleWorker() string {
-	return fmt.Sprintf("%s/%s", LabelRole, RoleWorker)
-}
-
-func GetLabelRoleMCPTest() string {
-	return fmt.Sprintf("%s/%s", LabelRole, RoleMCPTest)
-}
-
-func GetLoad(k8sCli *kubernetes.Clientset, nodeName string) (baseload.Load, error) {
-	nl := baseload.Load{
-		Name: nodeName,
-	}
-	pods, err := k8sCli.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{
-		FieldSelector: "spec.nodeName=" + nodeName,
-	})
-	if err != nil {
-		return nl, err
-	}
-
-	return baseload.FromPods(nodeName, pods.Items), nil
-}
-
-func GetControlPlane(cli client.Client, plat platform.Platform) ([]corev1.Node, error) {
+func GetControlPlane(cli client.Client, ctx context.Context, plat platform.Platform) ([]corev1.Node, error) {
 	nodeList := &corev1.NodeList{}
 	labels := metav1.LabelSelector{
 		MatchLabels: map[string]string{
@@ -96,11 +74,33 @@ func GetControlPlane(cli client.Client, plat platform.Platform) ([]corev1.Node, 
 		return nil, err
 	}
 
-	err = cli.List(context.TODO(), nodeList, &client.ListOptions{LabelSelector: selNodes})
+	err = cli.List(ctx, nodeList, &client.ListOptions{LabelSelector: selNodes})
 	if err != nil {
 		return nil, err
 	}
 	return nodeList.Items, nil
+}
+
+func GetLoad(k8sCli *kubernetes.Clientset, ctx context.Context, nodeName string) (baseload.Load, error) {
+	nl := baseload.Load{
+		Name: nodeName,
+	}
+	pods, err := k8sCli.CoreV1().Pods("").List(ctx, metav1.ListOptions{
+		FieldSelector: "spec.nodeName=" + nodeName,
+	})
+	if err != nil {
+		return nl, err
+	}
+
+	return baseload.FromPods(nodeName, pods.Items), nil
+}
+
+func GetLabelRoleWorker() string {
+	return fmt.Sprintf("%s/%s", LabelRole, RoleWorker)
+}
+
+func GetLabelRoleMCPTest() string {
+	return fmt.Sprintf("%s/%s", LabelRole, RoleMCPTest)
 }
 
 func GetNames(nodes []corev1.Node) []string {

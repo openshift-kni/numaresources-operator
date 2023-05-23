@@ -27,7 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
@@ -54,7 +54,7 @@ import (
 
 var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload placement considering specific resources requests", Serial, func() {
 	var fxt *e2efixture.Fixture
-	var nrtList nrtv1alpha1.NodeResourceTopologyList
+	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
@@ -84,7 +84,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 		// FIXME: this is a slight abuse of DescribeTable, but we need to run
 		// the same code with a different test_id per tmscope
 		DescribeTable("[tier1][ressched] a guaranteed pod with one container should be placed and aligned on the node",
-			func(tmPolicy nrtv1alpha1.TopologyManagerPolicy, requiredRes, expectedFreeRes corev1.ResourceList) {
+			func(tmPolicy nrtv1alpha2.TopologyManagerPolicy, requiredRes, expectedFreeRes corev1.ResourceList) {
 				nrtCandidates, targetNodeName := setupNodes(fxt, desiredNodesState{
 					NRTList:           nrtList,
 					RequiredNodes:     2,
@@ -123,7 +123,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			},
 			Entry("[tmscope:pod] with topology-manager-scope: pod, using memory as deciding factor",
-				nrtv1alpha1.SingleNUMANodePodLevel,
+				nrtv1alpha2.SingleNUMANodePodLevel,
 				// required resources for the test pod
 				corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("16"),
@@ -144,7 +144,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 				},
 			),
 			Entry("[tmscope:pod] with topology-manager-scope: pod, using CPU as the deciding factor",
-				nrtv1alpha1.SingleNUMANodePodLevel,
+				nrtv1alpha2.SingleNUMANodePodLevel,
 				// required resources for the test pod
 				corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("16"),
@@ -161,7 +161,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 })
 
 type desiredNodesState struct {
-	NRTList       nrtv1alpha1.NodeResourceTopologyList
+	NRTList       nrtv1alpha2.NodeResourceTopologyList
 	RequiredNodes int
 	// The following is Per Node
 	RequiredNUMAZones int
@@ -169,7 +169,7 @@ type desiredNodesState struct {
 	FreeResources     corev1.ResourceList
 }
 
-func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1alpha1.NodeResourceTopology, string) {
+func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1alpha2.NodeResourceTopology, string) {
 	By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", nodesState.RequiredNUMAZones))
 	nrtCandidates := e2enrt.FilterZoneCountEqual(nodesState.NRTList.Items, nodesState.RequiredNUMAZones)
 
@@ -201,7 +201,7 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 		nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 		ExpectWithOffset(1, err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-		baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+		baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
 		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 		By(fmt.Sprintf("computed base load: %s", baseload))
 
@@ -218,7 +218,7 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 
 	By("Padding the target node")
 
-	baseload, err := nodes.GetLoad(fxt.K8sClient, targetNodeName)
+	baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 	By(fmt.Sprintf("computed base load: %s", baseload))
 
@@ -236,7 +236,7 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 	return nrtCandidates, targetNodeName
 }
 
-func createPaddingPod(offset int, fxt *e2efixture.Fixture, podName, nodeName string, zone nrtv1alpha1.Zone, expectedFreeRes corev1.ResourceList) *corev1.Pod {
+func createPaddingPod(offset int, fxt *e2efixture.Fixture, podName, nodeName string, zone nrtv1alpha2.Zone, expectedFreeRes corev1.ResourceList) *corev1.Pod {
 	By(fmt.Sprintf("creating padding pod %q for node %q zone %q with resource target %s", podName, nodeName, zone.Name, e2ereslist.ToString(expectedFreeRes)))
 
 	padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, expectedFreeRes)

@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	k8swgschedupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/sched"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
@@ -60,7 +60,7 @@ func SchedulerConfig(cm *corev1.ConfigMap, name string, cacheResyncPeriod time.D
 		return fmt.Errorf("no data key named: %s found in ConfigMap: %s/%s", schedstate.SchedulerConfigFileName, cm.Namespace, cm.Name)
 	}
 
-	newData, err := manifests.RenderSchedulerConfig(data, name, cacheResyncPeriod)
+	newData, err := k8swgschedupdate.RenderConfig(data, name, cacheResyncPeriod)
 	if err != nil {
 		return err
 	}
