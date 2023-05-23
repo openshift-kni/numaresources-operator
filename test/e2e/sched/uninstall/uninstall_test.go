@@ -47,7 +47,7 @@ var _ = Describe("[Scheduler] uninstall", func() {
 				return
 			}
 
-			deploy, err := podlist.GetDeploymentByOwnerReference(e2eclient.Client, nroSchedObj.GetUID())
+			deploy, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.GetUID())
 			Expect(err).ToNot(HaveOccurred())
 
 			err = e2eclient.Client.Delete(context.TODO(), nroSchedObj)

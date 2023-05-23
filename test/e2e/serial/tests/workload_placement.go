@@ -215,13 +215,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedDp, err := wait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
+			updatedDp, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
 			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
-			pods, err := podlist.ByDeployment(fxt.Client, *updatedDp)
+			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(pods)).To(Equal(1))
 
@@ -272,12 +272,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				return fxt.Client.Update(context.TODO(), updatedDp)
 			}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
 
-			updatedDp, err = wait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
+			updatedDp, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedDpName := fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
 			Eventually(func() bool {
-				pods, err = podlist.ByDeployment(fxt.Client, *updatedDp)
+				pods, err = podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 				if err != nil {
 					klog.Warningf("failed to list the pods of deployment: %q error: %v", namespacedDpName, err)
 					return false
@@ -364,12 +364,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				return fxt.Client.Update(context.TODO(), updatedDp)
 			}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
 
-			updatedDp, err = wait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute)
+			updatedDp, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedDpName = fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
 			Eventually(func() bool {
-				pods, err = podlist.ByDeployment(fxt.Client, *updatedDp)
+				pods, err = podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 				if err != nil {
 					klog.Warningf("failed to list the pods of deployment: %q error: %v", namespacedDpName, err)
 					return false
@@ -528,7 +528,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// TODO: lacking better ways, let's monitor the pod "long enough" and let's check it stays Pending
 			// if it stays Pending "long enough" it still means little, but OTOH if it goes Running or Failed we
 			// can tell for sure something's wrong
-			err = wait.WhileInPodPhase(fxt.Client, pod2.Namespace, pod2.Name, corev1.PodPending, 10*time.Second, 3)
+			err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), pod2.Namespace, pod2.Name, corev1.PodPending)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod2.Namespace, pod2.Name)
 			}
@@ -536,7 +536,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			By(fmt.Sprintf("Verify the first pod %s/%s scheduled with TAS scheduler is running", pod.Namespace, pod.Name))
 			// 3 minutes is plenty, should never timeout
-			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 3*time.Minute)
+			updatedPod, err := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -576,7 +576,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("verify the pod %s/%s is removed", pod2.Namespace, pod2.Name))
-			err = wait.ForPodDeleted(fxt.Client, pod2.Namespace, pod2.Name, 3*time.Minute)
+			err = wait.With(fxt.Client).Timeout(3*time.Minute).ForPodDeleted(context.TODO(), pod2.Namespace, pod2.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
@@ -602,7 +602,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("verify the pod %s/%s is removed", updatedPod.Namespace, updatedPod.Name))
-			err = wait.ForPodDeleted(fxt.Client, updatedPod.Namespace, updatedPod.Name, 3*time.Minute)
+			err = wait.With(fxt.Client).Timeout(3*time.Minute).ForPodDeleted(context.TODO(), updatedPod.Namespace, updatedPod.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking the resources are restored as expected on node %q after deleting the running pod %s/%s", updatedPod.Spec.NodeName, updatedPod.Namespace, updatedPod.Name))
@@ -735,13 +735,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err = fxt.Client.Create(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedDp, err := wait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, 2*time.Minute)
+			updatedDp, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(2*time.Minute).ForDeploymentComplete(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
 			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
-			pods, err := podlist.ByDeployment(fxt.Client, *updatedDp)
+			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(pods)).To(Equal(2))
 
@@ -793,12 +793,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				return fxt.Client.Update(context.TODO(), updatedDp)
 			}, 10*time.Second, 2*time.Minute).ShouldNot(HaveOccurred())
 
-			updatedDp, err = wait.ForDeploymentComplete(fxt.Client, dp, time.Second*10, time.Minute*2)
+			updatedDp, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(2*time.Minute).ForDeploymentComplete(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedDpName := fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
 			Eventually(func() bool {
-				pods, err = podlist.ByDeployment(fxt.Client, *updatedDp)
+				pods, err = podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 				if err != nil {
 					klog.Warningf("failed to list the pods of deployment: %q error: %v", namespacedDpName, err)
 					return false
@@ -964,7 +964,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("wait for replicaset to be up and running with all its replicas")
-			rs, err = wait.ForReplicasetComplete(fxt.Client, rs, time.Second, 2*time.Minute)
+			rs, err = wait.With(fxt.Client).Interval(time.Second).Timeout(2*time.Minute).ForReplicasetComplete(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedRsName := client.ObjectKeyFromObject(rs)
@@ -973,7 +973,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			var pods []corev1.Pod
 			Eventually(func() bool {
-				pods, err = podlist.ByReplicaSet(fxt.Client, *rs)
+				pods, err = podlist.With(fxt.Client).ByReplicaSet(context.TODO(), *rs)
 				if err != nil {
 					klog.Warningf("failed to list the pods of replicaset: %q error: %v", namespacedRsName.String(), err)
 					return false
@@ -1037,7 +1037,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("verify replicaset's pods are deleted")
 			for _, pod := range pods {
 				klog.Infof("waiting for pod %s/%s to get deleted", pod.Namespace, pod.Name)
-				err := wait.ForPodDeleted(fxt.Client, pod.Namespace, pod.Name, 2*time.Minute)
+				err := wait.With(fxt.Client).Timeout(2*time.Minute).ForPodDeleted(context.TODO(), pod.Namespace, pod.Name)
 				Expect(err).ToNot(HaveOccurred(), "pod %s/%s still exists", pod.Namespace, pod.Name)
 			}
 
@@ -1071,7 +1071,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("wait for replicaset to be up and running with all its replicas")
-			rs, err = wait.ForReplicasetComplete(fxt.Client, rs, time.Second, 2*time.Minute)
+			rs, err = wait.With(fxt.Client).Interval(time.Second).Timeout(2*time.Minute).ForReplicasetComplete(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
 
 			namespacedRsName = client.ObjectKeyFromObject(rs)
@@ -1079,7 +1079,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() bool {
-				pods, err = podlist.ByReplicaSet(fxt.Client, *rs)
+				pods, err = podlist.With(fxt.Client).ByReplicaSet(context.TODO(), *rs)
 				if err != nil {
 					klog.Warningf("failed to list the pods of replicaset: %q error: %v", namespacedRsName.String(), err)
 					return false
@@ -1390,12 +1390,12 @@ func logSchedulerPluginLogs(fxt e2efixture.Fixture) {
 		klog.Warningf("error getting the scheduler plugin CR: %v", err)
 		return
 	}
-	schedDp, err := podlist.GetDeploymentByOwnerReference(fxt.Client, nroSchedObj.GetUID())
+	schedDp, err := podlist.With(fxt.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.GetUID())
 	if err != nil {
 		klog.Warningf("error getting the scheduler deployment: %v", err)
 		return
 	}
-	schedPods, err := podlist.ByDeployment(fxt.Client, *schedDp)
+	schedPods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *schedDp)
 	if err != nil {
 		klog.Warningf("error getting the scheduler pod: %v", err)
 		return

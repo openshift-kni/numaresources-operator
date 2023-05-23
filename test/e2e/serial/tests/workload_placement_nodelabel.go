@@ -216,7 +216,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
 
 			By("waiting for pod to be running")
-			updatedPod, err := wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, 1*time.Minute)
+			updatedPod, err := wait.With(fxt.Client).Timeout(time.Minute).ForPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
@@ -296,13 +296,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
 					By("waiting for deployment to be up & running")
-					dpRunningTimeout := 2 * time.Minute
-					dpRunningPollInterval := 10 * time.Second
-					_, err = wait.ForDeploymentComplete(fxt.Client, deployment, dpRunningPollInterval, dpRunningTimeout)
-					Expect(err).NotTo(HaveOccurred(), "Deployment %q not up & running after %v", deployment.Name, dpRunningTimeout)
+					_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(2*time.Minute).ForDeploymentComplete(context.TODO(), deployment)
+					Expect(err).NotTo(HaveOccurred(), "Deployment %q not up & running after %v", deployment.Name, 2*time.Minute)
 
 					By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
-					pods, err := podlist.ByDeployment(fxt.Client, *deployment)
+					pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *deployment)
 					Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q: %v", deployment.Name, err)
 					Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 					for _, pod := range pods {
