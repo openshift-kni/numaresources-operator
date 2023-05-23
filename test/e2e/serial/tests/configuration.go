@@ -216,13 +216,17 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("modifying the NUMAResourcesOperator nodeGroups field to match new mcp: %q labels %q", mcp.Name, mcp.Labels))
-			for i := range nroOperObj.Spec.NodeGroups {
-				nroOperObj.Spec.NodeGroups[i].MachineConfigPoolSelector.MatchLabels = mcp.Labels
-			}
+			Eventually(func(g Gomega) {
+				// we need that for the current ResourceVersion
+				err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
+				g.Expect(err).ToNot(HaveOccurred())
 
-			// TODO: this shoould be retried
-			err = fxt.Client.Update(context.TODO(), nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
+				for i := range nroOperObj.Spec.NodeGroups {
+					nroOperObj.Spec.NodeGroups[i].MachineConfigPoolSelector.MatchLabels = mcp.Labels
+				}
+				err = fxt.Client.Update(context.TODO(), nroOperObj)
+				g.Expect(err).ToNot(HaveOccurred())
+			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 			// here we expect mcp-test and worker mcps to get updated.
 			// worker will take much longer to get updated as a node reboot will
@@ -306,13 +310,14 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(BeTrue())
 
 			By(fmt.Sprintf("modifying the NUMAResourcesOperator ExporterImage field to %q", serialconfig.GetRteCiImage()))
-			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func(g Gomega) {
+				err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
+				g.Expect(err).ToNot(HaveOccurred())
 
-			nroOperObj.Spec.ExporterImage = serialconfig.GetRteCiImage()
-			// TODO: this should be retried
-			err = fxt.Client.Update(context.TODO(), nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
+				nroOperObj.Spec.ExporterImage = serialconfig.GetRteCiImage()
+				err = fxt.Client.Update(context.TODO(), nroOperObj)
+				g.Expect(err).ToNot(HaveOccurred())
+			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 			By("checking RTE has the correct image")
 			Eventually(func() (bool, error) {
@@ -336,13 +341,14 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with image %q", serialconfig.GetRteCiImage())
 
 			By(fmt.Sprintf("modifying the NUMAResourcesOperator LogLevel field to %q", operatorv1.Trace))
-			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroOperObj), nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func(g Gomega) {
+				err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
+				g.Expect(err).ToNot(HaveOccurred())
 
-			nroOperObj.Spec.LogLevel = operatorv1.Trace
-			// TODO: this should be retried
-			err = fxt.Client.Update(context.TODO(), nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
+				nroOperObj.Spec.LogLevel = operatorv1.Trace
+				err = fxt.Client.Update(context.TODO(), nroOperObj)
+				g.Expect(err).ToNot(HaveOccurred())
+			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 			By("checking the correct LogLevel")
 			Eventually(func() (bool, error) {
@@ -381,11 +387,15 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			nroSchedObj := initialNroSchedObj.DeepCopy()
 
 			By(fmt.Sprintf("modifying the NUMAResourcesScheduler SchedulerName field to %q", serialconfig.SchedulerTestName))
-			//updates must be done on object.Spec and active values should be fetched from object.Status
-			nroSchedObj.Spec.SchedulerName = serialconfig.SchedulerTestName
-			// TODO: this should be retried
-			err = fxt.Client.Update(context.TODO(), nroSchedObj)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func(g Gomega) {
+				//updates must be done on object.Spec and active values should be fetched from object.Status
+				err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroSchedObj), nroSchedObj)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				nroSchedObj.Spec.SchedulerName = serialconfig.SchedulerTestName
+				err = fxt.Client.Update(context.TODO(), nroSchedObj)
+				g.Expect(err).ToNot(HaveOccurred())
+			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 			By(fmt.Sprintf("Verify the scheduler object was updated properly with the new scheduler name %q", serialconfig.SchedulerTestName))
 			updatedSchedObj := &nropv1.NUMAResourcesScheduler{}
@@ -467,18 +477,26 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			}
 			Expect(targetedKC).ToNot(BeNil(), "there should be at least one kubeletconfig.machineconfiguration object")
 
-			By("modifying reserved CPUs under kubeletconfig")
+			//save initial reserved cpus to use it when restoring kc
 			kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
 			Expect(err).ToNot(HaveOccurred())
-
 			initialRsvCPUs := kcObj.ReservedSystemCPUs
-			applyNewReservedSystemCPUsValue(&kcObj.ReservedSystemCPUs)
-			err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
-			Expect(err).ToNot(HaveOccurred())
 
-			// TODO: this should be retried
-			err = fxt.Client.Update(context.TODO(), targetedKC)
-			Expect(err).ToNot(HaveOccurred())
+			By("modifying reserved CPUs under kubeletconfig")
+			Eventually(func(g Gomega) {
+				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), targetedKC)
+				Expect(err).ToNot(HaveOccurred())
+
+				kcObj, err = kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
+				Expect(err).ToNot(HaveOccurred())
+
+				applyNewReservedSystemCPUsValue(&kcObj.ReservedSystemCPUs)
+				err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = fxt.Client.Update(context.TODO(), targetedKC)
+				g.Expect(err).ToNot(HaveOccurred())
+			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 			By("waiting for MachineConfigPools to get updated")
 			var wg sync.WaitGroup
@@ -589,19 +607,20 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 			defer func() {
 				By("reverting kubeletconfig changes")
-				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), targetedKC)
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func(g Gomega) {
+					err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), targetedKC)
+					Expect(err).ToNot(HaveOccurred())
 
-				kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
-				Expect(err).ToNot(HaveOccurred())
+					kcObj, err = kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
+					Expect(err).ToNot(HaveOccurred())
 
-				kcObj.ReservedSystemCPUs = initialRsvCPUs
-				err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
-				Expect(err).ToNot(HaveOccurred())
+					kcObj.ReservedSystemCPUs = initialRsvCPUs
+					err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
+					Expect(err).ToNot(HaveOccurred())
 
-				// TODO: this should be retried
-				err = fxt.Client.Update(context.TODO(), targetedKC)
-				Expect(err).ToNot(HaveOccurred())
+					err = fxt.Client.Update(context.TODO(), targetedKC)
+					g.Expect(err).ToNot(HaveOccurred())
+				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 				By("waiting for MachineConfigPools to get updated")
 				for _, mcp := range mcps {
