@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/klogr"
 
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -68,6 +69,8 @@ type ProgArgs struct {
 }
 
 func main() {
+	logh := klogr.NewWithOptions(klogr.WithFormat(klogr.FormatKlog))
+
 	parsedArgs, err := parseArgs(os.Args[1:]...)
 	if err != nil {
 		klog.V(1).ErrorS(err, "parsing args")
@@ -103,6 +106,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	env := schedcache.Env{
+		Ctx:    context.Background(),
+		Cli:    cli,
+		K8sCli: k8sCli,
+		Log:    logh,
+	}
+
 	var nodeNames []string
 	if parsedArgs.NodeNames.Len() > 0 {
 		nodeNames = parsedArgs.NodeNames.List()
@@ -117,7 +127,7 @@ func main() {
 		klog.V(2).Infof("using autodetected node list with %d items", len(nodeNames))
 	}
 
-	ok, unsynced, err := schedcache.HasSynced(ctx, cli, k8sCli, nodeNames)
+	ok, unsynced, err := schedcache.HasSynced(&env, nodeNames)
 	if err != nil {
 		klog.V(1).ErrorS(err, "checking sched cache state")
 		os.Exit(1)
@@ -134,7 +144,7 @@ func main() {
 			continue
 		}
 
-		st, err := schedcache.GetUpdaterFingerprintStatus(k8sCli, podnn.Namespace, podnn.Name, rteupdate.MainContainerName)
+		st, err := schedcache.GetUpdaterFingerprintStatus(&env, podnn.Namespace, podnn.Name, rteupdate.MainContainerName)
 		if err != nil {
 			klog.V(1).ErrorS(err, "cannot get RTE pfp status from %q %s", nodeName, podnn.String())
 			continue
@@ -145,8 +155,17 @@ func main() {
 			podsByRTE.Insert(nn.String())
 		}
 
-		fmt.Printf("%s: pods on sched, not on RTE: %v\n", nodeName, podsBySched.Difference(podsByRTE).List())
-		fmt.Printf("%s: pods on RTE, not on sched: %v\n", nodeName, podsByRTE.Difference(podsBySched).List())
+		fmt.Printf("%s: pods on sched, not on RTE: [\n", nodeName)
+		for _, name := range podsBySched.Difference(podsByRTE).List() {
+			fmt.Printf(" - %s\n", name)
+		}
+		fmt.Printf("]\n")
+
+		fmt.Printf("%s: pods on RTE, not on sched: [\n", nodeName)
+		for _, name := range podsByRTE.Difference(podsBySched).List() {
+			fmt.Printf(" - %s\n", name)
+		}
+		fmt.Printf("]\n")
 	}
 }
 
