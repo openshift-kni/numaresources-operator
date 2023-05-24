@@ -169,16 +169,16 @@ func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, inst
 	return ctrl.Result{}, nil
 }
 
-func updateStatus(ctx context.Context, cli client.Client, rte *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
+func updateStatus(ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
 
-	conditions, ok := status.GetUpdatedConditions(rte.Status.Conditions, condition, reason, message)
+	conditions, ok := status.GetUpdatedConditions(instance.Status.Conditions, condition, reason, message)
 	if !ok {
 		return false, nil
 	}
-	rte.Status.Conditions = conditions
+	instance.Status.Conditions = conditions
 
-	if err := cli.Status().Update(ctx, rte); err != nil {
-		return false, errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(rte))
+	if err := cli.Status().Update(ctx, instance); err != nil {
+		return false, errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(instance))
 	}
 	return true, nil
 }
@@ -279,7 +279,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx contex
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) error {
-	klog.V(4).Info("Machine Config Sync start")
+	klog.V(4).InfoS("Machine Config Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Sync stop")
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
@@ -304,7 +304,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 }
 
 func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree) ([]nropv1.MachineConfigPool, bool) {
-	klog.V(4).Info("Machine Config Status Sync start")
+	klog.V(4).InfoS("Machine Config Status Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Status Sync stop")
 
 	mcpStatuses := []nropv1.MachineConfigPool{}
@@ -328,17 +328,27 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tre
 }
 
 func syncMachineConfigPoolNodeGroupConfigStatuses(instanceName string, mcpStatuses []nropv1.MachineConfigPool, trees []nodegroupv1.Tree) []nropv1.MachineConfigPool {
+	klog.V(4).InfoS("Machine Config Pool Node Group Status Sync start", "mcpStatuses", len(mcpStatuses), "trees", len(trees))
+	defer klog.V(4).Info("Machine Config Pool Node Group Status Sync stop")
+
 	updatedMcpStatuses := []nropv1.MachineConfigPool{}
 	for _, tree := range trees {
+		klog.V(5).InfoS("Machine Config Pool Node Group tree update", "mcps", len(tree.MachineConfigPools))
+
 		for _, mcp := range tree.MachineConfigPools {
 			mcpStatus := getMachineConfigPoolStatusByName(mcpStatuses, mcp.Name)
 
+			var confSource string
 			if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
+				confSource = "spec"
 				mcpStatus.Config = tree.NodeGroup.Config.DeepCopy()
 			} else {
+				confSource = "default"
 				ngc := nropv1.DefaultNodeGroupConfig()
 				mcpStatus.Config = &ngc
 			}
+
+			klog.V(6).InfoS("Machine Config Pool Node Group updated status config", "mcp", mcp.Name, "source", confSource, "data", fmt.Sprintf("%+v", mcpStatus.Config))
 
 			updatedMcpStatuses = append(updatedMcpStatuses, mcpStatus)
 		}
@@ -356,7 +366,7 @@ func getMachineConfigPoolStatusByName(mcpStatuses []nropv1.MachineConfigPool, na
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]nropv1.NamespacedName, error) {
-	klog.V(4).Info("RTESync start")
+	klog.V(4).InfoS("RTESync start", "trees", len(trees))
 	defer klog.V(4).Info("RTESync stop")
 
 	errorList := r.deleteUnusedDaemonSets(ctx, instance, trees)
