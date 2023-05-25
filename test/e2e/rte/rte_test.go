@@ -39,7 +39,7 @@ import (
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	mcov1cli "github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/typed/machineconfiguration.openshift.io/v1"
 
-	nrtv1alpha1cli "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
+	nrtv1alpha2cli "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
 	nodegroupv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1/helper/nodegroup"
@@ -59,7 +59,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		initialized bool
 		nropcli     *nropv1alpha1cli.NumaresourcesoperatorV1alpha1Client
 		mcocli      *mcov1cli.MachineconfigurationV1Client
-		nrtcli      *nrtv1alpha1cli.Clientset
+		nrtcli      *nrtv1alpha2cli.Clientset
 	)
 
 	f := framework.NewDefaultFramework("rte")
@@ -76,7 +76,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		mcocli, err = mcov1cli.NewForConfig(f.ClientConfig())
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-		nrtcli, err = nrtv1alpha1cli.NewForConfig(f.ClientConfig())
+		nrtcli, err = nrtv1alpha2cli.NewForConfig(f.ClientConfig())
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		initialized = true
@@ -267,7 +267,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 	})
 
 	ginkgo.It("[rte][podfingerprint] should expose the pod set fingerprint in NRT objects", func() {
-		nrtList, err := nrtcli.TopologyV1alpha1().NodeResourceTopologies().List(context.TODO(), metav1.ListOptions{})
+		nrtList, err := nrtcli.TopologyV1alpha2().NodeResourceTopologies().List(context.TODO(), metav1.ListOptions{})
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		for _, nrt := range nrtList.Items {

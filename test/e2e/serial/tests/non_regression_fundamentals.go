@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -44,7 +44,7 @@ type setupPodFunc func(pod *corev1.Pod)
 
 var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundamentals non-regression", Serial, func() {
 	var fxt *e2efixture.Fixture
-	var nrtList nrtv1alpha1.NodeResourceTopologyList
+	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())

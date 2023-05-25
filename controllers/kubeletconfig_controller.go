@@ -163,14 +163,14 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov
 	cfgManifests := cfgstate.Manifests{
 		Config: rendered,
 	}
-	existing := cfgstate.FromClient(context.TODO(), r.Client, r.Namespace, name)
+	existing := cfgstate.FromClient(ctx, r.Client, r.Namespace, name)
 	for _, objState := range existing.State(cfgManifests) {
 		// the owner should be the KubeletConfig object and not the NUMAResourcesOperator CR
 		// this means that when KubeletConfig will get deleted, the ConfigMap gets deleted as well
 		if err := controllerutil.SetControllerReference(mcoKc, objState.Desired, r.Scheme); err != nil {
 			return nil, errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
-		if _, err := apply.ApplyObject(context.TODO(), r.Client, objState); err != nil {
+		if _, err := apply.ApplyObject(ctx, r.Client, objState); err != nil {
 			return nil, errors.Wrapf(err, "could not create %s", objState.Desired.GetObjectKind().GroupVersionKind().String())
 		}
 	}

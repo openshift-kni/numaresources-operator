@@ -30,7 +30,7 @@ import (
 	"k8s.io/klog/v2"
 	corev1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
@@ -51,8 +51,8 @@ import (
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhead", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
-	var nrtList nrtv1alpha1.NodeResourceTopologyList
-	var nrts []nrtv1alpha1.NodeResourceTopology
+	var nrtList nrtv1alpha2.NodeResourceTopologyList
+	var nrts []nrtv1alpha2.NodeResourceTopology
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
@@ -70,9 +70,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
-		policies := []nrtv1alpha1.TopologyManagerPolicy{
-			nrtv1alpha1.SingleNUMANodeContainerLevel,
-			nrtv1alpha1.SingleNUMANodePodLevel,
+		policies := []nrtv1alpha2.TopologyManagerPolicy{
+			nrtv1alpha2.SingleNUMANodeContainerLevel,
+			nrtv1alpha2.SingleNUMANodePodLevel,
 		}
 		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
 		if len(nrts) < 2 {
@@ -95,7 +95,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 	// and will we want to start lean and mean.
 
 	Context("cluster with at least a worker node suitable", func() {
-		var nrtTwoZoneCandidates []nrtv1alpha1.NodeResourceTopology
+		var nrtTwoZoneCandidates []nrtv1alpha2.NodeResourceTopology
 		BeforeEach(func() {
 			const requiredNumaZones int = 2
 			const requiredNodeNumber int = 1
@@ -188,7 +188,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 					Expect(err).NotTo(HaveOccurred(), "missing NRT Info for node %q", nodeName)
 
-					baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+					baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
 					Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", nodeName)
 
 					for zIdx, zone := range nrtInfo.Zones {
@@ -280,8 +280,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 
 			It("[test_id:53819][tier2][unsched] Pod pending when resources requested + pod overhead don't fit on the target node; NRT objects are not updated", func() {
 				var targetNodeName string
-				var targetNrtInitial *nrtv1alpha1.NodeResourceTopology
-				var targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList
+				var targetNrtInitial *nrtv1alpha2.NodeResourceTopology
+				var targetNrtListInitial nrtv1alpha2.NodeResourceTopologyList
 				var err error
 
 				// even if it is not a hard rule, and even if there are a LOT of edge cases, a good starting point is usually
@@ -346,7 +346,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					nrtInfo, err := e2enrt.FindFromList(nrtTwoZoneCandidates, nodeName)
 					Expect(err).NotTo(HaveOccurred(), "missing NRT Info for node %q", nodeName)
 
-					baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+					baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
 					Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", nodeName)
 
 					for zIdx, zone := range nrtInfo.Zones {
@@ -376,7 +376,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				By("padding a NUMA node on the target node")
 				var paddingPodsTargetNode []*corev1.Pod
 
-				baseload, err := nodes.GetLoad(fxt.K8sClient, targetNodeName)
+				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
 				Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", targetNodeName)
 
 				for zIdx, zone := range targetNrtInitial.Zones {

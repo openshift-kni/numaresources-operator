@@ -31,7 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
@@ -111,7 +111,7 @@ func CheckPODKubeletRejectWithTopologyAffinityError(k8sCli *kubernetes.Clientset
 
 func CheckPODSchedulingFailedForAlignment(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName, policy string) (bool, error) {
 	var alignmentErr string
-	if policy == string(nrtv1alpha1.SingleNUMANodeContainerLevel) {
+	if policy == string(nrtv1alpha2.SingleNUMANodeContainerLevel) {
 		alignmentErr = ErrorCannotAlignContainer
 	} else {
 		alignmentErr = ErrorCannotAlignPod

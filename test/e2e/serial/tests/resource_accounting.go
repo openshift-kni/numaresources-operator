@@ -32,7 +32,7 @@ import (
 	corev1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
@@ -52,11 +52,11 @@ import (
 var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workload resource accounting", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
-	var nrtList nrtv1alpha1.NodeResourceTopologyList
-	var nrts []nrtv1alpha1.NodeResourceTopology
+	var nrtList nrtv1alpha2.NodeResourceTopologyList
+	var nrts []nrtv1alpha2.NodeResourceTopology
 	tmPolicyFuncsHandler := tmPolicyFuncsHandler{
-		nrtv1alpha1.SingleNUMANodePodLevel:       newPodScopeTMPolicyFuncs(),
-		nrtv1alpha1.SingleNUMANodeContainerLevel: newContainerScopeTMPolicyFuncs(),
+		nrtv1alpha2.SingleNUMANodePodLevel:       newPodScopeTMPolicyFuncs(),
+		nrtv1alpha2.SingleNUMANodeContainerLevel: newContainerScopeTMPolicyFuncs(),
 	}
 
 	BeforeEach(func() {
@@ -75,9 +75,9 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
-		policies := []nrtv1alpha1.TopologyManagerPolicy{
-			nrtv1alpha1.SingleNUMANodeContainerLevel,
-			nrtv1alpha1.SingleNUMANodePodLevel,
+		policies := []nrtv1alpha2.TopologyManagerPolicy{
+			nrtv1alpha2.SingleNUMANodeContainerLevel,
+			nrtv1alpha2.SingleNUMANodePodLevel,
 		}
 		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
 		if len(nrts) < 2 {
@@ -100,7 +100,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 	// and will we want to start lean and mean.
 
 	Context("cluster with at least a worker node suitable", func() {
-		var nrtTwoZoneCandidates []nrtv1alpha1.NodeResourceTopology
+		var nrtTwoZoneCandidates []nrtv1alpha2.NodeResourceTopology
 		BeforeEach(func() {
 			const requiredNumaZones int = 2
 			const requiredNodeNumber int = 1
@@ -165,8 +165,8 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
-			var targetNrtBefore *nrtv1alpha1.NodeResourceTopology
-			var targetNrtListBefore nrtv1alpha1.NodeResourceTopologyList
+			var targetNrtBefore *nrtv1alpha2.NodeResourceTopology
+			var targetNrtListBefore nrtv1alpha2.NodeResourceTopologyList
 			for idx, zone := range nrtInfo.Zones {
 				if idx == len(nrtInfo.Zones)-1 {
 					// store the NRT of the target node before scheduling the last placeholder pod,
@@ -302,10 +302,10 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 	})
 
 	Context("cluster with node/s having two numa zones, and there are enough resources on one node but not in any numa zone when trying to schedule a deployment with burstable pods", func() {
-		var nrtCandidates []nrtv1alpha1.NodeResourceTopology
+		var nrtCandidates []nrtv1alpha2.NodeResourceTopology
 		var targetNodeName string
-		var targetNrtInitial *nrtv1alpha1.NodeResourceTopology
-		var targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList
+		var targetNrtInitial *nrtv1alpha2.NodeResourceTopology
+		var targetNrtListInitial nrtv1alpha2.NodeResourceTopologyList
 		var deployment *appsv1.Deployment
 		var reqResources corev1.ResourceList
 		var err error
@@ -338,7 +338,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).NotTo(HaveOccurred())
 
 			//calculate base load on the target node
-			baseload, err := nodes.GetLoad(fxt.K8sClient, targetNodeName)
+			baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 			By(fmt.Sprintf("considering the computed base load: %s", baseload))
 
@@ -362,7 +362,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 				Expect(err).NotTo(HaveOccurred())
 
 				//calculate base load on the node
-				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 				klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 
@@ -501,7 +501,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			}
 
 			//calculate base load on the target node
-			baseload, err := nodes.GetLoad(fxt.K8sClient, targetNodeName)
+			baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 			klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 
@@ -527,7 +527,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			pod.Spec.Containers[0].Resources.Limits = reqResPerNUMA[0]
 			// keep the pod QoS as burstable
 			pod.Spec.Containers[1].Resources.Requests = reqResPerNUMA[1]
-			if targetNrtInitial.TopologyPolicies[0] == string(nrtv1alpha1.SingleNUMANodePodLevel) {
+			if targetNrtInitial.TopologyPolicies[0] == string(nrtv1alpha2.SingleNUMANodePodLevel) {
 				// if both containers should fit into the same zone, we should make the burstable one asking for minimum
 				// resources as possible so the node won't get filtered by the NodeResourceFit plugin
 				pod.Spec.Containers[1].Resources.Requests = corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("5Mi")}
@@ -651,7 +651,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			rl := e2ereslist.FromGuaranteedPod(*updatedPod2)
 			klog.Infof("post-create pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainers(podGuanranteed.Spec.Containers)), e2ereslist.ToString(rl))
 
-			policyFuncs := tmPolicyFuncsHandler[nrtv1alpha1.TopologyManagerPolicy(targetNrtInitial.TopologyPolicies[0])]
+			policyFuncs := tmPolicyFuncsHandler[nrtv1alpha2.TopologyManagerPolicy(targetNrtInitial.TopologyPolicies[0])]
 
 			By(fmt.Sprintf("checking post-update NRT for target node %q updated correctly", targetNodeName))
 			// it's simpler (no resource substraction/difference) to check against initial than compute
@@ -739,7 +739,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 	})
 })
 
-func expectNrtUnchanged(fxt *e2efixture.Fixture, targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList, nodeName string) {
+func expectNrtUnchanged(fxt *e2efixture.Fixture, targetNrtListInitial nrtv1alpha2.NodeResourceTopologyList, nodeName string) {
 	targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
 	ExpectWithOffset(1, err).ToNot(HaveOccurred())
 

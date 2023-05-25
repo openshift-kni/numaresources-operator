@@ -31,7 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
@@ -128,7 +128,7 @@ func (p *Padder) Pad(timeout time.Duration, options PaddingOptions) error {
 		return err
 	}
 
-	nrtList, err := nrtutil.GetUpdated(p.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+	nrtList, err := nrtutil.GetUpdated(p.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (p *Padder) Pad(timeout time.Duration, options PaddingOptions) error {
 	// since there is a relation of 1 : 1 between nodes and NRTs we can filter by the nodes` name
 	nrts := filterNrtByNodeName(nrtList.Items, nodeList.Items)
 
-	singleNumaNrt := nrtutil.FilterByPolicies(nrts, []nrtv1alpha1.TopologyManagerPolicy{nrtv1alpha1.SingleNUMANodePodLevel, nrtv1alpha1.SingleNUMANodeContainerLevel})
+	singleNumaNrt := nrtutil.FilterByPolicies(nrts, []nrtv1alpha2.TopologyManagerPolicy{nrtv1alpha2.SingleNUMANodePodLevel, nrtv1alpha2.SingleNUMANodeContainerLevel})
 	if p.nNodes > len(singleNumaNrt) {
 		return fmt.Errorf("not enough nodes were found for padding. requested: %d, got: %d", p.nNodes, len(singleNumaNrt))
 	}
@@ -281,7 +281,7 @@ func (p *Padder) GetPaddedNodes() []string {
 func (p *Padder) waitForUpdatedNRTs(timeout time.Duration) (bool, error) {
 	NRTUpdated := false
 	err := k8swait.PollImmediate(time.Second, timeout, func() (bool, error) {
-		nrtList, err := nrtutil.GetUpdated(p.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Second*10)
+		nrtList, err := nrtutil.GetUpdated(p.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
 		if err != nil {
 			klog.Warningf("failed to get updated noderesourcestopologies objects")
 			return false, err
@@ -344,7 +344,7 @@ func labelPod(pod *corev1.Pod, labelMap map[string]string) {
 	}
 }
 
-func isZoneMeetAllocationTarget(zone nrtv1alpha1.Zone, target corev1.ResourceList) bool {
+func isZoneMeetAllocationTarget(zone nrtv1alpha2.Zone, target corev1.ResourceList) bool {
 	available := nrtutil.AvailableFromZone(zone)
 	for res, targetQuan := range target {
 		availQuan := available.Name(res, resource.DecimalSI)
@@ -359,7 +359,7 @@ func isZoneMeetAllocationTarget(zone nrtv1alpha1.Zone, target corev1.ResourceLis
 	return true
 }
 
-func pinPodTo(pod *corev1.Pod, zone nrtv1alpha1.Zone, nodeName string) (*corev1.Pod, error) {
+func pinPodTo(pod *corev1.Pod, zone nrtv1alpha2.Zone, nodeName string) (*corev1.Pod, error) {
 	klog.Infof("forcing affinity to [%s: %s]", "kubernetes.io/hostname", nodeName)
 	pod.Spec.NodeSelector = map[string]string{
 		"kubernetes.io/hostname": nodeName,
@@ -379,7 +379,7 @@ func pinPodTo(pod *corev1.Pod, zone nrtv1alpha1.Zone, nodeName string) (*corev1.
 	return pod, nil
 }
 
-func numaCellResourceFound(zone nrtv1alpha1.Zone) bool {
+func numaCellResourceFound(zone nrtv1alpha2.Zone) bool {
 	for _, res := range zone.Resources {
 		if strings.HasPrefix(res.Name, numacellapi.NUMACellResourceNamespace) {
 			return true
@@ -388,8 +388,8 @@ func numaCellResourceFound(zone nrtv1alpha1.Zone) bool {
 	return false
 }
 
-func filterNrtByNodeName(nrts []nrtv1alpha1.NodeResourceTopology, nodes []corev1.Node) []nrtv1alpha1.NodeResourceTopology {
-	var filtered []nrtv1alpha1.NodeResourceTopology
+func filterNrtByNodeName(nrts []nrtv1alpha2.NodeResourceTopology, nodes []corev1.Node) []nrtv1alpha2.NodeResourceTopology {
+	var filtered []nrtv1alpha2.NodeResourceTopology
 	for _, node := range nodes {
 		if nrt, err := nrtutil.FindFromList(nrts, node.Name); err == nil {
 			filtered = append(filtered, *nrt)

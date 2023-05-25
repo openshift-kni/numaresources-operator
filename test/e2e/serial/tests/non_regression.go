@@ -31,7 +31,7 @@ import (
 	"k8s.io/klog/v2"
 	corev1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
@@ -50,11 +50,11 @@ import (
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
-	var nrtList nrtv1alpha1.NodeResourceTopologyList
-	var nrts []nrtv1alpha1.NodeResourceTopology
+	var nrtList nrtv1alpha2.NodeResourceTopologyList
+	var nrts []nrtv1alpha2.NodeResourceTopology
 	tmPolicyFuncsHandler := tmPolicyFuncsHandler{
-		nrtv1alpha1.SingleNUMANodePodLevel:       newPodScopeTMPolicyFuncs(),
-		nrtv1alpha1.SingleNUMANodeContainerLevel: newContainerScopeTMPolicyFuncs(),
+		nrtv1alpha2.SingleNUMANodePodLevel:       newPodScopeTMPolicyFuncs(),
+		nrtv1alpha2.SingleNUMANodeContainerLevel: newContainerScopeTMPolicyFuncs(),
 	}
 
 	BeforeEach(func() {
@@ -81,9 +81,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
-		policies := []nrtv1alpha1.TopologyManagerPolicy{
-			nrtv1alpha1.SingleNUMANodeContainerLevel,
-			nrtv1alpha1.SingleNUMANodePodLevel,
+		policies := []nrtv1alpha2.TopologyManagerPolicy{
+			nrtv1alpha2.SingleNUMANodeContainerLevel,
+			nrtv1alpha2.SingleNUMANodePodLevel,
 		}
 		nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
 		if len(nrts) < 2 {
@@ -140,7 +140,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:47584][tier2][nonreg] should be able to schedule guaranteed pod in selective way", func() {
-			nrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha1.NodeResourceTopologyList{}, time.Minute)
+			nrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
@@ -221,12 +221,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:48964][tier3][nonreg] should be able to schedule a guaranteed deployment pod to a specific node", func() {
-			nrtInitialList := nrtv1alpha1.NodeResourceTopologyList{}
+			nrtInitialList := nrtv1alpha2.NodeResourceTopologyList{}
 
 			err := fxt.Client.List(context.TODO(), &nrtInitialList)
 			Expect(err).ToNot(HaveOccurred())
 
-			workers, err := nodes.GetWorkerNodes(fxt.Client)
+			workers, err := nodes.GetWorkerNodes(fxt.Client, context.TODO())
 			Expect(err).ToNot(HaveOccurred())
 
 			targetIdx, ok := e2efixture.PickNodeIndex(workers)
@@ -302,7 +302,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			policyFuncs := tmPolicyFuncsHandler[nrtv1alpha1.TopologyManagerPolicy(nrtInitial.TopologyPolicies[0])]
+			policyFuncs := tmPolicyFuncsHandler[nrtv1alpha2.TopologyManagerPolicy(nrtInitial.TopologyPolicies[0])]
 
 			By(fmt.Sprintf("checking post-create NRT for target node %q updated correctly", targetNodeName))
 			dataBefore, err := yaml.Marshal(nrtInitial)
@@ -351,7 +351,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			for _, nodeName := range nrtNames.List() {
 
 				//calculate base load on the node
-				baseload, err := nodes.GetLoad(fxt.K8sClient, nodeName)
+				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 				klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 
@@ -382,7 +382,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			//prepare the test pod
 			//get maximum allocatable resources across all numas of the target node
-			var targetNrtListInitial nrtv1alpha1.NodeResourceTopologyList
+			var targetNrtListInitial nrtv1alpha2.NodeResourceTopologyList
 			err := fxt.Client.List(context.TODO(), &targetNrtListInitial)
 			Expect(err).ToNot(HaveOccurred())
 			targetNrtInitial, err := e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)

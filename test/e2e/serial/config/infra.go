@@ -32,7 +32,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nrtv1alpha1 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
@@ -46,12 +46,12 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 )
 
-func SetupInfra(fxt *e2efixture.Fixture, nroOperObj *nropv1.NUMAResourcesOperator, nrtList nrtv1alpha1.NodeResourceTopologyList) {
+func SetupInfra(fxt *e2efixture.Fixture, nroOperObj *nropv1.NUMAResourcesOperator, nrtList nrtv1alpha2.NodeResourceTopologyList) {
 	setupNUMACell(fxt, nroOperObj.Spec.NodeGroups, 3*time.Minute)
 	LabelNodes(fxt.Client, nrtList)
 }
 
-func TeardownInfra(fxt *e2efixture.Fixture, nrtList nrtv1alpha1.NodeResourceTopologyList) {
+func TeardownInfra(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopologyList) {
 	UnlabelNodes(fxt.Client, nrtList)
 }
 
@@ -133,7 +133,7 @@ func getNUMACellDevicePluginPullSpec() string {
 	return images.NUMACellDevicePluginTestImageCI
 }
 
-func LabelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyList) {
+func LabelNodes(cli client.Client, nrtList nrtv1alpha2.NodeResourceTopologyList) {
 	for _, nrt := range nrtList.Items {
 		node := corev1.Node{}
 		err := cli.Get(context.TODO(), client.ObjectKey{Name: nrt.Name}, &node)
@@ -148,7 +148,7 @@ func LabelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyList)
 	}
 }
 
-func UnlabelNodes(cli client.Client, nrtList nrtv1alpha1.NodeResourceTopologyList) {
+func UnlabelNodes(cli client.Client, nrtList nrtv1alpha2.NodeResourceTopologyList) {
 	var wg sync.WaitGroup
 	for _, nrt := range nrtList.Items {
 		wg.Add(1)

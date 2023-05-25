@@ -19,27 +19,22 @@ package wait
 import (
 	"context"
 	"fmt"
-	"time"
-
-	"github.com/go-logr/logr"
 
 	appsv1 "k8s.io/api/apps/v1"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ForDeploymentCompleteByKey(cli client.Client, logger logr.Logger, key ObjectKey, replicas int32, pollInterval, pollTimeout time.Duration) (*appsv1.Deployment, error) {
+func (wt Waiter) ForDeploymentCompleteByKey(ctx context.Context, key ObjectKey, replicas int32) (*appsv1.Deployment, error) {
 	updatedDp := &appsv1.Deployment{}
-	err := k8swait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		err := cli.Get(context.TODO(), key.AsKey(), updatedDp)
+	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+		err := wt.Cli.Get(ctx, key.AsKey(), updatedDp)
 		if err != nil {
-			logger.Info("failed to get the deployment", "key", key.String(), "error", err)
+			wt.Log.Info("failed to get the deployment", "key", key.String(), "error", err)
 			return false, err
 		}
 
 		if !areDeploymentReplicasAvailable(&updatedDp.Status, replicas) {
-			logger.Info("deployment not complete",
+			wt.Log.Info("deployment not complete",
 				"key", key.String(),
 				"replicas", updatedDp.Status.Replicas,
 				"updated", updatedDp.Status.UpdatedReplicas,
@@ -47,17 +42,17 @@ func ForDeploymentCompleteByKey(cli client.Client, logger logr.Logger, key Objec
 			return false, nil
 		}
 
-		logger.Info("deployment complete", "key", key.String())
+		wt.Log.Info("deployment complete", "key", key.String())
 		return true, nil
 	})
 	return updatedDp, err
 }
 
-func ForDeploymentComplete(cli client.Client, logger logr.Logger, dp *appsv1.Deployment, pollInterval, pollTimeout time.Duration) (*appsv1.Deployment, error) {
+func (wt Waiter) ForDeploymentComplete(ctx context.Context, dp *appsv1.Deployment) (*appsv1.Deployment, error) {
 	if dp.Spec.Replicas == nil {
 		return nil, fmt.Errorf("unspecified replicas in %s/%s", dp.Namespace, dp.Name)
 	}
-	return ForDeploymentCompleteByKey(cli, logger, ObjectKeyFromObject(dp), *dp.Spec.Replicas, pollInterval, pollTimeout)
+	return wt.ForDeploymentCompleteByKey(ctx, ObjectKeyFromObject(dp), *dp.Spec.Replicas)
 }
 
 func areDeploymentReplicasAvailable(newStatus *appsv1.DeploymentStatus, replicas int32) bool {
@@ -66,11 +61,11 @@ func areDeploymentReplicasAvailable(newStatus *appsv1.DeploymentStatus, replicas
 		newStatus.AvailableReplicas == replicas
 }
 
-func ForDeploymentDeleted(cli client.Client, logger logr.Logger, namespace, name string, pollTimeout time.Duration) error {
-	return k8swait.PollImmediate(time.Second, pollTimeout, func() (bool, error) {
+func (wt Waiter) ForDeploymentDeleted(ctx context.Context, namespace, name string) error {
+	return k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
 		obj := appsv1.Deployment{}
 		key := ObjectKey{Name: name, Namespace: namespace}
-		err := cli.Get(context.TODO(), key.AsKey(), &obj)
-		return deletionStatusFromError(logger, "Deployment", key, err)
+		err := wt.Cli.Get(ctx, key.AsKey(), &obj)
+		return deletionStatusFromError(wt.Log, "Deployment", key, err)
 	})
 }
