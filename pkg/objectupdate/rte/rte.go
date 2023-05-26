@@ -19,6 +19,7 @@ package rte
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -146,11 +147,12 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 		flags.SetOption("--sleep-interval", refreshPeriod)
 	}
 
-	pfpEnabled := isPodFingerprintEnabled(&conf)
+	pfpEnabled, pfpRestricted := isPodFingerprintEnabled(&conf)
 	klog.V(2).InfoS("DaemonSet update: pod fingerprinting status", "daemonset", ds.Name, "enabled", pfpEnabled)
 	if pfpEnabled {
 		flags.SetToggle("--pods-fingerprint")
 		flags.SetOption("--pods-fingerprint-status-file", filepath.Join(pfpStatusDir, "dump.json"))
+		flags.SetOption("--pods-fingerprint-unrestricted", strconv.FormatBool(!pfpRestricted)) // note the "not"!
 
 		podSpec := &ds.Spec.Template.Spec
 		// TODO: this doesn't really belong here, but OTOH adding the status file without having set
@@ -201,13 +203,14 @@ func FindContainerByName(podSpec *corev1.PodSpec, containerName string) (*corev1
 	return nil, fmt.Errorf("container %q not found - defaulting to the first", containerName)
 }
 
-func isPodFingerprintEnabled(conf *nropv1.NodeGroupConfig) bool {
+func isPodFingerprintEnabled(conf *nropv1.NodeGroupConfig) (bool, bool) {
 	cfg := nropv1.DefaultNodeGroupConfig()
 	if conf == nil || conf.PodsFingerprinting == nil {
 		// not specified -> use defaults
 		conf = &cfg
 	}
-	return *conf.PodsFingerprinting == nropv1.PodsFingerprintingEnabled
+	isRestricted := (*conf.PodsFingerprinting == nropv1.PodsFingerprintingEnabledExclusiveResources)
+	return (*conf.PodsFingerprinting == nropv1.PodsFingerprintingEnabled || isRestricted), isRestricted
 }
 
 func isNotifyFileEnabled(conf *nropv1.NodeGroupConfig) bool {

@@ -74,7 +74,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			name: "defaults",
 			conf: nropv1.DefaultNodeGroupConfig(),
 			expectedArgs: []string{
-				"--pods-fingerprint", "--refresh-node-resources", "--sleep-interval=10s", "--notify-file=/run/rte/notify",
+				"--pods-fingerprint", "--pods-fingerprint-unrestricted=false", "--refresh-node-resources", "--sleep-interval=10s", "--notify-file=/run/rte/notify",
 			},
 		},
 		{
@@ -85,7 +85,16 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				},
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--refresh-node-resources", "--sleep-interval=32s", "--notify-file=/run/rte/notify",
+				"--pods-fingerprint", "--pods-fingerprint-unrestricted=false", "--refresh-node-resources", "--sleep-interval=32s", "--notify-file=/run/rte/notify",
+			},
+		},
+		{
+			name: "enable unrestricted fingerprint",
+			conf: nropv1.NodeGroupConfig{
+				PodsFingerprinting: &nropv1.PodsFingerprintingEnabled,
+			},
+			expectedArgs: []string{
+				"--pods-fingerprint", "--pods-fingerprint-unrestricted=true", "--refresh-node-resources", "--sleep-interval=10s", "--notify-file=/run/rte/notify",
 			},
 		},
 		{
@@ -103,7 +112,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshMode: &nropv1.InfoRefreshEvents,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--refresh-node-resources", "--notify-file=/run/rte/notify",
+				"--pods-fingerprint", "--pods-fingerprint-unrestricted=false", "--refresh-node-resources", "--notify-file=/run/rte/notify",
 			},
 		},
 		{
@@ -112,7 +121,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshMode: &nropv1.InfoRefreshPeriodic,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--refresh-node-resources", "--sleep-interval=10s",
+				"--pods-fingerprint", "--pods-fingerprint-unrestricted=false", "--refresh-node-resources", "--sleep-interval=10s",
 			},
 		},
 	}
@@ -127,30 +136,27 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				t.Fatalf("update failed: %v", err)
 			}
 
-			expectCommandLine(t, ds, origDs, tc.expectedArgs)
+			expectCommandLine(t, ds, origDs, tc.name, tc.expectedArgs)
 		})
 	}
 }
 
-func expectCommandLine(t *testing.T, ds, origDs *appsv1.DaemonSet, expectedArgs []string) {
+func expectCommandLine(t *testing.T, ds, origDs *appsv1.DaemonSet, testName string, expectedArgs []string) {
 	for _, arg := range expectedArgs {
 		if idx := sliceIndex(ds.Spec.Template.Spec.Containers[0].Args, arg); idx == -1 {
-			t.Errorf("pods-fingerprint option missing from %v", ds.Spec.Template.Spec.Containers[0].Args)
-		}
-		if idx := sliceIndex(ds.Spec.Template.Spec.Containers[0].Args, "--refresh-node-resources"); idx == -1 {
-			t.Errorf("refresh-node-resources option missing from %v", ds.Spec.Template.Spec.Containers[0].Args)
+			t.Errorf("%s: %s option missing from %v", testName, arg, ds.Spec.Template.Spec.Containers[0].Args)
 		}
 	}
 
 	if !reflect.DeepEqual(origDs.Spec.Template.Spec.Containers[0].Command, ds.Spec.Template.Spec.Containers[0].Command) {
-		t.Errorf("unexpected change on command: %v", ds.Spec.Template.Spec.Containers[0].Command)
+		t.Errorf("%s: unexpected change on command: %v", testName, ds.Spec.Template.Spec.Containers[0].Command)
 	}
 
 	if !reflect.DeepEqual(origDs.Spec.Template.Spec.Containers[1].Args, ds.Spec.Template.Spec.Containers[1].Args) {
-		t.Errorf("unexpected change on command: %v", ds.Spec.Template.Spec.Containers[1].Args)
+		t.Errorf("%s: unexpected change on command: %v", testName, ds.Spec.Template.Spec.Containers[1].Args)
 	}
 	if !reflect.DeepEqual(origDs.Spec.Template.Spec.Containers[1].Command, ds.Spec.Template.Spec.Containers[1].Command) {
-		t.Errorf("unexpected change on command: %v", ds.Spec.Template.Spec.Containers[1].Command)
+		t.Errorf("%s: unexpected change on command: %v", testName, ds.Spec.Template.Spec.Containers[1].Command)
 	}
 }
 
