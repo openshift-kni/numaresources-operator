@@ -203,7 +203,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			err := fxt.Client.Create(context.TODO(), pod)
 			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
 
-			err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+			err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
@@ -233,11 +233,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
 			By("wait for the deployment to be up with its pod created")
-			deployment, err = wait.ForDeploymentReplicasCreation(fxt.Client, deployment, replicas, time.Second, time.Minute)
+			deployment, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDeploymentReplicasCreation(context.TODO(), deployment, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("checking deployment pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
-			pods, err := podlist.ByDeployment(fxt.Client, *deployment)
+			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *deployment)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
@@ -270,11 +270,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create daemonset %q", ds.Name)
 
 			By("wait for the daemonset to be up with its pods created")
-			ds, err = wait.ForDaemonsetPodsCreation(fxt.Client, ds, len(nrtCandidates), time.Second, time.Minute)
+			ds, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(context.TODO(), ds, len(nrtCandidates))
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("checking daemonset pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
-			pods, err := podlist.ByDaemonset(fxt.Client, *ds)
+			pods, err := podlist.With(fxt.Client).ByDaemonset(context.TODO(), *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
 
@@ -307,11 +307,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
 			By("wait for the deployment to be up with its pod created")
-			deployment, err = wait.ForDeploymentReplicasCreation(fxt.Client, deployment, replicas, time.Second, time.Minute)
+			deployment, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDeploymentReplicasCreation(context.TODO(), deployment, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("checking deployment pods have been handled by the default scheduler %q but failed to be scheduled", corev1.DefaultSchedulerName))
-			pods, err := podlist.ByDeployment(fxt.Client, *deployment)
+			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *deployment)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
@@ -412,11 +412,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create daemonset %q", ds.Name)
 
 			By("wait for the daemonset to be up with its pods created")
-			ds, err = wait.ForDaemonsetPodsCreation(fxt.Client, ds, len(nrtCandidates), time.Second, time.Minute)
+			ds, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(context.TODO(), ds, len(nrtCandidates))
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("checking daemonset pods have been scheduled with the topology aware scheduler %q ", serialconfig.Config.SchedulerName))
-			pods, err := podlist.ByDaemonset(fxt.Client, *ds)
+			pods, err := podlist.With(fxt.Client).ByDaemonset(context.TODO(), *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
 
@@ -431,7 +431,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					Expect(err).ToNot(HaveOccurred())
 					Expect(scheduledWithTAS).To(BeTrue(), "pod %s/%s was NOT scheduled with  %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 
-					_, err = wait.ForPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodRunning, podRunningTimeout)
+					_, err = wait.With(fxt.Client).Timeout(podRunningTimeout).ForPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodRunning)
 					Expect(err).ToNot(HaveOccurred(), "unable to get pod %s/%s to be Running after %v", pod.Namespace, pod.Name, podRunningTimeout)
 
 				} else {
@@ -597,7 +597,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			interval := 10 * time.Second
 			By(fmt.Sprintf("Checking pod %q keeps in %q state for at least %v seconds ...", pod.Name, string(corev1.PodPending), interval*3))
-			err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, interval, 3)
+			err = wait.With(fxt.Client).Interval(interval).Steps(3).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
@@ -695,11 +695,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			// although the deployment pods will be pending thus the deployment will not be counted as complete,
 			// we need to wait until all the replicas are created despite their status before moving forward with the checks
 			By("wait for the deployment to be up with its pod created")
-			dp, err = wait.ForDeploymentReplicasCreation(fxt.Client, dp, replicas, time.Second, time.Minute)
+			dp, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDeploymentReplicasCreation(context.TODO(), dp, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("checking deployment pods failed to be scheduled by %q ", schedulerName))
-			pods, err := podlist.ByDeployment(fxt.Client, *dp)
+			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *dp)
 			Expect(err).ToNot(HaveOccurred(), "unable to get pods from deployment %q:  %v", dp.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", dp.Namespace, dp.Name)
 
@@ -904,7 +904,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
 
 			By("check the pod is still pending")
-			err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+			err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
@@ -929,16 +929,16 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
 			By("wait for the deployment to be up with its pod created")
-			deployment, err = wait.ForDeploymentReplicasCreation(fxt.Client, deployment, replicas, time.Second, time.Minute)
+			deployment, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDeploymentReplicasCreation(context.TODO(), deployment, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("check the deployment pod is still pending")
-			pods, err := podlist.ByDeployment(fxt.Client, *deployment)
+			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *deployment)
 			Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
 			for _, pod := range pods {
-				err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+				err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
@@ -965,16 +965,16 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create daemonset %q", ds.Name)
 
 			By("wait for the daemonset to be up with its pods created")
-			ds, err = wait.ForDaemonsetPodsCreation(fxt.Client, ds, len(nrtCandidates), time.Second, time.Minute)
+			ds, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(context.TODO(), ds, len(nrtCandidates))
 			Expect(err).NotTo(HaveOccurred())
 
 			By("check the daemonset pods are still pending")
-			pods, err := podlist.ByDaemonset(fxt.Client, *ds)
+			pods, err := podlist.With(fxt.Client).ByDaemonset(context.TODO(), *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
 
 			for _, pod := range pods {
-				err = wait.WhileInPodPhase(fxt.Client, pod.Namespace, pod.Name, corev1.PodPending, 10*time.Second, 3)
+				err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}

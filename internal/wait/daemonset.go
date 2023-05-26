@@ -18,19 +18,16 @@ package wait
 
 import (
 	"context"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
+	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func ForDaemonSetReadyByKey(cli client.Client, key ObjectKey, pollInterval, pollTimeout time.Duration) (*appsv1.DaemonSet, error) {
+func (wt Waiter) ForDaemonSetReadyByKey(ctx context.Context, key ObjectKey) (*appsv1.DaemonSet, error) {
 	updatedDs := &appsv1.DaemonSet{}
-	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		err := cli.Get(context.TODO(), key.AsKey(), updatedDs)
+	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+		err := wt.Cli.Get(ctx, key.AsKey(), updatedDs)
 		if err != nil {
 			klog.Warningf("failed to get the daemonset %s: %v", key.String(), err)
 			return false, err
@@ -51,8 +48,8 @@ func ForDaemonSetReadyByKey(cli client.Client, key ObjectKey, pollInterval, poll
 	return updatedDs, err
 }
 
-func ForDaemonSetReady(cli client.Client, ds *appsv1.DaemonSet, pollInterval, pollTimeout time.Duration) (*appsv1.DaemonSet, error) {
-	return ForDaemonSetReadyByKey(cli, ObjectKeyFromObject(ds), pollInterval, pollTimeout)
+func (wt Waiter) ForDaemonSetReady(ctx context.Context, ds *appsv1.DaemonSet) (*appsv1.DaemonSet, error) {
+	return wt.ForDaemonSetReadyByKey(ctx, ObjectKeyFromObject(ds))
 }
 
 func AreDaemonSetPodsReady(newStatus *appsv1.DaemonSetStatus) bool {
@@ -60,11 +57,11 @@ func AreDaemonSetPodsReady(newStatus *appsv1.DaemonSetStatus) bool {
 		newStatus.DesiredNumberScheduled == newStatus.NumberReady
 }
 
-func ForDaemonsetPodsCreation(cli client.Client, ds *appsv1.DaemonSet, expectedPods int, pollInterval, pollTimeout time.Duration) (*appsv1.DaemonSet, error) {
+func (wt Waiter) ForDaemonsetPodsCreation(ctx context.Context, ds *appsv1.DaemonSet, expectedPods int) (*appsv1.DaemonSet, error) {
 	key := ObjectKeyFromObject(ds)
 	updatedDs := &appsv1.DaemonSet{}
-	err := wait.PollImmediate(pollInterval, pollTimeout, func() (bool, error) {
-		err := cli.Get(context.TODO(), key.AsKey(), updatedDs)
+	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+		err := wt.Cli.Get(ctx, key.AsKey(), updatedDs)
 		if err != nil {
 			klog.Warningf("failed to get the daemonset %s: %v", key.String(), err)
 			return false, err
