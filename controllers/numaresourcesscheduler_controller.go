@@ -193,6 +193,9 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, instance.Spec.LogLevel); err != nil {
 		return schedStatus, err
 	}
+	if instance.Spec.CacheResyncDebug != nil {
+		schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, *instance.Spec.CacheResyncDebug)
+	}
 
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
 	for _, objState := range existing.State(r.SchedulerManifests) {
