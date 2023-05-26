@@ -51,6 +51,10 @@ func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
 }
 
 func SchedulerConfig(cm *corev1.ConfigMap, name string, cacheResyncPeriod time.Duration) error {
+	return SchedulerConfigWithFilter(cm, name, Passthrough, cacheResyncPeriod)
+}
+
+func SchedulerConfigWithFilter(cm *corev1.ConfigMap, name string, filterFunc func([]byte) []byte, cacheResyncPeriod time.Duration) error {
 	if cm.Data == nil {
 		return fmt.Errorf("no data found in ConfigMap: %s/%s", cm.Namespace, cm.Name)
 	}
@@ -65,6 +69,10 @@ func SchedulerConfig(cm *corev1.ConfigMap, name string, cacheResyncPeriod time.D
 		return err
 	}
 
-	cm.Data[schedstate.SchedulerConfigFileName] = string(newData)
+	cm.Data[schedstate.SchedulerConfigFileName] = string(filterFunc([]byte(newData)))
 	return nil
+}
+
+func Passthrough(data []byte) []byte {
+	return data
 }

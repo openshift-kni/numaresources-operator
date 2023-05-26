@@ -229,6 +229,9 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
       statusDescriptors:
+      - description: CacheResyncPeriod shows the current cache resync period
+        displayName: Scheduler cache resync period
+        path: cacheResyncPeriod
       - description: Deployment of the secondary scheduler, namespaced name
         displayName: Scheduler deployment
         path: deployment
