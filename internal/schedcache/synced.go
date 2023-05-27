@@ -23,6 +23,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/go-logr/logr"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
@@ -42,12 +44,19 @@ const (
 	TracingDirectory = "/run/pfpstatus"
 )
 
-func HasSynced(ctx context.Context, cli client.Client, k8sCli kubernetes.Interface, nodeNames []string) (bool, map[string]sets.String, error) {
+type Env struct {
+	Ctx    context.Context
+	Cli    client.Client
+	K8sCli kubernetes.Interface
+	Log    logr.Logger
+}
+
+func HasSynced(env *Env, nodeNames []string) (bool, map[string]sets.String, error) {
 	var err error
 	var nroSched nropv1.NUMAResourcesScheduler
 	nroKey := client.ObjectKey{Name: objectnames.DefaultNUMAResourcesSchedulerCrName}
 
-	err = cli.Get(context.TODO(), nroKey, &nroSched)
+	err = env.Cli.Get(context.TODO(), nroKey, &nroSched)
 	if err != nil {
 		return false, nil, err
 	}
@@ -57,7 +66,7 @@ func HasSynced(ctx context.Context, cli client.Client, k8sCli kubernetes.Interfa
 		return false, nil, fmt.Errorf("missing condition: available")
 	}
 
-	dp, err := podlist.With(cli).DeploymentByOwnerReference(ctx, nroSched.UID)
+	dp, err := podlist.With(env.Cli).DeploymentByOwnerReference(env.Ctx, nroSched.UID)
 	if err != nil {
 		return false, nil, err
 	}
@@ -68,11 +77,11 @@ func HasSynced(ctx context.Context, cli client.Client, k8sCli kubernetes.Interfa
 
 	unsynced := make(map[string]sets.String)
 
-	podList, err := podlist.With(cli).ByDeployment(ctx, *dp)
+	podList, err := podlist.With(env.Cli).ByDeployment(env.Ctx, *dp)
 	for idx := range podList {
 		pod := &podList[idx]
 
-		notReady, err := ReplicaHasSynced(k8sCli, pod, nodeNames)
+		notReady, err := ReplicaHasSynced(env, pod, nodeNames)
 		mergeUnsynced(unsynced, notReady)
 		if err != nil {
 			return len(unsynced) == 0, unsynced, err
@@ -82,10 +91,10 @@ func HasSynced(ctx context.Context, cli client.Client, k8sCli kubernetes.Interfa
 	return len(unsynced) == 0, unsynced, nil
 }
 
-func ReplicaHasSynced(k8sCli kubernetes.Interface, pod *corev1.Pod, nodeNames []string) (map[string]sets.String, error) {
+func ReplicaHasSynced(env *Env, pod *corev1.Pod, nodeNames []string) (map[string]sets.String, error) {
 	unsynced := make(map[string]sets.String)
 	for _, nodeName := range nodeNames {
-		ok, detectedPods, err := ReplicaHasSyncedForNode(k8sCli, pod, nodeName)
+		ok, detectedPods, err := ReplicaHasSyncedForNode(env, pod, nodeName)
 		if err != nil {
 			return unsynced, err
 		}
@@ -98,9 +107,9 @@ func ReplicaHasSynced(k8sCli kubernetes.Interface, pod *corev1.Pod, nodeNames []
 	return unsynced, nil
 }
 
-func ReplicaHasSyncedForNode(k8sCli kubernetes.Interface, pod *corev1.Pod, nodeName string) (bool, sets.String, error) {
+func ReplicaHasSyncedForNode(env *Env, pod *corev1.Pod, nodeName string) (bool, sets.String, error) {
 	detectedPods := make(sets.String)
-	stdout, _, err := remoteexec.CommandOnPod(k8sCli, pod, "/bin/cat", filepath.Join(TracingDirectory, nodeNameToFileName(nodeName)+".json"))
+	stdout, _, err := remoteexec.CommandOnPod(env.K8sCli, pod, "/bin/cat", filepath.Join(TracingDirectory, nodeNameToFileName(nodeName)+".json"))
 	if err != nil {
 		return false, detectedPods, err
 	}
@@ -127,9 +136,9 @@ func ReplicaHasSyncedForNode(k8sCli kubernetes.Interface, pod *corev1.Pod, nodeN
 	return hasSync, detectedPods, nil
 }
 
-func GetUpdaterFingerprintStatus(k8sCli kubernetes.Interface, podNamespace, podName, cntName string) (podfingerprint.Status, error) {
+func GetUpdaterFingerprintStatus(env *Env, podNamespace, podName, cntName string) (podfingerprint.Status, error) {
 	var st podfingerprint.Status
-	stdout, _, err := remoteexec.CommandOnPodByNames(k8sCli, podNamespace, podName, cntName, "/bin/cat", filepath.Join(TracingDirectory, "dump.json"))
+	stdout, _, err := remoteexec.CommandOnPodByNames(env.K8sCli, podNamespace, podName, cntName, "/bin/cat", filepath.Join(TracingDirectory, "dump.json"))
 	if err != nil {
 		return st, err
 	}

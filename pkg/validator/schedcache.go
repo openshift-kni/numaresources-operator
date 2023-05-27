@@ -19,6 +19,7 @@ package validator
 import (
 	"context"
 
+	"github.com/go-logr/logr"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
@@ -42,7 +43,14 @@ func CollectSchedCache(ctx context.Context, cli client.Client, data *ValidatorDa
 		return err
 	}
 
-	_, unsynced, err := schedcache.HasSynced(ctx, cli, k8sCli, nodes.GetNames(workers))
+	env := schedcache.Env{
+		Ctx:    ctx,
+		Cli:    cli,
+		K8sCli: k8sCli,
+		Log:    logr.Discard(),
+	}
+
+	_, unsynced, err := schedcache.HasSynced(&env, nodes.GetNames(workers))
 	if err != nil {
 		return err
 	}
