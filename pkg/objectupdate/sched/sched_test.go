@@ -17,7 +17,9 @@
 package sched
 
 import (
+	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -25,13 +27,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 )
 
-var dp = &appsv1.Deployment{
+var dpRef = &appsv1.Deployment{
 	ObjectMeta: metav1.ObjectMeta{
-		Name:      "test-deployent",
+		Name:      "test-deployment",
 		Namespace: "test-namespace",
 	},
 	Spec: appsv1.DeploymentSpec{
@@ -68,6 +71,7 @@ func TestUpdateDeploymentImageSettings(t *testing.T) {
 		},
 	}
 
+	dp := dpRef.DeepCopy()
 	podSpec := &dp.Spec.Template.Spec
 	for _, tc := range testCases {
 		DeploymentImageSettings(dp, tc.imageSpec)
@@ -98,6 +102,7 @@ func TestUpdateDeploymentConfigMapSettings(t *testing.T) {
 		},
 	}
 
+	dp := dpRef.DeepCopy()
 	podSpec := &dp.Spec.Template.Spec
 	for _, tc := range testCases {
 		DeploymentConfigMapSettings(dp, tc.cmName, tc.cmHash)
@@ -272,4 +277,76 @@ func TestUpdateSchedulerConfig(t *testing.T) {
 			yamlCompare(t, tc.name, gotYAML, tc.expectedYAML)
 		})
 	}
+}
+
+func TestDeploymentEnvVarSettings(t *testing.T) {
+	cacheResyncDebugEnabled := nropv1.CacheResyncDebugDumpJSONFile
+	cacheResyncDebugDisabled := nropv1.CacheResyncDebugDisabled
+
+	type testCase struct {
+		name       string
+		spec       nropv1.NUMAResourcesSchedulerSpec
+		expectedDp appsv1.Deployment
+	}
+
+	testCases := []testCase{
+		{
+			name: "status dump disabled explicitly",
+			spec: nropv1.NUMAResourcesSchedulerSpec{
+				CacheResyncDebug: &cacheResyncDebugDisabled,
+			},
+			expectedDp: *dpRef.DeepCopy(),
+		},
+		{
+			name: "status dump enabled explicitly",
+			spec: nropv1.NUMAResourcesSchedulerSpec{
+				CacheResyncDebug: &cacheResyncDebugEnabled,
+			},
+			expectedDp: appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-deployment",
+					Namespace: "test-namespace",
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "secondary-scheduler",
+									Image: "quay.io/bar/image:v1",
+									Env: []corev1.EnvVar{
+										{
+											Name:  "PFP_STATUS_DUMP",
+											Value: "/run/pfpstatus",
+										},
+									},
+								},
+							},
+							Volumes: []corev1.Volume{
+								schedstate.NewSchedConfigVolume("foo", "bar"),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dp := dpRef.DeepCopy()
+			DeploymentEnvVarSettings(dp, tc.spec)
+			if !reflect.DeepEqual(*dp, tc.expectedDp) {
+				t.Errorf("got=%s expected %s", toJSON(dp), toJSON(tc.expectedDp))
+			}
+		})
+	}
+}
+
+func toJSON(obj interface{}) string {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return "<ERROR>"
+	}
+	return string(data)
 }

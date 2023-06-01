@@ -51,10 +51,6 @@ import (
 )
 
 const (
-	defaultCacheResyncPeriod = 5 * time.Second
-)
-
-const (
 	conditionTypeIncorrectNUMAResourcesSchedulerResourceName = "IncorrectNUMAResourcesSchedulerResourceName"
 )
 
@@ -175,27 +171,28 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	klog.V(4).Info("SchedulerSync start")
 	defer klog.V(4).Info("SchedulerSync stop")
 
-	cacheResyncPeriod := unpackAPIResyncPeriod(instance.Spec.CacheResyncPeriod)
-	if err := schedupdate.SchedulerConfigWithFilter(r.SchedulerManifests.ConfigMap, instance.Spec.SchedulerName, schedupdate.CleanSchedulerConfig, cacheResyncPeriod); err != nil {
+	schedSpec := instance.Spec.Normalize()
+
+	cacheResyncPeriod := unpackAPIResyncPeriod(schedSpec.CacheResyncPeriod)
+	if err := schedupdate.SchedulerConfigWithFilter(r.SchedulerManifests.ConfigMap, schedSpec.SchedulerName, schedupdate.CleanSchedulerConfig, cacheResyncPeriod); err != nil {
 		return nropv1.NUMAResourcesSchedulerStatus{}, err
 	}
 
 	schedStatus := nropv1.NUMAResourcesSchedulerStatus{
-		SchedulerName: instance.Spec.SchedulerName,
+		SchedulerName: schedSpec.SchedulerName,
 		CacheResyncPeriod: &metav1.Duration{
 			Duration: cacheResyncPeriod,
 		},
 	}
 
 	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
-	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, instance.Spec.SchedulerImage)
+	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, schedSpec.SchedulerImage)
 	schedupdate.DeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
-	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, instance.Spec.LogLevel); err != nil {
+	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, schedSpec.LogLevel); err != nil {
 		return schedStatus, err
 	}
-	if instance.Spec.CacheResyncDebug != nil {
-		schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, *instance.Spec.CacheResyncDebug)
-	}
+
+	schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec)
 
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
 	for _, objState := range existing.State(r.SchedulerManifests) {
@@ -226,9 +223,6 @@ func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sch
 }
 
 func unpackAPIResyncPeriod(reconcilePeriod *metav1.Duration) time.Duration {
-	if reconcilePeriod == nil {
-		return defaultCacheResyncPeriod
-	}
 	period := reconcilePeriod.Round(time.Second)
 	klog.InfoS("setting reconcile period", "computed", period, "supplied", reconcilePeriod)
 	return period
