@@ -90,7 +90,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 
 			mcpName = nroOperObj.Status.MachineConfigPools[0].Name
 			conf := nroOperObj.Status.MachineConfigPools[0].Config
-			if conf.PodsFingerprinting == nil || (*conf.PodsFingerprinting != nropv1.PodsFingerprintingEnabled || *conf.PodsFingerprinting != nropv1.PodsFingerprintingEnabledExclusiveResources) {
+			if !isPFPEnabledInConfig(conf) {
 				e2efixture.Skipf(fxt, "unsupported fingerprint status %v in %q", conf.PodsFingerprinting, mcpName)
 			}
 			if conf.InfoRefreshMode == nil {
@@ -634,4 +634,12 @@ func isInterferencePod(pod *corev1.Pod) bool {
 		return false
 	}
 	return pod.Annotations[interferenceAnnotation] == "true"
+}
+
+func isPFPEnabledInConfig(conf *nropv1.NodeGroupConfig) bool {
+	if conf == nil || conf.PodsFingerprinting == nil {
+		return false
+	}
+	val := *conf.PodsFingerprinting
+	return val == nropv1.PodsFingerprintingEnabled || val == nropv1.PodsFingerprintingEnabledExclusiveResources
 }

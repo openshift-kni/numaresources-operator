@@ -46,7 +46,7 @@ type NUMAResourcesOperatorSpec struct {
 // +kubebuilder:validation:Enum=Disabled;Enabled;EnabledExclusiveResources
 type PodsFingerprintingMode string
 
-var (
+const (
 	// PodsFingerprintingDisabled disables the pod fingerprinting reporting.
 	PodsFingerprintingDisabled PodsFingerprintingMode = "Disabled"
 
@@ -60,7 +60,7 @@ var (
 // +kubebuilder:validation:Enum=Periodic;Events;PeriodicAndEvents
 type InfoRefreshMode string
 
-var (
+const (
 	// InfoRefreshPeriodic is the default. Periodically polls the state and reports it.
 	InfoRefreshPeriodic InfoRefreshMode = "Periodic"
 
