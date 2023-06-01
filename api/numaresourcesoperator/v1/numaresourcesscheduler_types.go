@@ -33,6 +33,17 @@ const (
 	CacheResyncDebugDumpJSONFile CacheResyncDebugMode = "DumpJSONFile"
 )
 
+// +kubebuilder:validation:Enum=Shared;Dedicated
+type SchedulerInformerMode string
+
+const (
+	// SchedulerInformerDedicated makes the NodeResourceTopologyMatch plugin use the default framework informer.
+	SchedulerInformerShared SchedulerInformerMode = "Shared"
+
+	// SchedulerInformerDedicated sets an additional separate informer just for the NodeResourceTopologyMatch plugin. Default.
+	SchedulerInformerDedicated SchedulerInformerMode = "Dedicated"
+)
+
 // NUMAResourcesSchedulerSpec defines the desired state of NUMAResourcesScheduler
 type NUMAResourcesSchedulerSpec struct {
 	// Scheduler container image URL
@@ -55,6 +66,10 @@ type NUMAResourcesSchedulerSpec struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler cache resync debug setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	CacheResyncDebug *CacheResyncDebugMode `json:"cacheResyncDebug,omitempty"`
+	// Set the informer type to be used by the scheduler to connect to the apiserver. Defaults to dedicated.
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler cache apiserver informer setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	SchedulerInformer *SchedulerInformerMode `json:"schedulerInformer,omitempty"`
 }
 
 // NUMAResourcesSchedulerStatus defines the observed state of NUMAResourcesScheduler

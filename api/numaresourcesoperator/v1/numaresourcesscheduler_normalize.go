@@ -26,6 +26,7 @@ import (
 const (
 	defaultCacheResyncPeriod = 5 * time.Second
 	defaultCacheResyncDebug  = CacheResyncDebugDumpJSONFile
+	defaultSchedulerInformer = SchedulerInformerDedicated
 )
 
 func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
@@ -37,6 +38,10 @@ func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
 	if spec.CacheResyncDebug == nil {
 		resyncDebug := defaultCacheResyncDebug
 		spec.CacheResyncDebug = &resyncDebug
+	}
+	if spec.SchedulerInformer == nil {
+		infMode := defaultSchedulerInformer
+		spec.SchedulerInformer = &infMode
 	}
 }
 
