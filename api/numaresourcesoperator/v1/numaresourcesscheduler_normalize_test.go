@@ -29,9 +29,11 @@ import (
 func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 	cacheResyncPeriod := defaultCacheResyncPeriod
 	cacheResyncDebug := defaultCacheResyncDebug
+	schedInformer := defaultSchedulerInformer
 
 	cacheResyncPeriodCustom := 42 * time.Second
 	cacheResyncDebugCustom := CacheResyncDebugDisabled
+	schedInformerCustom := SchedulerInformerShared
 
 	type testCase struct {
 		description string
@@ -46,7 +48,8 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriod,
 				},
-				CacheResyncDebug: &cacheResyncDebug,
+				CacheResyncDebug:  &cacheResyncDebug,
+				SchedulerInformer: &schedInformer,
 			},
 		},
 		{
@@ -61,7 +64,8 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriod,
 				},
-				CacheResyncDebug: &cacheResyncDebug,
+				CacheResyncDebug:  &cacheResyncDebug,
+				SchedulerInformer: &schedInformer,
 			},
 		},
 		{
@@ -79,7 +83,28 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriodCustom,
 				},
-				CacheResyncDebug: &cacheResyncDebug,
+				CacheResyncDebug:  &cacheResyncDebug,
+				SchedulerInformer: &schedInformer,
+			},
+		},
+		{
+			description: "preserving already set and partially optional fields (2)",
+			current: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				LogLevel:       operatorv1.Trace,
+				CacheResyncPeriod: &metav1.Duration{
+					Duration: cacheResyncPeriodCustom,
+				},
+				SchedulerInformer: &schedInformerCustom,
+			},
+			expected: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				LogLevel:       operatorv1.Trace,
+				CacheResyncPeriod: &metav1.Duration{
+					Duration: cacheResyncPeriodCustom,
+				},
+				CacheResyncDebug:  &cacheResyncDebug,
+				SchedulerInformer: &schedInformerCustom,
 			},
 		},
 		{
@@ -88,13 +113,15 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriodCustom,
 				},
-				CacheResyncDebug: &cacheResyncDebugCustom,
+				CacheResyncDebug:  &cacheResyncDebugCustom,
+				SchedulerInformer: &schedInformerCustom,
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriodCustom,
 				},
-				CacheResyncDebug: &cacheResyncDebugCustom,
+				CacheResyncDebug:  &cacheResyncDebugCustom,
+				SchedulerInformer: &schedInformerCustom,
 			},
 		},
 		{
@@ -111,7 +138,8 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriod,
 				},
-				CacheResyncDebug: &cacheResyncDebug,
+				CacheResyncDebug:  &cacheResyncDebug,
+				SchedulerInformer: &schedInformer,
 			},
 		},
 		{
@@ -123,7 +151,8 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriodCustom,
 				},
-				CacheResyncDebug: &cacheResyncDebugCustom,
+				CacheResyncDebug:  &cacheResyncDebugCustom,
+				SchedulerInformer: &schedInformerCustom,
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
@@ -132,7 +161,8 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriodCustom,
 				},
-				CacheResyncDebug: &cacheResyncDebugCustom,
+				CacheResyncDebug:  &cacheResyncDebugCustom,
+				SchedulerInformer: &schedInformerCustom,
 			},
 		},
 	}

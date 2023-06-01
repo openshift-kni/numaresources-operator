@@ -279,9 +279,13 @@ func TestUpdateSchedulerConfig(t *testing.T) {
 	}
 }
 
+// TODO: the test depends on the order of the env vars
 func TestDeploymentEnvVarSettings(t *testing.T) {
 	cacheResyncDebugEnabled := nropv1.CacheResyncDebugDumpJSONFile
 	cacheResyncDebugDisabled := nropv1.CacheResyncDebugDisabled
+
+	schedInformerShared := nropv1.SchedulerInformerShared
+	schedInformerDedicated := nropv1.SchedulerInformerDedicated
 
 	type testCase struct {
 		name       string
@@ -293,14 +297,16 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 		{
 			name: "status dump disabled explicitly",
 			spec: nropv1.NUMAResourcesSchedulerSpec{
-				CacheResyncDebug: &cacheResyncDebugDisabled,
+				CacheResyncDebug:  &cacheResyncDebugDisabled,
+				SchedulerInformer: &schedInformerShared,
 			},
 			expectedDp: *dpRef.DeepCopy(),
 		},
 		{
 			name: "status dump enabled explicitly",
 			spec: nropv1.NUMAResourcesSchedulerSpec{
-				CacheResyncDebug: &cacheResyncDebugEnabled,
+				CacheResyncDebug:  &cacheResyncDebugEnabled,
+				SchedulerInformer: &schedInformerShared,
 			},
 			expectedDp: appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
@@ -318,6 +324,78 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 										{
 											Name:  "PFP_STATUS_DUMP",
 											Value: "/run/pfpstatus",
+										},
+									},
+								},
+							},
+							Volumes: []corev1.Volume{
+								schedstate.NewSchedConfigVolume("foo", "bar"),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "dedicated informer enabled explicitly",
+			spec: nropv1.NUMAResourcesSchedulerSpec{
+				CacheResyncDebug:  &cacheResyncDebugDisabled,
+				SchedulerInformer: &schedInformerDedicated,
+			},
+			expectedDp: appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-deployment",
+					Namespace: "test-namespace",
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "secondary-scheduler",
+									Image: "quay.io/bar/image:v1",
+									Env: []corev1.EnvVar{
+										{
+											Name:  "NRT_ENABLE_INFORMER",
+											Value: "true",
+										},
+									},
+								},
+							},
+							Volumes: []corev1.Volume{
+								schedstate.NewSchedConfigVolume("foo", "bar"),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "status dump and dedicated informer enabled explicitly",
+			spec: nropv1.NUMAResourcesSchedulerSpec{
+				CacheResyncDebug:  &cacheResyncDebugEnabled,
+				SchedulerInformer: &schedInformerDedicated,
+			},
+			expectedDp: appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-deployment",
+					Namespace: "test-namespace",
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "secondary-scheduler",
+									Image: "quay.io/bar/image:v1",
+									Env: []corev1.EnvVar{
+										{
+											Name:  "PFP_STATUS_DUMP",
+											Value: "/run/pfpstatus",
+										},
+										{
+											Name:  "NRT_ENABLE_INFORMER",
+											Value: "true",
 										},
 									},
 								},
