@@ -56,30 +56,25 @@ func DeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) {
 	klog.V(3).InfoS("Scheduler image", "reason", "user-provided", "pullSpec", userImageSpec)
 }
 
-func DeploymentEnvVarSettings(dp *appsv1.Deployment, cacheResyncDebug nropv1.CacheResyncDebugMode) {
-	if cacheResyncDebug == nropv1.CacheResyncDebugDisabled {
-		return // nothing to do
-	}
-	if cacheResyncDebug != nropv1.CacheResyncDebugDumpJSONFile {
-		return // because it's the only mode we support atm, so we keep the happy path simple
-	}
-
+func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) {
 	cnt, err := FindContainerByName(&dp.Spec.Template.Spec, MainContainerName)
 	if err != nil {
 		klog.ErrorS(err, "cannot update deployment env var settings")
 		return
 	}
 
-	if env := findEnvVarByName(cnt.Env, pfpStatusDumpEnvVar); env != nil {
-		klog.V(2).InfoS("overriding existing environment variable", "name", pfpStatusDumpEnvVar, "oldValue", env.Value, "newValue", pfpStatusDir)
-		env.Value = pfpStatusDir
-		return
+	cacheResyncDebug := *spec.CacheResyncDebug
+	if cacheResyncDebug == nropv1.CacheResyncDebugDumpJSONFile {
+		if env := findEnvVarByName(cnt.Env, pfpStatusDumpEnvVar); env != nil {
+			klog.V(2).InfoS("overriding existing environment variable", "name", pfpStatusDumpEnvVar, "oldValue", env.Value, "newValue", pfpStatusDir)
+			env.Value = pfpStatusDir
+		} else {
+			cnt.Env = append(cnt.Env, corev1.EnvVar{
+				Name:  pfpStatusDumpEnvVar,
+				Value: pfpStatusDir,
+			})
+		}
 	}
-
-	cnt.Env = append(cnt.Env, corev1.EnvVar{
-		Name:  pfpStatusDumpEnvVar,
-		Value: pfpStatusDir,
-	})
 }
 
 func findEnvVarByName(envs []corev1.EnvVar, name string) *corev1.EnvVar {
