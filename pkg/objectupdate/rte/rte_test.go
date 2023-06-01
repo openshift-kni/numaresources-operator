@@ -69,6 +69,12 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 		expectedArgs []string
 	}
 
+	pfpEnabled := nropv1.PodsFingerprintingEnabled
+	pfpDisabled := nropv1.PodsFingerprintingDisabled
+
+	refreshEvents := nropv1.InfoRefreshEvents
+	refreshPeriodic := nropv1.InfoRefreshPeriodic
+
 	testCases := []testCase{
 		{
 			name: "defaults",
@@ -91,7 +97,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 		{
 			name: "enable unrestricted fingerprint",
 			conf: nropv1.NodeGroupConfig{
-				PodsFingerprinting: &nropv1.PodsFingerprintingEnabled,
+				PodsFingerprinting: &pfpEnabled,
 			},
 			expectedArgs: []string{
 				"--pods-fingerprint", "--pods-fingerprint-unrestricted=true", "--refresh-node-resources", "--sleep-interval=10s", "--notify-file=/run/rte/notify",
@@ -100,7 +106,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 		{
 			name: "disable fingerprint",
 			conf: nropv1.NodeGroupConfig{
-				PodsFingerprinting: &nropv1.PodsFingerprintingDisabled,
+				PodsFingerprinting: &pfpDisabled,
 			},
 			expectedArgs: []string{
 				"--refresh-node-resources", "--sleep-interval=10s", "--notify-file=/run/rte/notify",
@@ -109,7 +115,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 		{
 			name: "disable periodic update",
 			conf: nropv1.NodeGroupConfig{
-				InfoRefreshMode: &nropv1.InfoRefreshEvents,
+				InfoRefreshMode: &refreshEvents,
 			},
 			expectedArgs: []string{
 				"--pods-fingerprint", "--pods-fingerprint-unrestricted=false", "--refresh-node-resources", "--notify-file=/run/rte/notify",
@@ -118,7 +124,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 		{
 			name: "disable events for update",
 			conf: nropv1.NodeGroupConfig{
-				InfoRefreshMode: &nropv1.InfoRefreshPeriodic,
+				InfoRefreshMode: &refreshPeriodic,
 			},
 			expectedArgs: []string{
 				"--pods-fingerprint", "--pods-fingerprint-unrestricted=false", "--refresh-node-resources", "--sleep-interval=10s",

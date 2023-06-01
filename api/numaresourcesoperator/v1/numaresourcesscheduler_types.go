@@ -25,7 +25,7 @@ import (
 // +kubebuilder:validation:Enum=Disabled;DumpJSONFile
 type CacheResyncDebugMode string
 
-var (
+const (
 	// CacheResyncDisabled is the default
 	CacheResyncDebugDisabled CacheResyncDebugMode = "Disabled"
 
