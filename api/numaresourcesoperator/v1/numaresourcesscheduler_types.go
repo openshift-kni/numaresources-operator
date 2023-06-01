@@ -26,10 +26,10 @@ import (
 type CacheResyncDebugMode string
 
 const (
-	// CacheResyncDisabled is the default
+	// CacheResyncDisabled disables additional report of the scheduler cache state.
 	CacheResyncDebugDisabled CacheResyncDebugMode = "Disabled"
 
-	// CacheResyncDumpJSONFile is the default
+	// CacheResyncDumpJSONFile makes the scheduler cache dump its internal state as JSON at each failed resync. Default.
 	CacheResyncDebugDumpJSONFile CacheResyncDebugMode = "DumpJSONFile"
 )
 
