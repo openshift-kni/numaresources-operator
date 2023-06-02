@@ -38,11 +38,11 @@ const (
 )
 
 const (
-	pfpStatusDumpEnvVar = "PFP_STATUS_DUMP"
-	nrtInformerEnvVar   = "NRT_ENABLE_INFORMER"
+	PFPStatusDumpEnvVar = "PFP_STATUS_DUMP"
+	NRTInformerEnvVar   = "NRT_ENABLE_INFORMER"
 
-	pfpStatusDir   = "/run/pfpstatus"
-	nrtInformerVal = "true"
+	PFPStatusDir   = "/run/pfpstatus"
+	NRTInformerVal = "true"
 )
 
 // TODO: we should inject also the mount point. As it is now, the information is split between the manifest
@@ -67,17 +67,17 @@ func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSc
 
 	cacheResyncDebug := *spec.CacheResyncDebug
 	if cacheResyncDebug == nropv1.CacheResyncDebugDumpJSONFile {
-		setContainerEnvVar(cnt, pfpStatusDumpEnvVar, pfpStatusDir)
+		setContainerEnvVar(cnt, PFPStatusDumpEnvVar, PFPStatusDir)
 	}
 
 	informerMode := *spec.SchedulerInformer
 	if informerMode == nropv1.SchedulerInformerDedicated {
-		setContainerEnvVar(cnt, nrtInformerEnvVar, nrtInformerVal)
+		setContainerEnvVar(cnt, NRTInformerEnvVar, NRTInformerVal)
 	}
 }
 
 func setContainerEnvVar(cnt *corev1.Container, name, value string) {
-	if env := findEnvVarByName(cnt.Env, name); env != nil {
+	if env := FindEnvVarByName(cnt.Env, name); env != nil {
 		klog.V(2).InfoS("overriding existing environment variable", "name", name, "oldValue", env.Value, "newValue", value)
 		env.Value = value
 		return
@@ -89,7 +89,7 @@ func setContainerEnvVar(cnt *corev1.Container, name, value string) {
 	})
 }
 
-func findEnvVarByName(envs []corev1.EnvVar, name string) *corev1.EnvVar {
+func FindEnvVarByName(envs []corev1.EnvVar, name string) *corev1.EnvVar {
 	for idx := range envs {
 		env := &envs[idx]
 		if env.Name == name {
