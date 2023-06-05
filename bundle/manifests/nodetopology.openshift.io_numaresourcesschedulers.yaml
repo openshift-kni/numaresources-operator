@@ -60,6 +60,13 @@ spec:
                 - Trace
                 - TraceAll
                 type: string
+              schedulerInformer:
+                description: Set the informer type to be used by the scheduler to
+                  connect to the apiserver. Defaults to dedicated.
+                enum:
+                - Shared
+                - Dedicated
+                type: string
               schedulerName:
                 description: Scheduler name to be used in pod templates
                 type: string

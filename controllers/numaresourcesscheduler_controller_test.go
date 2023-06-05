@@ -41,6 +41,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
+	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
@@ -290,6 +291,83 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			conf := pop(cm.Data, sched.SchedulerConfigFileName)
 
 			gomega.Expect(conf).ToNot(gomega.ContainSubstring("cacheResyncPeriodSeconds"))
+		})
+
+		ginkgo.It("should expose the KNI customization environment variables in the deployment", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			key = client.ObjectKey{
+				Name:      "secondary-scheduler",
+				Namespace: testNamespace,
+			}
+
+			dp := &appsv1.Deployment{}
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, dp)).ToNot(gomega.HaveOccurred())
+
+			cnt, err := schedupdate.FindContainerByName(&dp.Spec.Template.Spec, schedupdate.MainContainerName)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred(), "cannot find container %q in deployment", schedupdate.MainContainerName)
+
+			// ordering doesn't matter
+			for _, ev := range []corev1.EnvVar{
+				{
+					Name:  schedupdate.PFPStatusDumpEnvVar,
+					Value: schedupdate.PFPStatusDir,
+				},
+				{
+					Name:  schedupdate.NRTInformerEnvVar,
+					Value: schedupdate.NRTInformerVal,
+				},
+			} {
+				gotEv := schedupdate.FindEnvVarByName(cnt.Env, ev.Name)
+				gomega.Expect(gotEv).ToNot(gomega.BeNil(), "missing environment variable %q in %q", ev.Name, cnt.Name)
+				gomega.Expect(gotEv.Value).To(gomega.Equal(ev.Value), "unexpected value %q (wants %q) for variable %q in %q", gotEv.Value, ev.Value, ev.Name, cnt.Name)
+			}
+		})
+
+		ginkgo.It("should allow to disable the KNI customization environment variables in the deployment", func() {
+			debugDisabled := nropv1.CacheResyncDebugDisabled
+			informerShared := nropv1.SchedulerInformerShared
+			nrs := nrs.DeepCopy()
+			nrs.Spec.CacheResyncDebug = &debugDisabled
+			nrs.Spec.SchedulerInformer = &informerShared
+
+			gomega.Eventually(func() bool {
+				if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+					klog.Warningf("failed to update the scheduler object; err: %v", err)
+					return false
+				}
+				return true
+			}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			key = client.ObjectKey{
+				Name:      "secondary-scheduler",
+				Namespace: testNamespace,
+			}
+
+			dp := &appsv1.Deployment{}
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, dp)).ToNot(gomega.HaveOccurred())
+
+			cnt, err := schedupdate.FindContainerByName(&dp.Spec.Template.Spec, schedupdate.MainContainerName)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred(), "cannot find container %q in deployment", schedupdate.MainContainerName)
+
+			// ordering doesn't matter
+			for _, ev := range []corev1.EnvVar{
+				{
+					Name: schedupdate.PFPStatusDumpEnvVar,
+				},
+				{
+					Name: schedupdate.NRTInformerEnvVar,
+				},
+			} {
+				gotEv := schedupdate.FindEnvVarByName(cnt.Env, ev.Name)
+				gomega.Expect(gotEv).To(gomega.BeNil(), "unexpected environment variable %q in %q", ev.Name, cnt.Name)
+			}
 		})
 	})
 })
