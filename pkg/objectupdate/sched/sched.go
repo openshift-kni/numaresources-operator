@@ -38,9 +38,11 @@ const (
 )
 
 const (
-	pfpStatusDumpEnvVar = "PFP_STATUS_DUMP"
+	PFPStatusDumpEnvVar = "PFP_STATUS_DUMP"
+	NRTInformerEnvVar   = "NRT_ENABLE_INFORMER"
 
-	pfpStatusDir = "/run/pfpstatus"
+	PFPStatusDir   = "/run/pfpstatus"
+	NRTInformerVal = "true"
 )
 
 // TODO: we should inject also the mount point. As it is now, the information is split between the manifest
@@ -56,33 +58,38 @@ func DeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) {
 	klog.V(3).InfoS("Scheduler image", "reason", "user-provided", "pullSpec", userImageSpec)
 }
 
-func DeploymentEnvVarSettings(dp *appsv1.Deployment, cacheResyncDebug nropv1.CacheResyncDebugMode) {
-	if cacheResyncDebug == nropv1.CacheResyncDebugDisabled {
-		return // nothing to do
-	}
-	if cacheResyncDebug != nropv1.CacheResyncDebugDumpJSONFile {
-		return // because it's the only mode we support atm, so we keep the happy path simple
-	}
-
+func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) {
 	cnt, err := FindContainerByName(&dp.Spec.Template.Spec, MainContainerName)
 	if err != nil {
 		klog.ErrorS(err, "cannot update deployment env var settings")
 		return
 	}
 
-	if env := findEnvVarByName(cnt.Env, pfpStatusDumpEnvVar); env != nil {
-		klog.V(2).InfoS("overriding existing environment variable", "name", pfpStatusDumpEnvVar, "oldValue", env.Value, "newValue", pfpStatusDir)
-		env.Value = pfpStatusDir
+	cacheResyncDebug := *spec.CacheResyncDebug
+	if cacheResyncDebug == nropv1.CacheResyncDebugDumpJSONFile {
+		setContainerEnvVar(cnt, PFPStatusDumpEnvVar, PFPStatusDir)
+	}
+
+	informerMode := *spec.SchedulerInformer
+	if informerMode == nropv1.SchedulerInformerDedicated {
+		setContainerEnvVar(cnt, NRTInformerEnvVar, NRTInformerVal)
+	}
+}
+
+func setContainerEnvVar(cnt *corev1.Container, name, value string) {
+	if env := FindEnvVarByName(cnt.Env, name); env != nil {
+		klog.V(2).InfoS("overriding existing environment variable", "name", name, "oldValue", env.Value, "newValue", value)
+		env.Value = value
 		return
 	}
 
 	cnt.Env = append(cnt.Env, corev1.EnvVar{
-		Name:  pfpStatusDumpEnvVar,
-		Value: pfpStatusDir,
+		Name:  name,
+		Value: value,
 	})
 }
 
-func findEnvVarByName(envs []corev1.EnvVar, name string) *corev1.EnvVar {
+func FindEnvVarByName(envs []corev1.EnvVar, name string) *corev1.EnvVar {
 	for idx := range envs {
 		env := &envs[idx]
 		if env.Name == name {
