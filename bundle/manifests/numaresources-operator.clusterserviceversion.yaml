@@ -228,6 +228,12 @@ spec:
           to "Normal".'
         displayName: Scheduler log verbosity
         path: logLevel
+      - description: Set the informer type to be used by the scheduler to connect
+          to the apiserver. Defaults to dedicated.
+        displayName: Scheduler cache apiserver informer setting
+        path: schedulerInformer
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: Scheduler name to be used in pod templates
         displayName: Scheduler name
         path: schedulerName
