@@ -41,7 +41,7 @@ func (ngc *NodeGroupConfig) Default() {
 }
 
 func defaultPodsFingerprinting() *PodsFingerprintingMode {
-	podsFp := PodsFingerprintingEnabledExclusiveResources
+	podsFp := PodsFingerprintingEnabled
 	return &podsFp
 }
 
