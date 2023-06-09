@@ -70,6 +70,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 	}
 
 	pfpEnabled := nropv1.PodsFingerprintingEnabled
+	pfpEnabledExclusiveResources := nropv1.PodsFingerprintingEnabledExclusiveResources
 	pfpDisabled := nropv1.PodsFingerprintingDisabled
 
 	refreshEvents := nropv1.InfoRefreshEvents
@@ -80,7 +81,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			name: "defaults",
 			conf: nropv1.DefaultNodeGroupConfig(),
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-unrestricted=false", "--refresh-node-resources", "--sleep-interval=10s", "--notify-file=/run/rte/notify",
+				"--pods-fingerprint", "--pods-fingerprint-unrestricted=true", "--refresh-node-resources", "--sleep-interval=10s", "--notify-file=/run/rte/notify",
 			},
 		},
 		{
@@ -91,7 +92,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				},
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-unrestricted=false", "--refresh-node-resources", "--sleep-interval=32s", "--notify-file=/run/rte/notify",
+				"--pods-fingerprint", "--pods-fingerprint-unrestricted=true", "--refresh-node-resources", "--sleep-interval=32s", "--notify-file=/run/rte/notify",
 			},
 		},
 		{
@@ -101,6 +102,15 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			},
 			expectedArgs: []string{
 				"--pods-fingerprint", "--pods-fingerprint-unrestricted=true", "--refresh-node-resources", "--sleep-interval=10s", "--notify-file=/run/rte/notify",
+			},
+		},
+		{
+			name: "explicitely disable unrestricted fingerprint",
+			conf: nropv1.NodeGroupConfig{
+				PodsFingerprinting: &pfpEnabledExclusiveResources,
+			},
+			expectedArgs: []string{
+				"--pods-fingerprint", "--pods-fingerprint-unrestricted=false", "--refresh-node-resources", "--sleep-interval=10s", "--notify-file=/run/rte/notify",
 			},
 		},
 		{
@@ -118,7 +128,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshMode: &refreshEvents,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-unrestricted=false", "--refresh-node-resources", "--notify-file=/run/rte/notify",
+				"--pods-fingerprint", "--pods-fingerprint-unrestricted=true", "--refresh-node-resources", "--notify-file=/run/rte/notify",
 			},
 		},
 		{
@@ -127,7 +137,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshMode: &refreshPeriodic,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-unrestricted=false", "--refresh-node-resources", "--sleep-interval=10s",
+				"--pods-fingerprint", "--pods-fingerprint-unrestricted=true", "--refresh-node-resources", "--sleep-interval=10s",
 			},
 		},
 	}
