@@ -48,6 +48,7 @@ conflicts with the project layout go packages would expect for a version >= 1.
 This decision is likely to be revisited in the future.
 
 External milestone / release candidate tags are:
+
 - **always done in pairs referring to the same commit**.
 - **always done on a release branch, never on the main branch** (there could be some odd ones due
   to historical reasons, see introduction)
