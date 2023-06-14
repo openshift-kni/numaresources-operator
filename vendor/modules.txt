@@ -245,7 +245,7 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/client
 # github.com/k8stopologyawareschedwg/podfingerprint v0.2.1
 ## explicit; go 1.17
 github.com/k8stopologyawareschedwg/podfingerprint
-# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.11.1
+# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.11.2
 ## explicit; go 1.19
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/dump
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8sannotations
