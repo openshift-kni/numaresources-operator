@@ -489,7 +489,7 @@ spec:
                   requiredDuringSchedulingIgnoredDuringExecution:
                     nodeSelectorTerms:
                     - matchExpressions:
-                      - key: node-role.kubernetes.io/master
+                      - key: node-role.kubernetes.io/control-plane
                         operator: Exists
               containers:
               - args:
@@ -532,6 +532,8 @@ spec:
               serviceAccountName: numaresources-controller-manager
               terminationGracePeriodSeconds: 10
               tolerations:
+              - effect: NoSchedule
+                key: node-role.kubernetes.io/control-plane
               - effect: NoSchedule
                 key: node-role.kubernetes.io/master
       permissions:

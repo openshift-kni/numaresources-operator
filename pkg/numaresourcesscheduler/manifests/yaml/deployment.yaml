@@ -26,7 +26,7 @@ spec:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
               - matchExpressions:
-                  - key: node-role.kubernetes.io/master
+                  - key: node-role.kubernetes.io/control-plane
                     operator: Exists
       volumes:
         - name: "etckubernetes"
@@ -58,6 +58,8 @@ spec:
               name: "runpfpstatus"
       serviceAccountName: "secondary-scheduler"
       tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
         - effect: NoSchedule
           key: node-role.kubernetes.io/master
       volumes:

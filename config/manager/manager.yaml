@@ -30,13 +30,15 @@ spec:
         runAsNonRoot: true
       tolerations:
       - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+      - effect: NoSchedule
         key: node-role.kubernetes.io/master
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
             - matchExpressions:
-              - key: node-role.kubernetes.io/master
+              - key: node-role.kubernetes.io/control-plane
                 operator: Exists
       containers:
       - command:
