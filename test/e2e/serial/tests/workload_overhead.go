@@ -271,7 +271,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					Expect(err).ToNot(HaveOccurred())
 					// OTOH if we add the overhead no zone is expected to have allocated the EXTRA resources - exactly because the overhead
 					// should not be taken into account!
-					Expect(matchWithOverhead).To(Equal(""), "unexpected found resource+overhead allocation accounted to zone %q", matchWithOverhead, match)
+					Expect(matchWithOverhead).To(BeEmpty(), "unexpected found resource+overhead allocation accounted to zone %q", matchWithOverhead, match)
 				}
 
 			})
