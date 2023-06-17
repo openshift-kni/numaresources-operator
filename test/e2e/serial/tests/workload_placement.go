@@ -53,6 +53,7 @@ import (
 
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
@@ -1224,9 +1225,7 @@ func dumpNRTForNode(cli client.Client, nodeName, tag string) {
 	nrt := nrtv1alpha2.NodeResourceTopology{}
 	err := cli.Get(context.TODO(), client.ObjectKey{Name: nodeName}, &nrt)
 	Expect(err).ToNot(HaveOccurred())
-	data, err := yaml.Marshal(nrt)
-	Expect(err).ToNot(HaveOccurred())
-	klog.Infof("NRT for node %q (%s):\n%s", nodeName, tag, data)
+	klog.Infof("NRT for node %q (%s):\n%s", nodeName, tag, intnrt.ToString(nrt))
 }
 
 func labelNode(cli client.Client, label, nodeName string) (func() error, error) {
