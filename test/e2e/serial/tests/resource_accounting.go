@@ -34,6 +34,7 @@ import (
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
@@ -171,7 +172,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 				if idx == len(nrtInfo.Zones)-1 {
 					// store the NRT of the target node before scheduling the last placeholder pod,
 					// later we'll compare this when we delete of of those pods
-					targetNrtListBefore, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
+					targetNrtListBefore, err = e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
 					Expect(err).ToNot(HaveOccurred())
 					targetNrtBefore, err = e2enrt.FindFromList(targetNrtListBefore.Items, targetNodeName)
 					Expect(err).NotTo(HaveOccurred())
@@ -286,18 +287,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			//Check that NRT of the target node reflect correct consumed resources
 			By("Verifying NRT is updated properly when running the test's pod")
-			targetNrtListAfter, err := e2enrt.GetUpdated(fxt.Client, targetNrtListBefore, 1*time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-			targetNrtAfter, err := e2enrt.FindFromList(targetNrtListAfter.Items, targetNodeName)
-			Expect(err).NotTo(HaveOccurred())
-
-			dataBefore, err := yaml.Marshal(targetNrtBefore)
-			Expect(err).ToNot(HaveOccurred())
-			dataAfter, err := yaml.Marshal(targetNrtAfter)
-			Expect(err).ToNot(HaveOccurred())
-			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtBefore, *targetNrtAfter, requiredRes, corev1qos.GetPodQOS(updatedPod))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
+			expectNRTConsumedResources(fxt, *targetNrtBefore, requiredRes, updatedPod)
 		})
 	})
 
@@ -747,4 +737,23 @@ func expectNrtUnchanged(fxt *e2efixture.Fixture, targetNrtListInitial nrtv1alpha
 	isEqual, err := e2enrt.CheckEqualAvailableResources(*targetNrtInitial, *targetNrtCurrent)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 	ExpectWithOffset(1, isEqual).To(BeTrue(), "new resources are accounted on %q in NRT (%s)", nodeName)
+}
+
+// checkNRTConsumedResources returns the updated NRT and the name of the zone on which resources are consumed
+func checkNRTConsumedResources(fxt *e2efixture.Fixture, targetNrtInitial nrtv1alpha2.NodeResourceTopology, requiredRes corev1.ResourceList, updatedPod *corev1.Pod) (nrtv1alpha2.NodeResourceTopology, string) {
+	targetNrtCurrent, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), targetNrtInitial, 1*time.Minute)
+	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+
+	match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(targetNrtInitial, targetNrtCurrent, requiredRes, corev1qos.GetPodQOS(updatedPod))
+	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+	if match == "" {
+		klog.Warningf("inconsistent accounting: no resources consumed by the running pod,\nNRT before: %s \nNRT after: %s \npod resources: %v", intnrt.ToString(targetNrtInitial), intnrt.ToString(targetNrtCurrent), e2ereslist.ToString(requiredRes))
+	}
+	return targetNrtCurrent, match
+}
+
+func expectNRTConsumedResources(fxt *e2efixture.Fixture, targetNrtInitial nrtv1alpha2.NodeResourceTopology, requiredRes corev1.ResourceList, updatedPod *corev1.Pod) nrtv1alpha2.NodeResourceTopology {
+	targetNrtCurrent, match := checkNRTConsumedResources(fxt, targetNrtInitial, requiredRes, updatedPod)
+	ExpectWithOffset(1, match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", intnrt.ToString(targetNrtInitial), intnrt.ToString(targetNrtCurrent), e2ereslist.ToString(requiredRes))
+	return targetNrtCurrent
 }
