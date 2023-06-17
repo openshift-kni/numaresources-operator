@@ -32,20 +32,22 @@ import (
 )
 
 const (
-	LabelRole   = "node-role.kubernetes.io"
-	RoleWorker  = "worker"
-	RoleMCPTest = "mcp-test"
+	LabelRole = "node-role.kubernetes.io"
 
-	// LabelMasterRole contains the key for the role label
-	LabelMasterRole = "node-role.kubernetes.io/master"
+	RoleControlPlane = "control-plane"
+	RoleWorker       = "worker"
+	RoleMCPTest      = "mcp-test"
 
-	// LabelControlPlane contains the key for the control-plane role label
-	LabelControlPlane = "node-role.kubernetes.io/control-plane"
+	// LabelControlPlaneRole contains the key for the control-plane role label
+	LabelControlPlaneRole = "node-role.kubernetes.io/control-plane"
+
+	// LabelWorker contains the key for the worker role label
+	LabelWorkerRole = "node-role.kubernetes.io/worker"
 )
 
 func GetWorkerNodes(cli client.Client, ctx context.Context) ([]corev1.Node, error) {
 	nodes := &corev1.NodeList{}
-	selector, err := labels.Parse(fmt.Sprintf("%s/%s=", LabelRole, RoleWorker))
+	selector, err := labels.Parse(LabelWorkerRole + "=")
 	if err != nil {
 		return nil, err
 	}
@@ -62,11 +64,11 @@ func GetControlPlane(cli client.Client, ctx context.Context, plat platform.Platf
 	nodeList := &corev1.NodeList{}
 	labels := metav1.LabelSelector{
 		MatchLabels: map[string]string{
-			LabelMasterRole: "",
+			LabelControlPlaneRole: "",
 		},
 	}
 	if plat == platform.Kubernetes {
-		labels.MatchLabels[LabelControlPlane] = ""
+		labels.MatchLabels[LabelControlPlaneRole] = ""
 	}
 
 	selNodes, err := metav1.LabelSelectorAsSelector(&labels)
