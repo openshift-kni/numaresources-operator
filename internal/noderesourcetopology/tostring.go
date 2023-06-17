@@ -18,6 +18,7 @@ package noderesourcetopology
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
@@ -29,7 +30,9 @@ func ResourceInfoToString(resInfo nrtv1alpha2.ResourceInfo) string {
 
 func ResourceInfoListToString(resInfoList []nrtv1alpha2.ResourceInfo) string {
 	items := []string{}
-	for _, resInfo := range resInfoList {
+	resInfos := CloneResourceInfoList(resInfoList)
+	sort.Slice(resInfos, func(i, j int) bool { return resInfos[i].Name < resInfos[j].Name })
+	for _, resInfo := range resInfos {
 		items = append(items, ResourceInfoToString(resInfo))
 	}
 	return strings.Join(items, ",")
@@ -80,4 +83,12 @@ func ListToString(nrts []nrtv1alpha2.NodeResourceTopology, tag string) string {
 	}
 	fmt.Fprintf(&b, "NRT END dump\n")
 	return b.String()
+}
+
+func CloneResourceInfoList(ril []nrtv1alpha2.ResourceInfo) []nrtv1alpha2.ResourceInfo {
+	ret := make([]nrtv1alpha2.ResourceInfo, 0, len(ril))
+	for _, ri := range ril {
+		ret = append(ret, *ri.DeepCopy())
+	}
+	return ret
 }
