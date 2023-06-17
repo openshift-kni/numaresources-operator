@@ -135,18 +135,32 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			tnt := &tnts[0] // shortcut
 			var updatedNodeNames []string
 			for i := range nodes {
-				node := &nodes[i]
-				updatedNode, updated, err := taints.AddOrUpdateTaint(node, tnt)
-				Expect(err).ToNot(HaveOccurred())
-				if !updated {
-					continue
-				}
+				refNode := &nodes[i]
 
-				klog.Infof("adding taint: %q to node: %q", tnt.String(), updatedNode.Name)
-				err = fxt.Client.Update(context.TODO(), updatedNode)
-				Expect(err).ToNot(HaveOccurred())
+				Eventually(func() error {
+					var err error
+					node := &corev1.Node{}
+					err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(refNode), node)
+					if err != nil {
+						return err
+					}
 
-				updatedNodeNames = append(updatedNodeNames, updatedNode.Name)
+					updatedNode, updated, err := taints.AddOrUpdateTaint(node, tnt)
+					if err != nil {
+						return err
+					}
+					if !updated {
+						return nil
+					}
+
+					klog.Infof("adding taint: %q to node: %q", tnt.String(), updatedNode.Name)
+					err = fxt.Client.Update(context.TODO(), updatedNode)
+					if err != nil {
+						return err
+					}
+					updatedNodeNames = append(updatedNodeNames, updatedNode.Name)
+					return nil
+				}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).ShouldNot(HaveOccurred())
 			}
 			taintedNodeNames = updatedNodeNames
 
