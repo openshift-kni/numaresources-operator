@@ -36,7 +36,6 @@ import (
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
-	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
@@ -446,19 +445,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 
 			By("check NRT is updated properly when the test's pod is running")
-			targetNrtListAfter, err := e2enrt.GetUpdated(fxt.Client, targetNrtListBefore, 1*time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-			targetNrtAfter, err := e2enrt.FindFromList(targetNrtListAfter.Items, targetNodeName)
-			Expect(err).NotTo(HaveOccurred())
-
-			dataBefore, err := yaml.Marshal(targetNrtBefore)
-			Expect(err).ToNot(HaveOccurred())
-			dataAfter, err := yaml.Marshal(targetNrtAfter)
-			Expect(err).ToNot(HaveOccurred())
-
-			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*targetNrtBefore, *targetNrtAfter, requiredRes, corev1qos.GetPodQOS(&(pods[0])))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(requiredRes))
+			expectNRTConsumedResources(fxt, *targetNrtBefore, requiredRes, &pods[0])
 		})
 	})
 

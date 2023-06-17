@@ -1002,7 +1002,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			By(fmt.Sprintf("verifying resources allocation correctness for NRT target: %q", targetNodeName))
 			var nrtAfterRSCreation nrtv1alpha2.NodeResourceTopologyList
-			podQoS := corev1qos.GetPodQOS(&pods[0])
 			Eventually(func() bool {
 				nrtAfterRSCreation, err := e2enrt.GetUpdated(fxt.Client, nrtInitial, timeout)
 				Expect(err).ToNot(HaveOccurred())
@@ -1017,18 +1016,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 				rl := e2ereslist.FromReplicaSet(*rs)
 
-				dataBefore, err := yaml.Marshal(nrtInitialTarget)
-				Expect(err).ToNot(HaveOccurred())
-				dataAfter, err := yaml.Marshal(updatedTargetNrt)
-				Expect(err).ToNot(HaveOccurred())
-				match, err := e2enrt.CheckNodeConsumedResourcesAtLeast(*nrtInitialTarget, *updatedTargetNrt, rl, podQoS)
-				Expect(err).ToNot(HaveOccurred())
-
-				if match == "" {
-					klog.Warningf("inconsistent accounting: no resources consumed by the running pod,\nNRT before test replicaset: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
-					return false
-				}
-				return true
+				_, match := checkNRTConsumedResources(fxt, *nrtInitialTarget, rl, &pods[0])
+				return match != ""
 			}).WithTimeout(timeout).WithPolling(10 * time.Second).Should(BeTrue())
 
 			By(fmt.Sprintf("deleting replicaset %s/%s", fxt.Namespace.Name, rsName))
@@ -1106,7 +1095,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			By(fmt.Sprintf("verifying resources allocation correctness for NRT target: %q", targetNodeName))
-			podQoS = corev1qos.GetPodQOS(&pods[0])
 			Eventually(func() bool {
 				nrtAfterDPCreation, err := e2enrt.GetUpdated(fxt.Client, nrtInitial, timeout)
 				Expect(err).ToNot(HaveOccurred())
@@ -1121,18 +1109,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 				rl := e2ereslist.FromReplicaSet(*rs)
 
-				dataBefore, err := yaml.Marshal(nrtInitialTarget)
-				Expect(err).ToNot(HaveOccurred())
-				dataAfter, err := yaml.Marshal(updatedTargetNrt)
-				Expect(err).ToNot(HaveOccurred())
-				match, err := e2enrt.CheckNodeConsumedResourcesAtLeast(*nrtInitialTarget, *updatedTargetNrt, rl, podQoS)
-				Expect(err).ToNot(HaveOccurred())
-
-				if match == "" {
-					klog.Warningf("inconsistent accounting: no resources consumed by the running pod,\nNRT before test replicaset: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
-					return false
-				}
-				return true
+				_, match := checkNRTConsumedResources(fxt, *nrtInitialTarget, rl, &pods[0])
+				return match != ""
 			}).WithTimeout(timeout).WithPolling(10 * time.Second).Should(BeTrue())
 
 			By(fmt.Sprintf("comparing scheduling times between %q and %q", corev1.DefaultSchedulerName, serialconfig.Config.SchedulerName))
