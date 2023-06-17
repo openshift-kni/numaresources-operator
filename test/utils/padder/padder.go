@@ -37,6 +37,8 @@ import (
 
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 
+	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+
 	"github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	nrtutil "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
@@ -296,7 +298,7 @@ func (p *Padder) waitForUpdatedNRTs(timeout time.Duration) (bool, error) {
 
 			for _, zone := range nrt.Zones {
 				if !isZoneMeetAllocationTarget(zone, p.allocationTarget) {
-					klog.Warningf("node: %q zone: %q does not meet allocationTarget: %v", nodeName, zone.Name, p.allocationTarget)
+					klog.Warningf("node: %q zone: %q does not meet allocationTarget: %v", nodeName, zone.Name, e2ereslist.ToString(p.allocationTarget))
 					return false, nil
 				}
 			}
