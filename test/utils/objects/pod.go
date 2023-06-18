@@ -28,6 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
+	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 )
 
@@ -107,4 +108,17 @@ func GetLogsForPod(k8sCli *kubernetes.Clientset, podNamespace, podName, containe
 		return "", fmt.Errorf("Fetched log contains \"Internal Error\": %q", string(logs))
 	}
 	return string(logs), err
+}
+
+func DumpPODResourceRequirements(pod *corev1.Pod) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "resource requirements for pod %s/%s:\n", pod.Namespace, pod.Name)
+	allContainers := []corev1.Container{}
+	allContainers = append(allContainers, pod.Spec.Containers...)
+	allContainers = append(allContainers, pod.Spec.InitContainers...)
+	for _, container := range allContainers {
+		fmt.Fprintf(&sb, "+- container %q: %s\n", container.Name, resourcelist.ToString(container.Resources.Limits))
+	}
+	fmt.Fprintf(&sb, "---\n")
+	return sb.String()
 }
