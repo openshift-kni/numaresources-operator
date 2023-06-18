@@ -238,6 +238,7 @@ github.com/k8stopologyawareschedwg/deployer/pkg/validator
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2
+github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/scheme
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/typed/topology/v1alpha1
