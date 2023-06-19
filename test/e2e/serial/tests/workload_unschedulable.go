@@ -210,6 +210,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 			Expect(err).ToNot(HaveOccurred())
 
+			By("waiting for the NRT data to settle")
+			wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
+
 			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
 			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
 			Expect(err).ToNot(HaveOccurred())
@@ -241,6 +244,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *deployment)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
+
+			By("waiting for the NRT data to settle")
+			wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
 
 			for _, pod := range pods {
 				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
@@ -278,6 +284,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			pods, err := podlist.With(fxt.Client).ByDaemonset(context.TODO(), *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
+
+			By("waiting for the NRT data to settle")
+			wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
 
 			for _, pod := range pods {
 				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
@@ -420,6 +429,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			pods, err := podlist.With(fxt.Client).ByDaemonset(context.TODO(), *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
+
+			By("waiting for the NRT data to settle")
+			wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
 
 			By(fmt.Sprintf("checking only daemonset pod in targetNode:%q is up and running", targetNodeName))
 			podRunningTimeout := 3 * time.Minute
