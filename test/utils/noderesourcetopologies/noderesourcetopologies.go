@@ -33,6 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	nrtv1alpha2attr "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
+	"github.com/k8stopologyawareschedwg/podfingerprint"
 
 	e2enrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
@@ -91,6 +93,8 @@ func GetUpdatedForNode(cli client.Client, ctx context.Context, ref nrtv1alpha2.N
 }
 
 func CheckEqualAvailableResources(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourceTopology) (bool, error) {
+	logPFP(nrtInitial, "initial")
+	logPFP(nrtUpdated, "updated")
 	for idx := 0; idx < len(nrtInitial.Zones); idx++ {
 		zoneInitial := &nrtInitial.Zones[idx] // shortcut
 		zoneUpdated, err := findZoneByName(nrtUpdated, zoneInitial.Name)
@@ -108,7 +112,17 @@ func CheckEqualAvailableResources(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourc
 			return false, nil
 		}
 	}
+	klog.Infof("=> NRT %d zones equal", len(nrtInitial.Zones))
 	return true, nil
+}
+
+func logPFP(nrt nrtv1alpha2.NodeResourceTopology, tag string) {
+	attr, ok := nrtv1alpha2attr.Get(nrt.Attributes, podfingerprint.Attribute)
+	if !ok {
+		klog.Warningf("=> NRT %s had no PFP attribute")
+		return
+	}
+	klog.Infof("=> %s NRT %s PFP attribute %s", tag, nrt.Name, attr.Value)
 }
 
 func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourceTopology, required corev1.ResourceList, podQoS corev1.PodQOSClass) (string, error) {
