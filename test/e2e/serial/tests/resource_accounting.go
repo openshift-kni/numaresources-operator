@@ -227,6 +227,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			// TODO: smarter cooldown
+			By("cooling down")
 			time.Sleep(18 * time.Second)
 			for _, unsuitableNodeName := range unsuitableNodeNames {
 				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
@@ -285,7 +286,10 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
-			//Check that NRT of the target node reflect correct consumed resources
+			By("Waiting for the NRT data to stabilize")
+			wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
+
+			// Check that NRT of the target node reflect correct consumed resources
 			By("Verifying NRT is updated properly when running the test's pod")
 			expectNRTConsumedResources(fxt, *targetNrtBefore, requiredRes, updatedPod)
 		})
