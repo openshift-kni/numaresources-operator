@@ -433,14 +433,17 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					Expect(err).ToNot(HaveOccurred())
 				}
 
-				nrtListPostCreate, err := e2enrt.GetUpdated(fxt.Client, nrtListInitial, 1*time.Minute)
-				Expect(err).ToNot(HaveOccurred())
+				By("waiting for the NRT data to settle")
+				wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
 
-				for _, initialNrt := range nrtListInitial.Items {
-					nrtPostDpCreate, err := e2enrt.FindFromList(nrtListPostCreate.Items, initialNrt.Name)
+				for idx := range nrtListInitial.Items {
+					initialNrt := &nrtListInitial.Items[idx]
+
+					var nrtPostDpCreate nrtv1alpha2.NodeResourceTopology
+					err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNrt), &nrtPostDpCreate)
 					Expect(err).ToNot(HaveOccurred())
 
-					match, err := e2enrt.CheckEqualAvailableResources(initialNrt, *nrtPostDpCreate)
+					match, err := e2enrt.CheckEqualAvailableResources(*initialNrt, nrtPostDpCreate)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(match).To(BeTrue(), "inconsistent accounting: resources consumed by the updated pods on node %q", initialNrt.Name)
 				}
