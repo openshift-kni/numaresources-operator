@@ -24,6 +24,7 @@ import (
 	"github.com/ghodss/yaml"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -140,21 +141,19 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:47584][tier2][nonreg] should be able to schedule guaranteed pod in selective way", func() {
-			nrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
-			targetedNodeName, ok := e2efixture.PopNodeName(nodesNameSet)
+			targetNodeName, ok := e2efixture.PopNodeName(nodesNameSet)
 			Expect(ok).To(BeTrue())
 
-			nrtInitial, err := e2enrt.FindFromList(nrtListInitial.Items, targetedNodeName)
+			var nrtInitial nrtv1alpha2.NodeResourceTopology
+			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: targetNodeName}, &nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
 
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pSpec := &testPod.Spec
 
-			By(fmt.Sprintf("explicitly mentioning which we want pod to land on node %q", targetedNodeName))
-			pSpec.NodeName = targetedNodeName
+			By(fmt.Sprintf("explicitly mentioning which we want pod to land on node %q", targetNodeName))
+			pSpec.NodeName = targetNodeName
 
 			By("setting a fake schedule name under the pod to make sure pod not scheduled by any scheduler")
 			noneExistingSchedulerName := "foo"
@@ -178,26 +177,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetedNodeName))
-			Expect(updatedPod.Spec.NodeName).To(Equal(targetedNodeName),
-				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetedNodeName)
+			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
+			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
+				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
 
-			nrtListPostPodCreate, err := e2enrt.GetUpdated(fxt.Client, nrtListInitial, time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-
-			nrtPostPodCreate, err := e2enrt.FindFromList(nrtListPostPodCreate.Items, updatedPod.Spec.NodeName)
-			Expect(err).ToNot(HaveOccurred())
-
+			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetNodeName))
 			rl := e2ereslist.FromGuaranteedPod(*updatedPod)
-			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetedNodeName))
-			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
-			dataBefore, err := yaml.Marshal(nrtInitial)
-			Expect(err).ToNot(HaveOccurred())
-			dataAfter, err := yaml.Marshal(nrtPostPodCreate)
-			Expect(err).ToNot(HaveOccurred())
-			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostPodCreate, rl, corev1qos.GetPodQOS(updatedPod))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
+			nrtPostCreate := expectNRTConsumedResources(fxt, nrtInitial, rl, updatedPod)
 
 			By("deleting the pod")
 			err = fxt.Client.Delete(context.TODO(), updatedPod)
@@ -205,19 +191,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
 			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
-			Eventually(func() bool {
-				By(fmt.Sprintf("checking the resources are restored as expected on %q", targetedNodeName))
-
-				nrtListPostPodDelete, err := e2enrt.GetUpdated(fxt.Client, nrtListPostPodCreate, 1*time.Minute)
-				Expect(err).ToNot(HaveOccurred())
-
-				nrtPostDelete, err := e2enrt.FindFromList(nrtListPostPodDelete.Items, targetedNodeName)
-				Expect(err).ToNot(HaveOccurred())
-
-				ok, err := e2enrt.CheckEqualAvailableResources(*nrtInitial, *nrtPostDelete)
-				Expect(err).ToNot(HaveOccurred())
-				return ok
-			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(BeTrue(), "resources not restored on %q", targetedNodeName)
+			By(fmt.Sprintf("checking the resources are restored as expected on %q", targetNodeName))
+			nrtPostDelete, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), nrtPostCreate, 1*time.Minute)
+			ok, err = e2enrt.CheckEqualAvailableResources(nrtInitial, nrtPostDelete)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ok).To(BeTrue(), "NRT resources not restored correctly on %q", targetNodeName)
 		})
 
 		It("[test_id:48964][tier3][nonreg] should be able to schedule a guaranteed deployment pod to a specific node", func() {
@@ -427,5 +405,4 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 		})
 	})
-
 })
