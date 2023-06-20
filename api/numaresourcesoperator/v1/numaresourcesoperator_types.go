@@ -19,6 +19,7 @@ package v1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
@@ -109,6 +110,13 @@ type NUMAResourcesOperatorStatus struct {
 	// Conditions show the current state of the NUMAResourcesOperator Operator
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Condition reported"
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	// RelatedObjects is a list of objects that are "interesting" or related to this operator.  Common uses are:
+	// 1. the detailed resource driving the operator
+	// 2. operator namespaces
+	// 3. operand namespaces
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Related objects"
+	RelatedObjects []configv1.ObjectReference `json:"relatedObjects,omitempty"`
 }
 
 // MachineConfigPool defines the observed state of each MachineConfigPool selected by node groups

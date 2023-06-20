@@ -134,6 +134,11 @@ spec:
           applied to this MachineConfigPool
         displayName: Optional configuration enforced on this NodeGroup
         path: machineconfigpools[0].config
+      - description: 'RelatedObjects is a list of objects that are "interesting" or
+          related to this operator.  Common uses are: 1. the detailed resource driving
+          the operator 2. operator namespaces 3. operand namespaces'
+        displayName: Related objects
+        path: relatedObjects
       version: v1
     - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
         API
@@ -246,6 +251,11 @@ spec:
       - description: Deployment of the secondary scheduler, namespaced name
         displayName: Scheduler deployment
         path: deployment
+      - description: 'RelatedObjects is a list of objects that are "interesting" or
+          related to this operator.  Common uses are: 1. the detailed resource driving
+          the operator 2. operator namespaces 3. operand namespaces'
+        displayName: Related objects
+        path: relatedObjects
       - description: Scheduler name to be used in pod templates
         displayName: Scheduler name
         path: schedulerName

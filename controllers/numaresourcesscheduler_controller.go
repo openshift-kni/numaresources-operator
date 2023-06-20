@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +37,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	configv1 "github.com/openshift/api/config/v1"
 
 	"github.com/pkg/errors"
 
@@ -140,6 +143,7 @@ func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context
 	}
 
 	instance.Status = schedStatus
+	instance.Status.RelatedObjects = r.getRelatedObjects(instance.Status.Deployment)
 
 	ok, err := isDeploymentRunning(ctx, r.Client, schedStatus.Deployment)
 	if err != nil {
@@ -212,6 +216,15 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		}
 	}
 	return schedStatus, nil
+}
+
+func (r *NUMAResourcesSchedulerReconciler) getRelatedObjects(dpStatus nropv1.NamespacedName) []configv1.ObjectReference {
+	ret := []configv1.ObjectReference{
+		// The `resource` property of `relatedObjects` stanza should be the lowercase, plural value like `daemonsets`.
+		{Group: "", Resource: "namespaces", Name: r.Namespace},
+		{Group: "apps", Resource: "deployment", Name: dpStatus.Name, Namespace: dpStatus.Namespace},
+	}
+	return ret
 }
 
 func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
