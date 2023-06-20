@@ -25,6 +25,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -32,6 +33,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	nrtv1alpha2attr "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
+	"github.com/k8stopologyawareschedwg/podfingerprint"
 
 	e2enrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
@@ -66,7 +69,32 @@ func GetUpdated(cli client.Client, ref nrtv1alpha2.NodeResourceTopologyList, tim
 	return updatedNrtList, err
 }
 
+func GetUpdatedForNode(cli client.Client, ctx context.Context, ref nrtv1alpha2.NodeResourceTopology, timeout time.Duration) (nrtv1alpha2.NodeResourceTopology, error) {
+	var equalZones bool
+	var updatedNrt nrtv1alpha2.NodeResourceTopology
+	klog.Infof("NRT change: reference is %s", e2enrt.ToString(ref))
+	err := wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
+		err := cli.Get(ctx, client.ObjectKeyFromObject(&ref), &updatedNrt)
+		if err != nil {
+			klog.Errorf("cannot get the updated NRT object %s/%s", ref.Namespace, ref.Name)
+			return false, err
+		}
+		// very cheap test to rule out false negatives
+		if updatedNrt.ObjectMeta.ResourceVersion == ref.ObjectMeta.ResourceVersion {
+			klog.Warningf("NRT for %q resource version didn't change", ref.Name)
+			return false, nil
+		}
+		equalZones = apiequality.Semantic.DeepEqual(ref.Zones, updatedNrt.Zones)
+		klog.Infof("NRT change: updated to %s", e2enrt.ToString(updatedNrt))
+		return !equalZones, nil
+	})
+	klog.Infof("NRT change: finished, equalZones=%v", equalZones)
+	return updatedNrt, err
+}
+
 func CheckEqualAvailableResources(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourceTopology) (bool, error) {
+	logPFP(nrtInitial, "initial")
+	logPFP(nrtUpdated, "updated")
 	for idx := 0; idx < len(nrtInitial.Zones); idx++ {
 		zoneInitial := &nrtInitial.Zones[idx] // shortcut
 		zoneUpdated, err := findZoneByName(nrtUpdated, zoneInitial.Name)
@@ -84,7 +112,17 @@ func CheckEqualAvailableResources(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourc
 			return false, nil
 		}
 	}
+	klog.Infof("=> NRT %d zones equal", len(nrtInitial.Zones))
 	return true, nil
+}
+
+func logPFP(nrt nrtv1alpha2.NodeResourceTopology, tag string) {
+	attr, ok := nrtv1alpha2attr.Get(nrt.Attributes, podfingerprint.Attribute)
+	if !ok {
+		klog.Warningf("=> NRT %s had no PFP attribute")
+		return
+	}
+	klog.Infof("=> %s NRT %s PFP attribute %s", tag, nrt.Name, attr.Value)
 }
 
 func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourceTopology, required corev1.ResourceList, podQoS corev1.PodQOSClass) (string, error) {
@@ -154,7 +192,7 @@ func accumulateNodeAvailableResources(nrt nrtv1alpha2.NodeResourceTopology, reas
 	if len(resInfoList) < 1 {
 		return resInfoList, fmt.Errorf("failed to accumulate resources for node %q", nrt.Name)
 	}
-	klog.Infof("resInfoList %s: %s", reason, e2enrt.ResourceInfoListToString(resInfoList))
+	klog.Infof("resInfoList available %s: %s", reason, e2enrt.ResourceInfoListToString(resInfoList))
 	return resInfoList, nil
 }
 func SaturateZoneUntilLeft(zone nrtv1alpha2.Zone, requiredRes corev1.ResourceList) (corev1.ResourceList, error) {
@@ -232,17 +270,20 @@ func checkConsumedResourcesAtLeast(resourcesInitial, resourcesUpdated []nrtv1alp
 		if !ok {
 			return false, fmt.Errorf("resource %q not found in the initial set", string(resName))
 		}
+		expectedQty := initialQty.DeepCopy()
+		expectedQty.Sub(resQty)
+
 		updatedQty, ok := FindResourceAvailableByName(resourcesUpdated, string(resName))
 		if !ok {
 			return false, fmt.Errorf("resource %q not found in the updated set", string(resName))
 		}
-		expectedQty := initialQty.DeepCopy()
-		expectedQty.Sub(resQty)
+
 		ret := updatedQty.Cmp(expectedQty)
 		if ret > 0 {
-			klog.Infof("quantity for resource %q is greater than expected. expected=%s actual=%s", resName, expectedQty.String(), updatedQty.String())
+			klog.Infof("available quantity for resource %q is greater than expected. expected=%s actual=%s", resName, expectedQty.String(), updatedQty.String())
 			return false, nil
 		}
+		klog.Infof("+- resource consumption: %s (consumed %s): expected available [%v] updated available [%v]", resName, resQty.String(), expectedQty.String(), updatedQty.String())
 	}
 	return true, nil
 }

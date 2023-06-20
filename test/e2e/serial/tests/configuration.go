@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
-	corev1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 
 	"github.com/ghodss/yaml"
 	"github.com/google/go-cmp/cmp"
@@ -589,21 +588,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			nrtPreCreate, err := e2enrt.FindFromList(nrtPreCreatePodList.Items, testPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			nrtPostCreatePodList, err := e2enrt.GetUpdated(fxt.Client, nrtPreCreatePodList, timeout)
-			Expect(err).ToNot(HaveOccurred())
-
-			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreatePodList.Items, testPod.Spec.NodeName)
-			Expect(err).ToNot(HaveOccurred())
-
 			By(fmt.Sprintf("checking NRT for target node %q updated correctly", testPod.Spec.NodeName))
 			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
-			dataBefore, err := yaml.Marshal(nrtPreCreate)
-			Expect(err).ToNot(HaveOccurred())
-			dataAfter, err := yaml.Marshal(nrtPostCreate)
-			Expect(err).ToNot(HaveOccurred())
-			match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtPreCreate, *nrtPostCreate, rl, corev1qos.GetPodQOS(testPod))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", dataBefore, dataAfter, e2ereslist.ToString(rl))
+			expectNRTConsumedResources(fxt, *nrtPreCreate, rl, testPod)
 
 			defer func() {
 				By("reverting kubeletconfig changes")

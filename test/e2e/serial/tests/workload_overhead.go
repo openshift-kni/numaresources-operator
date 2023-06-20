@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	corev1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
@@ -215,8 +216,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 				Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
-				By("checking the resource allocation as the test starts")
-				nrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
+				By(fmt.Sprintf("checking the resource allocation on %q as the test starts", targetNodeName))
+				var nrtInitial nrtv1alpha2.NodeResourceTopology
+				err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: targetNodeName}, &nrtInitial)
 				Expect(err).ToNot(HaveOccurred())
 
 				By(fmt.Sprintf("Scheduling the testing deployment with RuntimeClass=%q", rtClass.Name))
@@ -239,7 +241,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(2*time.Minute).ForDeploymentComplete(context.TODO(), deployment)
 				Expect(err).NotTo(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, 2*time.Minute)
 
-				nrtListPostCreate, err := e2enrt.GetUpdated(fxt.Client, nrtListInitial, 1*time.Minute)
+				nrtPostCreate, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), nrtInitial, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
 
 				By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
@@ -257,23 +259,17 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 
 					By(fmt.Sprintf("checking the resources are accounted as expected on %q", pod.Spec.NodeName))
-					nrtInitial, err := e2enrt.FindFromList(nrtListInitial.Items, pod.Spec.NodeName)
-					Expect(err).ToNot(HaveOccurred())
-					nrtPostCreate, err := e2enrt.FindFromList(nrtListPostCreate.Items, pod.Spec.NodeName)
-					Expect(err).ToNot(HaveOccurred())
-
-					match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, podResources, corev1qos.GetPodQOS(&pod))
+					match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtPostCreate, podResources, corev1qos.GetPodQOS(&pod))
 					Expect(err).ToNot(HaveOccurred())
 					// If the pods are running, and they are because we reached this far, then the resources must have been accounted SOMEWHERE!
-					Expect(match).ToNot(Equal(""), "inconsistent accounting: no resources consumed by deployment running")
+					Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by deployment running")
 
-					matchWithOverhead, err := e2enrt.CheckZoneConsumedResourcesAtLeast(*nrtInitial, *nrtPostCreate, podResourcesWithOverhead, corev1qos.GetPodQOS(&pod))
+					matchWithOverhead, err := e2enrt.CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtPostCreate, podResourcesWithOverhead, corev1qos.GetPodQOS(&pod))
 					Expect(err).ToNot(HaveOccurred())
 					// OTOH if we add the overhead no zone is expected to have allocated the EXTRA resources - exactly because the overhead
 					// should not be taken into account!
-					Expect(matchWithOverhead).To(Equal(""), "unexpected found resource+overhead allocation accounted to zone %q", matchWithOverhead, match)
+					Expect(matchWithOverhead).To(BeEmpty(), "unexpected found resource+overhead allocation accounted to zone %q", matchWithOverhead, match)
 				}
-
 			})
 
 			It("[test_id:53819][tier2][unsched] Pod pending when resources requested + pod overhead don't fit on the target node; NRT objects are not updated", func() {
@@ -437,18 +433,20 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					Expect(err).ToNot(HaveOccurred())
 				}
 
-				nrtListPostCreate, err := e2enrt.GetUpdated(fxt.Client, nrtListInitial, 1*time.Minute)
-				Expect(err).ToNot(HaveOccurred())
+				By("waiting for the NRT data to settle")
+				wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
 
-				for _, initialNrt := range nrtListInitial.Items {
-					nrtPostDpCreate, err := e2enrt.FindFromList(nrtListPostCreate.Items, initialNrt.Name)
+				for idx := range nrtListInitial.Items {
+					initialNrt := &nrtListInitial.Items[idx]
+
+					var nrtPostDpCreate nrtv1alpha2.NodeResourceTopology
+					err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNrt), &nrtPostDpCreate)
 					Expect(err).ToNot(HaveOccurred())
 
-					match, err := e2enrt.CheckEqualAvailableResources(initialNrt, *nrtPostDpCreate)
+					match, err := e2enrt.CheckEqualAvailableResources(*initialNrt, nrtPostDpCreate)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(match).To(BeTrue(), "inconsistent accounting: resources consumed by the updated pods on node %q", initialNrt.Name)
 				}
-
 			})
 		})
 	})
