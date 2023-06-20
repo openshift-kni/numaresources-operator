@@ -55,16 +55,29 @@ func GetZoneIDFromName(zoneName string) (int, error) {
 	return strconv.Atoi(zoneName)
 }
 
-func GetUpdated(cli client.Client, ref nrtv1alpha2.NodeResourceTopologyList, timeout time.Duration) (nrtv1alpha2.NodeResourceTopologyList, error) {
+func GetUpdated(cli client.Client, initialNrtList nrtv1alpha2.NodeResourceTopologyList, timeout time.Duration) (nrtv1alpha2.NodeResourceTopologyList, error) {
 	var updatedNrtList nrtv1alpha2.NodeResourceTopologyList
-	err := wait.Poll(1*time.Second, timeout, func() (bool, error) {
+	klog.Infof("Waiting up to %v to get %d NRT objects updated", timeout, len(initialNrtList.Items))
+	err := wait.Poll(5*time.Second, timeout, func() (bool, error) {
 		err := cli.List(context.TODO(), &updatedNrtList)
 		if err != nil {
 			klog.Errorf("cannot get the NRT List: %v", err)
 			return false, err
 		}
-		klog.Infof("NRT List current ResourceVersion %s reference %s", updatedNrtList.ListMeta.ResourceVersion, ref.ListMeta.ResourceVersion)
-		return updatedNrtList.ListMeta.ResourceVersion != ref.ListMeta.ResourceVersion, nil
+		for idx := range initialNrtList.Items {
+			initialNrt := &initialNrtList.Items[idx]
+			updatedNrt, err := FindFromList(updatedNrtList.Items, initialNrt.Name)
+			if err != nil {
+				klog.Errorf("missing NRT for %s: %v", initialNrt.Name, err)
+				return false, err
+			}
+			if isEqualNRT(*initialNrt, *updatedNrt) {
+				klog.Warningf("NRT for %s not yet updated", initialNrt.Name)
+				return false, err
+			}
+		}
+		klog.Infof("Detected changes on all %d NRT objects", len(initialNrtList.Items))
+		return true, nil
 	})
 	return updatedNrtList, err
 }
@@ -72,24 +85,36 @@ func GetUpdated(cli client.Client, ref nrtv1alpha2.NodeResourceTopologyList, tim
 func GetUpdatedForNode(cli client.Client, ctx context.Context, ref nrtv1alpha2.NodeResourceTopology, timeout time.Duration) (nrtv1alpha2.NodeResourceTopology, error) {
 	var equalZones bool
 	var updatedNrt nrtv1alpha2.NodeResourceTopology
+	nrtKey := client.ObjectKeyFromObject(&ref)
 	klog.Infof("NRT change: reference is %s", e2enrt.ToString(ref))
 	err := wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
-		err := cli.Get(ctx, client.ObjectKeyFromObject(&ref), &updatedNrt)
+		err := cli.Get(ctx, nrtKey, &updatedNrt)
 		if err != nil {
 			klog.Errorf("cannot get the updated NRT object %s/%s", ref.Namespace, ref.Name)
 			return false, err
 		}
-		// very cheap test to rule out false negatives
-		if updatedNrt.ObjectMeta.ResourceVersion == ref.ObjectMeta.ResourceVersion {
-			klog.Warningf("NRT for %q resource version didn't change", ref.Name)
+		equalZones = isEqualNRT(ref, updatedNrt)
+		if equalZones {
+			klog.Warningf("NRT %s not updated yet", ref.Name)
 			return false, nil
 		}
-		equalZones = apiequality.Semantic.DeepEqual(ref.Zones, updatedNrt.Zones)
-		klog.Infof("NRT change: updated to %s", e2enrt.ToString(updatedNrt))
-		return !equalZones, nil
+		return true, nil
 	})
 	klog.Infof("NRT change: finished, equalZones=%v", equalZones)
 	return updatedNrt, err
+}
+
+func isEqualNRT(initialNrt, updatedNrt nrtv1alpha2.NodeResourceTopology) bool {
+	// very cheap test to rule out false negatives
+	if updatedNrt.ObjectMeta.ResourceVersion == initialNrt.ObjectMeta.ResourceVersion {
+		klog.Warningf("NRT %q resource version didn't change", initialNrt.Name)
+		return true
+	}
+	equalZones := apiequality.Semantic.DeepEqual(initialNrt.Zones, updatedNrt.Zones)
+	if !equalZones {
+		klog.Infof("NRT %q change: updated to %s", initialNrt.Name, e2enrt.ToString(updatedNrt))
+	}
+	return equalZones
 }
 
 func CheckEqualAvailableResources(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourceTopology) (bool, error) {
