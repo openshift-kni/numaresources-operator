@@ -119,7 +119,7 @@ func CheckEqualAvailableResources(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourc
 func logPFP(nrt nrtv1alpha2.NodeResourceTopology, tag string) {
 	attr, ok := nrtv1alpha2attr.Get(nrt.Attributes, podfingerprint.Attribute)
 	if !ok {
-		klog.Warningf("=> NRT %s had no PFP attribute")
+		klog.Warningf("=> %s NRT %s had no PFP attribute", tag, nrt.Name)
 		return
 	}
 	klog.Infof("=> %s NRT %s PFP attribute %s", tag, nrt.Name, attr.Value)
