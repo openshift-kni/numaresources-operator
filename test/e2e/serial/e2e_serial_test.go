@@ -17,6 +17,7 @@
 package serial
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 	"time"
@@ -34,6 +35,7 @@ import (
 )
 
 var afterSuiteReporters = []Reporter{}
+var setupExecuted = false
 
 var randomSeed int64
 
@@ -53,10 +55,17 @@ var _ = BeforeSuite(func() {
 
 	klog.Infof("using random seed %v", randomSeed)
 
+	Expect(serialconfig.CheckNodesTopology(context.TODO())).Should(Succeed())
 	serialconfig.Setup()
+	setupExecuted = true
 })
 
-var _ = AfterSuite(serialconfig.Teardown)
+var _ = AfterSuite(func() {
+	if setupExecuted {
+		serialconfig.Teardown()
+	}
+
+})
 
 var _ = ReportAfterSuite("TestTests", func(report Report) {
 	for _, reporter := range afterSuiteReporters {
