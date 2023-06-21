@@ -78,10 +78,6 @@ func (ps PFPState) Observe(nodeName, pfpValue string) int {
 	return count.Count
 }
 
-func (ps PFPState) String() string {
-	return "TODO"
-}
-
 func (wt Waiter) ForNodeResourceTopologiesSettled(ctx context.Context, threshold int, nodeNames ...string) (*nrtv1alpha2.NodeResourceTopologyList, error) {
 	expectedNodes := sets.NewString(nodeNames...)
 	pfpState := make(PFPState)
