@@ -19,7 +19,6 @@ package tests
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -35,13 +34,11 @@ import (
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
-	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
-	"github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
@@ -175,7 +172,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 		})
 
 		AfterEach(func() {
-			expectNRTRestoredTo(fxt, &nrtListInitial, 5*time.Second, 1*time.Minute)
+			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &nrtListInitial, wait.NRTIgnoreNothing)
 		})
 
 		It("[test_id:47617][tier2][unsched][failalign] workload requests guaranteed pod resources available on one node but not on a single numa", Label("unsched", "failalign"), func() {
@@ -702,28 +699,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(succeededPods).To(BeEmpty(), "some pods are running, but we expect all of them to fail")
 
 			By("Verifying NRTs had no updates because the pods failed to be scheduled on any node")
-			nrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Second*10)
-			Expect(err).ToNot(HaveOccurred())
-
-			for _, initialNrt := range nrtInitialList.Items {
-				if !nodesNameSet.Has(initialNrt.Name) {
-					klog.Infof("skipping uninteresting (unpadded) node: %q", initialNrt.Name)
-					continue
-				}
-
-				nrtCurrent, err := e2enrt.FindFromList(nrtListCurrent.Items, initialNrt.Name)
-				Expect(err).ToNot(HaveOccurred())
-
-				dataBefore, err := yaml.Marshal(initialNrt)
-				Expect(err).ToNot(HaveOccurred())
-				dataAfter, err := yaml.Marshal(nrtCurrent)
-				Expect(err).ToNot(HaveOccurred())
-
-				// NRTs before and after should be equal ASSUMING the pods failed scheduling, if not there would be probably a failure in the test steps before this fails
-				ok, err := e2enrt.CheckEqualAvailableResources(initialNrt, *nrtCurrent)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(ok).To(BeTrue(), "NRT of node %q was updated although the pods failed to be scheduled, expected: %s\n  found: %s", initialNrt.Name, dataBefore, dataAfter)
-			}
+			wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
+			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &nrtInitialList, func(nrt *nrtv1alpha2.NodeResourceTopology) bool {
+				return !nodesNameSet.Has(nrt.Name)
+			})
 
 			By("updating deployment in such way that some pods will fit into NUMA nodes")
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), dp)
@@ -852,7 +831,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 		})
 
 		AfterEach(func() {
-			expectNRTRestoredTo(fxt, nrtListInitial, 5*time.Second, 1*time.Minute)
+			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), nrtListInitial, wait.NRTIgnoreNothing)
 		})
 
 		It("[test_id:47614][tier3][unsched][pod] workload requests guaranteed pod resources available on one node but not on a single numa", func() {
@@ -980,34 +959,4 @@ func calcExpectedReadyReplicas(numOfMultiNUMACandidates, numOfSingleNUMACandidat
 	expectedReadyReplicas += int32(numOfSingleNUMACandidates)
 
 	return expectedReadyReplicas
-}
-
-func expectNRTRestoredTo(fxt *fixture.Fixture, nrtListInitial *nrtv1alpha2.NodeResourceTopologyList, pollInterval, timeout time.Duration) {
-	// TODO: interval proportional to periodic update
-	_, err := wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-
-	var wg sync.WaitGroup
-	By("Verifying NRTs had no updates because the pods failed to be scheduled on any node")
-	for idx := range nrtListInitial.Items {
-		nrtInitial := &nrtListInitial.Items[idx]
-		wg.Add(1)
-
-		go func(ref *nrtv1alpha2.NodeResourceTopology) {
-			defer GinkgoRecover()
-			defer wg.Done()
-
-			Consistently(func(g Gomega) {
-				var updatedNrt nrtv1alpha2.NodeResourceTopology
-				err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(ref), &updatedNrt)
-				g.Expect(err).ToNot(HaveOccurred(), "cannot get updated NRT for %q", ref.Name)
-
-				// NRTs before and after should be equal ASSUMING the pods failed scheduling, if not there would be probably a failure in the test steps before this fails
-				ok, err := e2enrt.CheckEqualAvailableResources(*ref, updatedNrt)
-				g.Expect(err).ToNot(HaveOccurred(), "failed to check available resources for %q", ref.Name)
-				g.Expect(ok).To(BeTrue(), "inconsistent accounting: NRT %q updated although the pods failed to be scheduled,\nNRT expected: %s \nNRT found: %s", ref.Name, intnrt.ToString(*ref), intnrt.ToString(updatedNrt))
-			}).WithTimeout(timeout).WithPolling(pollInterval).Should(Succeed())
-		}(nrtInitial)
-	}
-	wg.Wait()
 }
