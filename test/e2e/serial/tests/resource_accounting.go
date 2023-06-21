@@ -411,7 +411,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Verifying NRT reflects no updates after scheduling the best-effort pod")
-			expectNRTRestoredTo(fxt, &targetNrtListInitial, 5*time.Second, 1*time.Minute)
+			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListInitial, wait.NRTIgnoreNothing)
 		})
 
 		It("[test_id:48686][tier1] should properly schedule a burstable pod with no changes in NRTs", func() {
@@ -441,7 +441,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Verifying NRT reflects no updates after scheduling the burstable pod")
-			expectNRTRestoredTo(fxt, &targetNrtListInitial, 5*time.Second, 1*time.Minute)
+			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListInitial, wait.NRTIgnoreNothing)
 		})
 
 		It("[test_id:47618][tier2] should properly schedule deployment with burstable pod with no changes in NRTs", func() {
@@ -544,7 +544,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Verifying NRT reflects no updates after scheduling the burstable pod")
-			expectNRTRestoredTo(fxt, &targetNrtListInitial, 5*time.Second, 1*time.Minute)
+			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListInitial, wait.NRTIgnoreNothing)
 		})
 
 		It("[test_id:47620][tier2] should properly schedule a burstable pod with no changes in NRTs followed by a guaranteed pod that stays pending till burstable pod is deleted", func() {
@@ -574,7 +574,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Verifying NRT reflects no updates after scheduling the burstable pod")
-			expectNRTRestoredTo(fxt, &targetNrtListInitial, 5*time.Second, 1*time.Minute)
+			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListInitial, wait.NRTIgnoreNothing)
 
 			By("create a gu pod")
 
@@ -614,7 +614,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Verifying NRT reflects no updates after scheduling the burstable pod")
-			expectNRTRestoredTo(fxt, &targetNrtListInitial, 5*time.Second, 1*time.Minute)
+			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListInitial, wait.NRTIgnoreNothing)
 
 			By("delete the burstable pod and the guranteed pod should change state from pending to running")
 

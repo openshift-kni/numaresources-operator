@@ -20,9 +20,12 @@ import (
 	"context"
 	"fmt"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/util/sets"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	nrtv1alpha2attr "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
@@ -109,4 +112,66 @@ func (wt Waiter) ForNodeResourceTopologiesSettled(ctx context.Context, threshold
 
 	klog.Infof("done waiting for NRT to stabilize; observed nodes=%d ready=%d", pfpState.Len(), pfpState.CountReady(threshold))
 	return &nrtList, err
+}
+
+type NRTShouldIgnoreFunc func(nrt *nrtv1alpha2.NodeResourceTopology) bool
+
+func NRTIgnoreNothing(nrt *nrtv1alpha2.NodeResourceTopology) bool {
+	return false
+}
+
+func (wt Waiter) ForNodeResourceTopologiesEqualTo(ctx context.Context, nrtListReference *nrtv1alpha2.NodeResourceTopologyList, nrtShouldIgnore NRTShouldIgnoreFunc) (nrtv1alpha2.NodeResourceTopologyList, error) {
+	var updatedNrtList nrtv1alpha2.NodeResourceTopologyList
+	klog.Infof("Waiting up to %v to have %d NRT objects restored", wt.PollTimeout, len(nrtListReference.Items))
+	err := k8swait.Poll(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+		err := wt.Cli.List(ctx, &updatedNrtList)
+		if err != nil {
+			klog.Errorf("cannot get the NRT List: %v", err)
+			return false, err
+		}
+		for idx := range nrtListReference.Items {
+			referenceNrt := &nrtListReference.Items[idx]
+
+			if nrtShouldIgnore(referenceNrt) {
+				klog.Warningf("skipping NRT %q because of callback", referenceNrt.Name)
+				continue
+			}
+
+			updatedNrt, err := findNRTByName(updatedNrtList.Items, referenceNrt.Name)
+			if err != nil {
+				klog.Errorf("missing NRT for %s: %v", referenceNrt.Name, err)
+				return false, err
+			}
+			if !isNRTEqual(*referenceNrt, *updatedNrt) {
+				klog.Warningf("NRT for %s does not match reference", referenceNrt.Name)
+				return false, err
+			}
+			klog.Info("NRT for %s matches reference", referenceNrt.Name)
+		}
+		klog.Infof("Matched reference for all %d NRT objects", len(nrtListReference.Items))
+		return true, nil
+	})
+	return updatedNrtList, err
+}
+
+func findNRTByName(nrts []nrtv1alpha2.NodeResourceTopology, name string) (*nrtv1alpha2.NodeResourceTopology, error) {
+	for idx := 0; idx < len(nrts); idx++ {
+		if nrts[idx].Name == name {
+			return &nrts[idx], nil
+		}
+	}
+	return nil, fmt.Errorf("failed to find NRT for %q", name)
+}
+
+func isNRTEqual(initialNrt, updatedNrt nrtv1alpha2.NodeResourceTopology) bool {
+	// very cheap test to rule out false negatives
+	if updatedNrt.ObjectMeta.ResourceVersion == initialNrt.ObjectMeta.ResourceVersion {
+		klog.Warningf("NRT %q resource version didn't change", initialNrt.Name)
+		return true
+	}
+	equalZones := apiequality.Semantic.DeepEqual(initialNrt.Zones, updatedNrt.Zones)
+	if !equalZones {
+		klog.Infof("NRT %q change: updated to %s", initialNrt.Name, intnrt.ToString(updatedNrt))
+	}
+	return equalZones
 }
