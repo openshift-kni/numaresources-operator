@@ -49,7 +49,7 @@ jobs:
       run: |
         # kind is part of 20.04 image, see relevant READMEs in https://github.com/actions/virtual-environments/tree/main/images/linux
         kind version
-        kind create cluster --config=hack/kind-config-e2e-no-registry.yaml --image kindest/node:v1.24.0@sha256:0866296e693efe1fed79d5e6c7af8df71fc73ae45e3679af05342239cdc5bc8e
+        kind create cluster --config=hack/kind-config-e2e-no-registry.yaml --image kindest/node:v1.26.6@sha256:6e2d8b28a5b601defe327b98bd1c2d1930b49e5d8c512e1895099e4504007adb
         kubectl label node kind-worker node-role.kubernetes.io/worker=''
 
     - name: Deploy RTE Operator
