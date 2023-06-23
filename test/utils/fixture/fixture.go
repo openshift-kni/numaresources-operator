@@ -51,8 +51,9 @@ type Fixture struct {
 }
 
 const (
-	defaultTeardownTime = 180 * time.Second
-	defaultCooldownTime = 30 * time.Second
+	defaultTeardownTime      = 180 * time.Second
+	defaultCooldownTime      = 30 * time.Second
+	defaultCooldownThreshold = 5
 )
 
 type Options uint
@@ -63,13 +64,15 @@ const (
 )
 
 var (
-	teardownTime time.Duration
-	cooldownTime time.Duration
+	teardownTime      time.Duration
+	cooldownTime      time.Duration
+	cooldownThreshold int
 )
 
 func init() {
 	cooldownTime = getCooldownTimeFromEnvVar()
 	teardownTime = getTeardownTimeFromEnvVar()
+	cooldownThreshold = getCooldownThresholdFromEnvVar()
 }
 
 func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList, options Options) (*Fixture, error) {
@@ -132,6 +135,12 @@ func Cooldown(ft *Fixture) {
 	klog.Warningf("cooling down for %v", cooldownTime)
 	time.Sleep(cooldownTime)
 }
+
+func WaitForNRTSettle(fxt *Fixture) (*nrtv1alpha2.NodeResourceTopologyList, error) {
+	klog.Info("cooldown by verifying NRTs data is settled")
+	return intwait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), cooldownThreshold)
+}
+
 func setupNamespace(cli client.Client, baseName string, randomize bool) (corev1.Namespace, error) {
 	name := baseName
 	if randomize {
@@ -208,6 +217,19 @@ func getTeardownTimeFromEnvVar() time.Duration {
 	if err != nil {
 		klog.Errorf("cannot parse the provided test teardown time (fallback to default: %v): %v", defaultTeardownTime, err)
 		return defaultTeardownTime
+	}
+	return val
+}
+
+func getCooldownThresholdFromEnvVar() int {
+	raw, ok := os.LookupEnv("E2E_NROP_COOLDOWN_THRESHOLD")
+	if !ok {
+		return defaultCooldownThreshold
+	}
+	val, err := strconv.Atoi(raw)
+	if err != nil {
+		klog.Errorf("cannot parse the provided test cooldown threshold for resources (fallback to default: %v): %v", defaultCooldownThreshold, err)
+		return defaultCooldownThreshold
 	}
 	return val
 }
