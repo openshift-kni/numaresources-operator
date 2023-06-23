@@ -61,7 +61,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
 
 		var err error
-		fxt, err = e2efixture.Setup("e2e-test-workload-placement-resources")
+		fxt, err = e2efixture.Setup("e2e-test-workload-placement-resources", serialconfig.Config.NRTList)
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
 		err = fxt.Client.List(context.TODO(), &nrtList)
