@@ -63,14 +63,8 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	Context("using the NUMA-aware scheduler without NRT data", func() {
+	Context("using the NUMA-aware scheduler without verifying NRT data", func() {
 		var testPod *corev1.Pod
-
-		BeforeEach(func() {
-			if len(nrtList.Items) > 0 {
-				e2efixture.Skip(fxt, "this test require empty NRT data")
-			}
-		})
 
 		AfterEach(func() {
 			if testPod == nil {
@@ -102,6 +96,9 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+
+			By("Verify NRT data haven't changed")
+			e2efixture.Cooldown(fxt)
 		})
 
 		It("[tier1] should run a burstable pod", func() {
@@ -125,15 +122,20 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+
+			By("Verify NRT data haven't changed")
+			e2efixture.Cooldown(fxt)
 		})
 
 		It("[tier1][test_id:47611] should run a guaranteed pod", func() {
-			testPod = objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
-			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
-			testPod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
+			requiredRes := corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("1"),
 				corev1.ResourceMemory: resource.MustParse("256Mi"),
 			}
+
+			testPod = objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
+			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
+			testPod.Spec.Containers[0].Resources.Limits = requiredRes
 
 			By(fmt.Sprintf("creating pod %s/%s", testPod.Namespace, testPod.Name))
 			err := fxt.Client.Create(context.TODO(), testPod)
@@ -148,6 +150,16 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+
+			By("wait for NRT data to settle")
+			e2efixture.WaitForNRTSettle(fxt)
+
+			targetNode := updatedPod.Spec.NodeName
+			targetNRTInitial, err := e2enrt.FindFromList(nrtList.Items, targetNode)
+			Expect(err).ToNot(HaveOccurred())
+
+			By(fmt.Sprintf("verify NRT data reflects the consumed pod resources on node %q", targetNode))
+			expectNRTConsumedResources(fxt, *targetNRTInitial, requiredRes, updatedPod)
 		})
 	})
 
