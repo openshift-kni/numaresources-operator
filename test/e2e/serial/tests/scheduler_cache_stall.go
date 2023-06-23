@@ -137,7 +137,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 				Expect(err).ToNot(HaveOccurred())
 
 				// ensure foreign pods are reported
-				_, err = wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
+				_, err = e2efixture.WaitForNRTSettle(fxt)
 				Expect(err).ToNot(HaveOccurred())
 			})
 
