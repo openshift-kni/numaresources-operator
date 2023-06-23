@@ -287,8 +287,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Waiting for the NRT data to stabilize")
-			wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
-
+			e2efixture.WaitForNRTSettle(fxt)
 			// Check that NRT of the target node reflect correct consumed resources
 			By("Verifying NRT is updated properly when running the test's pod")
 			expectNRTConsumedResources(fxt, *targetNrtBefore, requiredRes, updatedPod)

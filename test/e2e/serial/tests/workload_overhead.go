@@ -434,7 +434,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				By("waiting for the NRT data to settle")
-				wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
+				e2efixture.WaitForNRTSettle(fxt)
 
 				for idx := range nrtListInitial.Items {
 					initialNrt := &nrtListInitial.Items[idx]
