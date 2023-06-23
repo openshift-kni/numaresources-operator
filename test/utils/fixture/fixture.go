@@ -62,6 +62,16 @@ const (
 	OptionRandomizeName = 1 << iota
 )
 
+var (
+	teardownTime time.Duration
+	cooldownTime time.Duration
+)
+
+func init() {
+	cooldownTime = getCooldownTimeFromEnvVar()
+	teardownTime = getTeardownTimeFromEnvVar()
+}
+
 func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList, options Options) (*Fixture, error) {
 	if !e2eclient.ClientsEnabled {
 		return nil, fmt.Errorf("clients not enabled")
@@ -119,9 +129,8 @@ func Cooldown(ft *Fixture) {
 		intwait.With(ft.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &ft.InitialNRTList, intwait.NRTIgnoreNothing)
 		return
 	}
-	cooldown := getCooldownTime()
-	klog.Warningf("cooling down for %v", cooldown)
-	time.Sleep(cooldown)
+	klog.Warningf("cooling down for %v", cooldownTime)
+	time.Sleep(cooldownTime)
 }
 func setupNamespace(cli client.Client, baseName string, randomize bool) (corev1.Namespace, error) {
 	name := baseName
@@ -153,12 +162,11 @@ func teardownNamespace(cli client.Client, ns corev1.Namespace) error {
 		return nil
 	}
 
-	teardownTimeout := getTeardownTime()
-	klog.Warningf("tearing down up to %v", teardownTimeout)
+	klog.Warningf("tearing down up to %v", teardownTime)
 
 	iterations := 0
 	updatedNs := corev1.Namespace{}
-	return wait.PollImmediate(1*time.Second, teardownTimeout, func() (bool, error) {
+	return wait.PollImmediate(1*time.Second, teardownTime, func() (bool, error) {
 		iterations++
 		err := cli.Get(context.TODO(), client.ObjectKeyFromObject(&ns), &updatedNs)
 		if err != nil {
@@ -178,7 +186,7 @@ func RandomizeName(baseName string) string {
 	return fmt.Sprintf("%s-%s", baseName, strconv.Itoa(rand.Intn(10000)))
 }
 
-func getCooldownTime() time.Duration {
+func getCooldownTimeFromEnvVar() time.Duration {
 	raw, ok := os.LookupEnv("E2E_NROP_TEST_COOLDOWN")
 	if !ok {
 		return defaultCooldownTime
@@ -191,7 +199,7 @@ func getCooldownTime() time.Duration {
 	return val
 }
 
-func getTeardownTime() time.Duration {
+func getTeardownTimeFromEnvVar() time.Duration {
 	raw, ok := os.LookupEnv("E2E_NROP_TEST_TEARDOWN")
 	if !ok {
 		return defaultTeardownTime
