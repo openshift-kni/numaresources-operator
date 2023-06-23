@@ -54,7 +54,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
 
 		var err error
-		fxt, err = e2efixture.Setup("e2e-test-sched-cache-stall")
+		fxt, err = e2efixture.Setup("e2e-test-sched-cache-stall", serialconfig.Config.NRTList)
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
 		err = fxt.Client.List(context.TODO(), &nrtList)

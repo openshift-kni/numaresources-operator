@@ -32,7 +32,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+
 	"github.com/openshift-kni/numaresources-operator/internal/objects"
+	intwait "github.com/openshift-kni/numaresources-operator/internal/wait"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -41,9 +44,10 @@ type Fixture struct {
 	// Client defines the API client to run CRUD operations, that will be used for testing
 	Client client.Client
 	// K8sClient defines k8s client to run subresource operations, for example you should use it to get pod logs
-	K8sClient *kubernetes.Clientset
-	Namespace corev1.Namespace
-	Skipped   bool
+	K8sClient      *kubernetes.Clientset
+	Namespace      corev1.Namespace
+	InitialNRTList nrtv1alpha2.NodeResourceTopologyList
+	Skipped        bool
 }
 
 const (
@@ -58,7 +62,7 @@ const (
 	OptionRandomizeName = 1 << iota
 )
 
-func SetupWithOptions(name string, options Options) (*Fixture, error) {
+func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList, options Options) (*Fixture, error) {
 	if !e2eclient.ClientsEnabled {
 		return nil, fmt.Errorf("clients not enabled")
 	}
@@ -70,15 +74,16 @@ func SetupWithOptions(name string, options Options) (*Fixture, error) {
 	}
 	ginkgo.By(fmt.Sprintf("set up the test namespace %q", ns.Name))
 	return &Fixture{
-		Client:    e2eclient.Client,
-		K8sClient: e2eclient.K8sClient,
-		Namespace: ns,
+		Client:         e2eclient.Client,
+		K8sClient:      e2eclient.K8sClient,
+		Namespace:      ns,
+		InitialNRTList: nrtList,
 	}, nil
 
 }
 
-func Setup(baseName string) (*Fixture, error) {
-	return SetupWithOptions(baseName, OptionRandomizeName)
+func Setup(baseName string, nrtList nrtv1alpha2.NodeResourceTopologyList) (*Fixture, error) {
+	return SetupWithOptions(baseName, nrtList, OptionRandomizeName)
 }
 
 func Teardown(ft *Fixture) error {
@@ -95,7 +100,7 @@ func Teardown(ft *Fixture) error {
 		return nil
 	}
 
-	Cooldown()
+	Cooldown(ft)
 	return nil
 }
 
@@ -108,12 +113,16 @@ func Skipf(ft *Fixture, format string, args ...interface{}) {
 	Skip(ft, fmt.Sprintf(format, args...))
 }
 
-func Cooldown() {
+func Cooldown(ft *Fixture) {
+	if len(ft.InitialNRTList.Items) > 0 {
+		ginkgo.By("cooldown by verifying NRTs data is settled to the initial state")
+		intwait.With(ft.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &ft.InitialNRTList, intwait.NRTIgnoreNothing)
+		return
+	}
 	cooldown := getCooldownTime()
 	klog.Warningf("cooling down for %v", cooldown)
 	time.Sleep(cooldown)
 }
-
 func setupNamespace(cli client.Client, baseName string, randomize bool) (corev1.Namespace, error) {
 	name := baseName
 	if randomize {
