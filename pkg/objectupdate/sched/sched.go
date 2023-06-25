@@ -68,11 +68,15 @@ func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSc
 	cacheResyncDebug := *spec.CacheResyncDebug
 	if cacheResyncDebug == nropv1.CacheResyncDebugDumpJSONFile {
 		setContainerEnvVar(cnt, PFPStatusDumpEnvVar, PFPStatusDir)
+	} else {
+		deleteContainerEnvVar(cnt, PFPStatusDumpEnvVar)
 	}
 
 	informerMode := *spec.SchedulerInformer
 	if informerMode == nropv1.SchedulerInformerDedicated {
 		setContainerEnvVar(cnt, NRTInformerEnvVar, NRTInformerVal)
+	} else {
+		deleteContainerEnvVar(cnt, NRTInformerEnvVar)
 	}
 }
 
@@ -87,6 +91,17 @@ func setContainerEnvVar(cnt *corev1.Container, name, value string) {
 		Name:  name,
 		Value: value,
 	})
+}
+
+func deleteContainerEnvVar(cnt *corev1.Container, name string) {
+	var envs []corev1.EnvVar
+	for _, env := range cnt.Env {
+		if env.Name == name {
+			continue
+		}
+		envs = append(envs, env)
+	}
+	cnt.Env = envs
 }
 
 func FindEnvVarByName(envs []corev1.EnvVar, name string) *corev1.EnvVar {
