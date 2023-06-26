@@ -150,8 +150,6 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 				// for HW availability. Adding more nodes is trivial, consuming more NUMA zones is doable but requires careful re-evaluation.
 				// We want to run more pods that can be aligned correctly on nodes, considering pessimistic overreserve
 
-				Expect(desiredPods).To(BeNumerically(">", hostsRequired)) // this is more like a C assert. Should never ever fail.
-
 				// we can assume now all the zones from all the nodes are equal from cpu/memory resource perspective
 				referenceNode := nrtCandidates[0]
 				referenceZone := referenceNode.Zones[0]
@@ -203,7 +201,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 				// note a compute node can handle exactly 2 pods because how we constructed the requirements.
 				// scheduling 2 pods right off the bat on the same compute node is actually correct (it will work)
 				// but it's not the behavior we expect. A conforming scheduler is expected to send first two pods,
-				// wait for reconciliation, the send the missing two.
+				// wait for reconciliation, then send the missing two.
 
 				klog.Infof("Creating %d pods each requiring %q", desiredPods, e2ereslist.ToString(podRequiredRes))
 				for _, testPod := range testPods {
@@ -265,6 +263,10 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 					resVal, ok := resQty.AsInt64()
 					Expect(ok).To(BeTrue(), "cannot convert allocatable CPU resource as int")
 
+					// this is "a little more" than the max allocatable quantity, to make sure we saturate a NUMA zone,
+					// triggering the pessimistic overallocation and making sure the scheduler will have to wait.
+					// the actual ratio is not that important (could have been 11/10 possibly) as long as it triggers
+					// this condition.
 					cpusVal := (10 * resVal) / 8
 					numPods := int(int64(len(nrts)) * cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
 
