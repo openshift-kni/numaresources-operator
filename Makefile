@@ -164,7 +164,7 @@ binary-nrovalidate: build-tools
 		-mod=vendor \
 		-o bin/nrovalidate \
 		-ldflags "$$LDFLAGS" \
-		nrovalidate/main.go
+		cmd/nrovalidate/main.go
 
 binary-nrtcacheck: build-tools
 	LDFLAGS="-s -w "; \
@@ -173,7 +173,7 @@ binary-nrtcacheck: build-tools
 		-mod=vendor \
 		-o bin/nrtcacheck \
 		-ldflags "$$LDFLAGS" \
-		nrtcacheck/main.go
+		cmd/nrtcacheck/main.go
 
 
 binary-all: binary binary-rte binary-nrovalidate binary-nrtcacheck
