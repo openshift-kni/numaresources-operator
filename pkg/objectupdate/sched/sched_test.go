@@ -32,7 +32,7 @@ import (
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 )
 
-var dpRef = &appsv1.Deployment{
+var dpMinimal = &appsv1.Deployment{
 	ObjectMeta: metav1.ObjectMeta{
 		Name:      "test-deployment",
 		Namespace: "test-namespace",
@@ -44,6 +44,38 @@ var dpRef = &appsv1.Deployment{
 					{
 						Name:  "secondary-scheduler",
 						Image: "quay.io/bar/image:v1",
+					},
+				},
+				Volumes: []corev1.Volume{
+					schedstate.NewSchedConfigVolume("foo", "bar"),
+				},
+			},
+		},
+	},
+}
+
+var dpAllOptions = &appsv1.Deployment{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "test-deployment",
+		Namespace: "test-namespace",
+	},
+	Spec: appsv1.DeploymentSpec{
+		Template: corev1.PodTemplateSpec{
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{
+					{
+						Name:  "secondary-scheduler",
+						Image: "quay.io/bar/image:v1",
+						Env: []corev1.EnvVar{
+							{
+								Name:  "PFP_STATUS_DUMP",
+								Value: "/run/pfpstatus",
+							},
+							{
+								Name:  "NRT_ENABLE_INFORMER",
+								Value: "true",
+							},
+						},
 					},
 				},
 				Volumes: []corev1.Volume{
@@ -71,7 +103,7 @@ func TestUpdateDeploymentImageSettings(t *testing.T) {
 		},
 	}
 
-	dp := dpRef.DeepCopy()
+	dp := dpMinimal.DeepCopy()
 	podSpec := &dp.Spec.Template.Spec
 	for _, tc := range testCases {
 		DeploymentImageSettings(dp, tc.imageSpec)
@@ -102,7 +134,7 @@ func TestUpdateDeploymentConfigMapSettings(t *testing.T) {
 		},
 	}
 
-	dp := dpRef.DeepCopy()
+	dp := dpMinimal.DeepCopy()
 	podSpec := &dp.Spec.Template.Spec
 	for _, tc := range testCases {
 		DeploymentConfigMapSettings(dp, tc.cmName, tc.cmHash)
@@ -290,6 +322,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 	type testCase struct {
 		name       string
 		spec       nropv1.NUMAResourcesSchedulerSpec
+		initialDp  *appsv1.Deployment
 		expectedDp appsv1.Deployment
 	}
 
@@ -300,7 +333,8 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 				CacheResyncDebug:  &cacheResyncDebugDisabled,
 				SchedulerInformer: &schedInformerShared,
 			},
-			expectedDp: *dpRef.DeepCopy(),
+			initialDp:  dpMinimal,
+			expectedDp: *dpMinimal.DeepCopy(),
 		},
 		{
 			name: "status dump enabled explicitly",
@@ -308,6 +342,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 				CacheResyncDebug:  &cacheResyncDebugEnabled,
 				SchedulerInformer: &schedInformerShared,
 			},
+			initialDp: dpMinimal,
 			expectedDp: appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-deployment",
@@ -342,6 +377,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 				CacheResyncDebug:  &cacheResyncDebugDisabled,
 				SchedulerInformer: &schedInformerDedicated,
 			},
+			initialDp: dpMinimal,
 			expectedDp: appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-deployment",
@@ -376,6 +412,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 				CacheResyncDebug:  &cacheResyncDebugEnabled,
 				SchedulerInformer: &schedInformerDedicated,
 			},
+			initialDp: dpMinimal,
 			expectedDp: appsv1.Deployment{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-deployment",
@@ -408,11 +445,120 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "dedicated informer enabled, disable it",
+			spec: nropv1.NUMAResourcesSchedulerSpec{
+				CacheResyncDebug:  &cacheResyncDebugEnabled,
+				SchedulerInformer: &schedInformerShared,
+			},
+			initialDp: dpAllOptions,
+			expectedDp: appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-deployment",
+					Namespace: "test-namespace",
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "secondary-scheduler",
+									Image: "quay.io/bar/image:v1",
+									Env: []corev1.EnvVar{
+										{
+											Name:  "PFP_STATUS_DUMP",
+											Value: "/run/pfpstatus",
+										},
+									},
+								},
+							},
+							Volumes: []corev1.Volume{
+								schedstate.NewSchedConfigVolume("foo", "bar"),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "dedicated informer already enabled, enable changes nothing",
+			spec: nropv1.NUMAResourcesSchedulerSpec{
+				CacheResyncDebug:  &cacheResyncDebugEnabled,
+				SchedulerInformer: &schedInformerDedicated,
+			},
+			initialDp: dpAllOptions,
+			expectedDp: appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-deployment",
+					Namespace: "test-namespace",
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "secondary-scheduler",
+									Image: "quay.io/bar/image:v1",
+									Env: []corev1.EnvVar{
+										{
+											Name:  "PFP_STATUS_DUMP",
+											Value: "/run/pfpstatus",
+										},
+										{
+											Name:  "NRT_ENABLE_INFORMER",
+											Value: "true",
+										},
+									},
+								},
+							},
+							Volumes: []corev1.Volume{
+								schedstate.NewSchedConfigVolume("foo", "bar"),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "status dump enabled, disable it",
+			spec: nropv1.NUMAResourcesSchedulerSpec{
+				CacheResyncDebug:  &cacheResyncDebugDisabled,
+				SchedulerInformer: &schedInformerDedicated,
+			},
+			initialDp: dpAllOptions,
+			expectedDp: appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-deployment",
+					Namespace: "test-namespace",
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:  "secondary-scheduler",
+									Image: "quay.io/bar/image:v1",
+									Env: []corev1.EnvVar{
+										{
+											Name:  "NRT_ENABLE_INFORMER",
+											Value: "true",
+										},
+									},
+								},
+							},
+							Volumes: []corev1.Volume{
+								schedstate.NewSchedConfigVolume("foo", "bar"),
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			dp := dpRef.DeepCopy()
+			dp := tc.initialDp.DeepCopy()
 			DeploymentEnvVarSettings(dp, tc.spec)
 			if !reflect.DeepEqual(*dp, tc.expectedDp) {
 				t.Errorf("got=%s expected %s", toJSON(dp), toJSON(tc.expectedDp))
