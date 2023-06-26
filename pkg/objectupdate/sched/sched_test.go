@@ -446,7 +446,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 			},
 		},
 		{
-			name: "dedicated informer enabled, disable it",
+			name: "dedicated informer enabled, disabling it",
 			spec: nropv1.NUMAResourcesSchedulerSpec{
 				CacheResyncDebug:  &cacheResyncDebugEnabled,
 				SchedulerInformer: &schedInformerShared,
@@ -481,7 +481,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 			},
 		},
 		{
-			name: "dedicated informer already enabled, enable changes nothing",
+			name: "dedicated informer already enabled, enabling it again changes nothing",
 			spec: nropv1.NUMAResourcesSchedulerSpec{
 				CacheResyncDebug:  &cacheResyncDebugEnabled,
 				SchedulerInformer: &schedInformerDedicated,
@@ -520,7 +520,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 			},
 		},
 		{
-			name: "status dump enabled, disable it",
+			name: "status dump enabled, disabling it",
 			spec: nropv1.NUMAResourcesSchedulerSpec{
 				CacheResyncDebug:  &cacheResyncDebugDisabled,
 				SchedulerInformer: &schedInformerDedicated,
