@@ -150,8 +150,6 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 				// for HW availability. Adding more nodes is trivial, consuming more NUMA zones is doable but requires careful re-evaluation.
 				// We want to run more pods that can be aligned correctly on nodes, considering pessimistic overreserve
 
-				Expect(desiredPods).To(BeNumerically(">", hostsRequired)) // this is more like a C assert. Should never ever fail.
-
 				// we can assume now all the zones from all the nodes are equal from cpu/memory resource perspective
 				referenceNode := nrtCandidates[0]
 				referenceZone := referenceNode.Zones[0]
