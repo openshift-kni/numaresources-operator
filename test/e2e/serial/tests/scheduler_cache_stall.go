@@ -201,7 +201,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 				// note a compute node can handle exactly 2 pods because how we constructed the requirements.
 				// scheduling 2 pods right off the bat on the same compute node is actually correct (it will work)
 				// but it's not the behavior we expect. A conforming scheduler is expected to send first two pods,
-				// wait for reconciliation, the send the missing two.
+				// wait for reconciliation, then send the missing two.
 
 				klog.Infof("Creating %d pods each requiring %q", desiredPods, e2ereslist.ToString(podRequiredRes))
 				for _, testPod := range testPods {
