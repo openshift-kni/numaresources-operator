@@ -263,6 +263,10 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 					resVal, ok := resQty.AsInt64()
 					Expect(ok).To(BeTrue(), "cannot convert allocatable CPU resource as int")
 
+					// this is "a little more" than the max allocatable quantity, to make sure we saturate a NUMA zone,
+					// triggering the pessimistic overallocation and making sure the scheduler will have to wait.
+					// the actual ratio is not that important (could have been 11/10 possibly) as long as it triggers
+					// this condition.
 					cpusVal := (10 * resVal) / 8
 					numPods := int(int64(len(nrts)) * cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
 
