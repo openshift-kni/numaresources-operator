@@ -90,14 +90,11 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 
 			mcpName = nroOperObj.Status.MachineConfigPools[0].Name
 			conf := nroOperObj.Status.MachineConfigPools[0].Config
-			if !isPFPEnabledInConfig(conf) {
-				e2efixture.Skipf(fxt, "unsupported fingerprint status %v in %q", conf.PodsFingerprinting, mcpName)
+			if ok, val := isPFPEnabledInConfig(conf); !ok {
+				e2efixture.Skipf(fxt, "unsupported fingerprint status %q in %q", val, mcpName)
 			}
-			if conf.InfoRefreshMode == nil {
-				e2efixture.Skipf(fxt, "missing refresh mode in %q", mcpName)
-			}
-			if *conf.InfoRefreshMode != nropv1.InfoRefreshPeriodic {
-				e2efixture.Skipf(fxt, "unsupported refresh mode %v in %q", *conf.InfoRefreshMode, mcpName)
+			if ok, val := isInfoRefreshModeEqual(conf, nropv1.InfoRefreshPeriodic); !ok {
+				e2efixture.Skipf(fxt, "unsupported refresh mode %q in %q", val, mcpName)
 			}
 			refreshPeriod = conf.InfoRefreshPeriod.Duration
 
@@ -636,10 +633,18 @@ func isInterferencePod(pod *corev1.Pod) bool {
 	return pod.Annotations[interferenceAnnotation] == "true"
 }
 
-func isPFPEnabledInConfig(conf *nropv1.NodeGroupConfig) bool {
+func isPFPEnabledInConfig(conf *nropv1.NodeGroupConfig) (bool, nropv1.PodsFingerprintingMode) {
 	if conf == nil || conf.PodsFingerprinting == nil {
-		return false
+		return false, ""
 	}
 	val := *conf.PodsFingerprinting
-	return val == nropv1.PodsFingerprintingEnabled || val == nropv1.PodsFingerprintingEnabledExclusiveResources
+	return (val == nropv1.PodsFingerprintingEnabled || val == nropv1.PodsFingerprintingEnabledExclusiveResources), val
+}
+
+func isInfoRefreshModeEqual(conf *nropv1.NodeGroupConfig, refMode nropv1.InfoRefreshMode) (bool, nropv1.InfoRefreshMode) {
+	if conf == nil || conf.InfoRefreshMode == nil {
+		return false, ""
+	}
+	val := *conf.InfoRefreshMode
+	return (val == refMode), val
 }
