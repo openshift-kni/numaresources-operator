@@ -51,7 +51,7 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
 
 		var err error
-		fxt, err = e2efixture.Setup("e2e-test-non-regression-fundamentals")
+		fxt, err = e2efixture.Setup("e2e-test-non-regression-fundamentals", serialconfig.Config.NRTList)
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
 		err = fxt.Client.List(context.TODO(), &nrtList)
