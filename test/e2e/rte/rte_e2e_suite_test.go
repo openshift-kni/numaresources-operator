@@ -37,6 +37,12 @@ import (
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater"
 )
 
+var (
+	BinaryPath string
+
+	randomSeed int64
+)
+
 func TestMain(m *testing.M) {
 	config.CopyFlags(config.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
@@ -45,7 +51,8 @@ func TestMain(m *testing.M) {
 
 	framework.AfterReadingAllFlags(&framework.TestContext)
 
-	rand.Seed(time.Now().UnixNano())
+	randomSeed = time.Now().UnixNano()
+	rand.Seed(randomSeed)
 	os.Exit(m.Run())
 }
 
@@ -54,9 +61,9 @@ func TestRTE(t *testing.T) {
 	RunSpecs(t, "RTE Test Suite")
 }
 
-var BinaryPath string
-
 var _ = BeforeSuite(func() {
+	By(fmt.Sprintf("Using random seed %v", randomSeed))
+
 	By("Finding the binaries path")
 
 	binPath, err := runtime.FindBinaryPath("exporter")
