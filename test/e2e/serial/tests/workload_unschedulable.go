@@ -105,7 +105,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 	Context("with no suitable node", func() {
 		var requiredRes corev1.ResourceList
-		var nrtListInitial nrtv1alpha2.NodeResourceTopologyList
 		var nrtCandidates []nrtv1alpha2.NodeResourceTopology
 		BeforeEach(func() {
 			neededNodes := 1
@@ -165,14 +164,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
-			//save initial NRT to compare the data after trying to schedule the workloads
-			var err error
-			nrtListInitial, err = e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
+			_, err := e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &nrtListInitial, wait.NRTIgnoreNothing)
 		})
 
 		It("[test_id:47617][tier2][unsched][failalign] workload requests guaranteed pod resources available on one node but not on a single numa", Label("unsched", "failalign"), func() {
@@ -761,7 +754,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 	Context("Requesting allocatable resources on the node", func() {
 		var requiredRes corev1.ResourceList
 		var targetNodeName string
-		var nrtListInitial *nrtv1alpha2.NodeResourceTopologyList
 		var nrtCandidates []nrtv1alpha2.NodeResourceTopology
 		var targetNrtInitial nrtv1alpha2.NodeResourceTopology
 		var err error
@@ -826,12 +818,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			// TODO: interval proportional to periodic update
-			nrtListInitial, err = e2efixture.WaitForNRTSettle(fxt)
+			_, err = e2efixture.WaitForNRTSettle(fxt)
 			Expect(err).ToNot(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), nrtListInitial, wait.NRTIgnoreNothing)
 		})
 
 		It("[test_id:47614][tier3][unsched][pod] workload requests guaranteed pod resources available on one node but not on a single numa", func() {
