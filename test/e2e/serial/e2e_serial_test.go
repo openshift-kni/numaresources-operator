@@ -25,6 +25,8 @@ import (
 	ginkgo_reporters "github.com/onsi/ginkgo/v2/reporters"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/klog/v2"
+
 	qe_reporters "kubevirt.io/qe-tools/pkg/ginkgo-reporters"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
@@ -32,6 +34,8 @@ import (
 )
 
 var afterSuiteReporters = []Reporter{}
+
+var randomSeed int64
 
 func TestSerial(t *testing.T) {
 	if qe_reporters.Polarion.Run {
@@ -44,7 +48,11 @@ func TestSerial(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	// this must be the very first thing
-	rand.Seed(time.Now().UnixNano())
+	randomSeed = time.Now().UnixNano()
+	rand.Seed(randomSeed)
+
+	klog.Infof("using random seed %v", randomSeed)
+
 	serialconfig.Setup()
 })
 
