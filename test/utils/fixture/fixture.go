@@ -49,6 +49,7 @@ type Fixture struct {
 	Namespace      corev1.Namespace
 	InitialNRTList nrtv1alpha2.NodeResourceTopologyList
 	Skipped        bool
+	avoidCooldown  bool
 }
 
 const (
@@ -64,6 +65,7 @@ type Options uint
 const (
 	OptionNone          = 0
 	OptionRandomizeName = 1 << iota
+	OptionAvoidCooldown = 2 << iota
 )
 
 var (
@@ -87,6 +89,7 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 		return nil, fmt.Errorf("clients not enabled")
 	}
 	randomizeName := (options & OptionRandomizeName) == OptionRandomizeName
+	avoidCooldown := (options & OptionAvoidCooldown) == OptionAvoidCooldown
 	ns, err := setupNamespace(e2eclient.Client, name, randomizeName)
 	if err != nil {
 		klog.Errorf("cannot setup namespace %q: %v", name, err)
@@ -98,6 +101,7 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 		K8sClient:      e2eclient.K8sClient,
 		Namespace:      ns,
 		InitialNRTList: nrtList,
+		avoidCooldown:  avoidCooldown,
 	}, nil
 
 }
@@ -117,6 +121,11 @@ func Teardown(ft *Fixture) error {
 	if ft.Skipped {
 		ft.Skipped = false
 		ginkgo.By(fmt.Sprintf("skipped - nothing to cool down"))
+		return nil
+	}
+
+	if ft.avoidCooldown {
+		ginkgo.By(fmt.Sprintf("skipped - cool down disabled"))
 		return nil
 	}
 
