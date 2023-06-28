@@ -24,6 +24,9 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
+
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
@@ -77,6 +80,7 @@ func NewFixtureWithOptions(nsName string, options e2efixture.Options) (*E2EConfi
 	if err != nil {
 		return nil, err
 	}
+	klog.Infof("detected reference NRT data:\n%s", intnrt.ListToString(cfg.NRTList.Items, "reference"))
 
 	err = cfg.Fixture.Client.Get(context.TODO(), objects.NROObjectKey(), cfg.NROOperObj)
 	if err != nil {
