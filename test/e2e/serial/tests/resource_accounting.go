@@ -65,7 +65,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
 
 		var err error
-		fxt, err = e2efixture.Setup("e2e-test-resource-accounting")
+		fxt, err = e2efixture.Setup("e2e-test-resource-accounting", serialconfig.Config.NRTList)
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
 		padder, err = e2epadder.New(fxt.Client, fxt.Namespace.Name)
@@ -287,8 +287,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Waiting for the NRT data to stabilize")
-			wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
-
+			e2efixture.WaitForNRTSettle(fxt)
 			// Check that NRT of the target node reflect correct consumed resources
 			By("Verifying NRT is updated properly when running the test's pod")
 			expectNRTConsumedResources(fxt, *targetNrtBefore, requiredRes, updatedPod)

@@ -60,7 +60,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
 
 		var err error
-		fxt, err = e2efixture.Setup("e2e-test-workload-overhead")
+		fxt, err = e2efixture.Setup("e2e-test-workload-overhead", serialconfig.Config.NRTList)
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
 		padder, err = e2epadder.New(fxt.Client, fxt.Namespace.Name)
@@ -434,7 +434,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				By("waiting for the NRT data to settle")
-				wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
+				e2efixture.WaitForNRTSettle(fxt)
 
 				for idx := range nrtListInitial.Items {
 					initialNrt := &nrtListInitial.Items[idx]
