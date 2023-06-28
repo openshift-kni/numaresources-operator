@@ -23,6 +23,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 
@@ -151,6 +152,32 @@ func (wt Waiter) ForNodeResourceTopologiesEqualTo(ctx context.Context, nrtListRe
 		return true, nil
 	})
 	return updatedNrtList, err
+}
+
+func (wt Waiter) ForNodeResourceTopologyToHave(ctx context.Context, nrtName string, haveResourceFunc func(resInfo nrtv1alpha2.ResourceInfo) bool) (nrtv1alpha2.NodeResourceTopology, error) {
+	updatedNrt := nrtv1alpha2.NodeResourceTopology{}
+	nrtKey := client.ObjectKey{Name: nrtName}
+	klog.Infof("Waiting up to %v for NRT %q to expose the desired resource", wt.PollTimeout, nrtName)
+	err := k8swait.Poll(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+		err := wt.Cli.Get(ctx, nrtKey, &updatedNrt)
+		if err != nil {
+			klog.Errorf("cannot get the NRT %q: %v", nrtName, err)
+			return false, err
+		}
+		zonesOk := 0
+		for _, zone := range updatedNrt.Zones {
+			for _, resInfo := range zone.Resources {
+				if haveResourceFunc(resInfo) {
+					klog.Infof("found resources in zone %q for NRT %q", zone.Name, updatedNrt.Name)
+					zonesOk++
+					break
+				}
+			}
+		}
+		klog.Infof("resource check for NRT %q: %d/%d zone expose the required resources", updatedNrt.Name, zonesOk, len(updatedNrt.Zones))
+		return (zonesOk == len(updatedNrt.Zones)), nil
+	})
+	return updatedNrt, err
 }
 
 func findNRTByName(nrts []nrtv1alpha2.NodeResourceTopology, name string) (*nrtv1alpha2.NodeResourceTopology, error) {
