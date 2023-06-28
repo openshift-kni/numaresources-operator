@@ -68,7 +68,7 @@ func NewFixtureWithOptions(nsName string, options e2efixture.Options) (*E2EConfi
 		NROSchedObj: &nropv1.NUMAResourcesScheduler{},
 	}
 
-	cfg.Fixture, err = e2efixture.SetupWithOptions(nsName, options)
+	cfg.Fixture, err = e2efixture.SetupWithOptions(nsName, nrtv1alpha2.NodeResourceTopologyList{}, options)
 	if err != nil {
 		return nil, err
 	}

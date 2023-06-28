@@ -49,7 +49,7 @@ var _ = Describe("[serial][disruptive][scheduler][rmsched] numaresources schedul
 		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
 
 		var err error
-		fxt, err = e2efixture.Setup("e2e-test-sched-remove")
+		fxt, err = e2efixture.Setup("e2e-test-sched-remove", serialconfig.Config.NRTList)
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
 		nrosched.CheckNROSchedulerAvailable(fxt.Client, serialconfig.Config.NROSchedObj.Name)
@@ -119,7 +119,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restar
 
 	BeforeEach(func() {
 		var err error
-		fxt, err = e2efixture.Setup("e2e-test-sched-remove")
+		fxt, err = e2efixture.Setup("e2e-test-sched-remove", serialconfig.Config.NRTList)
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
 		nroSchedObj = &nropv1.NUMAResourcesScheduler{}

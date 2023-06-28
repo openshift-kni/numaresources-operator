@@ -60,7 +60,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 		Expect(serialconfig.Config).ToNot(BeNil())
 
 		var err error
-		fxt, err = e2efixture.Setup("e2e-test-workload-unschedulable")
+		fxt, err = e2efixture.Setup("e2e-test-workload-unschedulable", serialconfig.Config.NRTList)
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
 		padder, err = e2epadder.New(fxt.Client, fxt.Namespace.Name)
@@ -105,7 +105,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 	Context("with no suitable node", func() {
 		var requiredRes corev1.ResourceList
-		var nrtListInitial nrtv1alpha2.NodeResourceTopologyList
 		var nrtCandidates []nrtv1alpha2.NodeResourceTopology
 		BeforeEach(func() {
 			neededNodes := 1
@@ -165,14 +164,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
-			//save initial NRT to compare the data after trying to schedule the workloads
-			var err error
-			nrtListInitial, err = e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
+			_, err := e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &nrtListInitial, wait.NRTIgnoreNothing)
 		})
 
 		It("[test_id:47617][tier2][unsched][failalign] workload requests guaranteed pod resources available on one node but not on a single numa", Label("unsched", "failalign"), func() {
@@ -192,7 +185,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for the NRT data to settle")
-			wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
+			e2efixture.WaitForNRTSettle(fxt)
 
 			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
 			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
@@ -227,7 +220,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
 			By("waiting for the NRT data to settle")
-			wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
+			e2efixture.WaitForNRTSettle(fxt)
 
 			for _, pod := range pods {
 				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
@@ -267,7 +260,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
 
 			By("waiting for the NRT data to settle")
-			wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
+			e2efixture.WaitForNRTSettle(fxt)
 
 			for _, pod := range pods {
 				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
@@ -411,7 +404,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
 
 			By("waiting for the NRT data to settle")
-			wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
+			e2efixture.WaitForNRTSettle(fxt)
 
 			By(fmt.Sprintf("checking only daemonset pod in targetNode:%q is up and running", targetNodeName))
 			podRunningTimeout := 3 * time.Minute
@@ -699,7 +692,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(succeededPods).To(BeEmpty(), "some pods are running, but we expect all of them to fail")
 
 			By("Verifying NRTs had no updates because the pods failed to be scheduled on any node")
-			wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
+			e2efixture.WaitForNRTSettle(fxt)
 			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &nrtInitialList, func(nrt *nrtv1alpha2.NodeResourceTopology) bool {
 				return !nodesNameSet.Has(nrt.Name)
 			})
@@ -761,7 +754,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 	Context("Requesting allocatable resources on the node", func() {
 		var requiredRes corev1.ResourceList
 		var targetNodeName string
-		var nrtListInitial *nrtv1alpha2.NodeResourceTopologyList
 		var nrtCandidates []nrtv1alpha2.NodeResourceTopology
 		var targetNrtInitial nrtv1alpha2.NodeResourceTopology
 		var err error
@@ -826,12 +818,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			// TODO: interval proportional to periodic update
-			nrtListInitial, err = wait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), 3)
+			_, err = e2efixture.WaitForNRTSettle(fxt)
 			Expect(err).ToNot(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), nrtListInitial, wait.NRTIgnoreNothing)
 		})
 
 		It("[test_id:47614][tier3][unsched][pod] workload requests guaranteed pod resources available on one node but not on a single numa", func() {
