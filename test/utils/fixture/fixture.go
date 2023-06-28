@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
 
 	corev1 "k8s.io/api/core/v1"
@@ -136,7 +137,11 @@ func Cooldown(ft *Fixture) {
 	if len(ft.InitialNRTList.Items) > 0 {
 		interval := 5 * time.Second
 		ginkgo.By(fmt.Sprintf("cooldown by verifying NRTs data is settled to the initial state (interval=%v timeout=%v)", interval, settleTimeout))
-		intwait.With(ft.Client).Interval(interval).Timeout(settleTimeout).ForNodeResourceTopologiesEqualTo(context.TODO(), &ft.InitialNRTList, intwait.NRTIgnoreNothing)
+		currentNrtList, err := intwait.With(ft.Client).Interval(interval).Timeout(settleTimeout).ForNodeResourceTopologiesEqualTo(context.TODO(), &ft.InitialNRTList, intwait.NRTIgnoreNothing)
+		if err != nil {
+			diff := cmp.Diff(ft.InitialNRTList.Items, currentNrtList.Items)
+			klog.Warningf("NRT MISMATCH:\n----\n%s\n---\n", diff)
+		}
 		return
 	}
 	klog.Warningf("cooling down for %v", cooldownTime)
