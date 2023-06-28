@@ -34,11 +34,16 @@ they found it before they run.
   failed unexpectedly on standard output, alongside (not replacing) the logging of the said events.
 - `E2E_NROP_TARGET_NODE` (accepts string, e.g. `node-0.my-cluster.io`) instructs the suite to always pick the
   node matching the given name when a random node is needed.
-- `E2E_NROP_COOLDOWN_THRESHOLD` (accepts integer, e.g 1, 3) instructs the suite to collect data of resources topology matching to the initial data for the specified threshold count, before considering it settled.
+- `E2E_NROP_COOLDOWN_THRESHOLD` (accepts integer, e.g 1, 3) instructs the suite to collect data of resources
+  topology matching to the initial data for the specified threshold count, before considering it settled.
 - `E2E_NROP_TEST_COOLDOWN` (accepts string expressing time unit, e.g. `30s`) instructs the suite to wait
   for the specified amount of time after each spec, to give time to the cluster to settle up.
 - `E2E_NROP_TEST_TEARDOWN` (accepts string expressing time unit, e.g. `30s`) instructs the suite to wait
   *up* to the specified amount of time while tearing down the resources needed by each spec.
+- `E2E_NROP_TEST_SETTLE_INTERVAL` (accepts string expressing time unit, e.g. `5s`) instructs the suite to poll
+  every given time unit to get the current NRT data, in order to check if the values are settled.
+- `E2E_NROP_TEST_SETTLE_TIMEOUT` (accepts string expressing time unit, e.g. `1m`) instructs the suite to wait
+  *up* to the specified amount of time while checking if the NRT data is settled.
 - `E2E_NROP_DEVICE_TYPE_1` (accepts string, e.g `example.com/deviceA`) declares name of a device type that exists on
   the cluster and will be used as a resource of type `device-type-1` in the tests.
 - `E2E_NROP_DEVICE_TYPE_2` (accepts string, e.g `example.com/deviceB`) declares name of a device type that exists on

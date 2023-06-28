@@ -53,6 +53,8 @@ type Fixture struct {
 const (
 	defaultTeardownTime      = 180 * time.Second
 	defaultCooldownTime      = 30 * time.Second
+	defaultSettleInterval    = 11 * time.Second
+	defaultSettleTimeout     = 1 * time.Minute
 	defaultCooldownThreshold = 5
 )
 
@@ -66,12 +68,16 @@ const (
 var (
 	teardownTime      time.Duration
 	cooldownTime      time.Duration
+	settleInterval    time.Duration
+	settleTimeout     time.Duration
 	cooldownThreshold int
 )
 
 func init() {
 	teardownTime = getTimeDurationFromEnvVar("E2E_NROP_TEST_TEARDOWN", "teardown time", defaultTeardownTime)
 	cooldownTime = getTimeDurationFromEnvVar("E2E_NROP_TEST_COOLDOWN", "cooldown time", defaultCooldownTime)
+	settleInterval = getTimeDurationFromEnvVar("E2E_NROP_TEST_SETTLE_INTERVAL", "settle interval", defaultSettleInterval)
+	settleTimeout = getTimeDurationFromEnvVar("E2E_NROP_TEST_SETTLE_TIMEOUT", "settle timeout", defaultSettleTimeout)
 	cooldownThreshold = getCooldownThresholdFromEnvVar()
 }
 
@@ -128,8 +134,9 @@ func Skipf(ft *Fixture, format string, args ...interface{}) {
 
 func Cooldown(ft *Fixture) {
 	if len(ft.InitialNRTList.Items) > 0 {
-		ginkgo.By("cooldown by verifying NRTs data is settled to the initial state")
-		intwait.With(ft.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &ft.InitialNRTList, intwait.NRTIgnoreNothing)
+		interval := 5 * time.Second
+		ginkgo.By(fmt.Sprintf("cooldown by verifying NRTs data is settled to the initial state (interval=%v timeout=%v)", interval, settleTimeout))
+		intwait.With(ft.Client).Interval(interval).Timeout(settleTimeout).ForNodeResourceTopologiesEqualTo(context.TODO(), &ft.InitialNRTList, intwait.NRTIgnoreNothing)
 		return
 	}
 	klog.Warningf("cooling down for %v", cooldownTime)
@@ -137,8 +144,8 @@ func Cooldown(ft *Fixture) {
 }
 
 func WaitForNRTSettle(fxt *Fixture) (*nrtv1alpha2.NodeResourceTopologyList, error) {
-	klog.Info("cooldown by verifying NRTs data is settled")
-	return intwait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), cooldownThreshold)
+	klog.Infof("cooldown by verifying NRTs data is settled (interval=%v timeout=%v)", settleInterval, settleTimeout)
+	return intwait.With(fxt.Client).Interval(settleInterval).Timeout(settleTimeout).ForNodeResourceTopologiesSettled(context.TODO(), cooldownThreshold)
 }
 
 func setupNamespace(cli client.Client, baseName string, randomize bool) (corev1.Namespace, error) {
