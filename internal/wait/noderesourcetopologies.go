@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -195,9 +194,13 @@ func isNRTEqual(initialNrt, updatedNrt nrtv1alpha2.NodeResourceTopology) bool {
 		klog.Warningf("NRT %q resource version didn't change", initialNrt.Name)
 		return true
 	}
-	equalZones := apiequality.Semantic.DeepEqual(initialNrt.Zones, updatedNrt.Zones)
+	equalZones, err := intnrt.EqualZones(initialNrt.Zones, updatedNrt.Zones)
+	if err != nil {
+		klog.Infof("error comparing NRT %q: %v", initialNrt.Name, err)
+		return false
+	}
 	if !equalZones {
-		klog.Infof("NRT %q change: updated to %s", initialNrt.Name, intnrt.ToString(updatedNrt))
+		klog.Infof("NRT %q change:\ninitial=%s\nupdated=%s", initialNrt.Name, intnrt.ToString(initialNrt), intnrt.ToString(updatedNrt))
 	}
 	return equalZones
 }
