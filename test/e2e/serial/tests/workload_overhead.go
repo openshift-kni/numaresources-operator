@@ -241,6 +241,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(2*time.Minute).ForDeploymentComplete(context.TODO(), deployment)
 				Expect(err).NotTo(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, 2*time.Minute)
 
+				By("wait for NRT data to settle")
+				e2efixture.WaitForNRTSettle(fxt)
+
 				nrtPostCreate, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), nrtInitial, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
 

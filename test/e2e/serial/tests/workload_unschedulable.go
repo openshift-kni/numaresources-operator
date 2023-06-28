@@ -584,6 +584,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 
+			By("wait for NRT data to settle")
+			e2efixture.WaitForNRTSettle(fxt)
+
 			By("Verifying NRT reflects no updates")
 			targetNrtListAfter, err := e2enrt.GetUpdated(fxt.Client, targetNrtListBefore, 1*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
@@ -729,6 +732,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				}
 				return true
 			}).WithTimeout(time.Minute*5).WithPolling(time.Second*30).Should(BeTrue(), "deployment %q failed to have %d running replicas within the defined period", dpKey.String(), expectedReadyReplicas)
+
+			By("wait for NRT data to settle")
+			e2efixture.WaitForNRTSettle(fxt)
 
 			By("checking NRT objects updated accordingly")
 			nrtPostDpCreateList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Second*10)

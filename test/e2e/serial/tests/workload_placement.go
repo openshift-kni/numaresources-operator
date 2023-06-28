@@ -242,6 +242,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
+			By("wait for NRT data to settle")
+			e2efixture.WaitForNRTSettle(fxt)
+
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -305,6 +308,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			rl = e2ereslist.FromGuaranteedPod(updatedPod)
 			klog.Infof("post-update pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainers(podSpec.Containers)), e2ereslist.ToString(rl))
+
+			By("wait for NRT data to settle")
+			e2efixture.WaitForNRTSettle(fxt)
 
 			nrtPostUpdate, err := e2enrt.FindFromList(nrtPostUpdateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -404,6 +410,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			nrtReorganized, err := e2enrt.FindFromList(nrtReorganizedList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
+
+			By("wait for NRT data to settle")
+			e2efixture.WaitForNRTSettle(fxt)
 
 			nrtLastUpdate, err := e2enrt.FindFromList(nrtLastUpdateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -557,6 +566,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			rl := e2ereslist.FromGuaranteedPod(*updatedPod)
 			klog.Infof("post-create pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainers(pod.Spec.Containers)), e2ereslist.ToString(rl))
+
+			By("wait for NRT data to settle")
+			e2efixture.WaitForNRTSettle(fxt)
 
 			nrtPostCreatePod1, err := e2enrt.FindFromList(nrtPostCreatePodList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -757,6 +769,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtInitial, err := e2enrt.FindFromList(nrtList.Items, targetNodeName)
 			Expect(err).ToNot(HaveOccurred())
 
+			By("wait for NRT data to settle")
+			e2efixture.WaitForNRTSettle(fxt)
+
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, targetNodeName)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -821,6 +836,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			updatedPod1 = pods[1]
 			checkReplica(updatedPod1, targetNodeName, fxt.K8sClient)
 			rl1 = e2ereslist.FromGuaranteedPod(updatedPod1)
+
+			By("wait for NRT data to settle")
+			e2efixture.WaitForNRTSettle(fxt)
 
 			nrtPostUpdate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, targetNodeName)
 			Expect(err).ToNot(HaveOccurred())
