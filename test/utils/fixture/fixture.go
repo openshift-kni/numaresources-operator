@@ -70,8 +70,8 @@ var (
 )
 
 func init() {
-	cooldownTime = getCooldownTimeFromEnvVar()
-	teardownTime = getTeardownTimeFromEnvVar()
+	teardownTime = getTimeDurationFromEnvVar("E2E_NROP_TEST_TEARDOWN", "teardown time", defaultTeardownTime)
+	cooldownTime = getTimeDurationFromEnvVar("E2E_NROP_TEST_COOLDOWN", "cooldown time", defaultCooldownTime)
 	cooldownThreshold = getCooldownThresholdFromEnvVar()
 }
 
@@ -195,28 +195,15 @@ func RandomizeName(baseName string) string {
 	return fmt.Sprintf("%s-%s", baseName, strconv.Itoa(rand.Intn(10000)))
 }
 
-func getCooldownTimeFromEnvVar() time.Duration {
-	raw, ok := os.LookupEnv("E2E_NROP_TEST_COOLDOWN")
+func getTimeDurationFromEnvVar(envVarName, description string, fallbackValue time.Duration) time.Duration {
+	raw, ok := os.LookupEnv(envVarName)
 	if !ok {
-		return defaultCooldownTime
+		return fallbackValue
 	}
 	val, err := time.ParseDuration(raw)
 	if err != nil {
-		klog.Errorf("cannot parse the provided test cooldown time (fallback to default: %v): %v", defaultCooldownTime, err)
-		return defaultCooldownTime
-	}
-	return val
-}
-
-func getTeardownTimeFromEnvVar() time.Duration {
-	raw, ok := os.LookupEnv("E2E_NROP_TEST_TEARDOWN")
-	if !ok {
-		return defaultTeardownTime
-	}
-	val, err := time.ParseDuration(raw)
-	if err != nil {
-		klog.Errorf("cannot parse the provided test teardown time (fallback to default: %v): %v", defaultTeardownTime, err)
-		return defaultTeardownTime
+		klog.Errorf("cannot parse the provided test %s (fallback to default: %v): %v", description, fallbackValue, err)
+		return fallbackValue
 	}
 	return val
 }
