@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/util/sets"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 
@@ -81,8 +80,13 @@ func (ps PFPState) Observe(nodeName, pfpValue string) int {
 	return count.Count
 }
 
-func (wt Waiter) ForNodeResourceTopologiesSettled(ctx context.Context, threshold int, nodeNames ...string) (*nrtv1alpha2.NodeResourceTopologyList, error) {
-	expectedNodes := sets.NewString(nodeNames...)
+type NRTShouldIgnoreFunc func(nrt *nrtv1alpha2.NodeResourceTopology) bool
+
+func NRTIgnoreNothing(nrt *nrtv1alpha2.NodeResourceTopology) bool {
+	return false
+}
+
+func (wt Waiter) ForNodeResourceTopologiesSettled(ctx context.Context, threshold int, nrtShouldIgnore NRTShouldIgnoreFunc) (nrtv1alpha2.NodeResourceTopologyList, error) {
 	pfpState := make(PFPState)
 	nrtList := nrtv1alpha2.NodeResourceTopologyList{}
 
@@ -95,8 +99,9 @@ func (wt Waiter) ForNodeResourceTopologiesSettled(ctx context.Context, threshold
 		}
 		for idx := range nrtList.Items {
 			nrt := &nrtList.Items[idx]
-			if expectedNodes.Len() > 0 && !expectedNodes.Has(nrt.Name) {
-				klog.Infof("-> waiting for NRT to stabilize; ignored unwanted node node=%s", nrt.Name)
+
+			if nrtShouldIgnore(nrt) {
+				klog.Warningf("skipping NRT %q because of callback", nrt.Name)
 				continue
 			}
 
@@ -111,13 +116,7 @@ func (wt Waiter) ForNodeResourceTopologiesSettled(ctx context.Context, threshold
 	})
 
 	klog.Infof("done waiting for NRT to stabilize; observed nodes=%d ready=%d", pfpState.Len(), pfpState.CountReady(threshold))
-	return &nrtList, err
-}
-
-type NRTShouldIgnoreFunc func(nrt *nrtv1alpha2.NodeResourceTopology) bool
-
-func NRTIgnoreNothing(nrt *nrtv1alpha2.NodeResourceTopology) bool {
-	return false
+	return nrtList, err
 }
 
 func (wt Waiter) ForNodeResourceTopologiesEqualTo(ctx context.Context, nrtListReference *nrtv1alpha2.NodeResourceTopologyList, nrtShouldIgnore NRTShouldIgnoreFunc) (nrtv1alpha2.NodeResourceTopologyList, error) {
