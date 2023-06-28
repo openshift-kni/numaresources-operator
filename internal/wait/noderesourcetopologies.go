@@ -145,7 +145,7 @@ func (wt Waiter) ForNodeResourceTopologiesEqualTo(ctx context.Context, nrtListRe
 				klog.Warningf("NRT for %s does not match reference", referenceNrt.Name)
 				return false, err
 			}
-			klog.Info("NRT for %s matches reference", referenceNrt.Name)
+			klog.Infof("NRT for %s matches reference", referenceNrt.Name)
 		}
 		klog.Infof("Matched reference for all %d NRT objects", len(nrtListReference.Items))
 		return true, nil
