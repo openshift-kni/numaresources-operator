@@ -277,6 +277,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
+			By("wait for NRT data to settle")
+			e2efixture.WaitForNRTSettle(fxt)
+
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -391,6 +394,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
 			Expect(err).ToNot(HaveOccurred())
+
+			By("wait for NRT data to settle")
+			e2efixture.WaitForNRTSettle(fxt)
 
 			By("check the NRT has no changes")
 			nrtListPostPodCreate, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)

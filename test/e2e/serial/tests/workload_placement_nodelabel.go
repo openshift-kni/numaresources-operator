@@ -230,6 +230,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
+			By("wait for NRT data to settle")
+			e2efixture.WaitForNRTSettle(fxt)
+
 			By("Verifing the NRT statistics are updated")
 			targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
@@ -309,6 +312,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 						Expect(err).ToNot(HaveOccurred())
 						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 					}
+
+					By("wait for NRT data to settle")
+					e2efixture.WaitForNRTSettle(fxt)
 
 					By("Verifing the NRT statistics are updated")
 					targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
