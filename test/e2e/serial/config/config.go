@@ -41,7 +41,10 @@ func Setup() {
 	err := SetupFixture()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
-	SetupInfra(Config.Fixture, Config.NROOperObj, Config.NRTList)
+	SetupInfra(Config.Fixture, Config.NROOperObj, Config.infraNRTList)
+
+	err = Config.RecordNRTReference()
+	Expect(err).ToNot(HaveOccurred(), "error while recording the reference NRT data")
 }
 
 func Teardown() {
@@ -55,7 +58,7 @@ func Teardown() {
 	if !Config.Ready() { // nothing to do
 		return
 	}
-	TeardownInfra(Config.Fixture, Config.NRTList)
+	TeardownInfra(Config.Fixture, Config.infraNRTList)
 	// numacell daemonset automatically cleaned up when we remove the namespace
 	err := TeardownFixture()
 	Expect(err).NotTo(HaveOccurred())

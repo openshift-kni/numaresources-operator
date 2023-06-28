@@ -37,6 +37,7 @@ type E2EConfig struct {
 	NROOperObj    *nropv1.NUMAResourcesOperator
 	NROSchedObj   *nropv1.NUMAResourcesScheduler
 	SchedulerName string
+	infraNRTList  nrtv1alpha2.NodeResourceTopologyList
 }
 
 func (cfg *E2EConfig) Ready() bool {
@@ -50,6 +51,15 @@ func (cfg *E2EConfig) Ready() bool {
 		return false
 	}
 	return true
+}
+
+func (cfg *E2EConfig) RecordNRTReference() error {
+	err := cfg.Fixture.Client.List(context.TODO(), &cfg.NRTList)
+	if err != nil {
+		return err
+	}
+	klog.Infof("recorded reference NRT data:\n%s", intnrt.ListToString(cfg.NRTList.Items, "reference"))
+	return nil
 }
 
 var Config *E2EConfig
@@ -76,11 +86,10 @@ func NewFixtureWithOptions(nsName string, options e2efixture.Options) (*E2EConfi
 		return nil, err
 	}
 
-	err = cfg.Fixture.Client.List(context.TODO(), &cfg.NRTList)
+	err = cfg.Fixture.Client.List(context.TODO(), &cfg.infraNRTList)
 	if err != nil {
 		return nil, err
 	}
-	klog.Infof("detected reference NRT data:\n%s", intnrt.ListToString(cfg.NRTList.Items, "reference"))
 
 	err = cfg.Fixture.Client.Get(context.TODO(), objects.NROObjectKey(), cfg.NROOperObj)
 	if err != nil {
