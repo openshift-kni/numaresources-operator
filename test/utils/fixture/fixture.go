@@ -150,6 +150,7 @@ func Cooldown(ft *Fixture) {
 		if err != nil {
 			diff := cmp.Diff(ft.InitialNRTList.Items, currentNrtList.Items)
 			klog.Warningf("NRT MISMATCH:\n----\n%s\n---\n", diff)
+			ginkgo.Fail("cooldown failed, the NRT data did not settle back to the initial state")
 		}
 		return
 	}
