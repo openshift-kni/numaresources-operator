@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
 
 	corev1 "k8s.io/api/core/v1"
@@ -48,11 +49,14 @@ type Fixture struct {
 	Namespace      corev1.Namespace
 	InitialNRTList nrtv1alpha2.NodeResourceTopologyList
 	Skipped        bool
+	avoidCooldown  bool
 }
 
 const (
 	defaultTeardownTime      = 180 * time.Second
 	defaultCooldownTime      = 30 * time.Second
+	defaultSettleInterval    = 11 * time.Second
+	defaultSettleTimeout     = 1 * time.Minute
 	defaultCooldownThreshold = 5
 )
 
@@ -61,17 +65,22 @@ type Options uint
 const (
 	OptionNone          = 0
 	OptionRandomizeName = 1 << iota
+	OptionAvoidCooldown = 2 << iota
 )
 
 var (
 	teardownTime      time.Duration
 	cooldownTime      time.Duration
+	settleInterval    time.Duration
+	settleTimeout     time.Duration
 	cooldownThreshold int
 )
 
 func init() {
-	cooldownTime = getCooldownTimeFromEnvVar()
-	teardownTime = getTeardownTimeFromEnvVar()
+	teardownTime = getTimeDurationFromEnvVar("E2E_NROP_TEST_TEARDOWN", "teardown time", defaultTeardownTime)
+	cooldownTime = getTimeDurationFromEnvVar("E2E_NROP_TEST_COOLDOWN", "cooldown time", defaultCooldownTime)
+	settleInterval = getTimeDurationFromEnvVar("E2E_NROP_TEST_SETTLE_INTERVAL", "settle interval", defaultSettleInterval)
+	settleTimeout = getTimeDurationFromEnvVar("E2E_NROP_TEST_SETTLE_TIMEOUT", "settle timeout", defaultSettleTimeout)
 	cooldownThreshold = getCooldownThresholdFromEnvVar()
 }
 
@@ -80,6 +89,7 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 		return nil, fmt.Errorf("clients not enabled")
 	}
 	randomizeName := (options & OptionRandomizeName) == OptionRandomizeName
+	avoidCooldown := (options & OptionAvoidCooldown) == OptionAvoidCooldown
 	ns, err := setupNamespace(e2eclient.Client, name, randomizeName)
 	if err != nil {
 		klog.Errorf("cannot setup namespace %q: %v", name, err)
@@ -91,6 +101,7 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 		K8sClient:      e2eclient.K8sClient,
 		Namespace:      ns,
 		InitialNRTList: nrtList,
+		avoidCooldown:  avoidCooldown,
 	}, nil
 
 }
@@ -113,6 +124,11 @@ func Teardown(ft *Fixture) error {
 		return nil
 	}
 
+	if ft.avoidCooldown {
+		ginkgo.By(fmt.Sprintf("skipped - cool down disabled"))
+		return nil
+	}
+
 	Cooldown(ft)
 	return nil
 }
@@ -128,8 +144,14 @@ func Skipf(ft *Fixture, format string, args ...interface{}) {
 
 func Cooldown(ft *Fixture) {
 	if len(ft.InitialNRTList.Items) > 0 {
-		ginkgo.By("cooldown by verifying NRTs data is settled to the initial state")
-		intwait.With(ft.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &ft.InitialNRTList, intwait.NRTIgnoreNothing)
+		interval := 5 * time.Second
+		ginkgo.By(fmt.Sprintf("cooldown by verifying NRTs data is settled to the initial state (interval=%v timeout=%v)", interval, settleTimeout))
+		currentNrtList, err := intwait.With(ft.Client).Interval(interval).Timeout(settleTimeout).ForNodeResourceTopologiesEqualTo(context.TODO(), &ft.InitialNRTList, intwait.NRTIgnoreNothing)
+		if err != nil {
+			diff := cmp.Diff(ft.InitialNRTList.Items, currentNrtList.Items)
+			klog.Warningf("NRT MISMATCH:\n----\n%s\n---\n", diff)
+			ginkgo.Fail("cooldown failed, the NRT data did not settle back to the initial state")
+		}
 		return
 	}
 	klog.Warningf("cooling down for %v", cooldownTime)
@@ -137,8 +159,9 @@ func Cooldown(ft *Fixture) {
 }
 
 func WaitForNRTSettle(fxt *Fixture) (*nrtv1alpha2.NodeResourceTopologyList, error) {
-	klog.Info("cooldown by verifying NRTs data is settled")
-	return intwait.With(fxt.Client).Interval(11*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesSettled(context.TODO(), cooldownThreshold)
+	klog.Infof("cooldown by verifying NRTs data is settled (interval=%v timeout=%v)", settleInterval, settleTimeout)
+	settledNRT, err := intwait.With(fxt.Client).Interval(settleInterval).Timeout(settleTimeout).ForNodeResourceTopologiesSettled(context.TODO(), cooldownThreshold, intwait.NRTIgnoreNothing)
+	return &settledNRT, err
 }
 
 func setupNamespace(cli client.Client, baseName string, randomize bool) (corev1.Namespace, error) {
@@ -195,28 +218,15 @@ func RandomizeName(baseName string) string {
 	return fmt.Sprintf("%s-%s", baseName, strconv.Itoa(rand.Intn(10000)))
 }
 
-func getCooldownTimeFromEnvVar() time.Duration {
-	raw, ok := os.LookupEnv("E2E_NROP_TEST_COOLDOWN")
+func getTimeDurationFromEnvVar(envVarName, description string, fallbackValue time.Duration) time.Duration {
+	raw, ok := os.LookupEnv(envVarName)
 	if !ok {
-		return defaultCooldownTime
+		return fallbackValue
 	}
 	val, err := time.ParseDuration(raw)
 	if err != nil {
-		klog.Errorf("cannot parse the provided test cooldown time (fallback to default: %v): %v", defaultCooldownTime, err)
-		return defaultCooldownTime
-	}
-	return val
-}
-
-func getTeardownTimeFromEnvVar() time.Duration {
-	raw, ok := os.LookupEnv("E2E_NROP_TEST_TEARDOWN")
-	if !ok {
-		return defaultTeardownTime
-	}
-	val, err := time.ParseDuration(raw)
-	if err != nil {
-		klog.Errorf("cannot parse the provided test teardown time (fallback to default: %v): %v", defaultTeardownTime, err)
-		return defaultTeardownTime
+		klog.Errorf("cannot parse the provided test %s (fallback to default: %v): %v", description, fallbackValue, err)
+		return fallbackValue
 	}
 	return val
 }

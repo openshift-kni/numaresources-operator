@@ -18,6 +18,7 @@ package api
 
 import (
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -38,4 +39,9 @@ func MakeResourceName(numacellid int) corev1.ResourceName {
 
 func MakeDeviceID(numacellid int) string {
 	return fmt.Sprintf("%s%02d", NUMACellResourceName, numacellid)
+}
+
+func IsResourceName(resName string) bool {
+	tmpl := fmt.Sprintf("%s/%s", NUMACellResourceNamespace, NUMACellResourceName)
+	return strings.HasPrefix(resName, tmpl)
 }

@@ -24,6 +24,9 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
+
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
@@ -34,6 +37,7 @@ type E2EConfig struct {
 	NROOperObj    *nropv1.NUMAResourcesOperator
 	NROSchedObj   *nropv1.NUMAResourcesScheduler
 	SchedulerName string
+	infraNRTList  nrtv1alpha2.NodeResourceTopologyList
 }
 
 func (cfg *E2EConfig) Ready() bool {
@@ -49,11 +53,20 @@ func (cfg *E2EConfig) Ready() bool {
 	return true
 }
 
+func (cfg *E2EConfig) RecordNRTReference() error {
+	err := cfg.Fixture.Client.List(context.TODO(), &cfg.NRTList)
+	if err != nil {
+		return err
+	}
+	klog.Infof("recorded reference NRT data:\n%s", intnrt.ListToString(cfg.NRTList.Items, "reference"))
+	return nil
+}
+
 var Config *E2EConfig
 
 func SetupFixture() error {
 	var err error
-	Config, err = NewFixtureWithOptions("e2e-test-infra", e2efixture.OptionRandomizeName)
+	Config, err = NewFixtureWithOptions("e2e-test-infra", e2efixture.OptionRandomizeName|e2efixture.OptionAvoidCooldown)
 	return err
 }
 
@@ -73,7 +86,7 @@ func NewFixtureWithOptions(nsName string, options e2efixture.Options) (*E2EConfi
 		return nil, err
 	}
 
-	err = cfg.Fixture.Client.List(context.TODO(), &cfg.NRTList)
+	err = cfg.Fixture.Client.List(context.TODO(), &cfg.infraNRTList)
 	if err != nil {
 		return nil, err
 	}

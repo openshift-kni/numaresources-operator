@@ -40,6 +40,7 @@ import (
 
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
+	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 	numacellmanifests "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
 
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
@@ -47,7 +48,7 @@ import (
 )
 
 func SetupInfra(fxt *e2efixture.Fixture, nroOperObj *nropv1.NUMAResourcesOperator, nrtList nrtv1alpha2.NodeResourceTopologyList) {
-	setupNUMACell(fxt, nroOperObj.Spec.NodeGroups, 3*time.Minute)
+	setupNUMACell(fxt, nroOperObj.Spec.NodeGroups, nrtList, 3*time.Minute)
 	LabelNodes(fxt.Client, nrtList)
 }
 
@@ -55,7 +56,7 @@ func TeardownInfra(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopo
 	UnlabelNodes(fxt.Client, nrtList)
 }
 
-func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, timeout time.Duration) {
+func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, nrtList nrtv1alpha2.NodeResourceTopologyList, timeout time.Duration) {
 	klog.Infof("e2e infra setup begin")
 
 	Expect(nodeGroups).ToNot(BeEmpty(), "cannot autodetect the TAS node groups from the cluster")
@@ -97,6 +98,16 @@ func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, timeo
 
 	klog.Infof("daemonsets created (%d)", len(dss))
 
+	waitAllDSReady(fxt, dss, timeout)
+	klog.Infof("daemonsets ready (%d)", len(dss))
+
+	waitResourcesAvailable(fxt, nrtList, timeout)
+	klog.Infof("resources available (%d)", len(nrtList.Items))
+
+	klog.Infof("e2e infra setup completed")
+}
+
+func waitAllDSReady(fxt *e2efixture.Fixture, dss []*appsv1.DaemonSet, timeout time.Duration) {
 	var wg sync.WaitGroup
 	for _, ds := range dss {
 		wg.Add(1)
@@ -112,8 +123,26 @@ func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, timeo
 		}(ds)
 	}
 	wg.Wait()
+}
 
-	klog.Infof("e2e infra setup completed")
+func waitResourcesAvailable(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopologyList, timeout time.Duration) {
+	var wg sync.WaitGroup
+	for _, nrt := range nrtList.Items {
+		wg.Add(1)
+		go func(nrtName string) {
+			defer GinkgoRecover()
+			defer wg.Done()
+
+			klog.Infof("waiting for numacell resources to be reported on NRT %q", nrtName)
+
+			_, err := wait.With(fxt.Client).Interval(11*time.Second).Timeout(timeout).ForNodeResourceTopologyToHave(context.TODO(), nrtName, func(resInfo nrtv1alpha2.ResourceInfo) bool {
+				// TODO: check available qty > 0?
+				return numacellapi.IsResourceName(resInfo.Name)
+			})
+			Expect(err).ToNot(HaveOccurred(), "NRT %q failed to expose numacell resources", nrtName)
+		}(nrt.Name)
+	}
+	wg.Wait()
 }
 
 func GetNUMACellDevicePluginPullSpec() string {
