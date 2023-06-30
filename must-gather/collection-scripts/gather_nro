@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+# Get NRO namespace and gather all the data there
+. namespace
+NRO_NAMESPACE=$(nro_namespace)
+
+if [ -z "$NRO_NAMESPACE" ]
+then
+    echo "NUMAresources Operator namespace not detected. Skipping NRO data gathering"
+else
+    # get crds
+    for crd_name in numaresourcesschedulers.nodetopology.openshift.io numaresourcesoperators.nodetopology.openshift.io noderesourcetopologies.topology.node.k8s.io
+    do
+        # get crd definition
+        oc adm inspect --dest-dir must-gather crd/${crd_name}
+
+        # get crd instances
+        oc adm inspect --dest-dir must-gather ${crd_name}
+    done
+
+    oc adm inspect --dest-dir must-gather ns/${NRO_NAMESPACE}
+fi
