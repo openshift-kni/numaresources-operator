@@ -17,15 +17,27 @@
 package config
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 
+	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+
 	. "github.com/onsi/gomega"
+
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+
+	"github.com/openshift-kni/numaresources-operator/pkg/validator"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
+	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 )
 
 const (
-	MultiNUMALabel    = "numa.hardware.openshift-kni.io/cell-count"
-	nropTestCIImage   = "quay.io/openshift-kni/resource-topology-exporter:test-ci"
-	SchedulerTestName = "test-topology-scheduler"
+	MultiNUMALabel                   = "numa.hardware.openshift-kni.io/cell-count"
+	nropTestCIImage                  = "quay.io/openshift-kni/resource-topology-exporter:test-ci"
+	SchedulerTestName                = "test-topology-scheduler"
+	minNumberOfNodesWithSameTopology = 2
 )
 
 // This suite holds the e2e tests which span across components,
@@ -69,4 +81,96 @@ func GetRteCiImage() string {
 		return pullSpec
 	}
 	return nropTestCIImage
+}
+
+func contains(items []string, st string) bool {
+	for _, item := range items {
+		if item == st {
+			return true
+		}
+	}
+	return false
+}
+
+var policyScopeToTmPolicy = map[string]nrtv1alpha2.TopologyManagerPolicy{
+	"restricted:pod":             nrtv1alpha2.RestrictedPodLevel,
+	"restricted:container":       nrtv1alpha2.RestrictedContainerLevel,
+	"best-effort:pod":            nrtv1alpha2.BestEffortPodLevel,
+	"best-effort:container":      nrtv1alpha2.BestEffortContainerLevel,
+	"none:":                      nrtv1alpha2.None,
+	"single-numa-node:pod":       nrtv1alpha2.SingleNUMANodePodLevel,
+	"single-numa-node:container": nrtv1alpha2.SingleNUMANodeContainerLevel,
+}
+
+func toTopologyPolicy(topologyManagerPolicy, topologyManagerScope string) (nrtv1alpha2.TopologyManagerPolicy, error) {
+	chain := topologyManagerPolicy + ":" + topologyManagerScope
+	nrtPolicy, ok := policyScopeToTmPolicy[chain]
+	if !ok {
+		return "", fmt.Errorf("Unable to convert %q to TmPolicy", chain)
+	}
+	return nrtPolicy, nil
+}
+
+func getTopologyConsistencyErrors(kconfigs map[string]*kubeletconfigv1beta1.KubeletConfiguration, nrts []nrtv1alpha2.NodeResourceTopology) map[string]error {
+	ret := make(map[string]error)
+	for nodeName, kconfig := range kconfigs {
+		nrt, err := e2enrt.FindFromList(nrts, nodeName)
+		if err != nil {
+			ret[nodeName] = fmt.Errorf("Unable to find NRT for node %q", nrt.Name)
+			continue
+		}
+
+		tmPolicy, err := toTopologyPolicy(kconfig.TopologyManagerPolicy, kconfig.TopologyManagerScope)
+		if err != nil {
+			ret[nodeName] = fmt.Errorf("Unable to convert kc.policy/kc.scope to TopologyManagerPolicy. node:%q, err: %w", nodeName, err)
+			continue
+		}
+
+		if !contains(nrt.TopologyPolicies, string(tmPolicy)) {
+			ret[nodeName] = fmt.Errorf("Incoherent KubeletConfig/NRT for node %q", nodeName)
+		}
+
+	}
+
+	for _, nrt := range nrts {
+		if _, ok := kconfigs[nrt.Name]; !ok {
+			ret[nrt.Name] = fmt.Errorf("Unable to find KubeletConfig for node %q", nrt.Name)
+		}
+	}
+
+	return ret
+}
+
+func CheckNodesTopology(ctx context.Context) error {
+	kconfigs, err := validator.GetKubeletConfigurationsFromTASEnabledNodes(ctx, e2eclient.Client)
+	if err != nil {
+		return fmt.Errorf("error while trying to get KubeletConfigurations. error: %w", err)
+	}
+
+	var nrtList nrtv1alpha2.NodeResourceTopologyList
+	err = e2eclient.Client.List(context.TODO(), &nrtList)
+	if err != nil {
+		return fmt.Errorf("error while trying to get NodeResourceTopology objects. error: %w", err)
+	}
+
+	errorMap := getTopologyConsistencyErrors(kconfigs, nrtList.Items)
+	if len(errorMap) != 0 {
+		prettyMap, err := json.MarshalIndent(errorMap, "", "  ")
+		if err != nil {
+			return fmt.Errorf("Found some nodes with incoherent info in KubeletConfig/NRT data")
+		}
+		return fmt.Errorf("Following nodes have incoherent info in KubeletConfig/NRT data:\n%s\n", string(prettyMap))
+	}
+
+	snnPodLevelNRTs := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, nrtv1alpha2.SingleNUMANodePodLevel)
+	numSnnPodLevelNRTs := len(snnPodLevelNRTs)
+
+	snnContainerLevelNRTs := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, nrtv1alpha2.SingleNUMANodeContainerLevel)
+	numSnnContainerLevelNRTs := len(snnContainerLevelNRTs)
+
+	if numSnnPodLevelNRTs < minNumberOfNodesWithSameTopology && numSnnContainerLevelNRTs < minNumberOfNodesWithSameTopology {
+		return fmt.Errorf("Not enough nodes with either %q topology (found:%d) nor %q topology (found: %d). Need at least %d", nrtv1alpha2.SingleNUMANodePodLevel, numSnnPodLevelNRTs, nrtv1alpha2.SingleNUMANodeContainerLevel, numSnnContainerLevelNRTs, minNumberOfNodesWithSameTopology)
+	}
+
+	return nil
 }

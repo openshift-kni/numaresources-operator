@@ -230,6 +230,22 @@ func Validate(data ValidatorData) (Report, error) {
 	}, nil
 }
 
+func GetKubeletConfigurationsFromTASEnabledNodes(ctx context.Context, cli client.Client) (map[string]*kubeletconfigv1beta1.KubeletConfiguration, error) {
+	tasEnabledNodeNames, err := GetNodesByNRO(ctx, cli)
+	if err != nil {
+		return nil, fmt.Errorf("error while trying to get TAS enabled nodes. error: %w", err)
+	}
+
+	validatorData := ValidatorData{
+		tasEnabledNodeNames: tasEnabledNodeNames,
+	}
+	if err := CollectKubeletConfig(ctx, cli, &validatorData); err != nil {
+		return nil, fmt.Errorf("error while collecting kubeletconfigs from TAS enabled nodes. error: %w", err)
+	}
+
+	return validatorData.kConfigs, nil
+}
+
 func getClusterVersionInfo() (*version.Info, error) {
 	cli, err := clientutil.NewDiscoveryClient()
 	if err != nil {
