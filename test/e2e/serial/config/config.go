@@ -22,11 +22,13 @@ import (
 	"fmt"
 	"os"
 
+	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	. "github.com/onsi/gomega"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	nrtv1alpha2attr "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/validator"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
@@ -38,6 +40,14 @@ const (
 	nropTestCIImage                  = "quay.io/openshift-kni/resource-topology-exporter:test-ci"
 	SchedulerTestName                = "test-topology-scheduler"
 	minNumberOfNodesWithSameTopology = 2
+)
+
+const (
+	tmPolicyAttr = "topologyManagerPolicy"
+	tmScopeAttr  = "topologyManagerScope"
+
+	tmPolicyDefault = "none"      // TODO: learn somehow from k8s
+	tmScopeDefault  = "container" // TODO: learn somehow from k8s
 )
 
 // This suite holds the e2e tests which span across components,
@@ -83,34 +93,6 @@ func GetRteCiImage() string {
 	return nropTestCIImage
 }
 
-func contains(items []string, st string) bool {
-	for _, item := range items {
-		if item == st {
-			return true
-		}
-	}
-	return false
-}
-
-var policyScopeToTmPolicy = map[string]nrtv1alpha2.TopologyManagerPolicy{
-	"restricted:pod":             nrtv1alpha2.RestrictedPodLevel,
-	"restricted:container":       nrtv1alpha2.RestrictedContainerLevel,
-	"best-effort:pod":            nrtv1alpha2.BestEffortPodLevel,
-	"best-effort:container":      nrtv1alpha2.BestEffortContainerLevel,
-	"none:":                      nrtv1alpha2.None,
-	"single-numa-node:pod":       nrtv1alpha2.SingleNUMANodePodLevel,
-	"single-numa-node:container": nrtv1alpha2.SingleNUMANodeContainerLevel,
-}
-
-func toTopologyPolicy(topologyManagerPolicy, topologyManagerScope string) (nrtv1alpha2.TopologyManagerPolicy, error) {
-	chain := topologyManagerPolicy + ":" + topologyManagerScope
-	nrtPolicy, ok := policyScopeToTmPolicy[chain]
-	if !ok {
-		return "", fmt.Errorf("Unable to convert %q to TmPolicy", chain)
-	}
-	return nrtPolicy, nil
-}
-
 func getTopologyConsistencyErrors(kconfigs map[string]*kubeletconfigv1beta1.KubeletConfiguration, nrts []nrtv1alpha2.NodeResourceTopology) map[string]error {
 	ret := make(map[string]error)
 	for nodeName, kconfig := range kconfigs {
@@ -120,16 +102,35 @@ func getTopologyConsistencyErrors(kconfigs map[string]*kubeletconfigv1beta1.Kube
 			continue
 		}
 
-		tmPolicy, err := toTopologyPolicy(kconfig.TopologyManagerPolicy, kconfig.TopologyManagerScope)
-		if err != nil {
-			ret[nodeName] = fmt.Errorf("Unable to convert kc.policy/kc.scope to TopologyManagerPolicy. node:%q, err: %w", nodeName, err)
+		nrtTMPolicy, ok := nrtv1alpha2attr.Get(nrt.Attributes, tmPolicyAttr)
+		if !ok {
+			ret[nodeName] = fmt.Errorf("Attribute %q not reported on NRT %q", tmPolicyAttr, nodeName)
+			continue
+		}
+		kconfTMPolicy := kconfig.TopologyManagerPolicy
+		if kconfTMPolicy == "" {
+			klog.Infof("Topology Manager Policy not set in kubeletconfig, fixing to %q", tmPolicyDefault)
+			kconfTMPolicy = tmPolicyDefault
+		}
+		if nrtTMPolicy.Value != kconfTMPolicy {
+			ret[nodeName] = fmt.Errorf("Inconsistent topology manager policy for node %q: NRT=%q KConfig=%q", nodeName, nrtTMPolicy.Value, kconfTMPolicy)
 			continue
 		}
 
-		if !contains(nrt.TopologyPolicies, string(tmPolicy)) {
-			ret[nodeName] = fmt.Errorf("Incoherent KubeletConfig/NRT for node %q", nodeName)
+		nrtTMScope, ok := nrtv1alpha2attr.Get(nrt.Attributes, tmScopeAttr)
+		if !ok {
+			ret[nodeName] = fmt.Errorf("Attribute %q not reported on NRT %q", tmScopeAttr, nodeName)
+			continue
 		}
-
+		kconfTMScope := kconfig.TopologyManagerScope
+		if kconfTMScope == "" {
+			klog.Infof("Topology Manager Scope not set in kubeletconfig, fixing to %q", tmScopeDefault)
+			kconfTMScope = tmScopeDefault
+		}
+		if nrtTMScope.Value != kconfTMScope {
+			ret[nodeName] = fmt.Errorf("Inconsistent topology manager scope for node %q: NRT=%q KConfig=%q", nodeName, nrtTMScope.Value, kconfTMScope)
+			continue
+		}
 	}
 
 	for _, nrt := range nrts {
@@ -155,6 +156,7 @@ func CheckNodesTopology(ctx context.Context) error {
 
 	errorMap := getTopologyConsistencyErrors(kconfigs, nrtList.Items)
 	if len(errorMap) != 0 {
+		klog.Infof("incoeherent NRT/KubeletConfig data: %v", errorMap)
 		prettyMap, err := json.MarshalIndent(errorMap, "", "  ")
 		if err != nil {
 			return fmt.Errorf("Found some nodes with incoherent info in KubeletConfig/NRT data")
