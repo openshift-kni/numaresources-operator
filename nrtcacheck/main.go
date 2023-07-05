@@ -39,7 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
@@ -58,7 +58,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
-	utilruntime.Must(nropv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(nropv1.AddToScheme(scheme))
 	utilruntime.Must(machineconfigv1.Install(scheme))
 	utilruntime.Must(securityv1.Install(scheme))
 }
@@ -197,7 +197,7 @@ func findRTEPodsByNodeName(ctx context.Context, cli client.Client) (map[string]t
 	nroNName := types.NamespacedName{
 		Name: objectnames.DefaultNUMAResourcesOperatorCrName,
 	}
-	nroObj := nropv1alpha1.NUMAResourcesOperator{}
+	nroObj := nropv1.NUMAResourcesOperator{}
 	err := cli.Get(context.TODO(), nroNName, &nroObj)
 	if err != nil {
 		return nil, err
