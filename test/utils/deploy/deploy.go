@@ -52,6 +52,11 @@ type NroDeployment struct {
 	NroObj *nropv1.NUMAResourcesOperator
 }
 
+type NroDeploymentWithSched struct {
+	NroDeployment
+	NroSchedObj *nropv1.NUMAResourcesScheduler
+}
+
 // OverallDeployment returns a struct containing all the deployed objects,
 // so it will be easier to introspect and delete them later.
 func OverallDeployment() NroDeployment {
@@ -103,6 +108,28 @@ func OverallDeployment() NroDeployment {
 	WaitForMCPUpdatedAfterNROCreated(2, nroObj)
 
 	return deployedObj
+}
+
+func GetDeploymentWithSched() (NroDeploymentWithSched, error) {
+	sd := NroDeploymentWithSched{}
+
+	nroKey := objects.NROObjectKey()
+	nroObj := nropv1.NUMAResourcesOperator{}
+	err := e2eclient.Client.Get(context.TODO(), nroKey, &nroObj)
+	if err != nil {
+		return sd, err
+	}
+	sd.NroObj = &nroObj
+
+	nroSchedKey := objects.NROSchedObjectKey()
+	nroSchedObj := nropv1.NUMAResourcesScheduler{}
+	err = e2eclient.Client.Get(context.TODO(), nroSchedKey, &nroSchedObj)
+	if err != nil {
+		return sd, err
+	}
+	sd.NroSchedObj = &nroSchedObj
+
+	return sd, nil
 }
 
 // TODO: what if timeout < period?
