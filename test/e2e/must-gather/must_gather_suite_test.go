@@ -57,6 +57,10 @@ var _ = ginkgo.BeforeSuite(func() {
 		ginkgo.Skip(fmt.Sprintf("running on %q platfrom but must-gather is only supported on %q platform", configuration.Plat, platform.OpenShift))
 	}
 
+	mustGatherImage = getStringValueFromEnv(envVarMustGatherImage, defaultMustGatherImage)
+	mustGatherTag = getStringValueFromEnv(envVarMustGatherTag, defaultMustGatherTag)
+	ginkgo.By(fmt.Sprintf("Using must-gather image %q tag %q", mustGatherImage, mustGatherTag))
+
 	if _, ok := os.LookupEnv("E2E_NROP_INFRA_SETUP_SKIP"); ok {
 		ginkgo.By("Fetching up cluster data")
 
@@ -79,3 +83,11 @@ var _ = ginkgo.AfterSuite(func() {
 	deploy.TeardownNROScheduler(deployment.NroSchedObj, 5*time.Minute)
 	deploy.TeardownDeployment(deployment.NroDeployment, 5*time.Minute)
 })
+
+func getStringValueFromEnv(envVar, fallback string) string {
+	val, ok := os.LookupEnv(envVar)
+	if !ok {
+		return fallback
+	}
+	return val
+}
