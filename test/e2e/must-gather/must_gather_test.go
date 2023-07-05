@@ -39,9 +39,13 @@ import (
 
 var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 	ginkgo.Context("with a freshly executed must-gather command", func() {
-		destDir := "must-gather"
+		var destDir string
 
 		ginkgo.BeforeEach(func() {
+			var err error
+			destDir, err = os.MkdirTemp("", "*-e2e-data")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			ginkgo.By(fmt.Sprintf("using destination data directory: %q", destDir))
 
 			ginkgo.By("Looking for oc tool")
 			ocExec, err := exec.LookPath("oc")
@@ -73,6 +77,9 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 		})
 
 		ginkgo.AfterEach(func() {
+			if _, ok := os.LookupEnv("E2E_NROP_MUSTGATHER_CLEANUP_SKIP"); ok {
+				return
+			}
 			os.RemoveAll(destDir)
 		})
 
