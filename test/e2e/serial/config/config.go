@@ -155,6 +155,7 @@ func CheckNodesTopology(ctx context.Context) error {
 
 	errorMap := getTopologyConsistencyErrors(kconfigs, nrtList.Items)
 	if len(errorMap) != 0 {
+		klog.Infof("incoeherent NRT/KubeletConfig data: %v", errorMap)
 		prettyMap, err := json.MarshalIndent(errorMap, "", "  ")
 		if err != nil {
 			return fmt.Errorf("Found some nodes with incoherent info in KubeletConfig/NRT data")
