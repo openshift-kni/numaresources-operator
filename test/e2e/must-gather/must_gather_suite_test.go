@@ -49,6 +49,7 @@ var _ = ginkgo.BeforeSuite(func() {
 })
 
 var _ = ginkgo.AfterSuite(func() {
-	deploy.TeardownDeployment(deployment, 5*time.Minute)
+	ginkgo.By("tearing down the cluster")
 	deploy.TeardownNROScheduler(nroSchedObj, 5*time.Minute)
+	deploy.TeardownDeployment(deployment, 5*time.Minute)
 })
