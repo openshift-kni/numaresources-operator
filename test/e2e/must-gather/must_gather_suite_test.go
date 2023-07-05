@@ -18,12 +18,12 @@ package mustgather
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/deploy"
 
@@ -31,8 +31,20 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var deployment deploy.NroDeployment
-var nroSchedObj *nropv1.NUMAResourcesScheduler
+const (
+	envVarMustGatherImage = "E2E_NROP_MUSTGATHER_IMAGE"
+	envVarMustGatherTag   = "E2E_NROP_MUSTGATHER_TAG"
+
+	defaultMustGatherImage = "quay.io/openshift-kni/numaresources-must-gather"
+	defaultMustGatherTag   = "4.14.999-snapshot"
+)
+
+var (
+	deployment deploy.NroDeploymentWithSched
+
+	mustGatherImage string
+	mustGatherTag   string
+)
 
 func TestMustGather(t *testing.T) {
 	gomega.RegisterFailHandler(ginkgo.Fail)
@@ -44,11 +56,38 @@ var _ = ginkgo.BeforeSuite(func() {
 	if configuration.Plat != platform.OpenShift {
 		ginkgo.Skip(fmt.Sprintf("running on %q platfrom but must-gather is only supported on %q platform", configuration.Plat, platform.OpenShift))
 	}
-	deployment = deploy.OverallDeployment()
-	nroSchedObj = deploy.DeployNROScheduler()
+
+	mustGatherImage = getStringValueFromEnv(envVarMustGatherImage, defaultMustGatherImage)
+	mustGatherTag = getStringValueFromEnv(envVarMustGatherTag, defaultMustGatherTag)
+	ginkgo.By(fmt.Sprintf("Using must-gather image %q tag %q", mustGatherImage, mustGatherTag))
+
+	if _, ok := os.LookupEnv("E2E_NROP_INFRA_SETUP_SKIP"); ok {
+		ginkgo.By("Fetching up cluster data")
+
+		var err error
+		deployment, err = deploy.GetDeploymentWithSched()
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		return
+	}
+	ginkgo.By("Setting up the cluster")
+	deployment.NroDeployment = deploy.OverallDeployment()
+	deployment.NroSchedObj = deploy.DeployNROScheduler()
 })
 
 var _ = ginkgo.AfterSuite(func() {
-	deploy.TeardownDeployment(deployment, 5*time.Minute)
-	deploy.TeardownNROScheduler(nroSchedObj, 5*time.Minute)
+	// TODO: unify and generalize
+	if _, ok := os.LookupEnv("E2E_NROP_INFRA_TEARDOWN_SKIP"); ok {
+		return
+	}
+	ginkgo.By("tearing down the cluster")
+	deploy.TeardownNROScheduler(deployment.NroSchedObj, 5*time.Minute)
+	deploy.TeardownDeployment(deployment.NroDeployment, 5*time.Minute)
 })
+
+func getStringValueFromEnv(envVar, fallback string) string {
+	val, ok := os.LookupEnv(envVar)
+	if !ok {
+		return fallback
+	}
+	return val
+}

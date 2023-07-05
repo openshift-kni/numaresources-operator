@@ -39,9 +39,13 @@ import (
 
 var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 	ginkgo.Context("with a freshly executed must-gather command", func() {
-		destDir := "must-gather"
+		var destDir string
 
 		ginkgo.BeforeEach(func() {
+			var err error
+			destDir, err = os.MkdirTemp("", "*-e2e-data")
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			ginkgo.By(fmt.Sprintf("using destination data directory: %q", destDir))
 
 			ginkgo.By("Looking for oc tool")
 			ocExec, err := exec.LookPath("oc")
@@ -50,10 +54,7 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 				ginkgo.Skip(fmt.Sprintf("unable to find 'oc' executable %v\n", err))
 			}
 
-			mgImage := "quay.io/openshift-kni/performance-addon-operator-must-gather"
-			mgTag := "4.11-snapshot"
-
-			mgImageParam := fmt.Sprintf("--image=%s:%s", mgImage, mgTag)
+			mgImageParam := fmt.Sprintf("--image=%s:%s", mustGatherImage, mustGatherTag)
 			mgDestDirParam := fmt.Sprintf("--dest-dir=%s", destDir)
 
 			cmdline := []string{
@@ -73,6 +74,9 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 		})
 
 		ginkgo.AfterEach(func() {
+			if _, ok := os.LookupEnv("E2E_NROP_MUSTGATHER_CLEANUP_SKIP"); ok {
+				return
+			}
 			os.RemoveAll(destDir)
 		})
 
@@ -98,7 +102,7 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				nropInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesoperators", deployment.NroObj.Name))
-				nroschedInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesschedulers", nroSchedObj.Name))
+				nroschedInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesschedulers", deployment.NroSchedObj.Name))
 
 				workerNodesNames, err := getWorkerNodesNames(filepath.Join(mgContentFolder, "cluster-scoped-resources/core/nodes"))
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
