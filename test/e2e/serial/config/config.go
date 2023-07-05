@@ -45,6 +45,9 @@ const (
 const (
 	tmPolicyAttr = "topologyManagerPolicy"
 	tmScopeAttr  = "topologyManagerScope"
+
+	tmPolicyDefault = "none"      // TODO: learn somehow from k8s
+	tmScopeDefault  = "container" // TODO: learn somehow from k8s
 )
 
 // This suite holds the e2e tests which span across components,
@@ -99,23 +102,33 @@ func getTopologyConsistencyErrors(kconfigs map[string]*kubeletconfigv1beta1.Kube
 			continue
 		}
 
-		tmPolicy, ok := nrtv1alpha2attr.Get(nrt.Attributes, tmPolicyAttr)
+		nrtTMPolicy, ok := nrtv1alpha2attr.Get(nrt.Attributes, tmPolicyAttr)
 		if !ok {
 			ret[nodeName] = fmt.Errorf("Attribute %q not reported on NRT %q", tmPolicyAttr, nodeName)
 			continue
 		}
-		if tmPolicy.Value != kconfig.TopologyManagerPolicy {
-			ret[nodeName] = fmt.Errorf("Inconsistent topology manager policy for node %q: NRT=%q KConfig=%q", nodeName, tmPolicy.Value, kconfig.TopologyManagerPolicy)
+		kconfTMPolicy := kconfig.TopologyManagerPolicy
+		if kconfTMPolicy == "" {
+			klog.Infof("Topology Manager Policy not set in kubeletconfig, fixing to %q", tmPolicyDefault)
+			kconfTMPolicy = tmPolicyDefault
+		}
+		if nrtTMPolicy.Value != kconfTMPolicy {
+			ret[nodeName] = fmt.Errorf("Inconsistent topology manager policy for node %q: NRT=%q KConfig=%q", nodeName, nrtTMPolicy.Value, kconfTMPolicy)
 			continue
 		}
 
-		tmScope, ok := nrtv1alpha2attr.Get(nrt.Attributes, tmScopeAttr)
+		nrtTMScope, ok := nrtv1alpha2attr.Get(nrt.Attributes, tmScopeAttr)
 		if !ok {
 			ret[nodeName] = fmt.Errorf("Attribute %q not reported on NRT %q", tmScopeAttr, nodeName)
 			continue
 		}
-		if tmScope.Value != kconfig.TopologyManagerScope {
-			ret[nodeName] = fmt.Errorf("Inconsistent topology manager scope for node %q: NRT=%q KConfig=%q", nodeName, tmScope.Value, kconfig.TopologyManagerScope)
+		kconfTMScope := kconfig.TopologyManagerScope
+		if kconfTMScope == "" {
+			klog.Infof("Topology Manager Scope not set in kubeletconfig, fixing to %q", tmScopeDefault)
+			kconfTMScope = tmScopeDefault
+		}
+		if nrtTMScope.Value != kconfTMScope {
+			ret[nodeName] = fmt.Errorf("Inconsistent topology manager scope for node %q: NRT=%q KConfig=%q", nodeName, nrtTMScope.Value, kconfTMScope)
 			continue
 		}
 	}
