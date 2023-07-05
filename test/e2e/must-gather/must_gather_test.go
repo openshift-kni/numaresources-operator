@@ -54,10 +54,7 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 				ginkgo.Skip(fmt.Sprintf("unable to find 'oc' executable %v\n", err))
 			}
 
-			mgImage := "quay.io/openshift-kni/performance-addon-operator-must-gather"
-			mgTag := "4.11-snapshot"
-
-			mgImageParam := fmt.Sprintf("--image=%s:%s", mgImage, mgTag)
+			mgImageParam := fmt.Sprintf("--image=%s:%s", mustGatherImage, mustGatherTag)
 			mgDestDirParam := fmt.Sprintf("--dest-dir=%s", destDir)
 
 			cmdline := []string{
