@@ -196,10 +196,22 @@ binary-e2e-serial:
 binary-e2e-tools:
 	go test -c -v -o bin/e2e-nrop-tools.test ./test/e2e/tools
 
-binary-must-gather-e2e:
+binary-e2e-must-gather:
 	go test -c -v -o bin/e2e-nrop-must-gather.test ./test/e2e/must-gather
 
-binary-e2e-all: goversion binary-e2e-install binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial binary-e2e-tools runner-e2e-serial build-pause
+# backward compatibility
+binary-must-gather-e2e: binary-e2e-must-gather
+
+binary-e2e-all: goversion \
+	binary-e2e-install \
+	binary-e2e-rte \
+	binary-e2e-sched \
+	binary-e2e-uninstall \
+	binary-e2e-serial \
+	binary-e2e-tools \
+	binary-e2e-must-gather \
+	runner-e2e-serial \
+	build-pause
 
 runner-e2e-serial: bin/envsubst
 	hack/render-e2e-runner.sh
@@ -223,7 +235,10 @@ build-e2e-uninstall: fmt vet binary-e2e-uninstall
 
 build-e2e-all: fmt vet binary-e2e-all
 
-build-must-gather-e2e: fmt vet binary-must-gather-e2e
+build-e2e-must-gather: fmt vet binary-e2e-must-gather
+
+# backward compatibility
+build-must-gather-e2e: build-e2e-must-gather
 
 build-pause: bin-dir
 	install -m 755 hack/pause bin/
