@@ -594,7 +594,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			args := ds.Spec.Template.Spec.Containers[0].Args
 			Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
-			Expect(args).To(ContainElement(ContainSubstring("--notify-file=")), "malformed args: %v", args)
 			Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
 		})
 
@@ -738,7 +737,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			args := ds.Spec.Template.Spec.Containers[0].Args
 			Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
-			Expect(args).To(ContainElement(ContainSubstring("--notify-file=")), "malformed args: %v", args)
 			Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
 
 			d, err := time.ParseDuration("12s")
