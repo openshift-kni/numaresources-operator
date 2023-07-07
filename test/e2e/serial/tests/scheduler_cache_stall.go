@@ -82,7 +82,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 			err = fxt.Client.Get(context.TODO(), nroSchedKey, &nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
-			if nroSchedObj.Spec.CacheResyncPeriod == nil { // should never trigger
+			if nroSchedObj.Status.CacheResyncPeriod == nil { // should never trigger
 				e2efixture.Skip(fxt, "Scheduler cache not enabled")
 			}
 
@@ -99,7 +99,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 			mcpName = nroOperObj.Status.MachineConfigPools[0].Name
 			conf := nroOperObj.Status.MachineConfigPools[0].Config
 			if ok, val := isPFPEnabledInConfig(conf); !ok {
-				e2efixture.Skipf(fxt, "unsupported refresh mode %q in %q", val, mcpName)
+				e2efixture.Skipf(fxt, "unsupported pfp mode %q in %q", val, mcpName)
 			}
 			if ok, val := isInfoRefreshModeEqual(conf, nropv1.InfoRefreshPeriodic); !ok {
 				e2efixture.Skipf(fxt, "unsupported refresh mode %q in %q", val, mcpName)
@@ -236,7 +236,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 				// like non-regression tests, but with jobs present
 
 				func(setupPod setupPodFunc) {
-					timeout := nroSchedObj.Spec.CacheResyncPeriod.Round(time.Second) * 10
+					timeout := nroSchedObj.Status.CacheResyncPeriod.Round(time.Second) * 10
 					klog.Infof("pod running timeout: %v", timeout)
 
 					nrts := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
