@@ -46,7 +46,7 @@ func defaultPodsFingerprinting() *PodsFingerprintingMode {
 }
 
 func defaultInfoRefreshMode() *InfoRefreshMode {
-	refMode := InfoRefreshPeriodicAndEvents
+	refMode := InfoRefreshPeriodic
 	return &refMode
 }
 

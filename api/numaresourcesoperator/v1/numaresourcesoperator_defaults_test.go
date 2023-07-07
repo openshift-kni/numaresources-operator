@@ -67,7 +67,7 @@ func TestNodeGroupConfigDefaultMethod(t *testing.T) {
 
 func TestNodeGroupConfigDefault(t *testing.T) {
 	podsFp := PodsFingerprintingEnabled
-	refMode := InfoRefreshPeriodicAndEvents
+	refMode := InfoRefreshPeriodic
 	period := metav1.Duration{
 		Duration: 10 * time.Second,
 	}
