@@ -168,10 +168,10 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 				err := fxt.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
 				Expect(err).ToNot(HaveOccurred())
 
-				if nroSchedObj.Spec.CacheResyncPeriod == nil {
+				if nroSchedObj.Status.CacheResyncPeriod == nil {
 					e2efixture.Skip(fxt, "Scheduler cache not enabled")
 				}
-				timeout := nroSchedObj.Spec.CacheResyncPeriod.Round(time.Second) * 10
+				timeout := nroSchedObj.Status.CacheResyncPeriod.Round(time.Second) * 10
 				klog.Infof("pod running timeout: %v", timeout)
 
 				nrts := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
@@ -263,10 +263,10 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 				err := fxt.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
 				Expect(err).ToNot(HaveOccurred())
 
-				if nroSchedObj.Spec.CacheResyncPeriod == nil {
+				if nroSchedObj.Status.CacheResyncPeriod == nil {
 					e2efixture.Skip(fxt, "Scheduler cache not enabled")
 				}
-				timeout := nroSchedObj.Spec.CacheResyncPeriod.Round(time.Second) * 10
+				timeout := nroSchedObj.Status.CacheResyncPeriod.Round(time.Second) * 10
 				klog.Infof("pod running timeout: %v", timeout)
 
 				nrts := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
