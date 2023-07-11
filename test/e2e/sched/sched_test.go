@@ -21,8 +21,11 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+	schedconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	pluginconfig "sigs.k8s.io/scheduler-plugins/apis/config"
 
 	"github.com/google/go-cmp/cmp"
 	. "github.com/onsi/ginkgo/v2"
@@ -39,11 +42,38 @@ import (
 
 var _ = Describe("[Scheduler] imageReplacement", func() {
 	var initialized bool
+	nroSchedObj := &nropv1.NUMAResourcesScheduler{}
 	BeforeEach(func() {
 		if !initialized {
 			Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
 		}
 		initialized = true
+		nroSchedKey := objects.NROSchedObjectKey()
+		Expect(e2eclient.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
+
+		DeferCleanup(func() {
+			Eventually(func() bool {
+				err := e2eclient.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
+				if err != nil {
+					klog.Warningf("failed to get %q", nroSchedKey)
+					return false
+				}
+
+				nroSchedObj.Spec = objects.TestNROScheduler().Spec
+				err = e2eclient.Client.Update(context.TODO(), nroSchedObj)
+				if err != nil {
+					klog.Warningf("failed to update %q", nroSchedKey)
+					return false
+				}
+				return true
+			}).Should(BeTrue(), "failed to revert changes to %q during cleanup", nroSchedKey)
+
+			dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.UID)
+			Expect(err).ToNot(HaveOccurred(), "unable to get deployment by owner reference")
+
+			dp, err = wait.With(e2eclient.Client).Timeout(5*time.Minute).Interval(10*time.Second).ForDeploymentComplete(context.TODO(), dp)
+			Expect(err).ToNot(HaveOccurred())
+		})
 	})
 	Context("with a running cluster with all the components", func() {
 		It("should be able to handle plugin image change without remove/rename", func() {
