@@ -2,7 +2,7 @@
 
 source hack/common.sh
 
-ENABLE_SCHED_TESTS="${ENABLE_SCHED_TESTS:-false}"
+ENABLE_SCHED_TESTS="${ENABLE_SCHED_TESTS:-true}"
 NO_TEARDOWN="${NO_TEARDOWN:-false}"
 
 function test_sched() {
