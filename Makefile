@@ -133,48 +133,27 @@ binary: build-tools
 	LDFLAGS="-s -w "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)"; \
-	CGO_ENABLED=0 go build \
-		-mod=vendor \
-		-o bin/manager \
-		-ldflags "$$LDFLAGS" \
-		main.go
+	go build -mod=vendor -o bin/manager -ldflags "$$LDFLAGS" main.go
 
 binary-rte: build-tools
 	LDFLAGS="-s -w "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)"; \
-	CGO_ENABLED=0 go build \
-		-mod=vendor \
-		-o bin/exporter \
-		-ldflags "$$LDFLAGS" \
-		rte/main.go
-
-binary-numacell: build-tools
-	LDFLAGS="-s -w "; \
-	CGO_ENABLED=0 go build \
-		-mod=vendor \
-		-o bin/numacell \
-		-ldflags "$$LDFLAGS" \
-		test/deviceplugin/cmd/numacell/main.go
+	go build -mod=vendor -o bin/exporter -ldflags "$$LDFLAGS" rte/main.go
 
 binary-nrovalidate: build-tools
 	LDFLAGS="-s -w "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
-	CGO_ENABLED=0 go build \
-		-mod=vendor \
-		-o bin/nrovalidate \
-		-ldflags "$$LDFLAGS" \
-		cmd/nrovalidate/main.go
+	go build -mod=vendor -o bin/nrovalidate -ldflags "$$LDFLAGS" cmd/nrovalidate/main.go
 
 binary-nrtcacheck: build-tools
 	LDFLAGS="-s -w "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
-	CGO_ENABLED=0 go build \
-		-mod=vendor \
-		-o bin/nrtcacheck \
-		-ldflags "$$LDFLAGS" \
-		cmd/nrtcacheck/main.go
+	go build -mod=vendor -o bin/nrtcacheck -ldflags "$$LDFLAGS" cmd/nrtcacheck/main.go
 
+binary-numacell: build-tools
+	LDFLAGS="-s -w "; \
+	CGO_ENABLED=0 go build -mod=vendor -o bin/numacell -ldflags "$$LDFLAGS" test/deviceplugin/cmd/numacell/main.go
 
 binary-all: binary binary-rte binary-nrovalidate binary-nrtcacheck
 
