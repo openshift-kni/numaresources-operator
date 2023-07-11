@@ -34,11 +34,16 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	e2eimages "github.com/openshift-kni/numaresources-operator/test/utils/images"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2eobjects "github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
+
+const schedulerPluginName = "NodeResourceTopologyMatch"
 
 var _ = Describe("[Scheduler] imageReplacement", func() {
 	var initialized bool
@@ -204,5 +209,102 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 				return true
 			}).WithTimeout(time.Minute * 2).WithPolling(time.Second * 30).Should(BeTrue())
 		})
+		It("should reflect changes in cacheResyncPeriod when configured", func() {
+			deployment, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.UID)
+			Expect(err).ToNot(HaveOccurred())
+			podList, err := podlist.With(e2eclient.Client).ByDeployment(context.TODO(), *deployment)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(podList).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
+			uid := &podList[0].UID
+
+			var t time.Duration
+			if nroSchedObj.Spec.CacheResyncPeriod != nil {
+				// change to something different from the current spec
+				t = nroSchedObj.Spec.CacheResyncPeriod.Duration * 2
+			} else {
+				t = 5 * time.Minute
+			}
+
+			nroSchedKey := objects.NROSchedObjectKey()
+			Eventually(func() bool {
+				err := e2eclient.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
+				if err != nil {
+					klog.Warningf("failed to get %q", nroSchedKey)
+					return false
+				}
+				nroSchedObj.Spec.CacheResyncPeriod = &metav1.Duration{Duration: t}
+
+				err = e2eclient.Client.Update(context.TODO(), nroSchedObj)
+				if err != nil {
+					klog.Warningf("failed to update %q", nroSchedKey)
+					return false
+				}
+				return true
+			}).Should(BeTrue(), "failed to update %s's CacheResyncPeriod value", nroSchedKey)
+
+			By("checking cacheResyncPeriod under the CR's Status")
+			Eventually(func() bool {
+				ExpectWithOffset(1, e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)).ToNot(HaveOccurred())
+				return nroSchedObj.Spec.CacheResyncPeriod.Duration == nroSchedObj.Status.CacheResyncPeriod.Duration
+			}).WithTimeout(time.Minute*2).WithPolling(time.Second*10).Should(BeTrue(), "cacheResyncPeriod not updated under the status; want: %d, got %d",
+				nroSchedObj.Spec.CacheResyncPeriod.Duration, nroSchedObj.Status.CacheResyncPeriod.Duration)
+
+			By("checking cacheResyncPeriod value reflected under the scheduler configMap")
+			cmList := &corev1.ConfigMapList{}
+			Expect(e2eclient.Client.List(context.TODO(), cmList)).ToNot(HaveOccurred())
+
+			var nroschedCM *corev1.ConfigMap
+			for i := 0; i < len(cmList.Items); i++ {
+				if e2eobjects.IsOwnedBy(cmList.Items[i].ObjectMeta, nroSchedObj.ObjectMeta) {
+					nroschedCM = &cmList.Items[i]
+					break
+				}
+			}
+			Expect(nroschedCM).ToNot(BeNil(), "failed to find ConfigMap owned by %q", nroSchedKey)
+			data, ok := nroschedCM.Data[schedstate.SchedulerConfigFileName]
+			Expect(data).ToNot(BeEmpty(), "no data found under %s/%s", nroschedCM.Namespace, nroschedCM.Name)
+
+			schedCfg, err := manifests.DecodeSchedulerConfigFromData([]byte(data))
+			Expect(err).ToNot(HaveOccurred())
+
+			schedProf, pluginConf := findKubeSchedulerProfileByName(schedCfg, schedulerPluginName)
+			Expect(schedProf).ToNot(BeNil(), "cannot find scheduler profile for %q", schedulerPluginName)
+			Expect(pluginConf).ToNot(BeNil(), "cannot find plugin config for %q", schedulerPluginName)
+
+			confObj := pluginConf.Args
+			cfg, ok := confObj.(*pluginconfig.NodeResourceTopologyMatchArgs)
+			Expect(ok).To(BeTrue(), "NRT arguments are missing for the scheduler config")
+
+			cacheCfg := time.Duration(cfg.CacheResyncPeriodSeconds) * time.Second
+			Expect(cacheCfg).To(Equal(nroSchedObj.Spec.CacheResyncPeriod.Duration))
+
+			By("checking new scheduler pod has been created")
+			dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.UID)
+			Expect(err).ToNot(HaveOccurred(), "unable to get deployment by owner reference")
+
+			dp, err = wait.With(e2eclient.Client).Timeout(5*time.Minute).Interval(10*time.Second).ForDeploymentComplete(context.TODO(), dp)
+			Expect(err).ToNot(HaveOccurred())
+
+			podList, err = podlist.With(e2eclient.Client).ByDeployment(context.TODO(), *dp)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(podList).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", dp.Namespace, dp.Name)
+			for _, pod := range podList {
+				Expect(pod.UID).ToNot(Equal(uid), "new scheduler pod has not been created")
+			}
+		})
 	})
 })
+
+func findKubeSchedulerProfileByName(sc *schedconfig.KubeSchedulerConfiguration, name string) (*schedconfig.KubeSchedulerProfile, *schedconfig.PluginConfig) {
+	for i := range sc.Profiles {
+		// if we have a configuration for the NodeResourceTopologyMatch
+		// this is a valid profile
+		for j := range sc.Profiles[i].PluginConfig {
+			if sc.Profiles[i].PluginConfig[j].Name == name {
+				return &sc.Profiles[i], &sc.Profiles[i].PluginConfig[j]
+			}
+		}
+	}
+
+	return nil, nil
+}
