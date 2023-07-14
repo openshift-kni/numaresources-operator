@@ -18,21 +18,16 @@ package rte
 
 import (
 	"fmt"
-	"os/exec"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"github.com/openshift-kni/numaresources-operator/test/utils/runtime"
 
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte"
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater"
 )
 
 var (
-	BinaryPath string
-
 	randomSeed int64
 )
 
@@ -43,24 +38,4 @@ func TestRTE(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	By(fmt.Sprintf("Using random seed %v", randomSeed))
-
-	By("Finding the binaries path")
-
-	binPath, err := runtime.FindBinaryPath("exporter")
-	Expect(err).ToNot(HaveOccurred())
-	BinaryPath = binPath
-
-	By(fmt.Sprintf("Using the binary at %q", BinaryPath))
 })
-
-func expectExecutableExists(path string) {
-	cmdline := []string{
-		path,
-		"-h",
-	}
-
-	cmd := exec.Command(cmdline[0], cmdline[1:]...)
-	out, err := cmd.CombinedOutput()
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-	ExpectWithOffset(1, out).ToNot(BeEmpty())
-}
