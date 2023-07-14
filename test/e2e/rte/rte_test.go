@@ -288,14 +288,14 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		gomega.Expect(rteDss).ToNot(gomega.BeEmpty(), "no RTE DS found")
 
 		for _, rteDs := range rteDss {
-			ginkgo.By(fmt.Sprintf("checking DS: %s/%s", rteDs.Namespace, rteDs.Name))
+			ginkgo.By(fmt.Sprintf("checking DS: %s/%s status=[%v]", rteDs.Namespace, rteDs.Name, toJSON(rteDs.Status)))
 
 			rtePods, err := podlistByDaemonset(f, rteDs)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(rtePods).ToNot(gomega.BeEmpty(), "no RTE pods found for %s/%s", rteDs.Namespace, rteDs.Name)
 
 			for _, rtePod := range rtePods {
-				ginkgo.By(fmt.Sprintf("checking DS: %s/%s POD %s/%s", rteDs.Namespace, rteDs.Name, rtePod.Namespace, rtePod.Name))
+				ginkgo.By(fmt.Sprintf("checking DS: %s/%s POD %s/%s (node=%s)", rteDs.Namespace, rteDs.Name, rtePod.Namespace, rtePod.Name, rtePod.Spec.NodeName))
 
 				rteCnt, err := rteupdate.FindContainerByName(&rtePod.Spec, rteupdate.MainContainerName)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -310,8 +310,11 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 					Stdin:              nil,
 					CaptureStdout:      true,
 					CaptureStderr:      true,
-					PreserveWhitespace: false,
+					PreserveWhitespace: true,
 				})
+				if err != nil {
+					_ = objects.LogEventsForPod(f.ClientSet, rtePod.Namespace, rtePod.Name)
+				}
 				gomega.Expect(err).ToNot(gomega.HaveOccurred(), "err=%v stderr=%s", err, stderr)
 
 				var st podfingerprint.Status
@@ -376,4 +379,12 @@ func podlistByDaemonset(f *framework.Framework, ds appsv1.DaemonSet) ([]corev1.P
 	}
 
 	return podList.Items, nil
+}
+
+func toJSON(obj interface{}) string {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return "<ERROR>"
+	}
+	return string(data)
 }
