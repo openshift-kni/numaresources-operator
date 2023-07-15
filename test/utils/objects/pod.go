@@ -56,7 +56,7 @@ const (
 	envVarDumpEvents = "E2E_NROP_DUMP_EVENTS"
 )
 
-func LogEventsForPod(k8sCli *kubernetes.Clientset, podNamespace, podName string) error {
+func LogEventsForPod(k8sCli kubernetes.Interface, podNamespace, podName string) error {
 	events, err := GetEventsForPod(k8sCli, podNamespace, podName)
 	if err != nil {
 		return err
@@ -83,7 +83,7 @@ func DumpEventsForPod(events []corev1.Event, podNamespace, podName string) strin
 	return buf.String()
 }
 
-func GetEventsForPod(k8sCli *kubernetes.Clientset, podNamespace, podName string) ([]corev1.Event, error) {
+func GetEventsForPod(k8sCli kubernetes.Interface, podNamespace, podName string) ([]corev1.Event, error) {
 	klog.Infof("checking events for pod %s/%s", podNamespace, podName)
 	opts := metav1.ListOptions{
 		FieldSelector: fmt.Sprintf("involvedObject.name=%s", podName),
