@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  namespace: sampledevices
+  name: dpa-ds
+spec:
+  selector:
+    matchLabels:
+      name: dpa
+  template:
+    metadata:
+      labels:
+        name: dpa
+    spec:
+      serviceAccountName: sampledevices-sa
+      containers:
+        - name: dpa-container
+          securityContext:
+            privileged: true
+          image: quay.io/k8stopologyawareschedwg/sample-device-plugin:v0.1.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DEVICE_RESOURCE_NAME
+              value: "example.com/deviceA"
+          volumeMounts:
+            - name: kubeletsockets
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: device-a-config-vol
+              mountPath: /etc/devices
+      volumes:
+        - name: kubeletsockets
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+            type: Directory
+        - configMap:
+            name: device-a-configmap
+          name: device-a-config-vol

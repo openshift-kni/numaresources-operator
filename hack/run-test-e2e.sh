@@ -40,6 +40,10 @@ trap '{ if [ "${NO_TEARDOWN}" = false ]; then
              echo "Running NROScheduler uninstall test suite";
              ${BIN_DIR}/e2e-nrop-sched-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.junit-report=${REPORT_DIR}/sched-uninstall.xml
           fi
+
+          echo "Undeploying sample devices for RTE tests"
+          rte/hack/undeploy-devices.sh
+
           echo "Running NRO uninstall test suite";
 	  ${BIN_DIR}/e2e-nrop-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.junit-report=${REPORT_DIR}/uninstall.xml
         fi }' EXIT SIGINT SIGTERM SIGSTOP
@@ -56,6 +60,21 @@ fi
 
 
 echo "Running Functional Tests: ${GINKGO_SUITS}"
+
+echo "Deploying sample devices for RTE tests"
+rte/hack/deploy-devices.sh
+if [ $? -ne 0 ]; then
+    echo "Failed to deploy sample device plugin for RTE tests"
+    exit 2
+fi
+
+rte/hack/check-ds.sh oc sampledevices device-plugin-a-ds
+if [ $? -ne 0 ]; then
+    echo "Failed to verify sample device plugin for RTE tests"
+    exit 4
+fi
+
+echo "Running RTE tests"
 export E2E_TOPOLOGY_MANAGER_POLICY="${E2E_TOPOLOGY_MANAGER_POLICY:-SingleNUMANodePodLevel}"
 # -v: print out the text and location for each spec before running it and flush output to stdout in realtime
 # -timeout: exit the suite after the specified time
