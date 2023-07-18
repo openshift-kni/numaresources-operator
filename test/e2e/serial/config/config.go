@@ -30,6 +30,7 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	nrtv1alpha2attr "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/pkg/validator"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
@@ -164,14 +165,9 @@ func CheckNodesTopology(ctx context.Context) error {
 		return fmt.Errorf("Following nodes have incoherent info in KubeletConfig/NRT data:\n%s\n", string(prettyMap))
 	}
 
-	snnPodLevelNRTs := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, nrtv1alpha2.SingleNUMANodePodLevel)
-	numSnnPodLevelNRTs := len(snnPodLevelNRTs)
-
-	snnContainerLevelNRTs := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, nrtv1alpha2.SingleNUMANodeContainerLevel)
-	numSnnContainerLevelNRTs := len(snnContainerLevelNRTs)
-
-	if numSnnPodLevelNRTs < minNumberOfNodesWithSameTopology && numSnnContainerLevelNRTs < minNumberOfNodesWithSameTopology {
-		return fmt.Errorf("Not enough nodes with either %q topology (found:%d) nor %q topology (found: %d). Need at least %d", nrtv1alpha2.SingleNUMANodePodLevel, numSnnPodLevelNRTs, nrtv1alpha2.SingleNUMANodeContainerLevel, numSnnContainerLevelNRTs, minNumberOfNodesWithSameTopology)
+	singleNUMANodeNRTs := e2enrt.FilterByTopologyManagerPolicy(nrtList.Items, intnrt.SingleNUMANode)
+	if len(singleNUMANodeNRTs) < minNumberOfNodesWithSameTopology {
+		return fmt.Errorf("Not enough nodes with %q topology (found:%d). Need at least %d", intnrt.SingleNUMANode, len(singleNUMANodeNRTs), minNumberOfNodesWithSameTopology)
 	}
 
 	return nil
