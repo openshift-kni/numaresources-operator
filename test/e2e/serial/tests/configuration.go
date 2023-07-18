@@ -51,6 +51,7 @@ import (
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
@@ -79,11 +80,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
-		policies := []nrtv1alpha2.TopologyManagerPolicy{
-			nrtv1alpha2.SingleNUMANodeContainerLevel,
-			nrtv1alpha2.SingleNUMANodePodLevel,
-		}
-		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
+		nrts = e2enrt.FilterByTopologyManagerPolicy(nrtList.Items, intnrt.SingleNUMANode)
 		if len(nrts) < 2 {
 			Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
 		}

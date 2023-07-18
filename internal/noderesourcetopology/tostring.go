@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 )
 
 func ResourceInfoToString(resInfo nrtv1alpha2.ResourceInfo) string {
@@ -61,10 +62,16 @@ func ToString(nrt nrtv1alpha2.NodeResourceTopology) string {
 		name = "<MISSING>"
 	}
 	pol := "N/A"
-	if len(nrt.TopologyPolicies) > 0 {
-		pol = nrt.TopologyPolicies[0]
+	tmPolicy, ok := attribute.Get(nrt.Attributes, TopologyManagerPolicyAttribute)
+	if ok {
+		pol = tmPolicy.Value
 	}
-	fmt.Fprintf(&b, "%s policy=%s\n", name, pol)
+	scope := "N/A"
+	tmScope, ok := attribute.Get(nrt.Attributes, TopologyManagerScopeAttribute)
+	if ok {
+		scope = tmScope.Value
+	}
+	fmt.Fprintf(&b, "%s policy=%s, scope=%s\n", name, pol, scope)
 	for idx := range nrt.Zones {
 		fmt.Fprintf(&b, "- zone: %s\n", ZoneToString(nrt.Zones[idx]))
 	}

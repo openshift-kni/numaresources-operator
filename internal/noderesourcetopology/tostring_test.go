@@ -20,7 +20,6 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 )
@@ -166,48 +165,7 @@ func TestToString(t *testing.T) {
 	}{
 		{
 			name:     "empty",
-			expected: "<MISSING> policy=N/A\n",
-		},
-		{
-			name: "only-one",
-			nrt: nrtv1alpha2.NodeResourceTopology{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test-nrt",
-				},
-				TopologyPolicies: []string{
-					"restricted",
-					"ignored-from-the-second-onwards",
-				},
-				Zones: []nrtv1alpha2.Zone{
-					{
-						Name:   "zone-0",
-						Type:   "zoneTypeA",
-						Parent: "will-not-be-stringified",
-						Resources: []nrtv1alpha2.ResourceInfo{
-							{
-								Name:        "dev1",
-								Capacity:    resource.MustParse("10"),
-								Allocatable: resource.MustParse("9"),
-								Available:   resource.MustParse("4"),
-							},
-						},
-					},
-					{
-						Name:   "zone-1",
-						Type:   "zoneTypeA",
-						Parent: "will-not-be-stringified",
-						Resources: []nrtv1alpha2.ResourceInfo{
-							{
-								Name:        "dev1",
-								Capacity:    resource.MustParse("10"),
-								Allocatable: resource.MustParse("10"),
-								Available:   resource.MustParse("8"),
-							},
-						},
-					},
-				},
-			},
-			expected: "test-nrt policy=restricted\n- zone: zone-0 [zoneTypeA]: dev1=10/9/4\n- zone: zone-1 [zoneTypeA]: dev1=10/10/8\n",
+			expected: "<MISSING> policy=N/A, scope=N/A\n",
 		},
 	}
 	for _, tt := range testCases {
