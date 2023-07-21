@@ -98,7 +98,7 @@ func getTopologyConsistencyErrors(kconfigs map[string]*kubeletconfigv1beta1.Kube
 	for nodeName, kconfig := range kconfigs {
 		nrt, err := e2enrt.FindFromList(nrts, nodeName)
 		if err != nil {
-			ret[nodeName] = fmt.Errorf("Unable to find NRT for node %q", nrt.Name)
+			ret[nodeName] = fmt.Errorf("Unable to find NRT for node %q", nodeName)
 			continue
 		}
 
