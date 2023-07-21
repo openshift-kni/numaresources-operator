@@ -5,5 +5,5 @@ COPY . .
 
 RUN make build-pause
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+FROM registry.access.redhat.com/ubi9/ubi-minimal
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/pause /
