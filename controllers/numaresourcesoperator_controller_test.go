@@ -23,6 +23,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
+	configv1 "github.com/openshift/api/config/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 	appsv1 "k8s.io/api/apps/v1"
 
@@ -361,6 +362,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}
 					Expect(reconciler.Client.Get(context.TODO(), mc2Key, mc)).ToNot(HaveOccurred())
 				})
+
 			})
 			Context("on the second iteration", func() {
 				var secondLoopResult reconcile.Result
@@ -468,7 +470,80 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						}
 						Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).ToNot(HaveOccurred())
 					})
+					When(" daemonsets are ready", func() {
+						var dsDesiredNumberScheduled int32
+						var dsNumReady int32
+						BeforeEach(func() {
+							dsDesiredNumberScheduled = reconciler.RTEManifests.DaemonSet.Status.DesiredNumberScheduled
+							dsNumReady = reconciler.RTEManifests.DaemonSet.Status.NumberReady
 
+							key := client.ObjectKeyFromObject(nro)
+
+							reconciler.RTEManifests.DaemonSet.Status.DesiredNumberScheduled = int32(len(nro.Spec.NodeGroups))
+							reconciler.RTEManifests.DaemonSet.Status.NumberReady = reconciler.RTEManifests.DaemonSet.Status.DesiredNumberScheduled
+
+							_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+							Expect(err).ToNot(HaveOccurred())
+						})
+						AfterEach(func() {
+							key := client.ObjectKeyFromObject(nro)
+
+							reconciler.RTEManifests.DaemonSet.Status.DesiredNumberScheduled = dsDesiredNumberScheduled
+							reconciler.RTEManifests.DaemonSet.Status.NumberReady = dsNumReady
+
+							_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+							Expect(err).ToNot(HaveOccurred())
+						})
+						It(" operator status should report RelatedObjects as expected", func() {
+
+							By("Getting updated NROP Status")
+							key := client.ObjectKeyFromObject(nro)
+							nroUpdated := &nropv1.NUMAResourcesOperator{}
+							Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).ToNot(HaveOccurred())
+
+							Expect(nroUpdated.Status.DaemonSets).ToNot(BeEmpty())
+
+							//Should have this object references ...
+							expected := []configv1.ObjectReference{
+								{
+									Resource: "namespaces",
+									Name:     reconciler.Namespace,
+								},
+								{
+									Group:    "machineconfiguration.openshift.io",
+									Resource: "kubeletconfigs",
+								},
+								{
+									Group:    "machineconfiguration.openshift.io",
+									Resource: "machineconfigs",
+								},
+								{
+									Group:    "machineconfiguration.openshift.io",
+									Resource: "noderesourcetopologies",
+								},
+								{
+									Group:    "nfd.k8s-sig.io",
+									Resource: "nodefaturerules",
+								},
+								{
+									Group:    "nfd.k8s-sig.io",
+									Resource: "nodefeatures",
+								},
+							}
+							// ... and one for each DaemonSet
+							for _, ds := range nroUpdated.Status.DaemonSets {
+								expected = append(expected, configv1.ObjectReference{
+									Group:     "apps",
+									Resource:  "daemonsets",
+									Namespace: ds.Namespace,
+									Name:      ds.Name,
+								})
+							}
+
+							Expect(len(nroUpdated.Status.RelatedObjects)).To(Equal(len(expected)))
+							Expect(nroUpdated.Status.RelatedObjects).To(ContainElements(expected))
+						})
+					})
 				})
 			})
 		})
@@ -579,7 +654,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			mcp = testobjs.NewMachineConfigPool("test", labels, &metav1.LabelSelector{MatchLabels: labels}, &metav1.LabelSelector{MatchLabels: labels})
 		})
-
 		It("should set defaults in the DS objects", func() {
 			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, nil)
 

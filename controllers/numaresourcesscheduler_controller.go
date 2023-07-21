@@ -48,6 +48,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
+
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 const (
@@ -140,6 +142,7 @@ func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context
 	}
 
 	instance.Status = schedStatus
+	instance.Status.RelatedObjects = r.getRelatedObjects(instance.Status.Deployment)
 
 	ok, err := isDeploymentRunning(ctx, r.Client, schedStatus.Deployment)
 	if err != nil {
@@ -151,6 +154,24 @@ func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context
 
 	return ctrl.Result{}, status.ConditionAvailable, nil
 
+}
+
+func (r *NUMAResourcesSchedulerReconciler) getRelatedObjects(dpStatus nropv1.NamespacedName) []configv1.ObjectReference {
+	// 'Resource' should be in lowercase and plural
+	// See BZ1851214
+	// See https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-subdomain-names
+	return []configv1.ObjectReference{
+		{
+			Resource: "namespaces",
+			Name:     r.Namespace,
+		},
+		{
+			Group:     "apps",
+			Resource:  "deployments",
+			Namespace: dpStatus.Namespace,
+			Name:      dpStatus.Name,
+		},
+	}
 }
 
 func isDeploymentRunning(ctx context.Context, c client.Client, key nropv1.NamespacedName) (bool, error) {

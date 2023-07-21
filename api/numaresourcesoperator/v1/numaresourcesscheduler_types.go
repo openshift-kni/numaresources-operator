@@ -19,6 +19,7 @@ package v1
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
@@ -86,6 +87,9 @@ type NUMAResourcesSchedulerStatus struct {
 	CacheResyncPeriod *metav1.Duration `json:"cacheResyncPeriod,omitEmpty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+	// RelatedObjects list of objects of interest for this operator
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Related Objects"
+	RelatedObjects []configv1.ObjectReference `json:"relatedObjects,omitempty"`
 }
 
 //+genclient

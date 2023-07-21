@@ -74,6 +74,9 @@ spec:
           applied to this MachineConfigPool
         displayName: Optional configuration enforced on this NodeGroup
         path: machineconfigpools[0].config
+      - description: RelatedObjects list of objects of interest for this operator
+        displayName: Related Objects
+        path: relatedObjects
       version: v1
     - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
         API
@@ -186,6 +189,9 @@ spec:
       - description: Deployment of the secondary scheduler, namespaced name
         displayName: Scheduler deployment
         path: deployment
+      - description: RelatedObjects list of objects of interest for this operator
+        displayName: Related Objects
+        path: relatedObjects
       - description: Scheduler name to be used in pod templates
         displayName: Scheduler name
         path: schedulerName

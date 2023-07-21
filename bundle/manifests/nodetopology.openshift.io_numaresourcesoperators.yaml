@@ -307,6 +307,30 @@ spec:
                   - name
                   type: object
                 type: array
+              relatedObjects:
+                description: RelatedObjects list of objects of interest for this operator
+                items:
+                  description: ObjectReference contains enough information to let
+                    you inspect or modify the referred object.
+                  properties:
+                    group:
+                      description: group of the referent.
+                      type: string
+                    name:
+                      description: name of the referent.
+                      type: string
+                    namespace:
+                      description: namespace of the referent.
+                      type: string
+                    resource:
+                      description: resource of the referent.
+                      type: string
+                  required:
+                  - group
+                  - name
+                  - resource
+                  type: object
+                type: array
             type: object
         type: object
     served: true

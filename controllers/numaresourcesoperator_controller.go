@@ -25,6 +25,7 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+	configv1 "github.com/openshift/api/config/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
@@ -233,6 +234,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 
 	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, instance, daemonSetsInfo)
 	instance.Status.DaemonSets = dsStatuses
+	instance.Status.RelatedObjects = r.getRelatedObjects(dsStatuses)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, err
 	}
@@ -588,6 +590,49 @@ func (r *NUMAResourcesOperatorReconciler) mcpToNUMAResourceOperator(mcpObj clien
 	}
 
 	return requests
+}
+
+func (r *NUMAResourcesOperatorReconciler) getRelatedObjects(dsStatuses []nropv1.NamespacedName) []configv1.ObjectReference {
+	// 'Resource' should be in lowercase and plural
+	// See BZ1851214
+	// See https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-subdomain-names
+	ret := []configv1.ObjectReference{
+		{
+			Resource: "namespaces",
+			Name:     r.Namespace,
+		},
+		{
+			Group:    "machineconfiguration.openshift.io",
+			Resource: "kubeletconfigs",
+		},
+		{
+			Group:    "machineconfiguration.openshift.io",
+			Resource: "machineconfigs",
+		},
+		{
+			Group:    "machineconfiguration.openshift.io",
+			Resource: "noderesourcetopologies",
+		},
+		{
+			Group:    "nfd.k8s-sig.io",
+			Resource: "nodefaturerules",
+		},
+		{
+			Group:    "nfd.k8s-sig.io",
+			Resource: "nodefeatures",
+		},
+	}
+
+	for _, dsStatus := range dsStatuses {
+		ret = append(ret, configv1.ObjectReference{
+			Group:     "apps",
+			Resource:  "daemonsets",
+			Namespace: dsStatus.Namespace,
+			Name:      dsStatus.Name,
+		})
+	}
+
+	return ret
 }
 
 func validateUpdateEvent(e *event.UpdateEvent) bool {
