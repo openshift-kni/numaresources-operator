@@ -17,7 +17,6 @@ jobs:
     env:
       built_image: "numaresources-operator:ci" # Arbitrary name
       E2E_NAMESPACE_NAME: numaresources
-      E2E_TOPOLOGY_MANAGER_POLICY: SingleNUMANodePodLevel
       LOG_DIR: /tmp/test_e2e_logs
     steps:
     - name: Checkout
@@ -39,7 +38,7 @@ jobs:
 
     - name: build test binary
       run: |
-        make binary-e2e-rte binary-e2e-install binary-e2e-uninstall
+        make build-tools binary-e2e-rte binary-e2e-install binary-e2e-uninstall
 
     - name: Build image
       run: |
@@ -60,7 +59,8 @@ jobs:
     - name: E2E Tests
       run: |
         export KUBECONFIG=${HOME}/.kube/config
-        NO_TEARDOWN=true make test-e2e
+        bin/catkubeletconfigmap --namespace ${E2E_NAMESPACE_NAME} --prefix 'E2E_' >> $GITHUB_ENV
+        make test-e2e
 
     - name: Export E2E Tests logs
       if: ${{ failure() }}
