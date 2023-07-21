@@ -1,6 +1,6 @@
 FROM quay.io/openshift/origin-must-gather:4.14.0 AS builder
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 RUN microdnf install -y procps-ng tar rsync
 RUN microdnf clean all
 

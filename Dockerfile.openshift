@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+FROM registry.access.redhat.com/ubi9/ubi-minimal
 COPY manager /bin/numaresources-operator
 # bundle the operand, and use a backward compatible name for RTE
 COPY exporter /bin/resource-topology-exporter
