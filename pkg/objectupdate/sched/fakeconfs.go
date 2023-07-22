@@ -237,6 +237,7 @@ profiles:
       enabled:
       - name: VolumeBinding
         weight: 0
+    preEnqueue: {}
     preFilter:
       enabled:
       - name: NodeResourcesFit
@@ -426,6 +427,7 @@ profiles:
       enabled:
       - name: VolumeBinding
         weight: 0
+    preEnqueue: {}
     preFilter:
       enabled:
       - name: NodeResourcesFit
@@ -615,6 +617,7 @@ profiles:
       enabled:
       - name: VolumeBinding
         weight: 0
+    preEnqueue: {}
     preFilter:
       enabled:
       - name: NodeResourcesFit

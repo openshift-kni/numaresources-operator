@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"github.com/k8stopologyawareschedwg/podfingerprint"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/sharedcpuspool"
@@ -130,6 +131,8 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	var sysReservedMemory string
 	var sysResourceMapping string
 
+	var pfpMethod string
+
 	flags := flag.NewFlagSet(version.ProgramName(), flag.ExitOnError)
 
 	klog.InitFlags(flags)
@@ -144,7 +147,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.BoolVar(&pArgs.Resourcemonitor.ExposeTiming, "expose-timing", false, "If enable, expose expected and actual sleep interval as annotations.")
 	flags.BoolVar(&pArgs.Resourcemonitor.RefreshNodeResources, "refresh-node-resources", false, "If enable, track changes in node's resources")
 	flags.StringVar(&pArgs.Resourcemonitor.PodSetFingerprintStatusFile, "pods-fingerprint-status-file", "", "File to dump the pods fingerprint status. Use \"\" to disable.")
-	flags.BoolVar(&pArgs.Resourcemonitor.PodSetFingerprintUnrestricted, "pods-fingerprint-unrestricted", false, "If enable, compute the pod set fingerprint using all pods, not just the ones with NUMA-pinned resources.")
+	flags.StringVar(&pfpMethod, "pods-fingerprint-method", podfingerprint.MethodAll, fmt.Sprintf("Select the method to compute the pods fingerprint. Valid options: %s.", resourcemonitor.PFPMethodSupported()))
 
 	flags.StringVar(&pArgs.LocalArgs.ConfigPath, "config", "/etc/resource-topology-exporter/config.yaml", "Configuration file path. Use this to set the exclude list.")
 
@@ -193,6 +196,11 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	}
 	if pArgs.RTE.ReferenceContainer.IsEmpty() {
 		pArgs.RTE.ReferenceContainer = sharedcpuspool.ContainerIdentFromEnv()
+	}
+
+	pArgs.Resourcemonitor.PodSetFingerprintMethod, err = resourcemonitor.PFPMethodIsSupported(pfpMethod)
+	if err != nil {
+		return pArgs, err
 	}
 
 	conf, err := config.ReadFile(pArgs.LocalArgs.ConfigPath)
