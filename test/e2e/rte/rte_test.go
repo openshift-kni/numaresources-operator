@@ -35,6 +35,7 @@ import (
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	k8se2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	mcov1cli "github.com/openshift/machine-config-operator/pkg/generated/clientset/versioned/typed/machineconfiguration.openshift.io/v1"
@@ -302,7 +303,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 				// TODO: hardcoded path. Any smarter option?
 				cmd := []string{"/bin/cat", "/run/pfpstatus/dump.json"}
-				stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+				stdout, stderr, err := k8se2epod.ExecWithOptions(f, k8se2epod.ExecOptions{
 					Command:            cmd,
 					Namespace:          rtePod.Namespace,
 					PodName:            rtePod.Name,
