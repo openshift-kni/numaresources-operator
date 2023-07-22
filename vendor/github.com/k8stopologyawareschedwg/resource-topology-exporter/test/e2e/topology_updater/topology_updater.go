@@ -33,6 +33,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	k8se2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
@@ -49,6 +50,7 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 		initialized         bool
 		timeout             time.Duration
 		tmPolicy            string
+		tmScope             string
 		topologyClient      *topologyclientset.Clientset
 		topologyUpdaterNode *corev1.Node
 		workerNodes         []corev1.Node
@@ -73,20 +75,24 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 
 			workerNodes, err = e2enodes.GetWorkerNodes(f)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(workerNodes).ToNot(gomega.BeEmpty())
 
 			// pick any worker node. The (implicit, TODO: make explicit) assumption is
 			// the daemonset runs on CI on all the worker nodes.
-			topologyUpdaterNode = &workerNodes[0]
+			var hasLabel bool
+			topologyUpdaterNode, hasLabel = e2enodes.PickTargetNode(workerNodes)
 			gomega.Expect(topologyUpdaterNode).NotTo(gomega.BeNil())
-
-			// during the e2e tests we expect changes on the node topology.
-			// but in an environment with multiple worker nodes, we might be looking at the wrong node.
-			// thus, we assign a unique label to the picked worker node
-			// and making sure to deploy the pod on it during the test using nodeSelector
-			err = e2enodes.LabelNode(f, topologyUpdaterNode, map[string]string{e2econsts.TestNodeLabel: ""})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			if !hasLabel {
+				// during the e2e tests we expect changes on the node topology.
+				// but in an environment with multiple worker nodes, we might be looking at the wrong node.
+				// thus, we assign a unique label to the picked worker node
+				// and making sure to deploy the pod on it during the test using nodeSelector
+				err = e2enodes.LabelNode(f, topologyUpdaterNode, map[string]string{e2econsts.TestNodeLabel: ""})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			}
 
 			tmPolicy = e2etestenv.GetTopologyManagerPolicy()
+			tmScope = e2etestenv.GetTopologyManagerScope()
 
 			initialized = true
 		}
@@ -101,7 +107,7 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 			ginkgo.By("creating a pod consuming resources from the shared, non-exclusive CPU pool (best-effort QoS)")
 			sleeperPod := e2epods.MakeBestEffortSleeperPod()
 
-			pod := f.PodClient().CreateSync(sleeperPod)
+			pod := k8se2epod.NewPodClient(f).CreateSync(sleeperPod)
 			ginkgo.DeferCleanup(func(cs clientset.Interface, podNamespace, podName string) error {
 				return e2epods.DeletePodSyncByName(cs, podNamespace, podName)
 			}, f.ClientSet, pod.Namespace, pod.Name)
@@ -141,7 +147,7 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 			ginkgo.By("creating a pod consuming resources from the shared, non-exclusive CPU pool (guaranteed QoS, nonintegral request)")
 			sleeperPod := e2epods.MakeGuaranteedSleeperPod("500m")
 
-			pod := f.PodClient().CreateSync(sleeperPod)
+			pod := k8se2epod.NewPodClient(f).CreateSync(sleeperPod)
 			ginkgo.DeferCleanup(func(cs clientset.Interface, podNamespace, podName string) error {
 				return e2epods.DeletePodSyncByName(cs, podNamespace, podName)
 			}, f.ClientSet, pod.Namespace, pod.Name)
@@ -189,7 +195,7 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 			ginkgo.By("creating a pod consuming exclusive CPUs")
 			sleeperPod := e2epods.MakeGuaranteedSleeperPod("1000m")
 
-			pod := f.PodClient().CreateSync(sleeperPod)
+			pod := k8se2epod.NewPodClient(f).CreateSync(sleeperPod)
 			ginkgo.DeferCleanup(func(cs clientset.Interface, podNamespace, podName string) error {
 				return e2epods.DeletePodSyncByName(cs, podNamespace, podName)
 			}, f.ClientSet, pod.Namespace, pod.Name)
@@ -219,7 +225,7 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 
 		ginkgo.It("should fill the node resource topologies CR with the data", func() {
 			nodeTopology := e2enodetopology.GetNodeTopology(topologyClient, topologyUpdaterNode.Name)
-			isValid := e2enodetopology.IsValidNodeTopology(nodeTopology, tmPolicy)
+			isValid := e2enodetopology.IsValidNodeTopology(nodeTopology, tmPolicy, tmScope)
 			gomega.Expect(isValid).To(gomega.BeTrue(), "received invalid topology: %v", nodeTopology)
 		})
 	})
