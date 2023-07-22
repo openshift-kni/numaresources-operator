@@ -791,7 +791,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
 
 			args := ds.Spec.Template.Spec.Containers[0].Args
-			Expect(args).To(ContainElement("--pods-fingerprint-unrestricted=false"), "malformed args: %v", args)
+			Expect(args).To(ContainElement("--pods-fingerprint-method=with-exclusive-resources"), "malformed args: %v", args)
 
 			key := client.ObjectKeyFromObject(nro)
 
@@ -810,7 +810,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
 
 			args = ds.Spec.Template.Spec.Containers[0].Args
-			Expect(args).To(ContainElement("--pods-fingerprint-unrestricted=true"), "malformed args: %v", args)
+			Expect(args).To(ContainElement("--pods-fingerprint-method=all"), "malformed args: %v", args)
 		})
 	})
 
