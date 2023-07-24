@@ -115,8 +115,13 @@ vet: ## Run go vet against code.
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
 
-test-unit: envtest
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./api/... ./controllers/... ./pkg/... ./rte/pkg/... ./internal/...
+test-unit: test-unit-pkgs test-controllers
+
+test-unit-pkgs:
+	go test ./api/... ./pkg/... ./rte/pkg/... ./internal/...
+
+test-controllers: envtest
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/...
 
 test-e2e: build-e2e-all
 	ENABLE_SCHED_TESTS=true hack/run-test-e2e.sh
