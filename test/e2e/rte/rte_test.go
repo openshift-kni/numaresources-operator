@@ -181,7 +181,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			for _, mcoKc := range mcoKcList.Items {
 				ginkgo.By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
 
-				_, err = mcoKubeletConfToKubeletConf(&mcoKc)
+				kc, err := mcoKubeletConfToKubeletConf(&mcoKc)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				mcps, err := nodegroupv1.FindMachineConfigPools(mcpList, nroObj.Spec.NodeGroups)
@@ -199,6 +199,8 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				rc, err := rteConfigMapToRTEConfig(cm)
 				klog.Infof("RTE config: %#v", rc)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(rc.TopologyManagerPolicy).To(gomega.Equal(kc.TopologyManagerPolicy), "TopologyManager Policy mismatch")
+				gomega.Expect(rc.TopologyManagerScope).To(gomega.Equal(kc.TopologyManagerScope), "TopologyManager Scope mismatch")
 			}
 		})
 
