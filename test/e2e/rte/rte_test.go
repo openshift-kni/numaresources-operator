@@ -200,14 +200,8 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				klog.Infof("RTE config: %#v", rc)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				// we intentionally don't check the values themselves - atm this would
-				// be to complex, effectively rewriting most of the controller logic
-				if len(kc.ReservedSystemCPUs) > 0 {
-					gomega.Expect(rc.Resources.ReservedCPUs).ToNot(gomega.BeEmpty())
-				}
-				if len(kc.ReservedMemory) > 0 {
-					gomega.Expect(rc.Resources.ReservedMemory).ToNot(gomega.BeEmpty())
-				}
+				gomega.Expect(rc.TopologyManagerPolicy).To(gomega.Equal(kc.TopologyManagerPolicy), "TopologyManager Policy mismatch")
+				gomega.Expect(rc.TopologyManagerScope).To(gomega.Equal(kc.TopologyManagerScope), "TopologyManager Scope mismatch")
 			}
 		})
 
