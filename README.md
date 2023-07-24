@@ -16,9 +16,11 @@ In addition to this, PodResource API is used to extract the resource information
 
 ## running the e2e suite against your cluster
 
-The NUMA resources operator comes with a growing e2e suite to validate components of the stack (operator proper, RTE) as well as the NUMA aware scheduling as a whole.
+The NUMA resources operator comes with a growing e2e suite to validate components of the stack (operator proper, RTE)
+as well as the NUMA aware scheduling as a whole.
 Pre-built container images including the suites [are available](https://quay.io/repository/openshift-kni/numaresources-operator-tests).
 There is **no support** for these e2e tests images, and they are recommended to be used only for development/CI purposes.
 
 See `README.tests.md` for detailed instructions about how to run the suite.
 See `tests/e2e/serial/README.md` for fine details about the suite and developer instructions.
+
