@@ -17,7 +17,6 @@ RUN yum --setopt=install_weak_deps=False -y install \
     gettext \
     which \
     findutils \
-    python2 \
     && yum clean all
 
 RUN mkdir -p $HOME && \
