@@ -146,7 +146,7 @@ func TestNodeGroupsSanity(t *testing.T) {
 			},
 
 			expectedError:        true,
-			expectedErrorMessage: "not a valid pod selector operator",
+			expectedErrorMessage: "not a valid label selector operator",
 		},
 		{
 			name: "correct values",

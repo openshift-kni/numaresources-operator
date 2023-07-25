@@ -237,6 +237,7 @@ profiles:
       enabled:
       - name: VolumeBinding
         weight: 0
+    preEnqueue: {}
     preFilter:
       enabled:
       - name: NodeResourcesFit
@@ -426,6 +427,7 @@ profiles:
       enabled:
       - name: VolumeBinding
         weight: 0
+    preEnqueue: {}
     preFilter:
       enabled:
       - name: NodeResourcesFit
@@ -615,6 +617,7 @@ profiles:
       enabled:
       - name: VolumeBinding
         weight: 0
+    preEnqueue: {}
     preFilter:
       enabled:
       - name: NodeResourcesFit
@@ -682,6 +685,7 @@ func yamlCompare(t *testing.T, testName, got, expected string) {
 			continue
 		}
 		t.Errorf("test %q diff %d: op=%s text=%q\n", testName, idx, hunk.Type.String(), hunk.Text)
+		diffCount++
 	}
 	if diffCount > 0 {
 		var err error

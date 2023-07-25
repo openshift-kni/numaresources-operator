@@ -32,11 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	k8se2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	e2enodes "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes"
 	e2epods "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods"
 	e2ertepod "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods/rtepod"
+	e2econsts "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testconsts"
 	e2etestenv "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testenv"
 )
 
@@ -69,11 +71,21 @@ var _ = ginkgo.Describe("[RTE][Monitoring] metrics", func() {
 
 			workerNodes, err = e2enodes.GetWorkerNodes(f)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(workerNodes).ToNot(gomega.BeEmpty())
 
 			// pick any worker node. The (implicit, TODO: make explicit) assumption is
 			// the daemonset runs on CI on all the worker nodes.
-			topologyUpdaterNode = &workerNodes[0]
+			var hasLabel bool
+			topologyUpdaterNode, hasLabel = e2enodes.PickTargetNode(workerNodes)
 			gomega.Expect(topologyUpdaterNode).NotTo(gomega.BeNil())
+			if !hasLabel {
+				// during the e2e tests we expect changes on the node topology.
+				// but in an environment with multiple worker nodes, we might be looking at the wrong node.
+				// thus, we assign a unique label to the picked worker node
+				// and making sure to deploy the pod on it during the test using nodeSelector
+				err = e2enodes.LabelNode(f, topologyUpdaterNode, map[string]string{e2econsts.TestNodeLabel: ""})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			}
 
 			initialized = true
 		}
@@ -84,7 +96,7 @@ var _ = ginkgo.Describe("[RTE][Monitoring] metrics", func() {
 			rteContainerName, err := e2ertepod.FindRTEContainerName(rtePod)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+			stdout, stderr, err := k8se2epod.ExecWithOptions(f, k8se2epod.ExecOptions{
 				Command:            []string{"curl", fmt.Sprintf("http://127.0.0.1:%d/metrics", metricsPort)},
 				Namespace:          rtePod.Namespace,
 				PodName:            rtePod.Name,
@@ -109,7 +121,7 @@ var _ = ginkgo.Describe("[RTE][Monitoring] metrics", func() {
 			dumpPods(f, topologyUpdaterNode.Name, "reference pods")
 
 			sleeperPod := e2epods.MakeGuaranteedSleeperPod("1000m")
-			pod := f.PodClient().CreateSync(sleeperPod)
+			pod := k8se2epod.NewPodClient(f).CreateSync(sleeperPod)
 			ginkgo.DeferCleanup(func(cs clientset.Interface, podNamespace, podName string) error {
 				return e2epods.DeletePodSyncByName(cs, podNamespace, podName)
 			}, f.ClientSet, pod.Namespace, pod.Name)
@@ -118,7 +130,7 @@ var _ = ginkgo.Describe("[RTE][Monitoring] metrics", func() {
 			rteContainerName, err := e2ertepod.FindRTEContainerName(rtePod)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+			stdout, stderr, err := k8se2epod.ExecWithOptions(f, k8se2epod.ExecOptions{
 				Command:            []string{"curl", fmt.Sprintf("http://127.0.0.1:%d/metrics", metricsPort)},
 				Namespace:          rtePod.Namespace,
 				PodName:            rtePod.Name,
