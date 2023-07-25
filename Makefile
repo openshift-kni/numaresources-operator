@@ -170,7 +170,7 @@ binary-e2e-sched:
 	go test -c -v -o bin/e2e-nrop-sched.test ./test/e2e/sched
 
 binary-e2e-serial:
-	go test -c -v -o bin/e2e-nrop-serial.test ./test/e2e/serial
+	CGO_ENABLED=0 go test -c -v -o bin/e2e-nrop-serial.test ./test/e2e/serial
 
 binary-e2e-tools:
 	go test -c -v -o bin/e2e-nrop-tools.test ./test/e2e/tools
