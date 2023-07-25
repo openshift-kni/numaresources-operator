@@ -48,7 +48,7 @@ trap '{ if [ "${NO_TEARDOWN}" = false ]; then
 echo "Running NRO install test suite"
 ${BIN_DIR}/e2e-nrop-install.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.fail-fast --ginkgo.junit-report=${REPORT_DIR}/install.xml --ginkgo.focus='\[Install\] continuousIntegration'
 
-# The install failed, no taste to continue
+# The install failed, no reason to continue
 if [ $? -ne 0 ]; then
     echo "Failed to install NRO"
     exit 1

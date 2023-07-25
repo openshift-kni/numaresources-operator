@@ -138,13 +138,17 @@ func NewNamespace(name string) *corev1.Namespace {
 			APIVersion: "v1",
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
-			Labels: map[string]string{
-				"pod-security.kubernetes.io/audit":               "privileged",
-				"pod-security.kubernetes.io/enforce":             "privileged",
-				"pod-security.kubernetes.io/warn":                "privileged",
-				"security.openshift.io/scc.podSecurityLabelSync": "false",
-			},
+			Name:   name,
+			Labels: NamespaceLabels(),
 		},
+	}
+}
+
+func NamespaceLabels() map[string]string {
+	return map[string]string{
+		"pod-security.kubernetes.io/audit":               "privileged",
+		"pod-security.kubernetes.io/enforce":             "privileged",
+		"pod-security.kubernetes.io/warn":                "privileged",
+		"security.openshift.io/scc.podSecurityLabelSync": "false",
 	}
 }
