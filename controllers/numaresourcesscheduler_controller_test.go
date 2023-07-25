@@ -22,6 +22,7 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	configv1 "github.com/openshift/api/config/v1"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -155,6 +156,31 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(gomega.HaveOccurred())
 			gomega.Expect(nrs.Status.CacheResyncPeriod).ToNot(gomega.BeNil())
 			gomega.Expect(*nrs.Status.CacheResyncPeriod).To(gomega.Equal(*nrs.Spec.CacheResyncPeriod))
+		})
+
+		ginkgo.It("should expose relatedObjects in status", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(gomega.HaveOccurred())
+
+			expected := []configv1.ObjectReference{
+				{
+					Resource: "namespaces",
+					Name:     reconciler.Namespace,
+				},
+				{
+					Group:     "apps",
+					Resource:  "deployments",
+					Namespace: nrs.Status.Deployment.Namespace,
+					Name:      nrs.Status.Deployment.Name,
+				},
+			}
+
+			gomega.Expect(nrs.Status.RelatedObjects).ToNot(gomega.BeEmpty())
+			gomega.Expect(len(nrs.Status.RelatedObjects)).To(gomega.Equal(len(expected)))
+			gomega.Expect(nrs.Status.RelatedObjects).To(gomega.ContainElements(expected))
 		})
 
 		ginkgo.It("should update the resync period in status", func() {
