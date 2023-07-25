@@ -33,6 +33,7 @@ import (
 	corev1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
@@ -72,11 +73,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
-		policies := []nrtv1alpha2.TopologyManagerPolicy{
-			nrtv1alpha2.SingleNUMANodeContainerLevel,
-			nrtv1alpha2.SingleNUMANodePodLevel,
-		}
-		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
+		nrts = e2enrt.FilterByTopologyManagerPolicy(nrtList.Items, intnrt.SingleNUMANode)
 		if len(nrts) < 2 {
 			e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 		}

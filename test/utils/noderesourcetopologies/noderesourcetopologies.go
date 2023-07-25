@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 	nrtv1alpha2attr "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
@@ -321,14 +322,30 @@ func AccumulateNames(nrts []nrtv1alpha2.NodeResourceTopology) sets.String {
 	return nodeNames
 }
 
-func FilterTopologyManagerPolicy(nrts []nrtv1alpha2.NodeResourceTopology, tmPolicy nrtv1alpha2.TopologyManagerPolicy) []nrtv1alpha2.NodeResourceTopology {
+func FilterByTopologyManagerPolicy(nrts []nrtv1alpha2.NodeResourceTopology, tmPolicy string) []nrtv1alpha2.NodeResourceTopology {
+	return filterByAttribute(nrts, nrtv1alpha2.AttributeInfo{Name: e2enrt.TopologyManagerPolicyAttribute, Value: tmPolicy})
+}
+
+func FilterByTopologyManagerScope(nrts []nrtv1alpha2.NodeResourceTopology, tmScope string) []nrtv1alpha2.NodeResourceTopology {
+	return filterByAttribute(nrts, nrtv1alpha2.AttributeInfo{Name: e2enrt.TopologyManagerScopeAttribute, Value: tmScope})
+}
+
+func FilterByTopologyManagerPolicyAndScope(nrts []nrtv1alpha2.NodeResourceTopology, tmPolicy, tmScope string) []nrtv1alpha2.NodeResourceTopology {
+	return FilterByTopologyManagerScope(FilterByTopologyManagerPolicy(nrts, tmPolicy), tmScope)
+}
+
+func filterByAttribute(nrts []nrtv1alpha2.NodeResourceTopology, attrInfo nrtv1alpha2.AttributeInfo) []nrtv1alpha2.NodeResourceTopology {
 	ret := []nrtv1alpha2.NodeResourceTopology{}
 	for _, nrt := range nrts {
-		if !contains(nrt.TopologyPolicies, string(tmPolicy)) {
-			klog.Warningf("SKIP: node %q doesn't support topology manager policy %q", nrt.Name, string(tmPolicy))
+		attr, ok := attribute.Get(nrt.Attributes, attrInfo.Name)
+		if !ok {
+			klog.Error("SKIP: node %q doesn't have required attribute %q", nrt.Name, attrInfo.Name)
 			continue
 		}
-		klog.Infof("ADD : node %q supports topology manager policy %q", nrt.Name, string(tmPolicy))
+		if attr.Value != attrInfo.Value {
+			klog.Warningf("SKIP: node %q doesn't wrong attribute value actual:%q, expected: %q", nrt.Name, attr.Value, attrInfo.Value)
+			continue
+		}
 		ret = append(ret, nrt)
 	}
 	return ret
@@ -432,15 +449,6 @@ func ResourceInfoProviding(resources []nrtv1alpha2.ResourceInfo, resName string,
 		return onEqual
 	}
 	return true
-}
-
-func FilterByPolicies(list []nrtv1alpha2.NodeResourceTopology, policies []nrtv1alpha2.TopologyManagerPolicy) []nrtv1alpha2.NodeResourceTopology {
-	var filteredNrts []nrtv1alpha2.NodeResourceTopology
-	for _, policy := range policies {
-		nrts := FilterTopologyManagerPolicy(list, policy)
-		filteredNrts = append(filteredNrts, nrts...)
-	}
-	return filteredNrts
 }
 
 func findZoneByName(nrt nrtv1alpha2.NodeResourceTopology, zoneName string) (*nrtv1alpha2.Zone, error) {

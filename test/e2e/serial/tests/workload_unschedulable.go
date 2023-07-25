@@ -33,10 +33,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
@@ -54,7 +57,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 	var nrts []nrtv1alpha2.NodeResourceTopology
-	var tmPolicy string
+	var tmScope string
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
@@ -71,11 +74,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
-		policies := []nrtv1alpha2.TopologyManagerPolicy{
-			nrtv1alpha2.SingleNUMANodeContainerLevel,
-			nrtv1alpha2.SingleNUMANodePodLevel,
-		}
-		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
+		nrts = e2enrt.FilterByTopologyManagerPolicy(nrtList.Items, intnrt.SingleNUMANode)
 		if len(nrts) < 2 {
 			e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 		}
@@ -86,7 +85,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 		}
 
 		// we expect having the same policy across all NRTs
-		tmPolicy = nrts[0].TopologyPolicies[0]
+		scope, ok := attribute.Get(nrts[0].Attributes, intnrt.TopologyManagerScopeAttribute)
+		Expect(ok).To(BeTrue(), fmt.Sprintf("Unable to find required Attribute %q", intnrt.TopologyManagerScopeAttribute))
+
+		tmScope = scope.Value
 
 		// Note that this test, being part of "serial", expects NO OTHER POD being scheduled
 		// in between, so we consider this information current and valid when the It()s run.
@@ -188,7 +190,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			e2efixture.WaitForNRTSettle(fxt)
 
 			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
-			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
+			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 		})
@@ -223,7 +225,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			e2efixture.WaitForNRTSettle(fxt)
 
 			for _, pod := range pods {
-				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
+				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
@@ -263,7 +265,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			e2efixture.WaitForNRTSettle(fxt)
 
 			for _, pod := range pods {
-				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
+				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
@@ -421,7 +423,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					Expect(err).ToNot(HaveOccurred(), "unable to get pod %s/%s to be Running after %v", pod.Namespace, pod.Name, podRunningTimeout)
 
 				} else {
-					isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmPolicy)
+					isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
 					if err != nil {
 						_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 					}
@@ -443,11 +445,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			neededNodes := 1
 			// with at least this number of numa zones
 			requiredNUMAZones := 2
-			// and with this policy
-			tmPolicy := nrtv1alpha2.SingleNUMANodePodLevel
+			// and with this policy/scope
+			tmPolicy := intnrt.SingleNUMANode
+			tmScope := intnrt.Pod
 
 			// filter by policy
-			nrtCandidates := e2enrt.FilterTopologyManagerPolicy(nrtList.Items, tmPolicy)
+			nrtCandidates := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtList.Items, tmPolicy, tmScope)
 			if len(nrtCandidates) < neededNodes {
 				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(tmPolicy), len(nrtCandidates))
 			}
@@ -577,7 +580,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled", serialconfig.Config.SchedulerName))
-			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, string(tmPolicy))
+			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
 			Expect(err).ToNot(HaveOccurred())
 			if !isFailed {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)

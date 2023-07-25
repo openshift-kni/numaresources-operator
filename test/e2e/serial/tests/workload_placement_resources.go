@@ -33,6 +33,7 @@ import (
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
@@ -84,7 +85,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 		// FIXME: this is a slight abuse of DescribeTable, but we need to run
 		// the same code with a different test_id per tmscope
 		DescribeTable("[tier1][ressched] a guaranteed pod with one container should be placed and aligned on the node",
-			func(tmPolicy nrtv1alpha2.TopologyManagerPolicy, requiredRes, expectedFreeRes corev1.ResourceList) {
+			func(tmPolicy, tmScope string, requiredRes, expectedFreeRes corev1.ResourceList) {
 				nrtCandidates, targetNodeName := setupNodes(fxt, desiredNodesState{
 					NRTList:           nrtList,
 					RequiredNodes:     2,
@@ -93,7 +94,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 					FreeResources:     expectedFreeRes,
 				})
 
-				nrts := e2enrt.FilterTopologyManagerPolicy(nrtCandidates, tmPolicy)
+				nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtCandidates, tmPolicy, tmScope)
 				if len(nrts) != len(nrtCandidates) {
 					e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts))
 				}
@@ -122,7 +123,8 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			},
 			Entry("[tmscope:pod] with topology-manager-scope: pod, using memory as deciding factor",
-				nrtv1alpha2.SingleNUMANodePodLevel,
+				intnrt.SingleNUMANode,
+				intnrt.Pod,
 				// required resources for the test pod
 				corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("16"),
@@ -143,7 +145,8 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 				},
 			),
 			Entry("[tmscope:pod] with topology-manager-scope: pod, using CPU as the deciding factor",
-				nrtv1alpha2.SingleNUMANodePodLevel,
+				intnrt.SingleNUMANode,
+				intnrt.Pod,
 				// required resources for the test pod
 				corev1.ResourceList{
 					corev1.ResourceCPU:    resource.MustParse("16"),
