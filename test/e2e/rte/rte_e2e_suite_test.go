@@ -31,6 +31,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
 
+	e2etestns "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/namespace"
+	"github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/test/utils/runtime"
 
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte"
@@ -53,6 +55,9 @@ func TestMain(m *testing.M) {
 
 	randomSeed = time.Now().UnixNano()
 	rand.Seed(randomSeed)
+
+	e2etestns.Labels = objects.NamespaceLabels()
+
 	os.Exit(m.Run())
 }
 
