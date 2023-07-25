@@ -6,5 +6,4 @@ spec:
   imageSpec: "quay.io/fromani/k8s-sched-plugins:v0.0.2023052204"
   logLevel: "Trace"
   schedulerName: "topo-aware-scheduler"
-  cacheResyncPeriod: "5s"
   cacheResyncDebug: "DumpJSONFile"
