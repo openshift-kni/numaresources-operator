@@ -6,6 +6,7 @@ kubeadmConfigPatches:
   cpuManagerPolicy: "static"
   cpuManagerReconcilePeriod: "5s"
   topologyManagerPolicy: "single-numa-node"
+  topologyManagerScope: "container"
   reservedSystemCPUs: "0"
   featureGates:
     KubeletPodResourcesGetAllocatable: true

@@ -363,7 +363,7 @@ goversion:
 	@go version
 
 .PHONY: build-tools
-build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform
+build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap
 
 bin/buildhelper:
 	@go build -o bin/buildhelper tools/buildhelper/buildhelper.go
@@ -373,6 +373,9 @@ bin/envsubst:
 
 bin/lsplatform:
 	@go build -o bin/lsplatform tools/lsplatform/lsplatform.go
+
+bin/catkubeletconfmap:
+	@go build -o bin/catkubeletconfmap tools/catkubeletconfmap/catkubeletconfmap.go
 
 verify-generated: bundle generate
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
