@@ -35,9 +35,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/config"
-	"github.com/openshift-kni/numaresources-operator/rte/pkg/podrescompat"
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/podresfilter"
-	"github.com/openshift-kni/numaresources-operator/rte/pkg/sysinfo"
 )
 
 const (
@@ -48,7 +46,6 @@ const (
 )
 
 type localArgs struct {
-	SysConf     sysinfo.Config
 	ConfigPath  string
 	PodExcludes map[string]string
 }
@@ -59,7 +56,6 @@ type ProgArgs struct {
 	RTE             resourcetopologyexporter.Args
 	LocalArgs       localArgs
 	Version         bool
-	SysinfoOnly     bool
 	DumpConfig      bool
 }
 
@@ -85,30 +81,12 @@ func main() {
 		os.Exit(0)
 	}
 
-	sysInfo, err := sysinfo.NewSysinfo(parsedArgs.LocalArgs.SysConf)
-	if err != nil {
-		klog.Fatalf("failed to query system info: %w", err)
-	}
-	klog.Infof(`
-=== System information ===
-%s
-==========================`, sysInfo)
-
-	if parsedArgs.SysinfoOnly {
-		os.Exit(0)
-	}
-
-	k8sCli, err := podres.GetClient(parsedArgs.RTE.PodResourcesSocketPath)
+	cli, err := podres.GetClient(parsedArgs.RTE.PodResourcesSocketPath)
 	if err != nil {
 		klog.Fatalf("failed to start prometheus server: %v", err)
 	}
 
-	sysCli := k8sCli
-	if !parsedArgs.LocalArgs.SysConf.IsEmpty() {
-		sysCli = podrescompat.NewSysinfoClientFromLister(k8sCli, parsedArgs.LocalArgs.SysConf)
-	}
-
-	cli := sharedcpuspool.NewFromLister(sysCli, parsedArgs.RTE.Debug, parsedArgs.RTE.ReferenceContainer)
+	cli = sharedcpuspool.NewFromLister(cli, parsedArgs.RTE.Debug, parsedArgs.RTE.ReferenceContainer)
 
 	err = prometheus.InitPrometheus(prometheus.ServingDisabled)
 	if err != nil {
@@ -126,9 +104,7 @@ func main() {
 func parseArgs(args ...string) (ProgArgs, error) {
 	pArgs := ProgArgs{}
 
-	var sysReservedCPUs string
-	var sysReservedMemory string
-	var sysResourceMapping string
+	var pfpMethod string
 
 	flags := flag.NewFlagSet(version.ProgramName(), flag.ExitOnError)
 
@@ -166,10 +142,6 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.Int64Var(&pArgs.RTE.MaxEventsPerTimeUnit, "max-events-per-second", 1, "Max times per second resources will be scanned and updated")
 	pArgs.RTE.TimeUnitToLimitEvents = time.Second
 
-	flags.StringVar(&sysReservedCPUs, "system-info-reserved-cpus", "", "kubelet reserved CPUs (cpuset format: 0,1 or 0,1-3 ...)")
-	flags.StringVar(&sysReservedMemory, "system-info-reserved-memory", "", "kubelet reserved memory: comma-separated 'numaID=amount' (example: '0=16Gi,1=8192Mi,3=1Gi')")
-	flags.StringVar(&sysResourceMapping, "system-info-resource-mapping", "", "kubelet resource mapping: comma-separated 'vendor:device=resourcename'")
-	flags.BoolVar(&pArgs.SysinfoOnly, "system-info", false, "Output detected system info and exit")
 	flags.BoolVar(&pArgs.DumpConfig, "dump-config", false, "Output the configuration settings and exit - the output format is JSON, subjected to change without notice.")
 	flags.BoolVar(&pArgs.Version, "version", false, "Output version and exit")
 
@@ -203,21 +175,8 @@ func parseArgs(args ...string) (ProgArgs, error) {
 		pArgs.Resourcemonitor.ResourceExclude = conf.ExcludeList
 		klog.V(2).Infof("using exclude list:\n%s", pArgs.Resourcemonitor.ResourceExclude.String())
 	}
-	pArgs.LocalArgs.SysConf = conf.Resources
+
 	pArgs.LocalArgs.PodExcludes = conf.PodExcludes
-
-	// override from the command line
-	if sysReservedCPUs != "" {
-		pArgs.LocalArgs.SysConf.ReservedCPUs = sysReservedCPUs
-	}
-	if rmap := sysinfo.ResourceMappingFromString(sysResourceMapping); len(rmap) > 0 {
-		pArgs.LocalArgs.SysConf.ResourceMapping = rmap
-	}
-	if rmap := sysinfo.ReservedMemoryFromString(sysReservedMemory); len(rmap) > 0 {
-		pArgs.LocalArgs.SysConf.ReservedMemory = rmap
-	}
-
-	klog.Infof("using sysinfo:\n%s", pArgs.LocalArgs.SysConf.ToYAMLString())
 
 	err = setupTopologyManagerConfig(&pArgs, conf)
 	if err != nil {
