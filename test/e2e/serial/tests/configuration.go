@@ -473,12 +473,12 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			}
 			Expect(targetedKC).ToNot(BeNil(), "there should be at least one kubeletconfig.machineconfiguration object")
 
-			//save initial reserved cpus to use it when restoring kc
+			//save initial Topology Manager scope to use it when restoring kc
 			kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
 			Expect(err).ToNot(HaveOccurred())
-			initialRsvCPUs := kcObj.ReservedSystemCPUs
+			initialTopologyManagerScope := kcObj.TopologyManagerScope
 
-			By("modifying reserved CPUs under kubeletconfig")
+			By("modifying Topology Manager Scope under kubeletconfig")
 			Eventually(func(g Gomega) {
 				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), targetedKC)
 				Expect(err).ToNot(HaveOccurred())
@@ -486,7 +486,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				kcObj, err = kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
 				Expect(err).ToNot(HaveOccurred())
 
-				applyNewReservedSystemCPUsValue(&kcObj.ReservedSystemCPUs)
+				applyNewTopologyManagerScopeValue(&kcObj.TopologyManagerScope)
 				err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -540,8 +540,8 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				conf, err := rteConfigFrom(data)
 				Expect(err).ToNot(HaveOccurred(), "failed to obtain rteConfig from ConfigMap %q error: %v", cmKey.String(), err)
 
-				if conf.Resources.ReservedCPUs == initialRsvCPUs {
-					klog.Warningf("ConfigMap %q has not been updated with new ReservedCPUs value after kubeletconfig modification", cmKey.String())
+				if conf.TopologyManagerScope == initialTopologyManagerScope {
+					klog.Warningf("ConfigMap %q has not been updated with new TopologyManagerScope after kubeletconfig modification", cmKey.String())
 					return false
 				}
 				return true
@@ -598,7 +598,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					kcObj, err = kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
 					Expect(err).ToNot(HaveOccurred())
 
-					kcObj.ReservedSystemCPUs = initialRsvCPUs
+					kcObj.TopologyManagerScope = initialTopologyManagerScope
 					err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
 					Expect(err).ToNot(HaveOccurred())
 
@@ -683,22 +683,22 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 	})
 })
 
-// each KubeletConfig has a (single) field of the ReservedSystemCPUs
+// each KubeletConfig has a field for TopologyManagerScope
 // since we don't care about the value itself, and we just want to trigger a machine-config change, we just pick some random value.
-// the current ReservedSystemCPUs value is unknown in runtime, hence there are two options here:
+// the current TopologyManagerScope value is unknown in runtime, hence there are two options here:
 // 1. the current value is equal to the random value we choose.
 // 2. the current value is not equal to the random value we choose.
 // in option number 2 we are good to go, but if happened, and we land on option number 1,
-// it won't trigger a machine-config change (because the value has left the same) so we just pick another random value,
+// it won't trigger a machine-config change (because the value has left the same) so we just pick another value,
 // which now we are certain that it is different from the existing one.
 // in conclusion, the maximum attempts is 2.
-func applyNewReservedSystemCPUsValue(oldRsvCPUs *string) {
-	newRsvCPUs := "3-4"
+func applyNewTopologyManagerScopeValue(oldTopologyManagerScopeValue *string) {
+	newTopologyManagerScopeValue := "container"
 	// if it happens to be the same, pick something else
-	if *oldRsvCPUs == newRsvCPUs {
-		newRsvCPUs = "3-5"
+	if *oldTopologyManagerScopeValue == newTopologyManagerScopeValue {
+		newTopologyManagerScopeValue = "pod"
 	}
-	*oldRsvCPUs = newRsvCPUs
+	*oldTopologyManagerScopeValue = newTopologyManagerScopeValue
 }
 
 func rteConfigFrom(data string) (*rteconfig.Config, error) {

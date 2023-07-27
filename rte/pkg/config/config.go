@@ -28,8 +28,6 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	"sigs.k8s.io/yaml"
-
-	"github.com/openshift-kni/numaresources-operator/rte/pkg/sysinfo"
 )
 
 const (
@@ -38,7 +36,6 @@ const (
 
 type Config struct {
 	ExcludeList           map[string][]string `json:"excludeList,omitempty"`
-	Resources             sysinfo.Config      `json:"resources,omitempty"`
 	TopologyManagerPolicy string              `json:"topologyManagerPolicy,omitempty"`
 	TopologyManagerScope  string              `json:"topologyManagerScope,omitempty"`
 	PodExcludes           map[string]string   `json:"podExcludes"`
@@ -62,10 +59,6 @@ func ReadFile(configPath string) (Config, error) {
 
 func Render(klConfig *kubeletconfigv1beta1.KubeletConfiguration, podExcludes map[string]string) (string, error) {
 	conf := Config{
-		Resources: sysinfo.Config{
-			ReservedCPUs:   klConfig.ReservedSystemCPUs,
-			ReservedMemory: findReservedMemoryFromKubelet(klConfig.ReservedMemory),
-		},
 		TopologyManagerPolicy: klConfig.TopologyManagerPolicy,
 		TopologyManagerScope:  klConfig.TopologyManagerScope,
 	}
