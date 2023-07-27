@@ -27,8 +27,7 @@ metadata:
   namespace: ${RTE_NAMESPACE}
 data:
   config.yaml: |
-    resources:
-      reservedcpus: "0,1"
+    topologyManagerPolicy: "pod"
 EOF
 
 RTE_CONTAINER_IMAGE=${RTE_CONTAINER_IMAGE} \

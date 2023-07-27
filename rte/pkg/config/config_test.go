@@ -27,7 +27,7 @@ func TestReadNonExistent(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if cfg.ExcludeList != nil || !cfg.Resources.IsEmpty() || cfg.TopologyManagerPolicy != "" {
+	if cfg.ExcludeList != nil || cfg.TopologyManagerPolicy != "" {
 		t.Errorf("unexpected data: %#v", cfg)
 	}
 }
@@ -61,12 +61,6 @@ func TestReadValidData(t *testing.T) {
 		t.Errorf("unexpected values: %#v", cfg)
 	}
 	if cfg.TopologyManagerScope != "pod" {
-		t.Errorf("unexpected values: %#v", cfg)
-	}
-	if cfg.Resources.ReservedCPUs != "0" {
-		t.Errorf("unexpected values: %#v", cfg)
-	}
-	if cfg.Resources.ResourceMapping["8086:1520"] != "intel_sriov_netdevice" {
 		t.Errorf("unexpected values: %#v", cfg)
 	}
 	if cfg.ExcludeList["masternode"][0] != "memory" {
