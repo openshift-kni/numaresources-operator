@@ -106,22 +106,3 @@ func UnpackConfigMap(cm *corev1.ConfigMap) (string, error) {
 	}
 	return configData, nil
 }
-
-func findReservedMemoryFromKubelet(klMemRes []kubeletconfigv1beta1.MemoryReservation) map[int]int64 {
-	res := make(map[int]int64)
-	for _, memRes := range klMemRes {
-		for resName, resQty := range memRes.Limits {
-			if resName != corev1.ResourceMemory {
-				// TODO we support only memory reservation atm
-				continue
-			}
-			v, ok := resQty.AsInt64()
-			if !ok {
-				// TODO log?
-				continue
-			}
-			res[int(memRes.NumaNode)] = v
-		}
-	}
-	return res
-}
