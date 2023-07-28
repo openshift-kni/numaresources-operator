@@ -9,7 +9,6 @@ require (
 	github.com/go-logr/logr v1.2.3
 	github.com/google/go-cmp v0.5.8
 	github.com/jaypipes/ghw v0.9.0
-	github.com/jaypipes/pcidb v1.0.0
 	github.com/k8stopologyawareschedwg/deployer v0.12.2
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.1
 	github.com/k8stopologyawareschedwg/podfingerprint v0.2.1
@@ -23,7 +22,6 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.1.0
 	github.com/stretchr/testify v1.8.0
-	google.golang.org/grpc v1.47.0
 	k8s.io/api v0.25.15
 	k8s.io/apiextensions-apiserver v0.25.15
 	k8s.io/apimachinery v0.25.15
@@ -82,6 +80,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/imdario/mergo v0.3.13 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
+	github.com/jaypipes/pcidb v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
@@ -126,6 +125,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20220624142145-8cd45d7dbd1f // indirect
+	google.golang.org/grpc v1.47.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

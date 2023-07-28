@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sort"
 	"strings"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/sharedcpuspool"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/prometheus"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
@@ -35,7 +37,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/config"
-	"github.com/openshift-kni/numaresources-operator/rte/pkg/podresfilter"
 )
 
 const (
@@ -47,7 +48,7 @@ const (
 
 type localArgs struct {
 	ConfigPath  string
-	PodExcludes map[string]string
+	PodExcludes podexclude.List
 }
 
 type ProgArgs struct {
@@ -94,7 +95,7 @@ func main() {
 	}
 
 	// TODO: recycled flag (no big deal, but still)
-	cli = podresfilter.NewFromLister(cli, parsedArgs.RTE.Debug, parsedArgs.LocalArgs.PodExcludes)
+	cli = podexclude.NewFromLister(cli, parsedArgs.RTE.Debug, parsedArgs.LocalArgs.PodExcludes)
 	err = resourcetopologyexporter.Execute(cli, parsedArgs.NRTupdater, parsedArgs.Resourcemonitor, parsedArgs.RTE)
 	// must never execute; if it does, we want to know
 	klog.Fatalf("failed to execute: %v", err)
@@ -176,7 +177,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 		klog.V(2).Infof("using exclude list:\n%s", pArgs.Resourcemonitor.ResourceExclude.String())
 	}
 
-	pArgs.LocalArgs.PodExcludes = conf.PodExcludes
+	pArgs.LocalArgs.PodExcludes = makePodExcludeList(conf.PodExcludes)
 
 	err = setupTopologyManagerConfig(&pArgs, conf)
 	if err != nil {
@@ -184,6 +185,24 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	}
 
 	return pArgs, nil
+}
+
+func makePodExcludeList(excludes map[string]string) podexclude.List {
+	keys := []string{}
+	for key := range excludes {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	exList := podexclude.List{}
+	for _, key := range keys {
+		val := excludes[key]
+		exList = append(exList, podexclude.Item{
+			NamespacePattern: key,
+			NamePattern:      val,
+		})
+	}
+	return exList
 }
 
 func defaultHostName() string {
