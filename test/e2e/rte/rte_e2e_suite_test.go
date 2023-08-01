@@ -17,21 +17,11 @@
 package rte
 
 import (
-	"flag"
 	"fmt"
-	"math/rand"
-	"os"
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/config"
-
-	e2etestns "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/namespace"
-	"github.com/openshift-kni/numaresources-operator/internal/objects"
 
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte"
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater"
@@ -41,22 +31,6 @@ import (
 var (
 	randomSeed int64
 )
-
-func TestMain(m *testing.M) {
-	config.CopyFlags(config.Flags, flag.CommandLine)
-	framework.RegisterCommonFlags(flag.CommandLine)
-	framework.RegisterClusterFlags(flag.CommandLine)
-	flag.Parse()
-
-	framework.AfterReadingAllFlags(&framework.TestContext)
-
-	randomSeed = time.Now().UnixNano()
-	rand.Seed(randomSeed)
-
-	e2etestns.Labels = objects.NamespaceLabels()
-
-	os.Exit(m.Run())
-}
 
 func TestRTE(t *testing.T) {
 	RegisterFailHandler(Fail)
