@@ -152,6 +152,7 @@ replace (
 	k8s.io/mount-utils => k8s.io/mount-utils v0.26.7
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.26.7
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.26.7
+	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.14.6
 )
 
 // local pinning
