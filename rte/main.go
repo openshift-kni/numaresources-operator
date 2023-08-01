@@ -27,6 +27,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/k8stopologyawareschedwg/podfingerprint"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8shelpers"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude"
@@ -83,6 +84,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	k8scli, err := k8shelpers.GetK8sClient("")
+	if err != nil {
+		klog.Fatalf("failed to get k8s client: %w", err)
+	}
+
 	cli, err := podres.GetClient(parsedArgs.RTE.PodResourcesSocketPath)
 	if err != nil {
 		klog.Fatalf("failed to start prometheus server: %v", err)
@@ -97,7 +103,11 @@ func main() {
 
 	// TODO: recycled flag (no big deal, but still)
 	cli = podexclude.NewFromLister(cli, parsedArgs.RTE.Debug, parsedArgs.LocalArgs.PodExcludes)
-	err = resourcetopologyexporter.Execute(cli, parsedArgs.NRTupdater, parsedArgs.Resourcemonitor, parsedArgs.RTE)
+	hnd := resourcemonitor.Handle{
+		PodResCli: cli,
+		K8SCli:    k8scli,
+	}
+	err = resourcetopologyexporter.Execute(hnd, parsedArgs.NRTupdater, parsedArgs.Resourcemonitor, parsedArgs.RTE)
 	// must never execute; if it does, we want to know
 	klog.Fatalf("failed to execute: %v", err)
 }
