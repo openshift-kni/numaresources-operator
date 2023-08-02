@@ -35,6 +35,7 @@ import (
 
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte"
 	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater"
+	_ "github.com/openshift-kni/numaresources-operator/test/e2e/rte/local"
 )
 
 var (

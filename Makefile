@@ -162,7 +162,10 @@ binary-numacell: build-tools
 
 binary-all: binary binary-rte binary-nrovalidate binary-nrtcacheck
 
-binary-e2e-rte:
+binary-e2e-rte-local:
+	go test -c -v -o bin/e2e-nrop-rte-local.test ./test/e2e/rte/local
+
+binary-e2e-rte: binary-e2e-rte-local
 	go test -c -v -o bin/e2e-nrop-rte.test ./test/e2e/rte
 
 binary-e2e-install:
