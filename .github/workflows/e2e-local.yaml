@@ -43,4 +43,4 @@ jobs:
 
     - name: E2E Tests - not requiring a cluster
       run: |
-        bin/e2e-nrop-rte.test -ginkgo.focus '.*rte.*local.*'
+        bin/e2e-nrop-rte-local.test
