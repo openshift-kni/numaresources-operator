@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package rte
+package local
 
 import (
 	"encoding/json"
