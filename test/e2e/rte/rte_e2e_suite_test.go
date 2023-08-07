@@ -17,7 +17,6 @@
 package rte
 
 import (
-	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -28,15 +27,7 @@ import (
 	_ "github.com/openshift-kni/numaresources-operator/test/e2e/rte/local"
 )
 
-var (
-	randomSeed int64
-)
-
 func TestRTE(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "RTE Test Suite")
 }
-
-var _ = BeforeSuite(func() {
-	By(fmt.Sprintf("Using random seed %v", randomSeed))
-})
