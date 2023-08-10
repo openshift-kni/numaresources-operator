@@ -233,6 +233,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
+			dpReplicas, err := podlist.With(fxt.Client).ReplicaSetByDeployment(context.TODO(), *updatedDp)
+			Expect(err).ToNot(HaveOccurred())
+
 			rl := e2ereslist.FromGuaranteedPod(updatedPod)
 			klog.Infof("post-create pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainers(podSpec.Containers)), e2ereslist.ToString(rl))
 
@@ -276,10 +279,21 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				return fxt.Client.Update(context.TODO(), updatedDp)
 			}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
 
+			// wait for the replicasets under the deployment are increased by 1
+			namespacedDpName := fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
+			Eventually(func() int {
+				r, err := podlist.With(fxt.Client).ReplicaSetByDeployment(context.TODO(), *updatedDp)
+				Expect(err).ToNot(HaveOccurred())
+				klog.Infof("number of replicasets under deployment %q is %d", namespacedDpName, len(r))
+				return len(r)
+			}).WithTimeout(10*time.Second).WithPolling(1*time.Second).Should(Equal(len(dpReplicas)+1), "deployment %q replicasets were not increased by 1", namespacedDpName)
+
+			dpReplicas, err = podlist.With(fxt.Client).ReplicaSetByDeployment(context.TODO(), *updatedDp)
+			Expect(err).ToNot(HaveOccurred())
+
 			updatedDp, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
-			namespacedDpName := fmt.Sprintf("%s/%s", updatedDp.Namespace, updatedDp.Name)
 			Eventually(func() bool {
 				pods, err = podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 				if err != nil {
@@ -370,6 +384,20 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() error {
 				return fxt.Client.Update(context.TODO(), updatedDp)
 			}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
+
+			//between updating the object and having the deployment in complete state, a creation of replicaset acctually happens.
+			//The check of the deployment completeness is not enough in this context because:
+			// 1. the test updates an exsiting deployment. the deployment was "complete" in earlier stages and
+			//    it will remain as such (even if the new pod after the update is in pending state, the old pod will still exists -> deployment is counted as complete)
+			// 2. this check may happen before the new replicaset is created,hence applying the later checks on an old pod -> failing the test
+			// Despite that the check is still needed but before applying it we need to make sure that the intermediate step is not neglected,
+			// which is the creation of the new pod -> new replica
+			Eventually(func() int {
+				r, err := podlist.With(fxt.Client).ReplicaSetByDeployment(context.TODO(), *updatedDp)
+				Expect(err).ToNot(HaveOccurred())
+				klog.Infof("number of replicasets under deployment %q is %d", namespacedDpName, len(r))
+				return len(r)
+			}).WithTimeout(10*time.Second).WithPolling(1*time.Second).Should(Equal(len(dpReplicas)+1), "deployment %q replicasets were not increased by 1", namespacedDpName)
 
 			updatedDp, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
