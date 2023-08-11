@@ -199,6 +199,112 @@ func TestEqualZones(t *testing.T) {
 	}
 }
 
+func TestEqualMemoryInfo(t *testing.T) {
+	testCases := []struct {
+		description string
+		A           nrtv1alpha2.ResourceInfoList
+		B           nrtv1alpha2.ResourceInfoList
+		expected    bool
+	}{
+		{
+			description: "equal",
+			A: nrtv1alpha2.ResourceInfoList{
+				{
+					Name:        "memory",
+					Capacity:    resource.MustParse("2"),
+					Allocatable: resource.MustParse("2"),
+					Available:   resource.MustParse("2"),
+				},
+				{
+					Name:        "memory",
+					Capacity:    resource.MustParse("4"),
+					Allocatable: resource.MustParse("4"),
+					Available:   resource.MustParse("4"),
+				},
+				{
+					Name:        "memory",
+					Capacity:    resource.MustParse("4"),
+					Allocatable: resource.MustParse("4"),
+					Available:   resource.MustParse("4"),
+				},
+			},
+			B: nrtv1alpha2.ResourceInfoList{
+				{
+					Name:        "memory",
+					Capacity:    resource.MustParse("4"),
+					Allocatable: resource.MustParse("4"),
+					Available:   resource.MustParse("4"),
+				},
+				{
+					Name:        "memory",
+					Capacity:    resource.MustParse("2"),
+					Allocatable: resource.MustParse("2"),
+					Available:   resource.MustParse("2"),
+				},
+				{
+					Name:        "memory",
+					Capacity:    resource.MustParse("4"),
+					Allocatable: resource.MustParse("4"),
+					Available:   resource.MustParse("4"),
+				},
+			},
+			expected: true,
+		},
+		{
+			description: "not equal",
+			A: nrtv1alpha2.ResourceInfoList{
+				{
+					Name:        "memory",
+					Capacity:    resource.MustParse("4"),
+					Allocatable: resource.MustParse("4"),
+					Available:   resource.MustParse("4"),
+				},
+				{
+					Name:        "memory",
+					Capacity:    resource.MustParse("4"),
+					Allocatable: resource.MustParse("4"),
+					Available:   resource.MustParse("4"),
+				},
+				{
+					Name:        "memory",
+					Capacity:    resource.MustParse("2"),
+					Allocatable: resource.MustParse("2"),
+					Available:   resource.MustParse("2"),
+				},
+			},
+			B: nrtv1alpha2.ResourceInfoList{
+				{
+					Name:        "memory",
+					Capacity:    resource.MustParse("4"),
+					Allocatable: resource.MustParse("4"),
+					Available:   resource.MustParse("4"),
+				},
+				{
+					Name:        "memory",
+					Capacity:    resource.MustParse("4"),
+					Allocatable: resource.MustParse("4"),
+					Available:   resource.MustParse("4"),
+				},
+				{
+					Name:        "memory",
+					Capacity:    resource.MustParse("4"),
+					Allocatable: resource.MustParse("4"),
+					Available:   resource.MustParse("4"),
+				},
+			},
+			expected: false,
+		},
+	}
+	for _, tt := range testCases {
+		got, _ := EqualMemoryInfo(tt.A, tt.B)
+		if got != tt.expected {
+			t.Errorf("got=%v expected=%v\ndata1=%s\ndata2=%s", got, tt.expected, toJSON(tt.A), toJSON(tt.B))
+		}
+
+	}
+
+}
+
 func toJSON(v any) string {
 	data, err := json.Marshal(v)
 	if err != nil {
