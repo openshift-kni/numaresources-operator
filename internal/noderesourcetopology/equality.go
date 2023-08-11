@@ -56,10 +56,6 @@ func EqualResourceInfos(resInfosA, resInfosB nrtv1alpha2.ResourceInfoList) (bool
 		resInfoA := resInfosA[idx]
 		resInfoB := resInfosB[idx]
 
-		if resInfoA.Name != resInfoB.Name {
-			return false, fmt.Errorf("mismatched resourceinfo %q vs %q", resInfoA.Name, resInfoB.Name)
-		}
-
 		ok, err := EqualResourceInfo(resInfoA, resInfoB)
 		if !ok || err != nil {
 			return ok, err
@@ -71,16 +67,16 @@ func EqualResourceInfos(resInfosA, resInfosB nrtv1alpha2.ResourceInfoList) (bool
 
 func EqualResourceInfo(resInfoA, resInfoB nrtv1alpha2.ResourceInfo) (bool, error) {
 	if resInfoA.Name != resInfoB.Name {
-		return false, nil
+		return false, fmt.Errorf("mismatched resource name %q vs %q", resInfoA.Name, resInfoB.Name)
 	}
 	if resInfoA.Capacity.Cmp(resInfoB.Capacity) != 0 {
-		return false, nil
+		return false, fmt.Errorf("resource %q: mismatched resource Capacity %q vs %q", resInfoA.Name, resInfoA.Capacity, resInfoB.Capacity)
 	}
 	if resInfoA.Allocatable.Cmp(resInfoB.Allocatable) != 0 {
-		return false, nil
+		return false, fmt.Errorf("resource %q: mismatched resource Allocatable %q vs %q", resInfoA.Name, resInfoA.Allocatable, resInfoB.Allocatable)
 	}
 	if resInfoA.Available.Cmp(resInfoB.Available) != 0 {
-		return false, nil
+		return false, fmt.Errorf("resource %q: mismatched resource Available %q vs %q", resInfoA.Name, resInfoA.Available, resInfoB.Available)
 	}
 	return true, nil
 }
