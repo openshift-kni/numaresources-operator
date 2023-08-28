@@ -17,11 +17,16 @@ spec:
         - name: dpa-container
           securityContext:
             privileged: true
-          image: quay.io/k8stopologyawareschedwg/sample-device-plugin:v0.1.1
+          image: quay.io/k8stopologyawareschedwg/sample-device-plugin:v0.2.2
           imagePullPolicy: IfNotPresent
           env:
             - name: DEVICE_RESOURCE_NAME
               value: "example.com/deviceA"
+          command:
+            - /bin/deviceplugin
+          args:
+            - --alsologtostderr
+            - --config-dir=/etc/devices
           volumeMounts:
             - name: kubeletsockets
               mountPath: /var/lib/kubelet/device-plugins
