@@ -585,7 +585,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			nroSchedKey := objects.NROSchedObjectKey()
 			err = fxt.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
-			schedulerName := nroSchedObj.Spec.SchedulerName
+			schedulerName := nroSchedObj.Status.SchedulerName
 
 			nrtPreCreatePodList, err := e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
 			Expect(err).ToNot(HaveOccurred())
