@@ -25,6 +25,10 @@ import (
 )
 
 func (wt Waiter) ForDeploymentComplete(ctx context.Context, dp *appsv1.Deployment) (*appsv1.Deployment, error) {
+	// This function waits for the readiness of the pods under the deployment. The best use of this check is for
+	// completely new deployments. If the deployment exists on the cluster and simply updated, this check is
+	// not enough to guarantee that the deployment is ready with the NEW replica, thus need to cover that by
+	// additional checks as the context requires
 	key := ObjectKeyFromObject(dp)
 	updatedDp := &appsv1.Deployment{}
 	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {

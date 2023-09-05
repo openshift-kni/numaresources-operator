@@ -510,6 +510,39 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			}
 			wg.Wait()
 
+			defer func() {
+				By("reverting kubeletconfig changes")
+				Eventually(func(g Gomega) {
+					err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), targetedKC)
+					Expect(err).ToNot(HaveOccurred())
+
+					kcObj, err = kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
+					Expect(err).ToNot(HaveOccurred())
+
+					kcObj.TopologyManagerScope = initialTopologyManagerScope
+					err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
+					Expect(err).ToNot(HaveOccurred())
+
+					err = fxt.Client.Update(context.TODO(), targetedKC)
+					g.Expect(err).ToNot(HaveOccurred())
+				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+				By("waiting for MachineConfigPools to get updated")
+				for _, mcp := range mcps {
+					wg.Add(1)
+					go func(mcpool *machineconfigv1.MachineConfigPool) {
+						defer GinkgoRecover()
+						defer wg.Done()
+						err = wait.With(fxt.Client).
+							Interval(configuration.MachineConfigPoolUpdateInterval).
+							Timeout(configuration.MachineConfigPoolUpdateTimeout).
+							ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
+						Expect(err).ToNot(HaveOccurred())
+					}(mcp)
+				}
+				wg.Wait()
+			}()
+
 			By("checking that NUMAResourcesOperator's ConfigMap has changed")
 			cmList := &corev1.ConfigMapList{}
 			err = fxt.Client.List(context.TODO(), cmList)
@@ -552,7 +585,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			nroSchedKey := objects.NROSchedObjectKey()
 			err = fxt.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
-			schedulerName := nroSchedObj.Spec.SchedulerName
+			schedulerName := nroSchedObj.Status.SchedulerName
 
 			nrtPreCreatePodList, err := e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
 			Expect(err).ToNot(HaveOccurred())
@@ -588,39 +621,6 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			By(fmt.Sprintf("checking NRT for target node %q updated correctly", testPod.Spec.NodeName))
 			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
 			expectNRTConsumedResources(fxt, *nrtPreCreate, rl, testPod)
-
-			defer func() {
-				By("reverting kubeletconfig changes")
-				Eventually(func(g Gomega) {
-					err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), targetedKC)
-					Expect(err).ToNot(HaveOccurred())
-
-					kcObj, err = kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
-					Expect(err).ToNot(HaveOccurred())
-
-					kcObj.TopologyManagerScope = initialTopologyManagerScope
-					err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
-					Expect(err).ToNot(HaveOccurred())
-
-					err = fxt.Client.Update(context.TODO(), targetedKC)
-					g.Expect(err).ToNot(HaveOccurred())
-				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
-
-				By("waiting for MachineConfigPools to get updated")
-				for _, mcp := range mcps {
-					wg.Add(1)
-					go func(mcpool *machineconfigv1.MachineConfigPool) {
-						defer GinkgoRecover()
-						defer wg.Done()
-						err = wait.With(fxt.Client).
-							Interval(configuration.MachineConfigPoolUpdateInterval).
-							Timeout(configuration.MachineConfigPoolUpdateTimeout).
-							ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
-						Expect(err).ToNot(HaveOccurred())
-					}(mcp)
-				}
-				wg.Wait()
-			}()
 		})
 
 		It("should report the NodeGroupConfig in the status", func() {

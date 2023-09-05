@@ -58,3 +58,18 @@ func (fnd Finder) ByDeployment(ctx context.Context, deployment appsv1.Deployment
 
 	return podList.Items, nil
 }
+
+func (fnd Finder) ReplicaSetByDeployment(ctx context.Context, deployment appsv1.Deployment) ([]appsv1.ReplicaSet, error) {
+	rpList := &appsv1.ReplicaSetList{}
+	sel, err := metav1.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return nil, err
+	}
+
+	err = fnd.List(ctx, rpList, &client.ListOptions{Namespace: deployment.Namespace, LabelSelector: sel})
+	if err != nil {
+		return nil, err
+	}
+
+	return rpList.Items, nil
+}
