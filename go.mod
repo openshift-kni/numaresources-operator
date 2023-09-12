@@ -12,7 +12,7 @@ require (
 	github.com/k8stopologyawareschedwg/deployer v0.12.1-0.20230322120411-111a4d4522b1
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.1
 	github.com/k8stopologyawareschedwg/podfingerprint v0.2.2
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.12.1-0.20230802163208-8e43599b3c05
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.14.1
 	github.com/kubevirt/device-plugin-manager v1.19.4
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo/v2 v2.9.5
@@ -37,7 +37,6 @@ require (
 )
 
 require (
-	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/OneOfOne/xxhash v1.2.9-0.20201014161131-8506fca4db5e // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
@@ -118,7 +117,6 @@ require (
 	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f // indirect
 	k8s.io/kube-scheduler v0.26.7 // indirect
 	k8s.io/metrics v0.26.7 // indirect
-	k8s.io/pod-security-admission v0.0.0 // indirect
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
