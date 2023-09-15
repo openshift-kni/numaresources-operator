@@ -54,7 +54,7 @@ func TestNROScheduler() *nropv1.NUMAResourcesScheduler {
 			Name: objectnames.DefaultNUMAResourcesSchedulerCrName,
 		},
 		Spec: nropv1.NUMAResourcesSchedulerSpec{
-			SchedulerImage: "quay.io/openshift-kni/scheduler-plugins:4.14-snapshot",
+			SchedulerImage: "quay.io/openshift-kni/scheduler-plugins:4.15-snapshot",
 		},
 	}
 }

@@ -36,7 +36,7 @@ const (
 	envVarMustGatherTag   = "E2E_NROP_MUSTGATHER_TAG"
 
 	defaultMustGatherImage = "quay.io/openshift-kni/numaresources-must-gather"
-	defaultMustGatherTag   = "4.14.999-snapshot"
+	defaultMustGatherTag   = "4.15.999-snapshot"
 )
 
 var (
