@@ -196,7 +196,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	imageSpec, pullPolicy, err := images.GetCurrentImage(context.Background())
+	imageSpec, pullPolicy, err := images.GetCurrentImage(context.Background(), mgr.GetClient())
 	if err != nil {
 		// intentionally continue
 		klog.InfoS("unable to find current image, using hardcoded", "error", err)
