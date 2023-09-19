@@ -29,7 +29,7 @@ metadata:
             "name": "numaresourcesscheduler"
           },
           "spec": {
-            "imageSpec": "quay.io/openshift-kni/scheduler-plugins:4.14-snapshot"
+            "imageSpec": "quay.io/openshift-kni/scheduler-plugins:4.15-snapshot"
           }
         },
         {
@@ -57,15 +57,15 @@ metadata:
             "name": "numaresourcesscheduler"
           },
           "spec": {
-            "imageSpec": "quay.io/openshift-kni/scheduler-plugins:4.14-snapshot"
+            "imageSpec": "quay.io/openshift-kni/scheduler-plugins:4.15-snapshot"
           }
         }
       ]
     capabilities: Basic Install
-    olm.skipRange: '>=4.13.0 <4.14.0'
+    olm.skipRange: '>=4.14.0 <4.15.0'
     operators.operatorframework.io/builder: operator-sdk-v1.25.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
-  name: numaresources-operator.v4.14.999-snapshot
+  name: numaresources-operator.v4.15.999-snapshot
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -513,7 +513,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: quay.io/openshift-kni/numaresources-operator:4.14.999-snapshot
+                image: quay.io/openshift-kni/numaresources-operator:4.15.999-snapshot
                 livenessProbe:
                   httpGet:
                     path: /healthz
@@ -599,4 +599,4 @@ spec:
   minKubeVersion: 1.23.0
   provider:
     name: Red Hat
-  version: 4.14.999-snapshot
+  version: 4.15.999-snapshot

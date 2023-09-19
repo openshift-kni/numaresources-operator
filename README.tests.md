@@ -34,7 +34,7 @@ podman run -ti \
 	-v $KUBECONFIG:/kubeconfig:z \
 	-e KUBECONFIG=/kubeconfig
 	-e E2E_NROP_INSTALL_SKIP_KC=true \
-	quay.io/openshift-kni/numaresources-operator-tests:4.14.999-snapshot
+	quay.io/openshift-kni/numaresources-operator-tests:4.15.999-snapshot
 ```
 
 To setup the stack from scratch and then run the tests (you may want to do that with *ephemeral* CI clusters)
@@ -43,7 +43,7 @@ podman run -ti \
 	-v $KUBECONFIG:/kubeconfig:z \
 	-e KUBECONFIG=/kubeconfig \
 	-e E2E_NROP_INSTALL_SKIP_KC=true \
-	quay.io/openshift-kni/numaresources-operator-tests:4.14.999-snapshot \
+	quay.io/openshift-kni/numaresources-operator-tests:4.15.999-snapshot \
 	--setup
 ```
 
@@ -53,7 +53,7 @@ podman run -ti \
 	-v $KUBECONFIG:/kubeconfig:z \
 	-e KUBECONFIG=/kubeconfig \
 	-e E2E_NROP_INSTALL_SKIP_KC=true \
-	quay.io/openshift-kni/numaresources-operator-tests:4.14.999-snapshot \
+	quay.io/openshift-kni/numaresources-operator-tests:4.15.999-snapshot \
 	--setup \
 	--teardown
 ```
@@ -69,7 +69,7 @@ However, in some cases it may be unpractical to depend on third party images.
 The E2E test image can act as replacement for all its dependencies, providing either the same code or replacements suitables for its use case.
 To replace the dependencies, you need to set up some environment variables:
 ```bash
-export E2E_IMAGE_URL=quay.io/openshift-kni/numaresources-operator-tests:4.14.999-snapshot
+export E2E_IMAGE_URL=quay.io/openshift-kni/numaresources-operator-tests:4.15.999-snapshot
 podman run -ti \
 	-v $KUBECONFIG:/kubeconfig:z \
 	-e KUBECONFIG=/kubeconfig \
@@ -86,7 +86,7 @@ While the primary source for pre-built test container image is the [numaresource
 will be updated shortly after. **Running the testsuite through CNF tests is fully supported**.
 To run the suite using the CNF tests image, you can run
 ```bash
-export CNF_TESTS_URL="quay.io/openshift-kni/cnf-tests:4.14.0"
+export CNF_TESTS_URL="quay.io/openshift-kni/cnf-tests:4.15.0"
 podman run -ti \
 	-v $KUBECONFIG:/kubeconfig:z \
 	-e KUBECONFIG=/kubeconfig \
@@ -104,7 +104,7 @@ podman run -ti \
 Some E2E tests require to reboot one or more worker node. This is intrinsically fragile and slow, and you may want to avoid to do this in your tier-1 runs.
 To do so, you can run
 ```bash
-export E2E_IMAGE_URL=quay.io/openshift-kni/numaresources-operator-tests:4.14.999-snapshot
+export E2E_IMAGE_URL=quay.io/openshift-kni/numaresources-operator-tests:4.15.999-snapshot
 podman run -ti \
 	-v $KUBECONFIG:/kubeconfig:z \
 	-e KUBECONFIG=/kubeconfig \
@@ -116,7 +116,7 @@ podman run -ti \
 ```
 or, with CNF tests:
 ```bash
-export CNF_TESTS_URL="quay.io/openshift-kni/cnf-tests:4.14.0"
+export CNF_TESTS_URL="quay.io/openshift-kni/cnf-tests:4.15.0"
 podman run -ti \
 	-v $KUBECONFIG:/kubeconfig:z \
 	-e KUBECONFIG=/kubeconfig \
