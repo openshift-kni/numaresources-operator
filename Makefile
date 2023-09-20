@@ -80,6 +80,13 @@ SHELL = /usr/bin/env bash -o pipefail
 
 KUSTOMIZE_DEPLOY_DIR ?= config/default
 
+# golangci-lint variables
+GOLANGCI_LINT_VERSION=1.54.2
+GOLANGCI_LINT_NAME=golangci-lint-$(GOLANGCI_LINT_VERSION)-$(GOOS)-$(GOARCH)
+GOLANGCI_LINT_ARTIFACT_FILE=$(GOLANGCI_LINT_NAME).tar.gz
+GOLANGCI_LINT_EXEC_NAME=golangci-lint
+GOLANGCI_LINT=$(BIN_DIR)/$(GOLANGCI_LINT_EXEC_NAME)
+
 all: build
 
 ##@ General
@@ -386,3 +393,21 @@ verify-generated: bundle generate
 
 install-git-hooks:
 	git config core.hooksPath .githooks	
+
+
+GOLANGCI_LINT_LOCAL_VERSION := $(shell command ${GOLANGCI_LINT} --version 2> /dev/null | awk '{print $$4}')
+.PHONY: golangci-lint
+golangci-lint:
+	@if [ ! -x "$(GOLANGCI_LINT)" ]; then\
+		echo "Downloading golangci-lint from https://github.com/golangci/golangci-lint/releases/download/v$(GOLANGCI_LINT_VERSION)/$(GOLANGCI_LINT_ARTIFACT_FILE)";\
+		mkdir -p $(BIN_DIR);\
+		curl -JL https://github.com/golangci/golangci-lint/releases/download/v$(GOLANGCI_LINT_VERSION)/$(GOLANGCI_LINT_ARTIFACT_FILE) -o $(BIN_DIR)/$(GOLANGCI_LINT_ARTIFACT_FILE);\
+		pushd $(BIN_DIR);\
+		tar --no-same-owner -xzf $(GOLANGCI_LINT_ARTIFACT_FILE)  --strip-components=1 $(GOLANGCI_LINT_NAME)/$(GOLANGCI_LINT_EXEC_NAME);\
+		chmod +x $(GOLANGCI_LINT_EXEC_NAME);\
+		rm -f $(GOLANGCI_LINT_ARTIFACT_FILE);\
+		popd;\
+	else\
+		echo "Using golangci-lint cached at $(GOLANGCI_LINT), current version $(GOLANGCI_LINT_LOCAL_VERSION) expected version: $(GOLANGCI_LINT_VERSION)";\
+	fi
+	$(GOLANGCI_LINT) run --verbose --print-resources-usage -c .golangci.yaml
