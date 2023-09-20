@@ -610,7 +610,7 @@ func (r *NUMAResourcesOperatorReconciler) getRelatedObjects(dsStatuses []nropv1.
 			Resource: "machineconfigs",
 		},
 		{
-			Group:    "machineconfiguration.openshift.io",
+			Group:    "topology.node.k8s.io",
 			Resource: "noderesourcetopologies",
 		},
 		{
