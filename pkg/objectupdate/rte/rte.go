@@ -160,6 +160,8 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 		AddVolumeMountMemory(podSpec, cnt, pfpStatusMountName, pfpStatusDir, 8*_MiB)
 	}
 
+	flags.SetOption("--add-nrt-owner", "false")
+
 	cnt.Args = flags.Argv()
 	return nil
 }
