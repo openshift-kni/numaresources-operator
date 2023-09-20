@@ -518,7 +518,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 									Resource: "machineconfigs",
 								},
 								{
-									Group:    "machineconfiguration.openshift.io",
+									Group:    "topology.node.k8s.io",
 									Resource: "noderesourcetopologies",
 								},
 								{
