@@ -523,7 +523,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								},
 								{
 									Group:    "nfd.k8s-sig.io",
-									Resource: "nodefaturerules",
+									Resource: "nodefeaturerules",
 								},
 								{
 									Group:    "nfd.k8s-sig.io",

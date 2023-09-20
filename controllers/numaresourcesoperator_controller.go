@@ -615,7 +615,7 @@ func (r *NUMAResourcesOperatorReconciler) getRelatedObjects(dsStatuses []nropv1.
 		},
 		{
 			Group:    "nfd.k8s-sig.io",
-			Resource: "nodefaturerules",
+			Resource: "nodefeaturerules",
 		},
 		{
 			Group:    "nfd.k8s-sig.io",
