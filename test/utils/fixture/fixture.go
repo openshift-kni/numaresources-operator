@@ -49,6 +49,7 @@ type Fixture struct {
 	Namespace      corev1.Namespace
 	InitialNRTList nrtv1alpha2.NodeResourceTopologyList
 	Skipped        bool
+	IsRebootTest   bool
 	avoidCooldown  bool
 }
 
@@ -146,7 +147,8 @@ func Cooldown(ft *Fixture) {
 	if len(ft.InitialNRTList.Items) > 0 {
 		interval := 5 * time.Second
 		ginkgo.By(fmt.Sprintf("cooldown by verifying NRTs data is settled to the initial state (interval=%v timeout=%v)", interval, settleTimeout))
-		currentNrtList, err := intwait.With(ft.Client).Interval(interval).Timeout(settleTimeout).ForNodeResourceTopologiesEqualTo(context.TODO(), &ft.InitialNRTList, intwait.NRTIgnoreNothing)
+		currentNrtList, err := intwait.With(ft.Client).Interval(interval).Timeout(settleTimeout).ForNodeResourceTopologiesEqualToPostReboot(context.TODO(), &ft.InitialNRTList, intwait.NRTIgnoreNothing, ft.IsRebootTest)
+		ft.IsRebootTest = false
 		if err != nil {
 			klog.Warning("NRT MISMATCH:\n")
 			a, _ := yaml.Marshal(ft.InitialNRTList.Items)
