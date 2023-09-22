@@ -18,11 +18,15 @@ package noderesourcetopology
 
 import (
 	"fmt"
+	"strings"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func EqualZones(zonesA, zonesB nrtv1alpha2.ZoneList) (bool, error) {
+func EqualZones(zonesA, zonesB nrtv1alpha2.ZoneList, isRebootTest bool) (bool, error) {
 	if len(zonesA) != len(zonesB) {
 		return false, fmt.Errorf("unequal zone count")
 	}
@@ -38,7 +42,7 @@ func EqualZones(zonesA, zonesB nrtv1alpha2.ZoneList) (bool, error) {
 			return false, fmt.Errorf("mismatched zones %q vs %q", zoneA.Name, zoneB.Name)
 		}
 
-		ok, err := EqualResourceInfos(SortedResourceInfoList(zoneA.Resources), SortedResourceInfoList(zoneB.Resources))
+		ok, err := EqualResourceInfos(SortedResourceInfoList(zoneA.Resources), SortedResourceInfoList(zoneB.Resources), isRebootTest)
 		if !ok || err != nil {
 			return ok, err
 		}
@@ -47,7 +51,7 @@ func EqualZones(zonesA, zonesB nrtv1alpha2.ZoneList) (bool, error) {
 	return true, nil
 }
 
-func EqualResourceInfos(resInfosA, resInfosB nrtv1alpha2.ResourceInfoList) (bool, error) {
+func EqualResourceInfos(resInfosA, resInfosB nrtv1alpha2.ResourceInfoList, isRebootTest bool) (bool, error) {
 	if len(resInfosA) != len(resInfosB) {
 		return false, fmt.Errorf("unequal resourceinfo count")
 	}
@@ -56,7 +60,7 @@ func EqualResourceInfos(resInfosA, resInfosB nrtv1alpha2.ResourceInfoList) (bool
 		resInfoA := resInfosA[idx]
 		resInfoB := resInfosB[idx]
 
-		ok, err := EqualResourceInfo(resInfoA, resInfoB)
+		ok, err := EqualResourceInfo(resInfoA, resInfoB, isRebootTest)
 		if !ok || err != nil {
 			return ok, err
 		}
@@ -65,7 +69,11 @@ func EqualResourceInfos(resInfosA, resInfosB nrtv1alpha2.ResourceInfoList) (bool
 	return true, nil
 }
 
-func EqualResourceInfo(resInfoA, resInfoB nrtv1alpha2.ResourceInfo) (bool, error) {
+func EqualResourceInfo(resInfoA, resInfoB nrtv1alpha2.ResourceInfo, isRebootTest bool) (bool, error) {
+	if isRebootTest && strings.Compare(resInfoA.Name, string(corev1.ResourceMemory)) == 0 {
+		return EqualResourceInfoWithDeviation(resInfoA, resInfoB)
+	}
+
 	if resInfoA.Name != resInfoB.Name {
 		return false, fmt.Errorf("mismatched resource name %q vs %q", resInfoA.Name, resInfoB.Name)
 	}
@@ -79,4 +87,39 @@ func EqualResourceInfo(resInfoA, resInfoB nrtv1alpha2.ResourceInfo) (bool, error
 		return false, fmt.Errorf("resource %q: mismatched resource Available %v vs %v", resInfoA.Name, resInfoA.Available, resInfoB.Available)
 	}
 	return true, nil
+}
+
+func EqualResourceInfoWithDeviation(resInfoA, resInfoB nrtv1alpha2.ResourceInfo) (bool, error) {
+	/*
+		tests that involve reboot show a difference in the memory capacity on numa nodes, e.g memory capacity
+		 is reallocated across numa nodes upon startup. This is a a kernel behavior which we have no control
+		 on thus we want to work it around. The tests failed when comapring initial (pre-reboot) NRT with the
+		 final (post reboot) NRT, and finds out a difference of 53760000 of memory (=52500Ki ~=52Mi).
+		 For those case, we allow a deviation of 52Mi when comparing the memory topologies.
+		 Note: by the time this modification is done, although it is performed on reboot tests only, but we made
+		 sure that there is no memory amount request equal or less than 52Mi thus it is safe to continue with this
+		  without confusing with a real difference caused by unsettled NRTs.
+	*/
+	dev, _ := resource.ParseQuantity("54525952") //52 Mi
+
+	if resInfoA.Name != resInfoB.Name {
+		return false, fmt.Errorf("mismatched resource name %q vs %q", resInfoA.Name, resInfoB.Name)
+	}
+	if !QuantityAbsCmp(resInfoA.Capacity, resInfoB.Capacity, dev) {
+		return false, fmt.Errorf("resource %q: mismatched resource Capacity %v vs %v", resInfoA.Name, resInfoA.Capacity, resInfoB.Capacity)
+	}
+	if !QuantityAbsCmp(resInfoA.Allocatable, resInfoB.Allocatable, dev) {
+		return false, fmt.Errorf("resource %q: mismatched resource Allocatable %v vs %v", resInfoA.Name, resInfoA.Allocatable, resInfoB.Allocatable)
+	}
+	if !QuantityAbsCmp(resInfoA.Available, resInfoB.Available, dev) {
+		return false, fmt.Errorf("resource %q: mismatched resource Available %v vs %v", resInfoA.Name, resInfoA.Available, resInfoB.Available)
+	}
+	return true, nil
+}
+
+func QuantityAbsCmp(a, b, dev resource.Quantity) bool {
+	a.Sub(b)
+	z, _ := resource.ParseQuantity("0")
+	z.Sub(dev)
+	return dev.Cmp(a) == 1 && z.Cmp(a) <= 0
 }

@@ -119,8 +119,10 @@ func (wt Waiter) ForNodeResourceTopologiesSettled(ctx context.Context, threshold
 	klog.Infof("done waiting for NRT to stabilize; observed nodes=%d ready=%d", pfpState.Len(), pfpState.CountReady(threshold))
 	return nrtList, err
 }
-
 func (wt Waiter) ForNodeResourceTopologiesEqualTo(ctx context.Context, nrtListReference *nrtv1alpha2.NodeResourceTopologyList, nrtShouldIgnore NRTShouldIgnoreFunc) (nrtv1alpha2.NodeResourceTopologyList, error) {
+	return wt.ForNodeResourceTopologiesEqualToPostReboot(ctx, nrtListReference, nrtShouldIgnore, false)
+}
+func (wt Waiter) ForNodeResourceTopologiesEqualToPostReboot(ctx context.Context, nrtListReference *nrtv1alpha2.NodeResourceTopologyList, nrtShouldIgnore NRTShouldIgnoreFunc, isRebootTest bool) (nrtv1alpha2.NodeResourceTopologyList, error) {
 	var updatedNrtList nrtv1alpha2.NodeResourceTopologyList
 	klog.Infof("Waiting up to %v to have %d NRT objects restored", wt.PollTimeout, len(nrtListReference.Items))
 	immediate := false
@@ -143,7 +145,7 @@ func (wt Waiter) ForNodeResourceTopologiesEqualTo(ctx context.Context, nrtListRe
 				klog.Errorf("missing NRT for %s: %v", referenceNrt.Name, err)
 				return false, err
 			}
-			if !isNRTEqual(*referenceNrt, *updatedNrt) {
+			if !isNRTEqual(*referenceNrt, *updatedNrt, isRebootTest) {
 				klog.Warningf("NRT for %s does not match reference", referenceNrt.Name)
 				return false, err
 			}
@@ -191,13 +193,13 @@ func findNRTByName(nrts []nrtv1alpha2.NodeResourceTopology, name string) (*nrtv1
 	return nil, fmt.Errorf("failed to find NRT for %q", name)
 }
 
-func isNRTEqual(initialNrt, updatedNrt nrtv1alpha2.NodeResourceTopology) bool {
+func isNRTEqual(initialNrt, updatedNrt nrtv1alpha2.NodeResourceTopology, isRebootTest bool) bool {
 	// very cheap test to rule out false negatives
 	if updatedNrt.ObjectMeta.ResourceVersion == initialNrt.ObjectMeta.ResourceVersion {
 		klog.Warningf("NRT %q resource version didn't change", initialNrt.Name)
 		return true
 	}
-	equalZones, err := intnrt.EqualZones(initialNrt.Zones, updatedNrt.Zones)
+	equalZones, err := intnrt.EqualZones(initialNrt.Zones, updatedNrt.Zones, isRebootTest)
 	if err != nil {
 		klog.Infof("error comparing NRT %q: %v", initialNrt.Name, err)
 		return false
