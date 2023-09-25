@@ -17,7 +17,6 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 )
@@ -41,7 +40,7 @@ func TestReadMalformed(t *testing.T) {
 
 func TestReadValidData(t *testing.T) {
 	content := []byte(testData)
-	tmpfile, err := ioutil.TempFile("", "testrteconfig")
+	tmpfile, err := os.CreateTemp("", "testrteconfig")
 	if err != nil {
 		t.Errorf("creating tempfile: %v", err)
 	}

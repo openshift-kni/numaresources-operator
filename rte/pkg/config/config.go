@@ -19,7 +19,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	corev1 "k8s.io/api/core/v1"
@@ -44,7 +43,7 @@ type Config struct {
 func ReadFile(configPath string) (Config, error) {
 	conf := Config{}
 	// TODO modernize using os.ReadFile
-	data, err := ioutil.ReadFile(configPath)
+	data, err := os.ReadFile(configPath)
 	if err != nil {
 		// config is optional
 		if errors.Is(err, os.ErrNotExist) {
