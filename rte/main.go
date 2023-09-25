@@ -92,6 +92,7 @@ func main() {
 	if err != nil {
 		klog.Fatalf("failed to start prometheus server: %v", err)
 	}
+	//nolint: errcheck
 	defer cleanup()
 
 	cli = sharedcpuspool.NewFromLister(cli, parsedArgs.RTE.Debug, parsedArgs.RTE.ReferenceContainer)

@@ -341,7 +341,11 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 		return mf, err
 	}
 	_ = rteupdate.DaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
-	rteupdate.DaemonSetPauseContainerSettings(mf.DaemonSet)
+
+	err = rteupdate.DaemonSetPauseContainerSettings(mf.DaemonSet)
+	if err != nil {
+		return mf, err
+	}
 	if mf.ConfigMap != nil {
 		rteupdate.DaemonSetHashAnnotation(mf.DaemonSet, hash.ConfigMapData(mf.ConfigMap))
 	}
