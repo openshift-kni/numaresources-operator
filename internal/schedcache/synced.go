@@ -51,7 +51,7 @@ type Env struct {
 	Log    logr.Logger
 }
 
-func HasSynced(env *Env, nodeNames []string) (bool, map[string]sets.String, error) {
+func HasSynced(env *Env, nodeNames []string) (bool, map[string]sets.Set[string], error) {
 	var err error
 	var nroSched nropv1.NUMAResourcesScheduler
 	nroKey := client.ObjectKey{Name: objectnames.DefaultNUMAResourcesSchedulerCrName}
@@ -75,8 +75,9 @@ func HasSynced(env *Env, nodeNames []string) (bool, map[string]sets.String, erro
 		return false, nil, fmt.Errorf("scheduler dp not ready (%d/%d)", dp.Status.ReadyReplicas, *dp.Spec.Replicas)
 	}
 
-	unsynced := make(map[string]sets.String)
+	unsynced := make(map[string]sets.Set[string])
 
+	//nolint: ineffassign,staticcheck,wastedassign
 	podList, err := podlist.With(env.Cli).ByDeployment(env.Ctx, *dp)
 	for idx := range podList {
 		pod := &podList[idx]
@@ -91,8 +92,8 @@ func HasSynced(env *Env, nodeNames []string) (bool, map[string]sets.String, erro
 	return len(unsynced) == 0, unsynced, nil
 }
 
-func ReplicaHasSynced(env *Env, pod *corev1.Pod, nodeNames []string) (map[string]sets.String, error) {
-	unsynced := make(map[string]sets.String)
+func ReplicaHasSynced(env *Env, pod *corev1.Pod, nodeNames []string) (map[string]sets.Set[string], error) {
+	unsynced := make(map[string]sets.Set[string])
 	for _, nodeName := range nodeNames {
 		ok, detectedPods, err := ReplicaHasSyncedForNode(env, pod, nodeName)
 		if err != nil {
@@ -107,8 +108,8 @@ func ReplicaHasSynced(env *Env, pod *corev1.Pod, nodeNames []string) (map[string
 	return unsynced, nil
 }
 
-func ReplicaHasSyncedForNode(env *Env, pod *corev1.Pod, nodeName string) (bool, sets.String, error) {
-	detectedPods := make(sets.String)
+func ReplicaHasSyncedForNode(env *Env, pod *corev1.Pod, nodeName string) (bool, sets.Set[string], error) {
+	detectedPods := sets.New[string]()
 	stdout, _, err := remoteexec.CommandOnPod(env.Ctx, env.K8sCli, pod, "/bin/cat", filepath.Join(TracingDirectory, nodeNameToFileName(nodeName)+".json"))
 	if err != nil {
 		return false, detectedPods, err
@@ -142,11 +143,11 @@ func GetUpdaterFingerprintStatus(env *Env, podNamespace, podName, cntName string
 	if err != nil {
 		return st, err
 	}
-	err = json.Unmarshal([]byte(stdout), &st)
+	err = json.Unmarshal(stdout, &st)
 	return st, err
 }
 
-func mergeUnsynced(total, partial map[string]sets.String) {
+func mergeUnsynced(total, partial map[string]sets.Set[string]) {
 	for nodeName, detectedPods := range partial {
 		existing := total[nodeName]
 		total[nodeName] = existing.Union(detectedPods)

@@ -82,7 +82,7 @@ func TestValidateCRDMissingData(t *testing.T) {
 
 func TestValidateCRDInconsistentData(t *testing.T) {
 	vd := ValidatorData{
-		tasEnabledNodeNames: sets.NewString("fake-node-0", "fake-node-1"),
+		tasEnabledNodeNames: sets.New[string]("fake-node-0", "fake-node-1"),
 		nrtList: &nrtv1alpha2.NodeResourceTopologyList{
 			// minimal initialization. Consistency doesn't really matter here
 			Items: []nrtv1alpha2.NodeResourceTopology{

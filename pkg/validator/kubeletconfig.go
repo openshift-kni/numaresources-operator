@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -77,7 +78,7 @@ func CollectKubeletConfig(ctx context.Context, cli client.Client, data *Validato
 
 func ValidateKubeletConfig(data ValidatorData) ([]deployervalidator.ValidationResult, error) {
 	var ret []deployervalidator.ValidationResult
-	for _, nodeName := range data.tasEnabledNodeNames.List() {
+	for _, nodeName := range sets.List(data.tasEnabledNodeNames) {
 		kc := data.kConfigs[nodeName]
 		// if a TAS enabled node has no MCO kubelet configuration kc will be nil and ValidateClusterNodeKubeletConfig will fill the proper error
 		res := deployervalidator.ValidateClusterNodeKubeletConfig(nodeName, data.versionInfo, kc)

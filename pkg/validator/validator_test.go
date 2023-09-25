@@ -20,6 +20,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func TestRequested(t *testing.T) {
@@ -29,7 +31,7 @@ func TestRequested(t *testing.T) {
 		expectedError error
 	}
 
-	available := strings.Join(Available().List(), ",")
+	available := strings.Join(sets.List(Available()), ",")
 
 	testcases := []testCase{
 		{
@@ -73,7 +75,8 @@ func TestRequested(t *testing.T) {
 				t.Errorf("Requested(%s): got error %v expected %v", tc.what, err, tc.expectedError)
 			}
 
-			gotValue := strings.Join(got.List(), ",")
+			gotValue := strings.Join(sets.List(got), ",")
+
 			if !reflect.DeepEqual(gotValue, tc.expectedValue) {
 				t.Errorf("Requested(%s): got %v expected %v", tc.what, got, tc.expectedValue)
 			}

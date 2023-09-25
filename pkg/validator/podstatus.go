@@ -23,6 +23,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -33,7 +34,7 @@ const (
 
 func CollectPodStatus(ctx context.Context, cli client.Client, data *ValidatorData) error {
 	nonRunningPodsByNode := make(map[string]map[string]corev1.PodPhase)
-	for _, nodeName := range data.tasEnabledNodeNames.List() {
+	for _, nodeName := range sets.List(data.tasEnabledNodeNames) {
 		sel, err := fields.ParseSelector("spec.nodeName=" + nodeName)
 		if err != nil {
 			return err
