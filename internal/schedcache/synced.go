@@ -109,7 +109,7 @@ func ReplicaHasSynced(env *Env, pod *corev1.Pod, nodeNames []string) (map[string
 
 func ReplicaHasSyncedForNode(env *Env, pod *corev1.Pod, nodeName string) (bool, sets.String, error) {
 	detectedPods := make(sets.String)
-	stdout, _, err := remoteexec.CommandOnPod(env.K8sCli, pod, "/bin/cat", filepath.Join(TracingDirectory, nodeNameToFileName(nodeName)+".json"))
+	stdout, _, err := remoteexec.CommandOnPod(env.Ctx, env.K8sCli, pod, "/bin/cat", filepath.Join(TracingDirectory, nodeNameToFileName(nodeName)+".json"))
 	if err != nil {
 		return false, detectedPods, err
 	}
@@ -138,7 +138,7 @@ func ReplicaHasSyncedForNode(env *Env, pod *corev1.Pod, nodeName string) (bool, 
 
 func GetUpdaterFingerprintStatus(env *Env, podNamespace, podName, cntName string) (podfingerprint.Status, error) {
 	var st podfingerprint.Status
-	stdout, _, err := remoteexec.CommandOnPodByNames(env.K8sCli, podNamespace, podName, cntName, "/bin/cat", filepath.Join(TracingDirectory, "dump.json"))
+	stdout, _, err := remoteexec.CommandOnPodByNames(env.Ctx, env.K8sCli, podNamespace, podName, cntName, "/bin/cat", filepath.Join(TracingDirectory, "dump.json"))
 	if err != nil {
 		return st, err
 	}
