@@ -60,7 +60,7 @@ spec:
                     by MachineConfigPoolSelector or by NodeSelector
                   properties:
                     config:
-                      description: Config defines the RTE behaviour for this NodeGroup
+                      description: Config defines the RTE behavior for this NodeGroup
                       properties:
                         infoRefreshMode:
                           description: InfoRefreshMode sets the mechanism which will
@@ -381,7 +381,7 @@ spec:
                     by MachineConfigPoolSelector or by NodeSelector
                   properties:
                     config:
-                      description: Config defines the RTE behaviour for this NodeGroup
+                      description: Config defines the RTE behavior for this NodeGroup
                       properties:
                         infoRefreshMode:
                           description: InfoRefreshMode sets the mechanism which will

@@ -85,7 +85,7 @@ func AddCoreResources(res, resToAdd corev1.ResourceList) {
 func SubCoreResources(res, resToSub corev1.ResourceList) error {
 	for resName, resQty := range resToSub {
 		if resQty.Cmp(res[resName]) > 0 {
-			return fmt.Errorf("cannot substract resource %q because it is not found in the current resources", resName)
+			return fmt.Errorf("cannot subtract resource %q because it is not found in the current resources", resName)
 		}
 		qty := res[resName]
 		qty.Sub(resQty)

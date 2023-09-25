@@ -93,7 +93,7 @@ type NodeGroup struct {
 	// DisablePodsFingerprinting defines if pod fingerprint should be omitted for the machines belonging to this group (DEPRECATED: use Config instead)
 	// +optional
 	DisablePodsFingerprinting *bool `json:"disablePodsFingerprinting,omitempty"`
-	// Config defines the RTE behaviour for this NodeGroup
+	// Config defines the RTE behavior for this NodeGroup
 	// +optional
 	Config *NodeGroupConfig `json:"config,omitempty"`
 }
