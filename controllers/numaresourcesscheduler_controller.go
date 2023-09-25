@@ -153,7 +153,6 @@ func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context
 	}
 
 	return ctrl.Result{}, status.ConditionAvailable, nil
-
 }
 
 func (r *NUMAResourcesSchedulerReconciler) getRelatedObjects(dpStatus nropv1.NamespacedName) []configv1.ObjectReference {

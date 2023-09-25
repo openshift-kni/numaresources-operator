@@ -50,7 +50,6 @@ func CollectKubeletConfig(ctx context.Context, cli client.Client, data *Validato
 			return err
 		}
 		for _, mcp := range machineConfigPools {
-
 			nodes, err := getNodeListFromMachineConfigPool(ctx, cli, *mcp)
 			if err != nil {
 				return err

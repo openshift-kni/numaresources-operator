@@ -84,5 +84,4 @@ func (dst *NUMAResourcesScheduler) ConvertFromV1Rote(src *nropv1.NUMAResourcesSc
 		copy(dst.Status.Conditions, src.Status.Conditions)
 	}
 	return nil
-
 }

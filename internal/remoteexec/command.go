@@ -73,5 +73,4 @@ func CommandOnPodByNames(c kubernetes.Interface, podNamespace, podName, cntName 
 	}
 
 	return outputBuf.Bytes(), errorBuf.Bytes(), nil
-
 }

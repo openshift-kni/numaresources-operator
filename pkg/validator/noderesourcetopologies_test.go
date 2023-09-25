@@ -114,5 +114,4 @@ func TestValidateCRDInconsistentData(t *testing.T) {
 	if !reflect.DeepEqual(got, expected) {
 		t.Errorf("validation mismatch: got=%#v expected=%#v", got, expected)
 	}
-
 }

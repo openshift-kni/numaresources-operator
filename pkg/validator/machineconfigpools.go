@@ -59,7 +59,6 @@ func getMachineConfigPoolListFromMCOKubeletConfig(ctx context.Context, cli clien
 		if sel.Matches(mcpLabels) {
 			result = append(result, mcp)
 		}
-
 	}
 	return result, nil
 }

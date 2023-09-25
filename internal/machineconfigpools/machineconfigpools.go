@@ -41,7 +41,6 @@ func GetListByNodeGroupsV1(ctx context.Context, cli client.Client, nodeGroups []
 func FindBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelector) (*mcov1.MachineConfigPool, error) {
 	if sel == nil {
 		return nil, fmt.Errorf("no MCP selector for selector %v", sel)
-
 	}
 
 	selector, err := metav1.LabelSelectorAsSelector(sel)

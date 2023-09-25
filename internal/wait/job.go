@@ -44,7 +44,6 @@ func (wt Waiter) ForJobCompleted(ctx context.Context, jobNamespace, jobName stri
 		}
 		klog.Infof("%s/%s completed! (succeeded=%d)", jobNamespace, jobName, updatedJob.Status.Succeeded)
 		return true, nil
-
 	})
 	return &updatedJob, err
 }

@@ -171,7 +171,6 @@ func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, inst
 }
 
 func updateStatus(ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
-
 	conditions, ok := status.GetUpdatedConditions(instance.Status.Conditions, condition, reason, message)
 	if !ok {
 		return false, nil
@@ -444,7 +443,6 @@ func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Con
 	for _, ds := range daemonSetList.Items {
 		if !expectedDaemonSetNames.Has(ds.Name) {
 			if isOwnedBy(ds.GetObjectMeta(), instance) {
-
 				if err := r.Client.Delete(ctx, &ds); err != nil {
 					klog.ErrorS(err, "error while deleting daemonset", "DaemonSet", ds.Name)
 					errors = append(errors, err)
