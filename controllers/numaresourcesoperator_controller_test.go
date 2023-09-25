@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -931,12 +930,4 @@ func reconcileObjects(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.Ma
 
 	ExpectWithOffset(1, secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
 	return reconciler
-}
-
-func nodeGroupConfigToString(conf nropv1.NodeGroupConfig) string {
-	data, err := json.Marshal(conf)
-	if err != nil {
-		return "<ERROR>"
-	}
-	return string(data)
 }
