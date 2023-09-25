@@ -156,7 +156,7 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov
 		klog.ErrorS(err, "rendering config", "namespace", r.Namespace, "name", name)
 		return nil, err
 	}
-	rendered := rteconfig.CreateConfigMap(r.Namespace, name, string(data))
+	rendered := rteconfig.CreateConfigMap(r.Namespace, name, data)
 	cfgManifests := cfgstate.Manifests{
 		Config: rendered,
 	}
