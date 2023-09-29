@@ -98,6 +98,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 		timeout := 5 * time.Minute
 
 		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator CR", func() {
+			fxt.IsRebootTest = true
 			nroOperObj := &nropv1.NUMAResourcesOperator{}
 			nroKey := objects.NROObjectKey()
 			err := fxt.Client.Get(context.TODO(), nroKey, nroOperObj)
@@ -442,6 +443,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 		})
 
 		It("[test_id:47585][reboot_required][slow] can change kubeletconfig and controller should adapt", func() {
+			fxt.IsRebootTest = true
 			nroOperObj := &nropv1.NUMAResourcesOperator{}
 			nroKey := objects.NROObjectKey()
 			err := fxt.Client.Get(context.TODO(), nroKey, nroOperObj)

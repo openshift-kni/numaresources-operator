@@ -188,10 +188,50 @@ func TestEqualZones(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := EqualZones(tt.data1, tt.data2)
-			if err != nil {
-				t.Errorf("unexpected comparison error: %v", err)
+			got, _ := EqualZones(tt.data1, tt.data2, false)
+			if got != tt.expected {
+				t.Errorf("got=%v expected=%v\ndata1=%s\ndata2=%s", got, tt.expected, toJSON(tt.data1), toJSON(tt.data2))
 			}
+		})
+	}
+}
+
+func TestQuantityAbsCmp(t *testing.T) {
+	dev := resource.MustParse("2")
+	testCases := []struct {
+		name     string
+		data1    resource.Quantity
+		data2    resource.Quantity
+		expected bool
+	}{
+		{
+			name:     "equal with deviation",
+			data1:    resource.MustParse("2"),
+			data2:    resource.MustParse("3"),
+			expected: true,
+		},
+		{
+			name:     "equal",
+			data1:    resource.MustParse("2"),
+			data2:    resource.MustParse("2"),
+			expected: true,
+		},
+		{
+			name:     "not equal despite the deviation",
+			data1:    resource.MustParse("4"),
+			data2:    resource.MustParse("1"),
+			expected: false,
+		},
+		{
+			name:     "not equal despite the deviation",
+			data1:    resource.MustParse("1"),
+			data2:    resource.MustParse("5"),
+			expected: false,
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			got := QuantityAbsCmp(tt.data1, tt.data2, dev)
 			if got != tt.expected {
 				t.Errorf("got=%v expected=%v\ndata1=%s\ndata2=%s", got, tt.expected, toJSON(tt.data1), toJSON(tt.data2))
 			}
