@@ -61,7 +61,7 @@ type NUMAResourcesSchedulerSpec struct {
 	// Set the cache resync period. Use explicit 0 to disable.
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler cache resync period setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
-	CacheResyncPeriod *metav1.Duration `json:"cacheResyncPeriod,omitEmpty"`
+	CacheResyncPeriod *metav1.Duration `json:"cacheResyncPeriod,omitempty"`
 	// Set the cache resync debug options. Defaults to disable.
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler cache resync debug setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
@@ -83,7 +83,7 @@ type NUMAResourcesSchedulerStatus struct {
 	// CacheResyncPeriod shows the current cache resync period
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Scheduler cache resync period"
-	CacheResyncPeriod *metav1.Duration `json:"cacheResyncPeriod,omitEmpty"`
+	CacheResyncPeriod *metav1.Duration `json:"cacheResyncPeriod,omitempty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
