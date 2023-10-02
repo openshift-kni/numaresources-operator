@@ -39,7 +39,7 @@ type NUMAResourcesSchedulerSpec struct {
 	// Set the cache resync period. Use explicit 0 to disable.
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler cache resync period setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
-	CacheResyncPeriod *metav1.Duration `json:"cacheResyncPeriod,omitEmpty"`
+	CacheResyncPeriod *metav1.Duration `json:"cacheResyncPeriod,omitempty"`
 }
 
 // NUMAResourcesSchedulerStatus defines the observed state of NUMAResourcesScheduler
