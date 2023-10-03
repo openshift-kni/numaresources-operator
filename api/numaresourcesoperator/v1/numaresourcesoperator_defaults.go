@@ -38,6 +38,9 @@ func (ngc *NodeGroupConfig) Default() {
 	if ngc.InfoRefreshMode == nil {
 		ngc.InfoRefreshMode = defaultInfoRefreshMode()
 	}
+	if ngc.InfoRefreshPause == nil {
+		ngc.InfoRefreshPause = defaultInfoRefreshPause()
+	}
 }
 
 func defaultPodsFingerprinting() *PodsFingerprintingMode {
@@ -55,4 +58,9 @@ func defaultInfoRefreshPeriod() *metav1.Duration {
 		Duration: 10 * time.Second,
 	}
 	return &period
+}
+
+func defaultInfoRefreshPause() *InfoRefreshPauseMode {
+	infoRefreshPause := InfoRefreshPauseDisabled
+	return &infoRefreshPause
 }

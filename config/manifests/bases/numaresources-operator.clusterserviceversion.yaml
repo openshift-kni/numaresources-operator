@@ -39,6 +39,12 @@ spec:
         path: nodeGroups[0].config.infoRefreshMode
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
+      - description: InfoRefreshPause defines if updates to NRTs are paused for the
+          machines belonging to this group
+        displayName: Enable or disable the RTE pause setting
+        path: nodeGroups[0].config.infoRefreshPause
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: InfoRefreshPeriod sets the topology info refresh period. Use
           explicit 0 to disable.
         displayName: Topology info refresh period setting
