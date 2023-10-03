@@ -475,198 +475,23 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
 		})
 
-		It("[test_id:47628][tier2] should schedule a workload (with TAS) and then keep a subsequent one (with default scheduler) pending ", func() {
-			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
-			nodesNameSet := e2enrt.AccumulateNames(nrts)
-			// the only node which was not padded is the targetedNode
-			// since we know exactly how the test setup looks like we expect only targeted node here
-			targetNodeNameSet := nodesNameSet.Difference(paddedNodeNames)
-			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
+		/*
+			DEPRECATED: [test_id:47628][tier2] should schedule a workload (with TAS) and then keep a subsequent one (with default scheduler) pending
 
-			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
-			Expect(ok).To(BeTrue())
+			This test revealed a race between the 2 schedulers, since we do not wait for the pod handled by TAS
+			scheduler to get created, we cannot guarantee that it will pick up the resources before the pod that
+			is handled by the default scheduler. because of this the test is fragile and fails frequently.
+			to try to overcome this there were the following options:
+			1. omit the test as it adds no value as it is now and only introduces a noise
+			2. wait for the pods to get created before checking and mark the test as non-reg
+			3. change the check to verify that 1 out of the 2 pods is running, with a warning of the status of the
+			 second pod (due to the race, we could hit TAE)
+			4. update the test goal to compare another aspect of both schedulers: scheduling time (already covered by another
+				 test); node pickup and in case not the same node keep that as a warning - (not much value in this either);
+			Finally, it was agreed to completely remove this test (option 1) for being too flaky and regardless how we change
+			 it (according to the options above), the change won't make it robust and will add little to no value.
+		*/
 
-			klog.Infof("target node will be %q", targetNodeName)
-
-			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
-			Expect(err).ToNot(HaveOccurred())
-
-			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, targetNodeName)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("create a guaranteed pod with topology aware scheduler")
-			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod-gu-with-tas-sched")
-
-			// calculate base load on the target node
-			baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
-			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
-			klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
-
-			var reqResPerNUMA []corev1.ResourceList
-			for _, zone := range nrtInitial.Zones {
-				numaRes := corev1.ResourceList{}
-				for _, res := range zone.Resources {
-					resName := corev1.ResourceName(res.Name)
-					if resName == corev1.ResourceCPU || resName == corev1.ResourceMemory {
-						quan := numaRes[resName]
-						quan.Add(res.Available)
-						numaRes[resName] = quan
-					}
-				}
-				err = baseload.Deduct(numaRes)
-				Expect(err).ToNot(HaveOccurred(), "failed deducting resources from baseload: %v", err)
-				reqResPerNUMA = append(reqResPerNUMA, numaRes)
-			}
-			//get the topology manager policy + scope of the NRT
-			tmPolicy, ok := attribute.Get(nrtInitial.Attributes, intnrt.TopologyManagerPolicyAttribute)
-			Expect(ok).To(BeTrue(), fmt.Sprintf("Unable to find required attribute %q", intnrt.TopologyManagerPolicyAttribute))
-
-			tmScope, ok := attribute.Get(nrtInitial.Attributes, intnrt.TopologyManagerScopeAttribute)
-			Expect(ok).To(BeTrue(), fmt.Sprintf("Unable to find required attribute %q", intnrt.TopologyManagerScopeAttribute))
-
-			if tmPolicy.Value == intnrt.SingleNUMANode && tmScope.Value == intnrt.Pod {
-				paddingPodName := "padding-pod-on-target"
-				By("Pad target node to fit only the pod with TAS scheduler")
-				zeroRl := corev1.ResourceList{
-					corev1.ResourceCPU:    resource.MustParse("0"),
-					corev1.ResourceMemory: resource.MustParse("0"),
-				}
-				padPod, err := makePaddingPod(fxt.Namespace.Name, paddingPodName, nrtInitial.Zones[1], zeroRl)
-				ExpectWithOffset(1, err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", paddingPodName, nrtInitial.Zones[1].Name)
-
-				padPod, err = pinPodTo(padPod, targetNodeName, nrtInitial.Zones[1].Name)
-				ExpectWithOffset(1, err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", paddingPodName, nrtInitial.Zones[1].Name)
-
-				err = fxt.Client.Create(context.TODO(), padPod)
-				ExpectWithOffset(1, err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", paddingPodName, nrtInitial.Zones[1].Name)
-				failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, []*corev1.Pod{padPod})
-				ExpectWithOffset(1, failedPodIds).To(BeEmpty(), "padding pod of the target node have failed to run")
-			}
-
-			nrtPostTargetPaddingList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Second*10)
-			Expect(err).ToNot(HaveOccurred())
-
-			nrtPostTargetPadding, err := e2enrt.FindFromList(nrtPostTargetPaddingList.Items, targetNodeName)
-			Expect(err).ToNot(HaveOccurred())
-
-			pod.Spec = getPodSpec(tmPolicy.Value, tmScope.Value, reqResPerNUMA)
-			//prepare the second pod with default scheduler name
-			pod2 := objects.NewTestPodPause(fxt.Namespace.Name, "testpod-gu-with-default-sched")
-			pod2.Spec = pod.Spec
-			pod2.Spec.SchedulerName = corev1.DefaultSchedulerName
-
-			// the test goal is to check that a pod that was scheduled first with TAS scheduler is the one that will go
-			// running while the pod with default scheduler will keep pending, thus we are not interested in checking if
-			//the pod went running at least not before creating a pod with default-sched
-
-			By(fmt.Sprintf("creating a guaranteed pod with two containers requiring total %s; scheduled by topology aware scheduler", e2ereslist.ToString(e2ereslist.FromContainers(pod.Spec.Containers))))
-			err = fxt.Client.Create(context.TODO(), pod)
-			Expect(err).ToNot(HaveOccurred())
-
-			By(fmt.Sprintf("creating another guaranteed pod with two containers requiring total %s ; scheduled by default scheduler ", e2ereslist.ToString(e2ereslist.FromContainers(pod.Spec.Containers))))
-			err = fxt.Client.Create(context.TODO(), pod2)
-			Expect(err).ToNot(HaveOccurred())
-
-			By(fmt.Sprintf("Verify the second pod %s/%s scheduled with default-scheduler keeps being pending", pod2.Namespace, pod2.Name))
-			// TODO: lacking better ways, let's monitor the pod "long enough" and let's check it stays Pending
-			// if it stays Pending "long enough" it still means little, but OTOH if it goes Running or Failed we
-			// can tell for sure something's wrong
-			err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), pod2.Namespace, pod2.Name, corev1.PodPending)
-			if err != nil {
-				_ = objects.LogEventsForPod(fxt.K8sClient, pod2.Namespace, pod2.Name)
-			}
-			Expect(err).ToNot(HaveOccurred())
-
-			By(fmt.Sprintf("Verify the first pod %s/%s scheduled with TAS scheduler is running", pod.Namespace, pod.Name))
-			// 3 minutes is plenty, should never timeout
-			updatedPod, err := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodRunning)
-			if err != nil {
-				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
-			}
-			Expect(err).ToNot(HaveOccurred())
-
-			nrtPostCreatePodList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-
-			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
-			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
-				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
-
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
-
-			rl := e2ereslist.FromGuaranteedPod(*updatedPod)
-			klog.Infof("post-create pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainers(pod.Spec.Containers)), e2ereslist.ToString(rl))
-
-			By("wait for NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
-
-			nrtPostCreatePod1, err := e2enrt.FindFromList(nrtPostCreatePodList.Items, updatedPod.Spec.NodeName)
-			Expect(err).ToNot(HaveOccurred())
-
-			policyFuncs := tmSingleNUMANodeFuncsHandler[tmScope.Value]
-
-			By(fmt.Sprintf("checking post-create NRT for target node %q updated correctly", targetNodeName))
-			dataBeforePod1, err := yaml.Marshal(nrtPostTargetPadding)
-			Expect(err).ToNot(HaveOccurred())
-			dataAfterPod1, err := yaml.Marshal(nrtPostCreatePod1)
-			Expect(err).ToNot(HaveOccurred())
-			match, err := policyFuncs.checkConsumedRes(*nrtPostTargetPadding, *nrtPostCreatePod1, rl, corev1qos.GetPodQOS(updatedPod))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBeforePod1, dataAfterPod1, e2ereslist.ToString(rl))
-
-			By(fmt.Sprintf("deleting the second pod %s/%s", pod2.Namespace, pod2.Name))
-			err = fxt.Client.Delete(context.TODO(), pod2)
-			Expect(err).ToNot(HaveOccurred())
-
-			By(fmt.Sprintf("verify the pod %s/%s is removed", pod2.Namespace, pod2.Name))
-			err = wait.With(fxt.Client).Timeout(3*time.Minute).ForPodDeleted(context.TODO(), pod2.Namespace, pod2.Name)
-			Expect(err).ToNot(HaveOccurred())
-
-			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
-			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
-			By(fmt.Sprintf("checking the resources haven't changed in NRTs of node %q after deleting the pending pod %s/%s", targetNodeName, pod2.Namespace, pod2.Name))
-			Eventually(func() bool {
-				nrtListPostDeletePod2, err := e2enrt.GetUpdated(fxt.Client, nrtPostCreatePodList, 1*time.Minute)
-				Expect(err).ToNot(HaveOccurred())
-
-				nrtPostDeletePod2, err := e2enrt.FindFromList(nrtListPostDeletePod2.Items, updatedPod.Spec.NodeName)
-				Expect(err).ToNot(HaveOccurred())
-
-				ok, err := e2enrt.CheckEqualAvailableResources(*nrtPostCreatePod1, *nrtPostDeletePod2)
-				Expect(err).ToNot(HaveOccurred())
-				if !ok {
-					klog.Infof("NRT of node %q is not as expected yet: expected it to be similar after deleting pending pod, but it reflects a change", targetNodeName)
-				}
-				return ok
-			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(BeTrue(), "resources have changed on %q but expected to stay the same after deleting a pending pod", targetNodeName)
-
-			By(fmt.Sprintf("deleting the first pod %s/%s", updatedPod.Namespace, updatedPod.Name))
-			err = fxt.Client.Delete(context.TODO(), updatedPod)
-			Expect(err).ToNot(HaveOccurred())
-
-			By(fmt.Sprintf("verify the pod %s/%s is removed", updatedPod.Namespace, updatedPod.Name))
-			err = wait.With(fxt.Client).Timeout(3*time.Minute).ForPodDeleted(context.TODO(), updatedPod.Namespace, updatedPod.Name)
-			Expect(err).ToNot(HaveOccurred())
-
-			By(fmt.Sprintf("checking the resources are restored as expected on node %q after deleting the running pod %s/%s", updatedPod.Spec.NodeName, updatedPod.Namespace, updatedPod.Name))
-			Eventually(func() bool {
-				nrtListPostDeletePod1, err := e2enrt.GetUpdated(fxt.Client, nrtPostCreatePodList, 1*time.Minute)
-				Expect(err).ToNot(HaveOccurred())
-
-				nrtPostDeletePod1, err := e2enrt.FindFromList(nrtListPostDeletePod1.Items, updatedPod.Spec.NodeName)
-				Expect(err).ToNot(HaveOccurred())
-
-				ok, err := e2enrt.CheckEqualAvailableResources(*nrtPostTargetPadding, *nrtPostDeletePod1)
-				Expect(err).ToNot(HaveOccurred())
-				if !ok {
-					klog.Infof("NRT of node %q is not as expected yet: expected the resources to be restored after deleting a running pod but NRT doesn't reflect a change", targetNodeName)
-				}
-				return ok
-			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(BeTrue(), "resources not restored on %q", updatedPod.Spec.NodeName)
-		})
 	})
 
 	Context("cluster has at least one suitable node with Topology Manager single numa policy (both container and pod scope acceptable)", func() {
@@ -769,7 +594,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			dp.Spec.Template.Spec.Containers[0].Resources.Limits = reqResources
 
 			// The deployment strategy type as `Recreate` is specified as the default strategy is `RollingUpdate`
-			// This is done because teh resource quantity is updated in the second part of this test and the
+			// This is done because the resource quantity is updated in the second part of this test and the
 			// desired behaviour is to have those updated replicas to be created after the older ones are deleted
 			// in order to make sure that the new replicas have adequate resources to run successfully.
 			dp.Spec.Strategy.Type = appsv1.RecreateDeploymentStrategyType
