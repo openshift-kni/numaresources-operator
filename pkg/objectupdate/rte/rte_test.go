@@ -75,6 +75,9 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 	refreshEvents := nropv1.InfoRefreshEvents
 	refreshPeriodic := nropv1.InfoRefreshPeriodic
 
+	infoRefreshPauseEnabled := nropv1.InfoRefreshPauseEnabled
+	infoRefreshPauseDisabled := nropv1.InfoRefreshPauseDisabled
+
 	testCases := []testCase{
 		{
 			name: "defaults",
@@ -125,6 +128,24 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			name: "disable events for update",
 			conf: nropv1.NodeGroupConfig{
 				InfoRefreshMode: &refreshPeriodic,
+			},
+			expectedArgs: []string{
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
+			},
+		},
+		{
+			name: "disable publishing NRT data",
+			conf: nropv1.NodeGroupConfig{
+				InfoRefreshPause: &infoRefreshPauseEnabled,
+			},
+			expectedArgs: []string{
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--no-publish", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
+			},
+		},
+		{
+			name: "precisely enable publishing NRT data",
+			conf: nropv1.NodeGroupConfig{
+				InfoRefreshPause: &infoRefreshPauseDisabled,
 			},
 			expectedArgs: []string{
 				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",

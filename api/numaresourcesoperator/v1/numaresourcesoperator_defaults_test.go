@@ -38,6 +38,7 @@ func TestNodeGroupConfigDefaultMethod(t *testing.T) {
 				PodsFingerprinting: defaultPodsFingerprinting(),
 				InfoRefreshMode:    defaultInfoRefreshMode(),
 				InfoRefreshPeriod:  defaultInfoRefreshPeriod(),
+				InfoRefreshPause:   defaultInfoRefreshPause(),
 			},
 		},
 		{
@@ -49,6 +50,19 @@ func TestNodeGroupConfigDefaultMethod(t *testing.T) {
 				PodsFingerprinting: defaultPodsFingerprinting(),
 				InfoRefreshMode:    defaultInfoRefreshMode(),
 				InfoRefreshPeriod:  ptrToDuration(42 * time.Second),
+				InfoRefreshPause:   defaultInfoRefreshPause(),
+			},
+		},
+		{
+			name: "partial fill: infoRefreshPause",
+			val: NodeGroupConfig{
+				InfoRefreshPause: ptrToRTEMode(InfoRefreshPauseEnabled),
+			},
+			expected: NodeGroupConfig{
+				PodsFingerprinting: defaultPodsFingerprinting(),
+				InfoRefreshMode:    defaultInfoRefreshMode(),
+				InfoRefreshPeriod:  defaultInfoRefreshPeriod(),
+				InfoRefreshPause:   ptrToRTEMode(InfoRefreshPauseEnabled),
 			},
 		},
 	}
@@ -71,11 +85,13 @@ func TestNodeGroupConfigDefault(t *testing.T) {
 	period := metav1.Duration{
 		Duration: 10 * time.Second,
 	}
+	infoRefreshPause := InfoRefreshPauseDisabled
 
 	exp := toJSON(NodeGroupConfig{
 		PodsFingerprinting: &podsFp,
 		InfoRefreshMode:    &refMode,
 		InfoRefreshPeriod:  &period,
+		InfoRefreshPause:   &infoRefreshPause,
 	})
 	got := toJSON(DefaultNodeGroupConfig())
 
@@ -97,4 +113,8 @@ func ptrToDuration(d time.Duration) *metav1.Duration {
 		Duration: d,
 	}
 	return &v
+}
+
+func ptrToRTEMode(m InfoRefreshPauseMode) *InfoRefreshPauseMode {
+	return &m
 }

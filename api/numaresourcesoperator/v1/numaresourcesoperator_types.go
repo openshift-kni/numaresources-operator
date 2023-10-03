@@ -58,6 +58,17 @@ const (
 	PodsFingerprintingEnabledExclusiveResources PodsFingerprintingMode = "EnabledExclusiveResources"
 )
 
+// +kubebuilder:validation:Enum=Disabled;Enabled
+type InfoRefreshPauseMode string
+
+const (
+	// InfoRefreshPauseDisabled enables RTE and NRT sync
+	InfoRefreshPauseDisabled InfoRefreshPauseMode = "Disabled"
+
+	// InfoRefreshPauseEnabled pauses RTE and disables the NRT sync
+	InfoRefreshPauseEnabled InfoRefreshPauseMode = "Enabled"
+)
+
 // +kubebuilder:validation:Enum=Periodic;Events;PeriodicAndEvents
 type InfoRefreshMode string
 
@@ -86,6 +97,10 @@ type NodeGroupConfig struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Topology info refresh period setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	InfoRefreshPeriod *metav1.Duration `json:"infoRefreshPeriod,omitempty"`
+	// InfoRefreshPause defines if updates to NRTs are paused for the machines belonging to this group
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Enable or disable the RTE pause setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	InfoRefreshPause *InfoRefreshPauseMode `json:"infoRefreshPause,omitempty"`
 }
 
 // NodeGroup defines group of nodes that will run resource topology exporter daemon set
