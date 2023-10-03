@@ -84,7 +84,7 @@ type NodeGroupConfig struct {
 	// InfoRefreshPeriod sets the topology info refresh period. Use explicit 0 to disable.
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Topology info refresh period setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
-	InfoRefreshPeriod *metav1.Duration `json:"infoRefreshPeriod,omitEmpty"`
+	InfoRefreshPeriod *metav1.Duration `json:"infoRefreshPeriod,omitempty"`
 }
 
 // NodeGroup defines group of nodes that will run resource topology exporter daemon set
