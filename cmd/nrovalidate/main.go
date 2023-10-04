@@ -62,7 +62,7 @@ type ProgArgs struct {
 	Quiet       bool
 	JSON        bool
 	Labels      string
-	Validations sets.String
+	Validations sets.Set[string]
 }
 
 func main() {
@@ -78,7 +78,7 @@ func main() {
 	}
 
 	if len(parsedArgs.Validations) == 0 || parsedArgs.Validations.Has("help") {
-		fmt.Fprintf(os.Stderr, "available validators: %v\n", strings.Join(nrovalidator.Available().List(), ","))
+		fmt.Fprintf(os.Stderr, "available validators: %v\n", strings.Join(sets.List(nrovalidator.Available()), ","))
 		os.Exit(0)
 	}
 
@@ -121,7 +121,7 @@ func validateCluster(ctx context.Context, args ProgArgs) error {
 	}
 
 	if !args.Quiet {
-		fmt.Fprintf(os.Stderr, "INFO>>>>: enabled validators: %s\n", strings.Join(args.Validations.List(), ","))
+		fmt.Fprintf(os.Stderr, "INFO>>>>: enabled validators: %s\n", strings.Join(sets.List(args.Validations), ","))
 	}
 
 	data, err := nrovalidator.Collect(ctx, cli, args.Labels, args.Validations)

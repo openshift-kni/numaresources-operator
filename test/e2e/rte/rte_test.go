@@ -278,7 +278,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 				// TODO: hardcoded path. Any smarter option?
 				cmd := []string{"/bin/cat", "/run/pfpstatus/dump.json"}
-				stdout, stderr, err := remoteexec.CommandOnPod(clients.K8sClient, &rtePod, cmd...)
+				stdout, stderr, err := remoteexec.CommandOnPod(context.Background(), clients.K8sClient, &rtePod, cmd...)
 				if err != nil {
 					_ = objects.LogEventsForPod(clients.K8sClient, rtePod.Namespace, rtePod.Name)
 				}

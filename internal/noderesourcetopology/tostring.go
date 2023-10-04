@@ -80,15 +80,15 @@ func ToString(nrt nrtv1alpha2.NodeResourceTopology) string {
 
 func ListToString(nrts []nrtv1alpha2.NodeResourceTopology, tag string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "NRT BEGIN dump")
+	fmt.Fprint(&b, "NRT BEGIN dump")
 	if len(tag) != 0 {
-		fmt.Fprintf(&b, " %s", tag)
+		fmt.Fprint(&b, tag)
 	}
-	fmt.Fprintf(&b, "\n")
+	fmt.Fprint(&b, "\n")
 	for idx := range nrts {
-		fmt.Fprintf(&b, ToString(nrts[idx]))
+		fmt.Fprint(&b, ToString(nrts[idx]))
 	}
-	fmt.Fprintf(&b, "NRT END dump\n")
+	fmt.Fprint(&b, "NRT END dump\n")
 	return b.String()
 }
 

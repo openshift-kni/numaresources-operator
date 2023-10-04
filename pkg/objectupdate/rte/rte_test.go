@@ -105,7 +105,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "explicitely disable unrestricted fingerprint",
+			name: "explicitly disable unrestricted fingerprint",
 			conf: nropv1.NodeGroupConfig{
 				PodsFingerprinting: &pfpEnabledExclusiveResources,
 			},

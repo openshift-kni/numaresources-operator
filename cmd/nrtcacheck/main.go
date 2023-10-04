@@ -66,7 +66,7 @@ func init() {
 type ProgArgs struct {
 	Version   bool
 	DumpNodes bool
-	NodeNames sets.String
+	NodeNames sets.Set[string]
 }
 
 func main() {
@@ -116,7 +116,7 @@ func main() {
 
 	var nodeNames []string
 	if parsedArgs.NodeNames.Len() > 0 {
-		nodeNames = parsedArgs.NodeNames.List()
+		nodeNames = sets.List(parsedArgs.NodeNames)
 		klog.V(2).Infof("using provided node list with %d items", len(nodeNames))
 	} else {
 		workers, err := nodes.GetWorkerNodes(cli, ctx)
@@ -174,19 +174,19 @@ func main() {
 			continue
 		}
 
-		podsByRTE := sets.String{}
+		podsByRTE := sets.New[string]()
 		for _, nn := range st.Pods {
 			podsByRTE.Insert(nn.String())
 		}
 
 		fmt.Printf("%s: pods on sched, not on RTE: [\n", nodeName)
-		for _, name := range podsBySched.Difference(podsByRTE).List() {
+		for _, name := range sets.List(podsBySched.Difference(podsByRTE)) {
 			fmt.Printf(" - %s\n", name)
 		}
 		fmt.Printf("]\n")
 
 		fmt.Printf("%s: pods on RTE, not on sched: [\n", nodeName)
-		for _, name := range podsByRTE.Difference(podsBySched).List() {
+		for _, name := range sets.List(podsByRTE.Difference(podsBySched)) {
 			fmt.Printf(" - %s\n", name)
 		}
 		fmt.Printf("]\n")
@@ -241,7 +241,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 
 	klog.InitFlags(flags)
 	err := flags.Parse(args)
-	pArgs.NodeNames = sets.NewString(flags.Args()...)
+	pArgs.NodeNames = sets.New[string](flags.Args()...)
 	return pArgs, err
 }
 

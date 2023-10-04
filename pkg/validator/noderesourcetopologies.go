@@ -37,7 +37,6 @@ const (
 )
 
 func CollectNodeResourceTopologies(ctx context.Context, _ client.Client, data *ValidatorData) error {
-
 	cli, err := getTopologyClient()
 	if err != nil {
 		return err

@@ -46,7 +46,7 @@ type Report struct {
 	Errors    []deployervalidator.ValidationResult `json:"errors,omitempty"`
 }
 
-func Requested(what string) (sets.String, error) {
+func Requested(what string) (sets.Set[string], error) {
 	items := strings.FieldsFunc(what, func(c rune) bool {
 		return c == ','
 	})
@@ -55,14 +55,14 @@ func Requested(what string) (sets.String, error) {
 	// handle special case first
 	for _, item := range items {
 		if strings.ToLower(item) == "help" {
-			return sets.NewString("help"), nil
+			return sets.New[string]("help"), nil
 		}
 		if strings.ToLower(item) == "all" {
 			return available, nil
 		}
 	}
 
-	ret := sets.NewString()
+	ret := sets.New[string]()
 	for _, item := range items {
 		vd := strings.ToLower(strings.TrimSpace(item))
 		if !available.Has(vd) {
@@ -73,8 +73,8 @@ func Requested(what string) (sets.String, error) {
 	return ret, nil
 }
 
-func Available() sets.String {
-	return sets.NewString(
+func Available() sets.Set[string] {
+	return sets.New[string](
 		ValidatorKubeletConfig,
 		ValidatorNodeResourceTopologies,
 		ValidatorPodStatus,
@@ -83,14 +83,14 @@ func Available() sets.String {
 }
 
 type ValidatorData struct {
-	tasEnabledNodeNames  sets.String
+	tasEnabledNodeNames  sets.Set[string]
 	nonRunningPodsByNode map[string]map[string]corev1.PodPhase
 	kConfigs             map[string]*kubeletconfigv1beta1.KubeletConfiguration
-	unsynchedCaches      map[string]sets.String
+	unsynchedCaches      map[string]sets.Set[string]
 	nrtCrdMissing        bool
 	nrtList              *nrtv1alpha2.NodeResourceTopologyList
 	versionInfo          *version.Info
-	what                 sets.String
+	what                 sets.Set[string]
 }
 
 type CollectFunc func(ctx context.Context, cli client.Client, data *ValidatorData) error
@@ -104,7 +104,7 @@ func Collectors() map[string]CollectFunc {
 	}
 }
 
-func Collect(ctx context.Context, cli client.Client, userLabels string, what sets.String) (ValidatorData, error) {
+func Collect(ctx context.Context, cli client.Client, userLabels string, what sets.Set[string]) (ValidatorData, error) {
 	collectors := Collectors()
 	colFns := []CollectFunc{}
 	for _, vd := range what.UnsortedList() {
@@ -127,7 +127,7 @@ func Collect(ctx context.Context, cli client.Client, userLabels string, what set
 	data.versionInfo = ver
 
 	// Get Node Names for those nodes with TAS enabled
-	var enabledNodeNames sets.String
+	var enabledNodeNames sets.Set[string]
 	if userLabels != "" {
 		enabledNodeNames, err = GetNodesByLabels(ctx, cli, userLabels)
 	} else {
@@ -149,8 +149,8 @@ func Collect(ctx context.Context, cli client.Client, userLabels string, what set
 	return data, nil
 }
 
-func GetNodesByLabels(ctx context.Context, cli client.Client, userLabels string) (sets.String, error) {
-	enabledNodeNames := sets.NewString()
+func GetNodesByLabels(ctx context.Context, cli client.Client, userLabels string) (sets.Set[string], error) {
+	enabledNodeNames := sets.New[string]()
 	sel, err := labels.Parse(userLabels)
 	if err != nil {
 		return enabledNodeNames, err
@@ -166,8 +166,8 @@ func GetNodesByLabels(ctx context.Context, cli client.Client, userLabels string)
 	return enabledNodeNames, err
 }
 
-func GetNodesByNRO(ctx context.Context, cli client.Client) (sets.String, error) {
-	enabledNodeNames := sets.NewString()
+func GetNodesByNRO(ctx context.Context, cli client.Client) (sets.Set[string], error) {
+	enabledNodeNames := sets.New[string]()
 	nroNamespacedName := types.NamespacedName{
 		Name: objectnames.DefaultNUMAResourcesOperatorCrName,
 	}

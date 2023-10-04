@@ -18,6 +18,7 @@ package remoteexec
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 
@@ -29,11 +30,11 @@ import (
 )
 
 // ExecCommandOnPod runs command in the pod and returns buffer output
-func CommandOnPod(c kubernetes.Interface, pod *corev1.Pod, command ...string) ([]byte, []byte, error) {
-	return CommandOnPodByNames(c, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, command...)
+func CommandOnPod(ctx context.Context, c kubernetes.Interface, pod *corev1.Pod, command ...string) ([]byte, []byte, error) {
+	return CommandOnPodByNames(ctx, c, pod.Namespace, pod.Name, pod.Spec.Containers[0].Name, command...)
 }
 
-func CommandOnPodByNames(c kubernetes.Interface, podNamespace, podName, cntName string, command ...string) ([]byte, []byte, error) {
+func CommandOnPodByNames(ctx context.Context, c kubernetes.Interface, podNamespace, podName, cntName string, command ...string) ([]byte, []byte, error) {
 	var outputBuf bytes.Buffer
 	var errorBuf bytes.Buffer
 
@@ -62,7 +63,7 @@ func CommandOnPodByNames(c kubernetes.Interface, podNamespace, podName, cntName 
 		return nil, nil, err
 	}
 
-	err = exec.Stream(remotecommand.StreamOptions{
+	err = exec.StreamWithContext(ctx, remotecommand.StreamOptions{
 		Stdin:  os.Stdin,
 		Stdout: &outputBuf,
 		Stderr: &errorBuf,
@@ -73,5 +74,4 @@ func CommandOnPodByNames(c kubernetes.Interface, podNamespace, podName, cntName 
 	}
 
 	return outputBuf.Bytes(), errorBuf.Bytes(), nil
-
 }

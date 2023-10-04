@@ -1,0 +1,36 @@
+run:
+  concurrency: 4
+  timeout: 5m
+  tests: true
+  skip-dirs:
+    - vendor
+    - test
+  modules-download-mode: vendor
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - bodyclose
+    - exportloopref
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - nolintlint
+    - nosprintfhostport
+    - staticcheck
+    - tenv
+    - typecheck
+    - unconvert
+    - unused
+    - wastedassign
+    - whitespace
+linters-settings:
+  misspell:
+    locale: US
+    ignore-words:
+      - NRO
+      - nro
+      - numaresource
+      - numa
+      - NUMA

@@ -78,7 +78,6 @@ func (nl Load) String() string {
 // the parameter in place
 func (nl Load) Apply(res corev1.ResourceList) {
 	resourcelist.AddCoreResources(res, nl.Resources)
-
 }
 
 // Deduct subtract the current node load from the given ResourceList by mutating

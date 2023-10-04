@@ -135,7 +135,6 @@ func TestAddFlags(t *testing.T) {
 }
 
 func TestDeleteFlags(t *testing.T) {
-
 	type testCase struct {
 		name     string
 		command  string

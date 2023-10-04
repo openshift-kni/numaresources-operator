@@ -124,7 +124,6 @@ func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
 		template.Annotations = map[string]string{}
 	}
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
-
 }
 
 func SchedulerConfig(cm *corev1.ConfigMap, name string, cacheResyncPeriod time.Duration) error {

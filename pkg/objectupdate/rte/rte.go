@@ -63,7 +63,10 @@ func DaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImag
 	cnt.ImagePullPolicy = builtinPullPolicy
 	klog.V(3).InfoS("Exporter image", "reason", "builtin", "pullSpec", builtinImageSpec, "pullPolicy", builtinPullPolicy)
 	// if we run with operator-as-operand, we know we NEED this.
-	DaemonSetRunAsIDs(ds)
+	err = DaemonSetRunAsIDs(ds)
+	if err != nil {
+		return fmt.Errorf("error while changing container priviledges %w", err)
+	}
 
 	return nil
 }

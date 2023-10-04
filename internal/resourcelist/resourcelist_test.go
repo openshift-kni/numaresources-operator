@@ -168,7 +168,10 @@ func TestSubCoreResources(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(ToString(tc.expected), func(t *testing.T) {
 			res := tc.res.DeepCopy()
-			SubCoreResources(res, tc.resToSub)
+			err := SubCoreResources(res, tc.resToSub)
+			if err != nil {
+				t.Errorf("Error while calculating resources: %s", err.Error())
+			}
 			// comparing strings it just easier
 			got := ToString(res)
 			expected := ToString(tc.expected)
