@@ -56,8 +56,8 @@ type Fixture struct {
 const (
 	defaultTeardownTime      = 180 * time.Second
 	defaultCooldownTime      = 30 * time.Second
-	defaultSettleInterval    = 11 * time.Second
-	defaultSettleTimeout     = 1 * time.Minute
+	defaultSettleInterval    = 9 * time.Second
+	defaultSettleTimeout     = 75 * time.Second
 	defaultCooldownThreshold = 5
 )
 
