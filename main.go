@@ -396,7 +396,10 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec string) (schedmanifests.Manifests, error) {
 	klog.InfoS("Updating scheduler manifests")
 	mf := schedManifests.Clone()
-	schedupdate.DeploymentImageSettings(mf.Deployment, imageSpec)
+	err := schedupdate.DeploymentImageSettings(mf.Deployment, imageSpec)
+	if err != nil {
+		return mf, err
+	}
 	// empty string is fine. Will be handled as "disabled".
 	// We only care about setting the environ variable to declare it exists,
 	// the best setting is "present, but disabled" vs "missing, thus implicitly disabled"

@@ -173,6 +173,12 @@ spec:
         path: imageSpec
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Enables KNI-specific logging in the scheduler. Default is enabled
+          differentiating by log ID.
+        displayName: KNI specific extra logger setting
+        path: kniLogger
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll". Defaults
           to "Normal".'
         displayName: Scheduler log verbosity

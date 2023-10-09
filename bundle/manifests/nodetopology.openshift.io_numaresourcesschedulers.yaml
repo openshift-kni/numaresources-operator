@@ -57,6 +57,13 @@ spec:
               imageSpec:
                 description: Scheduler container image URL
                 type: string
+              kniLogger:
+                description: Enables KNI-specific logging in the scheduler. Default
+                  is enabled differentiating by log ID.
+                enum:
+                - Disabled
+                - Disaggregate
+                type: string
               logLevel:
                 default: Normal
                 description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
