@@ -27,7 +27,9 @@ import (
 	k8swgschedupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/sched"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
+	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 )
 
@@ -38,31 +40,71 @@ const (
 )
 
 const (
-	PFPStatusDumpEnvVar = "PFP_STATUS_DUMP"
-	NRTInformerEnvVar   = "NRT_ENABLE_INFORMER"
+	PFPStatusDumpEnvVar     = "PFP_STATUS_DUMP"
+	NRTInformerEnvVar       = "NRT_ENABLE_INFORMER"
+	KNILoggerVerboseEnvVar  = "KNI_LOGGER_VERBOSE"
+	KNILoggerDirEnvVar      = "KNI_LOGGER_DUMP_DIR"
+	KNILoggerIntervalEnvVar = "KNI_LOGGER_DUMP_INTERVAL"
 
 	PFPStatusDir   = "/run/pfpstatus"
+	KNILoggerDir   = "/run/numasched/knilog"
 	NRTInformerVal = "true"
 )
 
 // TODO: we should inject also the mount point. As it is now, the information is split between the manifest
 // and the updating logic, causing unnecessary friction. This code needs to know too much what's in the manifest.
 
-func DeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) {
+func DeploymentArgs(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) error {
+	cnt, err := FindContainerByName(&dp.Spec.Template.Spec, MainContainerName)
+	if err != nil {
+		klog.ErrorS(err, "cannot update deployment command arguments")
+		return err
+	}
+
+	kniLogger := *spec.KNILogger
+	if kniLogger != nropv1.KNILoggerDisaggregate {
+		return nil //nothing to do
+	}
+
+	flags := flagcodec.ParseArgvKeyValue(cnt.Args)
+	if flags == nil {
+		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
+	}
+
+	flags.SetOption("--logging-format", "kni")
+
+	cnt.Args = flags.Argv()
+	return nil
+}
+
+func DeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) error {
 	cnt, err := FindContainerByName(&dp.Spec.Template.Spec, MainContainerName)
 	if err != nil {
 		klog.ErrorS(err, "cannot update deployment image settings")
-		return
+		return err
 	}
 	cnt.Image = userImageSpec
 	klog.V(3).InfoS("Scheduler image", "reason", "user-provided", "pullSpec", userImageSpec)
+	return nil
 }
 
-func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) {
+func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) error {
 	cnt, err := FindContainerByName(&dp.Spec.Template.Spec, MainContainerName)
 	if err != nil {
 		klog.ErrorS(err, "cannot update deployment env var settings")
-		return
+		return err
+	}
+
+	kniLogger := *spec.KNILogger
+	if kniLogger == nropv1.KNILoggerDisaggregate {
+		setContainerEnvVar(cnt, KNILoggerDirEnvVar, KNILoggerDir)
+		setContainerEnvVar(cnt, KNILoggerIntervalEnvVar, "1s") // TODO expose
+		lev := loglevel.ToKlog(spec.LogLevel)
+		setContainerEnvVar(cnt, KNILoggerVerboseEnvVar, lev.String())
+	} else {
+		deleteContainerEnvVar(cnt, KNILoggerDirEnvVar)
+		deleteContainerEnvVar(cnt, KNILoggerIntervalEnvVar)
+		deleteContainerEnvVar(cnt, KNILoggerVerboseEnvVar)
 	}
 
 	cacheResyncDebug := *spec.CacheResyncDebug
@@ -78,6 +120,8 @@ func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSc
 	} else {
 		deleteContainerEnvVar(cnt, NRTInformerEnvVar)
 	}
+
+	return nil
 }
 
 func setContainerEnvVar(cnt *corev1.Container, name, value string) {

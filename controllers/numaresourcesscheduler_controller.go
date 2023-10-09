@@ -50,6 +50,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
 const (
@@ -191,7 +192,8 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	klog.V(4).Info("SchedulerSync start")
 	defer klog.V(4).Info("SchedulerSync stop")
 
-	schedSpec := instance.Spec.Normalize()
+	userSchedSpec := instance.Spec.Normalize()
+	schedSpec := adjustLogLevel(userSchedSpec) // bumped loglevel, if needed; any other setting unchanged
 
 	cacheResyncPeriod := unpackAPIResyncPeriod(schedSpec.CacheResyncPeriod)
 	if err := schedupdate.SchedulerConfigWithFilter(r.SchedulerManifests.ConfigMap, schedSpec.SchedulerName, schedupdate.CleanSchedulerConfig, cacheResyncPeriod); err != nil {
@@ -206,13 +208,19 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	}
 
 	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
-	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, schedSpec.SchedulerImage)
 	schedupdate.DeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
+	if err := schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, schedSpec.SchedulerImage); err != nil {
+		return schedStatus, err
+	}
 	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, schedSpec.LogLevel); err != nil {
 		return schedStatus, err
 	}
-
-	schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec)
+	if err := schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, userSchedSpec); err != nil {
+		return schedStatus, err
+	}
+	if err := schedupdate.DeploymentArgs(r.SchedulerManifests.Deployment, schedSpec); err != nil {
+		return schedStatus, err
+	}
 
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
 	for _, objState := range existing.State(r.SchedulerManifests) {
@@ -232,6 +240,17 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		}
 	}
 	return schedStatus, nil
+}
+
+func adjustLogLevel(schedSpec nropv1.NUMAResourcesSchedulerSpec) nropv1.NUMAResourcesSchedulerSpec {
+	kniLogger := *schedSpec.KNILogger
+	if kniLogger != nropv1.KNILoggerDisaggregate {
+		return schedSpec //nothing to do
+	}
+	ret := schedSpec.DeepCopy()
+	ret.LogLevel = operatorv1.Trace
+	klog.InfoS("adjusted verbosiness", "user", schedSpec.LogLevel, "adjusted", ret.LogLevel)
+	return *ret
 }
 
 func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
