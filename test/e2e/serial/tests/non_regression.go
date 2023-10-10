@@ -179,6 +179,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
 				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
 
+			By("Waiting for the NRT data to stabilize")
+			e2efixture.WaitForNRTSettle(fxt)
+
 			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetNodeName))
 			rl := e2ereslist.FromGuaranteedPod(*updatedPod)
 			nrtPostCreate := expectNRTConsumedResources(fxt, nrtInitial, rl, updatedPod)
