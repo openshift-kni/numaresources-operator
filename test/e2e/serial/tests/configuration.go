@@ -620,6 +620,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			nrtPreCreate, err := e2enrt.FindFromList(nrtPreCreatePodList.Items, testPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
+			By("Waiting for the NRT data to stabilize")
+			e2efixture.WaitForNRTSettle(fxt)
+
 			By(fmt.Sprintf("checking NRT for target node %q updated correctly", testPod.Spec.NodeName))
 			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
 			expectNRTConsumedResources(fxt, *nrtPreCreate, rl, testPod)

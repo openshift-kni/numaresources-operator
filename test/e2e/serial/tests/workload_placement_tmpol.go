@@ -203,6 +203,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
+				By("Waiting for the NRT data to stabilize")
+				e2efixture.WaitForNRTSettle(fxt)
+
 				By("Verifying NRT is updated properly when running the test's pod")
 				expectNRTConsumedResources(fxt, targetNrtInitial, requiredRes, updatedPod)
 			},
@@ -300,6 +303,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					Expect(err).ToNot(HaveOccurred())
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 				}
+
+				By("Waiting for the NRT data to stabilize")
+				e2efixture.WaitForNRTSettle(fxt)
 
 				By("Verifying NRT is updated properly when running the test's pod")
 				expectNRTConsumedResources(fxt, targetNrtInitial, requiredRes, &pods[0])
