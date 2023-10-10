@@ -337,7 +337,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				klog.Infof("hosts required %d desired pods %d expected pending %d", hostsRequired, desiredPods, expectedPending)
 
 				// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
-				// TOOD: when we support NUMA zones > 2, switch to FilterZoneCountAtLeast
+				// TODO: when we support NUMA zones > 2, switch to FilterZoneCountAtLeast
 				By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
 				nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
 				if len(nrtCandidates) < hostsRequired {
@@ -620,7 +620,7 @@ func ResourceInfoProvidingAtMost(resources []nrtv1alpha2.ResourceInfo, resName s
 	if zoneQty.Cmp(zeroQty) <= 0 {
 		return false
 	}
-	if zoneQty.Cmp(resQty) > 0 {
+	if zoneQty.Cmp(resQty) < 0 {
 		return false
 	}
 	return true
