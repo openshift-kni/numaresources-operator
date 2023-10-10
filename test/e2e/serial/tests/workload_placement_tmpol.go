@@ -110,7 +110,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		var targetNodeName string
 		var nrtCandidates []nrtv1alpha2.NodeResourceTopology
 
-		setupCluster := func(requiredRes, paddingRes corev1.ResourceList) {
+		setupCluster := func(requiredRes, paddingRes corev1.ResourceList, tmPolicy, tmScope string) {
 			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
 			nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, requiredNUMAZones)
@@ -118,6 +118,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			neededNodes := 2
 			if len(nrtCandidates) < neededNodes {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes)
+			}
+
+			nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtCandidates, tmPolicy, tmScope)
+			if len(nrts) != len(nrtCandidates) {
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts))
 			}
 
 			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
@@ -169,12 +174,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		// the same code which a different test_id per tmscope
 		DescribeTable("[tier1] a guaranteed pod with one container should be scheduled into one NUMA zone",
 			func(tmPolicy, tmScope string, requiredRes, paddingRes corev1.ResourceList) {
-				setupCluster(requiredRes, paddingRes)
-
-				nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtCandidates, tmPolicy, tmScope)
-				if len(nrts) != len(nrtCandidates) {
-					e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts))
-				}
+				setupCluster(requiredRes, paddingRes, tmPolicy, tmScope)
 
 				var targetNrtInitial nrtv1alpha2.NodeResourceTopology
 				err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: targetNodeName}, &targetNrtInitial)
@@ -264,12 +264,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		// the same code which a different test_id per tmscope
 		DescribeTable("[tier1] a deployment with a guaranteed pod with one container should be scheduled into one NUMA zone",
 			func(tmPolicy, tmScope string, requiredRes, paddingRes corev1.ResourceList) {
-				setupCluster(requiredRes, paddingRes)
-
-				nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtCandidates, tmPolicy, tmScope)
-				if len(nrts) != len(nrtCandidates) {
-					e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts))
-				}
+				setupCluster(requiredRes, paddingRes, tmPolicy, tmScope)
 
 				var targetNrtInitial nrtv1alpha2.NodeResourceTopology
 				err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: targetNodeName}, &targetNrtInitial)
