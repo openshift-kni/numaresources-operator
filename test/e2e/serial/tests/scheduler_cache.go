@@ -326,7 +326,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				// In this testcase, having running pods is not good enough: we want to ALSO have pods which keep being
 				// pending "forever". We can't really check "forever", so we just check "long enough".
 
-				deviceName := e2efixture.GetDeviceType1Name()
+				deviceName := e2efixture.GetDeviceType3Name()
 				if deviceName == "" {
 					e2efixture.Skipf(fxt, "missing required device name (device1)")
 				}
@@ -449,7 +449,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				// So we will wait "long enough" to ensure a pod stays pending, and then we delete a random running pod;
 				// eventually, the scheduler must catch up and schedule the pod wherever resources have been freed.
 
-				deviceName := e2efixture.GetDeviceType1Name()
+				deviceName := e2efixture.GetDeviceType3Name()
 				if deviceName == "" {
 					e2efixture.Skipf(fxt, "missing required device name (device1)")
 				}
