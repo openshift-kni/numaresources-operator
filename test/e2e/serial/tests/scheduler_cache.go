@@ -326,7 +326,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				// In this testcase, having running pods is not good enough: we want to ALSO have pods which keep being
 				// pending "forever". We can't really check "forever", so we just check "long enough".
 
-				deviceName := e2efixture.GetDeviceType1Name()
+				deviceName := e2efixture.GetDeviceType3Name()
 				if deviceName == "" {
 					e2efixture.Skipf(fxt, "missing required device name (device1)")
 				}
@@ -337,7 +337,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				klog.Infof("hosts required %d desired pods %d expected pending %d", hostsRequired, desiredPods, expectedPending)
 
 				// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
-				// TOOD: when we support NUMA zones > 2, switch to FilterZoneCountAtLeast
+				// TODO: when we support NUMA zones > 2, switch to FilterZoneCountAtLeast
 				By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
 				nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
 				if len(nrtCandidates) < hostsRequired {
@@ -449,7 +449,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				// So we will wait "long enough" to ensure a pod stays pending, and then we delete a random running pod;
 				// eventually, the scheduler must catch up and schedule the pod wherever resources have been freed.
 
-				deviceName := e2efixture.GetDeviceType1Name()
+				deviceName := e2efixture.GetDeviceType3Name()
 				if deviceName == "" {
 					e2efixture.Skipf(fxt, "missing required device name (device1)")
 				}
@@ -620,7 +620,7 @@ func ResourceInfoProvidingAtMost(resources []nrtv1alpha2.ResourceInfo, resName s
 	if zoneQty.Cmp(zeroQty) <= 0 {
 		return false
 	}
-	if zoneQty.Cmp(resQty) > 0 {
+	if zoneQty.Cmp(resQty) < 0 {
 		return false
 	}
 	return true
