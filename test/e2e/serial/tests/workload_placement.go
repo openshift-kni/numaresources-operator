@@ -869,25 +869,26 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(pod.Spec.NodeName).To(Equal(targetNodeName), "pod landed on %q instead of on %v", pod.Spec.NodeName, targetNodeName)
 			}
 
+			By("Waiting for the NRT data to stabilize")
+			e2efixture.MustSettleNRT(fxt)
+
 			By(fmt.Sprintf("verifying resources allocation correctness for NRT target: %q", targetNodeName))
 			var nrtAfterRSCreation nrtv1alpha2.NodeResourceTopologyList
-			Eventually(func() bool {
-				nrtAfterRSCreation, err := e2enrt.GetUpdated(fxt.Client, nrtInitial, timeout)
-				Expect(err).ToNot(HaveOccurred())
+			nrtAfterRSCreation, err = e2enrt.GetUpdated(fxt.Client, nrtInitial, timeout)
+			Expect(err).ToNot(HaveOccurred())
 
-				nrtInitialTarget, err := e2enrt.FindFromList(nrtInitial.Items, targetNodeName)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(nrtInitialTarget.Name).To(Equal(targetNodeName), "expected targetNrt to be equal to %q", targetNodeName)
+			nrtInitialTarget, err := e2enrt.FindFromList(nrtInitial.Items, targetNodeName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(nrtInitialTarget.Name).To(Equal(targetNodeName), "expected targetNrt to be equal to %q", targetNodeName)
 
-				updatedTargetNrt, err := e2enrt.FindFromList(nrtAfterRSCreation.Items, targetNodeName)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(updatedTargetNrt.Name).To(Equal(targetNodeName), "expected targetNrt to be equal to %q", targetNodeName)
+			updatedTargetNrt, err := e2enrt.FindFromList(nrtAfterRSCreation.Items, targetNodeName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedTargetNrt.Name).To(Equal(targetNodeName), "expected targetNrt to be equal to %q", targetNodeName)
 
-				rl := e2ereslist.FromReplicaSet(*rs)
+			rl := e2ereslist.FromReplicaSet(*rs)
 
-				_, match := checkNRTConsumedResources(fxt, *nrtInitialTarget, rl, &pods[0])
-				return match != ""
-			}).WithTimeout(timeout).WithPolling(10 * time.Second).Should(BeTrue())
+			_, match := checkNRTConsumedResources(fxt, *nrtInitialTarget, rl, &pods[0])
+			Expect(match).ToNot(BeEmpty(), "inconsistent accounting when checking NRTs consumed resources")
 
 			By(fmt.Sprintf("deleting replicaset %s/%s", fxt.Namespace.Name, rsName))
 			err = fxt.Client.Delete(context.TODO(), rs)
@@ -900,22 +901,23 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred(), "pod %s/%s still exists", pod.Namespace, pod.Name)
 			}
 
-			Eventually(func() bool {
-				By(fmt.Sprintf("checking the resources are restored as expected on %q", targetNodeName))
+			By("Waiting for the NRT data to stabilize")
+			e2efixture.MustSettleNRT(fxt)
 
-				nrtListPostDelete, err := e2enrt.GetUpdated(fxt.Client, nrtAfterRSCreation, 1*time.Minute)
-				Expect(err).ToNot(HaveOccurred())
+			By(fmt.Sprintf("checking the resources are restored as expected on %q", targetNodeName))
 
-				nrtPostDelete, err := e2enrt.FindFromList(nrtListPostDelete.Items, targetNodeName)
-				Expect(err).ToNot(HaveOccurred())
+			nrtListPostDelete, err := e2enrt.GetUpdated(fxt.Client, nrtAfterRSCreation, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
 
-				nrtInitial, err := e2enrt.FindFromList(nrtInitial.Items, targetNodeName)
-				Expect(err).ToNot(HaveOccurred())
+			nrtPostDelete, err := e2enrt.FindFromList(nrtListPostDelete.Items, targetNodeName)
+			Expect(err).ToNot(HaveOccurred())
 
-				ok, err := e2enrt.CheckEqualAvailableResources(*nrtInitial, *nrtPostDelete)
-				Expect(err).ToNot(HaveOccurred())
-				return ok
-			}, time.Minute, time.Second*5).Should(BeTrue(), "resources not restored on %q", targetNodeName)
+			nrtInitialTarget, err = e2enrt.FindFromList(nrtInitial.Items, targetNodeName)
+			Expect(err).ToNot(HaveOccurred())
+
+			ok, err = e2enrt.CheckEqualAvailableResources(*nrtInitialTarget, *nrtPostDelete)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(ok).To(BeTrue(), "resources not restored on %q", targetNodeName)
 
 			rs = objects.NewTestReplicaSetWithPodSpec(replicaNumber, podLabels, map[string]string{}, fxt.Namespace.Name, rsName, corev1.PodSpec{
 				SchedulerName: serialconfig.Config.SchedulerName,
@@ -963,24 +965,25 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 			}
 
+			By("Waiting for the NRT data to stabilize")
+			e2efixture.MustSettleNRT(fxt)
+
 			By(fmt.Sprintf("verifying resources allocation correctness for NRT target: %q", targetNodeName))
-			Eventually(func() bool {
-				nrtAfterDPCreation, err := e2enrt.GetUpdated(fxt.Client, nrtInitial, timeout)
-				Expect(err).ToNot(HaveOccurred())
+			nrtAfterDPCreation, err := e2enrt.GetUpdated(fxt.Client, nrtInitial, timeout)
+			Expect(err).ToNot(HaveOccurred())
 
-				nrtInitialTarget, err := e2enrt.FindFromList(nrtInitial.Items, targetNodeName)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(nrtInitialTarget.Name).To(Equal(targetNodeName), "expected targetNrt to be equal to %q", targetNodeName)
+			nrtInitialTarget, err = e2enrt.FindFromList(nrtInitial.Items, targetNodeName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(nrtInitialTarget.Name).To(Equal(targetNodeName), "expected targetNrt to be equal to %q", targetNodeName)
 
-				updatedTargetNrt, err := e2enrt.FindFromList(nrtAfterDPCreation.Items, targetNodeName)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(updatedTargetNrt.Name).To(Equal(targetNodeName), "expected targetNrt to be equal to %q", targetNodeName)
+			updatedTargetNrt, err = e2enrt.FindFromList(nrtAfterDPCreation.Items, targetNodeName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedTargetNrt.Name).To(Equal(targetNodeName), "expected targetNrt to be equal to %q", targetNodeName)
 
-				rl := e2ereslist.FromReplicaSet(*rs)
+			rl = e2ereslist.FromReplicaSet(*rs)
 
-				_, match := checkNRTConsumedResources(fxt, *nrtInitialTarget, rl, &pods[0])
-				return match != ""
-			}).WithTimeout(timeout).WithPolling(10 * time.Second).Should(BeTrue())
+			_, match = checkNRTConsumedResources(fxt, *nrtInitialTarget, rl, &pods[0])
+			Expect(match).ToNot(BeEmpty(), "inconsistent accounting when checking NRTs consumed resources")
 
 			By(fmt.Sprintf("comparing scheduling times between %q and %q", corev1.DefaultSchedulerName, serialconfig.Config.SchedulerName))
 			diff := int64(math.Abs(float64(schedTimeWithTopologyScheduler.Milliseconds() - schedTimeWithDefaultScheduler.Milliseconds())))

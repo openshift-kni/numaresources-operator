@@ -235,6 +235,9 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 	failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 	ExpectWithOffset(1, failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
+	By("waiting for the NRT data to settle")
+	e2efixture.MustSettleNRT(fxt)
+
 	return nrtCandidates, targetNodeName
 }
 

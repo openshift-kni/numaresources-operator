@@ -366,6 +366,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
+			By("waiting for the NRT data to settle")
+			e2efixture.MustSettleNRT(fxt)
+
 			//prepare the test pod
 			//get maximum allocatable resources across all numas of the target node
 			var targetNrtListInitial nrtv1alpha2.NodeResourceTopologyList
