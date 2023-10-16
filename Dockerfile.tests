@@ -1,4 +1,4 @@
-FROM docker.io/golang:1.20 AS builder
+FROM docker.io/golang:1.21 AS builder
 
 WORKDIR /go/src/github.com/openshift-kni/numaresources-operator
 COPY . .
