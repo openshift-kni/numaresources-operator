@@ -48,8 +48,9 @@ const (
 )
 
 type localArgs struct {
-	ConfigPath  string
-	PodExcludes podexclude.List
+	ConfigPath       string
+	PodExcludes      podexclude.List
+	PrometheusEnable bool
 }
 
 type ProgArgs struct {
@@ -97,9 +98,12 @@ func main() {
 
 	cli = sharedcpuspool.NewFromLister(cli, parsedArgs.RTE.Debug, parsedArgs.RTE.ReferenceContainer)
 
-	err = prometheus.InitPrometheus()
-	if err != nil {
-		klog.Fatalf("failed to start prometheus server: %v", err)
+	if parsedArgs.LocalArgs.PrometheusEnable {
+		klog.Infof("serving prometheus metrics endpoint")
+		err = prometheus.InitPrometheus()
+		if err != nil {
+			klog.Fatalf("failed to start prometheus server: %v", err)
+		}
 	}
 
 	// TODO: recycled flag (no big deal, but still)
@@ -145,6 +149,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.StringVar(&pArgs.RTE.PodResourcesSocketPath, "podresources-socket", "unix:///podresources/kubelet.sock", "Pod Resource Socket path to use.")
 	flags.BoolVar(&pArgs.RTE.PodReadinessEnable, "podreadiness", true, "Custom condition injection using Podreadiness.")
 	flags.BoolVar(&pArgs.RTE.AddNRTOwnerEnable, "add-nrt-owner", true, "RTE will inject NRT's related node as OwnerReference to ensure cleanup if the node is deleted.")
+	flags.BoolVar(&pArgs.LocalArgs.PrometheusEnable, "prometheus", false, "Expose prometheus metrics endpoint.")
 
 	refCnt := flags.String("reference-container", "", "Reference container, used to learn about the shared cpu pool\n See: https://github.com/kubernetes/kubernetes/issues/102190\n format of spec is namespace/podname/containername.\n Alternatively, you can use the env vars REFERENCE_NAMESPACE, REFERENCE_POD_NAME, REFERENCE_CONTAINER_NAME.")
 
