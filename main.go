@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"os"
@@ -94,6 +95,9 @@ func main() {
 	var renderMode bool
 	var render RenderParams
 	var enableWebhooks bool
+	var enableMetrics bool
+	var enableHTTP2 bool
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -110,6 +114,8 @@ func main() {
 	flag.BoolVar(&showVersion, "version", false, "outputs the version and exit")
 	flag.BoolVar(&enableScheduler, "enable-scheduler", false, "enable support for the NUMAResourcesScheduler object")
 	flag.BoolVar(&enableWebhooks, "enable-webhooks", false, "enable conversion webhooks")
+	flag.BoolVar(&enableMetrics, "enable-metrics", false, "enable metrics server")
+	flag.BoolVar(&enableHTTP2, "enable-http2", false, "If HTTP/2 should be enabled for the webhook servers.")
 
 	klog.InitFlags(nil)
 	flag.Parse()
@@ -178,6 +184,11 @@ func main() {
 		os.Exit(manageRendering(render, clusterPlatform, apiManifests, rteManifests, namespace, enableScheduler))
 	}
 
+	if !enableMetrics {
+		metricsAddr = "0"
+	}
+	klog.InfoS("metrics server", "enabled", enableMetrics, "addr", metricsAddr)
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Namespace:               namespace,
 		Scheme:                  scheme,
@@ -187,6 +198,7 @@ func main() {
 		LeaderElection:          enableLeaderElection,
 		LeaderElectionNamespace: namespace,
 		LeaderElectionID:        "0e2a6bd3.openshift-kni.io",
+		TLSOpts:                 webhookTLSOpts(enableHTTP2),
 	})
 	if err != nil {
 		klog.ErrorS(err, "unable to start manager")
@@ -372,4 +384,16 @@ func SetupSchedulerWebhookWithManager(mgr ctrl.Manager, r *nropv1.NUMAResourcesS
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
+}
+
+func webhookTLSOpts(enableHTTP2 bool) []func(config *tls.Config) {
+	disableHTTP2 := func(c *tls.Config) {
+		klog.InfoS("HTTP2 serving for webhook", "enabled", enableHTTP2)
+		if enableHTTP2 {
+			return
+		}
+		c.NextProtos = []string{"http/1.1"}
+	}
+
+	return []func(config *tls.Config){disableHTTP2}
 }
