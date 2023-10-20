@@ -110,7 +110,7 @@ func main() {
 
 	cli := sharedcpuspool.NewFromLister(sysCli, parsedArgs.RTE.Debug, parsedArgs.RTE.ReferenceContainer)
 
-	err = prometheus.InitPrometheus()
+	err = prometheus.InitPrometheus(prometheus.ServingDisabled)
 	if err != nil {
 		klog.Fatalf("failed to start prometheus server: %v", err)
 	}
