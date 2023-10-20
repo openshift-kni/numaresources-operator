@@ -37,12 +37,14 @@ import (
 	e2enodes "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes"
 	e2epods "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods"
 	e2ertepod "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods/rtepod"
+	e2econsts "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testconsts"
 	e2etestenv "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testenv"
 )
 
 var _ = ginkgo.Describe("[RTE][Monitoring] metrics", func() {
 	var (
 		initialized         bool
+		hasMetrics          bool
 		rtePod              *corev1.Pod
 		metricsPort         int
 		workerNodes         []corev1.Node
@@ -55,31 +57,53 @@ var _ = ginkgo.Describe("[RTE][Monitoring] metrics", func() {
 	ginkgo.BeforeEach(func() {
 		if !initialized {
 			var err error
-			var pods *corev1.PodList
-			sel, err := labels.Parse(fmt.Sprintf("name=%s", e2etestenv.RTELabelName))
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			pods, err = f.ClientSet.CoreV1().Pods(e2etestenv.GetNamespaceName()).List(context.TODO(), metav1.ListOptions{LabelSelector: sel.String()})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-			gomega.Expect(len(pods.Items)).NotTo(gomega.BeZero())
-			rtePod = &pods.Items[0]
-			metricsPort, err = e2ertepod.FindMetricsPort(rtePod)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			hasMetrics = e2etestenv.GetMetricsEnabled()
 
 			workerNodes, err = e2enodes.GetWorkerNodes(f)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(workerNodes).ToNot(gomega.BeEmpty())
 
 			// pick any worker node. The (implicit, TODO: make explicit) assumption is
 			// the daemonset runs on CI on all the worker nodes.
-			topologyUpdaterNode = &workerNodes[0]
-			gomega.Expect(topologyUpdaterNode).NotTo(gomega.BeNil())
+			var hasLabel bool
+			topologyUpdaterNode, hasLabel = e2enodes.PickTargetNode(workerNodes)
+			gomega.Expect(topologyUpdaterNode).ToNot(gomega.BeNil())
+
+			if !hasLabel {
+				// during the e2e tests we expect changes on the node topology.
+				// but in an environment with multiple worker nodes, we might be looking at the wrong node.
+				// thus, we assign a unique label to the picked worker node
+				// and making sure to deploy the pod on it during the test using nodeSelector
+				err = e2enodes.LabelNode(f, topologyUpdaterNode, map[string]string{e2econsts.TestNodeLabel: ""})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			}
+
+			var pods *corev1.PodList
+			sel, err := labels.Parse(fmt.Sprintf("name=%s", e2etestenv.RTELabelName))
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			pods, err = f.ClientSet.CoreV1().Pods(e2etestenv.GetNamespaceName()).List(context.TODO(), metav1.ListOptions{LabelSelector: sel.String()})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Expect(len(pods.Items)).ToNot(gomega.BeZero())
+			rtePod = &pods.Items[0]
+
+			if hasMetrics {
+				metricsPort, err = e2ertepod.FindMetricsPort(rtePod)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			}
 
 			initialized = true
 		}
 	})
 
 	ginkgo.Context("With prometheus endpoint configured", func() {
+		ginkgo.BeforeEach(func() {
+			if !hasMetrics {
+				ginkgo.Skip("metrics disabled")
+			}
+		})
+
 		ginkgo.It("[EventChain] should have some metrics exported", func() {
 			rteContainerName, err := e2ertepod.FindRTEContainerName(rtePod)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
