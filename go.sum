@@ -293,10 +293,10 @@ github.com/k8stopologyawareschedwg/deployer v0.12.1-0.20230322120411-111a4d4522b
 github.com/k8stopologyawareschedwg/deployer v0.12.1-0.20230322120411-111a4d4522b1/go.mod h1:oE2sLyAaP5IkKmmHh4+gZHLK/RSPvgW68jQO9eKB7PQ=
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.1 h1:BI3L7hNqRvXtB42FO4NI/0ZjDDVRPOMBDFLShhFtf28=
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.1/go.mod h1:AkACMQGiTgCt0lQw3m7TTU8PLH9lYKNK5e9DqFf5VuM=
-github.com/k8stopologyawareschedwg/podfingerprint v0.2.1 h1:Ggdtpl9vZ3weUw63suPh2T6BCQpUTx8b9MJj29uXvKk=
-github.com/k8stopologyawareschedwg/podfingerprint v0.2.1/go.mod h1:C23pM15t06dXg/OihGlqBvnYzLr+MXDXJ7zMfbNAyXI=
-github.com/k8stopologyawareschedwg/resource-topology-exporter v0.11.2 h1:K5mRNN9EaSVyJsPJCkAMhkcqZaT4BRk7mTV4ebcMN/k=
-github.com/k8stopologyawareschedwg/resource-topology-exporter v0.11.2/go.mod h1:Hc8QqRBOOwQ5ZFmqXlPTnXOT8wXpW+0JUn8lPc0pK6E=
+github.com/k8stopologyawareschedwg/podfingerprint v0.2.2 h1:iFHPfZInM9pz2neye5RdmORMp1hPmte1EGJYpOOzZVg=
+github.com/k8stopologyawareschedwg/podfingerprint v0.2.2/go.mod h1:C23pM15t06dXg/OihGlqBvnYzLr+MXDXJ7zMfbNAyXI=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.12.1 h1:07lZb7jLOrryJdE+WiZY3P8qxP7dv5M/eVUikkrOAmA=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.12.1/go.mod h1:+ED18V7p2yvmFu9vC8Z6UYShnOwJE/oWaZ1Mslicx4s=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=

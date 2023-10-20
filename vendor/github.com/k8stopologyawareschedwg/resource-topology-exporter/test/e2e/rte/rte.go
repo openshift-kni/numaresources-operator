@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	k8se2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
@@ -42,11 +43,12 @@ import (
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8sannotations"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
 
+	e2etestns "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/namespace"
 	e2enodes "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes"
 	e2enodetopology "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodetopology"
 	e2epods "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods"
 	e2ertepod "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods/rtepod"
-	e2etestconsts "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testconsts"
+	e2econsts "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testconsts"
 	e2etestenv "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testenv"
 )
 
@@ -64,29 +66,35 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 
 	f := framework.NewDefaultFramework("rte")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.SkipNamespaceCreation = true
 
 	ginkgo.BeforeEach(func() {
 		var err error
 
-		if !initialized {
+		err = e2etestns.Setup(f)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
+		if !initialized {
 			topologyClient, err = topologyclientset.NewForConfig(f.ClientConfig())
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 			workerNodes, err = e2enodes.GetWorkerNodes(f)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			gomega.Expect(workerNodes).ToNot(gomega.BeEmpty())
 
 			// pick any worker node. The (implicit, TODO: make explicit) assumption is
 			// the daemonset runs on CI on all the worker nodes.
-			topologyUpdaterNode = &workerNodes[0]
+			var hasLabel bool
+			topologyUpdaterNode, hasLabel = e2enodes.PickTargetNode(workerNodes)
 			gomega.Expect(topologyUpdaterNode).NotTo(gomega.BeNil())
-
-			// during the e2e tests we expect changes on the node topology.
-			// but in an environment with multiple worker nodes, we might be looking at the wrong node.
-			// thus, we assign a unique label to the picked worker node
-			// and making sure to deploy the pod on it during the test using nodeSelector
-			err = e2enodes.LabelNode(f, topologyUpdaterNode, map[string]string{e2etestconsts.TestNodeLabel: ""})
-			gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			if !hasLabel {
+				// during the e2e tests we expect changes on the node topology.
+				// but in an environment with multiple worker nodes, we might be looking at the wrong node.
+				// thus, we assign a unique label to the picked worker node
+				// and making sure to deploy the pod on it during the test using nodeSelector
+				err = e2enodes.LabelNode(f, topologyUpdaterNode, map[string]string{e2econsts.TestNodeLabel: ""})
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+			}
 
 			initialized = true
 		}
@@ -117,7 +125,7 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 			doneChan := make(chan struct{})
 			started := false
 
-			go func(cs clientset.Interface, podCli *framework.PodClient, refPod *corev1.Pod) {
+			go func(cs clientset.Interface, podCli *k8se2epod.PodClient, refPod *corev1.Pod) {
 				defer ginkgo.GinkgoRecover()
 
 				<-stopChan
@@ -128,7 +136,7 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 				e2epods.DeletePodSyncByName(cs, pod.Namespace, pod.Name)
 
 				doneChan <- struct{}{}
-			}(f.ClientSet, f.PodClient(), sleeperPod)
+			}(f.ClientSet, k8se2epod.NewPodClient(f), sleeperPod)
 
 			ginkgo.By("getting the updated topology")
 			var finalNodeTopo *v1alpha2.NodeResourceTopology
@@ -311,7 +319,7 @@ var _ = ginkgo.Describe("[RTE][InfraConsuming] Resource topology exporter", func
 			framework.Logf("%s update interval: %s", method, updateInterval)
 
 			sleeperPod := e2epods.MakeGuaranteedSleeperPod("1000m")
-			pod := f.PodClient().CreateSync(sleeperPod)
+			pod := k8se2epod.NewPodClient(f).CreateSync(sleeperPod)
 			// (try to) delete the pod twice is no bother
 			cs := f.ClientSet
 			podNamespace, podName := pod.Namespace, pod.Name
@@ -401,7 +409,7 @@ func dumpPods(f *framework.Framework, nodeName, message string) {
 
 	framework.Logf("BEGIN pods running on %q: %s", nodeName, message)
 	for _, pod := range pods.Items {
-		framework.Logf("%s %s/%s annotations=%v status=%s (%s %s)", nodeName, pod.Namespace, pod.Name, pod.Annotations, pod.Status.Phase, pod.Status.Message, pod.Status.Reason)
+		framework.Logf("%s %s/%s status=%s (%s %s)", nodeName, pod.Namespace, pod.Name, pod.Status.Phase, pod.Status.Message, pod.Status.Reason)
 	}
 	framework.Logf("END pods running on %q: %s", nodeName, message)
 }
@@ -481,7 +489,7 @@ func estimateUpdateInterval(nrt v1alpha2.NodeResourceTopology) (time.Duration, s
 }
 
 func execCommandInContainer(f *framework.Framework, namespace, podName, containerName string, cmd ...string) string {
-	stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+	stdout, stderr, err := k8se2epod.ExecWithOptions(f, k8se2epod.ExecOptions{
 		Command:            cmd,
 		Namespace:          namespace,
 		PodName:            podName,
