@@ -278,8 +278,8 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.1 h1:BI3L7hNqRv
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.1/go.mod h1:AkACMQGiTgCt0lQw3m7TTU8PLH9lYKNK5e9DqFf5VuM=
 github.com/k8stopologyawareschedwg/podfingerprint v0.2.2 h1:iFHPfZInM9pz2neye5RdmORMp1hPmte1EGJYpOOzZVg=
 github.com/k8stopologyawareschedwg/podfingerprint v0.2.2/go.mod h1:C23pM15t06dXg/OihGlqBvnYzLr+MXDXJ7zMfbNAyXI=
-github.com/k8stopologyawareschedwg/resource-topology-exporter v0.14.2 h1:5crAEFBexcD8D+MstD3FsIr5eUezAz/9escIJiBvF4w=
-github.com/k8stopologyawareschedwg/resource-topology-exporter v0.14.2/go.mod h1:I1i6X+17UR5z9givot0O3M4a92UZ8Ac9ww2gelzJRs0=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.14.3 h1:A3YbO5qNT1qRUFHt6CsOCf7K28qCfpvemc13PhkiBkE=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.14.3/go.mod h1:I1i6X+17UR5z9givot0O3M4a92UZ8Ac9ww2gelzJRs0=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
