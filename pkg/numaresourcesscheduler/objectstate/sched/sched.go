@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
@@ -154,17 +155,20 @@ func SchedulerNameFromObject(obj client.Object) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	schedCfg, err := manifests.KubeSchedulerConfigurationFromData([]byte(data))
+
+	allParams, err := manifests.DecodeSchedulerProfilesFromData([]byte(data))
 	if err != nil {
 		return "", false
 	}
-	for _, schedProf := range schedCfg.Profiles {
-		// TODO: actually check this profile refers to a NodeResourceTopologyMatch
-		if schedProf.SchedulerName != nil {
-			return *schedProf.SchedulerName, true
-		}
+	if len(allParams) == 0 {
+		return "", false
 	}
-	return "", false
+
+	params := allParams[0]
+	if len(allParams) > 1 {
+		klog.InfoS("detected more params than expected, using first", "profileName", params.ProfileName, "count", len(allParams))
+	}
+	return params.ProfileName, true
 }
 
 func NewSchedConfigVolume(schedVolumeConfigName, configMapName string) corev1.Volume {
