@@ -478,7 +478,7 @@ golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/net v0.10.0 => golang.org/x/net v0.17.0
+# golang.org/x/net v0.17.0 => golang.org/x/net v0.17.0
 ## explicit; go 1.17
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -682,7 +682,7 @@ gopkg.in/yaml.v3
 # howett.net/plist v1.0.0
 ## explicit; go 1.12
 howett.net/plist
-# k8s.io/api v0.25.11 => k8s.io/api v0.25.11
+# k8s.io/api v0.25.15 => k8s.io/api v0.25.11
 ## explicit; go 1.19
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
@@ -732,7 +732,7 @@ k8s.io/api/scheduling/v1beta1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
-# k8s.io/apiextensions-apiserver v0.25.11 => k8s.io/apiextensions-apiserver v0.25.11
+# k8s.io/apiextensions-apiserver v0.25.15 => k8s.io/apiextensions-apiserver v0.25.11
 ## explicit; go 1.19
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
@@ -741,7 +741,7 @@ k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
-# k8s.io/apimachinery v0.25.11 => k8s.io/apimachinery v0.25.11
+# k8s.io/apimachinery v0.25.15 => k8s.io/apimachinery v0.25.11
 ## explicit; go 1.19
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
@@ -833,7 +833,7 @@ k8s.io/apiserver/pkg/util/feature
 k8s.io/apiserver/pkg/util/webhook
 k8s.io/apiserver/pkg/util/x509metrics
 k8s.io/apiserver/pkg/warning
-# k8s.io/client-go v0.25.11 => k8s.io/client-go v0.25.11
+# k8s.io/client-go v0.25.15 => k8s.io/client-go v0.25.11
 ## explicit; go 1.19
 k8s.io/client-go/applyconfigurations/admissionregistration/v1
 k8s.io/client-go/applyconfigurations/admissionregistration/v1beta1
@@ -1124,7 +1124,7 @@ k8s.io/code-generator/cmd/set-gen
 k8s.io/code-generator/pkg/namer
 k8s.io/code-generator/pkg/util
 k8s.io/code-generator/third_party/forked/golang/reflect
-# k8s.io/component-base v0.25.11 => k8s.io/component-base v0.25.11
+# k8s.io/component-base v0.25.15 => k8s.io/component-base v0.25.11
 ## explicit; go 1.19
 k8s.io/component-base/cli/flag
 k8s.io/component-base/config
@@ -1179,11 +1179,6 @@ k8s.io/kube-openapi/pkg/spec3
 k8s.io/kube-openapi/pkg/util/proto
 k8s.io/kube-openapi/pkg/util/sets
 k8s.io/kube-openapi/pkg/validation/spec
-# k8s.io/kube-scheduler v0.25.11 => k8s.io/kube-scheduler v0.25.11
-## explicit; go 1.19
-k8s.io/kube-scheduler/config/v1
-k8s.io/kube-scheduler/config/v1beta2
-k8s.io/kube-scheduler/config/v1beta3
 # k8s.io/kubectl v0.25.1 => k8s.io/kubectl v0.25.11
 ## explicit; go 1.19
 k8s.io/kubectl/pkg/scale
@@ -1226,12 +1221,6 @@ k8s.io/kubernetes/pkg/kubelet/cm/cpuset
 k8s.io/kubernetes/pkg/kubelet/metrics
 k8s.io/kubernetes/pkg/kubelet/util
 k8s.io/kubernetes/pkg/kubelet/util/format
-k8s.io/kubernetes/pkg/scheduler/apis/config
-k8s.io/kubernetes/pkg/scheduler/apis/config/scheme
-k8s.io/kubernetes/pkg/scheduler/apis/config/v1
-k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2
-k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3
-k8s.io/kubernetes/pkg/scheduler/framework/plugins/names
 k8s.io/kubernetes/pkg/util/hash
 k8s.io/kubernetes/pkg/util/labels
 k8s.io/kubernetes/pkg/util/parsers
@@ -1279,7 +1268,7 @@ sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/client/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/pkg/common/metrics
 sigs.k8s.io/apiserver-network-proxy/konnectivity-client/proto/client
-# sigs.k8s.io/controller-runtime v0.13.1
+# sigs.k8s.io/controller-runtime v0.13.2 => sigs.k8s.io/controller-runtime v0.13.2
 ## explicit; go 1.17
 sigs.k8s.io/controller-runtime
 sigs.k8s.io/controller-runtime/pkg/builder
@@ -1333,12 +1322,6 @@ sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics
 ## explicit; go 1.18
 sigs.k8s.io/json
 sigs.k8s.io/json/internal/golang/encoding/json
-# sigs.k8s.io/scheduler-plugins v0.24.9
-## explicit; go 1.17
-sigs.k8s.io/scheduler-plugins/apis/config
-sigs.k8s.io/scheduler-plugins/apis/config/scheme
-sigs.k8s.io/scheduler-plugins/apis/config/v1beta2
-sigs.k8s.io/scheduler-plugins/apis/config/v1beta3
 # sigs.k8s.io/structured-merge-diff/v4 v4.2.3
 ## explicit; go 1.13
 sigs.k8s.io/structured-merge-diff/v4/fieldpath
@@ -1379,3 +1362,4 @@ sigs.k8s.io/yaml
 # github.com/openshift/machine-config-operator => github.com/openshift/machine-config-operator v0.0.1-0.20221101091906-fa5e7ae3f0e9
 # golang.org/x/net => golang.org/x/net v0.17.0
 # golang.org/x/sys => golang.org/x/sys v0.13.0
+# sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.13.2

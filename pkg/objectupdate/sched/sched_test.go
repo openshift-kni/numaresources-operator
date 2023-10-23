@@ -27,6 +27,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
@@ -197,7 +199,10 @@ func TestUpdateSchedulerName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := SchedulerConfig(&tc.configMap, tc.schedulerName, 0); err != nil {
+			params := k8swgmanifests.ConfigParams{
+				ProfileName: tc.schedulerName,
+			}
+			if err := SchedulerConfig(&tc.configMap, "test-topo-aware-sched", &params); err != nil {
 				if !tc.isErrExpected {
 					t.Errorf("test %q: failed with error: %v", tc.name, err)
 				}
@@ -260,7 +265,7 @@ func TestUpdateSchedulerConfig(t *testing.T) {
 					Namespace: "test-ns",
 				},
 				Data: map[string]string{
-					"config.yaml": schedConfigWithParams,
+					"config.yaml": schedConfig,
 				},
 			},
 			expectedYAML: expectedYAMLWithReconcilePeriod,
@@ -276,7 +281,7 @@ func TestUpdateSchedulerConfig(t *testing.T) {
 					"config.yaml": schedConfig,
 				},
 			},
-			expectedYAML: expectedYAMLWithZeroReconcile,
+			expectedYAML: expectedYAMLWithoutReconcile,
 		},
 		{
 			name: "disable-reconcile",
@@ -286,16 +291,23 @@ func TestUpdateSchedulerConfig(t *testing.T) {
 					Namespace: "test-ns",
 				},
 				Data: map[string]string{
-					"config.yaml": schedConfigWithParams,
+					"config.yaml": schedConfig,
 				},
 			},
-			expectedYAML: expectedYAMLWithZeroReconcile,
+			expectedYAML: expectedYAMLWithoutReconcile,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := SchedulerConfig(&tc.configMap, "", tc.cacheResyncPeriod); err != nil {
+			resyncPeriod := int64(tc.cacheResyncPeriod.Seconds())
+			params := k8swgmanifests.ConfigParams{
+				Cache: &k8swgmanifests.ConfigCacheParams{
+					ResyncPeriodSeconds: &resyncPeriod,
+				},
+			}
+
+			if err := SchedulerConfig(&tc.configMap, "test-topo-aware-sched", &params); err != nil {
 				if !tc.isErrExpected {
 					t.Errorf("test %q: failed with error: %v", tc.name, err)
 				}
