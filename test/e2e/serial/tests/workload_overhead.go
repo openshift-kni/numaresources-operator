@@ -28,7 +28,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
-	corev1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	corev1qos "k8s.io/kubectl/pkg/util/qos"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"

@@ -45,8 +45,6 @@ github.com/coreos/vcontext/tree
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/docker/distribution v2.8.2+incompatible
-## explicit
 # github.com/drone/envsubst v1.0.3
 ## explicit; go 1.13
 github.com/drone/envsubst
@@ -956,8 +954,6 @@ k8s.io/component-base/metrics/prometheus/feature
 k8s.io/component-base/metrics/prometheusextension
 k8s.io/component-base/tracing/api/v1
 k8s.io/component-base/version
-# k8s.io/component-helpers v0.26.7 => k8s.io/component-helpers v0.26.7
-## explicit; go 1.19
 # k8s.io/gengo v0.0.0-20220902162205-c0856e24416d
 ## explicit; go 1.13
 k8s.io/gengo/args
@@ -1002,6 +998,10 @@ k8s.io/kube-openapi/pkg/validation/spec
 k8s.io/kube-scheduler/config/v1
 k8s.io/kube-scheduler/config/v1beta2
 k8s.io/kube-scheduler/config/v1beta3
+# k8s.io/kubectl v0.25.1 => k8s.io/kubectl v0.26.7
+## explicit; go 1.19
+k8s.io/kubectl/pkg/util/qos
+k8s.io/kubectl/pkg/util/resource
 # k8s.io/kubelet v0.26.7 => k8s.io/kubelet v0.26.7
 ## explicit; go 1.19
 k8s.io/kubelet/config/v1beta1
@@ -1009,10 +1009,8 @@ k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1
 k8s.io/kubelet/pkg/apis/podresources/v1
 # k8s.io/kubernetes v1.26.7
 ## explicit; go 1.19
-k8s.io/kubernetes/pkg/api/v1/resource
 k8s.io/kubernetes/pkg/apis/core
 k8s.io/kubernetes/pkg/apis/core/helper
-k8s.io/kubernetes/pkg/apis/core/v1/helper/qos
 k8s.io/kubernetes/pkg/features
 k8s.io/kubernetes/pkg/scheduler/apis/config
 k8s.io/kubernetes/pkg/scheduler/apis/config/scheme
@@ -1021,8 +1019,6 @@ k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta2
 k8s.io/kubernetes/pkg/scheduler/apis/config/v1beta3
 k8s.io/kubernetes/pkg/scheduler/framework/plugins/names
 k8s.io/kubernetes/pkg/util/taints
-# k8s.io/metrics v0.26.7 => k8s.io/metrics v0.26.7
-## explicit; go 1.19
 # k8s.io/utils v0.0.0-20230209194617-a36077c30491
 ## explicit; go 1.18
 k8s.io/utils/buffer

@@ -28,6 +28,7 @@ require (
 	k8s.io/client-go v0.27.2
 	k8s.io/code-generator v0.26.7
 	k8s.io/klog/v2 v2.90.1
+	k8s.io/kubectl v0.25.1
 	k8s.io/kubelet v0.26.7
 	k8s.io/kubernetes v1.26.7
 	kubevirt.io/qe-tools v0.1.8
@@ -49,7 +50,6 @@ require (
 	github.com/coreos/ignition/v2 v2.15.0 // indirect
 	github.com/coreos/vcontext v0.0.0-20230201181013-d72178a18687 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/emicklei/go-restful/v3 v3.9.0 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
@@ -109,11 +109,9 @@ require (
 	howett.net/plist v1.0.0 // indirect
 	k8s.io/apiserver v0.26.7 // indirect
 	k8s.io/component-base v0.27.2 // indirect
-	k8s.io/component-helpers v0.26.7 // indirect
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d // indirect
 	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f // indirect
 	k8s.io/kube-scheduler v0.26.7 // indirect
-	k8s.io/metrics v0.26.7 // indirect
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
