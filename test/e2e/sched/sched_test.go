@@ -23,9 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
-	schedconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	pluginconfig "sigs.k8s.io/scheduler-plugins/apis/config"
 
 	"github.com/google/go-cmp/cmp"
 	. "github.com/onsi/ginkgo/v2"
@@ -263,20 +261,16 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			Expect(nroschedCM).ToNot(BeNil(), "failed to find ConfigMap owned by %q", nroSchedKey)
 			data, ok := nroschedCM.Data[schedstate.SchedulerConfigFileName]
 			Expect(data).ToNot(BeEmpty(), "no data found under %s/%s", nroschedCM.Namespace, nroschedCM.Name)
+			Expect(ok).To(BeTrue(), "no data found under %s/%s", nroschedCM.Namespace, nroschedCM.Name)
 
-			schedCfg, err := manifests.DecodeSchedulerConfigFromData([]byte(data))
+			schedParams, err := manifests.DecodeSchedulerProfilesFromData([]byte(data))
 			Expect(err).ToNot(HaveOccurred())
 
-			schedProf, pluginConf := findKubeSchedulerProfileByName(schedCfg, schedulerPluginName)
-			Expect(schedProf).ToNot(BeNil(), "cannot find scheduler profile for %q", schedulerPluginName)
-			Expect(pluginConf).ToNot(BeNil(), "cannot find plugin config for %q", schedulerPluginName)
-
-			confObj := pluginConf.Args
-			cfg, ok := confObj.(*pluginconfig.NodeResourceTopologyMatchArgs)
-			Expect(ok).To(BeTrue(), "NRT arguments are missing for the scheduler config")
-
-			cacheCfg := time.Duration(cfg.CacheResyncPeriodSeconds) * time.Second
-			Expect(cacheCfg).To(Equal(nroSchedObj.Spec.CacheResyncPeriod.Duration))
+			schedCfg := manifests.FindSchedulerProfileByName(schedParams, nroSchedObj.Status.SchedulerName)
+			Expect(schedCfg).ToNot(BeNil(), "cannot find profile config for profile %q", nroSchedObj.Status.SchedulerName)
+			Expect(schedCfg.Cache).ToNot(BeNil(), "missing cache configuration")
+			Expect(schedCfg.Cache.ResyncPeriodSeconds).ToNot(BeNil(), "missing cache resync configuration")
+			Expect(*schedCfg.Cache.ResyncPeriodSeconds).To(Equal(int64(nroSchedObj.Spec.CacheResyncPeriod.Duration.Seconds())))
 
 			By("checking new scheduler pod has been created")
 			dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.UID)
@@ -294,17 +288,3 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 		})
 	})
 })
-
-func findKubeSchedulerProfileByName(sc *schedconfig.KubeSchedulerConfiguration, name string) (*schedconfig.KubeSchedulerProfile, *schedconfig.PluginConfig) {
-	for i := range sc.Profiles {
-		// if we have a configuration for the NodeResourceTopologyMatch
-		// this is a valid profile
-		for j := range sc.Profiles[i].PluginConfig {
-			if sc.Profiles[i].PluginConfig[j].Name == name {
-				return &sc.Profiles[i], &sc.Profiles[i].PluginConfig[j]
-			}
-		}
-	}
-
-	return nil, nil
-}

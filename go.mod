@@ -9,7 +9,7 @@ require (
 	github.com/go-logr/logr v1.2.4
 	github.com/google/go-cmp v0.5.9
 	github.com/jaypipes/ghw v0.9.0
-	github.com/k8stopologyawareschedwg/deployer v0.12.1-0.20230322120411-111a4d4522b1
+	github.com/k8stopologyawareschedwg/deployer v0.12.2
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.1
 	github.com/k8stopologyawareschedwg/podfingerprint v0.2.2
 	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.14.3
@@ -30,10 +30,8 @@ require (
 	k8s.io/klog/v2 v2.90.1
 	k8s.io/kubectl v0.25.1
 	k8s.io/kubelet v0.26.7
-	k8s.io/kubernetes v1.26.7
 	kubevirt.io/qe-tools v0.1.8
 	sigs.k8s.io/controller-runtime v0.15.0
-	sigs.k8s.io/scheduler-plugins v0.24.9
 	sigs.k8s.io/yaml v1.3.0
 )
 
@@ -107,11 +105,9 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	howett.net/plist v1.0.0 // indirect
-	k8s.io/apiserver v0.26.7 // indirect
 	k8s.io/component-base v0.27.2 // indirect
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d // indirect
 	k8s.io/kube-openapi v0.0.0-20230501164219-8b0f38b5fd1f // indirect
-	k8s.io/kube-scheduler v0.26.7 // indirect
 	k8s.io/utils v0.0.0-20230209194617-a36077c30491 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect

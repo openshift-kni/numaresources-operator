@@ -145,7 +145,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 			name, found := sched.SchedulerNameFromObject(cm)
 			gomega.Expect(found).To(gomega.BeTrue())
-			gomega.Expect(name).To(gomega.BeEquivalentTo(testSchedulerName))
+			gomega.Expect(name).To(gomega.BeEquivalentTo(testSchedulerName), "found scheduler %q expected %q", name, testSchedulerName)
 		})
 
 		ginkgo.It("should expose the resync period in status", func() {
@@ -405,11 +405,11 @@ func pop(m map[string]string, k string) string {
 }
 
 func diffYAML(want, got string) (string, error) {
-	cfgWant, err := depmanifests.DecodeSchedulerConfigFromData([]byte(want))
+	cfgWant, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(want))
 	if err != nil {
 		return "", err
 	}
-	cfgGot, err := depmanifests.DecodeSchedulerConfigFromData([]byte(got))
+	cfgGot, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(got))
 	if err != nil {
 		return "", err
 	}
