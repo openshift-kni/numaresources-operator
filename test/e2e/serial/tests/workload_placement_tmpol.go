@@ -22,9 +22,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
-	corev1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	corev1qos "k8s.io/kubectl/pkg/util/qos"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -2054,11 +2053,14 @@ func makeInitTestContainers(pod *corev1.Pod, initCnt []corev1.ResourceList) *cor
 
 func isHugePageInAvailable(rl corev1.ResourceList) bool {
 	for name, quan := range rl {
-		if helper.IsHugePageResourceName(core.ResourceName(name)) && !quan.IsZero() {
+		if isHugePageResourceName(corev1.ResourceName(name)) && !quan.IsZero() {
 			return true
 		}
 	}
 	return false
+}
+func isHugePageResourceName(name corev1.ResourceName) bool {
+	return strings.HasPrefix(string(name), "hugepages-")
 }
 
 func isHugepageNeeded(podRes podResourcesRequest) bool {
