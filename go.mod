@@ -35,7 +35,6 @@ require (
 	k8s.io/kubernetes v1.26.9
 	kubevirt.io/qe-tools v0.1.8
 	sigs.k8s.io/controller-runtime v0.14.6
-	sigs.k8s.io/scheduler-plugins v0.24.9
 	sigs.k8s.io/yaml v1.3.0
 )
 
@@ -127,7 +126,6 @@ require (
 	k8s.io/component-helpers v0.26.9 // indirect
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
-	k8s.io/kube-scheduler v0.26.9 // indirect
 	k8s.io/pod-security-admission v0.0.0 // indirect
 	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.37 // indirect
