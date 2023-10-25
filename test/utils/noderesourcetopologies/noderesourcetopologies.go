@@ -112,10 +112,12 @@ func isEqualNRT(initialNrt, updatedNrt nrtv1alpha2.NodeResourceTopology) bool {
 		return true
 	}
 	equalZones := apiequality.Semantic.DeepEqual(initialNrt.Zones, updatedNrt.Zones)
-	if !equalZones {
+	equalAttributes := apiequality.Semantic.DeepEqual(initialNrt.Attributes, updatedNrt.Attributes)
+
+	if !equalZones || !equalAttributes {
 		klog.Infof("NRT %q change: updated to %s", initialNrt.Name, e2enrt.ToString(updatedNrt))
 	}
-	return equalZones
+	return equalZones && equalAttributes
 }
 
 func CheckEqualAvailableResources(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourceTopology) (bool, error) {
