@@ -26,7 +26,6 @@ import (
 
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podrescli"
-	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/prometheus"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter"
 
@@ -93,11 +92,6 @@ func main() {
 	cli, err := podrescli.NewFilteringClientFromLister(sysCli, parsedArgs.RTE.Debug, parsedArgs.RTE.ReferenceContainer)
 	if err != nil {
 		klog.Fatalf("failed to get podresources filtering client: %v", err)
-	}
-
-	err = prometheus.InitPrometheus()
-	if err != nil {
-		klog.Fatalf("failed to start prometheus server: %v", err)
 	}
 
 	// TODO: recycled flag (no big deal, but still)
