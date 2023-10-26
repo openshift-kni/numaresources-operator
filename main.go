@@ -91,6 +91,7 @@ func main() {
 	var enableScheduler bool
 	var renderMode bool
 	var render RenderParams
+	var enableMetrics bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -106,6 +107,7 @@ func main() {
 	flag.StringVar(&render.ImageScheduler, "render-image-scheduler", "", "outputs the manifests rendered using the given image for the scheduler")
 	flag.BoolVar(&showVersion, "version", false, "outputs the version and exit")
 	flag.BoolVar(&enableScheduler, "enable-scheduler", false, "enable support for the NUMAResourcesScheduler object")
+	flag.BoolVar(&enableMetrics, "enable-metrics", false, "enable metrics server")
 
 	opts := zap.Options{
 		Development: true,
@@ -174,6 +176,11 @@ func main() {
 	if renderMode {
 		os.Exit(manageRendering(render, clusterPlatform, apiManifests, rteManifests, namespace, enableScheduler))
 	}
+
+	if !enableMetrics {
+		metricsAddr = "0"
+	}
+	klog.InfoS("metrics server", "enabled", enableMetrics, "addr", metricsAddr)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Namespace:               namespace,
