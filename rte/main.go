@@ -81,7 +81,7 @@ func main() {
 
 	k8sCli, err := podrescli.NewK8SClient(parsedArgs.RTE.PodResourcesSocketPath)
 	if err != nil {
-		klog.Fatalf("failed to start prometheus server: %v", err)
+		klog.Fatalf("failed to create podres client: %v", err)
 	}
 
 	sysCli := k8sCli
