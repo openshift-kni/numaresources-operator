@@ -317,7 +317,11 @@ func manageRendering(render RenderParams, clusterPlatform platform.Platform, api
 		}
 		klog.InfoS("manifests loaded", "component", "Scheduler")
 
-		mf := renderSchedulerManifests(schedMf, render.ImageScheduler)
+		mf, err := renderSchedulerManifests(schedMf, render.ImageScheduler)
+		if err != nil {
+			klog.ErrorS(err, "unable to render scheduler manifests")
+			return 1
+		}
 		objs = append(objs, mf.ToObjects()...)
 	}
 
@@ -356,7 +360,11 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 	if err != nil {
 		return mf, err
 	}
-	_ = rteupdate.DaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
+
+	err = rteupdate.DaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
+	if err != nil {
+		return mf, err
+	}
 
 	err = rteupdate.DaemonSetPauseContainerSettings(mf.DaemonSet)
 	if err != nil {
@@ -368,7 +376,7 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 	return mf, err
 }
 
-func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec string) schedmanifests.Manifests {
+func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec string) (schedmanifests.Manifests, error) {
 	klog.InfoS("Updating scheduler manifests")
 	mf := schedManifests.Clone()
 	schedupdate.DeploymentImageSettings(mf.Deployment, imageSpec)
@@ -376,7 +384,7 @@ func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec
 	// We only care about setting the environ variable to declare it exists,
 	// the best setting is "present, but disabled" vs "missing, thus implicitly disabled"
 	schedupdate.DeploymentConfigMapSettings(mf.Deployment, schedManifests.ConfigMap.Name, hash.ConfigMapData(schedManifests.ConfigMap))
-	return mf
+	return mf, nil
 }
 
 // SetupWebhookWithManager enables Webhooks - needed for version conversion
