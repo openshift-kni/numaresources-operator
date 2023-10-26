@@ -179,6 +179,7 @@ func main() {
 		Namespace:               namespace,
 		Scheme:                  scheme,
 		MetricsBindAddress:      metricsAddr,
+		Host:                    "127.0.0.1",
 		Port:                    9443,
 		HealthProbeBindAddress:  probeAddr,
 		LeaderElection:          enableLeaderElection,
