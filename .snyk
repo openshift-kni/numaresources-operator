@@ -11,3 +11,5 @@ exclude:
     - "vendor/github.com/google/**"
     - "vendor/github.com/openshift/**"
     - "vendor/golang.org/**"
+    - "vendor/github.com/stretchr/testify/**"
+    - "vendor/github.com/stretchr/objx/**"
