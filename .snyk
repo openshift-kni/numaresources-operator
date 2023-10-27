@@ -10,6 +10,8 @@ exclude:
     - "vendor/github.com/golang/**"
     - "vendor/github.com/google/**"
     - "vendor/github.com/openshift/**"
+    - "vendor/github.com/onsi/gomega**"
+    - "vendor/github.com/onsi/ginkgo/**"
     - "vendor/golang.org/**"
     - "vendor/github.com/stretchr/testify/**"
     - "vendor/github.com/stretchr/objx/**"
