@@ -8,6 +8,7 @@ exclude:
     - "vendor/k8s.io/**"
     - "vendor/sigs.k8s.io/**"
     - "vendor/github.com/jaypipes/ghw/**"
+    - "vendor/github.com/k8stopologyawareschedwg/deployer/pkg/kubeletconfig/*"
     - "vendor/github.com/golang/**"
     - "vendor/github.com/google/**"
     - "vendor/github.com/openshift/**"
