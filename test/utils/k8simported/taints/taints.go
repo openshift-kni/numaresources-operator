@@ -24,7 +24,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
 )
 
 const (
@@ -193,7 +192,7 @@ func AddOrUpdateTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 	updated := false
 	for i := range nodeTaints {
 		if taint.MatchTaint(&nodeTaints[i]) {
-			if helper.Semantic.DeepEqual(*taint, nodeTaints[i]) {
+			if helperSemantic.DeepEqual(*taint, nodeTaints[i]) {
 				return newNode, false, nil
 			}
 			newTaints = append(newTaints, *taint)
