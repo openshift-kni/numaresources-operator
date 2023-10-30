@@ -6,7 +6,7 @@ echo "performance-addon-operator/must-gather" > /must-gather/version
 version >> /must-gather/version
 
 # machine/node resources
-resources+=(nodes machineconfigs machineconfigpools featuregates kubeletconfigs)
+resources+=(nodes machineconfigs machineconfigpools featuregates kubeletconfigs crd)
 
 # run the collection of resources using must-gather
 for resource in ${resources[@]}; do
