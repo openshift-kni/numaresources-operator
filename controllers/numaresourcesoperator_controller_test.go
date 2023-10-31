@@ -520,14 +520,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 									Group:    "topology.node.k8s.io",
 									Resource: "noderesourcetopologies",
 								},
-								{
-									Group:    "nfd.k8s-sig.io",
-									Resource: "nodefeaturerules",
-								},
-								{
-									Group:    "nfd.k8s-sig.io",
-									Resource: "nodefeatures",
-								},
 							}
 							// ... and one for each DaemonSet
 							for _, ds := range nroUpdated.Status.DaemonSets {
