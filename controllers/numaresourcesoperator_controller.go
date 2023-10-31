@@ -613,14 +613,6 @@ func (r *NUMAResourcesOperatorReconciler) getRelatedObjects(dsStatuses []nropv1.
 			Group:    "topology.node.k8s.io",
 			Resource: "noderesourcetopologies",
 		},
-		{
-			Group:    "nfd.k8s-sig.io",
-			Resource: "nodefeaturerules",
-		},
-		{
-			Group:    "nfd.k8s-sig.io",
-			Resource: "nodefeatures",
-		},
 	}
 
 	for _, dsStatus := range dsStatuses {
