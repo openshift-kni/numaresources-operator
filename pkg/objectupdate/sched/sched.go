@@ -18,12 +18,12 @@ package sched
 
 import (
 	"fmt"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
+	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	k8swgschedupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/sched"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
@@ -126,11 +126,7 @@ func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
 }
 
-func SchedulerConfig(cm *corev1.ConfigMap, name string, cacheResyncPeriod time.Duration) error {
-	return SchedulerConfigWithFilter(cm, name, Passthrough, cacheResyncPeriod)
-}
-
-func SchedulerConfigWithFilter(cm *corev1.ConfigMap, name string, filterFunc func([]byte) []byte, cacheResyncPeriod time.Duration) error {
+func SchedulerConfig(cm *corev1.ConfigMap, name string, params *k8swgmanifests.ConfigParams) error {
 	if cm.Data == nil {
 		return fmt.Errorf("no data found in ConfigMap: %s/%s", cm.Namespace, cm.Name)
 	}
@@ -140,17 +136,16 @@ func SchedulerConfigWithFilter(cm *corev1.ConfigMap, name string, filterFunc fun
 		return fmt.Errorf("no data key named: %s found in ConfigMap: %s/%s", schedstate.SchedulerConfigFileName, cm.Namespace, cm.Name)
 	}
 
-	newData, err := k8swgschedupdate.RenderConfig(data, name, cacheResyncPeriod)
+	newData, ok, err := k8swgschedupdate.RenderConfig([]byte(data), name, params)
 	if err != nil {
 		return err
 	}
+	if !ok {
+		klog.V(2).InfoS("scheduler config not updated")
+	}
 
-	cm.Data[schedstate.SchedulerConfigFileName] = string(filterFunc([]byte(newData)))
+	cm.Data[schedstate.SchedulerConfigFileName] = string(newData)
 	return nil
-}
-
-func Passthrough(data []byte) []byte {
-	return data
 }
 
 func FindContainerByName(podSpec *corev1.PodSpec, containerName string) (*corev1.Container, error) {
