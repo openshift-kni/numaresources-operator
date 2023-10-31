@@ -4,7 +4,7 @@ run:
   tests: true
   skip-dirs:
     - vendor
-    - test
+    - test/utils/k8simported
   modules-download-mode: vendor
 linters:
   disable-all: true
