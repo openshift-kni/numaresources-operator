@@ -164,12 +164,15 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
+			By("waiting for the NRT data to settle")
+			e2efixture.WaitForNRTSettle(fxt)
+
 			var targetNrtBefore *nrtv1alpha2.NodeResourceTopology
 			var targetNrtListBefore nrtv1alpha2.NodeResourceTopologyList
 			for idx, zone := range nrtInfo.Zones {
 				if idx == len(nrtInfo.Zones)-1 {
 					// store the NRT of the target node before scheduling the last placeholder pod,
-					// later we'll compare this when we delete of of those pods
+					// later we'll compare this when we delete of those pods
 					targetNrtListBefore, err = e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
 					Expect(err).ToNot(HaveOccurred())
 					targetNrtBefore, err = e2enrt.FindFromList(targetNrtListBefore.Items, targetNodeName)
