@@ -66,7 +66,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 	var nrts []nrtv1alpha2.NodeResourceTopology
-
+	// test
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
 		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
