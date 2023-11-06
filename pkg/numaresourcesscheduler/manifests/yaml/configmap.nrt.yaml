@@ -43,5 +43,7 @@ data:
         pluginConfig:
         - name: NodeResourceTopologyMatch
           args:
+            apiVersion: kubescheduler.config.k8s.io/v1beta2
+            kind: NodeResourceTopologyMatchArgs
             scoringStrategy:
               type: LeastAllocated
