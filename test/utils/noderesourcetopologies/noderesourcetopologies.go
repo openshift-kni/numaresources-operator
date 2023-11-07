@@ -316,8 +316,8 @@ func checkConsumedResourcesAtLeast(resourcesInitial, resourcesUpdated []nrtv1alp
 	return true, nil
 }
 
-func AccumulateNames(nrts []nrtv1alpha2.NodeResourceTopology) sets.String {
-	nodeNames := sets.NewString()
+func AccumulateNames(nrts []nrtv1alpha2.NodeResourceTopology) sets.Set[string] {
+	nodeNames := sets.New[string]()
 	for _, nrt := range nrts {
 		nodeNames.Insert(nrt.Name)
 	}

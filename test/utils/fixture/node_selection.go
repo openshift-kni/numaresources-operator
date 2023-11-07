@@ -39,7 +39,7 @@ func PickNodeIndex(nodes []corev1.Node) (int, bool) {
 	return 0, false // "safe" default
 }
 
-func PopNodeName(nodeNames sets.String) (string, bool) {
+func PopNodeName(nodeNames sets.Set[string]) (string, bool) {
 	name, ok := os.LookupEnv("E2E_NROP_TARGET_NODE")
 	if !ok {
 		return nodeNames.PopAny()
@@ -52,4 +52,8 @@ func PopNodeName(nodeNames sets.String) (string, bool) {
 
 	klog.Infof("node %q not found among candidates, fall back to random one", name)
 	return nodeNames.PopAny()
+}
+
+func ListNodeNames(nodeNames sets.Set[string]) []string {
+	return sets.List[string](nodeNames)
 }

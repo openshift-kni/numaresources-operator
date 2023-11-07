@@ -135,8 +135,8 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
 			// nodes we have now are all equal for our purposes. Pick one at random
 			targetNodeName, ok := e2efixture.PopNodeName(candidateNodeNames)
-			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
-			unsuitableNodeNames := candidateNodeNames.List()
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(candidateNodeNames))
+			unsuitableNodeNames := e2efixture.ListNodeNames(candidateNodeNames)
 
 			By(fmt.Sprintf("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames))
 			var targetPaddingPods []*corev1.Pod
@@ -321,7 +321,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			var ok bool
 			targetNodeName, ok = e2efixture.PopNodeName(nrtCandidateNames)
-			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtCandidateNames.List())
+			Expect(ok).To(BeTrue(), "cannot select a node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
 			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 
 			targetNrtListInitial, err = e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
@@ -347,7 +347,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By(fmt.Sprintf("padding all other candidate nodes leaving room for the baseload only (updated maximum available resources: %s)", e2ereslist.ToString(reqResources)))
 			var paddingPods []*corev1.Pod
-			for _, nodeName := range nrtCandidateNames.List() {
+			for _, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 				node := &corev1.Node{}
 				nodeKey := client.ObjectKey{Name: nodeName}
 				err = fxt.Client.Get(context.TODO(), nodeKey, node)

@@ -328,13 +328,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			//select target node
 			targetNodeName, ok := e2efixture.PopNodeName(nrtNames)
-			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtNames.List())
+			Expect(ok).To(BeTrue(), "cannot select a node among %#v", e2efixture.ListNodeNames(nrtNames))
 			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 
 			//pad non target nodes
 			By("padding non target nodes leaving room for the baseload only")
 			var paddingPods []*corev1.Pod
-			for _, nodeName := range nrtNames.List() {
+			for _, nodeName := range e2efixture.ListNodeNames(nrtNames) {
 
 				//calculate base load on the node
 				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)

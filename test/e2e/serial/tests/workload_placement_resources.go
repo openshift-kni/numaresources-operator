@@ -188,7 +188,7 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 
 	var ok bool
 	targetNodeName, ok := e2efixture.PopNodeName(nrtCandidateNames)
-	ExpectWithOffset(1, ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
+	ExpectWithOffset(1, ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
 	By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
 	// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
 	// but have enough allocatable resources at node level to shedule the pod on it.
@@ -199,7 +199,7 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 	By("Padding all other candidate nodes")
 
 	var paddingPods []*corev1.Pod
-	for nIdx, nodeName := range nrtCandidateNames.List() {
+	for nIdx, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 		nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 		ExpectWithOffset(1, err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 

@@ -153,7 +153,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:47591][tier1] should modify workload post scheduling while keeping the resource requests available", func() {
-			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
+			paddedNodeNames := sets.New[string](padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
 			// since we know exactly how the test setup looks like we expect only targeted node here
@@ -543,7 +543,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:48746][tier2] should modify workload post scheduling while keeping the resource requests available across all NUMA node", func() {
-			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
+			paddedNodeNames := sets.New[string](padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
 			// since we know exactly how the test setup looks like we expect only targeted node here
@@ -777,7 +777,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:47627] should be able to schedule many replicas with TAS scheduler with performance time equals to the default scheduler", func() {
-			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
+			paddedNodeNames := sets.New[string](padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
 			// since we know exactly how the test setup looks like we expect only targeted node here

@@ -132,15 +132,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			var ok bool
 			targetNodeName, ok = e2efixture.PopNodeName(nrtCandidateNames)
-			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
 			By(fmt.Sprintf("selecting target node we expect the pod will be scheduled into: %q", targetNodeName))
 
 			alternativeNodeName, ok = nrtCandidateNames.PopAny()
-			Expect(ok).To(BeTrue(), "cannot select an alternative target node among %#v", nrtCandidateNames.List())
+			Expect(ok).To(BeTrue(), "cannot select an alternative target node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
 			By(fmt.Sprintf("selecting alternative node candidate for the scheduling: %q", alternativeNodeName))
 
 			// we need to also pad one of the labeled nodes.
-			nrtToPadNames := append(nrtCandidateNames.List(), alternativeNodeName)
+			nrtToPadNames := append(e2efixture.ListNodeNames(nrtCandidateNames), alternativeNodeName)
 			By(fmt.Sprintf("Padding all other candidate nodes: %v", nrtToPadNames))
 
 			var paddingPods []*corev1.Pod

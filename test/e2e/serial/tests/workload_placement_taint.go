@@ -187,7 +187,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:47594][tier1] should make a pod with a toleration land on a node with enough resources on a specific NUMA zone", func() {
-			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
+			paddedNodeNames := sets.New[string](padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
 			// since we know exactly how the test setup looks like we expect only targeted node here

@@ -133,7 +133,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			var ok bool
 			targetNodeName, ok = e2efixture.PopNodeName(nrtCandidateNames)
-			ExpectWithOffset(1, ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
+			ExpectWithOffset(1, ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
 			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
 			// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
 			// but have enough allocatable resources at node level to shedule the pod on it.
@@ -144,7 +144,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("Padding all other candidate nodes")
 
 			var paddingPods []*corev1.Pod
-			for nIdx, nodeName := range nrtCandidateNames.List() {
+			for nIdx, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				ExpectWithOffset(1, err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
@@ -409,8 +409,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
 			// nodes we have now are all equal for our purposes. Pick one at random
 			targetNodeName, ok := e2efixture.PopNodeName(candidateNodeNames)
-			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
-			unsuitableNodeNames := candidateNodeNames.List()
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(candidateNodeNames))
+			unsuitableNodeNames := e2efixture.ListNodeNames(candidateNodeNames)
 
 			By(fmt.Sprintf("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames))
 
@@ -1321,8 +1321,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
 			// nodes we have now are all equal for our purposes. Pick one at random
 			targetNodeName, ok := e2efixture.PopNodeName(candidateNodeNames)
-			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
-			unsuitableNodeNames := candidateNodeNames.List()
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(candidateNodeNames))
+			unsuitableNodeNames := e2efixture.ListNodeNames(candidateNodeNames)
 
 			By(fmt.Sprintf("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames))
 
