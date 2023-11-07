@@ -991,7 +991,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			diff := int64(math.Abs(float64(schedTimeWithTopologyScheduler.Milliseconds() - schedTimeWithDefaultScheduler.Milliseconds())))
 			// 2000 milliseconds diff seems reasonable, but can evaluate later if needed.
 			d := time.Millisecond * 2000
-			Expect(diff).To(BeNumerically("<", d.Milliseconds()), "expected the difference between scheduling times to be %d at max; actual diff: %d milliseconds", d, diff)
+			Expect(diff).To(BeNumerically("<", d.Milliseconds()), "expected the difference between scheduling times to be %d at max; actual diff: %d milliseconds", d.Milliseconds(), diff)
 
 			By(fmt.Sprintf("deleting deployment %s/%s", fxt.Namespace.Name, rsName))
 			err = fxt.Client.Delete(context.TODO(), rs)
