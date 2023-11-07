@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
+	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
@@ -76,8 +77,8 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				}
 
 				for _, ds := range rteDss {
-					rteCnt, err := rteupdate.FindContainerByName(&ds.Spec.Template.Spec, rteupdate.MainContainerName)
-					gomega.Expect(err).ToNot(gomega.HaveOccurred())
+					rteCnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, rteupdate.MainContainerName)
+					gomega.Expect(rteCnt).ToNot(gomega.BeNil())
 
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
@@ -115,8 +116,8 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				}
 
 				for _, ds := range rteDss {
-					rteCnt, err := rteupdate.FindContainerByName(&ds.Spec.Template.Spec, rteupdate.MainContainerName)
-					gomega.Expect(err).ToNot(gomega.HaveOccurred())
+					rteCnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, rteupdate.MainContainerName)
+					gomega.Expect(rteCnt).ToNot(gomega.BeNil())
 
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
@@ -274,8 +275,8 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			for _, rtePod := range rtePods {
 				ginkgo.By(fmt.Sprintf("checking DS: %s/%s POD %s/%s (node=%s)", rteDs.Namespace, rteDs.Name, rtePod.Namespace, rtePod.Name, rtePod.Spec.NodeName))
 
-				rteCnt, err := rteupdate.FindContainerByName(&rtePod.Spec, rteupdate.MainContainerName)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				rteCnt := k8swgobjupdate.FindContainerByName(rtePod.Spec.Containers, rteupdate.MainContainerName)
+				gomega.Expect(rteCnt).ToNot(gomega.BeNil())
 
 				// TODO: hardcoded path. Any smarter option?
 				cmd := []string{"/bin/cat", "/run/pfpstatus/dump.json"}

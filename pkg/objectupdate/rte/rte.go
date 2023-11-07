@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
+	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
@@ -44,9 +45,9 @@ const (
 )
 
 func DaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImageSpec string, builtinPullPolicy corev1.PullPolicy) error {
-	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
-	if err != nil {
-		return err
+	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
+	if cnt == nil {
+		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
 	if userImageSpec != "" {
 		// we don't really know what's out there, so we minimize the changes.
@@ -63,19 +64,22 @@ func DaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImag
 	cnt.ImagePullPolicy = builtinPullPolicy
 	klog.V(3).InfoS("Exporter image", "reason", "builtin", "pullSpec", builtinImageSpec, "pullPolicy", builtinPullPolicy)
 	// if we run with operator-as-operand, we know we NEED this.
-	DaemonSetRunAsIDs(ds)
+	err := DaemonSetRunAsIDs(ds)
+	if err != nil {
+		return fmt.Errorf("error while changing container priviledges %w", err)
+	}
 
 	return nil
 }
 
 func DaemonSetPauseContainerSettings(ds *appsv1.DaemonSet) error {
-	rteCnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
-	if err != nil {
-		return err
+	rteCnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
+	if rteCnt == nil {
+		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
-	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, HelperContainerName)
-	if err != nil {
-		return err
+	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, HelperContainerName)
+	if cnt == nil {
+		return fmt.Errorf("cannot find container data for %q", HelperContainerName)
 	}
 
 	cnt.Image = rteCnt.Image
@@ -98,9 +102,9 @@ func DaemonSetPauseContainerSettings(ds *appsv1.DaemonSet) error {
 // the SCC/SELinux context take cares of the MAC (when needed, e.g. on OCP), while
 // we take care of DAC here.
 func DaemonSetRunAsIDs(ds *appsv1.DaemonSet) error {
-	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
-	if err != nil {
-		return err
+	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
+	if cnt == nil {
+		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
 	if cnt.SecurityContext == nil {
 		cnt.SecurityContext = &corev1.SecurityContext{}
@@ -123,9 +127,9 @@ func DaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
 const _MiB = 1024 * 1024
 
 func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
-	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
-	if err != nil {
-		return err
+	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
+	if cnt == nil {
+		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
 	flags := flagcodec.ParseArgvKeyValue(cnt.Args)
 	if flags == nil {
@@ -167,9 +171,9 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 }
 
 func ContainerConfig(ds *appsv1.DaemonSet, name string) error {
-	cnt, err := FindContainerByName(&ds.Spec.Template.Spec, MainContainerName)
-	if err != nil {
-		return err
+	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
+	if cnt == nil {
+		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
 	k8swgrteupdate.ContainerConfig(&ds.Spec.Template.Spec, cnt, name)
 	return nil
@@ -193,16 +197,6 @@ func AddVolumeMountMemory(podSpec *corev1.PodSpec, cnt *corev1.Container, mountN
 			},
 		},
 	)
-}
-
-func FindContainerByName(podSpec *corev1.PodSpec, containerName string) (*corev1.Container, error) {
-	for idx := 0; idx < len(podSpec.Containers); idx++ {
-		cnt := &podSpec.Containers[idx]
-		if cnt.Name == containerName {
-			return cnt, nil
-		}
-	}
-	return nil, fmt.Errorf("container %q not found - defaulting to the first", containerName)
 }
 
 func isPodFingerprintEnabled(conf *nropv1.NodeGroupConfig) (bool, string) {
