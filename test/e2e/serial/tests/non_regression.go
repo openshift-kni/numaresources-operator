@@ -191,9 +191,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
-			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
+			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			By(fmt.Sprintf("checking the resources are restored as expected on %q", targetNodeName))
 			nrtPostDelete, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), nrtPostCreate, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
 			ok, err = e2enrt.CheckEqualAvailableResources(nrtInitial, nrtPostDelete)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(ok).To(BeTrue(), "NRT resources not restored correctly on %q", targetNodeName)

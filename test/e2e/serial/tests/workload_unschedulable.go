@@ -698,10 +698,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(succeededPods).To(BeEmpty(), "some pods are running, but we expect all of them to fail")
 
 			By("Verifying NRTs had no updates because the pods failed to be scheduled on any node")
-			e2efixture.WaitForNRTSettle(fxt)
-			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &nrtInitialList, func(nrt *nrtv1alpha2.NodeResourceTopology) bool {
+			e2efixture.MustSettleNRT(fxt)
+			_, err = wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &nrtInitialList, func(nrt *nrtv1alpha2.NodeResourceTopology) bool {
 				return !nodesNameSet.Has(nrt.Name)
 			})
+			Expect(err).ToNot(HaveOccurred())
 
 			By("updating deployment in such way that some pods will fit into NUMA nodes")
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), dp)
