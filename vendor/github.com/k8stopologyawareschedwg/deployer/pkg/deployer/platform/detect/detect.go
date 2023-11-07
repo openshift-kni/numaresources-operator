@@ -23,8 +23,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"k8s.io/client-go/discovery"
+
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	ocpconfigv1 "github.com/openshift/api/config/v1"
 )
 
 func Platform(ctx context.Context) (platform.Platform, error) {
@@ -32,14 +35,22 @@ func Platform(ctx context.Context) (platform.Platform, error) {
 	if err != nil {
 		return platform.Unknown, err
 	}
-	sccs, err := ocpCli.ConfigV1.ClusterVersions().List(ctx, metav1.ListOptions{})
+	return PlatformFromLister(ctx, ocpCli.ConfigV1.ClusterVersions())
+}
+
+type ClusterVersionsLister interface {
+	List(ctx context.Context, opts metav1.ListOptions) (*ocpconfigv1.ClusterVersionList, error)
+}
+
+func PlatformFromLister(ctx context.Context, cvLister ClusterVersionsLister) (platform.Platform, error) {
+	vers, err := cvLister.List(ctx, metav1.ListOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return platform.Kubernetes, nil
 		}
 		return platform.Unknown, err
 	}
-	if len(sccs.Items) > 0 {
+	if len(vers.Items) > 0 {
 		return platform.OpenShift, nil
 	}
 	return platform.Kubernetes, nil
@@ -53,11 +64,15 @@ func Version(ctx context.Context, plat platform.Platform) (platform.Version, err
 }
 
 // TODO: we need to wait for the client-go to be fixed to accept a context
-func KubernetesVersion(_ context.Context) (platform.Version, error) {
+func KubernetesVersion(ctx context.Context) (platform.Version, error) {
 	cli, err := clientutil.NewDiscoveryClient()
 	if err != nil {
 		return "", err
 	}
+	return KubernetesVersionFromDiscovery(ctx, cli)
+}
+
+func KubernetesVersionFromDiscovery(_ context.Context, cli discovery.ServerVersionInterface) (platform.Version, error) {
 	ver, err := cli.ServerVersion()
 	if err != nil {
 		return "", err
@@ -70,7 +85,15 @@ func OpenshiftVersion(ctx context.Context) (platform.Version, error) {
 	if err != nil {
 		return platform.MissingVersion, err
 	}
-	ocpApi, err := ocpCli.ConfigV1.ClusterOperators().Get(ctx, "openshift-apiserver", metav1.GetOptions{})
+	return OpenshiftVersionFromGetter(ctx, ocpCli.ConfigV1.ClusterOperators())
+}
+
+type ClusterOperatorsGetter interface {
+	Get(ctx context.Context, name string, opts metav1.GetOptions) (*ocpconfigv1.ClusterOperator, error)
+}
+
+func OpenshiftVersionFromGetter(ctx context.Context, coGetter ClusterOperatorsGetter) (platform.Version, error) {
+	ocpApi, err := coGetter.Get(ctx, "openshift-apiserver", metav1.GetOptions{})
 	if err != nil {
 		return platform.MissingVersion, err
 	}

@@ -17,10 +17,6 @@
 package rte
 
 import (
-	"context"
-
-	"github.com/go-logr/logr"
-
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -29,9 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/wait"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	ocpupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/ocp"
@@ -184,79 +178,6 @@ func (mf Manifests) ToObjects() []client.Object {
 		mf.DaemonSet,
 		mf.ServiceAccount,
 	)
-}
-
-func (mf Manifests) ToCreatableObjects(cli client.Client, log logr.Logger) []deployer.WaitableObject {
-	var objs []deployer.WaitableObject
-	if mf.ConfigMap != nil {
-		objs = append(objs, deployer.WaitableObject{
-			Obj: mf.ConfigMap,
-		})
-	}
-
-	if mf.SecurityContextConstraint != nil {
-		objs = append(objs, deployer.WaitableObject{
-			Obj: mf.SecurityContextConstraint,
-		})
-	}
-
-	if mf.MachineConfig != nil {
-		// TODO: we should add functionality to wait for the MCP update
-		objs = append(objs, deployer.WaitableObject{
-			Obj: mf.MachineConfig,
-		})
-	}
-
-	key := wait.ObjectKey{
-		Namespace: mf.DaemonSet.Namespace,
-		Name:      mf.DaemonSet.Name,
-	}
-
-	return append(objs,
-		deployer.WaitableObject{Obj: mf.Role},
-		deployer.WaitableObject{Obj: mf.RoleBinding},
-		deployer.WaitableObject{Obj: mf.ClusterRole},
-		deployer.WaitableObject{Obj: mf.ClusterRoleBinding},
-		deployer.WaitableObject{Obj: mf.ServiceAccount},
-		deployer.WaitableObject{
-			Obj: mf.DaemonSet,
-			Wait: func(ctx context.Context) error {
-				_, err := wait.With(cli, log).ForDaemonSetReadyByKey(ctx, key)
-				return err
-			},
-		},
-	)
-}
-
-func (mf Manifests) ToDeletableObjects(cli client.Client, log logr.Logger) []deployer.WaitableObject {
-	objs := []deployer.WaitableObject{
-		{
-			Obj: mf.DaemonSet,
-			Wait: func(ctx context.Context) error {
-				return wait.With(cli, log).ForDaemonSetDeleted(ctx, mf.DaemonSet.Namespace, mf.DaemonSet.Name)
-			},
-		},
-		{Obj: mf.Role},
-		{Obj: mf.RoleBinding},
-		{Obj: mf.ClusterRole},
-		{Obj: mf.ClusterRoleBinding},
-		{Obj: mf.ServiceAccount},
-	}
-	if mf.ConfigMap != nil {
-		objs = append(objs, deployer.WaitableObject{Obj: mf.ConfigMap})
-	}
-	if mf.SecurityContextConstraint != nil {
-		objs = append(objs, deployer.WaitableObject{
-			Obj: mf.SecurityContextConstraint,
-		})
-	}
-	if mf.MachineConfig != nil {
-		objs = append(objs, deployer.WaitableObject{
-			// TODO: we should add functionality to wait for the MCP update
-			Obj: mf.MachineConfig,
-		})
-	}
-	return objs
 }
 
 func New(plat platform.Platform) Manifests {

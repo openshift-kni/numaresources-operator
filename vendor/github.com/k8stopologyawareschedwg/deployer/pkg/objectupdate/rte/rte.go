@@ -133,14 +133,11 @@ func DaemonSet(ds *appsv1.DaemonSet, plat platform.Platform, configMapName strin
 		if opts.NotificationEnable {
 			flags.SetOption("--notify-file", fmt.Sprintf("/%s/%s", rteNotifierVolumeName, rteNotifierFileName))
 		}
-		if opts.PFPEnable {
-			flags.SetToggle("--pods-fingerprint")
-		}
+
+		flags.SetOption("--pods-fingerprint", strconv.FormatBool(opts.PFPEnable))
+
 		if plat == platform.Kubernetes {
 			flags.SetOption("--kubelet-config-file", fmt.Sprintf("/%s/config.yaml", rteKubeletDirVolumeName))
-			if opts.NotificationEnable {
-				flags.SetOption("--kubelet-state-dir", fmt.Sprintf("/%s", rteKubeletDirVolumeName))
-			}
 		}
 		cntSpec.Args = flags.Argv()
 
