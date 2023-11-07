@@ -33,6 +33,7 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/wait"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	ocpupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/ocp"
 	rbacupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rbac"
 	rteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
@@ -82,8 +83,7 @@ func (mf Manifests) Clone() Manifests {
 
 type RenderOptions struct {
 	// DaemonSet options
-	PullIfNotPresent bool
-	NodeSelector     *metav1.LabelSelector
+	DaemonSet objectupdate.DaemonSetOptions
 
 	// MachineConfig options
 	MachineConfigPoolSelector *metav1.LabelSelector
@@ -94,7 +94,6 @@ type RenderOptions struct {
 	// General options
 	Namespace string
 	Name      string
-	PFPEnable bool
 }
 
 func (mf Manifests) Render(options RenderOptions) (Manifests, error) {
@@ -127,9 +126,11 @@ func (mf Manifests) Render(options RenderOptions) (Manifests, error) {
 	if ret.ConfigMap != nil {
 		rteConfigMapName = ret.ConfigMap.Name
 	}
-	rteupdate.DaemonSet(ret.DaemonSet, rteConfigMapName, options.PullIfNotPresent, options.PFPEnable, options.NodeSelector)
+	rteupdate.DaemonSet(ret.DaemonSet, mf.plat, rteConfigMapName, options.DaemonSet)
 
 	if mf.plat == platform.OpenShift {
+		rteupdate.SecurityContext(ret.DaemonSet)
+
 		if options.Name != "" {
 			ret.MachineConfig.Name = ocpupdate.MakeMachineConfigName(options.Name)
 		}
@@ -302,7 +303,7 @@ func GetManifests(plat platform.Platform, version platform.Version, namespace st
 	if err != nil {
 		return mf, err
 	}
-	mf.DaemonSet, err = manifests.DaemonSet(manifests.ComponentResourceTopologyExporter, "", plat, namespace)
+	mf.DaemonSet, err = manifests.DaemonSet(manifests.ComponentResourceTopologyExporter, "", namespace)
 	if err != nil {
 		return mf, err
 	}
