@@ -39,8 +39,8 @@ spec:
           volumeMounts:
             - mountPath: /host-var/lib/kubelet/config.yaml
               name: kubelet-podresources-conf
-            - mountPath: /host-var/lib/kubelet/pod-resources/kubelet.sock
-              name: kubelet-podresources-sock
+            - mountPath: /host-var/lib/kubelet/pod-resources
+              name: kubelet-podresources
             - mountPath: /host-sys
               name: host-sys
       dnsPolicy: ClusterFirstWithHostNet
@@ -53,5 +53,5 @@ spec:
             path: /var/lib/kubelet/config.yaml
           name: kubelet-podresources-conf
         - hostPath:
-            path: /var/lib/kubelet/pod-resources/kubelet.sock
-          name: kubelet-podresources-sock
+            path: /var/lib/kubelet/pod-resources
+          name: kubelet-podresources

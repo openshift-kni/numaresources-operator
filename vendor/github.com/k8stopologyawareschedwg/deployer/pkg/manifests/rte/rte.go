@@ -267,12 +267,12 @@ func New(plat platform.Platform) Manifests {
 	return mf
 }
 
-func GetManifests(plat platform.Platform, version platform.Version, namespace string) (Manifests, error) {
+func GetManifests(plat platform.Platform, version platform.Version, namespace string, withCRIHooks bool) (Manifests, error) {
 	var err error
 	mf := New(plat)
 
 	if plat == platform.OpenShift {
-		mf.MachineConfig, err = manifests.MachineConfig(manifests.ComponentResourceTopologyExporter, version)
+		mf.MachineConfig, err = manifests.MachineConfig(manifests.ComponentResourceTopologyExporter, version, withCRIHooks)
 		if err != nil {
 			return mf, err
 		}
