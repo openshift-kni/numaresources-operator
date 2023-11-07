@@ -506,12 +506,3 @@ func ResourceInfoListToResourceList(ri nrtv1alpha2.ResourceInfoList) corev1.Reso
 	}
 	return rl
 }
-
-func contains(items []string, st string) bool {
-	for _, item := range items {
-		if item == st {
-			return true
-		}
-	}
-	return false
-}

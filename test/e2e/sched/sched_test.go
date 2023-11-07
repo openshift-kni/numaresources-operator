@@ -41,8 +41,6 @@ import (
 	e2eobjects "github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
-const schedulerPluginName = "NodeResourceTopologyMatch"
-
 var _ = Describe("[Scheduler] imageReplacement", func() {
 	var initialized bool
 	nroSchedObj := &nropv1.NUMAResourcesScheduler{}
