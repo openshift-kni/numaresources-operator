@@ -853,7 +853,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 				return true
 			}, time.Minute, time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
-			schedTimeWithDefaultScheduler := time.Now().Sub(rsCreateStart)
+			schedTimeWithDefaultScheduler := time.Since(rsCreateStart)
 
 			By(fmt.Sprintf("checking the pods were scheduled with scheduler %q", corev1.DefaultSchedulerName))
 			for _, pod := range pods {
@@ -948,7 +948,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 				return true
 			}, time.Minute, time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
-			schedTimeWithTopologyScheduler := time.Now().Sub(rsCreateStart)
+			schedTimeWithTopologyScheduler := time.Since(rsCreateStart)
 
 			By(fmt.Sprintf("checking the pods were scheduled on the target node %q", targetNodeName))
 			for _, pod := range pods {
