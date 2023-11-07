@@ -193,7 +193,7 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 	// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
 	// but have enough allocatable resources at node level to shedule the pod on it.
 	// If we pad each zone with a pod with 3/4 of the required resources, as those nodes have at least
-	// 2 NUMA zones, they will have enogh allocatable resources at node level to accomodate the required
+	// 2 NUMA zones, they will have enogh allocatable resources at node level to accommondate the required
 	// resources but they won't have enough resources in only one NUMA zone.
 
 	By("Padding all other candidate nodes")

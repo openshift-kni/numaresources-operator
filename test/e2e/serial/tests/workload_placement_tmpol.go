@@ -138,7 +138,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
 			// but have enough allocatable resources at node level to shedule the pod on it.
 			// If we pad each zone with a pod with 3/4 of the required resources, as those nodes have at least
-			// 2 NUMA zones, they will have enogh allocatable resources at node level to accomodate the required
+			// 2 NUMA zones, they will have enogh allocatable resources at node level to accommondate the required
 			// resources but they won't have enough resources in only one NUMA zone.
 
 			By("Padding all other candidate nodes")
@@ -496,7 +496,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
-			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
+			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			Eventually(func() bool {
 				By(fmt.Sprintf("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName))
 

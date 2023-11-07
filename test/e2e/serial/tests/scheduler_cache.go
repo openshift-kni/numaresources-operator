@@ -426,7 +426,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				}
 
 				for _, failedPod := range failedPods {
-					// we get the scheduler event after the pod was succesfully bound to the node, so we cant CheckPODWasScheduledWith:
+					// we get the scheduler event after the pod was successfully bound to the node, so we cant CheckPODWasScheduledWith:
 					// the operation didn't complete yet, and this is exactly what we want!
 					if failedPod.Status.Phase != corev1.PodPending {
 						_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
@@ -458,7 +458,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				Expect(expectedPending).To(Equal(1))
 
 				// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
-				// TOOD: when we support NUMA zones > 2, switch to FilterZoneCountAtLeast
+				// TODO: when we support NUMA zones > 2, switch to FilterZoneCountAtLeast
 				By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
 				nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
 				if len(nrtCandidates) < hostsRequired {
@@ -546,7 +546,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				}
 
 				failedPod := failedPods[0]
-				// we get the scheduler event after the pod was succesfully bound to the node, so we cant CheckPODWasScheduledWith:
+				// we get the scheduler event after the pod was successfully bound to the node, so we cant CheckPODWasScheduledWith:
 				// the operation didn't complete yet, and this is exactly what we want!
 				if failedPod.Status.Phase != corev1.PodPending {
 					_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)

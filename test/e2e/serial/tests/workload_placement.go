@@ -330,7 +330,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking post-update NRT for target node %q updated correctly", targetNodeName))
-			// it's simpler (no resource substraction/difference) to check against initial than compute
+			// it's simpler (no resource subtraction/difference) to check against initial than compute
 			// the delta between postUpdate and postCreate. Both must yield the same result anyway.
 			dataBefore, err = yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
@@ -387,7 +387,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			//between updating the object and having the deployment in complete state, a creation of replicaset acctually happens.
 			//The check of the deployment completeness is not enough in this context because:
-			// 1. the test updates an exsiting deployment. the deployment was "complete" in earlier stages and
+			// 1. the test updates an existing deployment. the deployment was "complete" in earlier stages and
 			//    it will remain as such (even if the new pod after the update is in pending state, the old pod will still exists -> deployment is counted as complete)
 			// 2. this check may happen before the new replicaset is created,hence applying the later checks on an old pod -> failing the test
 			// Despite that the check is still needed but before applying it we need to make sure that the intermediate step is not neglected,
@@ -577,7 +577,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			// We want a container to occupy as much resources from a single NUMA nodes as possible in order to prevent another
 			// container to be allocated resources from the same NUMA node. To determine the value of resources, we use the
-			// resource availablity of a NUMA node that has the least amount of resources out of all the NUMA nodes on that
+			// resource availability of a NUMA node that has the least amount of resources out of all the NUMA nodes on that
 			// node and request that in the test-deployment.
 			reqResources := corev1.ResourceList{
 				corev1.ResourceCPU:    cpus,
@@ -595,7 +595,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			// The deployment strategy type as `Recreate` is specified as the default strategy is `RollingUpdate`
 			// This is done because the resource quantity is updated in the second part of this test and the
-			// desired behaviour is to have those updated replicas to be created after the older ones are deleted
+			// desired behavior is to have those updated replicas to be created after the older ones are deleted
 			// in order to make sure that the new replicas have adequate resources to run successfully.
 			dp.Spec.Strategy.Type = appsv1.RecreateDeploymentStrategyType
 
@@ -718,7 +718,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
-			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
+			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			Eventually(func() bool {
 				By(fmt.Sprintf("checking the resources are restored as expected on %q", targetNodeName))
 

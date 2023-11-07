@@ -625,7 +625,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			_, err = wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListInitial, wait.NRTIgnoreNothing)
 			Expect(err).ToNot(HaveOccurred())
 
-			By("delete the burstable pod and the guranteed pod should change state from pending to running")
+			By("delete the burstable pod and the guaranteed pod should change state from pending to running")
 
 			err = fxt.Client.Delete(context.TODO(), podBurstable)
 			Expect(err).ToNot(HaveOccurred())
@@ -661,7 +661,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			policyFuncs := tmSingleNUMANodeFuncsHandler[scope.Value]
 
 			By(fmt.Sprintf("checking post-update NRT for target node %q updated correctly", targetNodeName))
-			// it's simpler (no resource substraction/difference) to check against initial than compute
+			// it's simpler (no resource subtraction/difference) to check against initial than compute
 			// the delta between postUpdate and postCreate. Both must yield the same result anyway.
 			dataBefore, err := yaml.Marshal(targetNrtInitial)
 			Expect(err).ToNot(HaveOccurred())
@@ -676,7 +676,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
-			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
+			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			Eventually(func() bool {
 				By(fmt.Sprintf("checking the resources are restored as expected on %q", updatedPod2.Spec.NodeName))
 

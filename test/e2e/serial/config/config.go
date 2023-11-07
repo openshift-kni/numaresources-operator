@@ -52,10 +52,10 @@ const (
 )
 
 // This suite holds the e2e tests which span across components,
-// e.g. involve both the behaviour of RTE and the scheduler.
+// e.g. involve both the behavior of RTE and the scheduler.
 // These tests are almost always disruptive, meaning they significantly
 // alter the cluster state and need a very specific cluster state (which
-// is each test responsability to setup and cleanup).
+// is each test responsibility to setup and cleanup).
 // Hence we call this suite serial, implying each test should run alone
 // and indisturbed on the cluster. No concurrency at all is possible,
 // each test "owns" the cluster - but again, must leave no leftovers.

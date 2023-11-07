@@ -54,7 +54,7 @@ func TestMustGather(t *testing.T) {
 
 var _ = ginkgo.BeforeSuite(func() {
 	if configuration.Plat != platform.OpenShift {
-		ginkgo.Skip(fmt.Sprintf("running on %q platfrom but must-gather is only supported on %q platform", configuration.Plat, platform.OpenShift))
+		ginkgo.Skip(fmt.Sprintf("running on %q platform but must-gather is only supported on %q platform", configuration.Plat, platform.OpenShift))
 	}
 
 	mustGatherImage = getStringValueFromEnv(envVarMustGatherImage, defaultMustGatherImage)

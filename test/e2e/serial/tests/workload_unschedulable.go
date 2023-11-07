@@ -518,7 +518,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 
 			// Pad the zones so no one could handle both containers
-			// so we should left enought resources on each zone to accomodate
+			// so we should left enought resources on each zone to accommondate
 			// the "biggest" ( in term of resources) container but not the
 			// sum of both
 			paddingResources := corev1.ResourceList{
@@ -932,7 +932,7 @@ func filterNRTsEachRequestOnADifferentZone(nrts []nrtv1alpha2.NodeResourceTopolo
 	return ret
 }
 
-// returns true if nrt can accomodate r1 and r2 in one of its two first zones.
+// returns true if nrt can accommondate r1 and r2 in one of its two first zones.
 func nrtCanAccomodateEachRequestOnADifferentZone(nrt nrtv1alpha2.NodeResourceTopology, r1, r2 corev1.ResourceList) bool {
 	if len(nrt.Zones) < 2 {
 		return false
