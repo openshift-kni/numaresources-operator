@@ -19,7 +19,23 @@ package images
 import "os"
 
 func init() {
+	_, ok := os.LookupEnv("TAS_IMAGES_USE_SHA")
+	SetDefaults(ok)
 	Setup(os.LookupEnv)
+}
+
+func SetDefaults(useSHA bool) {
+	if useSHA {
+		SchedulerPluginSchedulerImage = SchedulerPluginSchedulerDefaultImageSHA
+		SchedulerPluginControllerImage = SchedulerPluginControllerDefaultImageSHA
+		ResourceTopologyExporterImage = ResourceTopologyExporterDefaultImageSHA
+		NodeFeatureDiscoveryImage = NodeFeatureDiscoveryDefaultImageSHA
+	} else {
+		SchedulerPluginSchedulerImage = SchedulerPluginSchedulerDefaultImageTag
+		SchedulerPluginControllerImage = SchedulerPluginControllerDefaultImageTag
+		ResourceTopologyExporterImage = ResourceTopologyExporterDefaultImageTag
+		NodeFeatureDiscoveryImage = NodeFeatureDiscoveryDefaultImageTag
+	}
 }
 
 func Setup(getImage func(string) (string, bool)) {
@@ -39,7 +55,7 @@ func Setup(getImage func(string) (string, bool)) {
 
 var (
 	SchedulerPluginSchedulerImage  = SchedulerPluginSchedulerDefaultImageTag
-	SchedulerPluginControllerImage = SchedulerPluginSchedulerDefaultImageTag
+	SchedulerPluginControllerImage = SchedulerPluginControllerDefaultImageTag
 	ResourceTopologyExporterImage  = ResourceTopologyExporterDefaultImageTag
 	NodeFeatureDiscoveryImage      = NodeFeatureDiscoveryDefaultImageTag
 )

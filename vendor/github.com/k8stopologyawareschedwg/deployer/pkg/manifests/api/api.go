@@ -17,13 +17,10 @@
 package api
 
 import (
-	"github.com/go-logr/logr"
-
 	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 )
@@ -37,18 +34,6 @@ type Manifests struct {
 func (mf Manifests) ToObjects() []client.Object {
 	return []client.Object{
 		mf.Crd,
-	}
-}
-
-func (mf Manifests) ToCreatableObjects(cli client.Client, log logr.Logger) []deployer.WaitableObject {
-	return []deployer.WaitableObject{
-		{Obj: mf.Crd},
-	}
-}
-
-func (mf Manifests) ToDeletableObjects(cli client.Client, log logr.Logger) []deployer.WaitableObject {
-	return []deployer.WaitableObject{
-		{Obj: mf.Crd},
 	}
 }
 
