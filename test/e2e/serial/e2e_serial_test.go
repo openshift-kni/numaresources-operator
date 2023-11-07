@@ -18,15 +18,11 @@ package serial
 
 import (
 	"context"
-	"math/rand"
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	ginkgo_reporters "github.com/onsi/ginkgo/v2/reporters"
 	. "github.com/onsi/gomega"
-
-	"k8s.io/klog/v2"
 
 	qe_reporters "kubevirt.io/qe-tools/pkg/ginkgo-reporters"
 
@@ -36,8 +32,6 @@ import (
 
 var afterSuiteReporters = []Reporter{}
 var setupExecuted = false
-
-var randomSeed int64
 
 func TestSerial(t *testing.T) {
 	if qe_reporters.Polarion.Run {
@@ -49,12 +43,6 @@ func TestSerial(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	// this must be the very first thing
-	randomSeed = time.Now().UnixNano()
-	rand.Seed(randomSeed)
-
-	klog.Infof("using random seed %v", randomSeed)
-
 	Expect(serialconfig.CheckNodesTopology(context.TODO())).Should(Succeed())
 	serialconfig.Setup()
 	setupExecuted = true
