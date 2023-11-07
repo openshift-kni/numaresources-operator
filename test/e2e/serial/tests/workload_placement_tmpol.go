@@ -203,7 +203,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 				By("Waiting for the NRT data to stabilize")
-				e2efixture.WaitForNRTSettle(fxt)
+				e2efixture.MustSettleNRT(fxt)
 
 				By("Verifying NRT is updated properly when running the test's pod")
 				expectNRTConsumedResources(fxt, targetNrtInitial, requiredRes, updatedPod)
@@ -304,7 +304,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 
 				By("Waiting for the NRT data to stabilize")
-				e2efixture.WaitForNRTSettle(fxt)
+				e2efixture.MustSettleNRT(fxt)
 
 				By("Verifying NRT is updated properly when running the test's pod")
 				expectNRTConsumedResources(fxt, targetNrtInitial, requiredRes, &pods[0])
@@ -476,7 +476,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("wait for NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			By(fmt.Sprintf("checking the resources are accounted as expected on %q", updatedPod.Spec.NodeName))
 			nrtPostCreate, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), nrtInitial, 1*time.Minute)

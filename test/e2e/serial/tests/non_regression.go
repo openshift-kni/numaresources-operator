@@ -180,7 +180,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
 
 			By("Waiting for the NRT data to stabilize")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetNodeName))
 			rl := e2ereslist.FromGuaranteedPod(*updatedPod)
@@ -279,7 +279,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("wait for NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -395,12 +395,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("check the pod keeps on pending")
 			err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
 			if err != nil {
-				objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
 			Expect(err).ToNot(HaveOccurred())
 
 			By("wait for NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			By("check the NRT has no changes")
 			nrtListPostPodCreate, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)

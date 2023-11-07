@@ -240,7 +240,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				Expect(err).NotTo(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, 2*time.Minute)
 
 				By("wait for NRT data to settle")
-				e2efixture.WaitForNRTSettle(fxt)
+				e2efixture.MustSettleNRT(fxt)
 
 				nrtPostCreate, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), nrtInitial, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
@@ -435,7 +435,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				By("waiting for the NRT data to settle")
-				e2efixture.WaitForNRTSettle(fxt)
+				e2efixture.MustSettleNRT(fxt)
 
 				for idx := range nrtListInitial.Items {
 					initialNrt := &nrtListInitial.Items[idx]

@@ -26,6 +26,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -161,6 +162,11 @@ func Cooldown(ft *Fixture) {
 	}
 	klog.Warningf("cooling down for %v", cooldownTime)
 	time.Sleep(cooldownTime)
+}
+
+func MustSettleNRT(fxt *Fixture) {
+	_, err := WaitForNRTSettle(fxt)
+	gomega.ExpectWithOffset(1, err).ToNot(gomega.HaveOccurred())
 }
 
 func WaitForNRTSettle(fxt *Fixture) (*nrtv1alpha2.NodeResourceTopologyList, error) {
