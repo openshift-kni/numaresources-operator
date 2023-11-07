@@ -20,7 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -87,7 +86,7 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 				"cluster-scoped-resources/apiextensions.k8s.io/customresourcedefinitions/numaresourcesschedulers.nodetopology.openshift.io.yaml",
 			}
 
-			destDirContent, err := ioutil.ReadDir(destDir)
+			destDirContent, err := os.ReadDir(destDir)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "unable to read contents from destDir:%s. error: %w", destDir, err)
 
 			for _, content := range destDirContent {
@@ -129,7 +128,7 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				podsFolder := filepath.Join(namespaceFolder, "pods")
-				podsFolders, err := ioutil.ReadDir(podsFolder)
+				podsFolders, err := os.ReadDir(podsFolder)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				podFolderNames := []string{}
@@ -161,7 +160,7 @@ func checkfilesExist(listOfFiles []string, path string) error {
 // label "node-role.kubernetes.io/worker"
 func getWorkerNodesNames(folder string) ([]string, error) {
 	retval := []string{}
-	items, err := ioutil.ReadDir(folder)
+	items, err := os.ReadDir(folder)
 	if err != nil {
 		return retval, err
 	}
@@ -171,7 +170,7 @@ func getWorkerNodesNames(folder string) ([]string, error) {
 			continue
 		}
 
-		data, err := ioutil.ReadFile(filepath.Join(folder, item.Name()))
+		data, err := os.ReadFile(filepath.Join(folder, item.Name()))
 		if err != nil {
 			return retval, err
 		}
