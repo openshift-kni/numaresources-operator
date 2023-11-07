@@ -121,12 +121,12 @@ func Teardown(ft *Fixture) error {
 
 	if ft.Skipped {
 		ft.Skipped = false
-		ginkgo.By(fmt.Sprintf("skipped - nothing to cool down"))
+		ginkgo.By("skipped - nothing to cool down")
 		return nil
 	}
 
 	if ft.avoidCooldown {
-		ginkgo.By(fmt.Sprintf("skipped - cool down disabled"))
+		ginkgo.By("skipped - cool down disabled")
 		return nil
 	}
 
