@@ -39,12 +39,12 @@ const (
 )
 
 const (
-	rteNotifierVolumeName           = "host-run-rte"
-	rteSysVolumeName                = "host-sys"
-	rtePodresourcesSocketVolumeName = "host-podresources-socket"
-	rteKubeletDirVolumeName         = "host-var-lib-kubelet"
-	rteNotifierFileName             = "notify"
-	hostNotifierDir                 = "/run/rte"
+	rteNotifierVolumeName        = "host-run-rte"
+	rteSysVolumeName             = "host-sys"
+	rtePodresourcesDirVolumeName = "host-podresources"
+	rteKubeletDirVolumeName      = "host-var-lib-kubelet"
+	rteNotifierFileName          = "notify"
+	hostNotifierDir              = "/run/rte"
 )
 
 func ContainerConfig(podSpec *corev1.PodSpec, cnt *corev1.Container, configMapName string) {

@@ -23,7 +23,7 @@ spec:
         args:
         - --sleep-interval=10s
         - --sysfs=/host-sys
-        - --podresources-socket=unix:///host-podresources-socket/kubelet.sock
+        - --podresources-socket=unix:///host-podresources/kubelet.sock
         env:
         - name: NODE_NAME
           valueFrom:
@@ -45,8 +45,8 @@ spec:
           - name: host-sys
             mountPath: "/host-sys"
             readOnly: true
-          - name: host-podresources-socket
-            mountPath: "/host-podresources-socket/kubelet.sock"
+          - name: host-podresources
+            mountPath: "/host-podresources"
       - name: shared-pool-container
         image: gcr.io/google_containers/pause-amd64:3.0
       volumes:
@@ -54,7 +54,7 @@ spec:
         hostPath:
           path: "/sys"
           type: Directory
-      - name: host-podresources-socket
+      - name: host-podresources
         hostPath:
-          path: "/var/lib/kubelet/pod-resources/kubelet.sock"
-          type: Socket
+          path: "/var/lib/kubelet/pod-resources"
+          type: Directory
