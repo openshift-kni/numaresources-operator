@@ -250,7 +250,6 @@ func WaitForMCPUpdatedAfterNROCreated(offset int, nroObj *nropv1.NUMAResourcesOp
 //
 // see: `TestNROScheduler` to see the specific object characteristics.
 func DeployNROScheduler() *nropv1.NUMAResourcesScheduler {
-
 	nroSchedObj := objects.TestNROScheduler()
 
 	err := e2eclient.Client.Create(context.TODO(), nroSchedObj)

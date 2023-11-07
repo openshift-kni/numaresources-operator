@@ -104,7 +104,6 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 		InitialNRTList: nrtList,
 		avoidCooldown:  avoidCooldown,
 	}, nil
-
 }
 
 func Setup(baseName string, nrtList nrtv1alpha2.NodeResourceTopologyList) (*Fixture, error) {
