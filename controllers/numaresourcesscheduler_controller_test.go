@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	depmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
@@ -332,8 +333,8 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			dp := &appsv1.Deployment{}
 			gomega.Expect(reconciler.Client.Get(context.TODO(), key, dp)).ToNot(gomega.HaveOccurred())
 
-			cnt, err := schedupdate.FindContainerByName(&dp.Spec.Template.Spec, schedupdate.MainContainerName)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred(), "cannot find container %q in deployment", schedupdate.MainContainerName)
+			cnt := depobjupdate.FindContainerByName(dp.Spec.Template.Spec.Containers, schedupdate.MainContainerName)
+			gomega.Expect(cnt).ToNot(gomega.BeNil(), "cannot find container %q in deployment", schedupdate.MainContainerName)
 
 			// ordering doesn't matter
 			for _, ev := range []corev1.EnvVar{
@@ -379,8 +380,8 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			dp := &appsv1.Deployment{}
 			gomega.Expect(reconciler.Client.Get(context.TODO(), key, dp)).ToNot(gomega.HaveOccurred())
 
-			cnt, err := schedupdate.FindContainerByName(&dp.Spec.Template.Spec, schedupdate.MainContainerName)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred(), "cannot find container %q in deployment", schedupdate.MainContainerName)
+			cnt := depobjupdate.FindContainerByName(dp.Spec.Template.Spec.Containers, schedupdate.MainContainerName)
+			gomega.Expect(cnt).ToNot(gomega.BeNil(), "cannot find container %q in deployment", schedupdate.MainContainerName)
 
 			// ordering doesn't matter
 			for _, ev := range []corev1.EnvVar{

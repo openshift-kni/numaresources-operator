@@ -24,6 +24,7 @@ import (
 	"k8s.io/klog/v2"
 
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	k8swgschedupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/sched"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
@@ -49,9 +50,9 @@ const (
 // and the updating logic, causing unnecessary friction. This code needs to know too much what's in the manifest.
 
 func DeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) {
-	cnt, err := FindContainerByName(&dp.Spec.Template.Spec, MainContainerName)
-	if err != nil {
-		klog.ErrorS(err, "cannot update deployment image settings")
+	cnt := k8swgobjupdate.FindContainerByName(dp.Spec.Template.Spec.Containers, MainContainerName)
+	if cnt == nil {
+		klog.ErrorS(nil, "cannot find container", "name", MainContainerName)
 		return
 	}
 	cnt.Image = userImageSpec
@@ -59,9 +60,9 @@ func DeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) {
 }
 
 func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) {
-	cnt, err := FindContainerByName(&dp.Spec.Template.Spec, MainContainerName)
-	if err != nil {
-		klog.ErrorS(err, "cannot update deployment env var settings")
+	cnt := k8swgobjupdate.FindContainerByName(dp.Spec.Template.Spec.Containers, MainContainerName)
+	if cnt == nil {
+		klog.ErrorS(nil, "cannot find container", "name", MainContainerName)
 		return
 	}
 
@@ -146,14 +147,4 @@ func SchedulerConfig(cm *corev1.ConfigMap, name string, params *k8swgmanifests.C
 
 	cm.Data[schedstate.SchedulerConfigFileName] = string(newData)
 	return nil
-}
-
-func FindContainerByName(podSpec *corev1.PodSpec, containerName string) (*corev1.Container, error) {
-	for idx := 0; idx < len(podSpec.Containers); idx++ {
-		cnt := &podSpec.Containers[idx]
-		if cnt.Name == containerName {
-			return cnt, nil
-		}
-	}
-	return nil, fmt.Errorf("container %q not found - defaulting to the first", containerName)
 }
