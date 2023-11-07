@@ -22,7 +22,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
-	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
