@@ -73,7 +73,8 @@ var _ = Describe("[tools][validation] nrovalidate tools", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			rep := nrovalidator.Report{}
-			err = json.Unmarshal([]byte(out), &rep)
+			err = json.Unmarshal(out, &rep)
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(rep.Succeeded).To(BeFalse())
 			Expect(len(rep.Errors)).ToNot(BeZero())
@@ -129,7 +130,8 @@ var _ = Describe("[tools][validation] nrovalidate tools", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			rep := nrovalidator.Report{}
-			err = json.Unmarshal([]byte(out), &rep)
+			err = json.Unmarshal(out, &rep)
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(rep.Succeeded).To(BeFalse())
 			Expect(len(rep.Errors)).ToNot(BeZero())

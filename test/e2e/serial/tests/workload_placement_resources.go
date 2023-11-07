@@ -96,7 +96,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 
 				nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtCandidates, tmPolicy, tmScope)
 				if len(nrts) != len(nrtCandidates) {
-					e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts))
+					e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", tmPolicy, len(nrts))
 				}
 
 				By("Scheduling the testing pod")

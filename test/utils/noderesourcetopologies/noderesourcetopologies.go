@@ -439,7 +439,7 @@ func ResourceInfoMatchesRequest(resources []nrtv1alpha2.ResourceInfo, requests c
 }
 
 func ResourceInfoProviding(resources []nrtv1alpha2.ResourceInfo, resName string, resQty resource.Quantity, onEqual bool) bool {
-	zoneQty, ok := FindResourceAvailableByName(resources, string(resName))
+	zoneQty, ok := FindResourceAvailableByName(resources, resName)
 	if !ok {
 		return false
 	}

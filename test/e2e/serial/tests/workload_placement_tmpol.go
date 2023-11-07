@@ -121,7 +121,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtCandidates, tmPolicy, tmScope)
 			if len(nrts) != len(nrtCandidates) {
-				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts))
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", tmPolicy, len(nrts))
 			}
 
 			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
@@ -371,7 +371,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtList.Items, policyFuncs.policyName(), policyFuncs.scopeName())
 			if len(nrts) < hostsRequired {
-				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(policyFuncs.policyName()), len(nrts))
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", policyFuncs.policyName(), len(nrts))
 			}
 
 			Expect(len(unsuitableFreeRes)).To(Equal(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
@@ -1274,7 +1274,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtList.Items, policyFuncs.policyName(), policyFuncs.scopeName())
 			if len(nrts) < hostsRequired {
-				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(policyFuncs.policyName()), len(nrts))
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", policyFuncs.policyName(), len(nrts))
 			}
 
 			Expect(len(unsuitableFreeRes)).To(Equal(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
@@ -2066,7 +2066,7 @@ func makeInitTestContainers(pod *corev1.Pod, initCnt []corev1.ResourceList) *cor
 
 func isHugePageInAvailable(rl corev1.ResourceList) bool {
 	for name, quan := range rl {
-		if isHugePageResourceName(corev1.ResourceName(name)) && !quan.IsZero() {
+		if isHugePageResourceName(name) && !quan.IsZero() {
 			return true
 		}
 	}

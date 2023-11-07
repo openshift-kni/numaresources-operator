@@ -452,7 +452,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			// filter by policy
 			nrtCandidates := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtList.Items, tmPolicy, tmScope)
 			if len(nrtCandidates) < neededNodes {
-				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(tmPolicy), len(nrtCandidates))
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", tmPolicy, len(nrtCandidates))
 			}
 
 			// Filter by number of numa zones

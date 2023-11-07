@@ -93,7 +93,7 @@ func (dpi *NUMACellDevicePlugin) device(idx int) *pluginapi.Device {
 		Topology: &pluginapi.TopologyInfo{
 			Nodes: []*pluginapi.NUMANode{
 				{
-					ID: int64(dpi.numacellID),
+					ID: dpi.numacellID,
 				},
 			},
 		},
