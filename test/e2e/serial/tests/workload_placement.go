@@ -887,7 +887,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			rl := e2ereslist.FromReplicaSet(*rs)
 
-			_, match := checkNRTConsumedResources(fxt, *nrtInitialTarget, rl, &pods[0])
+			match, err := e2enrt.CheckNodeConsumedResourcesAtLeast(*nrtInitialTarget, *updatedTargetNrt, rl, corev1qos.GetPodQOS(&pods[0]))
+			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(BeEmpty(), "inconsistent accounting when checking NRTs consumed resources")
 
 			By(fmt.Sprintf("deleting replicaset %s/%s", fxt.Namespace.Name, rsName))
@@ -982,7 +983,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			rl = e2ereslist.FromReplicaSet(*rs)
 
-			_, match = checkNRTConsumedResources(fxt, *nrtInitialTarget, rl, &pods[0])
+			match, err = e2enrt.CheckNodeConsumedResourcesAtLeast(*nrtInitialTarget, *updatedTargetNrt, rl, corev1qos.GetPodQOS(&pods[0]))
+			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(BeEmpty(), "inconsistent accounting when checking NRTs consumed resources")
 
 			By(fmt.Sprintf("comparing scheduling times between %q and %q", corev1.DefaultSchedulerName, serialconfig.Config.SchedulerName))
