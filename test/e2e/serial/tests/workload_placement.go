@@ -43,7 +43,8 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 
-	"github.com/openshift-kni/numaresources-operator/pkg/flagcodec"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
+
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 
 	"github.com/openshift-kni/numaresources-operator/internal/baseload"
