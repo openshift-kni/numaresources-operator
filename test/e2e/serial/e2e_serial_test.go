@@ -21,23 +21,15 @@ import (
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
-	ginkgo_reporters "github.com/onsi/ginkgo/v2/reporters"
 	. "github.com/onsi/gomega"
-
-	qe_reporters "kubevirt.io/qe-tools/pkg/ginkgo-reporters"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	_ "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
 )
 
-var afterSuiteReporters = []Reporter{}
 var setupExecuted = false
 
 func TestSerial(t *testing.T) {
-	if qe_reporters.Polarion.Run {
-		afterSuiteReporters = append(afterSuiteReporters, &qe_reporters.Polarion)
-	}
-
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "NUMAResources serial e2e tests")
 }
@@ -53,10 +45,4 @@ var _ = AfterSuite(func() {
 		serialconfig.Teardown()
 	}
 
-})
-
-var _ = ReportAfterSuite("TestTests", func(report Report) {
-	for _, reporter := range afterSuiteReporters {
-		ginkgo_reporters.ReportViaDeprecatedReporter(reporter, report)
-	}
 })
