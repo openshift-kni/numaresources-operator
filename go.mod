@@ -168,6 +168,8 @@ replace (
 // local pinning
 replace (
 	github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
+	github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.4.0
+	github.com/onsi/gomega => github.com/onsi/gomega v1.23.0
 	github.com/openshift/machine-config-operator => github.com/openshift/machine-config-operator v0.0.1-0.20231106161944-36b955cd2bc0 // release-4.13
 	golang.org/x/net => golang.org/x/net v0.17.0
 	golang.org/x/sys => golang.org/x/sys v0.13.0
