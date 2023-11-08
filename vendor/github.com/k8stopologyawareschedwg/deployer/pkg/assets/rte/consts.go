@@ -11,22 +11,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Copyright 2021 Red Hat, Inc.
+ * Copyright 2023 Red Hat, Inc.
  */
 
-package clientutil
+package rte
 
 const (
-	// RoleWorker contains the worker role
-	RoleWorker = "worker"
-)
-
-const (
-	// LabelRole contains the key for the role label
-	LabelRole = "node-role.kubernetes.io"
-)
-
-const (
-	// FilePathKubeletConfig contains the kubelet.conf file path
-	FilePathKubeletConfig = "/etc/kubernetes/kubelet.conf"
+	HostNotifierDir       = "/run/rte"
+	NotifierFileName      = "notify"
+	NotifierScriptName    = "rte-notifier.sh"
+	NotifierOCIHookConfig = "rte-notifier.json"
 )

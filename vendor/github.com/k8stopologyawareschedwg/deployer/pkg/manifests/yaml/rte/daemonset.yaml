@@ -17,13 +17,13 @@ spec:
       serviceAccountName: rte
       containers:
       - name: resource-topology-exporter
-        image: ${RTE_CONTAINER_IMAGE}
+        image: quay.io/k8stopologyawareschedwg/resource-topology-exporter:latest
         command:
         - /bin/resource-topology-exporter
         args:
-        - --sleep-interval=${RTE_POLL_INTERVAL}
+        - --sleep-interval=10s
         - --sysfs=/host-sys
-        - --podresources-socket=unix:///host-var/lib/kubelet/pod-resources/kubelet.sock
+        - --podresources-socket=unix:///host-podresources/kubelet.sock
         env:
         - name: NODE_NAME
           valueFrom:
@@ -40,19 +40,21 @@ spec:
         - name: REFERENCE_CONTAINER_NAME
           value: shared-pool-container
         - name: METRICS_PORT
-          value: "${METRICS_PORT}"
+          value: "2112"
         volumeMounts:
           - name: host-sys
             mountPath: "/host-sys"
             readOnly: true
           - name: host-podresources
-            mountPath: "/host-var/lib/kubelet/pod-resources"
+            mountPath: "/host-podresources"
       - name: shared-pool-container
         image: gcr.io/google_containers/pause-amd64:3.0
       volumes:
       - name: host-sys
         hostPath:
           path: "/sys"
+          type: Directory
       - name: host-podresources
         hostPath:
           path: "/var/lib/kubelet/pod-resources"
+          type: Directory

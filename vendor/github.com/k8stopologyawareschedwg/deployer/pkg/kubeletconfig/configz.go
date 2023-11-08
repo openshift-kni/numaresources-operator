@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -38,7 +37,7 @@ func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger logr.Logge
 	defer stderr.Close()
 	defer cmd.Process.Kill()
 
-	port, err := getKubeletProxyPort(stdout)
+	port, err := FindProxyPort(stdout)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +64,7 @@ func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger logr.Logge
 			logger.Info("request creation failed - skipped", "endpoint", endpoint, "error", err)
 			continue
 		}
-		if resp.StatusCode != 200 {
+		if resp.StatusCode != http.StatusOK {
 			logger.Info("unexpected response status code - skipped", "endpoint", endpoint, "statusCode", resp.StatusCode)
 			continue
 		}
@@ -81,7 +80,7 @@ func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger logr.Logge
 	return kubeletConfs, nil
 }
 
-func getKubeletProxyPort(r io.Reader) (int, error) {
+func FindProxyPort(r io.Reader) (int, error) {
 	buf := make([]byte, 128)
 	n, err := r.Read(buf)
 	if err != nil {
@@ -93,6 +92,9 @@ func getKubeletProxyPort(r io.Reader) (int, error) {
 		return -1, err
 	}
 	match := proxyRegexp.FindStringSubmatch(output)
+	if match == nil {
+		return -1, fmt.Errorf("cannot find port announcement")
+	}
 	return strconv.Atoi(match[1])
 }
 
@@ -102,7 +104,7 @@ func decodeConfigz(resp *http.Response) (*kubeletconfigv1beta1.KubeletConfigurat
 	}
 
 	configz := configzWrapper{}
-	contentsBytes, err := ioutil.ReadAll(resp.Body)
+	contentsBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

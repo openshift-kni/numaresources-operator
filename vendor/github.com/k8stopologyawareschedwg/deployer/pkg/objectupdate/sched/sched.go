@@ -17,25 +17,38 @@
 package sched
 
 import (
+	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/images"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 )
 
-const (
-	SchedulerConfigFileName = "scheduler-config.yaml" // TODO duplicate from yaml
-	schedulerPluginName     = "NodeResourceTopologyMatch"
-)
+func SchedulerDeployment(dp *appsv1.Deployment, pullIfNotPresent, ctrlPlaneAffinity bool, verbose int) {
+	cnt := &dp.Spec.Template.Spec.Containers[0] // shortcut
 
-func SchedulerDeployment(dp *appsv1.Deployment, pullIfNotPresent bool) {
-	dp.Spec.Template.Spec.Containers[0].Image = images.SchedulerPluginSchedulerImage
-	dp.Spec.Template.Spec.Containers[0].ImagePullPolicy = pullPolicy(pullIfNotPresent)
+	cnt.Image = images.SchedulerPluginSchedulerImage
+	cnt.ImagePullPolicy = pullPolicy(pullIfNotPresent)
+
+	flags := flagcodec.ParseArgvKeyValue(cnt.Args)
+	flags.SetOption("--v", fmt.Sprintf("%d", verbose)) // TODO: keep in sync with the manifest (-v vs --v)
+	cnt.Args = flags.Argv()
+
+	if ctrlPlaneAffinity {
+		objectupdate.SetPodSchedulerAffinityOnControlPlane(&dp.Spec.Template.Spec)
+	}
 }
 
-func ControllerDeployment(dp *appsv1.Deployment, pullIfNotPresent bool) {
+func ControllerDeployment(dp *appsv1.Deployment, pullIfNotPresent, ctrlPlaneAffinity bool) {
 	dp.Spec.Template.Spec.Containers[0].Image = images.SchedulerPluginControllerImage
 	dp.Spec.Template.Spec.Containers[0].ImagePullPolicy = pullPolicy(pullIfNotPresent)
+
+	if ctrlPlaneAffinity {
+		objectupdate.SetPodSchedulerAffinityOnControlPlane(&dp.Spec.Template.Spec)
+	}
 }
 
 func pullPolicy(pullIfNotPresent bool) corev1.PullPolicy {

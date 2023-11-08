@@ -19,23 +19,43 @@ package images
 import "os"
 
 func init() {
-	if schedImage, ok := os.LookupEnv("TAS_SCHEDULER_PLUGIN_IMAGE"); ok {
+	_, ok := os.LookupEnv("TAS_IMAGES_USE_SHA")
+	SetDefaults(ok)
+	Setup(os.LookupEnv)
+}
+
+func SetDefaults(useSHA bool) {
+	if useSHA {
+		SchedulerPluginSchedulerImage = SchedulerPluginSchedulerDefaultImageSHA
+		SchedulerPluginControllerImage = SchedulerPluginControllerDefaultImageSHA
+		ResourceTopologyExporterImage = ResourceTopologyExporterDefaultImageSHA
+		NodeFeatureDiscoveryImage = NodeFeatureDiscoveryDefaultImageSHA
+	} else {
+		SchedulerPluginSchedulerImage = SchedulerPluginSchedulerDefaultImageTag
+		SchedulerPluginControllerImage = SchedulerPluginControllerDefaultImageTag
+		ResourceTopologyExporterImage = ResourceTopologyExporterDefaultImageTag
+		NodeFeatureDiscoveryImage = NodeFeatureDiscoveryDefaultImageTag
+	}
+}
+
+func Setup(getImage func(string) (string, bool)) {
+	if schedImage, ok := getImage("TAS_SCHEDULER_PLUGIN_IMAGE"); ok {
 		SchedulerPluginSchedulerImage = schedImage
 	}
-	if schedCtrlImage, ok := os.LookupEnv("TAS_SCHEDULER_PLUGIN_CONTROLLER_IMAGE"); ok {
+	if schedCtrlImage, ok := getImage("TAS_SCHEDULER_PLUGIN_CONTROLLER_IMAGE"); ok {
 		SchedulerPluginControllerImage = schedCtrlImage
 	}
-	if rteImage, ok := os.LookupEnv("TAS_RESOURCE_EXPORTER_IMAGE"); ok {
+	if rteImage, ok := getImage("TAS_RESOURCE_EXPORTER_IMAGE"); ok {
 		ResourceTopologyExporterImage = rteImage
 	}
-	if nfdImage, ok := os.LookupEnv("TAS_NODE_FEATURE_DISCOVERY_IMAGE"); ok {
+	if nfdImage, ok := getImage("TAS_NODE_FEATURE_DISCOVERY_IMAGE"); ok {
 		NodeFeatureDiscoveryImage = nfdImage
 	}
 }
 
 var (
 	SchedulerPluginSchedulerImage  = SchedulerPluginSchedulerDefaultImageTag
-	SchedulerPluginControllerImage = SchedulerPluginSchedulerDefaultImageTag
+	SchedulerPluginControllerImage = SchedulerPluginControllerDefaultImageTag
 	ResourceTopologyExporterImage  = ResourceTopologyExporterDefaultImageTag
 	NodeFeatureDiscoveryImage      = NodeFeatureDiscoveryDefaultImageTag
 )
