@@ -89,10 +89,12 @@ type ControllerConfigSpec struct {
 	Proxy *configv1.ProxyStatus `json:"proxy"`
 
 	// infra holds the infrastructure details
+	// +kubebuilder:validation:EmbeddedResource
 	// +nullable
 	Infra *configv1.Infrastructure `json:"infra"`
 
 	// dns holds the cluster dns details
+	// +kubebuilder:validation:EmbeddedResource
 	// +nullable
 	DNS *configv1.DNS `json:"dns"`
 
@@ -115,9 +117,10 @@ type ControllerConfigSpec struct {
 type IPFamiliesType string
 
 const (
-	IPFamiliesIPv4      IPFamiliesType = "IPv4"
-	IPFamiliesIPv6      IPFamiliesType = "IPv6"
-	IPFamiliesDualStack IPFamiliesType = "DualStack"
+	IPFamiliesIPv4                 IPFamiliesType = "IPv4"
+	IPFamiliesIPv6                 IPFamiliesType = "IPv6"
+	IPFamiliesDualStack            IPFamiliesType = "DualStack"
+	IPFamiliesDualStackIPv6Primary IPFamiliesType = "DualStackIPv6Primary"
 )
 
 // Network contains network related configuration
