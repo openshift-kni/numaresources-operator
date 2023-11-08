@@ -41,10 +41,10 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
@@ -109,10 +109,6 @@ func main() {
 	flag.BoolVar(&enableScheduler, "enable-scheduler", false, "enable support for the NUMAResourcesScheduler object")
 	flag.BoolVar(&enableMetrics, "enable-metrics", false, "enable metrics server")
 
-	opts := zap.Options{
-		Development: true,
-	}
-	opts.BindFlags(flag.CommandLine)
 	klog.InitFlags(nil)
 	flag.Parse()
 
@@ -120,6 +116,9 @@ func main() {
 		fmt.Printf("%s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
 		os.Exit(0)
 	}
+
+	logh := klogr.NewWithOptions(klogr.WithFormat(klogr.FormatKlog))
+	ctrl.SetLogger(logh)
 
 	klog.InfoS("starting", "program", version.ProgramName(), "version", version.Get(), "gitcommit", version.GetGitCommit(), "golang", runtime.Version())
 
@@ -170,8 +169,6 @@ func main() {
 		os.Exit(1)
 	}
 	klog.InfoS("manifests loaded", "component", "RTE")
-
-	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	if renderMode {
 		os.Exit(manageRendering(render, clusterPlatform, apiManifests, rteManifests, namespace, enableScheduler))
