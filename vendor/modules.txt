@@ -214,10 +214,10 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/client
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/scheme
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/typed/topology/v1alpha1
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/typed/topology/v1alpha2
-# github.com/k8stopologyawareschedwg/podfingerprint v0.2.1
+# github.com/k8stopologyawareschedwg/podfingerprint v0.2.2
 ## explicit; go 1.17
 github.com/k8stopologyawareschedwg/podfingerprint
-# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.11.5
+# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.12.2
 ## explicit; go 1.19
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/dump
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8sannotations
@@ -236,10 +236,10 @@ github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/ratelimiter
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/sysinfo
-github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/topologypolicy
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/client
+github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/namespace
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodetopology
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods
