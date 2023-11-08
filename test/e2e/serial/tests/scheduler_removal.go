@@ -25,10 +25,11 @@ import (
 	. "github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/klogr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	depwait "github.com/k8stopologyawareschedwg/deployer/pkg/deployer/wait"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -142,28 +143,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restar
 		It("[case:1][test_id:48069][tier2] should schedule any pending workloads submitted while the scheduler was unavailable", func() {
 			var err error
 
-			dps, err := getDPOwnedBy(fxt.Client, nroSchedObj.ObjectMeta)
-			Expect(err).ToNot(HaveOccurred())
+			dpNName := nroSchedObj.Status.Deployment // shortcut
+			if dpNName.Namespace == "" || dpNName.Name == "" {
+				Fail(fmt.Sprintf("scheduler deployment missing: %q", dpNName.String()))
+			}
 
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", nroSchedObj.Name))
 			err = fxt.Client.Delete(context.TODO(), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			// make sure scheduler deployment is gone
-			Eventually(func() bool {
-				for _, dp := range dps {
-					if err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), dp); err != nil {
-						if apierrors.IsNotFound(err) {
-							return true
-						}
-						klog.Warningf("failed to get Deployment %s/%s; err: %v", dp.Namespace, dp.Name, err)
-						return false
-					}
-					klog.Warningf("Deployment %s/%s is still exists", dp.Namespace, dp.Name)
-					return false
-				}
-				return true
-			}, time.Minute, time.Second*10).Should(BeTrue())
+			err = depwait.With(fxt.Client, klogr.New()).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(context.TODO(), dpNName.Namespace, dpNName.Name)
+			Expect(err).ToNot(HaveOccurred())
 
 			dp := createDeployment(fxt, "testdp", schedulerName)
 
@@ -231,19 +222,4 @@ func createDeploymentSync(fxt *e2efixture.Fixture, name, schedulerName string) *
 	_, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(context.TODO(), dp)
 	Expect(err).ToNot(HaveOccurred(), "Deployment %q is not up & running after %v", dp.Name, time.Minute)
 	return dp
-}
-
-func getDPOwnedBy(cli client.Client, objMeta metav1.ObjectMeta) ([]*appsv1.Deployment, error) {
-	dpList := &appsv1.DeploymentList{}
-	if err := cli.List(context.TODO(), dpList); err != nil {
-		return nil, err
-	}
-
-	var dps []*appsv1.Deployment
-	for i := range dpList.Items {
-		if objects.IsOwnedBy(dpList.Items[i].ObjectMeta, objMeta) {
-			dps = append(dps, &dpList.Items[i])
-		}
-	}
-	return dps, nil
 }
