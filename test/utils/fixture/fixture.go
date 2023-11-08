@@ -26,6 +26,7 @@ import (
 
 	"github.com/ghodss/yaml"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -104,7 +105,6 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 		InitialNRTList: nrtList,
 		avoidCooldown:  avoidCooldown,
 	}, nil
-
 }
 
 func Setup(baseName string, nrtList nrtv1alpha2.NodeResourceTopologyList) (*Fixture, error) {
@@ -121,12 +121,12 @@ func Teardown(ft *Fixture) error {
 
 	if ft.Skipped {
 		ft.Skipped = false
-		ginkgo.By(fmt.Sprintf("skipped - nothing to cool down"))
+		ginkgo.By("skipped - nothing to cool down")
 		return nil
 	}
 
 	if ft.avoidCooldown {
-		ginkgo.By(fmt.Sprintf("skipped - cool down disabled"))
+		ginkgo.By("skipped - cool down disabled")
 		return nil
 	}
 
@@ -162,6 +162,11 @@ func Cooldown(ft *Fixture) {
 	}
 	klog.Warningf("cooling down for %v", cooldownTime)
 	time.Sleep(cooldownTime)
+}
+
+func MustSettleNRT(fxt *Fixture) {
+	_, err := WaitForNRTSettle(fxt)
+	gomega.ExpectWithOffset(1, err).ToNot(gomega.HaveOccurred())
 }
 
 func WaitForNRTSettle(fxt *Fixture) (*nrtv1alpha2.NodeResourceTopologyList, error) {

@@ -178,11 +178,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 
 				candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
 				targetNodeName, ok := e2efixture.PopNodeName(candidateNodeNames)
-				Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
+				Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(candidateNodeNames))
 
 				By("padding non-target nodes")
 				var paddingPods []*corev1.Pod
-				for _, nodeName := range candidateNodeNames.List() {
+				for _, nodeName := range e2efixture.ListNodeNames(candidateNodeNames) {
 
 					nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 					Expect(err).NotTo(HaveOccurred(), "missing NRT Info for node %q", nodeName)
@@ -240,7 +240,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				Expect(err).NotTo(HaveOccurred(), "Deployment %q not up&running after %v", deployment.Name, 2*time.Minute)
 
 				By("wait for NRT data to settle")
-				e2efixture.WaitForNRTSettle(fxt)
+				e2efixture.MustSettleNRT(fxt)
 
 				nrtPostCreate, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), nrtInitial, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
@@ -300,7 +300,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 
 				var ok bool
 				targetNodeName, ok = e2efixture.PopNodeName(candidateNodeNames)
-				Expect(ok).To(BeTrue(), "cannot select a node among %#v", candidateNodeNames.List())
+				Expect(ok).To(BeTrue(), "cannot select a node among %#v", e2efixture.ListNodeNames(candidateNodeNames))
 				By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 
 				err = fxt.Client.List(context.TODO(), &targetNrtListInitial)
@@ -336,7 +336,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 
 				By("padding non-target nodes")
 				var paddingPods []*corev1.Pod
-				for _, nodeName := range candidateNodeNames.List() {
+				for _, nodeName := range e2efixture.ListNodeNames(candidateNodeNames) {
 
 					nrtInfo, err := e2enrt.FindFromList(nrtTwoZoneCandidates, nodeName)
 					Expect(err).NotTo(HaveOccurred(), "missing NRT Info for node %q", nodeName)
@@ -435,7 +435,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				By("waiting for the NRT data to settle")
-				e2efixture.WaitForNRTSettle(fxt)
+				e2efixture.MustSettleNRT(fxt)
 
 				for idx := range nrtListInitial.Items {
 					initialNrt := &nrtListInitial.Items[idx]

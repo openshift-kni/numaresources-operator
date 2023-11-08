@@ -258,6 +258,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 	ginkgo.It("[rte][podfingerprint] should expose the pod set fingerprint status on each worker", func() {
 		nropObj := &nropv1.NUMAResourcesOperator{}
 		err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
+		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 		rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())

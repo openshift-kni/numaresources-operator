@@ -137,8 +137,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 				Expect(err).ToNot(HaveOccurred())
 
 				// ensure foreign pods are reported
-				_, err = e2efixture.WaitForNRTSettle(fxt)
-				Expect(err).ToNot(HaveOccurred())
+				e2efixture.MustSettleNRT(fxt)
 			})
 
 			It("should be able to schedule pods with no stalls", func() {

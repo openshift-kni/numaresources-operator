@@ -41,8 +41,6 @@ import (
 	e2eobjects "github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
-const schedulerPluginName = "NodeResourceTopologyMatch"
-
 var _ = Describe("[Scheduler] imageReplacement", func() {
 	var initialized bool
 	nroSchedObj := &nropv1.NUMAResourcesScheduler{}
@@ -74,7 +72,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.UID)
 			Expect(err).ToNot(HaveOccurred(), "unable to get deployment by owner reference")
 
-			dp, err = wait.With(e2eclient.Client).Timeout(5*time.Minute).Interval(10*time.Second).ForDeploymentComplete(context.TODO(), dp)
+			_, err = wait.With(e2eclient.Client).Timeout(5*time.Minute).Interval(10*time.Second).ForDeploymentComplete(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})

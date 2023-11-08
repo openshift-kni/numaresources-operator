@@ -335,7 +335,6 @@ var _ = Describe("[Install] durability", func() {
 })
 
 func findContainerByName(daemonset appsv1.DaemonSet, containerName string) (*corev1.Container, error) {
-
 	//shortcut
 	containers := daemonset.Spec.Template.Spec.Containers
 
@@ -381,7 +380,6 @@ func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {
 }
 
 func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context.Context, nroObj *nropv1.NUMAResourcesOperator, reason string) {
-
 	dss, err := objects.GetDaemonSetsOwnedBy(cli, nroObj.ObjectMeta)
 	if err != nil {
 		klog.Warningf("no DaemonSets for %s (%s)", nroObj.Name, nroObj.GetUID())

@@ -134,7 +134,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 
 			var paddingPods []*corev1.Pod
-			for _, nodeName := range nrtCandidateNames.List() {
+			for _, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
@@ -187,7 +187,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for the NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
 			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
@@ -222,7 +222,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
 			By("waiting for the NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			for _, pod := range pods {
 				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
@@ -262,7 +262,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
 
 			By("waiting for the NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			for _, pod := range pods {
 				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
@@ -343,7 +343,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 
 			var paddingPods []*corev1.Pod
-			for nodeIdx, nodeName := range nrtCandidateNames.List() {
+			for nodeIdx, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
@@ -406,7 +406,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
 
 			By("waiting for the NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			By(fmt.Sprintf("checking only daemonset pod in targetNode:%q is up and running", targetNodeName))
 			podRunningTimeout := 3 * time.Minute
@@ -452,7 +452,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			// filter by policy
 			nrtCandidates := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtList.Items, tmPolicy, tmScope)
 			if len(nrtCandidates) < neededNodes {
-				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(tmPolicy), len(nrtCandidates))
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", tmPolicy, len(nrtCandidates))
 			}
 
 			// Filter by number of numa zones
@@ -482,12 +482,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			// After filter get one of the candidate nodes left
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 			targetNodeName, ok := e2efixture.PopNodeName(nrtCandidateNames)
-			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
 			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
 
 			By("Padding all other candidate nodes")
 			var paddingPods []*corev1.Pod
-			for nodeIdx, nodeName := range nrtCandidateNames.List() {
+			for nodeIdx, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
@@ -518,7 +518,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 
 			// Pad the zones so no one could handle both containers
-			// so we should left enought resources on each zone to accomodate
+			// so we should left enought resources on each zone to accommondate
 			// the "biggest" ( in term of resources) container but not the
 			// sum of both
 			paddingResources := corev1.ResourceList{
@@ -588,7 +588,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 
 			By("wait for NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			By("Verifying NRT reflects no updates")
 			targetNrtListAfter, err := e2enrt.GetUpdated(fxt.Client, targetNrtListBefore, 1*time.Minute)
@@ -698,10 +698,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(succeededPods).To(BeEmpty(), "some pods are running, but we expect all of them to fail")
 
 			By("Verifying NRTs had no updates because the pods failed to be scheduled on any node")
-			e2efixture.WaitForNRTSettle(fxt)
-			wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &nrtInitialList, func(nrt *nrtv1alpha2.NodeResourceTopology) bool {
+			e2efixture.MustSettleNRT(fxt)
+			_, err = wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &nrtInitialList, func(nrt *nrtv1alpha2.NodeResourceTopology) bool {
 				return !nodesNameSet.Has(nrt.Name)
 			})
+			Expect(err).ToNot(HaveOccurred())
 
 			By("updating deployment in such way that some pods will fit into NUMA nodes")
 			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), dp)
@@ -737,7 +738,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}).WithTimeout(time.Minute*5).WithPolling(time.Second*30).Should(BeTrue(), "deployment %q failed to have %d running replicas within the defined period", dpKey.String(), expectedReadyReplicas)
 
 			By("wait for NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			By("checking NRT objects updated accordingly")
 			nrtPostDpCreateList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Second*10)
@@ -780,7 +781,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			var ok bool
 			targetNodeName, ok = e2efixture.PopNodeName(nrtCandidateNames)
-			Expect(ok).To(BeTrue(), "cannot select a node among %#v", nrtCandidateNames.List())
+			Expect(ok).To(BeTrue(), "cannot select a node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
 			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 
 			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: targetNodeName}, &targetNrtInitial)
@@ -794,7 +795,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			By("padding all other candidate nodes leaving room for the baseload only")
 			var paddingPods []*corev1.Pod
-			for _, nodeName := range nrtCandidateNames.List() {
+			for _, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 
 				//calculate base load on the node
 				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
@@ -826,9 +827,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
-			// TODO: interval proportional to periodic update
-			_, err = e2efixture.WaitForNRTSettle(fxt)
-			Expect(err).ToNot(HaveOccurred())
+			e2efixture.MustSettleNRT(fxt)
 		})
 
 		It("[test_id:47614][tier3][unsched][pod] workload requests guaranteed pod resources available on one node but not on a single numa", func() {
@@ -933,7 +932,7 @@ func filterNRTsEachRequestOnADifferentZone(nrts []nrtv1alpha2.NodeResourceTopolo
 	return ret
 }
 
-// returns true if nrt can accomodate r1 and r2 in one of its two first zones.
+// returns true if nrt can accommondate r1 and r2 in one of its two first zones.
 func nrtCanAccomodateEachRequestOnADifferentZone(nrt nrtv1alpha2.NodeResourceTopology, r1, r2 corev1.ResourceList) bool {
 	if len(nrt.Zones) < 2 {
 		return false

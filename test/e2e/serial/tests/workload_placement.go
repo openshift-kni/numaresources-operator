@@ -153,7 +153,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:47591][tier1] should modify workload post scheduling while keeping the resource requests available", func() {
-			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
+			paddedNodeNames := sets.New[string](padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
 			// since we know exactly how the test setup looks like we expect only targeted node here
@@ -243,7 +243,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("wait for NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -324,13 +324,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			klog.Infof("post-update pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainers(podSpec.Containers)), e2ereslist.ToString(rl))
 
 			By("wait for NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			nrtPostUpdate, err := e2enrt.FindFromList(nrtPostUpdateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking post-update NRT for target node %q updated correctly", targetNodeName))
-			// it's simpler (no resource substraction/difference) to check against initial than compute
+			// it's simpler (no resource subtraction/difference) to check against initial than compute
 			// the delta between postUpdate and postCreate. Both must yield the same result anyway.
 			dataBefore, err = yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
@@ -387,7 +387,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			//between updating the object and having the deployment in complete state, a creation of replicaset acctually happens.
 			//The check of the deployment completeness is not enough in this context because:
-			// 1. the test updates an exsiting deployment. the deployment was "complete" in earlier stages and
+			// 1. the test updates an existing deployment. the deployment was "complete" in earlier stages and
 			//    it will remain as such (even if the new pod after the update is in pending state, the old pod will still exists -> deployment is counted as complete)
 			// 2. this check may happen before the new replicaset is created,hence applying the later checks on an old pod -> failing the test
 			// Despite that the check is still needed but before applying it we need to make sure that the intermediate step is not neglected,
@@ -440,7 +440,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("wait for NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			nrtLastUpdate, err := e2enrt.FindFromList(nrtLastUpdateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -543,7 +543,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:48746][tier2] should modify workload post scheduling while keeping the resource requests available across all NUMA node", func() {
-			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
+			paddedNodeNames := sets.New[string](padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
 			// since we know exactly how the test setup looks like we expect only targeted node here
@@ -577,7 +577,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			// We want a container to occupy as much resources from a single NUMA nodes as possible in order to prevent another
 			// container to be allocated resources from the same NUMA node. To determine the value of resources, we use the
-			// resource availablity of a NUMA node that has the least amount of resources out of all the NUMA nodes on that
+			// resource availability of a NUMA node that has the least amount of resources out of all the NUMA nodes on that
 			// node and request that in the test-deployment.
 			reqResources := corev1.ResourceList{
 				corev1.ResourceCPU:    cpus,
@@ -595,7 +595,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			// The deployment strategy type as `Recreate` is specified as the default strategy is `RollingUpdate`
 			// This is done because the resource quantity is updated in the second part of this test and the
-			// desired behaviour is to have those updated replicas to be created after the older ones are deleted
+			// desired behavior is to have those updated replicas to be created after the older ones are deleted
 			// in order to make sure that the new replicas have adequate resources to run successfully.
 			dp.Spec.Strategy.Type = appsv1.RecreateDeploymentStrategyType
 
@@ -624,7 +624,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("wait for NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, targetNodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -692,7 +692,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			rl1 = e2ereslist.FromGuaranteedPod(updatedPod1)
 
 			By("wait for NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			nrtPostUpdate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, targetNodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -718,7 +718,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
-			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
+			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			Eventually(func() bool {
 				By(fmt.Sprintf("checking the resources are restored as expected on %q", targetNodeName))
 
@@ -777,7 +777,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:47627] should be able to schedule many replicas with TAS scheduler with performance time equals to the default scheduler", func() {
-			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
+			paddedNodeNames := sets.New[string](padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
 			// since we know exactly how the test setup looks like we expect only targeted node here
@@ -853,7 +853,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 				return true
 			}, time.Minute, time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
-			schedTimeWithDefaultScheduler := time.Now().Sub(rsCreateStart)
+			schedTimeWithDefaultScheduler := time.Since(rsCreateStart)
 
 			By(fmt.Sprintf("checking the pods were scheduled with scheduler %q", corev1.DefaultSchedulerName))
 			for _, pod := range pods {
@@ -948,7 +948,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 				return true
 			}, time.Minute, time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
-			schedTimeWithTopologyScheduler := time.Now().Sub(rsCreateStart)
+			schedTimeWithTopologyScheduler := time.Since(rsCreateStart)
 
 			By(fmt.Sprintf("checking the pods were scheduled on the target node %q", targetNodeName))
 			for _, pod := range pods {
@@ -1267,49 +1267,4 @@ func checkReplica(pod corev1.Pod, targetNodeName string, K8sClient *kubernetes.C
 	schedOK, err := nrosched.CheckPODWasScheduledWith(K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
-}
-
-func getPodSpec(tmPolicy, tmScope string, rlPerNuma []corev1.ResourceList) corev1.PodSpec {
-	podSpec := corev1.PodSpec{
-		SchedulerName: serialconfig.Config.SchedulerName,
-		Containers: []corev1.Container{
-			{
-				Name:    "testpod-cnt",
-				Image:   images.GetPauseImage(),
-				Command: []string{images.PauseCommand},
-				Resources: corev1.ResourceRequirements{
-					Limits:   rlPerNuma[0],
-					Requests: rlPerNuma[0],
-				},
-			},
-			{
-				Name:    "testpod-cnt2",
-				Image:   images.GetPauseImage(),
-				Command: []string{images.PauseCommand},
-				Resources: corev1.ResourceRequirements{
-					Limits:   rlPerNuma[1],
-					Requests: rlPerNuma[1],
-				},
-			},
-		},
-		RestartPolicy: corev1.RestartPolicyAlways,
-		NodeSelector: map[string]string{
-			serialconfig.MultiNUMALabel: "2",
-		},
-	}
-
-	if tmPolicy == intnrt.SingleNUMANode && tmScope == intnrt.Pod {
-		podSpec.Containers = []corev1.Container{
-			{
-				Name:    "testpod-cnt",
-				Image:   images.GetPauseImage(),
-				Command: []string{images.PauseCommand},
-				Resources: corev1.ResourceRequirements{
-					Limits:   rlPerNuma[0],
-					Requests: rlPerNuma[0],
-				},
-			},
-		}
-	}
-	return podSpec
 }

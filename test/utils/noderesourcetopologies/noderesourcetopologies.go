@@ -316,8 +316,8 @@ func checkConsumedResourcesAtLeast(resourcesInitial, resourcesUpdated []nrtv1alp
 	return true, nil
 }
 
-func AccumulateNames(nrts []nrtv1alpha2.NodeResourceTopology) sets.String {
-	nodeNames := sets.NewString()
+func AccumulateNames(nrts []nrtv1alpha2.NodeResourceTopology) sets.Set[string] {
+	nodeNames := sets.New[string]()
 	for _, nrt := range nrts {
 		nodeNames.Insert(nrt.Name)
 	}
@@ -439,7 +439,7 @@ func ResourceInfoMatchesRequest(resources []nrtv1alpha2.ResourceInfo, requests c
 }
 
 func ResourceInfoProviding(resources []nrtv1alpha2.ResourceInfo, resName string, resQty resource.Quantity, onEqual bool) bool {
-	zoneQty, ok := FindResourceAvailableByName(resources, string(resName))
+	zoneQty, ok := FindResourceAvailableByName(resources, resName)
 	if !ok {
 		return false
 	}
@@ -505,13 +505,4 @@ func ResourceInfoListToResourceList(ri nrtv1alpha2.ResourceInfoList) corev1.Reso
 		rl[corev1.ResourceName(res.Name)] = res.Available
 	}
 	return rl
-}
-
-func contains(items []string, st string) bool {
-	for _, item := range items {
-		if item == st {
-			return true
-		}
-	}
-	return false
 }

@@ -621,7 +621,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Waiting for the NRT data to stabilize")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			By(fmt.Sprintf("checking NRT for target node %q updated correctly", testPod.Spec.NodeName))
 			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)

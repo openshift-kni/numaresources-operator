@@ -121,7 +121,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtCandidates, tmPolicy, tmScope)
 			if len(nrts) != len(nrtCandidates) {
-				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(tmPolicy), len(nrts))
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", tmPolicy, len(nrts))
 			}
 
 			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
@@ -133,18 +133,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			var ok bool
 			targetNodeName, ok = e2efixture.PopNodeName(nrtCandidateNames)
-			ExpectWithOffset(1, ok).To(BeTrue(), "cannot select a target node among %#v", nrtCandidateNames.List())
+			ExpectWithOffset(1, ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
 			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
 			// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
 			// but have enough allocatable resources at node level to shedule the pod on it.
 			// If we pad each zone with a pod with 3/4 of the required resources, as those nodes have at least
-			// 2 NUMA zones, they will have enogh allocatable resources at node level to accomodate the required
+			// 2 NUMA zones, they will have enogh allocatable resources at node level to accommondate the required
 			// resources but they won't have enough resources in only one NUMA zone.
 
 			By("Padding all other candidate nodes")
 
 			var paddingPods []*corev1.Pod
-			for nIdx, nodeName := range nrtCandidateNames.List() {
+			for nIdx, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				ExpectWithOffset(1, err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
@@ -203,7 +203,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 				By("Waiting for the NRT data to stabilize")
-				e2efixture.WaitForNRTSettle(fxt)
+				e2efixture.MustSettleNRT(fxt)
 
 				By("Verifying NRT is updated properly when running the test's pod")
 				expectNRTConsumedResources(fxt, targetNrtInitial, requiredRes, updatedPod)
@@ -304,7 +304,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 
 				By("Waiting for the NRT data to stabilize")
-				e2efixture.WaitForNRTSettle(fxt)
+				e2efixture.MustSettleNRT(fxt)
 
 				By("Verifying NRT is updated properly when running the test's pod")
 				expectNRTConsumedResources(fxt, targetNrtInitial, requiredRes, &pods[0])
@@ -371,7 +371,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtList.Items, policyFuncs.policyName(), policyFuncs.scopeName())
 			if len(nrts) < hostsRequired {
-				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(policyFuncs.policyName()), len(nrts))
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", policyFuncs.policyName(), len(nrts))
 			}
 
 			Expect(len(unsuitableFreeRes)).To(Equal(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
@@ -409,8 +409,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
 			// nodes we have now are all equal for our purposes. Pick one at random
 			targetNodeName, ok := e2efixture.PopNodeName(candidateNodeNames)
-			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
-			unsuitableNodeNames := candidateNodeNames.List()
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(candidateNodeNames))
+			unsuitableNodeNames := e2efixture.ListNodeNames(candidateNodeNames)
 
 			By(fmt.Sprintf("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames))
 
@@ -476,7 +476,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("wait for NRT data to settle")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			By(fmt.Sprintf("checking the resources are accounted as expected on %q", updatedPod.Spec.NodeName))
 			nrtPostCreate, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), nrtInitial, 1*time.Minute)
@@ -496,7 +496,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
-			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
+			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			Eventually(func() bool {
 				By(fmt.Sprintf("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName))
 
@@ -1274,7 +1274,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtList.Items, policyFuncs.policyName(), policyFuncs.scopeName())
 			if len(nrts) < hostsRequired {
-				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", string(policyFuncs.policyName()), len(nrts))
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", policyFuncs.policyName(), len(nrts))
 			}
 
 			Expect(len(unsuitableFreeRes)).To(Equal(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
@@ -1321,8 +1321,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
 			// nodes we have now are all equal for our purposes. Pick one at random
 			targetNodeName, ok := e2efixture.PopNodeName(candidateNodeNames)
-			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", candidateNodeNames.List())
-			unsuitableNodeNames := candidateNodeNames.List()
+			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(candidateNodeNames))
+			unsuitableNodeNames := e2efixture.ListNodeNames(candidateNodeNames)
 
 			By(fmt.Sprintf("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames))
 
@@ -1390,7 +1390,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 				klog.Warningf("failed to find the expected event with Reason=\"FailedScheduling\" and Message contains: %q", errMsg)
 				if !loggedEvents {
-					objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 					loggedEvents = true
 				}
 				return false
@@ -2066,7 +2066,7 @@ func makeInitTestContainers(pod *corev1.Pod, initCnt []corev1.ResourceList) *cor
 
 func isHugePageInAvailable(rl corev1.ResourceList) bool {
 	for name, quan := range rl {
-		if isHugePageResourceName(corev1.ResourceName(name)) && !quan.IsZero() {
+		if isHugePageResourceName(name) && !quan.IsZero() {
 			return true
 		}
 	}

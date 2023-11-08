@@ -134,7 +134,7 @@ func CheckPODSchedulingFailedForAlignment(k8sCli *kubernetes.Clientset, podNames
 			klog.Warningf("pod %s/%s controller %q expected %q", podNamespace, podName, item.ReportingController, schedulerName)
 			return false
 		}
-		// workaround kubelet race/confusing behaviour
+		// workaround kubelet race/confusing behavior
 		if !strings.Contains(item.Message, alignmentErr) {
 			klog.Warningf("pod %s/%s message %q expected %q", podNamespace, podName, item.Message, alignmentErr)
 			return false

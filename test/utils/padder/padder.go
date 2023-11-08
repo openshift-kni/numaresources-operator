@@ -154,7 +154,7 @@ func (p *Padder) Pad(timeout time.Duration, options PaddingOptions) error {
 		// select one node randomly
 		nodeName, ok := candidateNodes.PopAny()
 		if !ok {
-			return fmt.Errorf("cannot select a node to be padded among %#v", candidateNodes.List())
+			return fmt.Errorf("cannot select a node to be padded among %#v", fixture.ListNodeNames(candidateNodes))
 		}
 
 		nrt, err := nrtutil.FindFromList(singleNumaNrt, nodeName)

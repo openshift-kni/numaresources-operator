@@ -187,7 +187,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:47594][tier1] should make a pod with a toleration land on a node with enough resources on a specific NUMA zone", func() {
-			paddedNodeNames := sets.NewString(padder.GetPaddedNodes()...)
+			paddedNodeNames := sets.New[string](padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
 			// since we know exactly how the test setup looks like we expect only targeted node here
@@ -238,7 +238,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Waiting for the NRT data to stabilize")
-			e2efixture.WaitForNRTSettle(fxt)
+			e2efixture.MustSettleNRT(fxt)
 
 			rl := e2ereslist.FromGuaranteedPod(*updatedPod)
 			By("Verifying NRT is updated properly when running the test's pod")
@@ -256,7 +256,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
-			// (kubelet, runtime). This is a known behaviour. We can only tolerate some delay in reporting on pod removal.
+			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			Eventually(func() bool {
 				By(fmt.Sprintf("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName))
 
