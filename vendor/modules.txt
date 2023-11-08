@@ -181,6 +181,7 @@ github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux
 github.com/k8stopologyawareschedwg/deployer/pkg/clientutil
 github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform
 github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect
+github.com/k8stopologyawareschedwg/deployer/pkg/deployer/wait
 github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec
 github.com/k8stopologyawareschedwg/deployer/pkg/images
 github.com/k8stopologyawareschedwg/deployer/pkg/kubeletconfig
