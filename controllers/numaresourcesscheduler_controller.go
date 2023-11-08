@@ -39,6 +39,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
@@ -174,7 +176,24 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	schedSpec := instance.Spec.Normalize()
 
 	cacheResyncPeriod := unpackAPIResyncPeriod(schedSpec.CacheResyncPeriod)
-	if err := schedupdate.SchedulerConfigWithFilter(r.SchedulerManifests.ConfigMap, schedSpec.SchedulerName, schedupdate.CleanSchedulerConfig, cacheResyncPeriod); err != nil {
+
+	resyncPeriod := int64(cacheResyncPeriod.Seconds())
+	params := k8swgmanifests.ConfigParams{
+		ProfileName: schedSpec.SchedulerName,
+		Cache: &k8swgmanifests.ConfigCacheParams{
+			ResyncPeriodSeconds: &resyncPeriod,
+		},
+	}
+
+	schedName, ok := schedstate.SchedulerNameFromObject(r.SchedulerManifests.ConfigMap)
+	if !ok {
+		err := fmt.Errorf("missing scheduler name in builtin config map")
+		klog.V(2).ErrorS(err, "cannot find the scheduler profile name")
+		return nropv1.NUMAResourcesSchedulerStatus{}, err
+	}
+	klog.V(4).InfoS("detected scheduler profile", "profileName", schedName)
+
+	if err := schedupdate.SchedulerConfig(r.SchedulerManifests.ConfigMap, schedName, &params); err != nil {
 		return nropv1.NUMAResourcesSchedulerStatus{}, err
 	}
 

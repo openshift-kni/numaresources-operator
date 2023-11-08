@@ -32,8 +32,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	k8se2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	e2etestns "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/namespace"
 	e2enodes "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes"
 	e2epods "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods"
 	e2ertepod "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods/rtepod"
@@ -53,10 +55,15 @@ var _ = ginkgo.Describe("[RTE][Monitoring] metrics", func() {
 
 	f := framework.NewDefaultFramework("metrics")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.SkipNamespaceCreation = true
 
 	ginkgo.BeforeEach(func() {
+		var err error
+
+		err = e2etestns.Setup(f)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
 		if !initialized {
-			var err error
 			hasMetrics = e2etestenv.GetMetricsEnabled()
 
 			workerNodes, err = e2enodes.GetWorkerNodes(f)
@@ -108,7 +115,7 @@ var _ = ginkgo.Describe("[RTE][Monitoring] metrics", func() {
 			rteContainerName, err := e2ertepod.FindRTEContainerName(rtePod)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+			stdout, stderr, err := k8se2epod.ExecWithOptions(f, k8se2epod.ExecOptions{
 				Command:            []string{"curl", fmt.Sprintf("http://127.0.0.1:%d/metrics", metricsPort)},
 				Namespace:          rtePod.Namespace,
 				PodName:            rtePod.Name,
@@ -133,7 +140,7 @@ var _ = ginkgo.Describe("[RTE][Monitoring] metrics", func() {
 			dumpPods(f, topologyUpdaterNode.Name, "reference pods")
 
 			sleeperPod := e2epods.MakeGuaranteedSleeperPod("1000m")
-			pod := f.PodClient().CreateSync(sleeperPod)
+			pod := k8se2epod.NewPodClient(f).CreateSync(sleeperPod)
 			ginkgo.DeferCleanup(func(cs clientset.Interface, podNamespace, podName string) error {
 				return e2epods.DeletePodSyncByName(cs, podNamespace, podName)
 			}, f.ClientSet, pod.Namespace, pod.Name)
@@ -142,7 +149,7 @@ var _ = ginkgo.Describe("[RTE][Monitoring] metrics", func() {
 			rteContainerName, err := e2ertepod.FindRTEContainerName(rtePod)
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
-			stdout, stderr, err := f.ExecWithOptions(framework.ExecOptions{
+			stdout, stderr, err := k8se2epod.ExecWithOptions(f, k8se2epod.ExecOptions{
 				Command:            []string{"curl", fmt.Sprintf("http://127.0.0.1:%d/metrics", metricsPort)},
 				Namespace:          rtePod.Namespace,
 				PodName:            rtePod.Name,

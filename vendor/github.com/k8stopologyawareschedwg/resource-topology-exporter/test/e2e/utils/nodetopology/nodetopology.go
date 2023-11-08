@@ -18,16 +18,28 @@ package nodetopology
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
-	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
-	topologyclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+
+	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	nrtv1alpha2attr "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
+	topologyclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+)
+
+const (
+	PolicyAttr = "topologyManagerPolicy"
+	ScopeAttr  = "topologyManagerScope"
+
+	PolicyDefault = "none"      // TODO: learn somehow from k8s
+	ScopeDefault  = "container" // TODO: learn somehow from k8s
 )
 
 func GetNodeTopology(topologyClient *topologyclientset.Clientset, nodeName string) *v1alpha2.NodeResourceTopology {
@@ -35,6 +47,8 @@ func GetNodeTopology(topologyClient *topologyclientset.Clientset, nodeName strin
 }
 
 func GetNodeTopologyWithResource(topologyClient *topologyclientset.Clientset, nodeName, resName string) *v1alpha2.NodeResourceTopology {
+	ginkgo.By(fmt.Sprintf("getting NRT for node=%q resource=%q", nodeName, resName))
+
 	var nodeTopology *v1alpha2.NodeResourceTopology
 	var err error
 	gomega.EventuallyWithOffset(1, func() bool {
@@ -48,17 +62,36 @@ func GetNodeTopologyWithResource(topologyClient *topologyclientset.Clientset, no
 		}
 		return containsResource(nodeTopology, resName)
 	}, time.Minute, 5*time.Second).Should(gomega.BeTrue())
+
 	return nodeTopology
 }
 
-func IsValidNodeTopology(nodeTopology *v1alpha2.NodeResourceTopology, tmPolicy string) bool {
-	if nodeTopology == nil || len(nodeTopology.TopologyPolicies) == 0 {
+func isValidAttribute(attrs v1alpha2.AttributeList, name, value string) bool {
+	val, ok := nrtv1alpha2attr.Get(attrs, name)
+	if !ok {
+		framework.Logf("missing expected attribute %q", name)
+		return false
+	}
+	if value != "" && value != val.Value {
+		framework.Logf("value mismatch for attribute %q got %q expected %q", name, val.Value, value)
+		return false
+	}
+	return true
+}
+
+func IsValidNodeTopology(nodeTopology *v1alpha2.NodeResourceTopology, tmPolicy, tmScope string) bool {
+	if nodeTopology == nil {
 		framework.Logf("failed to get topology policy from the node topology resource")
 		return false
 	}
 
-	if nodeTopology.TopologyPolicies[0] != tmPolicy {
-		framework.Logf("topology mismatch got %q expected %q", nodeTopology.TopologyPolicies[0], tmPolicy)
+	if len(nodeTopology.TopologyPolicies) > 0 {
+		framework.Logf("topologyPolicies is deprecated and should not be populated anymore")
+		return false
+	}
+
+	if !isValidAttribute(nodeTopology.Attributes, PolicyAttr, tmPolicy) || !isValidAttribute(nodeTopology.Attributes, ScopeAttr, tmScope) {
+		// the helper function already logged
 		return false
 	}
 

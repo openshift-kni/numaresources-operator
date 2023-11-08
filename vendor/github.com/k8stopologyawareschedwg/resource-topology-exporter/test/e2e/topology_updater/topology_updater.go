@@ -33,10 +33,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	k8se2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"sigs.k8s.io/yaml"
 
 	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	topologyclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
+	e2etestns "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/namespace"
 	e2enodes "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes"
 	e2enodetopology "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodetopology"
 	e2epods "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/pods"
@@ -49,6 +52,7 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 		initialized         bool
 		timeout             time.Duration
 		tmPolicy            string
+		tmScope             string
 		topologyClient      *topologyclientset.Clientset
 		topologyUpdaterNode *corev1.Node
 		workerNodes         []corev1.Node
@@ -56,9 +60,13 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 
 	f := framework.NewDefaultFramework("topology-updater")
 	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
+	f.SkipNamespaceCreation = true
 
 	ginkgo.BeforeEach(func() {
 		var err error
+
+		err = e2etestns.Setup(f)
+		gomega.Expect(err).NotTo(gomega.HaveOccurred())
 
 		if !initialized {
 			timeout, err = time.ParseDuration(e2etestenv.GetPollInterval())
@@ -90,6 +98,7 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 			}
 
 			tmPolicy = e2etestenv.GetTopologyManagerPolicy()
+			tmScope = e2etestenv.GetTopologyManagerScope()
 
 			initialized = true
 		}
@@ -104,7 +113,7 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 			ginkgo.By("creating a pod consuming resources from the shared, non-exclusive CPU pool (best-effort QoS)")
 			sleeperPod := e2epods.MakeBestEffortSleeperPod()
 
-			pod := f.PodClient().CreateSync(sleeperPod)
+			pod := k8se2epod.NewPodClient(f).CreateSync(sleeperPod)
 			ginkgo.DeferCleanup(func(cs clientset.Interface, podNamespace, podName string) error {
 				return e2epods.DeletePodSyncByName(cs, podNamespace, podName)
 			}, f.ClientSet, pod.Namespace, pod.Name)
@@ -144,7 +153,7 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 			ginkgo.By("creating a pod consuming resources from the shared, non-exclusive CPU pool (guaranteed QoS, nonintegral request)")
 			sleeperPod := e2epods.MakeGuaranteedSleeperPod("500m")
 
-			pod := f.PodClient().CreateSync(sleeperPod)
+			pod := k8se2epod.NewPodClient(f).CreateSync(sleeperPod)
 			ginkgo.DeferCleanup(func(cs clientset.Interface, podNamespace, podName string) error {
 				return e2epods.DeletePodSyncByName(cs, podNamespace, podName)
 			}, f.ClientSet, pod.Namespace, pod.Name)
@@ -192,7 +201,7 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 			ginkgo.By("creating a pod consuming exclusive CPUs")
 			sleeperPod := e2epods.MakeGuaranteedSleeperPod("1000m")
 
-			pod := f.PodClient().CreateSync(sleeperPod)
+			pod := k8se2epod.NewPodClient(f).CreateSync(sleeperPod)
 			ginkgo.DeferCleanup(func(cs clientset.Interface, podNamespace, podName string) error {
 				return e2epods.DeletePodSyncByName(cs, podNamespace, podName)
 			}, f.ClientSet, pod.Namespace, pod.Name)
@@ -222,8 +231,16 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 
 		ginkgo.It("should fill the node resource topologies CR with the data", func() {
 			nodeTopology := e2enodetopology.GetNodeTopology(topologyClient, topologyUpdaterNode.Name)
-			isValid := e2enodetopology.IsValidNodeTopology(nodeTopology, tmPolicy)
-			gomega.Expect(isValid).To(gomega.BeTrue(), "received invalid topology: %v", nodeTopology)
+			isValid := e2enodetopology.IsValidNodeTopology(nodeTopology, tmPolicy, tmScope)
+			gomega.Expect(isValid).To(gomega.BeTrue(), "received invalid topology:\n%v", toYAML(nodeTopology))
 		})
 	})
 })
+
+func toYAML(obj interface{}) string {
+	data, err := yaml.Marshal(obj)
+	if err != nil {
+		return fmt.Sprintf("<SERIALIZE ERROR: %v>", err)
+	}
+	return string(data)
+}

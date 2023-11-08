@@ -27,9 +27,7 @@ import (
 	k8sjson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 
-	schedconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	schedscheme "sigs.k8s.io/scheduler-plugins/apis/config/scheme"
-	"sigs.k8s.io/scheduler-plugins/apis/config/v1beta2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func SerializeObject(obj runtime.Object, out io.Writer) error {
@@ -76,34 +74,13 @@ func loadObject(path string) (runtime.Object, error) {
 	return DeserializeObjectFromData(data)
 }
 
-func DecodeSchedulerConfigFromData(data []byte) (*schedconfig.KubeSchedulerConfiguration, error) {
-	decoder := schedscheme.Codecs.UniversalDecoder()
-	obj, gvk, err := decoder.Decode(data, nil, nil)
-
-	if err != nil {
-		return nil, err
+func RenderObjects(objs []client.Object, w io.Writer) error {
+	for _, obj := range objs {
+		fmt.Fprintf(w, "---\n")
+		if err := SerializeObject(obj, w); err != nil {
+			return err
+		}
 	}
 
-	schedCfg, ok := obj.(*schedconfig.KubeSchedulerConfiguration)
-	if !ok {
-		return nil, fmt.Errorf("decoded unsupported type: %T gvk=%s", obj, gvk)
-	}
-	return schedCfg, nil
-}
-
-func EncodeSchedulerConfigToData(schedCfg *schedconfig.KubeSchedulerConfiguration) ([]byte, error) {
-	yamlInfo, ok := runtime.SerializerInfoForMediaType(schedscheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeYAML)
-	if !ok {
-		return nil, fmt.Errorf("unable to locate encoder -- %q is not a supported media type", runtime.ContentTypeYAML)
-	}
-
-	encoder := schedscheme.Codecs.EncoderForVersion(yamlInfo.Serializer, v1beta2.SchemeGroupVersion)
-
-	var buf bytes.Buffer
-	err := encoder.Encode(schedCfg, &buf)
-	if err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
+	return nil
 }
