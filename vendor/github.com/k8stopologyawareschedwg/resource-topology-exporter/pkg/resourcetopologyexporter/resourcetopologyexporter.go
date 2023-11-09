@@ -1,12 +1,12 @@
 package resourcetopologyexporter
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
-	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/kubeconf"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/notification"
@@ -23,13 +23,13 @@ type Args struct {
 	TopologyManagerPolicy  string
 	TopologyManagerScope   string
 	KubeletConfigFile      string
-	KubeletStateDirs       []string
 	PodResourcesSocketPath string
 	SleepInterval          time.Duration
 	PodReadinessEnable     bool
 	NotifyFilePath         string
 	MaxEventsPerTimeUnit   int64
 	TimeUnitToLimitEvents  time.Duration
+	AddNRTOwnerEnable      bool
 	PrometheusMode         string
 }
 
@@ -37,16 +37,27 @@ type tmSettings struct {
 	config nrtupdater.TMConfig
 }
 
-func Execute(cli podresourcesapi.PodResourcesListerClient, nrtupdaterArgs nrtupdater.Args, resourcemonitorArgs resourcemonitor.Args, rteArgs Args) error {
+func Execute(hnd resourcemonitor.Handle, nrtupdaterArgs nrtupdater.Args, resourcemonitorArgs resourcemonitor.Args, rteArgs Args) error {
 	tmConf, err := getTopologyManagerSettings(rteArgs)
 	if err != nil {
 		return err
 	}
 
+	var nodeGetter nrtupdater.NodeGetter
+	if rteArgs.AddNRTOwnerEnable {
+		nodeGetter, err = nrtupdater.NewCachedNodeGetter(hnd.K8SCli, context.Background())
+		if err != nil {
+			klog.V(2).Info("Cannot enable 'add-nrt-owner'. Unable to get node info")
+			return fmt.Errorf("Cannot enable 'add-nrt-owner'. %w", err)
+		}
+	} else {
+		nodeGetter = &nrtupdater.DisabledNodeGetter{}
+	}
+
 	var condChan chan v1.PodCondition
 	if rteArgs.PodReadinessEnable {
 		condChan = make(chan v1.PodCondition)
-		condIn, err := podreadiness.NewConditionInjector()
+		condIn, err := podreadiness.NewConditionInjector(hnd.K8SCli)
 		if err != nil {
 			return err
 		}
@@ -58,13 +69,13 @@ func Execute(cli podresourcesapi.PodResourcesListerClient, nrtupdaterArgs nrtupd
 		return err
 	}
 
-	resObs, err := NewResourceObserver(cli, resourcemonitorArgs)
+	resObs, err := NewResourceObserver(hnd, resourcemonitorArgs)
 	if err != nil {
 		return err
 	}
 	go resObs.Run(eventSource.Events(), condChan)
 
-	upd := nrtupdater.NewNRTUpdater(nrtupdaterArgs, tmConf.config)
+	upd := nrtupdater.NewNRTUpdater(nodeGetter, nrtupdaterArgs, tmConf.config)
 	go upd.Run(resObs.Infos, condChan)
 
 	go eventSource.Run()
@@ -88,11 +99,6 @@ func createEventSource(rteArgs *Args) (notification.EventSource, error) {
 	}
 
 	err = eventSource.AddFile(rteArgs.NotifyFilePath)
-	if err != nil {
-		return nil, err
-	}
-
-	err = eventSource.AddDirs(rteArgs.KubeletStateDirs)
 	if err != nil {
 		return nil, err
 	}

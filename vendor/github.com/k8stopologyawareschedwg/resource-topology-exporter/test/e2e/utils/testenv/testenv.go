@@ -31,6 +31,7 @@ const (
 	RTELabelName                = "resource-topology"
 	RTEContainerName            = "resource-topology-exporter-container"
 	DefaultDeviceName           = "example.com/deviceA"
+	DefaultNodeReferenceEnabled = false
 	DefaultMetricsEnabled       = false
 )
 
@@ -90,6 +91,15 @@ func GetDeviceName() string {
 		return devName
 	}
 	return DefaultDeviceName
+}
+
+func GetNodeReferenceEnabled() bool {
+	if nodeRef, ok := os.LookupEnv("E2E_NODE_REFERENCE"); ok {
+		if val, err := strconv.ParseBool(nodeRef); err == nil {
+			return val
+		}
+	}
+	return DefaultNodeReferenceEnabled
 }
 
 func GetMetricsEnabled() bool {

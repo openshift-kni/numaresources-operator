@@ -37,8 +37,8 @@ import (
 	"k8s.io/utils/pointer"
 
 	rteassets "github.com/k8stopologyawareschedwg/deployer/pkg/assets/rte"
+	selinuxassets "github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/images"
 )
 
 const (
@@ -64,21 +64,9 @@ const (
 	defaultIgnitionContentSource = "data:text/plain;charset=utf-8;base64"
 	defaultOCIHooksDir           = "/etc/containers/oci/hooks.d"
 	defaultScriptsDir            = "/usr/local/bin"
-	seLinuxRTEPolicyDst          = "/etc/selinux/rte.cil"
-	seLinuxRTEContextType        = "rte.process"
-	seLinuxRTEContextLevel       = "s0"
 	templateSELinuxPolicyDst     = "selinuxPolicyDst"
 	templateNotifierBinaryDst    = "notifierScriptPath"
 	templateNotifierFilePath     = "notifierFilePath"
-)
-
-const (
-	rteNotifierVolumeName           = "host-run-rte"
-	rteSysVolumeName                = "host-sys"
-	rtePodresourcesSocketVolumeName = "host-podresources-socket"
-	rteKubeletDirVolumeName         = "host-var-lib-kubelet"
-	rteNotifierFileName             = "notify"
-	hostNotifierDir                 = "/run/rte"
 )
 
 //go:embed yaml
@@ -287,7 +275,7 @@ func Deployment(component, subComponent, namespace string) (*appsv1.Deployment, 
 	return dp, nil
 }
 
-func DaemonSet(component, subComponent string, plat platform.Platform, namespace string) (*appsv1.DaemonSet, error) {
+func DaemonSet(component, subComponent string, namespace string) (*appsv1.DaemonSet, error) {
 	if err := validateComponent(component); err != nil {
 		return nil, err
 	}
@@ -304,120 +292,11 @@ func DaemonSet(component, subComponent string, plat platform.Platform, namespace
 		return nil, fmt.Errorf("unexpected type, got %t", obj)
 	}
 
-	if component == ComponentResourceTopologyExporter {
-		hostPathDirectory := corev1.HostPathDirectory
-		hostPathSocket := corev1.HostPathSocket
-		hostPathDirectoryOrCreate := corev1.HostPathDirectoryOrCreate
-		ds.Spec.Template.Spec.Volumes = []corev1.Volume{
-			{
-				// needed to get the CPU, PCI devices and memory information
-				Name: rteSysVolumeName,
-				VolumeSource: corev1.VolumeSource{
-					HostPath: &corev1.HostPathVolumeSource{
-						Path: "/sys",
-						Type: &hostPathDirectory,
-					},
-				},
-			},
-			{
-				Name: rtePodresourcesSocketVolumeName,
-				VolumeSource: corev1.VolumeSource{
-					HostPath: &corev1.HostPathVolumeSource{
-						Path: "/var/lib/kubelet/pod-resources/kubelet.sock",
-						Type: &hostPathSocket,
-					},
-				},
-			},
-			{
-				// notifier file volume
-				Name: rteNotifierVolumeName,
-				VolumeSource: corev1.VolumeSource{
-					HostPath: &corev1.HostPathVolumeSource{
-						Path: hostNotifierDir,
-						Type: &hostPathDirectoryOrCreate,
-					},
-				},
-			},
-		}
-
-		containerPodResourcesSocket := filepath.Join("/", rtePodresourcesSocketVolumeName, "kubelet.sock")
-		containerHostSysDir := filepath.Join("/", rteSysVolumeName)
-		rteContainerVolumeMounts := []corev1.VolumeMount{
-			{
-				Name:      rteSysVolumeName,
-				ReadOnly:  true,
-				MountPath: containerHostSysDir,
-			},
-			{
-				Name:      rtePodresourcesSocketVolumeName,
-				MountPath: containerPodResourcesSocket,
-			},
-			{
-				Name:      rteNotifierVolumeName,
-				MountPath: filepath.Join("/", rteNotifierVolumeName),
-			},
-		}
-		if plat == platform.Kubernetes {
-			ds.Spec.Template.Spec.Volumes = append(ds.Spec.Template.Spec.Volumes,
-				corev1.Volume{
-					Name: rteKubeletDirVolumeName,
-					VolumeSource: corev1.VolumeSource{
-						HostPath: &corev1.HostPathVolumeSource{
-							Path: "/var/lib/kubelet",
-							Type: &hostPathDirectory,
-						},
-					},
-				},
-			)
-			rteContainerVolumeMounts = append(rteContainerVolumeMounts, corev1.VolumeMount{
-				Name:      rteKubeletDirVolumeName,
-				ReadOnly:  true,
-				MountPath: filepath.Join("/", rteKubeletDirVolumeName),
-			})
-		}
-
-		for i := range ds.Spec.Template.Spec.Containers {
-			c := &ds.Spec.Template.Spec.Containers[i]
-			if c.Name == ContainerNameRTE {
-				c.Image = images.ResourceTopologyExporterImage
-
-				c.Args = []string{
-					"--sleep-interval=10s",
-					fmt.Sprintf("--sysfs=%s", containerHostSysDir),
-					fmt.Sprintf("--podresources-socket=unix://%s", containerPodResourcesSocket),
-					fmt.Sprintf("--notify-file=/%s/%s", rteNotifierVolumeName, rteNotifierFileName),
-				}
-
-				if plat == platform.OpenShift {
-					// this is needed to put watches in the kubelet state dirs AND
-					// to open the podresources socket in R/W mode
-					if c.SecurityContext == nil {
-						c.SecurityContext = &corev1.SecurityContext{}
-					}
-					c.SecurityContext.SELinuxOptions = &corev1.SELinuxOptions{
-						Type:  seLinuxRTEContextType,
-						Level: seLinuxRTEContextLevel,
-					}
-				}
-
-				if plat == platform.Kubernetes {
-					c.Args = append(
-						c.Args,
-						fmt.Sprintf("--kubelet-config-file=/%s/config.yaml", rteKubeletDirVolumeName),
-						fmt.Sprintf("--kubelet-state-dir=/%s", rteKubeletDirVolumeName),
-					)
-				}
-
-				c.VolumeMounts = rteContainerVolumeMounts
-			}
-		}
-	}
-
 	ds.Namespace = namespace
 	return ds, nil
 }
 
-func MachineConfig(component string, ver platform.Version) (*machineconfigv1.MachineConfig, error) {
+func MachineConfig(component string, ver platform.Version, withCRIHooks bool) (*machineconfigv1.MachineConfig, error) {
 	if component != ComponentResourceTopologyExporter {
 		return nil, fmt.Errorf("component %q is not an %q component", component, ComponentResourceTopologyExporter)
 	}
@@ -432,7 +311,7 @@ func MachineConfig(component string, ver platform.Version) (*machineconfigv1.Mac
 		return nil, fmt.Errorf("unexpected type, got %t", obj)
 	}
 
-	ignitionConfig, err := getIgnitionConfig(ver)
+	ignitionConfig, err := makeIgnitionConfig(ver, withCRIHooks)
 	if err != nil {
 		return nil, err
 	}
@@ -441,46 +320,47 @@ func MachineConfig(component string, ver platform.Version) (*machineconfigv1.Mac
 	return mc, nil
 }
 
-func getIgnitionConfig(ver platform.Version) ([]byte, error) {
+func makeIgnitionConfig(ver platform.Version, withCRIHooks bool) ([]byte, error) {
 	var files []igntypes.File
 
-	// get SELinux policy
-	selinuxPolicy, err := rteassets.GetSELinuxPolicy(ver)
+	if withCRIHooks {
+		// load RTE notifier OCI hook config
+		notifierHookConfigContent, err := getTemplateContent(rteassets.HookConfigRTENotifier, map[string]string{
+			templateNotifierBinaryDst: filepath.Join(defaultScriptsDir, rteassets.NotifierScriptName),
+			templateNotifierFilePath:  filepath.Join(rteassets.HostNotifierDir, rteassets.NotifierFileName),
+		})
+		if err != nil {
+			return nil, err
+		}
+		files = addFileToIgnitionConfig(
+			files,
+			notifierHookConfigContent,
+			0644,
+			filepath.Join(defaultOCIHooksDir, rteassets.NotifierOCIHookConfig),
+		)
+
+		// load RTE notifier script
+		files = addFileToIgnitionConfig(
+			files,
+			rteassets.NotifierScript,
+			0755,
+			filepath.Join(defaultScriptsDir, rteassets.NotifierScriptName),
+		)
+	}
+
+	// we always need the SELinux policy
+	selinuxPolicy, err := selinuxassets.GetPolicy(ver)
 	if err != nil {
 		return nil, err
 	}
 
-	// load SELinux policy
-	files = addFileToIgnitionConfig(files, selinuxPolicy, 0644, seLinuxRTEPolicyDst)
+	files = addFileToIgnitionConfig(files, selinuxPolicy, 0644, selinuxassets.RTEPolicyFileName)
 
-	// load RTE notifier OCI hook config
-	notifierHookConfigContent, err := getTemplateContent(rteassets.HookConfigRTENotifier, map[string]string{
-		templateNotifierBinaryDst: filepath.Join(defaultScriptsDir, "rte-notifier.sh"),
-		templateNotifierFilePath:  filepath.Join(hostNotifierDir, rteNotifierFileName),
-	})
-	if err != nil {
-		return nil, err
-	}
-	files = addFileToIgnitionConfig(
-		files,
-		notifierHookConfigContent,
-		0644,
-		filepath.Join(defaultOCIHooksDir, "rte-notifier.json"),
-	)
-
-	// load RTE notifier script
-	files = addFileToIgnitionConfig(
-		files,
-		rteassets.NotifierScript,
-		0755,
-		filepath.Join(defaultScriptsDir, "rte-notifier.sh"),
-	)
-
-	// load systemd service to install SELinux policy
+	// and while we (always) need the SELinuc policy, we also need to make sure it's installed
 	systemdServiceContent, err := getTemplateContent(
-		rteassets.SELinuxInstallSystemdServiceTemplate,
+		selinuxassets.InstallSystemdServiceTemplate,
 		map[string]string{
-			templateSELinuxPolicyDst: seLinuxRTEPolicyDst,
+			templateSELinuxPolicyDst: selinuxassets.RTEPolicyFileName,
 		},
 	)
 	if err != nil {
@@ -497,18 +377,13 @@ func getIgnitionConfig(ver platform.Version) ([]byte, error) {
 				{
 					Contents: pointer.StringPtr(string(systemdServiceContent)),
 					Enabled:  pointer.BoolPtr(true),
-					Name:     "rte-selinux-policy-install.service",
+					Name:     selinuxassets.RTEPolicyInstallServiceName,
 				},
 			},
 		},
 	}
 
-	rawIgnition, err := json.Marshal(ignitionConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	return rawIgnition, nil
+	return json.Marshal(ignitionConfig)
 }
 
 func addFileToIgnitionConfig(files []igntypes.File, fileContent []byte, mode int, fileDst string) []igntypes.File {
@@ -561,8 +436,8 @@ func SecurityContextConstraint(component string) (*securityv1.SecurityContextCon
 	scc.SELinuxContext = securityv1.SELinuxContextStrategyOptions{
 		Type: securityv1.SELinuxStrategyMustRunAs,
 		SELinuxOptions: &corev1.SELinuxOptions{
-			Type:  seLinuxRTEContextType,
-			Level: seLinuxRTEContextLevel,
+			Type:  selinuxassets.RTEContextType,
+			Level: selinuxassets.RTEContextLevel,
 		},
 	}
 
