@@ -42,7 +42,6 @@ import (
 	topologyv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
-	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8shelpers"
 	podresfilter "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/filter"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/filter/numalocality"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude"
@@ -68,6 +67,11 @@ type Args struct {
 	PodSetFingerprintStatusFile string
 	PodExclude                  podexclude.List
 	ExcludeTerminalPods         bool
+}
+
+type Handle struct {
+	PodResCli podresourcesapi.PodResourcesListerClient
+	K8SCli    kubernetes.Interface
 }
 
 type ScanResponse struct {
@@ -132,14 +136,21 @@ type resourceMonitor struct {
 	nodeAllocatable   perNUMAResourceCounter
 }
 
-func NewResourceMonitor(podResCli podresourcesapi.PodResourcesListerClient, args Args, options ...func(*resourceMonitor)) (*resourceMonitor, error) {
+func NewResourceMonitor(hnd Handle, args Args, options ...func(*resourceMonitor)) (*resourceMonitor, error) {
 	rm := &resourceMonitor{
-		podResCli: podResCli,
+		podResCli: hnd.PodResCli,
+		k8sCli:    hnd.K8SCli,
 		args:      args,
 	}
 	for _, opt := range options {
 		opt(rm)
 	}
+
+	if rm.nodeName == "" {
+		rm.nodeName = os.Getenv("NODE_NAME")
+	}
+
+	klog.Infof("resource monitor for %q starting", rm.nodeName)
 
 	if rm.topo == nil {
 		topo, err := ghw.Topology(ghw.WithPathOverrides(ghw.PathOverrides{
@@ -150,13 +161,10 @@ func NewResourceMonitor(podResCli podresourcesapi.PodResourcesListerClient, args
 		}
 		rm.topo = topo
 	}
+
+	klog.V(3).Infof("machine topology: %s", toJSON(rm.topo))
+
 	rm.coreIDToNodeIDMap = MakeCoreIDToNodeIDMap(rm.topo)
-
-	if rm.nodeName == "" {
-		rm.nodeName = os.Getenv("NODE_NAME")
-	}
-
-	klog.Infof("resource monitor for %q starting", rm.nodeName)
 
 	if !rm.args.RefreshNodeResources {
 		klog.Infof("getting node resources once")
@@ -165,14 +173,6 @@ func NewResourceMonitor(podResCli podresourcesapi.PodResourcesListerClient, args
 		}
 	} else {
 		klog.Infof("tracking node resources")
-		if rm.k8sCli == nil {
-			c, err := k8shelpers.GetK8sClient("")
-			if err != nil {
-				return nil, err
-			}
-			rm.k8sCli = c
-		}
-
 		if err := rm.updateNodeResources(); err != nil {
 			return nil, err
 		}
@@ -522,6 +522,7 @@ func MakeCoreIDToNodeIDMap(topo *ghw.TopologyInfo) map[int]int {
 			}
 		}
 	}
+	klog.V(5).Infof("CPU mapping: %s", mapIntIntToString(coreToNode))
 	return coreToNode
 }
 
@@ -631,4 +632,20 @@ func PFPMethodIsSupported(value string) (string, error) {
 		return val, nil
 	}
 	return val, fmt.Errorf("unsupported method  %q", value)
+}
+
+func mapIntIntToString(mii map[int]int) string {
+	var sb strings.Builder
+	for key, val := range mii {
+		fmt.Fprintf(&sb, "%d:%d ", key, val)
+	}
+	return sb.String()
+}
+
+func toJSON(obj interface{}) string {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return "<ERROR>"
+	}
+	return string(data)
 }

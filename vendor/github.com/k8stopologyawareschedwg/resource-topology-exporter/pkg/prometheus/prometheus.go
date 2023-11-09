@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 
 	"k8s.io/klog/v2"
 
@@ -15,31 +14,6 @@ import (
 )
 
 const prometheusDefaultPort = "2112"
-
-const (
-	ServingDisabled = "disabled"
-	ServingHTTP     = "http" // plaintext
-)
-
-func ServingModeIsSupported(value string) (string, error) {
-	val := strings.ToLower(value)
-	switch val {
-	case ServingDisabled:
-		return val, nil
-	case ServingHTTP:
-		return val, nil
-	default:
-		return val, fmt.Errorf("unsupported method  %q", value)
-	}
-}
-
-func ServingModeSupported() string {
-	modes := []string{
-		ServingDisabled,
-		ServingHTTP,
-	}
-	return strings.Join(modes, ",")
-}
 
 var nodeName string
 
@@ -108,12 +82,7 @@ func UpdateWakeupDelayMetric(trigger string, wakeupDelay float64) {
 	}).Set(wakeupDelay)
 }
 
-func InitPrometheus(mode string) error {
-	if mode == ServingDisabled {
-		klog.Infof("prometheus endpoint disabled")
-		return nil
-	}
-
+func InitPrometheus() error {
 	var err error
 	var port = prometheusDefaultPort
 
