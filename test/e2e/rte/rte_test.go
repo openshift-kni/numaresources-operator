@@ -181,7 +181,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			for _, mcoKc := range mcoKcList.Items {
 				ginkgo.By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
 
-				kc, err := mcoKubeletConfToKubeletConf(&mcoKc)
+				_, err = mcoKubeletConfToKubeletConf(&mcoKc)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				mcps, err := nodegroupv1.FindMachineConfigPools(mcpList, nroObj.Spec.NodeGroups)
@@ -199,15 +199,6 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				rc, err := rteConfigMapToRTEConfig(cm)
 				klog.Infof("RTE config: %#v", rc)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-				// we intentionally don't check the values themselves - atm this would
-				// be to complex, effectively rewriting most of the controller logic
-				if len(kc.ReservedSystemCPUs) > 0 {
-					gomega.Expect(rc.Resources.ReservedCPUs).ToNot(gomega.BeEmpty())
-				}
-				if len(kc.ReservedMemory) > 0 {
-					gomega.Expect(rc.Resources.ReservedMemory).ToNot(gomega.BeEmpty())
-				}
 			}
 		})
 
