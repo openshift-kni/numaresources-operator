@@ -21,11 +21,11 @@ import (
 	"os"
 	"runtime"
 	"sort"
-	"strings"
 	"time"
 
 	"k8s.io/klog/v2"
 
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8shelpers"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude"
@@ -82,10 +82,16 @@ func main() {
 		os.Exit(0)
 	}
 
-	cli, err := podres.GetClient(parsedArgs.RTE.PodResourcesSocketPath)
+	k8scli, err := k8shelpers.GetK8sClient("")
+	if err != nil {
+		klog.Fatalf("failed to get k8s client: %w", err)
+	}
+
+	cli, cleanup, err := podres.GetClient(parsedArgs.RTE.PodResourcesSocketPath)
 	if err != nil {
 		klog.Fatalf("failed to start prometheus server: %v", err)
 	}
+	defer cleanup()
 
 	cli = sharedcpuspool.NewFromLister(cli, parsedArgs.RTE.Debug, parsedArgs.RTE.ReferenceContainer)
 
@@ -104,8 +110,6 @@ func main() {
 // The args is passed only for testing purposes.
 func parseArgs(args ...string) (ProgArgs, error) {
 	pArgs := ProgArgs{}
-
-	var pfpMethod string
 
 	flags := flag.NewFlagSet(version.ProgramName(), flag.ExitOnError)
 
@@ -133,7 +137,6 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.StringVar(&pArgs.RTE.PodResourcesSocketPath, "podresources-socket", "unix:///podresources/kubelet.sock", "Pod Resource Socket path to use.")
 	flags.BoolVar(&pArgs.RTE.PodReadinessEnable, "podreadiness", true, "Custom condition injection using Podreadiness.")
 
-	kubeletStateDirs := flags.String("kubelet-state-dir", "", "Kubelet state directory (RO access needed), for smart polling.")
 	refCnt := flags.String("reference-container", "", "Reference container, used to learn about the shared cpu pool\n See: https://github.com/kubernetes/kubernetes/issues/102190\n format of spec is namespace/podname/containername.\n Alternatively, you can use the env vars REFERENCE_NAMESPACE, REFERENCE_POD_NAME, REFERENCE_CONTAINER_NAME.")
 
 	flags.StringVar(&pArgs.RTE.NotifyFilePath, "notify-file", "", "Notification file path.")
@@ -152,11 +155,6 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	}
 
 	if pArgs.Version {
-		return pArgs, err
-	}
-
-	pArgs.RTE.KubeletStateDirs, err = setKubeletStateDirs(*kubeletStateDirs)
-	if err != nil {
 		return pArgs, err
 	}
 
@@ -289,10 +287,6 @@ func setupTopologyManagerConfig(pArgs *ProgArgs, conf config.Config) error {
 		return fmt.Errorf("incomplete Topology Manager configuration")
 	}
 	return nil
-}
-
-func setKubeletStateDirs(value string) ([]string, error) {
-	return append([]string{}, strings.Split(value, " ")...), nil
 }
 
 func setContainerIdent(value string) (*sharedcpuspool.ContainerIdent, error) {
