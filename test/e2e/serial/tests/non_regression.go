@@ -33,12 +33,14 @@ import (
 	corev1qos "k8s.io/kubectl/pkg/util/qos"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/images"
@@ -53,9 +55,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 	var nrts []nrtv1alpha2.NodeResourceTopology
-	tmPolicyFuncsHandler := tmPolicyFuncsHandler{
-		nrtv1alpha2.SingleNUMANodePodLevel:       newPodScopeTMPolicyFuncs(),
-		nrtv1alpha2.SingleNUMANodeContainerLevel: newContainerScopeTMPolicyFuncs(),
+	tmSingleNUMANodeFuncsHandler := tmScopeFuncsHandler{
+		intnrt.Pod:       newPodScopeSingleNUMANodeFuncs(),
+		intnrt.Container: newContainerScopeSingleNUMANodeFuncs(),
 	}
 
 	BeforeEach(func() {
@@ -82,11 +84,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
-		policies := []nrtv1alpha2.TopologyManagerPolicy{
-			nrtv1alpha2.SingleNUMANodeContainerLevel,
-			nrtv1alpha2.SingleNUMANodePodLevel,
-		}
-		nrts = e2enrt.FilterByPolicies(nrtCandidates, policies)
+		nrts = e2enrt.FilterByTopologyManagerPolicy(nrtCandidates, intnrt.SingleNUMANode)
 		if len(nrts) < 2 {
 			e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 		}
@@ -280,7 +278,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			policyFuncs := tmPolicyFuncsHandler[nrtv1alpha2.TopologyManagerPolicy(nrtInitial.TopologyPolicies[0])]
+			scope, ok := attribute.Get(nrtInitial.Attributes, intnrt.TopologyManagerScopeAttribute)
+			Expect(ok).To(BeTrue(), fmt.Sprintf("Unable to get required attribute %q from NRT %q", intnrt.TopologyManagerScopeAttribute, nrtInitial.Name))
+
+			policyFuncs := tmSingleNUMANodeFuncsHandler[scope.Value]
 
 			By(fmt.Sprintf("checking post-create NRT for target node %q updated correctly", targetNodeName))
 			dataBefore, err := yaml.Marshal(nrtInitial)
