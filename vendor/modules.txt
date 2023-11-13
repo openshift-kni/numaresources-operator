@@ -1030,10 +1030,6 @@ k8s.io/utils/net
 k8s.io/utils/pointer
 k8s.io/utils/strings/slices
 k8s.io/utils/trace
-# kubevirt.io/qe-tools v0.1.8
-## explicit; go 1.16
-kubevirt.io/qe-tools/pkg/ginkgo-reporters
-kubevirt.io/qe-tools/pkg/polarion-xml
 # sigs.k8s.io/controller-runtime v0.15.0 => sigs.k8s.io/controller-runtime v0.14.6
 ## explicit; go 1.19
 sigs.k8s.io/controller-runtime
