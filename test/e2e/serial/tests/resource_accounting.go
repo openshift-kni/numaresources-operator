@@ -34,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
@@ -56,9 +57,9 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 	var nrts []nrtv1alpha2.NodeResourceTopology
-	tmPolicyFuncsHandler := tmPolicyFuncsHandler{
-		nrtv1alpha2.SingleNUMANodePodLevel:       newPodScopeTMPolicyFuncs(),
-		nrtv1alpha2.SingleNUMANodeContainerLevel: newContainerScopeTMPolicyFuncs(),
+	tmSingleNUMANodeFuncsHandler := tmScopeFuncsHandler{
+		intnrt.Pod:       newPodScopeSingleNUMANodeFuncs(),
+		intnrt.Container: newContainerScopeSingleNUMANodeFuncs(),
 	}
 
 	BeforeEach(func() {
@@ -77,11 +78,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
-		policies := []nrtv1alpha2.TopologyManagerPolicy{
-			nrtv1alpha2.SingleNUMANodeContainerLevel,
-			nrtv1alpha2.SingleNUMANodePodLevel,
-		}
-		nrts = e2enrt.FilterByPolicies(nrtList.Items, policies)
+		nrts = e2enrt.FilterByTopologyManagerPolicy(nrtList.Items, intnrt.SingleNUMANode)
 		if len(nrts) < 2 {
 			e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 		}
@@ -519,7 +516,13 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			pod.Spec.Containers[0].Resources.Limits = reqResPerNUMA[0]
 			// keep the pod QoS as burstable
 			pod.Spec.Containers[1].Resources.Requests = reqResPerNUMA[1]
-			if targetNrtInitial.TopologyPolicies[0] == string(nrtv1alpha2.SingleNUMANodePodLevel) {
+			tmPolicy, ok := attribute.Get(targetNrtInitial.Attributes, intnrt.TopologyManagerPolicyAttribute)
+			Expect(ok).To(BeTrue(), fmt.Sprintf("Unable to get %q attribute", intnrt.TopologyManagerPolicyAttribute))
+
+			tmScope, ok := attribute.Get(targetNrtInitial.Attributes, intnrt.TopologyManagerScopeAttribute)
+			Expect(ok).To(BeTrue(), fmt.Sprintf("Unable to get %q attribute", intnrt.TopologyManagerPolicyAttribute))
+
+			if tmPolicy.Value == intnrt.SingleNUMANode && tmScope.Value == intnrt.Pod {
 				// if both containers should fit into the same zone, we should make the burstable one asking for minimum
 				// resources as possible so the node won't get filtered by the NodeResourceFit plugin
 				pod.Spec.Containers[1].Resources.Requests = corev1.ResourceList{corev1.ResourceMemory: resource.MustParse("5Mi")}
@@ -643,7 +646,10 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			rl := e2ereslist.FromGuaranteedPod(*updatedPod2)
 			klog.Infof("post-create pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainers(podGuanranteed.Spec.Containers)), e2ereslist.ToString(rl))
 
-			policyFuncs := tmPolicyFuncsHandler[nrtv1alpha2.TopologyManagerPolicy(targetNrtInitial.TopologyPolicies[0])]
+			scope, ok := attribute.Get(targetNrtInitial.Attributes, intnrt.TopologyManagerScopeAttribute)
+			Expect(ok).To(BeTrue(), fmt.Sprintf("Unable to find required attribute %q on NRT %q", intnrt.TopologyManagerScopeAttribute, targetNrtInitial.Name))
+
+			policyFuncs := tmSingleNUMANodeFuncsHandler[scope.Value]
 
 			By(fmt.Sprintf("checking post-update NRT for target node %q updated correctly", targetNodeName))
 			// it's simpler (no resource substraction/difference) to check against initial than compute

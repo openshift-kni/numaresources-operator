@@ -37,10 +37,8 @@ import (
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
-	"github.com/ghodss/yaml"
 	"github.com/pkg/errors"
 
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
@@ -48,7 +46,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	cfgstate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/cfg"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
-	"github.com/openshift-kni/numaresources-operator/rte/pkg/sysinfo"
 )
 
 const (
@@ -154,12 +151,12 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 }
 
 func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov1.KubeletConfig, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, name string, podExcludes map[string]string) (*corev1.ConfigMap, error) {
-	rendered, err := renderRTEConfig(r.Namespace, name, kubeletConfig, podExcludes)
+	data, err := rteconfig.Render(kubeletConfig, podExcludes)
 	if err != nil {
 		klog.ErrorS(err, "rendering config", "namespace", r.Namespace, "name", name)
 		return nil, err
 	}
-
+	rendered := rteconfig.CreateConfigMap(r.Namespace, name, string(data))
 	cfgManifests := cfgstate.Manifests{
 		Config: rendered,
 	}
@@ -175,44 +172,6 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov
 		}
 	}
 	return rendered, nil
-}
-
-func renderRTEConfig(namespace, name string, klConfig *kubeletconfigv1beta1.KubeletConfiguration, podExcludes map[string]string) (*corev1.ConfigMap, error) {
-	conf := rteconfig.Config{
-		Resources: sysinfo.Config{
-			ReservedCPUs:   klConfig.ReservedSystemCPUs,
-			ReservedMemory: findReservedMemoryFromKubelet(klConfig.ReservedMemory),
-		},
-		TopologyManagerPolicy: klConfig.TopologyManagerPolicy,
-		TopologyManagerScope:  klConfig.TopologyManagerScope,
-	}
-	if len(podExcludes) > 0 {
-		conf.PodExcludes = podExcludes
-	}
-	data, err := yaml.Marshal(conf)
-	if err != nil {
-		return nil, err
-	}
-	return rtemanifests.CreateConfigMap(namespace, name, string(data)), nil
-}
-
-func findReservedMemoryFromKubelet(klMemRes []kubeletconfigv1beta1.MemoryReservation) map[int]int64 {
-	res := make(map[int]int64)
-	for _, memRes := range klMemRes {
-		for resName, resQty := range memRes.Limits {
-			if resName != corev1.ResourceMemory {
-				// TODO we support only memory reservation atm
-				continue
-			}
-			v, ok := resQty.AsInt64()
-			if !ok {
-				// TODO log?
-				continue
-			}
-			res[int(memRes.NumaNode)] = v
-		}
-	}
-	return res
 }
 
 func podExcludesListToMap(podExcludes []nropv1.NamespacedName) map[string]string {

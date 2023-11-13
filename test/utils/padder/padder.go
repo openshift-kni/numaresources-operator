@@ -37,6 +37,7 @@ import (
 
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 
 	"github.com/openshift-kni/numaresources-operator/test/utils/fixture"
@@ -138,7 +139,7 @@ func (p *Padder) Pad(timeout time.Duration, options PaddingOptions) error {
 	// since there is a relation of 1 : 1 between nodes and NRTs we can filter by the nodes` name
 	nrts := filterNrtByNodeName(nrtList.Items, nodeList.Items)
 
-	singleNumaNrt := nrtutil.FilterByPolicies(nrts, []nrtv1alpha2.TopologyManagerPolicy{nrtv1alpha2.SingleNUMANodePodLevel, nrtv1alpha2.SingleNUMANodeContainerLevel})
+	singleNumaNrt := nrtutil.FilterByTopologyManagerPolicy(nrts, intnrt.SingleNUMANode)
 	if p.nNodes > len(singleNumaNrt) {
 		return fmt.Errorf("not enough nodes were found for padding. requested: %d, got: %d", p.nNodes, len(singleNumaNrt))
 	}

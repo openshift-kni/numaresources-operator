@@ -17,19 +17,12 @@
 package rte
 
 import (
-	"flag"
 	"fmt"
-	"math/rand"
-	"os"
 	"os/exec"
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/config"
 
 	"github.com/openshift-kni/numaresources-operator/test/utils/runtime"
 
@@ -42,19 +35,6 @@ var (
 
 	randomSeed int64
 )
-
-func TestMain(m *testing.M) {
-	config.CopyFlags(config.Flags, flag.CommandLine)
-	framework.RegisterCommonFlags(flag.CommandLine)
-	framework.RegisterClusterFlags(flag.CommandLine)
-	flag.Parse()
-
-	framework.AfterReadingAllFlags(&framework.TestContext)
-
-	randomSeed = time.Now().UnixNano()
-	rand.Seed(randomSeed)
-	os.Exit(m.Run())
-}
 
 func TestRTE(t *testing.T) {
 	RegisterFailHandler(Fail)

@@ -20,13 +20,15 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"strings"
+	"sort"
 	"time"
 
 	"k8s.io/klog/v2"
 
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8shelpers"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/sharedcpuspool"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/prometheus"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
@@ -35,9 +37,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/config"
-	"github.com/openshift-kni/numaresources-operator/rte/pkg/podrescompat"
-	"github.com/openshift-kni/numaresources-operator/rte/pkg/podresfilter"
-	"github.com/openshift-kni/numaresources-operator/rte/pkg/sysinfo"
 )
 
 const (
@@ -48,9 +47,8 @@ const (
 )
 
 type localArgs struct {
-	SysConf     sysinfo.Config
 	ConfigPath  string
-	PodExcludes map[string]string
+	PodExcludes podexclude.List
 }
 
 type ProgArgs struct {
@@ -59,7 +57,6 @@ type ProgArgs struct {
 	RTE             resourcetopologyexporter.Args
 	LocalArgs       localArgs
 	Version         bool
-	SysinfoOnly     bool
 	DumpConfig      bool
 }
 
@@ -85,30 +82,18 @@ func main() {
 		os.Exit(0)
 	}
 
-	sysInfo, err := sysinfo.NewSysinfo(parsedArgs.LocalArgs.SysConf)
+	k8scli, err := k8shelpers.GetK8sClient("")
 	if err != nil {
-		klog.Fatalf("failed to query system info: %w", err)
-	}
-	klog.Infof(`
-=== System information ===
-%s
-==========================`, sysInfo)
-
-	if parsedArgs.SysinfoOnly {
-		os.Exit(0)
+		klog.Fatalf("failed to get k8s client: %w", err)
 	}
 
-	k8sCli, err := podres.GetClient(parsedArgs.RTE.PodResourcesSocketPath)
+	cli, cleanup, err := podres.GetClient(parsedArgs.RTE.PodResourcesSocketPath)
 	if err != nil {
 		klog.Fatalf("failed to start prometheus server: %v", err)
 	}
+	defer cleanup()
 
-	sysCli := k8sCli
-	if !parsedArgs.LocalArgs.SysConf.IsEmpty() {
-		sysCli = podrescompat.NewSysinfoClientFromLister(k8sCli, parsedArgs.LocalArgs.SysConf)
-	}
-
-	cli := sharedcpuspool.NewFromLister(sysCli, parsedArgs.RTE.Debug, parsedArgs.RTE.ReferenceContainer)
+	cli = sharedcpuspool.NewFromLister(cli, parsedArgs.RTE.Debug, parsedArgs.RTE.ReferenceContainer)
 
 	err = prometheus.InitPrometheus(prometheus.ServingDisabled)
 	if err != nil {
@@ -116,8 +101,12 @@ func main() {
 	}
 
 	// TODO: recycled flag (no big deal, but still)
-	cli = podresfilter.NewFromLister(cli, parsedArgs.RTE.Debug, parsedArgs.LocalArgs.PodExcludes)
-	err = resourcetopologyexporter.Execute(cli, parsedArgs.NRTupdater, parsedArgs.Resourcemonitor, parsedArgs.RTE)
+	cli = podexclude.NewFromLister(cli, parsedArgs.RTE.Debug, parsedArgs.LocalArgs.PodExcludes)
+	hnd := resourcemonitor.Handle{
+		PodResCli: cli,
+		K8SCli:    k8scli,
+	}
+	err = resourcetopologyexporter.Execute(hnd, parsedArgs.NRTupdater, parsedArgs.Resourcemonitor, parsedArgs.RTE)
 	// must never execute; if it does, we want to know
 	klog.Fatalf("failed to execute: %v", err)
 }
@@ -125,10 +114,6 @@ func main() {
 // The args is passed only for testing purposes.
 func parseArgs(args ...string) (ProgArgs, error) {
 	pArgs := ProgArgs{}
-
-	var sysReservedCPUs string
-	var sysReservedMemory string
-	var sysResourceMapping string
 
 	flags := flag.NewFlagSet(version.ProgramName(), flag.ExitOnError)
 
@@ -156,7 +141,6 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.StringVar(&pArgs.RTE.PodResourcesSocketPath, "podresources-socket", "unix:///podresources/kubelet.sock", "Pod Resource Socket path to use.")
 	flags.BoolVar(&pArgs.RTE.PodReadinessEnable, "podreadiness", true, "Custom condition injection using Podreadiness.")
 
-	kubeletStateDirs := flags.String("kubelet-state-dir", "", "Kubelet state directory (RO access needed), for smart polling.")
 	refCnt := flags.String("reference-container", "", "Reference container, used to learn about the shared cpu pool\n See: https://github.com/kubernetes/kubernetes/issues/102190\n format of spec is namespace/podname/containername.\n Alternatively, you can use the env vars REFERENCE_NAMESPACE, REFERENCE_POD_NAME, REFERENCE_CONTAINER_NAME.")
 
 	flags.StringVar(&pArgs.RTE.NotifyFilePath, "notify-file", "", "Notification file path.")
@@ -166,10 +150,6 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.Int64Var(&pArgs.RTE.MaxEventsPerTimeUnit, "max-events-per-second", 1, "Max times per second resources will be scanned and updated")
 	pArgs.RTE.TimeUnitToLimitEvents = time.Second
 
-	flags.StringVar(&sysReservedCPUs, "system-info-reserved-cpus", "", "kubelet reserved CPUs (cpuset format: 0,1 or 0,1-3 ...)")
-	flags.StringVar(&sysReservedMemory, "system-info-reserved-memory", "", "kubelet reserved memory: comma-separated 'numaID=amount' (example: '0=16Gi,1=8192Mi,3=1Gi')")
-	flags.StringVar(&sysResourceMapping, "system-info-resource-mapping", "", "kubelet resource mapping: comma-separated 'vendor:device=resourcename'")
-	flags.BoolVar(&pArgs.SysinfoOnly, "system-info", false, "Output detected system info and exit")
 	flags.BoolVar(&pArgs.DumpConfig, "dump-config", false, "Output the configuration settings and exit - the output format is JSON, subjected to change without notice.")
 	flags.BoolVar(&pArgs.Version, "version", false, "Output version and exit")
 
@@ -179,11 +159,6 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	}
 
 	if pArgs.Version {
-		return pArgs, err
-	}
-
-	pArgs.RTE.KubeletStateDirs, err = setKubeletStateDirs(*kubeletStateDirs)
-	if err != nil {
 		return pArgs, err
 	}
 
@@ -203,21 +178,8 @@ func parseArgs(args ...string) (ProgArgs, error) {
 		pArgs.Resourcemonitor.ResourceExclude = conf.ExcludeList
 		klog.V(2).Infof("using exclude list:\n%s", pArgs.Resourcemonitor.ResourceExclude.String())
 	}
-	pArgs.LocalArgs.SysConf = conf.Resources
-	pArgs.LocalArgs.PodExcludes = conf.PodExcludes
 
-	// override from the command line
-	if sysReservedCPUs != "" {
-		pArgs.LocalArgs.SysConf.ReservedCPUs = sysReservedCPUs
-	}
-	if rmap := sysinfo.ResourceMappingFromString(sysResourceMapping); len(rmap) > 0 {
-		pArgs.LocalArgs.SysConf.ResourceMapping = rmap
-	}
-	if rmap := sysinfo.ReservedMemoryFromString(sysReservedMemory); len(rmap) > 0 {
-		pArgs.LocalArgs.SysConf.ReservedMemory = rmap
-	}
-
-	klog.Infof("using sysinfo:\n%s", pArgs.LocalArgs.SysConf.ToYAMLString())
+	pArgs.LocalArgs.PodExcludes = makePodExcludeList(conf.PodExcludes)
 
 	err = setupTopologyManagerConfig(&pArgs, conf)
 	if err != nil {
@@ -225,6 +187,24 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	}
 
 	return pArgs, nil
+}
+
+func makePodExcludeList(excludes map[string]string) podexclude.List {
+	keys := []string{}
+	for key := range excludes {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	exList := podexclude.List{}
+	for _, key := range keys {
+		val := excludes[key]
+		exList = append(exList, podexclude.Item{
+			NamespacePattern: key,
+			NamePattern:      val,
+		})
+	}
+	return exList
 }
 
 func defaultHostName() string {
@@ -311,10 +291,6 @@ func setupTopologyManagerConfig(pArgs *ProgArgs, conf config.Config) error {
 		return fmt.Errorf("incomplete Topology Manager configuration")
 	}
 	return nil
-}
-
-func setKubeletStateDirs(value string) ([]string, error) {
-	return append([]string{}, strings.Split(value, " ")...), nil
 }
 
 func setContainerIdent(value string) (*sharedcpuspool.ContainerIdent, error) {
