@@ -160,7 +160,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
 
 			// Ensure mcp1 is ready
-			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).ToNot(HaveOccurred())
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
 			mcp1.Status.Configuration.Source = []corev1.ObjectReference{
 				{
 					Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
@@ -172,10 +172,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Status: corev1.ConditionTrue,
 				},
 			}
-			Expect(reconciler.Client.Status().Update(context.TODO(), mcp1))
+			Expect(reconciler.Client.Update(context.TODO(), mcp1)).To(Succeed())
 
 			// ensure mcp2 is ready
-			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).ToNot(HaveOccurred())
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
 			mcp2.Status.Configuration.Source = []corev1.ObjectReference{
 				{
 					Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
@@ -187,7 +187,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Status: corev1.ConditionTrue,
 				},
 			}
-			Expect(reconciler.Client.Status().Update(context.TODO(), mcp2))
+			Expect(reconciler.Client.Update(context.TODO(), mcp2)).To(Succeed())
 
 			secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
@@ -205,7 +205,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
 				Namespace: testNamespace,
 			}
-			Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).ToNot(HaveOccurred())
+			Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).To(Succeed())
 		})
 		When("a NodeGroup is deleted", func() {
 			BeforeEach(func() {
@@ -401,7 +401,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								Status: corev1.ConditionTrue,
 							},
 						}
-						Expect(reconciler.Client.Status().Update(context.TODO(), mcp1))
+						Expect(reconciler.Client.Update(context.TODO(), mcp1))
 
 						// ensure mcp2 is ready
 						Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).ToNot(HaveOccurred())
@@ -416,7 +416,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								Status: corev1.ConditionTrue,
 							},
 						}
-						Expect(reconciler.Client.Status().Update(context.TODO(), mcp2))
+						Expect(reconciler.Client.Update(context.TODO(), mcp2))
 
 						key := client.ObjectKeyFromObject(nro)
 						secondLoopResult, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
@@ -850,7 +850,7 @@ func reconcileObjects(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.Ma
 			Status: corev1.ConditionTrue,
 		},
 	}
-	ExpectWithOffset(1, reconciler.Client.Status().Update(context.TODO(), mcp))
+	ExpectWithOffset(1, reconciler.Client.Update(context.TODO(), mcp)).Should(Succeed())
 
 	var secondLoopResult reconcile.Result
 	secondLoopResult, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
