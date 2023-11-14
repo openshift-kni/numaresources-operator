@@ -52,7 +52,7 @@ import (
 const testSchedulerName = "testSchedulerName"
 
 func NewFakeNUMAResourcesSchedulerReconciler(initObjects ...runtime.Object) (*NUMAResourcesSchedulerReconciler, error) {
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(initObjects...).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithStatusSubresource(&nropv1.NUMAResourcesScheduler{}).WithRuntimeObjects(initObjects...).Build()
 	schedMf, err := schedmanifests.GetManifests(testNamespace)
 	if err != nil {
 		return nil, err
