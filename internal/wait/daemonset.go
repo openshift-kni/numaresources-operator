@@ -81,3 +81,30 @@ func (wt Waiter) ForDaemonsetPodsCreation(ctx context.Context, ds *appsv1.Daemon
 	})
 	return updatedDs, err
 }
+
+func (wt Waiter) ForDaemonSetUpdateByKey(ctx context.Context, key ObjectKey) (*appsv1.DaemonSet, error) {
+	updatedDs := &appsv1.DaemonSet{}
+
+	immediate := true
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
+		err := wt.Cli.Get(aContext, key.AsKey(), updatedDs)
+		if err != nil {
+			klog.Warningf("failed to get the daemonset %s: %v", key.String(), err)
+			return false, err
+		}
+
+		if AreDaemonSetPodsReady(&updatedDs.Status) {
+			klog.Warningf("daemonset %s desired %d scheduled %d ready %d up-to-date %d",
+				key.String(),
+				updatedDs.Status.DesiredNumberScheduled,
+				updatedDs.Status.CurrentNumberScheduled,
+				updatedDs.Status.NumberReady,
+				updatedDs.Status.UpdatedNumberScheduled)
+			return false, nil
+		}
+
+		klog.Infof("daemonset %s has started updating", key.String())
+		return true, nil
+	})
+	return updatedDs, err
+}
