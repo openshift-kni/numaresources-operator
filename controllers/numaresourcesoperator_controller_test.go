@@ -56,7 +56,7 @@ import (
 
 const (
 	testImageSpec     = "quay.io/openshift-kni/numaresources-operator:ci-test"
-	defaultOCPVersion = "v4.11"
+	defaultOCPVersion = "v4.14"
 )
 
 func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion platform.Version, initObjects ...runtime.Object) (*NUMAResourcesOperatorReconciler, error) {

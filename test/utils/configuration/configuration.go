@@ -39,7 +39,7 @@ const (
 const (
 	defaultMCPUpdateTimeout  = 30 * time.Minute
 	defaultMCPUpdateInterval = 30 * time.Second
-	defaultOCPVersion        = "v4.11"
+	defaultOCPVersion        = "v4.14"
 )
 
 var (
