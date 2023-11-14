@@ -375,8 +375,8 @@ func makeIgnitionConfig(ver platform.Version, withCRIHooks bool) ([]byte, error)
 		Systemd: igntypes.Systemd{
 			Units: []igntypes.Unit{
 				{
-					Contents: pointer.StringPtr(string(systemdServiceContent)),
-					Enabled:  pointer.BoolPtr(true),
+					Contents: pointer.String(string(systemdServiceContent)),
+					Enabled:  pointer.Bool(true),
 					Name:     selinuxassets.RTEPolicyInstallServiceName,
 				},
 			},
@@ -394,9 +394,9 @@ func addFileToIgnitionConfig(files []igntypes.File, fileContent []byte, mode int
 		},
 		FileEmbedded1: igntypes.FileEmbedded1{
 			Contents: igntypes.Resource{
-				Source: pointer.StringPtr(fmt.Sprintf("%s,%s", defaultIgnitionContentSource, base64FileContent)),
+				Source: pointer.String(fmt.Sprintf("%s,%s", defaultIgnitionContentSource, base64FileContent)),
 			},
-			Mode: pointer.IntPtr(mode),
+			Mode: pointer.Int(mode),
 		},
 	})
 

@@ -72,7 +72,6 @@ func ContainerConfig(podSpec *corev1.PodSpec, cnt *corev1.Container, configMapNa
 func DaemonSet(ds *appsv1.DaemonSet, plat platform.Platform, configMapName string, opts objectupdate.DaemonSetOptions) {
 	podSpec := &ds.Spec.Template.Spec
 	if cntSpec := objectupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, manifests.ContainerNameRTE); cntSpec != nil {
-
 		cntSpec.Image = images.ResourceTopologyExporterImage
 
 		cntSpec.ImagePullPolicy = corev1.PullAlways
