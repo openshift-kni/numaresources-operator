@@ -119,11 +119,12 @@ func Teardown(ft *Fixture) error {
 
 func Skip(ft *Fixture, message string) {
 	ft.Skipped = true
-	ginkgo.Skip(message)
+	ginkgo.Skip(message, 1)
 }
 
 func Skipf(ft *Fixture, format string, args ...interface{}) {
-	Skip(ft, fmt.Sprintf(format, args...))
+	ft.Skipped = true
+	ginkgo.Skip(fmt.Sprintf(format, args...), 1)
 }
 
 func Cooldown(ft *Fixture) {
