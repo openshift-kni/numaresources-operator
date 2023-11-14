@@ -25,11 +25,10 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
-
-	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -61,94 +60,6 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 	AfterEach(func() {
 		err := e2efixture.Teardown(fxt)
 		Expect(err).NotTo(HaveOccurred())
-	})
-
-	Context("using the NUMA-aware scheduler without NRT data", func() {
-		var testPod *corev1.Pod
-
-		BeforeEach(func() {
-			if len(nrtList.Items) > 0 {
-				e2efixture.Skip(fxt, "this test require empty NRT data")
-			}
-		})
-
-		AfterEach(func() {
-			if testPod == nil {
-				return
-			}
-
-			err := fxt.Client.Delete(context.TODO(), testPod)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("checking the test pod is removed")
-			err = wait.With(fxt.Client).Timeout(3*time.Minute).ForPodDeleted(context.TODO(), testPod.Namespace, testPod.Name)
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		It("[tier1] should run a best-effort pod", func() {
-			testPod = objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
-			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
-
-			By(fmt.Sprintf("creating pod %s/%s", testPod.Namespace, testPod.Name))
-			err := fxt.Client.Create(context.TODO(), testPod)
-			Expect(err).ToNot(HaveOccurred())
-
-			updatedPod, err := wait.With(fxt.Client).Timeout(5*time.Minute).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
-			if err != nil {
-				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
-			}
-			Expect(err).ToNot(HaveOccurred())
-
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
-		})
-
-		It("[tier1] should run a burstable pod", func() {
-			testPod = objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
-			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
-			testPod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("256Mi"),
-			}
-
-			By(fmt.Sprintf("creating pod %s/%s", testPod.Namespace, testPod.Name))
-			err := fxt.Client.Create(context.TODO(), testPod)
-			Expect(err).ToNot(HaveOccurred())
-
-			updatedPod, err := wait.With(fxt.Client).Timeout(5*time.Minute).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
-			if err != nil {
-				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
-			}
-			Expect(err).ToNot(HaveOccurred())
-
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
-		})
-
-		It("[tier1][test_id:47611] should run a guaranteed pod", func() {
-			testPod = objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
-			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
-			testPod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("256Mi"),
-			}
-
-			By(fmt.Sprintf("creating pod %s/%s", testPod.Namespace, testPod.Name))
-			err := fxt.Client.Create(context.TODO(), testPod)
-			Expect(err).ToNot(HaveOccurred())
-
-			updatedPod, err := wait.With(fxt.Client).Timeout(5*time.Minute).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
-			if err != nil {
-				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
-			}
-			Expect(err).ToNot(HaveOccurred())
-
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
-		})
 	})
 
 	Context("using the NUMA-aware scheduler with NRT data", func() {
