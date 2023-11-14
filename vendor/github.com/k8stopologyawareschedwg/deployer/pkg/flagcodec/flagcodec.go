@@ -16,7 +16,7 @@
 
 // flagcodec allows to manipulate foreign command lines following the
 // standard golang conventions. It offeres two-way processing aka
-// parsing/marshalling of flags. It is different from the other, well
+// parsing/marshaling of flags. It is different from the other, well
 // established packages (pflag...) because it aims to manipulate command
 // lines in general, not this program command line.
 
@@ -49,7 +49,7 @@ func ParseArgvKeyValue(args []string) *Flags {
 
 // ParseArgvKeyValue parses a clean (trimmed) argv whose components are
 // either toggles or key=value pairs. IOW, this is a restricted and easier
-// to parse flavour of argv on which option and value are guaranteed to
+// to parse flavor of argv on which option and value are guaranteed to
 // be in the same item.
 // IOW, we expect
 // "--opt=foo"

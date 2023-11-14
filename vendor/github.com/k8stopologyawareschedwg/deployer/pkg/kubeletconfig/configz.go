@@ -30,12 +30,16 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 )
 
-func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger logr.Logger) (map[string]*kubeletconfigv1beta1.KubeletConfiguration, error) {
+func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger logr.Logger) (k8sconf map[string]*kubeletconfigv1beta1.KubeletConfiguration, err error) {
 	cmd := kc.Command("proxy", "-p", "0")
-	stdout, stderr, err := StartWithStreamOutput(cmd)
+	var stdout, stderr io.ReadCloser
+	stdout, stderr, err = StartWithStreamOutput(cmd)
+	if err != nil {
+		return nil, err
+	}
 	defer stdout.Close()
 	defer stderr.Close()
-	defer cmd.Process.Kill()
+	defer func() { err = cmd.Process.Kill() }()
 
 	port, err := FindProxyPort(stdout)
 	if err != nil {
@@ -48,7 +52,7 @@ func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger logr.Logge
 	}
 	client := &http.Client{Transport: tr}
 
-	kubeletConfs := make(map[string]*kubeletconfigv1beta1.KubeletConfiguration)
+	k8sconf = make(map[string]*kubeletconfigv1beta1.KubeletConfiguration)
 	for _, nodeName := range nodeNames {
 		endpoint := fmt.Sprintf("http://127.0.0.1:%d/api/v1/nodes/%s/proxy/configz", port, nodeName)
 
@@ -64,6 +68,7 @@ func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger logr.Logge
 			logger.Info("request creation failed - skipped", "endpoint", endpoint, "error", err)
 			continue
 		}
+		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			logger.Info("unexpected response status code - skipped", "endpoint", endpoint, "statusCode", resp.StatusCode)
 			continue
@@ -75,9 +80,9 @@ func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger logr.Logge
 			continue
 		}
 
-		kubeletConfs[nodeName] = conf
+		k8sconf[nodeName] = conf
 	}
-	return kubeletConfs, nil
+	return k8sconf, nil
 }
 
 func FindProxyPort(r io.Reader) (int, error) {
