@@ -17,9 +17,12 @@
 package objects
 
 import (
+	"context"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func NewTestDeployment(replicas int32, podLabels map[string]string, nodeSelector map[string]string, namespace, name, image string, command, args []string) *appsv1.Deployment {
@@ -65,4 +68,19 @@ func NewTestDeploymentWithPodSpec(replicas int32, podLabels map[string]string, n
 		dp.Spec.Template.Spec.NodeSelector = nodeSelector
 	}
 	return dp
+}
+
+func GetDeploymentOwnedBy(cli client.Client, objMeta metav1.ObjectMeta) ([]*appsv1.Deployment, error) {
+	dpList := &appsv1.DeploymentList{}
+	if err := cli.List(context.TODO(), dpList); err != nil {
+		return nil, err
+	}
+
+	var dps []*appsv1.Deployment
+	for i := range dpList.Items {
+		if IsOwnedBy(dpList.Items[i].ObjectMeta, objMeta) {
+			dps = append(dps, &dpList.Items[i])
+		}
+	}
+	return dps, nil
 }

@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,10 +42,12 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 
+	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
+	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
@@ -683,8 +687,83 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			}
 			Expect(err).ToNot(HaveOccurred(), "failed to check the NodeGroupConfig status for %q", nroKey.String())
 		})
+
+		It("should report relatedObjects in the status", func(ctx context.Context) {
+			By("getting NROP object")
+			nroKey := objects.NROObjectKey()
+			nroOperObj := nropv1.NUMAResourcesOperator{}
+
+			err := fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
+
+			if len(nroOperObj.Spec.NodeGroups) != 1 {
+				// TODO: this is the simplest case, there is no hard requirement really
+				// but we took the simplest option atm
+				e2efixture.Skipf(fxt, "more than one NodeGroup not yet supported, found %d", len(nroOperObj.Spec.NodeGroups))
+			}
+
+			By("checking the DSs owned by NROP")
+			dss, err := objects.GetDaemonSetsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
+			Expect(err).ToNot(HaveOccurred())
+
+			dssExpected := namespacedNameListToStringList(nroOperObj.Status.DaemonSets)
+			dssGot := namespacedNameListToStringList(daemonSetListToNamespacedNameList(dss))
+			Expect(dssGot).To(Equal(dssExpected), "mismatching RTE DaemonSets for NUMAResourcesOperator")
+
+			By("checking the relatedObjects for NROP")
+			// shortcut, they all must be here anyway
+			nroExpected := objRefListToStringList(relatedobjects.ResourceTopologyExporter(dss[0].Namespace, nroOperObj.Status.DaemonSets))
+			nroGot := objRefListToStringList(nroOperObj.Status.RelatedObjects)
+			Expect(nroGot).To(Equal(nroExpected), "mismatching related objects for NUMAResourcesOperator")
+
+			By("getting NROSched object")
+			nroSchedKey := objects.NROSchedObjectKey()
+			nroSchedObj := nropv1.NUMAResourcesScheduler{}
+
+			err = fxt.Client.Get(context.TODO(), nroSchedKey, &nroSchedObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
+
+			By("checking the DP owned by NROSched")
+			dps, err := objects.GetDeploymentOwnedBy(fxt.Client, nroSchedObj.ObjectMeta)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(dps)).To(Equal(1), "unexpected amount of scheduler deployments: %d", len(dps))
+
+			By("checking the relatedObjects for NROSched")
+			nrsExpected := objRefListToStringList(relatedobjects.Scheduler(dps[0].Namespace, nroSchedObj.Status.Deployment))
+			nrsGot := objRefListToStringList(nroSchedObj.Status.RelatedObjects)
+			Expect(nrsGot).To(Equal(nrsExpected), "mismatching related objects for NUMAResourcesScheduler")
+		})
 	})
 })
+
+func daemonSetListToNamespacedNameList(dss []*appsv1.DaemonSet) []nropv1.NamespacedName {
+	ret := make([]nropv1.NamespacedName, 0, len(dss))
+	for _, ds := range dss {
+		ret = append(ret, nropv1.NamespacedName{
+			Namespace: ds.Namespace,
+			Name:      ds.Name,
+		})
+	}
+	return ret
+}
+
+func namespacedNameListToStringList(nnames []nropv1.NamespacedName) []string {
+	ret := make([]string, 0, len(nnames))
+	for _, nname := range nnames {
+		ret = append(ret, nname.String())
+	}
+	sort.Strings(ret)
+	return ret
+}
+
+func objRefListToStringList(objRefs []configv1.ObjectReference) []string {
+	ret := make([]string, 0, len(objRefs))
+	for _, objRef := range objRefs {
+		ret = append(ret, fmt.Sprintf("%s/%s/%s/%s", objRef.Group, objRef.Resource, objRef.Namespace, objRef.Name))
+	}
+	sort.Strings(ret)
+	return ret
+}
 
 // each KubeletConfig has a field for TopologyManagerScope
 // since we don't care about the value itself, and we just want to trigger a machine-config change, we just pick some random value.
