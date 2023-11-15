@@ -25,7 +25,6 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	configv1 "github.com/openshift/api/config/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
@@ -53,6 +52,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
@@ -233,7 +233,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 
 	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, instance, daemonSetsInfo)
 	instance.Status.DaemonSets = dsStatuses
-	instance.Status.RelatedObjects = r.getRelatedObjects(dsStatuses)
+	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dsStatuses)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, err
 	}
@@ -588,41 +588,6 @@ func (r *NUMAResourcesOperatorReconciler) mcpToNUMAResourceOperator(mcpObj clien
 	}
 
 	return requests
-}
-
-func (r *NUMAResourcesOperatorReconciler) getRelatedObjects(dsStatuses []nropv1.NamespacedName) []configv1.ObjectReference {
-	// 'Resource' should be in lowercase and plural
-	// See BZ1851214
-	// See https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-subdomain-names
-	ret := []configv1.ObjectReference{
-		{
-			Resource: "namespaces",
-			Name:     r.Namespace,
-		},
-		{
-			Group:    "machineconfiguration.openshift.io",
-			Resource: "kubeletconfigs",
-		},
-		{
-			Group:    "machineconfiguration.openshift.io",
-			Resource: "machineconfigs",
-		},
-		{
-			Group:    "topology.node.k8s.io",
-			Resource: "noderesourcetopologies",
-		},
-	}
-
-	for _, dsStatus := range dsStatuses {
-		ret = append(ret, configv1.ObjectReference{
-			Group:     "apps",
-			Resource:  "daemonsets",
-			Namespace: dsStatus.Namespace,
-			Name:      dsStatus.Name,
-		})
-	}
-
-	return ret
 }
 
 func validateUpdateEvent(e *event.UpdateEvent) bool {
