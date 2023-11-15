@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package rte
+package local
 
 import (
 	"encoding/json"
@@ -28,6 +28,8 @@ import (
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter"
+
+	"github.com/openshift-kni/numaresources-operator/test/utils/runtime"
 )
 
 type ProgArgs struct {
@@ -36,7 +38,20 @@ type ProgArgs struct {
 	RTE             resourcetopologyexporter.Args
 }
 
+var binaryPath string
+
 var _ = Describe("[rte][local][config] RTE configuration", func() {
+
+	BeforeEach(func() {
+		By("Finding the binaries path")
+
+		binPath, err := runtime.FindBinaryPath("exporter")
+		Expect(err).ToNot(HaveOccurred())
+		binaryPath = binPath
+
+		By(fmt.Sprintf("Using the binary at %q", binaryPath))
+	})
+
 	Context("with the binary available", func() {
 		It("should have any default for TM params", func() {
 			args := runConfig([]string{}, map[string]string{})
@@ -80,7 +95,7 @@ var _ = Describe("[rte][local][config] RTE configuration", func() {
 
 func runConfig(argv []string, env map[string]string) ProgArgs {
 	cmdline := []string{
-		BinaryPath,
+		binaryPath,
 		"--dump-config",
 	}
 	cmdline = append(cmdline, argv...)
@@ -111,4 +126,16 @@ func flattenEnv(env map[string]string) []string {
 		ret = append(ret, strings.TrimSpace(key)+"="+strings.TrimSpace(value))
 	}
 	return ret
+}
+
+func expectExecutableExists(path string) {
+	cmdline := []string{
+		path,
+		"-h",
+	}
+
+	cmd := exec.Command(cmdline[0], cmdline[1:]...)
+	out, err := cmd.CombinedOutput()
+	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+	ExpectWithOffset(1, out).ToNot(BeEmpty())
 }
