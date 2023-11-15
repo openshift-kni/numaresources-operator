@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Red Hat, Inc.
+ * Copyright 2023 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,29 +14,16 @@
  * limitations under the License.
  */
 
-package rte
+package local
 
 import (
-	"fmt"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte"
-	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater"
-	_ "github.com/openshift-kni/numaresources-operator/test/e2e/rte/local"
 )
 
-var (
-	randomSeed int64
-)
-
-func TestRTE(t *testing.T) {
+func TestLocal(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "RTE Test Suite")
+	RunSpecs(t, "RTE Local Test Suite")
 }
-
-var _ = BeforeSuite(func() {
-	By(fmt.Sprintf("Using random seed %v", randomSeed))
-})
