@@ -190,8 +190,9 @@ func setupNamespace(cli client.Client, baseName string, randomize bool) (corev1.
 
 	// again we do like the k8s e2e framework does and we try to be robust
 	var updatedNs corev1.Namespace
-	err = wait.PollImmediate(1*time.Second, 30*time.Second, func() (bool, error) {
-		err := cli.Get(context.TODO(), client.ObjectKeyFromObject(ns), &updatedNs)
+	immediate := true
+	err = wait.PollUntilContextTimeout(context.Background(), 1*time.Second, 30*time.Second, immediate, func(ctx context.Context) (bool, error) {
+		err := cli.Get(ctx, client.ObjectKeyFromObject(ns), &updatedNs)
 		if err != nil {
 			return false, err
 		}
@@ -210,9 +211,10 @@ func teardownNamespace(cli client.Client, ns corev1.Namespace) error {
 
 	iterations := 0
 	updatedNs := corev1.Namespace{}
-	return wait.PollImmediate(1*time.Second, teardownTime, func() (bool, error) {
+	immediate := true
+	return wait.PollUntilContextTimeout(context.Background(), 1*time.Second, teardownTime, immediate, func(ctx context.Context) (bool, error) {
 		iterations++
-		err := cli.Get(context.TODO(), client.ObjectKeyFromObject(&ns), &updatedNs)
+		err := cli.Get(ctx, client.ObjectKeyFromObject(&ns), &updatedNs)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				return true, nil
