@@ -642,11 +642,12 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			}
 
 			seenStatusConf := false
-			err = k8swait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
+			immediate := true
+			err = k8swait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, immediate, func(ctx context.Context) (bool, error) {
 				klog.Infof("getting: %q", nroKey.String())
 
 				// getting the same object twice is awkward, but still it seems better better than skipping inside a loop.
-				err := fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
+				err := fxt.Client.Get(ctx, nroKey, &nroOperObj)
 				if err != nil {
 					return false, fmt.Errorf("cannot get %q in the cluster: %w", nroKey.String(), err)
 				}

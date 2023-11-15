@@ -26,20 +26,22 @@ import (
 )
 
 func (wt Waiter) ForNUMAResourcesOperatorDeleted(ctx context.Context, nrop *nropv1.NUMAResourcesOperator) error {
-	err := k8swait.Poll(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+	immediate := false
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
 		updatedNrop := nropv1.NUMAResourcesOperator{}
 		key := ObjectKeyFromObject(nrop)
-		err := wt.Cli.Get(ctx, key.AsKey(), &updatedNrop)
+		err := wt.Cli.Get(aContext, key.AsKey(), &updatedNrop)
 		return deletionStatusFromError("NUMAResourcesOperator", key, err)
 	})
 	return err
 }
 
 func (wt Waiter) ForNUMAResourcesSchedulerDeleted(ctx context.Context, nrSched *nropv1.NUMAResourcesScheduler) error {
-	err := k8swait.Poll(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+	immediate := false
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
 		updatedNROSched := nropv1.NUMAResourcesScheduler{}
 		key := ObjectKeyFromObject(nrSched)
-		err := wt.Cli.Get(ctx, key.AsKey(), &updatedNROSched)
+		err := wt.Cli.Get(aContext, key.AsKey(), &updatedNROSched)
 		return deletionStatusFromError("NUMAResourcesScheduler", key, err)
 	})
 	return err
@@ -47,9 +49,10 @@ func (wt Waiter) ForNUMAResourcesSchedulerDeleted(ctx context.Context, nrSched *
 
 func (wt Waiter) ForDaemonsetInNUMAResourcesOperatorStatus(ctx context.Context, nroObj *nropv1.NUMAResourcesOperator) (*nropv1.NUMAResourcesOperator, error) {
 	updatedNRO := nropv1.NUMAResourcesOperator{}
-	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+	immediate := true
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
 		key := ObjectKeyFromObject(nroObj)
-		err := wt.Cli.Get(ctx, key.AsKey(), &updatedNRO)
+		err := wt.Cli.Get(aContext, key.AsKey(), &updatedNRO)
 		if err != nil {
 			klog.Warningf("failed to get the NUMAResourcesOperator %s: %v", key.String(), err)
 			return false, err

@@ -70,8 +70,9 @@ var _ = Describe("[Install] continuousIntegration", func() {
 
 			By("checking that the condition Available=true")
 			updatedNROObj := &nropv1.NUMAResourcesOperator{}
-			err := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
-				err := e2eclient.Client.Get(context.TODO(), nname, updatedNROObj)
+			immediate := true
+			err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, immediate, func(ctx context.Context) (bool, error) {
+				err := e2eclient.Client.Get(ctx, nname, updatedNROObj)
 				if err != nil {
 					klog.Warningf("failed to get the NRO resource: %v", err)
 					return false, err
@@ -192,8 +193,9 @@ var _ = Describe("[Install] durability", func() {
 			Expect(nroKey.Name).NotTo(BeEmpty())
 
 			nroObj := &nropv1.NUMAResourcesOperator{}
-			err := wait.PollImmediate(10*time.Second, 5*time.Minute, func() (bool, error) {
-				err := e2eclient.Client.Get(context.TODO(), nroKey, nroObj)
+			immediate := true
+			err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, immediate, func(ctx context.Context) (bool, error) {
+				err := e2eclient.Client.Get(ctx, nroKey, nroObj)
 				if err != nil {
 					return false, err
 				}

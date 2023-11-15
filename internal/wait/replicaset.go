@@ -27,8 +27,9 @@ import (
 func (wt Waiter) ForReplicasetComplete(ctx context.Context, rs *appsv1.ReplicaSet) (*appsv1.ReplicaSet, error) {
 	key := ObjectKeyFromObject(rs)
 	updatedRs := &appsv1.ReplicaSet{}
-	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
-		err := wt.Cli.Get(ctx, key.AsKey(), updatedRs)
+	immediate := true
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
+		err := wt.Cli.Get(aContext, key.AsKey(), updatedRs)
 		if err != nil {
 			klog.Warningf("failed to get the replicaset %s: %v", key.String(), err)
 			return false, err
