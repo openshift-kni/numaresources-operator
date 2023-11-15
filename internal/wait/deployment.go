@@ -31,8 +31,9 @@ func (wt Waiter) ForDeploymentComplete(ctx context.Context, dp *appsv1.Deploymen
 	// additional checks as the context requires
 	key := ObjectKeyFromObject(dp)
 	updatedDp := &appsv1.Deployment{}
-	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
-		err := wt.Cli.Get(ctx, key.AsKey(), updatedDp)
+	immediate := true
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
+		err := wt.Cli.Get(aContext, key.AsKey(), updatedDp)
 		if err != nil {
 			klog.Warningf("failed to get the deployment %s: %v", key.String(), err)
 			return false, err
@@ -63,8 +64,9 @@ func IsDeploymentComplete(dp *appsv1.Deployment, newStatus *appsv1.DeploymentSta
 func (wt Waiter) ForDeploymentReplicasCreation(ctx context.Context, dp *appsv1.Deployment, expectedReplicas int32) (*appsv1.Deployment, error) {
 	key := ObjectKeyFromObject(dp)
 	updatedDp := &appsv1.Deployment{}
-	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
-		err := wt.Cli.Get(ctx, key.AsKey(), updatedDp)
+	immediate := true
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
+		err := wt.Cli.Get(aContext, key.AsKey(), updatedDp)
 		if err != nil {
 			klog.Warningf("failed to get the deployment %s: %v", key.String(), err)
 			return false, err

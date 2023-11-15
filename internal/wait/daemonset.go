@@ -26,8 +26,10 @@ import (
 
 func (wt Waiter) ForDaemonSetReadyByKey(ctx context.Context, key ObjectKey) (*appsv1.DaemonSet, error) {
 	updatedDs := &appsv1.DaemonSet{}
-	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
-		err := wt.Cli.Get(ctx, key.AsKey(), updatedDs)
+
+	immediate := true
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
+		err := wt.Cli.Get(aContext, key.AsKey(), updatedDs)
 		if err != nil {
 			klog.Warningf("failed to get the daemonset %s: %v", key.String(), err)
 			return false, err
@@ -60,8 +62,9 @@ func AreDaemonSetPodsReady(newStatus *appsv1.DaemonSetStatus) bool {
 func (wt Waiter) ForDaemonsetPodsCreation(ctx context.Context, ds *appsv1.DaemonSet, expectedPods int) (*appsv1.DaemonSet, error) {
 	key := ObjectKeyFromObject(ds)
 	updatedDs := &appsv1.DaemonSet{}
-	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
-		err := wt.Cli.Get(ctx, key.AsKey(), updatedDs)
+	immediate := true
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
+		err := wt.Cli.Get(aContext, key.AsKey(), updatedDs)
 		if err != nil {
 			klog.Warningf("failed to get the daemonset %s: %v", key.String(), err)
 			return false, err
