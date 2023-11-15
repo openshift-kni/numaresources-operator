@@ -101,10 +101,10 @@ func (wt *Waiter) Interval(iv time.Duration) *Waiter {
 func (wt Waiter) ForNamespaceDeleted(ctx context.Context, namespace string) error {
 	log := wt.Log.WithValues("namespace", namespace)
 	log.Info("wait for the namespace to be gone")
-	return k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+	return k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, true, func(fctx context.Context) (bool, error) {
 		nsKey := ObjectKey{Name: namespace}
 		ns := corev1.Namespace{} // unused
-		err := wt.Cli.Get(ctx, nsKey.AsKey(), &ns)
+		err := wt.Cli.Get(fctx, nsKey.AsKey(), &ns)
 		return deletionStatusFromError(wt.Log, "Namespace", nsKey, err)
 	})
 }

@@ -49,7 +49,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
@@ -537,13 +536,13 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 		Owns(&rbacv1.Role{}, builder.WithPredicates(p)).
 		Owns(&appsv1.DaemonSet{}, builder.WithPredicates(p)).
 		Watches(
-			&source.Kind{Type: &machineconfigv1.MachineConfigPool{}},
+			&machineconfigv1.MachineConfigPool{},
 			handler.EnqueueRequestsFromMapFunc(r.mcpToNUMAResourceOperator),
 			builder.WithPredicates(mcpPredicates)).
 		Complete(r)
 }
 
-func (r *NUMAResourcesOperatorReconciler) mcpToNUMAResourceOperator(mcpObj client.Object) []reconcile.Request {
+func (r *NUMAResourcesOperatorReconciler) mcpToNUMAResourceOperator(ctx context.Context, mcpObj client.Object) []reconcile.Request {
 	mcp := &machineconfigv1.MachineConfigPool{}
 
 	key := client.ObjectKey{
@@ -551,13 +550,13 @@ func (r *NUMAResourcesOperatorReconciler) mcpToNUMAResourceOperator(mcpObj clien
 		Name:      mcpObj.GetName(),
 	}
 
-	if err := r.Get(context.TODO(), key, mcp); err != nil {
+	if err := r.Get(ctx, key, mcp); err != nil {
 		klog.Errorf("failed to get the machine config pool %+v", key)
 		return nil
 	}
 
 	nros := &nropv1.NUMAResourcesOperatorList{}
-	if err := r.List(context.TODO(), nros); err != nil {
+	if err := r.List(ctx, nros); err != nil {
 		klog.Error("failed to get numa-resources operator")
 		return nil
 	}

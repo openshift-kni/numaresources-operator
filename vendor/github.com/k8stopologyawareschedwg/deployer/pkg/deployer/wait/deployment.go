@@ -26,8 +26,8 @@ import (
 
 func (wt Waiter) ForDeploymentCompleteByKey(ctx context.Context, key ObjectKey, replicas int32) (*appsv1.Deployment, error) {
 	updatedDp := &appsv1.Deployment{}
-	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
-		err := wt.Cli.Get(ctx, key.AsKey(), updatedDp)
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, true, func(fctx context.Context) (bool, error) {
+		err := wt.Cli.Get(fctx, key.AsKey(), updatedDp)
 		if err != nil {
 			wt.Log.Info("failed to get the deployment", "key", key.String(), "error", err)
 			return false, err
@@ -62,10 +62,10 @@ func areDeploymentReplicasAvailable(newStatus *appsv1.DeploymentStatus, replicas
 }
 
 func (wt Waiter) ForDeploymentDeleted(ctx context.Context, namespace, name string) error {
-	return k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+	return k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, true, func(fctx context.Context) (bool, error) {
 		obj := appsv1.Deployment{}
 		key := ObjectKey{Name: name, Namespace: namespace}
-		err := wt.Cli.Get(ctx, key.AsKey(), &obj)
+		err := wt.Cli.Get(fctx, key.AsKey(), &obj)
 		return deletionStatusFromError(wt.Log, "Deployment", key, err)
 	})
 }
