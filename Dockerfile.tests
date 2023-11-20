@@ -10,6 +10,6 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal
 WORKDIR /usr/local/bin
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/e2e-nrop*.test .
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/run-e2e-nrop*.sh .
-COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/numacell .
-COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/pause .
+COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/numacell /bin/numacell
+COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/pause /pause
 CMD ["./run-e2e-nrop-serial.sh"]
