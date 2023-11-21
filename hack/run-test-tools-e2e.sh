@@ -2,6 +2,8 @@
 
 source hack/common.sh
 
+### tools suite runner
+
 NO_COLOR=""
 if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
   echo "Terminal does not seem to support colored output, disabling it" 1>&2
