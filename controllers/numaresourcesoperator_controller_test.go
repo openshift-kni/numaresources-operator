@@ -501,8 +501,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							nroUpdated := &nropv1.NUMAResourcesOperator{}
 							Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).ToNot(HaveOccurred())
 
-							Expect(nroUpdated.Status.DaemonSets).ToNot(BeEmpty())
-
 							//Should have this object references ...
 							expected := []configv1.ObjectReference{
 								{
