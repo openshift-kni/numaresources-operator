@@ -85,7 +85,11 @@ func RenderConfig(data []byte, schedulerName string, params *manifests.ConfigPar
 		}
 
 		if params.ProfileName != "" {
-			unstructured.SetNestedField(profile, params.ProfileName, "schedulerName")
+			err = unstructured.SetNestedField(profile, params.ProfileName, "schedulerName")
+			if err != nil {
+				klog.ErrorS(err, "failed to update unstructured data", "schedulerName", params.ProfileName)
+				return data, false, err
+			}
 			updated = true
 		}
 

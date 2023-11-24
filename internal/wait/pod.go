@@ -52,9 +52,10 @@ func (wt Waiter) WhileInPodPhase(ctx context.Context, podNamespace, podName stri
 
 func (wt Waiter) ForPodPhase(ctx context.Context, podNamespace, podName string, phase corev1.PodPhase) (*corev1.Pod, error) {
 	updatedPod := &corev1.Pod{}
-	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+	immediate := true
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
 		objKey := ObjectKey{Name: podName, Namespace: podNamespace}
-		if err := wt.Cli.Get(ctx, objKey.AsKey(), updatedPod); err != nil {
+		if err := wt.Cli.Get(aContext, objKey.AsKey(), updatedPod); err != nil {
 			klog.Warningf("failed to get the pod %#v: %v", objKey, err)
 			return false, nil
 		}
@@ -71,10 +72,11 @@ func (wt Waiter) ForPodPhase(ctx context.Context, podNamespace, podName string, 
 }
 
 func (wt Waiter) ForPodDeleted(ctx context.Context, podNamespace, podName string) error {
-	return k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+	immediate := true
+	return k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
 		pod := &corev1.Pod{}
 		key := ObjectKey{Name: podName, Namespace: podNamespace}
-		err := wt.Cli.Get(ctx, key.AsKey(), pod)
+		err := wt.Cli.Get(aContext, key.AsKey(), pod)
 		return deletionStatusFromError("Pod", key, err)
 	})
 }

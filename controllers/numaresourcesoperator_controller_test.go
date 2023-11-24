@@ -60,7 +60,7 @@ const (
 )
 
 func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion platform.Version, initObjects ...runtime.Object) (*NUMAResourcesOperatorReconciler, error) {
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(initObjects...).Build()
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithStatusSubresource(&nropv1.NUMAResourcesOperator{}).WithRuntimeObjects(initObjects...).Build()
 	apiManifests, err := apimanifests.GetManifests(plat)
 	if err != nil {
 		return nil, err

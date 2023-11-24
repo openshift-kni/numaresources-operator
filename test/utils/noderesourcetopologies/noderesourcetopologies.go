@@ -59,8 +59,9 @@ func GetZoneIDFromName(zoneName string) (int, error) {
 func GetUpdated(cli client.Client, initialNrtList nrtv1alpha2.NodeResourceTopologyList, timeout time.Duration) (nrtv1alpha2.NodeResourceTopologyList, error) {
 	var updatedNrtList nrtv1alpha2.NodeResourceTopologyList
 	klog.Infof("Waiting up to %v to get %d NRT objects updated", timeout, len(initialNrtList.Items))
-	err := wait.Poll(5*time.Second, timeout, func() (bool, error) {
-		err := cli.List(context.TODO(), &updatedNrtList)
+	immediate := false
+	err := wait.PollUntilContextTimeout(context.Background(), 5*time.Second, timeout, immediate, func(ctx context.Context) (bool, error) {
+		err := cli.List(ctx, &updatedNrtList)
 		if err != nil {
 			klog.Errorf("cannot get the NRT List: %v", err)
 			return false, err
@@ -88,8 +89,9 @@ func GetUpdatedForNode(cli client.Client, ctx context.Context, ref nrtv1alpha2.N
 	var updatedNrt nrtv1alpha2.NodeResourceTopology
 	nrtKey := client.ObjectKeyFromObject(&ref)
 	klog.Infof("NRT change: reference is %s", e2enrt.ToString(ref))
-	err := wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
-		err := cli.Get(ctx, nrtKey, &updatedNrt)
+	immediate := true
+	err := wait.PollUntilContextTimeout(ctx, 5*time.Second, timeout, immediate, func(aContext context.Context) (bool, error) {
+		err := cli.Get(aContext, nrtKey, &updatedNrt)
 		if err != nil {
 			klog.Errorf("cannot get the updated NRT object %s/%s", ref.Namespace, ref.Name)
 			return false, err
