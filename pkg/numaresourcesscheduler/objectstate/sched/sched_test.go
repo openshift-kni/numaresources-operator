@@ -61,13 +61,13 @@ func TestDeploymentNamespacedNameFromObject(t *testing.T) {
 }
 
 const (
-	schedConfigNoProfiles = `apiVersion: kubescheduler.config.k8s.io/v1beta2
+	schedConfigNoProfiles = `apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 leaderElection:
   leaderElect: false
 profiles: []`
 
-	schedConfigOK = `apiVersion: kubescheduler.config.k8s.io/v1beta2
+	schedConfigOK = `apiVersion: kubescheduler.config.k8s.io/v1beta3
 kind: KubeSchedulerConfiguration
 leaderElection:
   leaderElect: false
