@@ -103,7 +103,6 @@ func DecodeSchedulerProfilesFromData(data []byte) ([]ConfigParams, error) {
 	}
 
 	return params, nil
-
 }
 
 func FindSchedulerProfileByName(profileParams []ConfigParams, schedulerName string) *ConfigParams {

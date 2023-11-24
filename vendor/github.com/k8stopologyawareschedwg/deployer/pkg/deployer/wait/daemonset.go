@@ -25,8 +25,8 @@ import (
 
 func (wt Waiter) ForDaemonSetReadyByKey(ctx context.Context, key ObjectKey) (*appsv1.DaemonSet, error) {
 	updatedDs := &appsv1.DaemonSet{}
-	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
-		err := wt.Cli.Get(ctx, key.AsKey(), updatedDs)
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, true, func(fctx context.Context) (bool, error) {
+		err := wt.Cli.Get(fctx, key.AsKey(), updatedDs)
 		if err != nil {
 			wt.Log.Info("failed to get the daemonset", "key", key.String(), "error", err)
 			return false, err
@@ -57,10 +57,10 @@ func AreDaemonSetPodsReady(newStatus *appsv1.DaemonSetStatus) bool {
 }
 
 func (wt Waiter) ForDaemonSetDeleted(ctx context.Context, namespace, name string) error {
-	return k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+	return k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, true, func(fctx context.Context) (bool, error) {
 		obj := appsv1.DaemonSet{}
 		key := ObjectKey{Name: name, Namespace: namespace}
-		err := wt.Cli.Get(ctx, key.AsKey(), &obj)
+		err := wt.Cli.Get(fctx, key.AsKey(), &obj)
 		return deletionStatusFromError(wt.Log, "DaemonSet", key, err)
 	})
 }

@@ -283,7 +283,8 @@ func (p *Padder) GetPaddedNodes() []string {
 
 func (p *Padder) waitForUpdatedNRTs(timeout time.Duration) (bool, error) {
 	NRTUpdated := false
-	err := k8swait.PollImmediate(time.Second, timeout, func() (bool, error) {
+	immediate := true
+	err := k8swait.PollUntilContextTimeout(context.Background(), time.Second, timeout, immediate, func(ctx context.Context) (bool, error) {
 		nrtList, err := nrtutil.GetUpdated(p.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
 		if err != nil {
 			klog.Warningf("failed to get updated noderesourcestopologies objects")

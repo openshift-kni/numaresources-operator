@@ -33,8 +33,9 @@ func (wt Waiter) ForJobCompleted(ctx context.Context, jobNamespace, jobName stri
 		Name:      jobName,
 	}
 	updatedJob := batchv1.Job{}
-	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
-		err := wt.Cli.Get(context.TODO(), jobKey, &updatedJob)
+	immediate := true
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
+		err := wt.Cli.Get(aContext, jobKey, &updatedJob)
 		if err != nil {
 			return false, err
 		}

@@ -90,10 +90,11 @@ func (wt Waiter) ForNodeResourceTopologiesSettled(ctx context.Context, threshold
 	pfpState := make(PFPState)
 	nrtList := nrtv1alpha2.NodeResourceTopologyList{}
 
-	err := k8swait.PollImmediate(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
+	immediate := true
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
 		klog.Infof("waiting for NRT to stabilize; observed nodes=%d ready=%d", pfpState.Len(), pfpState.CountReady(threshold))
 
-		err := wt.Cli.List(context.TODO(), &nrtList)
+		err := wt.Cli.List(aContext, &nrtList)
 		if err != nil {
 			return false, err
 		}
@@ -122,8 +123,9 @@ func (wt Waiter) ForNodeResourceTopologiesSettled(ctx context.Context, threshold
 func (wt Waiter) ForNodeResourceTopologiesEqualTo(ctx context.Context, nrtListReference *nrtv1alpha2.NodeResourceTopologyList, nrtShouldIgnore NRTShouldIgnoreFunc) (nrtv1alpha2.NodeResourceTopologyList, error) {
 	var updatedNrtList nrtv1alpha2.NodeResourceTopologyList
 	klog.Infof("Waiting up to %v to have %d NRT objects restored", wt.PollTimeout, len(nrtListReference.Items))
-	err := k8swait.Poll(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
-		err := wt.Cli.List(ctx, &updatedNrtList)
+	immediate := false
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
+		err := wt.Cli.List(aContext, &updatedNrtList)
 		if err != nil {
 			klog.Errorf("cannot get the NRT List: %v", err)
 			return false, err
@@ -157,8 +159,9 @@ func (wt Waiter) ForNodeResourceTopologyToHave(ctx context.Context, nrtName stri
 	updatedNrt := nrtv1alpha2.NodeResourceTopology{}
 	nrtKey := client.ObjectKey{Name: nrtName}
 	klog.Infof("Waiting up to %v for NRT %q to expose the desired resource", wt.PollTimeout, nrtName)
-	err := k8swait.Poll(wt.PollInterval, wt.PollTimeout, func() (bool, error) {
-		err := wt.Cli.Get(ctx, nrtKey, &updatedNrt)
+	immediate := false
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
+		err := wt.Cli.Get(aContext, nrtKey, &updatedNrt)
 		if err != nil {
 			klog.Errorf("cannot get the NRT %q: %v", nrtName, err)
 			return false, err
