@@ -27,11 +27,12 @@ import (
 
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8shelpers"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/metrics"
+	metricssrv "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/metrics/server"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/sharedcpuspool"
-	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/prometheus"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter"
 
@@ -97,9 +98,13 @@ func main() {
 
 	cli = sharedcpuspool.NewFromLister(cli, parsedArgs.RTE.Debug, parsedArgs.RTE.ReferenceContainer)
 
-	err = prometheus.InitPrometheus(prometheus.ServingDisabled)
+	err = metrics.Setup("")
 	if err != nil {
-		klog.Fatalf("failed to start prometheus server: %v", err)
+		klog.Fatalf("failed to setup metrics: %v", err)
+	}
+	err = metricssrv.Setup(parsedArgs.RTE.MetricsMode, metricssrv.NewDefaultConfig())
+	if err != nil {
+		klog.Fatalf("failed to setup metrics server: %v", err)
 	}
 
 	// TODO: recycled flag (no big deal, but still)
@@ -118,6 +123,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	pArgs := ProgArgs{}
 
 	var pfpMethod string
+	var metricsMode string
 
 	flags := flag.NewFlagSet(version.ProgramName(), flag.ExitOnError)
 
@@ -145,6 +151,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.StringVar(&pArgs.RTE.PodResourcesSocketPath, "podresources-socket", "unix:///podresources/kubelet.sock", "Pod Resource Socket path to use.")
 	flags.BoolVar(&pArgs.RTE.PodReadinessEnable, "podreadiness", true, "Custom condition injection using Podreadiness.")
 	flags.BoolVar(&pArgs.RTE.AddNRTOwnerEnable, "add-nrt-owner", true, "RTE will inject NRT's related node as OwnerReference to ensure cleanup if the node is deleted.")
+	flags.StringVar(&metricsMode, "metrics-mode", metricssrv.ServingDisabled, fmt.Sprintf("Select the mode to expose metrics endpoint. Valid options: %s", metricssrv.ServingModeSupported()))
 
 	refCnt := flags.String("reference-container", "", "Reference container, used to learn about the shared cpu pool\n See: https://github.com/kubernetes/kubernetes/issues/102190\n format of spec is namespace/podname/containername.\n Alternatively, you can use the env vars REFERENCE_NAMESPACE, REFERENCE_POD_NAME, REFERENCE_CONTAINER_NAME.")
 
@@ -173,6 +180,11 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	}
 	if pArgs.RTE.ReferenceContainer.IsEmpty() {
 		pArgs.RTE.ReferenceContainer = sharedcpuspool.ContainerIdentFromEnv()
+	}
+
+	pArgs.RTE.MetricsMode, err = metricssrv.ServingModeIsSupported(metricsMode)
+	if err != nil {
+		return pArgs, err
 	}
 
 	pArgs.Resourcemonitor.PodSetFingerprintMethod, err = resourcemonitor.PFPMethodIsSupported(pfpMethod)
