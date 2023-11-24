@@ -23,17 +23,13 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -46,6 +42,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
+	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
@@ -173,7 +176,7 @@ func main() {
 		namespace = defaultNamespace
 	}
 
-	rteManifests, err := rtemanifests.GetManifests(clusterPlatform, clusterPlatformVersion, namespace)
+	rteManifests, err := rtemanifests.GetManifests(clusterPlatform, clusterPlatformVersion, namespace, true)
 	if err != nil {
 		klog.ErrorS(err, "unable to load the RTE manifests")
 		os.Exit(1)
@@ -346,6 +349,11 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 	klog.InfoS("Updating RTE manifests")
 	mf, err := rteManifests.Render(rtemanifests.RenderOptions{
 		Namespace: namespace,
+		DaemonSet: depobjupdate.DaemonSetOptions{
+			Verbose:            2,
+			NotificationEnable: true,
+			UpdateInterval:     10 * time.Second,
+		},
 	})
 	if err != nil {
 		return mf, err

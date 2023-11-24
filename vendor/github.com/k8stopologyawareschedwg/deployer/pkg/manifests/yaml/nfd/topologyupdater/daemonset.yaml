@@ -26,7 +26,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-          image: ${NFD_CONTAINER_IMAGE}
+          image: gcr.io/k8s-staging-nfd/node-feature-discovery:master
           imagePullPolicy: Always
           name: nfd-topology-updater
           securityContext:
@@ -39,8 +39,8 @@ spec:
           volumeMounts:
             - mountPath: /host-var/lib/kubelet/config.yaml
               name: kubelet-podresources-conf
-            - mountPath: /host-var/lib/kubelet/pod-resources/kubelet.sock
-              name: kubelet-podresources-sock
+            - mountPath: /host-var/lib/kubelet/pod-resources
+              name: kubelet-podresources
             - mountPath: /host-sys
               name: host-sys
       dnsPolicy: ClusterFirstWithHostNet
@@ -53,5 +53,5 @@ spec:
             path: /var/lib/kubelet/config.yaml
           name: kubelet-podresources-conf
         - hostPath:
-            path: /var/lib/kubelet/pod-resources/kubelet.sock
-          name: kubelet-podresources-sock
+            path: /var/lib/kubelet/pod-resources
+          name: kubelet-podresources
