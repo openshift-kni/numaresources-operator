@@ -40,8 +40,11 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
@@ -200,15 +203,20 @@ func main() {
 	klog.InfoS("metrics server", "enabled", enableMetrics, "addr", metricsAddr)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Namespace:               namespace,
-		Scheme:                  scheme,
-		MetricsBindAddress:      metricsAddr,
-		Port:                    webhookPort,
+		Cache:  cache.Options{}, // TODO: restrict namespace here?
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			// TODO: secureServing?
+			BindAddress: metricsAddr,
+		},
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Port:    webhookPort,
+			TLSOpts: webhookTLSOpts(enableHTTP2),
+		}),
 		HealthProbeBindAddress:  probeAddr,
 		LeaderElection:          enableLeaderElection,
 		LeaderElectionNamespace: namespace,
 		LeaderElectionID:        defaultLeaderElectionID,
-		TLSOpts:                 webhookTLSOpts(enableHTTP2),
 	})
 	if err != nil {
 		klog.ErrorS(err, "unable to start manager")
