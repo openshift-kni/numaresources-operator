@@ -166,6 +166,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
+			By("waiting for the NRT data to settle")
+			e2efixture.MustSettleNRT(fxt)
+
 			_, err := e2enrt.GetUpdated(fxt.Client, nrtList, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -375,6 +378,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
+			By("waiting for the NRT data to settle")
+			e2efixture.MustSettleNRT(fxt)
+
 			targetNrtListBefore, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 			targetNrtBefore, err := e2enrt.FindFromList(targetNrtListBefore.Items, targetNodeName)
@@ -412,6 +418,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			podRunningTimeout := 3 * time.Minute
 			for _, pod := range pods {
 				if pod.Spec.NodeName == targetNodeName {
+					By(fmt.Sprintf("verify events for pod %s/%s node: %q", pod.Namespace, pod.Name, pod.Spec.NodeName))
 					scheduledWithTAS, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 					if err != nil {
 						_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
@@ -554,6 +561,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
+			By("waiting for the NRT data to settle")
+			e2efixture.MustSettleNRT(fxt)
+
 			targetNrtListBefore, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 			targetNrtBefore, err := e2enrt.FindFromList(targetNrtListBefore.Items, targetNodeName)
@@ -633,6 +643,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				LabelSelector: labSel,
 			})
 			Expect(err).ToNot(HaveOccurred())
+
+			By("waiting for the NRT data to settle")
+			e2efixture.MustSettleNRT(fxt)
 
 			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())

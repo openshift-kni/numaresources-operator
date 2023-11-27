@@ -437,9 +437,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
-			// TODO: smarter cooldown
-			klog.Infof("cooling down")
-			time.Sleep(18 * time.Second)
+			By("waiting for the NRT data to settle")
+			e2efixture.MustSettleNRT(fxt)
 
 			for _, unsuitableNodeName := range unsuitableNodeNames {
 				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
@@ -1349,9 +1348,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
-			// TODO: smarter cooldown
-			klog.Infof("cooling down")
-			time.Sleep(18 * time.Second)
+			By("waiting for the NRT data to settle")
+			e2efixture.MustSettleNRT(fxt)
 
 			for _, unsuitableNodeName := range unsuitableNodeNames {
 				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
