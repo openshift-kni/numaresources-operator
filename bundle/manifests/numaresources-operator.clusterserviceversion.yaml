@@ -224,6 +224,12 @@ spec:
         path: cacheResyncDebug
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Set the cache resync detection mode. Default is to trigger resyncs
+          only when detected guaranteed QoS pods which require NUMA-specific resources.
+        displayName: Scheduler cache resync detection setting
+        path: cacheResyncDetection
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: Set the cache resync period. Use explicit 0 to disable.
         displayName: Scheduler cache resync period setting
         path: cacheResyncPeriod
