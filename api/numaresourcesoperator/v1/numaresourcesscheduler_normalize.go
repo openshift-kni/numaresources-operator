@@ -24,9 +24,10 @@ import (
 
 // TODO: move into _defaults.go? expose?
 const (
-	defaultCacheResyncPeriod = 5 * time.Second
-	defaultCacheResyncDebug  = CacheResyncDebugDumpJSONFile
-	defaultSchedulerInformer = SchedulerInformerDedicated
+	defaultCacheResyncPeriod    = 5 * time.Second
+	defaultCacheResyncDebug     = CacheResyncDebugDumpJSONFile
+	defaultSchedulerInformer    = SchedulerInformerDedicated
+	defaultCacheResyncDetection = CacheResyncDetectionRelaxed
 )
 
 func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
@@ -42,6 +43,10 @@ func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
 	if spec.SchedulerInformer == nil {
 		infMode := defaultSchedulerInformer
 		spec.SchedulerInformer = &infMode
+	}
+	if spec.CacheResyncDetection == nil {
+		resyncDetection := defaultCacheResyncDetection
+		spec.CacheResyncDetection = &resyncDetection
 	}
 }
 
