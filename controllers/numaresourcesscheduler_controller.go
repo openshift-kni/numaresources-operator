@@ -176,7 +176,6 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 
 	schedSpec := instance.Spec.Normalize()
 	cacheResyncPeriod := unpackAPIResyncPeriod(schedSpec.CacheResyncPeriod)
-
 	params := configParamsFromSchedSpec(schedSpec, cacheResyncPeriod)
 
 	schedName, ok := schedstate.SchedulerNameFromObject(r.SchedulerManifests.ConfigMap)
@@ -243,6 +242,7 @@ func unpackAPIResyncPeriod(reconcilePeriod *metav1.Duration) time.Duration {
 
 func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cacheResyncPeriod time.Duration) k8swgmanifests.ConfigParams {
 	resyncPeriod := int64(cacheResyncPeriod.Seconds())
+
 	params := k8swgmanifests.ConfigParams{
 		ProfileName: schedSpec.SchedulerName,
 		Cache: &k8swgmanifests.ConfigCacheParams{
@@ -250,12 +250,21 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 		},
 	}
 
+	var foreignPodsDetect string
+	var resyncMethod string = k8swgmanifests.CacheResyncAutodetect
 	var informerMode string
+	if *schedSpec.CacheResyncDetection == nropv1.CacheResyncDetectionRelaxed {
+		foreignPodsDetect = k8swgmanifests.ForeignPodsDetectOnlyExclusiveResources
+	} else {
+		foreignPodsDetect = k8swgmanifests.ForeignPodsDetectAll
+	}
 	if *schedSpec.SchedulerInformer == k8swgmanifests.CacheInformerDedicated {
 		informerMode = k8swgmanifests.CacheInformerDedicated
 	} else {
 		informerMode = k8swgmanifests.CacheInformerShared
 	}
+	params.Cache.ResyncMethod = &resyncMethod
+	params.Cache.ForeignPodsDetectMode = &foreignPodsDetect
 	params.Cache.InformerMode = &informerMode
 	klog.InfoS("setting cache parameters", dumpConfigCacheParams(params.Cache)...)
 
@@ -266,6 +275,8 @@ func dumpConfigCacheParams(ccp *k8swgmanifests.ConfigCacheParams) []interface{} 
 	return []interface{}{
 		"resyncPeriod", strInt64Ptr(ccp.ResyncPeriodSeconds),
 		"informerMode", strStringPtr(ccp.InformerMode),
+		"resyncMethod", strStringPtr(ccp.ResyncMethod),
+		"foreignPodsDetectMode", strStringPtr(ccp.ForeignPodsDetectMode),
 	}
 }
 
