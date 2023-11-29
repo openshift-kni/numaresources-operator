@@ -175,16 +175,9 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	defer klog.V(4).Info("SchedulerSync stop")
 
 	schedSpec := instance.Spec.Normalize()
-
 	cacheResyncPeriod := unpackAPIResyncPeriod(schedSpec.CacheResyncPeriod)
 
-	resyncPeriod := int64(cacheResyncPeriod.Seconds())
-	params := k8swgmanifests.ConfigParams{
-		ProfileName: schedSpec.SchedulerName,
-		Cache: &k8swgmanifests.ConfigCacheParams{
-			ResyncPeriodSeconds: &resyncPeriod,
-		},
-	}
+	params := configParamsFromSchedSpec(schedSpec, cacheResyncPeriod)
 
 	schedName, ok := schedstate.SchedulerNameFromObject(r.SchedulerManifests.ConfigMap)
 	if !ok {
@@ -246,4 +239,15 @@ func unpackAPIResyncPeriod(reconcilePeriod *metav1.Duration) time.Duration {
 	period := reconcilePeriod.Round(time.Second)
 	klog.InfoS("setting reconcile period", "computed", period, "supplied", reconcilePeriod)
 	return period
+}
+
+func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cacheResyncPeriod time.Duration) k8swgmanifests.ConfigParams {
+	resyncPeriod := int64(cacheResyncPeriod.Seconds())
+	params := k8swgmanifests.ConfigParams{
+		ProfileName: schedSpec.SchedulerName,
+		Cache: &k8swgmanifests.ConfigCacheParams{
+			ResyncPeriodSeconds: &resyncPeriod,
+		},
+	}
+	return params
 }
