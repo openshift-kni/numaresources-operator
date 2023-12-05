@@ -70,7 +70,6 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 	}
 
 	pfpEnabled := nropv1.PodsFingerprintingEnabled
-	pfpEnabledExclusiveResources := nropv1.PodsFingerprintingEnabledExclusiveResources
 	pfpDisabled := nropv1.PodsFingerprintingDisabled
 
 	refreshEvents := nropv1.InfoRefreshEvents
@@ -81,7 +80,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			name: "defaults",
 			conf: nropv1.DefaultNodeGroupConfig(),
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=all", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
 			},
 		},
 		{
@@ -92,25 +91,16 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				},
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=all", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=32s",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=32s",
 			},
 		},
 		{
-			name: "enable unrestricted fingerprint",
+			name: "explicitly disable restricted fingerprint",
 			conf: nropv1.NodeGroupConfig{
 				PodsFingerprinting: &pfpEnabled,
 			},
 			expectedArgs: []string{
 				"--pods-fingerprint", "--pods-fingerprint-method=all", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
-			},
-		},
-		{
-			name: "explicitly disable unrestricted fingerprint",
-			conf: nropv1.NodeGroupConfig{
-				PodsFingerprinting: &pfpEnabledExclusiveResources,
-			},
-			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
 			},
 		},
 		{
@@ -128,7 +118,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshMode: &refreshEvents,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=all", "--refresh-node-resources", "--add-nrt-owner=false", "--notify-file=/run/rte/notify",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--notify-file=/run/rte/notify",
 			},
 		},
 		{
@@ -137,7 +127,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshMode: &refreshPeriodic,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=all", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
 			},
 		},
 	}
