@@ -81,19 +81,19 @@ func TestUpdatePodSpec(t *testing.T) {
 	}{
 		{
 			in:           operatorv1.Normal,
-			expectedArgs: append(getArgsCopy(args), "--v=2"),
+			expectedArgs: append(getArgsCopy(args), "-v=2"),
 		},
 		{
 			in:           operatorv1.Debug,
-			expectedArgs: append(getArgsCopy(args), "--v=4"),
+			expectedArgs: append(getArgsCopy(args), "-v=4"),
 		},
 		{
 			in:           operatorv1.Trace,
-			expectedArgs: append(getArgsCopy(args), "--v=6"),
+			expectedArgs: append(getArgsCopy(args), "-v=6"),
 		},
 		{
 			in:           operatorv1.TraceAll,
-			expectedArgs: append(getArgsCopy(args), "--v=8"),
+			expectedArgs: append(getArgsCopy(args), "-v=8"),
 		},
 	}
 

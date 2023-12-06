@@ -50,12 +50,12 @@ func UpdatePodSpec(podSpec *corev1.PodSpec, level operatorv1.LogLevel) error {
 	// TODO: better match by name than assume container#0 is the right one
 	cnt := &podSpec.Containers[0]
 	kLog := ToKlog(level)
-	flags := flagcodec.ParseArgvKeyValue(cnt.Args)
+	flags := flagcodec.ParseArgvKeyValue(cnt.Args, flagcodec.WithFlagNormalization)
 	if flags == nil {
 		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
 	}
 	flags.SetOption("--v", kLog.String())
-	klog.InfoS("container klog level", "container", cnt.Name, "--v", kLog.String())
+	klog.InfoS("container klog level", "container", cnt.Name, "-v", kLog.String())
 	cnt.Args = flags.Argv()
 	return nil
 }

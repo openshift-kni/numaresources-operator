@@ -317,10 +317,10 @@ func getOwnedDss(cs kubernetes.Interface, owner metav1.ObjectMeta) ([]appsv1.Dae
 }
 
 func matchLogLevelToKlog(cnt *corev1.Container, level operatorv1.LogLevel) (bool, bool) {
-	rteFlags := flagcodec.ParseArgvKeyValue(cnt.Args)
+	rteFlags := flagcodec.ParseArgvKeyValue(cnt.Args, flagcodec.WithFlagNormalization)
 	kLvl := loglevel.ToKlog(level)
 
-	val, found := rteFlags.GetFlag("--v")
+	val, found := rteFlags.GetFlag("--")
 	return found, val.Data == kLvl.String()
 }
 
