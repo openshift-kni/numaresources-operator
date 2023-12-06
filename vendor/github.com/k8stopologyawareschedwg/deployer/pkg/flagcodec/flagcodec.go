@@ -38,27 +38,28 @@ type Val struct {
 }
 
 type Flags struct {
-	command string
-	args    map[string]Val
-	keys    []string
+	command         string
+	args            map[string]Val
+	keys            []string
+	processFlagName func(string) string
 }
 
-func ParseArgvKeyValue(args []string) *Flags {
-	return ParseArgvKeyValueWithCommand("", args)
-}
-
-// ParseArgvKeyValue parses a clean (trimmed) argv whose components are
-// either toggles or key=value pairs. IOW, this is a restricted and easier
+// ParseArgvKeyValue parses a clean (trimmed) argv whose components
+// are either toggles or key=value pairs. IOW, this is a restricted and easier
 // to parse flavor of argv on which option and value are guaranteed to
 // be in the same item.
 // IOW, we expect
 // "--opt=foo"
 // AND NOT
 // "--opt", "foo"
-func ParseArgvKeyValueWithCommand(command string, args []string) *Flags {
+func ParseArgvKeyValue(args []string, opts ...Option) *Flags {
 	ret := &Flags{
-		command: command,
-		args:    make(map[string]Val),
+		command:         "",
+		args:            make(map[string]Val),
+		processFlagName: func(v string) string { return v },
+	}
+	for _, opt := range opts {
+		opt(ret)
 	}
 	for _, arg := range args {
 		fields := strings.SplitN(arg, "=", 2)
@@ -69,6 +70,53 @@ func ParseArgvKeyValueWithCommand(command string, args []string) *Flags {
 		ret.SetOption(fields[0], fields[1])
 	}
 	return ret
+}
+
+// ParseArgvKeyValueWithCommand parses a clean (trimmed) argv whose components
+// are either toggles or key=value pairs. IOW, this is a restricted and easier
+// to parse flavor of argv on which option and value are guaranteed to
+// be in the same item.
+// IOW, we expect
+// "--opt=foo"
+// AND NOT
+// "--opt", "foo"
+// The command is supplied explicitly as parameter.
+// DEPRECATED: use ParseArgvValue and WithCommand option
+func ParseArgvKeyValueWithCommand(command string, args []string) *Flags {
+	return ParseArgvKeyValue(args, WithCommand(command))
+}
+
+type Option func(*Flags) *Flags
+
+func normalizeFlagName(v string) string {
+	if len(v) == 3 && v[0] == '-' && v[1] == '-' {
+		// single char, double dash flag (ugly?), fix it
+		return v[1:]
+	}
+	// everything else pass through silently
+	return v
+}
+
+// WithFlagNormalization optionally enables flag normalization.
+// The canonical representation of flags in this package is:
+// * single-dash for one-char flags (-v, -h)
+// * double-dash for multi-char flags (--foo, --long-option)
+// pflag allows one-char to have one or two dashes. For flagcodec
+// these were different options. When normalization is enabled,
+// though, all flag names are processed to adhere to the canonical
+// representation, so flagcodec will treat `--v` and `-v` to
+// be the same flag. Since this is possibly breaking change,
+// this treatment is opt-in.
+func WithFlagNormalization(fl *Flags) *Flags {
+	fl.processFlagName = normalizeFlagName
+	return fl
+}
+
+func WithCommand(command string) Option {
+	return func(fl *Flags) *Flags {
+		fl.command = command
+		return fl
+	}
 }
 
 func (fl *Flags) recordFlag(name string) {
@@ -89,6 +137,7 @@ func (fl *Flags) forgetFlag(name string) {
 }
 
 func (fl *Flags) SetToggle(name string) {
+	name = fl.processFlagName(name)
 	fl.recordFlag(name)
 	fl.args[name] = Val{
 		Kind: FlagToggle,
@@ -96,6 +145,7 @@ func (fl *Flags) SetToggle(name string) {
 }
 
 func (fl *Flags) SetOption(name, data string) {
+	name = fl.processFlagName(name)
 	fl.recordFlag(name)
 	fl.args[name] = Val{
 		Kind: FlagOption,
@@ -104,6 +154,7 @@ func (fl *Flags) SetOption(name, data string) {
 }
 
 func (fl *Flags) Delete(name string) {
+	name = fl.processFlagName(name)
 	fl.forgetFlag(name)
 	delete(fl.args, name)
 }
@@ -129,6 +180,7 @@ func (fl *Flags) Argv() []string {
 }
 
 func (fl *Flags) GetFlag(name string) (Val, bool) {
+	name = fl.processFlagName(name)
 	if val, ok := fl.args[name]; ok {
 		return val, ok
 	}
