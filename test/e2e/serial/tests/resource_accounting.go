@@ -327,10 +327,14 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(ok).To(BeTrue(), "cannot select a node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
 			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 
-			targetNrtListInitial, err = e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
+			// TODO: just use nrtList?
+			err = fxt.Client.List(context.TODO(), &targetNrtListInitial)
 			Expect(err).ToNot(HaveOccurred())
+			klog.Infof("initial NRT List: %s", intnrt.ListToString(targetNrtListInitial.Items, " initial list"))
+
 			targetNrtInitial, err = e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
+			klog.Infof("initial NRT target: %s", intnrt.ToString(*targetNrtInitial))
 
 			//calculate base load on the target node
 			baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
