@@ -308,7 +308,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 		/*
 		 1. choose a target node on which the test's burstable pod will run
 		 2. fully pad the non-target nodes
-		 3. test step: create a workload with burstable pod and check which scheduler took charge and NRT
+		 3. test step: create a workload with burstable pod and check which scheduler took charge and NRT was _not_ affected
 		*/
 		BeforeEach(func() {
 			const requiredNUMAZones = 2
@@ -487,7 +487,8 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).NotTo(HaveOccurred())
 			Expect(e2enrt.CheckEqualAvailableResources(*targetNrtInitial, *targetNrtCurrent)).To(BeTrue(), "new resources are accounted in NRT although scheduling burstable pod")
 		})
-		It("should properly schedule a burstable pod when one of the containers is asking for requests=limits, with no changes in NRTs", func() {
+
+		It("[tier2] should properly schedule a burstable pod when one of the containers is asking for requests=limits, with no changes in NRTs", func() {
 			By("create a burstable pod")
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod-bu")
 			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
