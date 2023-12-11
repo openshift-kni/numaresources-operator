@@ -537,7 +537,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			err = fxt.Client.Create(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
-			klog.Infof("create the busrtable test pod with requests %s", e2ereslist.ToString(reqResources))
+			klog.Infof("create the burstable test pod with requests %s", e2ereslist.ToString(reqResources))
 
 			By("waiting for the pod to be scheduled")
 			// 3 minutes is plenty, should never timeout

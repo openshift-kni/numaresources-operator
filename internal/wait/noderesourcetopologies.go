@@ -132,6 +132,9 @@ func (wt Waiter) ForNodeResourceTopologiesEqualToPostReboot(ctx context.Context,
 			klog.Errorf("cannot get the NRT List: %v", err)
 			return false, err
 		}
+
+		klog.Infof("checking %s", intnrt.ListToString(updatedNrtList.Items, " current nrt list"))
+
 		for idx := range nrtListReference.Items {
 			referenceNrt := &nrtListReference.Items[idx]
 

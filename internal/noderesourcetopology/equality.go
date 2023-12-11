@@ -39,7 +39,7 @@ func EqualZones(zonesA, zonesB nrtv1alpha2.ZoneList, isRebootTest bool) (bool, e
 		zoneB := &zB[idx]
 
 		if zoneA.Name != zoneB.Name {
-			return false, fmt.Errorf("mismatched zones %q vs %q", zoneA.Name, zoneB.Name)
+			return false, fmt.Errorf("mismatched zones initial=%q vs updated=%q", zoneA.Name, zoneB.Name)
 		}
 
 		ok, err := EqualResourceInfos(SortedResourceInfoList(zoneA.Resources), SortedResourceInfoList(zoneB.Resources), isRebootTest)
@@ -75,16 +75,16 @@ func EqualResourceInfo(resInfoA, resInfoB nrtv1alpha2.ResourceInfo, isRebootTest
 	}
 
 	if resInfoA.Name != resInfoB.Name {
-		return false, fmt.Errorf("mismatched resource name %q vs %q", resInfoA.Name, resInfoB.Name)
+		return false, fmt.Errorf("mismatched resource name initial=%q vs updated=%q", resInfoA.Name, resInfoB.Name)
 	}
 	if resInfoA.Capacity.Cmp(resInfoB.Capacity) != 0 {
-		return false, fmt.Errorf("resource %q: mismatched resource Capacity %v vs %v", resInfoA.Name, resInfoA.Capacity, resInfoB.Capacity)
+		return false, fmt.Errorf("mismatched resource Capacity initial=%v vs updated=%v", ResourceInfoToString(resInfoA), ResourceInfoToString(resInfoB))
 	}
 	if resInfoA.Allocatable.Cmp(resInfoB.Allocatable) != 0 {
-		return false, fmt.Errorf("resource %q: mismatched resource Allocatable %v vs %v", resInfoA.Name, resInfoA.Allocatable, resInfoB.Allocatable)
+		return false, fmt.Errorf("mismatched resource Allocatable initial=%v vs updated=%v", ResourceInfoToString(resInfoA), ResourceInfoToString(resInfoB))
 	}
 	if resInfoA.Available.Cmp(resInfoB.Available) != 0 {
-		return false, fmt.Errorf("resource %q: mismatched resource Available %v vs %v", resInfoA.Name, resInfoA.Available, resInfoB.Available)
+		return false, fmt.Errorf("mismatched resource Available initial=%v vs updated=%v", ResourceInfoToString(resInfoA), ResourceInfoToString(resInfoB))
 	}
 	return true, nil
 }
@@ -103,16 +103,16 @@ func EqualResourceInfoWithDeviation(resInfoA, resInfoB nrtv1alpha2.ResourceInfo)
 	dev, _ := resource.ParseQuantity("54525952") //52 Mi
 
 	if resInfoA.Name != resInfoB.Name {
-		return false, fmt.Errorf("mismatched resource name %q vs %q", resInfoA.Name, resInfoB.Name)
+		return false, fmt.Errorf("mismatched resource name initial=%q vs updated=%q", resInfoA.Name, resInfoB.Name)
 	}
 	if !QuantityAbsCmp(resInfoA.Capacity, resInfoB.Capacity, dev) {
-		return false, fmt.Errorf("resource %q: mismatched resource Capacity %v vs %v", resInfoA.Name, resInfoA.Capacity, resInfoB.Capacity)
+		return false, fmt.Errorf("resource %q: mismatched resource Capacity initial=%v vs updated=%v", resInfoA.Name, resInfoA.Capacity, resInfoB.Capacity)
 	}
 	if !QuantityAbsCmp(resInfoA.Allocatable, resInfoB.Allocatable, dev) {
-		return false, fmt.Errorf("resource %q: mismatched resource Allocatable %v vs %v", resInfoA.Name, resInfoA.Allocatable, resInfoB.Allocatable)
+		return false, fmt.Errorf("resource %q: mismatched resource Allocatable initial=%v vs updated=%v", resInfoA.Name, resInfoA.Allocatable, resInfoB.Allocatable)
 	}
 	if !QuantityAbsCmp(resInfoA.Available, resInfoB.Available, dev) {
-		return false, fmt.Errorf("resource %q: mismatched resource Available %v vs %v", resInfoA.Name, resInfoA.Available, resInfoB.Available)
+		return false, fmt.Errorf("resource %q: mismatched resource Available initial=%v vs updated=%v", resInfoA.Name, resInfoA.Available, resInfoB.Available)
 	}
 	return true, nil
 }

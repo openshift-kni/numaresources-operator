@@ -36,6 +36,7 @@ import (
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/objects"
 	intwait "github.com/openshift-kni/numaresources-operator/internal/wait"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
@@ -98,6 +99,9 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 		return nil, err
 	}
 	ginkgo.By(fmt.Sprintf("set up the test namespace %q", ns.Name))
+
+	klog.Infof("set up the fixture reference NRT List: %s", intnrt.ListToString(nrtList.Items, " fixture initial"))
+
 	return &Fixture{
 		Client:         e2eclient.Client,
 		K8sClient:      e2eclient.K8sClient,
