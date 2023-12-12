@@ -7,3 +7,4 @@ RUN make build-pause-gcc
 
 FROM scratch
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/pause /
+ENTRYPOINT ["/pause"]
