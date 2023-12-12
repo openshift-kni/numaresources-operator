@@ -1,0 +1,9 @@
+FROM docker.io/gcc AS builder
+
+WORKDIR /go/src/github.com/openshift-kni/numaresources-operator
+COPY . .
+
+RUN make build-pause-gcc
+
+FROM scratch
+COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/pause /
