@@ -131,7 +131,7 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 	if cnt == nil {
 		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
-	flags := flagcodec.ParseArgvKeyValue(cnt.Args)
+	flags := flagcodec.ParseArgvKeyValue(cnt.Args, flagcodec.WithFlagNormalization)
 	if flags == nil {
 		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
 	}
