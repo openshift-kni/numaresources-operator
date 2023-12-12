@@ -200,6 +200,9 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			failedPodIds = e2efixture.WaitForPaddingPodsRunning(fxt, targetPaddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
+			By("waiting for the NRT data to settle")
+			e2efixture.MustSettleNRT(fxt)
+
 			By("saturating nodes we want to be unsuitable")
 			for idx, unsuitableNodeName := range unsuitableNodeNames {
 				nrtInfo, err := e2enrt.FindFromList(nrtList.Items, unsuitableNodeName)
@@ -227,9 +230,9 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			failedPodIds = e2efixture.WaitForPaddingPodsRunning(fxt, allPaddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
-			// TODO: smarter cooldown
-			By("cooling down")
-			time.Sleep(18 * time.Second)
+			By("waiting for the NRT data to settle")
+			e2efixture.MustSettleNRT(fxt)
+
 			for _, unsuitableNodeName := range unsuitableNodeNames {
 				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
 			}
@@ -301,6 +304,8 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 		var targetNodeName string
 		var targetNrtInitial *nrtv1alpha2.NodeResourceTopology
 		var targetNrtListInitial nrtv1alpha2.NodeResourceTopologyList
+		var targetNrtReference *nrtv1alpha2.NodeResourceTopology
+		var targetNrtListReference nrtv1alpha2.NodeResourceTopologyList
 		var deployment *appsv1.Deployment
 		var reqResources corev1.ResourceList
 		var err error
@@ -308,7 +313,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 		/*
 		 1. choose a target node on which the test's burstable pod will run
 		 2. fully pad the non-target nodes
-		 3. test step: create a workload with burstable pod and check which scheduler took charge and NRT
+		 3. test step: create a workload with burstable pod and check which scheduler took charge and NRT was _not_ affected
 		*/
 		BeforeEach(func() {
 			const requiredNUMAZones = 2
@@ -327,10 +332,14 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(ok).To(BeTrue(), "cannot select a node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
 			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 
-			targetNrtListInitial, err = e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
+			// TODO: just use nrtList?
+			err = fxt.Client.List(context.TODO(), &targetNrtListInitial)
 			Expect(err).ToNot(HaveOccurred())
+			klog.Infof("initial NRT List: %s", intnrt.ListToString(targetNrtListInitial.Items, " initial list"))
+
 			targetNrtInitial, err = e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
+			klog.Infof("initial NRT target: %s", intnrt.ToString(*targetNrtInitial))
 
 			//calculate base load on the target node
 			baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
@@ -385,6 +394,18 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			By("Waiting for padding pods to be ready")
 			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
+
+			By("waiting for the NRT data to settle")
+			e2efixture.MustSettleNRT(fxt)
+
+			By("Getting the reference NRT list post padding")
+			targetNrtListReference, err = e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
+			Expect(err).ToNot(HaveOccurred())
+			klog.Infof("reference NRT List: %s", intnrt.ListToString(targetNrtListReference.Items, " reference list"))
+
+			targetNrtReference, err = e2enrt.FindFromList(targetNrtListReference.Items, targetNodeName)
+			Expect(err).NotTo(HaveOccurred())
+			klog.Infof("reference NRT target: %s", intnrt.ToString(*targetNrtReference))
 		})
 
 		It("[test_id:48685][tier1] should properly schedule a best-effort pod with no changes in NRTs", func() {
@@ -412,7 +433,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Verifying NRT reflects no updates after scheduling the best-effort pod")
-			_, err = wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListInitial, wait.NRTIgnoreNothing)
+			_, err = wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListReference, wait.NRTIgnoreNothing)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -443,7 +464,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Verifying NRT reflects no updates after scheduling the burstable pod")
-			_, err = wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListInitial, wait.NRTIgnoreNothing)
+			_, err = wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListReference, wait.NRTIgnoreNothing)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -481,13 +502,14 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			}
 
 			By("Verifying NRT reflects no updates after scheduling the burstable pod")
-			targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
+			targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListReference, 1*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 			targetNrtCurrent, err := e2enrt.FindFromList(targetNrtListCurrent.Items, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(e2enrt.CheckEqualAvailableResources(*targetNrtInitial, *targetNrtCurrent)).To(BeTrue(), "new resources are accounted in NRT although scheduling burstable pod")
+			Expect(e2enrt.CheckEqualAvailableResources(*targetNrtReference, *targetNrtCurrent)).To(BeTrue(), "new resources are accounted in NRT although scheduling burstable pod")
 		})
-		It("should properly schedule a burstable pod when one of the containers is asking for requests=limits, with no changes in NRTs", func() {
+
+		It("[tier2] should properly schedule a burstable pod when one of the containers is asking for requests=limits, with no changes in NRTs", func() {
 			By("create a burstable pod")
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod-bu")
 			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
@@ -537,7 +559,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			err = fxt.Client.Create(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
-			klog.Infof("create the busrtable test pod with requests %s", e2ereslist.ToString(reqResources))
+			klog.Infof("create the burstable test pod with requests %s", e2ereslist.ToString(reqResources))
 
 			By("waiting for the pod to be scheduled")
 			// 3 minutes is plenty, should never timeout
@@ -553,7 +575,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Verifying NRT reflects no updates after scheduling the burstable pod")
-			_, err = wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListInitial, wait.NRTIgnoreNothing)
+			_, err = wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListReference, wait.NRTIgnoreNothing)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -584,7 +606,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			By("Verifying NRT reflects no updates after scheduling the burstable pod")
-			_, err = wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListInitial, wait.NRTIgnoreNothing)
+			_, err = wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListReference, wait.NRTIgnoreNothing)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("create a gu pod")
@@ -625,7 +647,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 
 			By("Verifying NRT reflects no updates after scheduling the burstable pod")
-			_, err = wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListInitial, wait.NRTIgnoreNothing)
+			_, err = wait.With(fxt.Client).Interval(5*time.Second).Timeout(1*time.Minute).ForNodeResourceTopologiesEqualTo(context.TODO(), &targetNrtListReference, wait.NRTIgnoreNothing)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("delete the burstable pod and the guaranteed pod should change state from pending to running")
@@ -649,7 +671,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			By("wait for NRT data to settle")
 			e2efixture.MustSettleNRT(fxt)
 
-			nrtPostPodCreateList, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, time.Minute)
+			nrtPostPodCreateList, err := e2enrt.GetUpdated(fxt.Client, targetNrtListReference, time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostPodCreateList.Items, updatedPod.Spec.NodeName)
@@ -732,11 +754,11 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			}
 
 			By("Verifying NRT reflects no updates after scheduling the burstable pod")
-			targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
+			targetNrtListCurrent, err := e2enrt.GetUpdated(fxt.Client, targetNrtListReference, 1*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 			targetNrtCurrent, err := e2enrt.FindFromList(targetNrtListCurrent.Items, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(e2enrt.CheckEqualAvailableResources(*targetNrtInitial, *targetNrtCurrent)).To(BeTrue(), "new resources are accounted in NRT although scheduling burstable pod")
+			Expect(e2enrt.CheckEqualAvailableResources(*targetNrtReference, *targetNrtCurrent)).To(BeTrue(), "new resources are accounted in NRT although scheduling burstable pod")
 
 			By("deleting the daemonset")
 			err = fxt.Client.Delete(context.TODO(), ds)

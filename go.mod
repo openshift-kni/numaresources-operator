@@ -12,7 +12,7 @@ require (
 	github.com/k8stopologyawareschedwg/deployer v0.18.2
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.1
 	github.com/k8stopologyawareschedwg/podfingerprint v0.2.2
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.16.0
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.16.1-0.20231211140359-6dba655b8b2a
 	github.com/kubevirt/device-plugin-manager v1.19.4
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo/v2 v2.11.0

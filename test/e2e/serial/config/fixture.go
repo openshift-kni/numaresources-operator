@@ -58,7 +58,7 @@ func (cfg *E2EConfig) RecordNRTReference() error {
 	if err != nil {
 		return err
 	}
-	klog.Infof("recorded reference NRT data:\n%s", intnrt.ListToString(cfg.NRTList.Items, "reference"))
+	klog.Infof("recorded reference NRT data:\n%s", intnrt.ListToString(cfg.NRTList.Items, " reference"))
 	return nil
 }
 
