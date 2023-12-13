@@ -237,6 +237,9 @@ build-must-gather-e2e: build-e2e-must-gather
 build-pause: bin-dir
 	install -m 755 hack/pause bin/
 
+build-pause-gcc: bin-dir
+	gcc -Wall -g -Os -static -o bin/pause hack/pause.c
+
 bin-dir:
 	@mkdir -p bin || :
 
@@ -253,6 +256,12 @@ container-build: #test ## Build container image with the manager.
 
 container-push: ## Push container image with the manager.
 	$(CONTAINER_ENGINE) push ${IMG}
+
+container-build-pause:
+	$(CONTAINER_ENGINE) build -f Dockerfile.pause.gcc -t ${REPO}/pause:test-ci . 
+
+container-push-pause:
+	$(CONTAINER_ENGINE) push ${REPO}/pause:test-ci . 
 
 ##@ Deployment
 
