@@ -58,7 +58,7 @@ const (
 	defaultTeardownTime      = 180 * time.Second
 	defaultCooldownTime      = 30 * time.Second
 	defaultSettleInterval    = 9 * time.Second
-	defaultSettleTimeout     = 75 * time.Second
+	defaultSettleTimeout     = 2 * time.Minute // increased twice
 	defaultCooldownThreshold = 5
 )
 
