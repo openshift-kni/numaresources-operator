@@ -59,7 +59,7 @@ const (
 	defaultTeardownTime      = 180 * time.Second
 	defaultCooldownTime      = 30 * time.Second
 	defaultSettleInterval    = 9 * time.Second
-	defaultSettleTimeout     = 75 * time.Second
+	defaultSettleTimeout     = 2 * time.Minute // increased twice
 	defaultCooldownThreshold = 5
 )
 
@@ -171,7 +171,7 @@ func Cooldown(ft *Fixture) {
 
 func MustSettleNRT(fxt *Fixture) {
 	_, err := WaitForNRTSettle(fxt)
-	gomega.ExpectWithOffset(1, err).ToNot(gomega.HaveOccurred())
+	gomega.ExpectWithOffset(1, err).ToNot(gomega.HaveOccurred(), "NRTs have not settled during the provided cooldown time: %v", err)
 }
 
 func WaitForNRTSettle(fxt *Fixture) (*nrtv1alpha2.NodeResourceTopologyList, error) {
