@@ -347,7 +347,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 
 				NUMAZonesWithDevice := 1
 				By(fmt.Sprintf("filtering available nodes which provide %q on exactly %d zones", deviceName, NUMAZonesWithDevice))
-				nrtCandidates = FilterAnyZoneProvidingResourcesAtMost(nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
+				nrtCandidates = e2enrt.FilterAnyZoneProvidingResourcesAtMost(nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with at most %d NUMA Zones offering %q: found %d", NUMAZonesWithDevice, deviceName, len(nrtCandidates))
 				}
@@ -468,7 +468,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 
 				NUMAZonesWithDevice := 1
 				By(fmt.Sprintf("filtering available nodes which provide %q on exactly %d zones", deviceName, NUMAZonesWithDevice))
-				nrtCandidates = FilterAnyZoneProvidingResourcesAtMost(nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
+				nrtCandidates = e2enrt.FilterAnyZoneProvidingResourcesAtMost(nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with at most %d NUMA Zones offering %q: found %d", NUMAZonesWithDevice, deviceName, len(nrtCandidates))
 				}
@@ -583,48 +583,6 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 		})
 	})
 })
-
-func FilterAnyZoneProvidingResourcesAtMost(nrts []nrtv1alpha2.NodeResourceTopology, resourceName string, maxResources int64, maxZones int) []nrtv1alpha2.NodeResourceTopology {
-	maxQty := *resource.NewQuantity(maxResources, resource.DecimalSI)
-	ret := []nrtv1alpha2.NodeResourceTopology{}
-	for _, nrt := range nrts {
-		matches := 0
-		for _, zone := range nrt.Zones {
-			klog.Infof(" ----> node %q zone %q provides %s request resource %q", nrt.Name, zone.Name, e2ereslist.ToString(e2enrt.AvailableFromZone(zone)), resourceName)
-			if !ResourceInfoProvidingAtMost(zone.Resources, resourceName, maxQty) {
-				continue
-			}
-			matches++
-		}
-		if matches == 0 {
-			klog.Warningf("SKIP: node %q does NOT provide %q at all!", nrt.Name, resourceName)
-			continue
-		}
-		if matches > maxZones {
-			klog.Warningf("SKIP: node %q provides %q on %d zones (looking max=%d)", nrt.Name, resourceName, matches, maxZones)
-			continue
-		}
-		klog.Infof("ADD : node %q provides %q on %d/%d zones", nrt.Name, resourceName, matches, len(nrt.Zones))
-		ret = append(ret, nrt)
-	}
-	return ret
-}
-
-func ResourceInfoProvidingAtMost(resources []nrtv1alpha2.ResourceInfo, resName string, resQty resource.Quantity) bool {
-	zeroQty := resource.MustParse("0")
-	zoneQty, ok := e2enrt.FindResourceAvailableByName(resources, resName)
-	klog.Infof("  +--> checking if resources include %q in (0, %s] (zoneQty=%s found=%v)", resName, resQty.String(), zoneQty.String(), ok)
-	if !ok {
-		return false
-	}
-	if zoneQty.Cmp(zeroQty) <= 0 {
-		return false
-	}
-	if zoneQty.Cmp(resQty) < 0 {
-		return false
-	}
-	return true
-}
 
 func isInterferencePod(pod *corev1.Pod) bool {
 	if pod == nil || pod.Annotations == nil {
