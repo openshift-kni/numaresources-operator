@@ -200,14 +200,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				// very generous timeout here. It's hard and racy to check we had 2 pods pending (expected phased scheduling),
 				// but that would be the most correct and stricter testing.
 				failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodListAllRunning(context.TODO(), testPods)
-				if len(failedPods) > 0 {
-					nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
-					klog.Infof("%s", e2enrtint.ListToString(nrtListFailed.Items, "post failure"))
-
-					for _, failedPod := range failedPods {
-						_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-					}
-				}
+				dumpFailedPodInfo(fxt, failedPods)
 				Expect(len(failedPods)).To(BeZero(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
 
 				for _, updatedPod := range updatedPods {
@@ -302,17 +295,9 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 					// even more generous timeout here. We need to tolerate more reconciliation time because of the interference
 					startTime := time.Now()
 					failedPods, updatedPods := wait.With(fxt.Client).Interval(5*time.Second).Timeout(5*time.Minute).ForPodListAllRunning(context.TODO(), testPods)
+					dumpFailedPodInfo(fxt, failedPods)
 					elapsed := time.Since(startTime)
 					klog.Infof("test pods (payload + interference) gone running in %v", elapsed)
-
-					if len(failedPods) > 0 {
-						nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
-						klog.Infof("%s", e2enrtint.ListToString(nrtListFailed.Items, "post failure"))
-
-						for _, failedPod := range failedPods {
-							_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-						}
-					}
 					Expect(len(failedPods)).To(BeZero(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
 
 					By("checking the test pods once running")
@@ -611,12 +596,25 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache", Label("sch
 				// The reason to be supercareful here is the potentially long interplay between
 				// NRT updater, resync loop, scheduler retry loop.
 				failedPods, updatedPods = wait.With(fxt.Client).Timeout(5*time.Minute).ForPodListAllRunning(context.TODO(), expectedRunningPods)
+				dumpFailedPodInfo(fxt, failedPods)
 				Expect(len(updatedPods)).To(Equal(hostsRequired))
 				Expect(failedPods).To(BeEmpty())
 			})
 		})
 	})
 })
+
+func dumpFailedPodInfo(fxt *e2efixture.Fixture, failedPods []*corev1.Pod) {
+	if len(failedPods) == 0 {
+		return // not much to do here
+	}
+	nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
+	klog.Infof("%s", e2enrtint.ListToString(nrtListFailed.Items, "post failure"))
+
+	for _, failedPod := range failedPods {
+		_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
+	}
+}
 
 func isInterferencePod(pod *corev1.Pod) bool {
 	if pod == nil || pod.Annotations == nil {
