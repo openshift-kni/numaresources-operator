@@ -24,6 +24,17 @@ fi
 if [ -n "${E2E_SERIAL_FOCUS}" ]; then
 	FOCUS="-ginkgo.focus=${E2E_SERIAL_FOCUS}"
 fi
+if [ -n "${E2E_SERIAL_TIER_UPTO}" ]; then
+	if [[ ${E2E_SERIAL_TIER_UPTO} < 0 ]]; then
+		echo "Focus tier ${E2E_SERIAL_TIER_UPTO} cannot be negative"
+		exit 127
+	fi
+	TIER_UPTOS="tier0"
+	for tier in $(seq 1 ${E2E_SERIAL_TIER_UPTO}); do
+		TIER_UPTOS="${TIER_UPTOS}|tier${tier}"
+	done
+	FOCUS="-ginkgo.focus='${TIER_UPTOS}'"
+fi
 if [ -n "${E2E_SERIAL_SKIP}" ]; then
 	SKIP="-ginkgo.skip=${E2E_SERIAL_SKIP}"
 fi
@@ -59,6 +70,19 @@ while [[ $# -gt 0 ]]; do
 			shift
 			shift
 			;;
+		--tier-up-to)
+			if [[ $2 < 0 ]]; then
+				echo "Focus tier $2 cannot be negative"
+				exit 127
+			fi
+			TIER_UPTOS="tier0"
+			for tier in $(seq 1 $2); do
+				TIER_UPTOS="${TIER_UPTOS}|tier${tier}"
+			done
+			FOCUS="-ginkgo.focus='${TIER_UPTOS}'"
+			shift
+			shift
+			;;
 		--skip)
 			SKIP="-ginkgo.skip='$2'"
 			shift
@@ -79,6 +103,7 @@ while [[ $# -gt 0 ]]; do
 			echo "--no-color            force colored output to off"
 			echo "--dry-run             logs what about to do, but don't actually do it"
 			echo "--focus <regex>       only run cases matching <regex> (passed to -ginkgo.focus)"
+			echo "--tier-up-to <N>      run cases belonging to all tiers up to <N> (passed to -ginkgo.focus)"
 			echo "--skip <regex>        skip cases matching <regex> (passed to -ginkgo.skip)"
 			echo "--report-file <file>  write report file for this suite on <file>"
 			echo "--help                shows this message and helps correctly"
