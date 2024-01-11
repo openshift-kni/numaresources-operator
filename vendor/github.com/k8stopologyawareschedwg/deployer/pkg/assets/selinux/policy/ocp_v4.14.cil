@@ -1,0 +1,25 @@
+(block rte
+	(type process)
+	(roletype system_r process)
+	(typeattributeset domain (process))
+	;
+	; Giving rte.process the same attributes as container_t
+	(typeattributeset container_domain (process))
+	(typeattributeset container_net_domain (process))
+	(typeattributeset svirt_sandbox_domain (process))
+	(typeattributeset sandbox_net_domain (process))
+	; MCS is leveraged by container_t and others, like us, to prevent cross-pod communication.
+	(typeattributeset mcs_constrained_type (process))
+	;
+	; Allow access to procfs (also needed by libraries)
+	(allow process proc_type (file (open read)))
+	;
+	; Allow to RTE pod access to /run/rte directory
+	(allow process container_var_run_t (dir (add_name write)))
+	(allow process container_var_run_t (file (create read write open)))
+	;
+	; Allow to RTE pod connect, read and write permissions to /var/lib/kubelet/pod-resource/kubelet.sock
+	(allow process container_var_lib_t (sock_file (open getattr read write ioctl lock append)))
+	(allow process container_var_lib_t (unix_stream_socket (connectto)))
+	(allow process unconfined_service_t (unix_stream_socket (connectto)))
+)
