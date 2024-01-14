@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	securityv1 "github.com/openshift/api/security/v1"
@@ -392,7 +393,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		return daemonSetsNName, err
 	}
 
-	err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, instance.Spec.LogLevel)
+	err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
 	if err != nil {
 		return daemonSetsNName, err
 	}
