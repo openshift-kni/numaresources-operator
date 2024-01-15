@@ -396,6 +396,29 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				gomega.Expect(gotEv).To(gomega.BeNil(), "unexpected environment variable %q in %q", ev.Name, cnt.Name)
 			}
 		})
+
+		ginkgo.It("should configure by default the relaxed resync detection mode in configmap", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectOnlyExclusiveResources)
+		})
+
+		ginkgo.It("should allow to set aggressive resync detection mode in configmap", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			nrsUpdated := &nropv1.NUMAResourcesScheduler{}
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrsUpdated)).To(gomega.Succeed())
+
+			resyncDetect := nropv1.CacheResyncDetectionAggressive
+			nrsUpdated.Spec.CacheResyncDetection = &resyncDetect
+			gomega.Expect(reconciler.Client.Update(context.TODO(), nrsUpdated)).To(gomega.Succeed())
+
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectAll)
+		})
 	})
 })
 
@@ -415,4 +438,27 @@ func diffYAML(want, got string) (string, error) {
 		return "", err
 	}
 	return cmp.Diff(cfgWant, cfgGot), nil
+}
+
+func expectCacheParams(cli client.Client, resyncMethod, foreignPodsDetect string) {
+	key := client.ObjectKey{
+		Name:      "topo-aware-scheduler-config",
+		Namespace: testNamespace,
+	}
+
+	cm := corev1.ConfigMap{}
+	gomega.ExpectWithOffset(1, cli.Get(context.TODO(), key, &cm)).To(gomega.Succeed())
+
+	confRaw := cm.Data[sched.SchedulerConfigFileName]
+	cfgs, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(confRaw))
+	gomega.ExpectWithOffset(1, err).ToNot(gomega.HaveOccurred())
+	gomega.ExpectWithOffset(1, cfgs).To(gomega.HaveLen(1), "unexpected config params count: %d", len(cfgs))
+	cfg := cfgs[0]
+
+	klog.InfoS("config", dumpConfigCacheParams(cfg.Cache)...)
+
+	gomega.ExpectWithOffset(1, cfg.Cache.ResyncMethod).ToNot(gomega.BeNil())
+	gomega.ExpectWithOffset(1, *cfg.Cache.ResyncMethod).To(gomega.Equal(resyncMethod))
+	gomega.ExpectWithOffset(1, cfg.Cache.ForeignPodsDetectMode).ToNot(gomega.BeNil())
+	gomega.ExpectWithOffset(1, *cfg.Cache.ForeignPodsDetectMode).To(gomega.Equal(foreignPodsDetect))
 }

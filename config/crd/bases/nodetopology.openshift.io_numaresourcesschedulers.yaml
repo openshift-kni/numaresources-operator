@@ -44,6 +44,14 @@ spec:
                 - Disabled
                 - DumpJSONFile
                 type: string
+              cacheResyncDetection:
+                description: Set the cache resync detection mode. Default is to trigger
+                  resyncs only when detected guaranteed QoS pods which require NUMA-specific
+                  resources.
+                enum:
+                - Relaxed
+                - Aggressive
+                type: string
               cacheResyncPeriod:
                 description: Set the cache resync period. Use explicit 0 to disable.
                 type: string
