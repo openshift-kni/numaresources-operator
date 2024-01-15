@@ -536,13 +536,12 @@ func FilterAnyZoneProvidingResourcesAtMost(nrts []nrtv1alpha2.NodeResourceTopolo
 }
 
 func ResourceInfoProvidingAtMost(resources []nrtv1alpha2.ResourceInfo, resName string, resQty resource.Quantity) bool {
-	zeroQty := resource.MustParse("0")
 	zoneQty, ok := FindResourceAvailableByName(resources, resName)
 	klog.Infof("  +--> checking if resources include %q in (0, %s] (zoneQty=%s found=%v)", resName, resQty.String(), zoneQty.String(), ok)
 	if !ok {
 		return false
 	}
-	if zoneQty.Cmp(zeroQty) <= 0 {
+	if zoneQty.IsZero() {
 		return false
 	}
 	if zoneQty.Cmp(resQty) < 0 {
