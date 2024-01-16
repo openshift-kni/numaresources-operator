@@ -8,7 +8,7 @@ The operator provides minimal support to deploy [secondary schedulers](https://g
 
 Please check the [issues section](https://github.com/openshift-kni/numaresources-operator/issues) for the known issues and limitations of the NUMA resources operator.
 
-## Additional noteworthy information
+## additional noteworthy information
 
 NRT objects only take into consideration exclusively allocated CPUs while accounting. In order for a pod to be allocated exclusive CPUs, it HAS to belong to Guaranteed QoS class (request=limit) and request has to be integral. Therefore, CPUs in the shared pool because of pods belonging to best effort/burstable QoS or guaranteed pod with non-integral CPU request would not be accounted for in the NRT objects. Please refer to CPU Manager docs [here](https://kubernetes.io/docs/tasks/administer-cluster/cpu-management-policies/#static-policy) for more detail on this.
 
