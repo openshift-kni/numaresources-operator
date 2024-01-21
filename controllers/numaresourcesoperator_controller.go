@@ -110,8 +110,8 @@ type NUMAResourcesOperatorReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.9.2/pkg/reconcile
 func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	klog.V(3).InfoS("Starting NUMAResourcesOperator reconcile loop", "object", req.NamespacedName)
-	defer klog.V(3).InfoS("Finish NUMAResourcesOperator reconcile loop", "object", req.NamespacedName)
+	klog.V(2).InfoS("Starting NUMAResourcesOperator reconcile loop", "object", req.NamespacedName)
+	defer klog.V(2).InfoS("Finish NUMAResourcesOperator reconcile loop", "object", req.NamespacedName)
 
 	instance := &nropv1.NUMAResourcesOperator{}
 	err := r.Get(ctx, req.NamespacedName, instance)
@@ -144,24 +144,27 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}
 
-	for idx := range trees {
+	/*for idx := range trees {
 		conf := trees[idx].NodeGroup.NormalizeConfig()
 		trees[idx].NodeGroup.Config = &conf
-	}
+	}*/
 
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
 	if condition != "" {
 		// TODO: use proper reason
 		reason, message := condition, messageFromError(err)
 		_, _ = r.updateStatus(ctx, instance, condition, reason, message)
+	} else {
+		_, _ = r.updateStatus(ctx, instance, "unknown", "unknown reason", "something wrong happened hence updating th object wasn't completed")
 	}
+
 	return result, err
 }
 
 func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (ctrl.Result, error) {
-	klog.InfoS("updateStatus", "condition", condition, "reason", reason, "message", message)
+	klog.InfoS("updateStatusConditions", "condition", condition, "reason", reason, "message", message)
 
-	if _, err := updateStatus(ctx, r.Client, instance, condition, reason, message); err != nil {
+	if _, err := updateStatusConditions(ctx, r.Client, instance, condition, reason, message); err != nil {
 		klog.InfoS("Failed to update numaresourcesoperator status", "Desired condition", status.ConditionDegraded, "error", err)
 		return ctrl.Result{}, err
 	}
@@ -170,7 +173,7 @@ func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, inst
 	return ctrl.Result{}, nil
 }
 
-func updateStatus(ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
+func updateStatusConditions(ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
 	conditions, ok := status.GetUpdatedConditions(instance.Status.Conditions, condition, reason, message)
 	if !ok {
 		return false, nil
@@ -204,9 +207,10 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulCRDInstall", "Node Resource Topology CRD installed")
 
 	if r.Platform == platform.OpenShift {
-		// we need to create machine configs first and wait for the MachineConfigPool updates
-		// before creating additional components
+		// we need to synchronize machine configs first and wait for the MachineConfigPool updates
+		// before synchronizing additional components
 		if err := r.syncMachineConfigs(ctx, instance, trees); err != nil {
+			klog.V(2).Infof("Shereen debug: failed sync of machine configs: %v", err)
 			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
 			return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "failed to sync machine configs")
 		}
@@ -218,8 +222,10 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 		instance.Status.MachineConfigPools = mcpStatuses
 		if !allMCPsUpdated {
 			// the Machine Config Pool still did not apply the machine config, wait for one minute
+			klog.V(2).Infof("Shereen debug: failed sync of machine configs pools: %v - Progressing ", err)
 			return ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, status.ConditionProgressing, nil
 		}
+		klog.V(2).Info("Shereen debug: sync of machine configs pools - Updated ")
 	}
 
 	daemonSetsInfo, err := r.syncNUMAResourcesOperatorResources(ctx, instance, trees)
@@ -229,9 +235,15 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	}
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
 
-	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Name, instance.Status.MachineConfigPools, trees)
+	instance.Status.MachineConfigPools, err = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
+	if err != nil {
+		klog.V(2).Info("Shereen debug: sync of machine configs pools Config Status - Failed ")
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCPConfigStatusSync", "Failed to sync mcp config status: %v", err)
+		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedMCPConfigStatusSync")
+	}
+	klog.V(2).Info("Shereen debug: sync of machine configs pools Config Status - Updated ")
 
-	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, instance, daemonSetsInfo)
+	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, daemonSetsInfo)
 	instance.Status.DaemonSets = dsStatuses
 	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dsStatuses)
 	if err != nil {
@@ -244,7 +256,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	return ctrl.Result{}, status.ConditionAvailable, nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, instance *nropv1.NUMAResourcesOperator, daemonSetsInfo []nropv1.NamespacedName) ([]nropv1.NamespacedName, bool, error) {
+func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, daemonSetsInfo []nropv1.NamespacedName) ([]nropv1.NamespacedName, bool, error) {
 	dsStatuses := []nropv1.NamespacedName{}
 	for _, nname := range daemonSetsInfo {
 		ds := appsv1.DaemonSet{}
@@ -266,8 +278,8 @@ func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Con
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx context.Context) error {
-	klog.V(4).Info("APISync start")
-	defer klog.V(4).Info("APISync stop")
+	klog.V(2).Info("APISync start")
+	defer klog.V(2).Info("APISync stop")
 
 	existing := apistate.FromClient(ctx, r.Client, r.Platform, r.APIManifests)
 
@@ -280,8 +292,8 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx contex
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) error {
-	klog.V(4).InfoS("Machine Config Sync start", "trees", len(trees))
-	defer klog.V(4).Info("Machine Config Sync stop")
+	klog.V(2).InfoS("Machine Config Sync start", "trees", len(trees))
+	defer klog.V(2).Info("Machine Config Sync stop")
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
 
@@ -305,8 +317,8 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 }
 
 func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree) ([]nropv1.MachineConfigPool, bool) {
-	klog.V(4).InfoS("Machine Config Status Sync start", "trees", len(trees))
-	defer klog.V(4).Info("Machine Config Status Sync stop")
+	klog.V(2).InfoS("Machine Config Status Sync start", "trees", len(trees))
+	defer klog.V(2).Info("Machine Config Status Sync stop")
 
 	mcpStatuses := []nropv1.MachineConfigPool{}
 	for _, tree := range trees {
@@ -318,9 +330,11 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tre
 			})
 
 			isUpdated := IsMachineConfigPoolUpdated(instanceName, mcp)
-			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instanceName, "updated", isUpdated)
+			klog.V(2).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instanceName, "updated", isUpdated)
+			klog.V(2).Infof("Shereen debug: updated mcp: %s", mcp.Name)
 
 			if !isUpdated {
+				klog.V(2).Infof("Shereen debug: abort updates: mcp %s is not updated", mcp.Name)
 				return mcpStatuses, false
 			}
 		}
@@ -328,25 +342,47 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tre
 	return mcpStatuses, true
 }
 
-func syncMachineConfigPoolNodeGroupConfigStatuses(instanceName string, mcpStatuses []nropv1.MachineConfigPool, trees []nodegroupv1.Tree) []nropv1.MachineConfigPool {
-	klog.V(4).InfoS("Machine Config Pool Node Group Status Sync start", "mcpStatuses", len(mcpStatuses), "trees", len(trees))
-	defer klog.V(4).Info("Machine Config Pool Node Group Status Sync stop")
+func syncMachineConfigPoolNodeGroupConfigStatuses(mcpStatuses []nropv1.MachineConfigPool, trees []nodegroupv1.Tree) ([]nropv1.MachineConfigPool, error) {
+	klog.V(2).InfoS("Machine Config Pool Node Group Status Sync start", "mcpStatuses", len(mcpStatuses), "trees", len(trees))
+	defer klog.V(2).Info("Machine Config Pool Node Group Status Sync stop")
 
 	updatedMcpStatuses := []nropv1.MachineConfigPool{}
+	ngcDefault := nropv1.DefaultNodeGroupConfig()
+
 	for _, tree := range trees {
-		klog.V(5).InfoS("Machine Config Pool Node Group tree update", "mcps", len(tree.MachineConfigPools))
+		klog.V(2).InfoS("Machine Config Pool Node Group tree update", "mcps", len(tree.MachineConfigPools))
 
 		for _, mcp := range tree.MachineConfigPools {
 			mcpStatus := getMachineConfigPoolStatusByName(mcpStatuses, mcp.Name)
-
+			klog.V(2).Infof("Shereen debug: mcp status config before update: %+v", mcpStatus.Config.ToString())
 			var confSource string
-			if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
+			//if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
+			if tree.NodeGroup == nil {
+				klog.V(2).Infof("Shereen debug: Failed mcp nodegroup status update; nodegroup is empty while it is required.")
+				return mcpStatuses, fmt.Errorf("Shereen debug: Failed mcp nodegroup status update; nodegroup of %s is empty while it is required.", mcp.Name)
+			}
+			if tree.NodeGroup.Config != nil { //<---this is never false because of the normalization at the beggining of the reconcile
+				klog.V(2).Infof("Shereen debug: wanted nodegroup config: %+v", tree.NodeGroup.Config.ToString())
 				confSource = "spec"
-				mcpStatus.Config = tree.NodeGroup.Config.DeepCopy()
+				tree.NodeGroup.Config.FillEmptyFeilds()
+				mcpStatus.Config = tree.NodeGroup.Config
+				klog.V(2).Infof("Shereen debug: wanted nodegroup config after normalization: %+v", mcpStatus.Config.ToString())
+				// prase default and non default values
+				//if tree.NodeGroup.Config.PodsFingerprinting == nil {
+				//	mcpStatus.Config.PodsFingerprinting = ngcDefault.PodsFingerprinting
+				//}
+				//if tree.NodeGroup.Config.InfoRefreshMode == nil {
+				//	mcpStatus.Config.InfoRefreshMode = ngcDefault.InfoRefreshMode
+				//}
+				//if tree.NodeGroup.Config.InfoRefreshPeriod == nil {
+				//	mcpStatus.Config.InfoRefreshPeriod = ngcDefault.InfoRefreshPeriod
+				//}
+				//if tree.NodeGroup.Config.InfoRefreshPause == nil {
+				//	mcpStatus.Config.InfoRefreshPause = ngcDefault.InfoRefreshPause
+				//}
 			} else {
 				confSource = "default"
-				ngc := nropv1.DefaultNodeGroupConfig()
-				mcpStatus.Config = &ngc
+				mcpStatus.Config = &ngcDefault
 			}
 
 			klog.V(6).InfoS("Machine Config Pool Node Group updated status config", "mcp", mcp.Name, "source", confSource, "data", fmt.Sprintf("%+v", mcpStatus.Config))
@@ -354,7 +390,7 @@ func syncMachineConfigPoolNodeGroupConfigStatuses(instanceName string, mcpStatus
 			updatedMcpStatuses = append(updatedMcpStatuses, mcpStatus)
 		}
 	}
-	return updatedMcpStatuses
+	return updatedMcpStatuses, nil
 }
 
 func getMachineConfigPoolStatusByName(mcpStatuses []nropv1.MachineConfigPool, name string) nropv1.MachineConfigPool {
@@ -367,8 +403,8 @@ func getMachineConfigPoolStatusByName(mcpStatuses []nropv1.MachineConfigPool, na
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]nropv1.NamespacedName, error) {
-	klog.V(4).InfoS("RTESync start", "trees", len(trees))
-	defer klog.V(4).Info("RTESync stop")
+	klog.V(2).InfoS("RTESync start", "trees", len(trees))
+	defer klog.V(2).Info("RTESync stop")
 
 	errorList := r.deleteUnusedDaemonSets(ctx, instance, trees)
 	if len(errorList) > 0 {
@@ -425,8 +461,8 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 }
 
 func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
-	klog.V(3).Info("Delete Daemonsets start")
-	defer klog.V(3).Info("Delete Daemonsets end")
+	klog.V(2).Info("Delete Daemonsets start")
+	defer klog.V(2).Info("Delete Daemonsets end")
 	var errors []error
 	var daemonSetList appsv1.DaemonSetList
 	if err := r.List(ctx, &daemonSetList, &client.ListOptions{Namespace: instance.Namespace}); err != nil {
@@ -448,7 +484,7 @@ func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Con
 					klog.ErrorS(err, "error while deleting daemonset", "DaemonSet", ds.Name)
 					errors = append(errors, err)
 				} else {
-					klog.V(3).InfoS("Daemonset deleted", "name", ds.Name)
+					klog.V(2).InfoS("Daemonset deleted", "name", ds.Name)
 				}
 			}
 		}
@@ -457,8 +493,8 @@ func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Con
 }
 
 func (r *NUMAResourcesOperatorReconciler) deleteUnusedMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
-	klog.V(3).Info("Delete Machineconfigs start")
-	defer klog.V(3).Info("Delete Machineconfigs end")
+	klog.V(2).Info("Delete Machineconfigs start")
+	defer klog.V(2).Info("Delete Machineconfigs end")
 	var errors []error
 	var machineConfigList machineconfigv1.MachineConfigList
 	if err := r.List(ctx, &machineConfigList); err != nil {
@@ -480,7 +516,7 @@ func (r *NUMAResourcesOperatorReconciler) deleteUnusedMachineConfigs(ctx context
 					klog.ErrorS(err, "error while deleting machineconfig", "MachineConfig", mc.Name)
 					errors = append(errors, err)
 				} else {
-					klog.V(3).InfoS("Machineconfig deleted", "name", mc.Name)
+					klog.V(2).InfoS("Machineconfig deleted", "name", mc.Name)
 				}
 			}
 		}
@@ -673,14 +709,14 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 	// a specific configmap for each daemonset, whose name we know only
 	// when we instantiate the daemonset from the MCP.
 	if gdm.ClusterPlatform != platform.OpenShift {
-		klog.V(5).InfoS("DaemonSet update: unsupported platform", "mcp", mcpName, "platform", gdm.ClusterPlatform)
+		klog.V(2).InfoS("DaemonSet update: unsupported platform", "mcp", mcpName, "platform", gdm.ClusterPlatform)
 		// nothing to do!
 		return nil
 	}
 	err := rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
 	if err != nil {
 		// intentionally info because we want to keep going
-		klog.V(5).InfoS("DaemonSet update: cannot update config", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
+		klog.V(2).InfoS("DaemonSet update: cannot update config", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
 		return err
 	}
 
@@ -689,7 +725,7 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 
 func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
 	ok := (ds.Status.DesiredNumberScheduled > 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberReady)
-	klog.V(5).InfoS("daemonset", "namespace", ds.Namespace, "name", ds.Name, "desired", ds.Status.DesiredNumberScheduled, "current", ds.Status.CurrentNumberScheduled, "ready", ds.Status.NumberReady)
+	klog.V(2).InfoS("daemonset", "namespace", ds.Namespace, "name", ds.Name, "desired", ds.Status.DesiredNumberScheduled, "current", ds.Status.CurrentNumberScheduled, "ready", ds.Status.NumberReady)
 	return ok
 }
 

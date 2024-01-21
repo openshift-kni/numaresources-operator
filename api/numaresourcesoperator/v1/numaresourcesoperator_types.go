@@ -17,6 +17,7 @@
 package v1
 
 import (
+	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -101,6 +102,14 @@ type NodeGroupConfig struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Enable or disable the RTE pause setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	InfoRefreshPause *InfoRefreshPauseMode `json:"infoRefreshPause,omitempty"`
+}
+
+func (ngc *NodeGroupConfig) ToString() string {
+	if ngc != nil {
+		return fmt.Sprintf("PodsFingerprinting mode: %s InfoRefreshMode: %s InfoRefreshPeriod: %s InfoRefreshPause: %s", *ngc.PodsFingerprinting, *ngc.InfoRefreshMode, *ngc.InfoRefreshPeriod, *ngc.InfoRefreshPause)
+	}
+	rt := DefaultNodeGroupConfig()
+	return rt.ToString()
 }
 
 // NodeGroup defines group of nodes that will run resource topology exporter daemon set

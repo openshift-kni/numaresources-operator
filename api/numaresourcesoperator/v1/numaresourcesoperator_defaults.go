@@ -24,11 +24,11 @@ import (
 
 func DefaultNodeGroupConfig() NodeGroupConfig {
 	ngc := NodeGroupConfig{}
-	ngc.Default()
+	ngc.FillEmptyFeilds()
 	return ngc
 }
 
-func (ngc *NodeGroupConfig) Default() {
+func (ngc *NodeGroupConfig) FillEmptyFeilds() {
 	if ngc.PodsFingerprinting == nil {
 		ngc.PodsFingerprinting = defaultPodsFingerprinting()
 	}

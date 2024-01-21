@@ -258,10 +258,10 @@ container-push: ## Push container image with the manager.
 	$(CONTAINER_ENGINE) push ${IMG}
 
 container-build-pause:
-	$(CONTAINER_ENGINE) build -f Dockerfile.pause.gcc -t ${REPO}/pause:test-ci . 
+	$(CONTAINER_ENGINE) build -f Dockerfile.pause.gcc -t ${REPO}/pause:test-ci .
 
 container-push-pause:
-	$(CONTAINER_ENGINE) push ${REPO}/pause:test-ci . 
+	$(CONTAINER_ENGINE) push ${REPO}/pause:test-ci .
 
 ##@ Deployment
 
@@ -401,7 +401,7 @@ verify-generated: bundle generate
 	hack/verify-generated.sh
 
 install-git-hooks:
-	git config core.hooksPath .githooks	
+	git config core.hooksPath .githooks
 
 
 GOLANGCI_LINT_LOCAL_VERSION := $(shell command ${GOLANGCI_LINT} --version 2> /dev/null | awk '{print $$4}')

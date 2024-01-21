@@ -1359,7 +1359,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("running the test pod")
 			klog.Infof(objects.DumpPODResourceRequirements(pod))
 
-			By("running the test pod")
 			err := fxt.Client.Create(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
 
