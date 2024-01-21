@@ -227,6 +227,13 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 		}
 		klog.V(2).Info("Shereen debug: sync of machine configs pools - Updated ")
 	}
+	nodeGroupStatuses, err := syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, &trees)
+	if err != nil {
+		klog.V(2).Info("Shereen debug: sync of machine configs pools Config Status - Failed ")
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCPConfigStatusSync", "Failed to sync mcp config status: %v", err)
+		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedMCPConfigStatusSync")
+	}
+	klog.V(2).Info("Shereen debug: sync of machine configs pools Config Status - Updated ")
 
 	daemonSetsInfo, err := r.syncNUMAResourcesOperatorResources(ctx, instance, trees)
 	if err != nil {
@@ -235,17 +242,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	}
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
 
-	instance.Status.MachineConfigPools, err = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
-	if err != nil {
-		klog.V(2).Info("Shereen debug: sync of machine configs pools Config Status - Failed ")
-		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCPConfigStatusSync", "Failed to sync mcp config status: %v", err)
-		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedMCPConfigStatusSync")
-	}
-	klog.V(2).Info("Shereen debug: sync of machine configs pools Config Status - Updated ")
-
 	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, daemonSetsInfo)
-	instance.Status.DaemonSets = dsStatuses
-	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dsStatuses)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, err
 	}
@@ -253,6 +250,9 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
 	}
 
+	instance.Status.DaemonSets = dsStatuses
+	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dsStatuses)
+	instance.Status.MachineConfigPools = nodeGroupStatuses
 	return ctrl.Result{}, status.ConditionAvailable, nil
 }
 
@@ -342,14 +342,14 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tre
 	return mcpStatuses, true
 }
 
-func syncMachineConfigPoolNodeGroupConfigStatuses(mcpStatuses []nropv1.MachineConfigPool, trees []nodegroupv1.Tree) ([]nropv1.MachineConfigPool, error) {
-	klog.V(2).InfoS("Machine Config Pool Node Group Status Sync start", "mcpStatuses", len(mcpStatuses), "trees", len(trees))
+func syncMachineConfigPoolNodeGroupConfigStatuses(mcpStatuses []nropv1.MachineConfigPool, trees *[]nodegroupv1.Tree) ([]nropv1.MachineConfigPool, error) {
+	klog.V(2).InfoS("Machine Config Pool Node Group Status Sync start", "mcpStatuses", len(mcpStatuses), "trees", len(*trees))
 	defer klog.V(2).Info("Machine Config Pool Node Group Status Sync stop")
 
 	updatedMcpStatuses := []nropv1.MachineConfigPool{}
 	ngcDefault := nropv1.DefaultNodeGroupConfig()
 
-	for _, tree := range trees {
+	for _, tree := range *trees {
 		klog.V(2).InfoS("Machine Config Pool Node Group tree update", "mcps", len(tree.MachineConfigPools))
 
 		for _, mcp := range tree.MachineConfigPools {
@@ -382,6 +382,7 @@ func syncMachineConfigPoolNodeGroupConfigStatuses(mcpStatuses []nropv1.MachineCo
 				//}
 			} else {
 				confSource = "default"
+				tree.NodeGroup.Config = &ngcDefault
 				mcpStatus.Config = &ngcDefault
 			}
 

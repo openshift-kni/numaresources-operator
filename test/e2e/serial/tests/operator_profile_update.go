@@ -66,7 +66,7 @@ var _ = Describe("[serial][nrop_update] numaresources operator profile updates",
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	Context("using the NUMA-aware scheduler without updated NRT data", func() {
+	FContext("using the NUMA-aware scheduler without updated NRT data", func() {
 		// TODO The set of tests under this context are expecting that all worker nodes of the cluster
 		// be NROP-configured. this case is covered. However, if the cluster has other worker nodes (>2)
 		// and those nodes are not NROP-configured then the expected behavior of these tests will change
@@ -110,7 +110,7 @@ var _ = Describe("[serial][nrop_update] numaresources operator profile updates",
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		FIt("[tier1] should make a burstable pod pending", func() {
+		It("[tier1] should make a burstable pod pending", func() {
 			By("create burstable pod and expect it to keep pending")
 			testPod = objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName

@@ -106,6 +106,7 @@ type NodeGroupConfig struct {
 
 func (ngc *NodeGroupConfig) ToString() string {
 	if ngc != nil {
+		ngc.FillEmptyFeilds()
 		return fmt.Sprintf("PodsFingerprinting mode: %s InfoRefreshMode: %s InfoRefreshPeriod: %s InfoRefreshPause: %s", *ngc.PodsFingerprinting, *ngc.InfoRefreshMode, *ngc.InfoRefreshPeriod, *ngc.InfoRefreshPause)
 	}
 	rt := DefaultNodeGroupConfig()
