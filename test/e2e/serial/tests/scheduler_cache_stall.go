@@ -45,7 +45,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
-var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Label("scheduler", "cache", "stall", "tier1"), func() {
+var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("scheduler", "cache", "stall"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
@@ -109,7 +109,7 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 			klog.Infof("using MCP %q - refresh period %v", mcpName, refreshPeriod)
 		})
 
-		When("there are jobs in the cluster", Label("job", "generic"), func() {
+		When("there are jobs in the cluster [tier0]", Label("job", "generic", "tier0"), func() {
 			var idleJob *batchv1.Job
 			var hostsRequired int
 			var NUMAZonesRequired int
@@ -302,13 +302,13 @@ var _ = Describe("[serial][scheduler][cache][tier1] scheduler cache stall", Labe
 						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					}
 				},
-				Entry("should handle a burst of qos=guaranteed pods [tier1]", func(pod *corev1.Pod) {
+				Entry("should handle a burst of qos=guaranteed pods [tier0]", func(pod *corev1.Pod) {
 					pod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 						corev1.ResourceMemory: resource.MustParse("64Mi"),
 					}
 				}),
-				Entry("should handle a burst of qos=burstable pods [tier2]", func(pod *corev1.Pod) {
+				Entry("should handle a burst of qos=burstable pods [tier0]", func(pod *corev1.Pod) {
 					pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 						corev1.ResourceMemory: resource.MustParse("64Mi"),
