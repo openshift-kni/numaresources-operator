@@ -63,7 +63,7 @@ var _ = Describe("[Install] continuousIntegration", func() {
 	})
 
 	Context("with a running cluster with all the components", func() {
-		It("[test_id:47574][tier1] should perform overall deployment and verify the condition is reported as available", func() {
+		It("[test_id:47574][tier0] should perform overall deployment and verify the condition is reported as available", func() {
 			deployedObj := deploy.OverallDeployment()
 			nname := client.ObjectKeyFromObject(deployedObj.NroObj)
 			Expect(nname.Name).ToNot(BeEmpty())

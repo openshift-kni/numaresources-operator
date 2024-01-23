@@ -84,7 +84,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 	Context("with at least two nodes suitable", func() {
 		// FIXME: this is a slight abuse of DescribeTable, but we need to run
 		// the same code with a different test_id per tmscope
-		DescribeTable("[tier1][ressched] a guaranteed pod with one container should be placed and aligned on the node",
+		DescribeTable("[tier0][ressched] a guaranteed pod with one container should be placed and aligned on the node",
 			func(tmPolicy, tmScope string, requiredRes, expectedFreeRes corev1.ResourceList) {
 				nrtCandidates, targetNodeName := setupNodes(fxt, desiredNodesState{
 					NRTList:           nrtList,
