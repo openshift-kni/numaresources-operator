@@ -17,6 +17,8 @@
 package v1
 
 import (
+	"fmt"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -172,4 +174,12 @@ type NUMAResourcesOperatorList struct {
 
 func init() {
 	SchemeBuilder.Register(&NUMAResourcesOperator{}, &NUMAResourcesOperatorList{})
+}
+
+func (ngc *NodeGroupConfig) ToString() string {
+	if ngc != nil {
+		ngc.SetDefaults()
+		return fmt.Sprintf("PodsFingerprinting mode: %s InfoRefreshMode: %s InfoRefreshPeriod: %s InfoRefreshPause: %s", *ngc.PodsFingerprinting, *ngc.InfoRefreshMode, *ngc.InfoRefreshPeriod, *ngc.InfoRefreshPause)
+	}
+	return ""
 }
