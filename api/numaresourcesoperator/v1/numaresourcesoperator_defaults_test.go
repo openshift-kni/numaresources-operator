@@ -69,7 +69,7 @@ func TestNodeGroupConfigDefaultMethod(t *testing.T) {
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.val.DeepCopy()
-			got.Default()
+			got.SetDefaults()
 			gotJSON := toJSON(got)
 			expJSON := toJSON(tt.expected)
 			if !reflect.DeepEqual(gotJSON, expJSON) {
