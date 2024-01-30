@@ -259,7 +259,7 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 	}
 	params.Cache.ResyncMethod = &resyncMethod
 	params.Cache.ForeignPodsDetectMode = &foreignPodsDetect
-
+	
 	klog.InfoS("setting cache parameters", dumpConfigCacheParams(params.Cache)...)
 
 	return params
