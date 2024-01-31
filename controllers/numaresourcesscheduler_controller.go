@@ -250,5 +250,36 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 			ResyncPeriodSeconds: &resyncPeriod,
 		},
 	}
+
+	var informerMode string
+	if *schedSpec.SchedulerInformer == k8swgmanifests.CacheInformerDedicated {
+		informerMode = k8swgmanifests.CacheInformerDedicated
+	} else {
+		informerMode = k8swgmanifests.CacheInformerShared
+	}
+	params.Cache.InformerMode = &informerMode
+	klog.InfoS("setting cache parameters", dumpConfigCacheParams(params.Cache)...)
+
 	return params
+}
+
+func dumpConfigCacheParams(ccp *k8swgmanifests.ConfigCacheParams) []interface{} {
+	return []interface{}{
+		"resyncPeriod", strInt64Ptr(ccp.ResyncPeriodSeconds),
+		"informerMode", strStringPtr(ccp.InformerMode),
+	}
+}
+
+func strInt64Ptr(ip *int64) string {
+	if ip == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("%d", *ip)
+}
+
+func strStringPtr(sp *string) string {
+	if sp == nil {
+		return "N/A"
+	}
+	return *sp
 }

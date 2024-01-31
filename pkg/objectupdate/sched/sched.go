@@ -40,10 +40,8 @@ const (
 
 const (
 	PFPStatusDumpEnvVar = "PFP_STATUS_DUMP"
-	NRTInformerEnvVar   = "NRT_ENABLE_INFORMER"
 
-	PFPStatusDir   = "/run/pfpstatus"
-	NRTInformerVal = "true"
+	PFPStatusDir = "/run/pfpstatus"
 )
 
 // TODO: we should inject also the mount point. As it is now, the information is split between the manifest
@@ -71,13 +69,6 @@ func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSc
 		setContainerEnvVar(cnt, PFPStatusDumpEnvVar, PFPStatusDir)
 	} else {
 		deleteContainerEnvVar(cnt, PFPStatusDumpEnvVar)
-	}
-
-	informerMode := *spec.SchedulerInformer
-	if informerMode == nropv1.SchedulerInformerDedicated {
-		setContainerEnvVar(cnt, NRTInformerEnvVar, NRTInformerVal)
-	} else {
-		deleteContainerEnvVar(cnt, NRTInformerEnvVar)
 	}
 }
 
