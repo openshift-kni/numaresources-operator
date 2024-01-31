@@ -252,14 +252,20 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 
 	var foreignPodsDetect string
 	var resyncMethod string = k8swgmanifests.CacheResyncAutodetect
+	var informerMode string
 	if *schedSpec.CacheResyncDetection == nropv1.CacheResyncDetectionRelaxed {
 		foreignPodsDetect = k8swgmanifests.ForeignPodsDetectOnlyExclusiveResources
 	} else {
 		foreignPodsDetect = k8swgmanifests.ForeignPodsDetectAll
 	}
+	if *schedSpec.SchedulerInformer == k8swgmanifests.CacheInformerDedicated {
+		informerMode = k8swgmanifests.CacheInformerDedicated
+	} else {
+		informerMode = k8swgmanifests.CacheInformerShared
+	}
 	params.Cache.ResyncMethod = &resyncMethod
 	params.Cache.ForeignPodsDetectMode = &foreignPodsDetect
-	
+	params.Cache.InformerMode = &informerMode
 	klog.InfoS("setting cache parameters", dumpConfigCacheParams(params.Cache)...)
 
 	return params
@@ -270,6 +276,7 @@ func dumpConfigCacheParams(ccp *k8swgmanifests.ConfigCacheParams) []interface{} 
 		"resyncPeriod", strInt64Ptr(ccp.ResyncPeriodSeconds),
 		"resyncMethod", strStringPtr(ccp.ResyncMethod),
 		"foreignPodsDetectMode", strStringPtr(ccp.ForeignPodsDetectMode),
+		"informerMode", strStringPtr(ccp.InformerMode),
 	}
 }
 
