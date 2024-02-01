@@ -109,6 +109,7 @@ func main() {
 	var enableWebhooks bool
 	var enableMetrics bool
 	var enableHTTP2 bool
+	var enableMCPCondsForward bool
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -129,6 +130,7 @@ func main() {
 	flag.IntVar(&webhookPort, "webhook-port", webhookPort, "The port the operator webhook should listen to.")
 	flag.BoolVar(&enableMetrics, "enable-metrics", false, "enable metrics server")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false, "If HTTP/2 should be enabled for the webhook servers.")
+	flag.BoolVar(&enableMCPCondsForward, "enable-mcp-conds-fwd", false, "enable MCP Status Condition forwarding")
 
 	klog.InitFlags(nil)
 	flag.Parse()
@@ -246,6 +248,7 @@ func main() {
 		ImageSpec:       imageSpec,
 		ImagePullPolicy: pullPolicy,
 		Namespace:       namespace,
+		ForwardMCPConds: enableMCPCondsForward,
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesOperator")
 		os.Exit(1)
