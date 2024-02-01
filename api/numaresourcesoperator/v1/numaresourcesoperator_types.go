@@ -105,6 +105,7 @@ type NUMAResourcesOperatorStatus struct {
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="RTE DaemonSets"
 	DaemonSets []NamespacedName `json:"daemonsets,omitempty"`
 	// MachineConfigPools resolved from configured node groups
+	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="RTE MCPs from node groups"
 	MachineConfigPools []MachineConfigPool `json:"machineconfigpools,omitempty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
