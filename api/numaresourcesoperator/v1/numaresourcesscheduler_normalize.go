@@ -28,6 +28,7 @@ const (
 	defaultCacheResyncDebug     = CacheResyncDebugDumpJSONFile
 	defaultSchedulerInformer    = SchedulerInformerDedicated
 	defaultCacheResyncDetection = CacheResyncDetectionRelaxed
+	defaultKNILogger            = KNILoggerDisaggregate
 )
 
 func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
@@ -47,6 +48,10 @@ func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
 	if spec.CacheResyncDetection == nil {
 		resyncDetection := defaultCacheResyncDetection
 		spec.CacheResyncDetection = &resyncDetection
+	}
+	if spec.KNILogger == nil {
+		kniLog := defaultKNILogger
+		spec.KNILogger = &kniLog
 	}
 }
 

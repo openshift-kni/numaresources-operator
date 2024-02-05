@@ -56,6 +56,17 @@ const (
 	CacheResyncDetectionAggressive CacheResyncDetectionMode = "Aggressive"
 )
 
+// +kubebuilder:validation:Enum=Disabled;Disaggregate
+type KNILoggerMode string
+
+const (
+	// KNILoggerDisabled disables any KNI-specific logging
+	KNILoggerDisabled KNILoggerMode = "Disabled"
+
+	// KNILoggerDisaggregate enables KNI-specific logging differentiating by LogID
+	KNILoggerDisaggregate KNILoggerMode = "Disaggregate"
+)
+
 // NUMAResourcesSchedulerSpec defines the desired state of NUMAResourcesScheduler
 type NUMAResourcesSchedulerSpec struct {
 	// Scheduler container image URL
@@ -86,6 +97,10 @@ type NUMAResourcesSchedulerSpec struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler cache resync detection setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	CacheResyncDetection *CacheResyncDetectionMode `json:"cacheResyncDetection,omitempty"`
+	// Enables KNI-specific logging in the scheduler. Default is enabled differentiating by log ID.
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="KNI specific extra logger setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	KNILogger *KNILoggerMode `json:"kniLogger,omitempty"`
 }
 
 // NUMAResourcesSchedulerStatus defines the observed state of NUMAResourcesScheduler

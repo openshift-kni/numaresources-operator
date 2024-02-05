@@ -108,7 +108,10 @@ func TestUpdateDeploymentImageSettings(t *testing.T) {
 	dp := dpMinimal.DeepCopy()
 	podSpec := &dp.Spec.Template.Spec
 	for _, tc := range testCases {
-		DeploymentImageSettings(dp, tc.imageSpec)
+		err := DeploymentImageSettings(dp, tc.imageSpec)
+		if err != nil {
+			t.Fatalf("failed to update the image settings: %v", err)
+		}
 		if podSpec.Containers[0].Image != tc.imageSpec {
 			t.Errorf("failed to update deployemt image, expected: %q actual: %q", tc.imageSpec, podSpec.Containers[0].Image)
 		}
@@ -327,6 +330,7 @@ func TestUpdateSchedulerConfig(t *testing.T) {
 func TestDeploymentEnvVarSettings(t *testing.T) {
 	cacheResyncDebugEnabled := nropv1.CacheResyncDebugDumpJSONFile
 	cacheResyncDebugDisabled := nropv1.CacheResyncDebugDisabled
+	kniLoggerDisabled := nropv1.KNILoggerDisabled
 
 	schedInformerShared := nropv1.SchedulerInformerShared
 	schedInformerDedicated := nropv1.SchedulerInformerDedicated
@@ -344,6 +348,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 			spec: nropv1.NUMAResourcesSchedulerSpec{
 				CacheResyncDebug:  &cacheResyncDebugDisabled,
 				SchedulerInformer: &schedInformerShared,
+				KNILogger:         &kniLoggerDisabled,
 			},
 			initialDp:  dpMinimal,
 			expectedDp: *dpMinimal.DeepCopy(),
@@ -353,6 +358,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 			spec: nropv1.NUMAResourcesSchedulerSpec{
 				CacheResyncDebug:  &cacheResyncDebugEnabled,
 				SchedulerInformer: &schedInformerShared,
+				KNILogger:         &kniLoggerDisabled,
 			},
 			initialDp: dpMinimal,
 			expectedDp: appsv1.Deployment{
@@ -388,6 +394,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 			spec: nropv1.NUMAResourcesSchedulerSpec{
 				CacheResyncDebug:  &cacheResyncDebugDisabled,
 				SchedulerInformer: &schedInformerDedicated,
+				KNILogger:         &kniLoggerDisabled,
 			},
 			initialDp: dpMinimal,
 			expectedDp: appsv1.Deployment{
@@ -423,6 +430,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 			spec: nropv1.NUMAResourcesSchedulerSpec{
 				CacheResyncDebug:  &cacheResyncDebugEnabled,
 				SchedulerInformer: &schedInformerDedicated,
+				KNILogger:         &kniLoggerDisabled,
 			},
 			initialDp: dpMinimal,
 			expectedDp: appsv1.Deployment{
@@ -462,6 +470,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 			spec: nropv1.NUMAResourcesSchedulerSpec{
 				CacheResyncDebug:  &cacheResyncDebugEnabled,
 				SchedulerInformer: &schedInformerShared,
+				KNILogger:         &kniLoggerDisabled,
 			},
 			initialDp: dpAllOptions,
 			expectedDp: appsv1.Deployment{
@@ -497,6 +506,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 			spec: nropv1.NUMAResourcesSchedulerSpec{
 				CacheResyncDebug:  &cacheResyncDebugEnabled,
 				SchedulerInformer: &schedInformerDedicated,
+				KNILogger:         &kniLoggerDisabled,
 			},
 			initialDp: dpAllOptions,
 			expectedDp: appsv1.Deployment{
@@ -536,6 +546,7 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 			spec: nropv1.NUMAResourcesSchedulerSpec{
 				CacheResyncDebug:  &cacheResyncDebugDisabled,
 				SchedulerInformer: &schedInformerDedicated,
+				KNILogger:         &kniLoggerDisabled,
 			},
 			initialDp: dpAllOptions,
 			expectedDp: appsv1.Deployment{
@@ -571,7 +582,10 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dp := tc.initialDp.DeepCopy()
-			DeploymentEnvVarSettings(dp, tc.spec)
+			err := DeploymentEnvVarSettings(dp, tc.spec)
+			if err != nil {
+				t.Fatalf("failed to update the image settings: %v", err)
+			}
 			if !reflect.DeepEqual(*dp, tc.expectedDp) {
 				t.Errorf("got=%s expected %s", toJSON(dp), toJSON(tc.expectedDp))
 			}

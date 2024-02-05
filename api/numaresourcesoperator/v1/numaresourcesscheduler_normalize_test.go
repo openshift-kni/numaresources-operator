@@ -31,6 +31,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 	cacheResyncDebug := defaultCacheResyncDebug
 	cacheResyncDetection := defaultCacheResyncDetection
 	schedInformer := defaultSchedulerInformer
+	kniLogger := defaultKNILogger
 
 	cacheResyncPeriodCustom := 42 * time.Second
 	cacheResyncDebugCustom := CacheResyncDebugDisabled
@@ -53,6 +54,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebug,
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetection,
+				KNILogger:            &kniLogger,
 			},
 		},
 		{
@@ -70,6 +72,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebug,
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetection,
+				KNILogger:            &kniLogger,
 			},
 		},
 		{
@@ -90,6 +93,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebug,
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetection,
+				KNILogger:            &kniLogger,
 			},
 		},
 		{
@@ -111,6 +115,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebug,
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetection,
+				KNILogger:            &kniLogger,
 			},
 		},
 		{
@@ -132,6 +137,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebug,
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
+				KNILogger:            &kniLogger,
 			},
 		},
 
@@ -152,6 +158,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebugCustom,
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
+				KNILogger:            &kniLogger,
 			},
 		},
 		{
@@ -171,6 +178,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebug,
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetection,
+				KNILogger:            &kniLogger,
 			},
 		},
 		{
@@ -196,6 +204,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebugCustom,
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
+				KNILogger:            &kniLogger,
 			},
 		},
 	}
