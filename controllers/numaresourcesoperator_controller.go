@@ -76,6 +76,7 @@ type NUMAResourcesOperatorReconciler struct {
 	ImageSpec       string
 	ImagePullPolicy corev1.PullPolicy
 	Recorder        record.EventRecorder
+	ForwardMCPConds bool
 }
 
 // TODO: narrow down
@@ -213,7 +214,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 
 		// MCO need to update SELinux context and other stuff, and need to trigger a reboot.
 		// It can take a while.
-		mcpStatuses, allMCPsUpdated := syncMachineConfigPoolsStatuses(instance.Name, trees)
+		mcpStatuses, allMCPsUpdated := syncMachineConfigPoolsStatuses(instance.Name, trees, r.ForwardMCPConds)
 		instance.Status.MachineConfigPools = mcpStatuses
 		if !allMCPsUpdated {
 			// the Machine Config Pool still did not apply the machine config, wait for one minute
@@ -303,18 +304,14 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	return nil
 }
 
-func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree) ([]nropv1.MachineConfigPool, bool) {
+func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree, forwardMCPConds bool) ([]nropv1.MachineConfigPool, bool) {
 	klog.V(4).InfoS("Machine Config Status Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Status Sync stop")
 
 	mcpStatuses := []nropv1.MachineConfigPool{}
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
-			// update MCP conditions under the NRO
-			mcpStatuses = append(mcpStatuses, nropv1.MachineConfigPool{
-				Name:       mcp.Name,
-				Conditions: mcp.Status.Conditions,
-			})
+			mcpStatuses = append(mcpStatuses, extractMCPStatus(mcp, forwardMCPConds))
 
 			isUpdated := IsMachineConfigPoolUpdated(instanceName, mcp)
 			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instanceName, "updated", isUpdated)
@@ -325,6 +322,17 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tre
 		}
 	}
 	return mcpStatuses, true
+}
+
+func extractMCPStatus(mcp *machineconfigv1.MachineConfigPool, forwardMCPConds bool) nropv1.MachineConfigPool {
+	mcpStatus := nropv1.MachineConfigPool{
+		Name: mcp.Name,
+	}
+	if !forwardMCPConds {
+		return mcpStatus
+	}
+	mcpStatus.Conditions = mcp.Status.Conditions
+	return mcpStatus
 }
 
 func syncMachineConfigPoolNodeGroupConfigStatuses(instanceName string, mcpStatuses []nropv1.MachineConfigPool, trees []nodegroupv1.Tree) []nropv1.MachineConfigPool {
