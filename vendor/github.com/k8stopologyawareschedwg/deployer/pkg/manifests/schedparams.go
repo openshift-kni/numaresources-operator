@@ -30,8 +30,65 @@ const (
 	SchedulerPluginName     = "NodeResourceTopologyMatch"
 )
 
+const (
+	ForeignPodsDetectNone                   = "None"
+	ForeignPodsDetectAll                    = "All"
+	ForeignPodsDetectOnlyExclusiveResources = "OnlyExclusiveResources"
+)
+
+const (
+	CacheResyncAutodetect             = "Autodetect"
+	CacheResyncAll                    = "All"
+	CacheResyncOnlyExclusiveResources = "OnlyExclusiveResources"
+)
+
+const (
+	CacheInformerShared    = "Shared"
+	CacheInformerDedicated = "Dedicated"
+)
+
+func ValidateForeignPodsDetectMode(value string) error {
+	switch value {
+	case ForeignPodsDetectNone:
+		return nil
+	case ForeignPodsDetectAll:
+		return nil
+	case ForeignPodsDetectOnlyExclusiveResources:
+		return nil
+	default:
+		return fmt.Errorf("unsupported foreignPodsDetectMode: %v", value)
+	}
+}
+
+func ValidateCacheResyncMethod(value string) error {
+	switch value {
+	case CacheResyncAutodetect:
+		return nil
+	case CacheResyncAll:
+		return nil
+	case CacheResyncOnlyExclusiveResources:
+		return nil
+	default:
+		return fmt.Errorf("unsupported cacheResyncMethod: %v", value)
+	}
+}
+
+func ValidateCacheInformerMode(value string) error {
+	switch value {
+	case CacheInformerShared:
+		return nil
+	case CacheInformerDedicated:
+		return nil
+	default:
+		return fmt.Errorf("unsupported cacheInformerMode: %v", value)
+	}
+}
+
 type ConfigCacheParams struct {
-	ResyncPeriodSeconds *int64
+	ResyncPeriodSeconds   *int64
+	ResyncMethod          *string
+	ForeignPodsDetectMode *string
+	InformerMode          *string
 }
 
 type ConfigParams struct {
@@ -122,15 +179,51 @@ func extractParams(profileName string, args map[string]interface{}) (ConfigParam
 	}
 	// json quirk: we know it's int64, yet it's detected as float64
 	resyncPeriod, ok, err := unstructured.NestedFloat64(args, "cacheResyncPeriodSeconds")
-	if !ok {
-		// nothing to do
-		return params, nil
-	}
 	if err != nil {
 		return params, fmt.Errorf("cannot process field cacheResyncPeriodSeconds: %w", err)
 	}
+	if ok {
+		val := int64(resyncPeriod)
+		params.Cache.ResyncPeriodSeconds = &val
+	}
 
-	val := int64(resyncPeriod)
-	params.Cache.ResyncPeriodSeconds = &val
+	cacheArgs, ok, err := unstructured.NestedMap(args, "cache")
+	if err != nil {
+		return params, fmt.Errorf("cannot process field cache: %w", err)
+	}
+	if ok {
+		resyncMethod, cacheOk, err := unstructured.NestedString(cacheArgs, "resyncMethod")
+		if err != nil {
+			return params, fmt.Errorf("cannot process field cache.resyncMethod: %w", err)
+		}
+		if cacheOk {
+			if err := ValidateCacheResyncMethod(resyncMethod); err != nil {
+				return params, err
+			}
+			params.Cache.ResyncMethod = &resyncMethod
+		}
+
+		foreignPodsDetect, cacheOk, err := unstructured.NestedString(cacheArgs, "foreignPodsDetect")
+		if err != nil {
+			return params, fmt.Errorf("cannot process field cache.foreignPodsDetect: %w", err)
+		}
+		if cacheOk {
+			if err := ValidateForeignPodsDetectMode(foreignPodsDetect); err != nil {
+				return params, err
+			}
+			params.Cache.ForeignPodsDetectMode = &foreignPodsDetect
+		}
+
+		informerMode, cacheOk, err := unstructured.NestedString(cacheArgs, "informerMode")
+		if err != nil {
+			return params, fmt.Errorf("cannot process field cache.informerMode: %w", err)
+		}
+		if cacheOk {
+			if err := ValidateCacheInformerMode(informerMode); err != nil {
+				return params, err
+			}
+			params.Cache.InformerMode = &informerMode
+		}
+	}
 	return params, nil
 }
