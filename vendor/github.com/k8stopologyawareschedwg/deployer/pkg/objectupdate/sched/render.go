@@ -167,7 +167,74 @@ func updateArgs(args map[string]interface{}, params *manifests.ConfigParams) (bo
 			updated++
 		}
 	}
+
+	cacheArgs, ok, err := unstructured.NestedMap(args, "cache")
+	if !ok {
+		cacheArgs = make(map[string]interface{})
+	}
+	if err != nil {
+		return updated > 0, err
+	}
+
+	var cacheArgsUpdated int
+	if params.Cache != nil {
+		cacheArgsUpdated, err = updateCacheArgs(cacheArgs, params)
+		if err != nil {
+			return updated > 0, err
+		}
+	}
+	updated += cacheArgsUpdated
+
+	if cacheArgsUpdated > 0 {
+		if err := unstructured.SetNestedMap(args, cacheArgs, "cache"); err != nil {
+			return updated > 0, err
+		}
+	}
 	return updated > 0, ensureBackwardCompatibility(args)
+}
+
+func updateCacheArgs(args map[string]interface{}, params *manifests.ConfigParams) (int, error) {
+	var updated int
+	var err error
+
+	if params.Cache.ResyncMethod != nil {
+		resyncMethod := *params.Cache.ResyncMethod // shortcut
+		err = manifests.ValidateCacheResyncMethod(resyncMethod)
+		if err != nil {
+			return updated, err
+		}
+		err = unstructured.SetNestedField(args, resyncMethod, "resyncMethod")
+		if err != nil {
+			return updated, err
+		}
+		updated++
+	}
+	if params.Cache.ForeignPodsDetectMode != nil {
+		foreignPodsMode := *params.Cache.ForeignPodsDetectMode // shortcut
+		err = manifests.ValidateForeignPodsDetectMode(foreignPodsMode)
+		if err != nil {
+			return updated, err
+		}
+		err = unstructured.SetNestedField(args, foreignPodsMode, "foreignPodsDetect")
+		if err != nil {
+			return updated, err
+		}
+		updated++
+	}
+	if params.Cache.InformerMode != nil {
+		informerMode := *params.Cache.InformerMode // shortcut
+		err = manifests.ValidateCacheInformerMode(informerMode)
+		if err != nil {
+			return updated, err
+		}
+		err = unstructured.SetNestedField(args, informerMode, "informerMode")
+		if err != nil {
+			return updated, err
+		}
+		updated++
+	}
+
+	return updated, nil
 }
 
 func ensureBackwardCompatibility(args map[string]interface{}) error {
