@@ -175,16 +175,9 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	defer klog.V(4).Info("SchedulerSync stop")
 
 	schedSpec := instance.Spec.Normalize()
-
 	cacheResyncPeriod := unpackAPIResyncPeriod(schedSpec.CacheResyncPeriod)
 
-	resyncPeriod := int64(cacheResyncPeriod.Seconds())
-	params := k8swgmanifests.ConfigParams{
-		ProfileName: schedSpec.SchedulerName,
-		Cache: &k8swgmanifests.ConfigCacheParams{
-			ResyncPeriodSeconds: &resyncPeriod,
-		},
-	}
+	params := configParamsFromSchedSpec(schedSpec, cacheResyncPeriod)
 
 	schedName, ok := schedstate.SchedulerNameFromObject(r.SchedulerManifests.ConfigMap)
 	if !ok {
@@ -246,4 +239,46 @@ func unpackAPIResyncPeriod(reconcilePeriod *metav1.Duration) time.Duration {
 	period := reconcilePeriod.Round(time.Second)
 	klog.InfoS("setting reconcile period", "computed", period, "supplied", reconcilePeriod)
 	return period
+}
+
+func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cacheResyncPeriod time.Duration) k8swgmanifests.ConfigParams {
+	resyncPeriod := int64(cacheResyncPeriod.Seconds())
+	params := k8swgmanifests.ConfigParams{
+		ProfileName: schedSpec.SchedulerName,
+		Cache: &k8swgmanifests.ConfigCacheParams{
+			ResyncPeriodSeconds: &resyncPeriod,
+		},
+	}
+
+	var informerMode string
+	if *schedSpec.SchedulerInformer == k8swgmanifests.CacheInformerDedicated {
+		informerMode = k8swgmanifests.CacheInformerDedicated
+	} else {
+		informerMode = k8swgmanifests.CacheInformerShared
+	}
+	params.Cache.InformerMode = &informerMode
+	klog.InfoS("setting cache parameters", dumpConfigCacheParams(params.Cache)...)
+
+	return params
+}
+
+func dumpConfigCacheParams(ccp *k8swgmanifests.ConfigCacheParams) []interface{} {
+	return []interface{}{
+		"resyncPeriod", strInt64Ptr(ccp.ResyncPeriodSeconds),
+		"informerMode", strStringPtr(ccp.InformerMode),
+	}
+}
+
+func strInt64Ptr(ip *int64) string {
+	if ip == nil {
+		return "N/A"
+	}
+	return fmt.Sprintf("%d", *ip)
+}
+
+func strStringPtr(sp *string) string {
+	if sp == nil {
+		return "N/A"
+	}
+	return *sp
 }

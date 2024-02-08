@@ -342,10 +342,6 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 					Name:  schedupdate.PFPStatusDumpEnvVar,
 					Value: schedupdate.PFPStatusDir,
 				},
-				{
-					Name:  schedupdate.NRTInformerEnvVar,
-					Value: schedupdate.NRTInformerVal,
-				},
 			} {
 				gotEv := schedupdate.FindEnvVarByName(cnt.Env, ev.Name)
 				gomega.Expect(gotEv).ToNot(gomega.BeNil(), "missing environment variable %q in %q", ev.Name, cnt.Name)
@@ -388,13 +384,58 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				{
 					Name: schedupdate.PFPStatusDumpEnvVar,
 				},
-				{
-					Name: schedupdate.NRTInformerEnvVar,
-				},
 			} {
 				gotEv := schedupdate.FindEnvVarByName(cnt.Env, ev.Name)
 				gomega.Expect(gotEv).To(gomega.BeNil(), "unexpected environment variable %q in %q", ev.Name, cnt.Name)
 			}
+		})
+
+		ginkgo.It("should configure by default the informerMode to be Dedicated", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			expectCacheParams(reconciler.Client, depmanifests.CacheInformerDedicated)
+
+		})
+
+		ginkgo.It("should allow to change the informerMode to Shared", func() {
+			nrs := nrs.DeepCopy()
+			informerMode := nropv1.SchedulerInformerShared
+			nrs.Spec.SchedulerInformer = &informerMode
+			gomega.Eventually(func() bool {
+				if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+					klog.Warningf("failed to update the scheduler object; err: %v", err)
+					return false
+				}
+				return true
+			}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			expectCacheParams(reconciler.Client, depmanifests.CacheInformerShared)
+
+		})
+
+		ginkgo.It("should allow to change the informerMode to Dedicated", func() {
+			nrs := nrs.DeepCopy()
+			informerMode := nropv1.SchedulerInformerDedicated
+			nrs.Spec.SchedulerInformer = &informerMode
+			gomega.Eventually(func() bool {
+				if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+					klog.Warningf("failed to update the scheduler object; err: %v", err)
+					return false
+				}
+				return true
+			}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			expectCacheParams(reconciler.Client, depmanifests.CacheInformerDedicated)
+
 		})
 	})
 })
@@ -415,4 +456,25 @@ func diffYAML(want, got string) (string, error) {
 		return "", err
 	}
 	return cmp.Diff(cfgWant, cfgGot), nil
+}
+
+func expectCacheParams(cli client.Client, informerMode string) {
+	key := client.ObjectKey{
+		Name:      "topo-aware-scheduler-config",
+		Namespace: testNamespace,
+	}
+
+	cm := corev1.ConfigMap{}
+	gomega.ExpectWithOffset(1, cli.Get(context.TODO(), key, &cm)).To(gomega.Succeed())
+
+	confRaw := cm.Data[sched.SchedulerConfigFileName]
+	cfgs, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(confRaw))
+	gomega.ExpectWithOffset(1, err).ToNot(gomega.HaveOccurred())
+	gomega.ExpectWithOffset(1, cfgs).To(gomega.HaveLen(1), "unexpected config params count: %d", len(cfgs))
+	cfg := cfgs[0]
+
+	klog.InfoS("config", dumpConfigCacheParams(cfg.Cache)...)
+
+	gomega.ExpectWithOffset(1, cfg.Cache.InformerMode).ToNot(gomega.BeNil())
+	gomega.ExpectWithOffset(1, *cfg.Cache.InformerMode).To(gomega.Equal(informerMode))
 }
