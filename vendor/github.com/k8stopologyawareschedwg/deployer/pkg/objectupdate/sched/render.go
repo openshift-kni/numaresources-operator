@@ -176,9 +176,12 @@ func updateArgs(args map[string]interface{}, params *manifests.ConfigParams) (bo
 		return updated > 0, err
 	}
 
-	cacheArgsUpdated, err := updateCacheArgs(cacheArgs, params)
-	if err != nil {
-		return updated > 0, err
+	var cacheArgsUpdated int
+	if params.Cache != nil {
+		cacheArgsUpdated, err = updateCacheArgs(cacheArgs, params)
+		if err != nil {
+			return updated > 0, err
+		}
 	}
 	updated += cacheArgsUpdated
 
@@ -194,31 +197,41 @@ func updateCacheArgs(args map[string]interface{}, params *manifests.ConfigParams
 	var updated int
 	var err error
 
-	if params.Cache != nil {
-		if params.Cache.ResyncMethod != nil {
-			resyncMethod := *params.Cache.ResyncMethod // shortcut
-			err = manifests.ValidateCacheResyncMethod(resyncMethod)
-			if err != nil {
-				return updated, err
-			}
-			err = unstructured.SetNestedField(args, resyncMethod, "resyncMethod")
-			if err != nil {
-				return updated, err
-			}
-			updated++
+	if params.Cache.ResyncMethod != nil {
+		resyncMethod := *params.Cache.ResyncMethod // shortcut
+		err = manifests.ValidateCacheResyncMethod(resyncMethod)
+		if err != nil {
+			return updated, err
 		}
-		if params.Cache.ForeignPodsDetectMode != nil {
-			foreignPodsMode := *params.Cache.ForeignPodsDetectMode // shortcut
-			err = manifests.ValidateForeignPodsDetectMode(foreignPodsMode)
-			if err != nil {
-				return updated, err
-			}
-			err = unstructured.SetNestedField(args, foreignPodsMode, "foreignPodsDetect")
-			if err != nil {
-				return updated, err
-			}
-			updated++
+		err = unstructured.SetNestedField(args, resyncMethod, "resyncMethod")
+		if err != nil {
+			return updated, err
 		}
+		updated++
+	}
+	if params.Cache.ForeignPodsDetectMode != nil {
+		foreignPodsMode := *params.Cache.ForeignPodsDetectMode // shortcut
+		err = manifests.ValidateForeignPodsDetectMode(foreignPodsMode)
+		if err != nil {
+			return updated, err
+		}
+		err = unstructured.SetNestedField(args, foreignPodsMode, "foreignPodsDetect")
+		if err != nil {
+			return updated, err
+		}
+		updated++
+	}
+	if params.Cache.InformerMode != nil {
+		informerMode := *params.Cache.InformerMode // shortcut
+		err = manifests.ValidateCacheInformerMode(informerMode)
+		if err != nil {
+			return updated, err
+		}
+		err = unstructured.SetNestedField(args, informerMode, "informerMode")
+		if err != nil {
+			return updated, err
+		}
+		updated++
 	}
 
 	return updated, nil

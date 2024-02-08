@@ -42,6 +42,11 @@ const (
 	CacheResyncOnlyExclusiveResources = "OnlyExclusiveResources"
 )
 
+const (
+	CacheInformerShared    = "Shared"
+	CacheInformerDedicated = "Dedicated"
+)
+
 func ValidateForeignPodsDetectMode(value string) error {
 	switch value {
 	case ForeignPodsDetectNone:
@@ -68,10 +73,22 @@ func ValidateCacheResyncMethod(value string) error {
 	}
 }
 
+func ValidateCacheInformerMode(value string) error {
+	switch value {
+	case CacheInformerShared:
+		return nil
+	case CacheInformerDedicated:
+		return nil
+	default:
+		return fmt.Errorf("unsupported cacheInformerMode: %v", value)
+	}
+}
+
 type ConfigCacheParams struct {
 	ResyncPeriodSeconds   *int64
 	ResyncMethod          *string
 	ForeignPodsDetectMode *string
+	InformerMode          *string
 }
 
 type ConfigParams struct {
@@ -195,6 +212,17 @@ func extractParams(profileName string, args map[string]interface{}) (ConfigParam
 				return params, err
 			}
 			params.Cache.ForeignPodsDetectMode = &foreignPodsDetect
+		}
+
+		informerMode, cacheOk, err := unstructured.NestedString(cacheArgs, "informerMode")
+		if err != nil {
+			return params, fmt.Errorf("cannot process field cache.informerMode: %w", err)
+		}
+		if cacheOk {
+			if err := ValidateCacheInformerMode(informerMode); err != nil {
+				return params, err
+			}
+			params.Cache.InformerMode = &informerMode
 		}
 	}
 	return params, nil
