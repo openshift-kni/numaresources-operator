@@ -433,6 +433,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 
 func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
 	klog.V(3).Info("Delete Daemonsets start")
+	defer klog.V(3).Info("Delete Daemonsets end")
 	var errors []error
 	var daemonSetList appsv1.DaemonSetList
 	if err := r.List(ctx, &daemonSetList, &client.ListOptions{Namespace: instance.Namespace}); err != nil {
@@ -464,6 +465,7 @@ func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Con
 
 func (r *NUMAResourcesOperatorReconciler) deleteUnusedMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
 	klog.V(3).Info("Delete Machineconfigs start")
+	defer klog.V(3).Info("Delete Machineconfigs end")
 	var errors []error
 	var machineConfigList machineconfigv1.MachineConfigList
 	if err := r.List(ctx, &machineConfigList); err != nil {
