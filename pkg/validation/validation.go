@@ -31,7 +31,7 @@ const (
 	NodeGroupsError = "ValidationErrorUnderNodeGroups"
 )
 
-// MachineConfigPoolDuplicates selected MCPs for duplicates
+// MachineConfigPoolDuplicates validates selected MCPs for duplicates
 // TODO: move it under the validation webhook once we will have one
 func MachineConfigPoolDuplicates(trees []nodegroupv1.Tree) error {
 	duplicates := map[string]int{}
