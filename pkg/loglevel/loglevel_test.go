@@ -98,7 +98,7 @@ func TestUpdatePodSpec(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		if err := UpdatePodSpec(podSpec, tc.in); err != nil {
+		if err := UpdatePodSpec(podSpec, "", tc.in); err != nil {
 			t.Errorf("UpdatePodSpec failed with error: %v", err)
 		}
 		cnt := podSpec.Containers[0]

@@ -24,11 +24,11 @@ import (
 
 func DefaultNodeGroupConfig() NodeGroupConfig {
 	ngc := NodeGroupConfig{}
-	ngc.Default()
+	ngc.SetDefaults()
 	return ngc
 }
 
-func (ngc *NodeGroupConfig) Default() {
+func (ngc *NodeGroupConfig) SetDefaults() {
 	if ngc.PodsFingerprinting == nil {
 		ngc.PodsFingerprinting = defaultPodsFingerprinting()
 	}
@@ -37,6 +37,9 @@ func (ngc *NodeGroupConfig) Default() {
 	}
 	if ngc.InfoRefreshMode == nil {
 		ngc.InfoRefreshMode = defaultInfoRefreshMode()
+	}
+	if ngc.InfoRefreshPause == nil {
+		ngc.InfoRefreshPause = defaultInfoRefreshPause()
 	}
 }
 
@@ -55,4 +58,9 @@ func defaultInfoRefreshPeriod() *metav1.Duration {
 		Duration: 10 * time.Second,
 	}
 	return &period
+}
+
+func defaultInfoRefreshPause() *InfoRefreshPauseMode {
+	infoRefreshPause := InfoRefreshPauseDisabled
+	return &infoRefreshPause
 }

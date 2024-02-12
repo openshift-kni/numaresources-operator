@@ -136,11 +136,21 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
 	}
 
+	infoRefreshPauseEnabled := isInfoRefreshPauseEnabled(&conf)
+	klog.V(2).InfoS("DaemonSet update: InfoRefreshPause status", "daemonset", ds.Name, "enabled", infoRefreshPauseEnabled)
+	if infoRefreshPauseEnabled {
+		flags.SetToggle("--no-publish")
+	} else {
+		flags.Delete("--no-publish")
+	}
+
 	flags.SetToggle("--refresh-node-resources")
 
 	notifEnabled := isNotifyFileEnabled(&conf)
 	klog.V(2).InfoS("DaemonSet update: event notification", "daemonset", ds.Name, "enabled", notifEnabled)
-	if !notifEnabled {
+	if notifEnabled {
+		flags.SetOption("--notify-file", "/run/rte/notify")
+	} else {
 		flags.Delete("--notify-file")
 	}
 
@@ -241,4 +251,13 @@ func findRefreshPeriod(conf *nropv1.NodeGroupConfig) string {
 	// TODO ensure we overwrite - and possibly find a less ugly stringification code
 	// TODO: what if sleep-interval is set and is 0 ?
 	return conf.InfoRefreshPeriod.Duration.String()
+}
+
+func isInfoRefreshPauseEnabled(conf *nropv1.NodeGroupConfig) bool {
+	cfg := nropv1.DefaultNodeGroupConfig()
+	if conf == nil || conf.InfoRefreshPause == nil {
+		// not specified -> use defaults
+		conf = &cfg
+	}
+	return *conf.InfoRefreshPause == nropv1.InfoRefreshPauseEnabled
 }
