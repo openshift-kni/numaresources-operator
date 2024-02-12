@@ -205,8 +205,8 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulCRDInstall", "Node Resource Topology CRD installed")
 
 	if r.Platform == platform.OpenShift {
-		// we need to create machine configs first and wait for the MachineConfigPool updates
-		// before creating additional components
+		// we need to sync machine configs first and wait for the MachineConfigPool updates
+		// before checking additional components for updates
 		if err := r.syncMachineConfigs(ctx, instance, trees); err != nil {
 			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
 			return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "failed to sync machine configs")
@@ -230,9 +230,9 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	}
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
 
-	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Name, instance.Status.MachineConfigPools, trees)
+	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
 
-	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, instance, daemonSetsInfo)
+	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, daemonSetsInfo)
 	instance.Status.DaemonSets = dsStatuses
 	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dsStatuses)
 	if err != nil {
@@ -245,7 +245,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	return ctrl.Result{}, status.ConditionAvailable, nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, instance *nropv1.NUMAResourcesOperator, daemonSetsInfo []nropv1.NamespacedName) ([]nropv1.NamespacedName, bool, error) {
+func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, daemonSetsInfo []nropv1.NamespacedName) ([]nropv1.NamespacedName, bool, error) {
 	dsStatuses := []nropv1.NamespacedName{}
 	for _, nname := range daemonSetsInfo {
 		ds := appsv1.DaemonSet{}
@@ -336,7 +336,7 @@ func extractMCPStatus(mcp *machineconfigv1.MachineConfigPool, forwardMCPConds bo
 	return mcpStatus
 }
 
-func syncMachineConfigPoolNodeGroupConfigStatuses(instanceName string, mcpStatuses []nropv1.MachineConfigPool, trees []nodegroupv1.Tree) []nropv1.MachineConfigPool {
+func syncMachineConfigPoolNodeGroupConfigStatuses(mcpStatuses []nropv1.MachineConfigPool, trees []nodegroupv1.Tree) []nropv1.MachineConfigPool {
 	klog.V(4).InfoS("Machine Config Pool Node Group Status Sync start", "mcpStatuses", len(mcpStatuses), "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Pool Node Group Status Sync stop")
 
@@ -507,7 +507,7 @@ func isOwnedBy(element metav1.Object, owner metav1.Object) bool {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// we want to initate reconcile loop only on change under labels or spec of the object
+	// we want to initiate reconcile loop only on change under labels or spec of the object
 	p := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			if !validateUpdateEvent(&e) {
