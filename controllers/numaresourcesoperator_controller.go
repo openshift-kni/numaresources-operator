@@ -357,7 +357,7 @@ func syncMachineConfigPoolNodeGroupConfigStatuses(mcpStatuses []nropv1.MachineCo
 				mcpStatus.Config = &ngc
 			}
 
-			klog.V(6).InfoS("Machine Config Pool Node Group updated status config", "mcp", mcp.Name, "source", confSource, "data", fmt.Sprintf("%+v", mcpStatus.Config))
+			klog.V(6).InfoS("Machine Config Pool Node Group updated status config", "mcp", mcp.Name, "source", confSource, "data", mcpStatus.Config.ToString())
 
 			updatedMcpStatuses = append(updatedMcpStatuses, mcpStatus)
 		}
