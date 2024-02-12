@@ -36,8 +36,5 @@ func (current NodeGroupConfig) Merge(updated NodeGroupConfig) NodeGroupConfig {
 	if updated.InfoRefreshMode != nil {
 		conf.InfoRefreshMode = updated.InfoRefreshMode
 	}
-	if updated.InfoRefreshPause != nil {
-		conf.InfoRefreshPause = updated.InfoRefreshPause
-	}
 	return conf
 }

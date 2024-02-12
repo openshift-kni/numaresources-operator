@@ -23,7 +23,6 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
-	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
@@ -47,14 +46,9 @@ func ToKlog(level operatorv1.LogLevel) klog.Level {
 	}
 }
 
-func UpdatePodSpec(podSpec *corev1.PodSpec, cntName string, level operatorv1.LogLevel) error {
+func UpdatePodSpec(podSpec *corev1.PodSpec, level operatorv1.LogLevel) error {
+	// TODO: better match by name than assume container#0 is the right one
 	cnt := &podSpec.Containers[0]
-	if cntName != "" {
-		cnt = k8swgobjupdate.FindContainerByName(podSpec.Containers, cntName)
-		if cnt == nil {
-			return fmt.Errorf("cannot find container data for %q", cntName)
-		}
-	}
 	kLog := ToKlog(level)
 	flags := flagcodec.ParseArgvKeyValue(cnt.Args, flagcodec.WithFlagNormalization)
 	if flags == nil {

@@ -669,12 +669,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			}
 			pfpMode := nropv1.PodsFingerprintingEnabled
 			refMode := nropv1.InfoRefreshPeriodic
-			rteMode := nropv1.InfoRefreshPauseEnabled
 			conf := nropv1.NodeGroupConfig{
 				PodsFingerprinting: &pfpMode,
 				InfoRefreshPeriod:  &period,
 				InfoRefreshMode:    &refMode,
-				InfoRefreshPause:   &rteMode,
 			}
 
 			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
@@ -698,12 +696,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			}
 			pfpMode := nropv1.PodsFingerprintingEnabled
 			refMode := nropv1.InfoRefreshPeriodic
-			rteMode := nropv1.InfoRefreshPauseEnabled
 			conf := nropv1.NodeGroupConfig{
 				PodsFingerprinting: &pfpMode,
 				InfoRefreshPeriod:  &period,
 				InfoRefreshMode:    &refMode,
-				InfoRefreshPause:   &rteMode,
 			}
 
 			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
@@ -721,7 +717,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(args).To(ContainElement("--sleep-interval=33s"), "malformed args: %v", args)
 			Expect(args).ToNot(ContainElement(ContainSubstring("--notify-file=")), "malformed args: %v", args)
 			Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
-			Expect(args).To(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
 		})
 
 		It("should allow to disable pods fingerprinting", func() {
@@ -790,78 +785,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(args).ToNot(ContainElement(ContainSubstring("--notify-file")), "malformed args: %v", args)
 		})
 
-		It("should find default behavior to update NRT data", func() {
-			conf := nropv1.DefaultNodeGroupConfig()
-
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
-
-			reconciler := reconcileObjects(nro, mcp)
-
-			key := client.ObjectKeyFromObject(nro)
-
-			nroCurrent := &nropv1.NUMAResourcesOperator{}
-			Expect(reconciler.Client.Get(context.TODO(), key, nroCurrent)).NotTo(HaveOccurred())
-			Expect(nroCurrent.Spec.NodeGroups[0].Config.InfoRefreshPause).To(Equal(conf.InfoRefreshPause))
-
-			mcpDSKey := client.ObjectKey{
-				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
-				Namespace: testNamespace,
-			}
-			ds := &appsv1.DaemonSet{}
-			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
-
-			args := ds.Spec.Template.Spec.Containers[0].Args
-			Expect(args).ToNot(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
-		})
-
-		It("should allow to disabling NRT updates and enabling it back", func() {
-			rteMode := nropv1.InfoRefreshPauseEnabled
-			conf := nropv1.NodeGroupConfig{
-				InfoRefreshPause: &rteMode,
-			}
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
-
-			reconciler := reconcileObjects(nro, mcp)
-
-			key := client.ObjectKeyFromObject(nro)
-
-			nroCurrent := &nropv1.NUMAResourcesOperator{}
-			Expect(reconciler.Client.Get(context.TODO(), key, nroCurrent)).NotTo(HaveOccurred())
-			Expect(nroCurrent.Spec.NodeGroups[0].Config.InfoRefreshPause).To(Equal(&rteMode))
-
-			mcpDSKey := client.ObjectKey{
-				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
-				Namespace: testNamespace,
-			}
-			ds := &appsv1.DaemonSet{}
-			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
-
-			args := ds.Spec.Template.Spec.Containers[0].Args
-			Expect(args).To(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
-
-			rteModeOpp := nropv1.InfoRefreshPauseDisabled
-			confUpdated := nropv1.NodeGroupConfig{
-				InfoRefreshPause: &rteModeOpp,
-			}
-
-			Eventually(func() error {
-				nroUpdated := &nropv1.NUMAResourcesOperator{}
-				Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).NotTo(HaveOccurred())
-				nroUpdated.Spec.NodeGroups[0].Config = &confUpdated
-				return reconciler.Client.Update(context.TODO(), nroUpdated)
-			}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
-
-			thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-			Expect(err).ToNot(HaveOccurred())
-			Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
-
-			dsUpdated := &appsv1.DaemonSet{}
-			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, dsUpdated)).ToNot(HaveOccurred())
-
-			argsUpdated := dsUpdated.Spec.Template.Spec.Containers[0].Args
-			Expect(argsUpdated).ToNot(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", argsUpdated)
-		})
-
 		It("should allow to update all the settings of the DS objects", func() {
 			conf := nropv1.DefaultNodeGroupConfig()
 			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
@@ -878,7 +801,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			args := ds.Spec.Template.Spec.Containers[0].Args
 			Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
 			Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
-			Expect(args).ToNot(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
 
 			d, err := time.ParseDuration("12s")
 			Expect(err).ToNot(HaveOccurred())
@@ -887,11 +809,9 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Duration: d,
 			}
 			refMode := nropv1.InfoRefreshPeriodic
-			rteMode := nropv1.InfoRefreshPauseEnabled
 			confUpdated := nropv1.NodeGroupConfig{
 				InfoRefreshPeriod: &period,
 				InfoRefreshMode:   &refMode,
-				InfoRefreshPause:  &rteMode,
 			}
 
 			key := client.ObjectKeyFromObject(nro)
@@ -914,7 +834,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(argsUpdated).To(ContainElement("--sleep-interval=12s"), "malformed updated args: %v", argsUpdated)
 			Expect(argsUpdated).ToNot(ContainElement(ContainSubstring("--notify-file=")), "malformed updated args: %v", argsUpdated)
 			Expect(argsUpdated).To(ContainElement("--pods-fingerprint"), "malformed updated args: %v", argsUpdated)
-			Expect(argsUpdated).To(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", argsUpdated)
 		})
 
 		It("should allow to change the PFP method dynamically", func() {

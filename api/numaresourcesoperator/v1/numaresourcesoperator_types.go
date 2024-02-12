@@ -17,8 +17,6 @@
 package v1
 
 import (
-	"fmt"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -60,17 +58,6 @@ const (
 	PodsFingerprintingEnabledExclusiveResources PodsFingerprintingMode = "EnabledExclusiveResources"
 )
 
-// +kubebuilder:validation:Enum=Disabled;Enabled
-type InfoRefreshPauseMode string
-
-const (
-	// InfoRefreshPauseDisabled enables RTE and NRT sync
-	InfoRefreshPauseDisabled InfoRefreshPauseMode = "Disabled"
-
-	// InfoRefreshPauseEnabled pauses RTE and disables the NRT sync
-	InfoRefreshPauseEnabled InfoRefreshPauseMode = "Enabled"
-)
-
 // +kubebuilder:validation:Enum=Periodic;Events;PeriodicAndEvents
 type InfoRefreshMode string
 
@@ -99,10 +86,6 @@ type NodeGroupConfig struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Topology info refresh period setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	InfoRefreshPeriod *metav1.Duration `json:"infoRefreshPeriod,omitempty"`
-	// InfoRefreshPause defines if updates to NRTs are paused for the machines belonging to this group
-	// +optional
-	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Enable or disable the RTE pause setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
-	InfoRefreshPause *InfoRefreshPauseMode `json:"infoRefreshPause,omitempty"`
 }
 
 // NodeGroup defines group of nodes that will run resource topology exporter daemon set
@@ -174,12 +157,4 @@ type NUMAResourcesOperatorList struct {
 
 func init() {
 	SchemeBuilder.Register(&NUMAResourcesOperator{}, &NUMAResourcesOperatorList{})
-}
-
-func (ngc *NodeGroupConfig) ToString() string {
-	if ngc != nil {
-		ngc.SetDefaults()
-		return fmt.Sprintf("PodsFingerprinting mode: %s InfoRefreshMode: %s InfoRefreshPeriod: %s InfoRefreshPause: %s", *ngc.PodsFingerprinting, *ngc.InfoRefreshMode, *ngc.InfoRefreshPeriod, *ngc.InfoRefreshPause)
-	}
-	return ""
 }

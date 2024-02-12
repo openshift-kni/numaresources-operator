@@ -69,13 +69,6 @@ spec:
                           - Events
                           - PeriodicAndEvents
                           type: string
-                        infoRefreshPause:
-                          description: InfoRefreshPause defines if updates to NRTs
-                            are paused for the machines belonging to this group
-                          enum:
-                          - Disabled
-                          - Enabled
-                          type: string
                         infoRefreshPeriod:
                           description: InfoRefreshPeriod sets the topology info refresh
                             period. Use explicit 0 to disable.
@@ -292,13 +285,6 @@ spec:
                           - Periodic
                           - Events
                           - PeriodicAndEvents
-                          type: string
-                        infoRefreshPause:
-                          description: InfoRefreshPause defines if updates to NRTs
-                            are paused for the machines belonging to this group
-                          enum:
-                          - Disabled
-                          - Enabled
                           type: string
                         infoRefreshPeriod:
                           description: InfoRefreshPeriod sets the topology info refresh

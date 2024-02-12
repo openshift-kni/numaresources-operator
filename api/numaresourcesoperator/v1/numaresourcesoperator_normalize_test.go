@@ -64,7 +64,6 @@ func TestNodeGroupConfigMerge(t *testing.T) {
 				InfoRefreshPeriod: &metav1.Duration{
 					Duration: 42 * time.Second,
 				},
-				InfoRefreshPause: ptrToRTEMode(InfoRefreshPauseEnabled),
 			},
 			expected: NodeGroupConfig{
 				PodsFingerprinting: &podsFp,
@@ -72,7 +71,6 @@ func TestNodeGroupConfigMerge(t *testing.T) {
 				InfoRefreshPeriod: &metav1.Duration{
 					Duration: 42 * time.Second,
 				},
-				InfoRefreshPause: ptrToRTEMode(InfoRefreshPauseEnabled),
 			},
 		},
 	}
