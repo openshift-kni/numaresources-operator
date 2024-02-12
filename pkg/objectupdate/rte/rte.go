@@ -148,7 +148,9 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 
 	notifEnabled := isNotifyFileEnabled(&conf)
 	klog.V(2).InfoS("DaemonSet update: event notification", "daemonset", ds.Name, "enabled", notifEnabled)
-	if !notifEnabled {
+	if notifEnabled {
+		flags.SetOption("--notify-file", "/run/rte/notify")
+	} else {
 		flags.Delete("--notify-file")
 	}
 
