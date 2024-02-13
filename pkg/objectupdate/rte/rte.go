@@ -49,10 +49,12 @@ func DaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImag
 	if cnt == nil {
 		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
+
+	currentImageSpec := cnt.Image
 	if userImageSpec != "" {
 		// we don't really know what's out there, so we minimize the changes.
 		cnt.Image = userImageSpec
-		klog.V(3).InfoS("Exporter image", "reason", "user-provided", "pullSpec", userImageSpec)
+		klog.V(2).InfoS("Exporter image", "reason", "user-provided", "pullSpec", userImageSpec, "previousSpec", currentImageSpec)
 		return nil
 	}
 
@@ -62,7 +64,7 @@ func DaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImag
 
 	cnt.Image = builtinImageSpec
 	cnt.ImagePullPolicy = builtinPullPolicy
-	klog.V(3).InfoS("Exporter image", "reason", "builtin", "pullSpec", builtinImageSpec, "pullPolicy", builtinPullPolicy)
+	klog.V(2).InfoS("Exporter image", "reason", "builtin", "pullSpec", builtinImageSpec, "pullPolicy", builtinPullPolicy, "previousSpec", currentImageSpec)
 	// if we run with operator-as-operand, we know we NEED this.
 	err := DaemonSetRunAsIDs(ds)
 	if err != nil {
