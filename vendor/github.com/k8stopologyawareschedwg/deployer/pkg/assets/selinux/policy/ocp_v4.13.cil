@@ -20,6 +20,5 @@
 	;
 	; Allow to RTE pod connect, read and write permissions to /var/lib/kubelet/pod-resource/kubelet.sock
 	(allow process container_var_lib_t (sock_file (open getattr read write ioctl lock append)))
-	(allow process container_var_lib_t (unix_stream_socket (connectto)))
-	(allow process unconfined_service_t (unix_stream_socket (connectto)))
+	(allow process kubelet_t (unix_stream_socket (connectto)))
 )
