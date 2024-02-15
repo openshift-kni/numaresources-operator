@@ -1,0 +1,22 @@
+# References:
+# https://docs.snyk.io/scan-applications/snyk-code/using-snyk-code-from-the-cli/excluding-directories-and-files-from-the-snyk-code-cli-test
+# https://docs.snyk.io/snyk-cli/commands/ignore
+exclude:
+  global:
+    - "test/**"
+    - "**/*_test.go"
+    - "vendor/k8s.io/**"
+    - "vendor/sigs.k8s.io/**"
+    - "vendor/github.com/jaypipes/ghw/**"
+    - "vendor/github.com/k8stopologyawareschedwg/deployer/pkg/kubeletconfig/*"
+    - "vendor/github.com/golang/**"
+    - "vendor/github.com/google/**"
+    - "vendor/github.com/go-task/slim-sprig/**"
+    - "vendor/github.com/Azure/go-autorest/autorest/**"
+    - "vendor/github.com/openshift/**"
+    - "vendor/github.com/onsi/gomega**"
+    - "vendor/github.com/onsi/ginkgo/**"
+    - "vendor/golang.org/**"
+    - "vendor/github.com/stretchr/testify/**"
+    - "vendor/github.com/stretchr/objx/**"
+
