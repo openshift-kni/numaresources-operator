@@ -44,7 +44,7 @@ spec:
       - command:
         - /bin/numaresources-operator
         args:
-        - --v=4
+        - -v=4
         - --leader-elect
         - --enable-scheduler
         image: controller:latest
