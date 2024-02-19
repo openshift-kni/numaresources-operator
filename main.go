@@ -47,7 +47,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
@@ -166,31 +165,12 @@ func main() {
 	logh := klogr.NewWithOptions(klogr.WithFormat(klogr.FormatKlog))
 	ctrl.SetLogger(logh)
 
-	klog.InfoS("starting", "program", version.ProgramName(), "version", version.Get(), "gitcommit", version.GetGitCommit(), "golang", runtime.Version())
-
-	// if it is unknown, it's fine
-	userPlatform, _ := platform.ParsePlatform(params.platformName)
-	userPlatformVersion, _ := platform.ParseVersion(params.platformVersion)
-
 	ctx := context.Background()
 
-	plat, reason, err := detect.FindPlatform(ctx, userPlatform)
-	klog.InfoS("platform detection", "kind", plat.Discovered, "reason", reason)
-	clusterPlatform := plat.Discovered
-	if clusterPlatform == platform.Unknown {
-		klog.ErrorS(err, "cannot autodetect the platform, and no platform given")
+	clusterPlatform, clusterPlatformVersion, err := version.DiscoverCluster(ctx, version.ProgramName(), params.platformName, params.platformVersion)
+	if err != nil {
 		os.Exit(1)
 	}
-
-	platVersion, source, err := detect.FindVersion(ctx, clusterPlatform, userPlatformVersion)
-	klog.InfoS("platform detection", "version", platVersion.Discovered, "reason", source)
-	clusterPlatformVersion := version.Minimize(platVersion.Discovered)
-	if clusterPlatformVersion == platform.MissingVersion {
-		klog.ErrorS(err, "cannot autodetect the platform version, and no platform given")
-		os.Exit(1)
-	}
-
-	klog.InfoS("detected cluster", "platform", clusterPlatform, "version", clusterPlatformVersion)
 
 	if params.detectPlatformOnly {
 		fmt.Printf("platform=%s version=%s\n", clusterPlatform, clusterPlatformVersion)

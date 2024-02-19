@@ -29,7 +29,9 @@ they found it before they run.
 - `E2E_NROP_MCP_UPDATE_INTERVAL` (accepts a duration, e.g. `10s`) instructs the suite about how much it should
   wait between checks for MCP updates.
 - `E2E_NROP_PLATFORM` (accepts a string, e.g. `Kubernetes`, `OpenShift`) instructs the suite to *disable* the
-  autodetection of the platform and force it to the provided value.
+  autodetection of the platform name and force it to the provided value.
+- `E2E_NROP_PLATFORM_VERSION` (accepts a string, e.g. `1.30`, `4.16`) instructs the suite to *disable* the
+  autodetection of the platform version and force it to the provided value.
 - `E2E_NROP_DUMP_EVENTS` (accepts boolean, e.g. `true`) requests the suite to dump events pertaining to pods
   failed unexpectedly on standard output, alongside (not replacing) the logging of the said events.
 - `E2E_NROP_TARGET_NODE` (accepts string, e.g. `node-0.my-cluster.io`) instructs the suite to always pick the

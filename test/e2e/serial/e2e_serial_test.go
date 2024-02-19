@@ -23,6 +23,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	_ "github.com/openshift-kni/numaresources-operator/test/utils/configuration"
+
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	_ "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
 )
@@ -35,14 +37,15 @@ func TestSerial(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	Expect(serialconfig.CheckNodesTopology(context.TODO())).Should(Succeed())
+	ctx := context.Background()
+	Expect(serialconfig.CheckNodesTopology(ctx)).Should(Succeed())
 	serialconfig.Setup()
 	setupExecuted = true
 })
 
 var _ = AfterSuite(func() {
-	if setupExecuted {
-		serialconfig.Teardown()
+	if !setupExecuted {
+		return
 	}
-
+	serialconfig.Teardown()
 })
