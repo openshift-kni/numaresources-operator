@@ -25,6 +25,7 @@ linters:
     - unused
     - wastedassign
     - whitespace
+    - depguard
 linters-settings:
   misspell:
     locale: US
@@ -34,3 +35,20 @@ linters-settings:
       - numaresource
       - numa
       - NUMA
+  depguard:
+    rules:
+      main:
+        list-mode: original
+        files:
+          - $all
+          - "!$test"
+        deny:
+          - pkg: "k8s.io/kubernetes"
+            desc: Importing k8s.io/kubernetes as library is not supported
+      test:
+        list-mode: lax
+        files:
+          - $test
+        deny:
+          - pkg: "k8s.io/kubernetes"
+            desc: Importing k8s.io/kubernetes as library is not supported
