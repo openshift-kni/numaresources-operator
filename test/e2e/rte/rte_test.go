@@ -82,11 +82,11 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
-						klog.Warningf("--v flag doesn't exist in container %q args managed by DaemonSet: %q", rteCnt.Name, ds.Name)
+						klog.Warningf("-v flag doesn't exist in container %q args managed by DaemonSet: %q", rteCnt.Name, ds.Name)
 						return false
 					}
 					if !match {
-						klog.Warningf("LogLevel %s doesn't match the existing --v flag in container: %q under DaemonSet: %q", nropObj.Spec.LogLevel, rteCnt.Name, ds.Name)
+						klog.Warningf("LogLevel %s doesn't match the existing -v flag in container: %q under DaemonSet: %q", nropObj.Spec.LogLevel, rteCnt.Name, ds.Name)
 						return false
 					}
 				}
@@ -121,12 +121,12 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
-						klog.Warningf("--v flag doesn't exist in container %q args under DaemonSet: %q", rteCnt.Name, ds.Name)
+						klog.Warningf("-v flag doesn't exist in container %q args under DaemonSet: %q", rteCnt.Name, ds.Name)
 						return false
 					}
 
 					if !match {
-						klog.Warningf("LogLevel %s doesn't match the existing --v flag in container: %q managed by DaemonSet: %q", nropObj.Spec.LogLevel, rteCnt.Name, ds.Name)
+						klog.Warningf("LogLevel %s doesn't match the existing -v flag in container: %q managed by DaemonSet: %q", nropObj.Spec.LogLevel, rteCnt.Name, ds.Name)
 						return false
 					}
 				}

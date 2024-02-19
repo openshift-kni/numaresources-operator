@@ -366,12 +366,12 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					cnt := &ds.Spec.Template.Spec.Containers[0]
 					found, match := matchLogLevelToKlog(cnt, nroOperObj.Spec.LogLevel)
 					if !found {
-						klog.Warningf("--v flag doesn't exist in container %q args under DaemonSet: %q", cnt.Name, ds.Name)
+						klog.Warningf("-v  flag doesn't exist in container %q args under DaemonSet: %q", cnt.Name, ds.Name)
 						return false, nil
 					}
 
 					if !match {
-						klog.Warningf("LogLevel %s doesn't match the existing --v flag in container: %q managed by DaemonSet: %q", nroOperObj.Spec.LogLevel, cnt.Name, ds.Name)
+						klog.Warningf("LogLevel %s doesn't match the existing -v  flag in container: %q managed by DaemonSet: %q", nroOperObj.Spec.LogLevel, cnt.Name, ds.Name)
 						return false, nil
 					}
 				}

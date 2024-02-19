@@ -60,7 +60,7 @@ func UpdatePodSpec(podSpec *corev1.PodSpec, cntName string, level operatorv1.Log
 	if flags == nil {
 		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
 	}
-	flags.SetOption("--v", kLog.String())
+	flags.SetOption("-v", kLog.String())
 	klog.InfoS("container klog level", "container", cnt.Name, "-v", kLog.String())
 	cnt.Args = flags.Argv()
 	return nil
