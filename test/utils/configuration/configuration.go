@@ -20,13 +20,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
-	"k8s.io/klog/v2"
-
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
+	"github.com/openshift-kni/numaresources-operator/pkg/version"
 )
 
 const (
@@ -39,7 +36,7 @@ const (
 const (
 	defaultMCPUpdateTimeout  = 30 * time.Minute
 	defaultMCPUpdateInterval = 30 * time.Second
-	defaultOCPVersion        = "v4.14"
+	defaultOCPVersion        = "v4.16"
 )
 
 var (
@@ -64,53 +61,7 @@ func init() {
 		panic(fmt.Errorf("failed to parse machine config pool update interval: %w", err))
 	}
 
-	Plat, err = detect.Platform(ctx)
-	if err != nil {
-		Plat = getPlatformFromEnv(envVarPlatform)
-	}
-	if Plat == platform.Unknown {
-		Plat = platform.OpenShift
-		klog.Infof("forced to %q: failed to detect a platform: %w", Plat, err)
-	}
-
-	PlatVersion, err = detect.Version(ctx, Plat)
-	if err != nil {
-		PlatVersion, err = getPlatformVersionFromEnv(envVarPlatform)
-		if err != nil {
-			PlatVersion = platform.Version(defaultOCPVersion)
-			klog.Infof("forced to %q: failed to detect platform version: %w", PlatVersion, err)
-		}
-	}
-	if PlatVersion == platform.MissingVersion {
-		PlatVersion = platform.Version(defaultOCPVersion)
-		klog.Infof("forced to %q: failed to detect a platform: %w", Plat, err)
-	}
-}
-
-func getPlatformFromEnv(envVar string) platform.Platform {
-	val, ok := os.LookupEnv(envVar)
-	if !ok {
-		return platform.Unknown
-	}
-	switch strings.ToLower(val) {
-	case "kubernetes":
-		return platform.Kubernetes
-	case "openshift":
-		return platform.OpenShift
-	}
-	return platform.Unknown
-}
-
-func getPlatformVersionFromEnv(envVar string) (platform.Version, error) {
-	val, ok := os.LookupEnv(envVar)
-	if !ok {
-		return platform.MissingVersion, fmt.Errorf("failed to get platform version from environment variable %s", envVar)
-	}
-	version, err := platform.ParseVersion(val)
-	if err != nil {
-		return platform.MissingVersion, fmt.Errorf("failed to parse platform version %s: %w", val, err)
-	}
-	return version, nil
+	Plat, PlatVersion, _ = version.DiscoverCluster(ctx, "NROPtests", os.Getenv(envVarPlatform), os.Getenv(envVarPlatformVersion))
 }
 
 func getMachineConfigPoolUpdateValueFromEnv(envVar string, fallback time.Duration) (time.Duration, error) {
