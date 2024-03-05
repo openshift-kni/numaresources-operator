@@ -129,6 +129,22 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 				event := <-fakeRecorder.Events
 				Expect(event).To(ContainSubstring("ProcessFailed"))
 			})
+
+			It("should skip invalid kubeletconfig", func() {
+				invalidMcoKc := testobjs.NewKubeletConfigWithoutData("test1", label1, mcp1.Spec.MachineConfigSelector)
+				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, invalidMcoKc)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(mcoKc1)
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+
+				// verify creation event
+				fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
+				Expect(ok).To(BeTrue())
+				event := <-fakeRecorder.Events
+				Expect(event).To(ContainSubstring("ProcessSkip"))
+			})
 		})
 	})
 })
