@@ -79,6 +79,31 @@ spec:
               schedulerName:
                 description: Scheduler name to be used in pod templates
                 type: string
+              scoringStrategy:
+                description: ScoringStrategy a scoring model that determine how the
+                  plugin will score the nodes. Defaults to LeastAllocated.
+                properties:
+                  resources:
+                    items:
+                      properties:
+                        name:
+                          description: Name of the resource.
+                          type: string
+                        weight:
+                          description: Weight of the resource.
+                          format: int64
+                          type: integer
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  type:
+                    enum:
+                    - MostAllocated
+                    - BalancedAllocation
+                    - LeastAllocated
+                    type: string
+                type: object
             required:
             - imageSpec
             type: object

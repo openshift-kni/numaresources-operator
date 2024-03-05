@@ -28,6 +28,7 @@ const (
 	defaultCacheResyncDebug     = CacheResyncDebugDumpJSONFile
 	defaultSchedulerInformer    = SchedulerInformerDedicated
 	defaultCacheResyncDetection = CacheResyncDetectionRelaxed
+	defaultScoringStrategy      = LeastAllocated
 )
 
 func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
@@ -47,6 +48,11 @@ func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
 	if spec.CacheResyncDetection == nil {
 		resyncDetection := defaultCacheResyncDetection
 		spec.CacheResyncDetection = &resyncDetection
+	}
+	if spec.ScoringStrategy == nil {
+		spec.ScoringStrategy = &ScoringStrategyParams{
+			Type: defaultScoringStrategy,
+		}
 	}
 }
 

@@ -45,6 +45,30 @@ const (
 	SchedulerInformerDedicated SchedulerInformerMode = "Dedicated"
 )
 
+// +kubebuilder:validation:Enum=MostAllocated;BalancedAllocation;LeastAllocated
+type ScoringStrategyType string
+
+const (
+	// MostAllocated strategy favors node with the least amount of available resource
+	MostAllocated ScoringStrategyType = "MostAllocated"
+	// BalancedAllocation strategy favors nodes with balanced resource usage rate
+	BalancedAllocation ScoringStrategyType = "BalancedAllocation"
+	// LeastAllocated strategy favors node with the most amount of available resource
+	LeastAllocated ScoringStrategyType = "LeastAllocated"
+)
+
+type ResourceSpecParams struct {
+	// Name of the resource.
+	Name string `json:"name"`
+	// Weight of the resource.
+	Weight int64 `json:"weight,omitempty"`
+}
+
+type ScoringStrategyParams struct {
+	Type      ScoringStrategyType  `json:"type,omitempty"`
+	Resources []ResourceSpecParams `json:"resources,omitempty"`
+}
+
 // +kubebuilder:validation:Enum=Relaxed;Aggressive
 type CacheResyncDetectionMode string
 
@@ -86,6 +110,10 @@ type NUMAResourcesSchedulerSpec struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler cache resync detection setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	CacheResyncDetection *CacheResyncDetectionMode `json:"cacheResyncDetection,omitempty"`
+	// ScoringStrategy a scoring model that determine how the plugin will score the nodes. Defaults to LeastAllocated.
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler scoring strategy setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	ScoringStrategy *ScoringStrategyParams `json:"scoringStrategy,omitempty"`
 }
 
 // NUMAResourcesSchedulerStatus defines the observed state of NUMAResourcesScheduler
