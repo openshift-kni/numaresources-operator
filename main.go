@@ -50,7 +50,7 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/options"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
@@ -369,9 +369,9 @@ func renderObjects(objs []client.Object) error {
 // renderRTEManifests renders the reconciler manifests so they can be deployed on the cluster.
 func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, imageSpec string) (rtemanifests.Manifests, error) {
 	klog.InfoS("Updating RTE manifests")
-	mf, err := rteManifests.Render(rtemanifests.RenderOptions{
+	mf, err := rteManifests.Render(options.UpdaterDaemon{
 		Namespace: namespace,
-		DaemonSet: depobjupdate.DaemonSetOptions{
+		DaemonSet: options.DaemonSet{
 			Verbose:            2,
 			NotificationEnable: true,
 			UpdateInterval:     10 * time.Second,

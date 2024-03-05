@@ -27,10 +27,10 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	ocpupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/ocp"
 	rbacupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rbac"
 	rteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/options"
 )
 
 const (
@@ -75,36 +75,21 @@ func (mf Manifests) Clone() Manifests {
 	return ret
 }
 
-type RenderOptions struct {
-	// DaemonSet options
-	DaemonSet objectupdate.DaemonSetOptions
-
-	// MachineConfig options
-	MachineConfigPoolSelector *metav1.LabelSelector
-
-	// Config Map options
-	ConfigData string
-
-	// General options
-	Namespace string
-	Name      string
-}
-
-func (mf Manifests) Render(options RenderOptions) (Manifests, error) {
+func (mf Manifests) Render(opts options.UpdaterDaemon) (Manifests, error) {
 	ret := mf.Clone()
 	if ret.plat == platform.Kubernetes {
-		if options.Namespace != "" {
-			ret.ServiceAccount.Namespace = options.Namespace
+		if opts.Namespace != "" {
+			ret.ServiceAccount.Namespace = opts.Namespace
 		}
 	}
 
-	if options.Name != "" {
-		ret.RoleBinding.Name = options.Name
-		ret.ServiceAccount.Name = options.Name
-		ret.Role.Name = options.Name
-		ret.DaemonSet.Name = options.Name
-		ret.ClusterRole.Name = options.Name
-		ret.ClusterRoleBinding.Name = options.Name
+	if opts.Name != "" {
+		ret.RoleBinding.Name = opts.Name
+		ret.ServiceAccount.Name = opts.Name
+		ret.Role.Name = opts.Name
+		ret.DaemonSet.Name = opts.Name
+		ret.ClusterRole.Name = opts.Name
+		ret.ClusterRoleBinding.Name = opts.Name
 	}
 
 	rbacupdate.RoleBinding(ret.RoleBinding, mf.ServiceAccount.Name, ret.ServiceAccount.Namespace)
@@ -113,23 +98,23 @@ func (mf Manifests) Render(options RenderOptions) (Manifests, error) {
 	ret.DaemonSet.Spec.Template.Spec.ServiceAccountName = mf.ServiceAccount.Name
 
 	rteConfigMapName := ""
-	if len(options.ConfigData) > 0 {
-		ret.ConfigMap = CreateConfigMap(ret.DaemonSet.Namespace, rteupdate.RTEConfigMapName, options.ConfigData)
+	if len(opts.ConfigData) > 0 {
+		ret.ConfigMap = CreateConfigMap(ret.DaemonSet.Namespace, rteupdate.RTEConfigMapName, opts.ConfigData)
 	}
 
 	if ret.ConfigMap != nil {
 		rteConfigMapName = ret.ConfigMap.Name
 	}
-	rteupdate.DaemonSet(ret.DaemonSet, mf.plat, rteConfigMapName, options.DaemonSet)
+	rteupdate.DaemonSet(ret.DaemonSet, mf.plat, rteConfigMapName, opts.DaemonSet)
 
 	if mf.plat == platform.OpenShift {
 		rteupdate.SecurityContext(ret.DaemonSet)
 
-		if options.Name != "" {
-			ret.MachineConfig.Name = ocpupdate.MakeMachineConfigName(options.Name)
+		if opts.Name != "" {
+			ret.MachineConfig.Name = ocpupdate.MakeMachineConfigName(opts.Name)
 		}
-		if options.MachineConfigPoolSelector != nil {
-			ret.MachineConfig.Labels = options.MachineConfigPoolSelector.MatchLabels
+		if opts.MachineConfigPoolSelector != nil {
+			ret.MachineConfig.Labels = opts.MachineConfigPoolSelector.MatchLabels
 		}
 		ocpupdate.SecurityContextConstraint(ret.SecurityContextConstraint, ret.ServiceAccount)
 	}

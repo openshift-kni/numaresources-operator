@@ -33,8 +33,8 @@ func SchedulerDeployment(dp *appsv1.Deployment, pullIfNotPresent, ctrlPlaneAffin
 	cnt.Image = images.SchedulerPluginSchedulerImage
 	cnt.ImagePullPolicy = pullPolicy(pullIfNotPresent)
 
-	flags := flagcodec.ParseArgvKeyValue(cnt.Args)
-	flags.SetOption("--v", fmt.Sprintf("%d", verbose)) // TODO: keep in sync with the manifest (-v vs --v)
+	flags := flagcodec.ParseArgvKeyValue(cnt.Args, flagcodec.WithFlagNormalization)
+	flags.SetOption("-v", fmt.Sprintf("%d", verbose))
 	cnt.Args = flags.Argv()
 
 	if ctrlPlaneAffinity {
