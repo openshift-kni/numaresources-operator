@@ -113,6 +113,14 @@ func NewKubeletConfig(name string, labels map[string]string, machineConfigSelect
 }
 
 func NewKubeletConfigWithData(name string, labels map[string]string, machineConfigSelector *metav1.LabelSelector, data []byte) *machineconfigv1.KubeletConfig {
+	kc := NewKubeletConfigWithoutData(name, labels, machineConfigSelector)
+	kc.Spec.KubeletConfig = &runtime.RawExtension{
+		Raw: data,
+	}
+	return kc
+}
+
+func NewKubeletConfigWithoutData(name string, labels map[string]string, machineConfigSelector *metav1.LabelSelector) *machineconfigv1.KubeletConfig {
 	return &machineconfigv1.KubeletConfig{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "KubeletConfig",
@@ -124,9 +132,6 @@ func NewKubeletConfigWithData(name string, labels map[string]string, machineConf
 		},
 		Spec: machineconfigv1.KubeletConfigSpec{
 			MachineConfigPoolSelector: machineConfigSelector,
-			KubeletConfig: &runtime.RawExtension{
-				Raw: data,
-			},
 		},
 	}
 }
