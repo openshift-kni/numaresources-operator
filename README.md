@@ -16,11 +16,24 @@ Assuming you can push container images to a container registry and you are in th
 
 For further details, please refer to the [operator-sdk documentation](https://sdk.operatorframework.io/docs/olm-integration/tutorial-bundle/)
 
+## roadmap
+
+The NUMA Resources operator is meant to have a limited lifetime, because all the operands it manages have a path towards
+integration in core k8s or towards replacement with other established components:
+1. The NodResourceTopology API is meant to be proposed to be accepted among the k8s APIs
+2. The ResourceTopologyExporter is meant to be replaced by nfd-topology-updater, part of the Node Feature Discovery project,
+   and managed by the nfd-operator
+3. The out-of-tree scheduler plugin is meant to be proposed to be accepted in the k8s core repo; for the mid-term,
+   it should be managed by the secondary-scheduler-operator.
+
+Once all the components are merged or replaced, we plan to extract the testsuite, and then to deprecate and dissolve
+the NUMA Resources Operator.
+
 ## current limitations
 
 Please check the [issues section](https://github.com/openshift-kni/numaresources-operator/issues) for the known issues and limitations of the NUMA resources operator.
 
-## Additional noteworthy information
+## additional noteworthy information
 
 NRT objects only take into consideration exclusively allocated CPUs while accounting. In order for a pod to be allocated exclusive CPUs, it HAS to belong to Guaranteed QoS class (request=limit) and request has to be integral. Therefore, CPUs in the shared pool because of pods belonging to best effort/burstable QoS or guaranteed pod with non-integral CPU request would not be accounted for in the NRT objects. Please refer to CPU Manager docs [here](https://kubernetes.io/docs/tasks/administer-cluster/cpu-management-policies/#static-policy) for more detail on this.
 
@@ -34,3 +47,13 @@ There is **no support** for these e2e tests images, and they are recommended to 
 
 See `README.tests.md` for detailed instructions about how to run the suite.
 See `tests/e2e/serial/README.md` for fine details about the suite and developer instructions.
+
+## linking bugs and issues to PRs
+
+PRs fixing issues may link either
+1. [the project issues](https://github.com/openshift-kni/numaresources-operator/issues) per standard github flow (preferred)
+   Please link the PR using `Fixes: #12345` in the PR description and/or link using the github UI
+2. [the OCPBUGS jira board](https://issues.redhat.com/projects/OCPBUGS/issues).
+   Please link the PR using the `OCPBUGS-12345: ` prefix in the PR description.
+
+we currently don't support other issue trackers.
