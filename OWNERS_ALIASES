@@ -3,12 +3,12 @@
 aliases:
   numaresources-reviewers:
     - ffromani
-    - Tal-or
-    - jlojosnegros
     - shajmakh
     - swatisehgal
+    - Tal-or
   numaresources-approvers:
     - ffromani
-    - yanirq
-    - Tal-or
+    - shajmakh
     - swatisehgal
+    - Tal-or
+    - yanirq
