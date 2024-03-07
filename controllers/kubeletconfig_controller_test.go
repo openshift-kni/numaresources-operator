@@ -166,14 +166,7 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 			})
 
 			It("should ignore non-matching kubeketconfigs", func() {
-				ctrlPlaneLabSel := &metav1.LabelSelector{
-					MatchLabels: map[string]string{
-						"pools.operator.machineconfiguration.openshift.io/ctrlplane": "",
-					},
-				}
-				var true_ bool = true
-				ctrlPlaneKc := testobjs.NewKubeletConfigWithoutData("autoresize-ctrlplane", nil, ctrlPlaneLabSel)
-				ctrlPlaneKc.Spec.AutoSizingReserved = &true_
+				ctrlPlaneKc := testobjs.NewKubeletConfigAutoresizeControlPlane()
 
 				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, mcoKc1, ctrlPlaneKc)
 				Expect(err).ToNot(HaveOccurred())
