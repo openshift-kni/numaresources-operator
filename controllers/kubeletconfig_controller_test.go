@@ -115,11 +115,11 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 			})
 
 			It("should send events when NRO present and operation failure", func() {
-				brokenMcoKc := testobjs.NewKubeletConfigWithData("test1", label1, mcp1.Spec.MachineConfigSelector, []byte(""))
+				brokenMcoKc := testobjs.NewKubeletConfigWithData("broken", label1, mcp1.Spec.MachineConfigSelector, []byte(""))
 				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, brokenMcoKc)
 				Expect(err).ToNot(HaveOccurred())
 
-				key := client.ObjectKeyFromObject(mcoKc1)
+				key := client.ObjectKeyFromObject(brokenMcoKc)
 				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).To(HaveOccurred())
 
