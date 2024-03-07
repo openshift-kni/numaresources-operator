@@ -31,6 +31,11 @@ import (
 
 const (
 	Key string = "config.yaml"
+
+	LabelOperatorName  string = "numaresourcesoperator.nodetopology.openshift.io/name"
+	LabelNodeGroupName string = "nodegroup.nodetopology.openshift.io"
+
+	LabelNodeGroupKindMachineConfigPool string = "machineconfigpool"
 )
 
 type Config struct {
@@ -89,6 +94,15 @@ func CreateConfigMap(namespace, name, configData string) *corev1.ConfigMap {
 			Key: configData,
 		},
 	}
+	return cm
+}
+
+func AddSoftRefLabels(cm *corev1.ConfigMap, instanceName, mcpName string) *corev1.ConfigMap {
+	if cm.Labels == nil {
+		cm.Labels = make(map[string]string)
+	}
+	cm.Labels[LabelOperatorName] = instanceName
+	cm.Labels[LabelNodeGroupName+"/"+LabelNodeGroupKindMachineConfigPool] = mcpName
 	return cm
 }
 
