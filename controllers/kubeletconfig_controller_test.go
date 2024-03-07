@@ -131,11 +131,11 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 			})
 
 			It("should skip invalid kubeletconfig", func() {
-				invalidMcoKc := testobjs.NewKubeletConfigWithoutData("test1", label1, mcp1.Spec.MachineConfigSelector)
+				invalidMcoKc := testobjs.NewKubeletConfigWithoutData("payloadless", label1, mcp1.Spec.MachineConfigSelector)
 				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, invalidMcoKc)
 				Expect(err).ToNot(HaveOccurred())
 
-				key := client.ObjectKeyFromObject(mcoKc1)
+				key := client.ObjectKeyFromObject(invalidMcoKc)
 				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).ToNot(HaveOccurred())
 
@@ -144,6 +144,74 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 				Expect(ok).To(BeTrue())
 				event := <-fakeRecorder.Events
 				Expect(event).To(ContainSubstring("ProcessSkip"))
+				Expect(event).To(ContainSubstring(invalidMcoKc.Name))
+			})
+
+			It("should ignore non-matching kubeketconfigs", func() {
+				ctrlPlaneLabSel := &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"pools.operator.machineconfiguration.openshift.io/ctrlplane": "",
+					},
+				}
+				var true_ bool = true
+				ctrlPlaneKc := testobjs.NewKubeletConfigWithoutData("autoresize-ctrlplane", nil, ctrlPlaneLabSel)
+				ctrlPlaneKc.Spec.AutoSizingReserved = &true_
+
+				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, mcoKc1, ctrlPlaneKc)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(ctrlPlaneKc)
+				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				// verify creation event
+				fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
+				Expect(ok).To(BeTrue())
+				event := <-fakeRecorder.Events
+				Expect(event).To(ContainSubstring("ProcessSkip"))
+				Expect(event).To(ContainSubstring(ctrlPlaneKc.Name))
+			})
+
+			It("should process matching kubeletconfig, then ignore non-matching kubeketconfig", func() {
+				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1)
+				Expect(err).ToNot(HaveOccurred())
+
+				fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
+				Expect(ok).To(BeTrue())
+
+				err = reconciler.Client.Create(context.TODO(), mcoKc1)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(mcoKc1)
+				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				cm := &corev1.ConfigMap{}
+				key = client.ObjectKey{
+					Namespace: testNamespace,
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+				}
+				Expect(reconciler.Client.Get(context.TODO(), key, cm)).ToNot(HaveOccurred())
+				// verify creation event
+				event := <-fakeRecorder.Events
+				Expect(event).To(ContainSubstring("ProcessOK"))
+				Expect(event).To(ContainSubstring(mcoKc1.Name))
+
+				ctrlPlaneKc := testobjs.NewKubeletConfigAutoresizeControlPlane()
+				err = reconciler.Client.Create(context.TODO(), ctrlPlaneKc)
+				Expect(err).ToNot(HaveOccurred())
+
+				key = client.ObjectKeyFromObject(ctrlPlaneKc)
+				result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				// verify creation event
+				event = <-fakeRecorder.Events
+				Expect(event).To(ContainSubstring("ProcessSkip"))
+				Expect(event).To(ContainSubstring(ctrlPlaneKc.Name))
 			})
 		})
 	})
