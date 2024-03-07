@@ -34,6 +34,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
@@ -96,7 +97,24 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
 				}
 				Expect(reconciler.Client.Get(context.TODO(), key, cm)).ToNot(HaveOccurred())
+			})
+			It("with NRO present, the created configmap should have the linking labels", func() {
+				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, mcoKc1)
+				Expect(err).ToNot(HaveOccurred())
 
+				key := client.ObjectKeyFromObject(mcoKc1)
+				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				cm := &corev1.ConfigMap{}
+				key = client.ObjectKey{
+					Namespace: testNamespace,
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+				}
+				Expect(reconciler.Client.Get(context.TODO(), key, cm)).ToNot(HaveOccurred())
+				Expect(cm.Labels).To(HaveKeyWithValue(rteconfig.LabelOperatorName, nro.Name))
+				Expect(cm.Labels).To(HaveKeyWithValue(rteconfig.LabelNodeGroupName+"/"+rteconfig.LabelNodeGroupKindMachineConfigPool, mcp1.Name))
 			})
 			It("should send events when NRO present and operation succesfull", func() {
 				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, mcoKc1)
