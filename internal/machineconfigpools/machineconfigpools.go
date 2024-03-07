@@ -18,7 +18,6 @@ package machineconfigpools
 
 import (
 	"context"
-	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -38,10 +37,22 @@ func GetListByNodeGroupsV1(ctx context.Context, cli client.Client, nodeGroups []
 	return nodegroupv1.FindMachineConfigPools(mcps, nodeGroups)
 }
 
+type NotFound struct {
+	Selector string
+}
+
+func (e *NotFound) Error() string {
+	return "cannot find a MCP related to the selector " + e.Selector
+}
+
+func (e *NotFound) Is(target error) bool {
+	te, ok := target.(*NotFound)
+	return ok && e.Selector == te.Selector
+}
+
 func FindBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelector) (*mcov1.MachineConfigPool, error) {
 	if sel == nil {
-		return nil, fmt.Errorf("no MCP selector for selector %v", sel)
-
+		return nil, &NotFound{}
 	}
 
 	selector, err := metav1.LabelSelectorAsSelector(sel)
@@ -54,5 +65,5 @@ func FindBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelector) 
 			return mcp, nil
 		}
 	}
-	return nil, fmt.Errorf("cannot find MCP related to the selector %v", sel)
+	return nil, &NotFound{Selector: sel.String()}
 }
