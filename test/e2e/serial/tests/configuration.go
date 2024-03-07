@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 
@@ -48,6 +50,7 @@ import (
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
+	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
@@ -603,6 +606,41 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			}
 			Expect(err).ToNot(HaveOccurred(), "failed to check the NodeGroupConfig status for %q", nroKey.String())
 		})
+
+		It("[slow][tier1] ignores non-matching kubeletconfigs", func(ctx context.Context) {
+			By("getting the NROP object")
+			nroOperObj := &nropv1.NUMAResourcesOperator{}
+			nroKey := objects.NROObjectKey()
+			err := fxt.Client.Get(ctx, nroKey, nroOperObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
+
+			By("recording the current kubeletconfig and configmap status")
+			kcCmsPre, err := getKubeletConfigMapsSoftOwnedBy(ctx, fxt.Client, nroOperObj.Name)
+			Expect(err).ToNot(HaveOccurred(), "cannot list KubeletConfig ConfigMaps in the cluster (PRE)")
+			kcCmNamesPre := sets.List[string](accumulateKubeletConfigNames(kcCmsPre))
+			klog.Infof("initial set of configmaps from kubeletconfigs: %v", strings.Join(kcCmNamesPre, ","))
+
+			By("creating extra ctrplane kubeletconfig")
+			ctrlPlaneKc := intobjs.NewKubeletConfigAutoresizeControlPlane()
+			err = fxt.Client.Create(ctx, ctrlPlaneKc)
+			Expect(err).ToNot(HaveOccurred(), "cannot create %q in the cluster", ctrlPlaneKc.Name)
+
+			defer func(ctx2 context.Context) {
+				By("deleting the extra ctrlplane kubeletconfig")
+				err := fxt.Client.Delete(ctx2, ctrlPlaneKc)
+				Expect(err).ToNot(HaveOccurred(), "cannot delete %q from the cluster", ctrlPlaneKc.Name)
+				err = wait.With(fxt.Client).ForMCOKubeletConfigDeleted(ctx2, ctrlPlaneKc.Name)
+				Expect(err).ToNot(HaveOccurred(), "waiting for %q to be deleted", ctrlPlaneKc.Name)
+			}(ctx)
+
+			Consistently(func() []string {
+				kcCmsCur, err := getKubeletConfigMapsSoftOwnedBy(ctx, fxt.Client, nroOperObj.Name)
+				Expect(err).ToNot(HaveOccurred(), "cannot list KubeletConfig ConfigMaps in the cluster (current)")
+				kcCmNamesCur := sets.List[string](accumulateKubeletConfigNames(kcCmsCur))
+				klog.Infof("current set of configmaps from kubeletconfigs: %v", strings.Join(kcCmNamesCur, ","))
+				return kcCmNamesCur
+			}).WithContext(ctx).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Equal(kcCmNamesPre))
+		})
 	})
 })
 
@@ -640,4 +678,30 @@ func toJSON(obj interface{}) string {
 		return "<ERROR>"
 	}
 	return string(data)
+}
+
+func getKubeletConfigMapsSoftOwnedBy(ctx context.Context, cli client.Client, nropName string) ([]corev1.ConfigMap, error) {
+	sel, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			rteconfig.LabelOperatorName: nropName,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	cmList := &corev1.ConfigMapList{}
+	if err := cli.List(ctx, cmList, &client.ListOptions{LabelSelector: sel}); err != nil {
+		return nil, err
+	}
+
+	return cmList.Items, nil
+}
+
+func accumulateKubeletConfigNames(cms []corev1.ConfigMap) sets.Set[string] {
+	cmNames := sets.New[string]()
+	for _, cm := range cms {
+		cmNames.Insert(cm.Name)
+	}
+	return cmNames
 }
