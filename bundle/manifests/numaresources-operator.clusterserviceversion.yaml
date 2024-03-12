@@ -254,6 +254,12 @@ spec:
         path: schedulerName
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
+      - description: ScoringStrategy a scoring model that determine how the plugin
+          will score the nodes. Defaults to LeastAllocated.
+        displayName: Scheduler scoring strategy setting
+        path: scoringStrategy
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       statusDescriptors:
       - description: CacheResyncPeriod shows the current cache resync period
         displayName: Scheduler cache resync period

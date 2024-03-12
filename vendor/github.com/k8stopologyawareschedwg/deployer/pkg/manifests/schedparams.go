@@ -47,6 +47,12 @@ const (
 	CacheInformerDedicated = "Dedicated"
 )
 
+const (
+	ScoringStrategyMostAllocated      = "MostAllocated"
+	ScoringStrategyBalancedAllocation = "BalancedAllocation"
+	ScoringStrategyLeastAllocated     = "LeastAllocated"
+)
+
 func ValidateForeignPodsDetectMode(value string) error {
 	switch value {
 	case ForeignPodsDetectNone:
@@ -91,9 +97,35 @@ type ConfigCacheParams struct {
 	InformerMode          *string
 }
 
+type ResourceSpecParams struct {
+	// Name of the resource.
+	Name string `json:"name"`
+	// Weight of the resource.
+	Weight int64 `json:"weight,omitempty"`
+}
+
+type ScoringStrategyParams struct {
+	Type      string               `json:"type,omitempty"`
+	Resources []ResourceSpecParams `json:"resources,omitempty"`
+}
+
+func ValidateScoringStrategyType(value string) error {
+	switch value {
+	case ScoringStrategyMostAllocated:
+		return nil
+	case ScoringStrategyBalancedAllocation:
+		return nil
+	case ScoringStrategyLeastAllocated:
+		return nil
+	default:
+		return fmt.Errorf("unsupported scoringStrategyType: %v", value)
+	}
+}
+
 type ConfigParams struct {
-	ProfileName string // can't be empty, so no need for pointer
-	Cache       *ConfigCacheParams
+	ProfileName     string // can't be empty, so no need for pointer
+	Cache           *ConfigCacheParams
+	ScoringStrategy *ScoringStrategyParams
 }
 
 func DecodeSchedulerProfilesFromData(data []byte) ([]ConfigParams, error) {
@@ -131,7 +163,7 @@ func DecodeSchedulerProfilesFromData(data []byte) ([]ConfigParams, error) {
 		for _, plConf := range pluginConfigs {
 			pluginConf, ok := plConf.(map[string]interface{})
 			if !ok {
-				klog.V(1).InfoS("unexpected profile coonfig data")
+				klog.V(1).InfoS("unexpected profile config data")
 				return params, nil
 			}
 
@@ -225,5 +257,55 @@ func extractParams(profileName string, args map[string]interface{}) (ConfigParam
 			params.Cache.InformerMode = &informerMode
 		}
 	}
+
+	scoringStratArgs, ok, err := unstructured.NestedMap(args, "scoringStrategy")
+	if err != nil {
+		return params, fmt.Errorf("cannot process field scoringStrategy: %w", err)
+	}
+	if ok {
+		params.ScoringStrategy = &ScoringStrategyParams{}
+
+		scoringType, cacheOk, err := unstructured.NestedString(scoringStratArgs, "type")
+		if err != nil {
+			return params, fmt.Errorf("cannot process field scoringStrategy.type: %w", err)
+		}
+		if cacheOk {
+			if err := ValidateScoringStrategyType(scoringType); err != nil {
+				return params, err
+			}
+			params.ScoringStrategy.Type = scoringType
+		}
+
+		scoringRess, cacheOk, err := unstructured.NestedSlice(scoringStratArgs, "resources")
+		if err != nil {
+			return params, fmt.Errorf("cannot process field scoringStrategy.resources: %w", err)
+		}
+		if cacheOk {
+			var resources []ResourceSpecParams
+			for idx, scRes := range scoringRess {
+				res, ok := scRes.(map[string]interface{})
+				if !ok {
+					return params, fmt.Errorf("unexpected scoringStrategy.resources[%d] data", idx)
+				}
+
+				name, ok, err := unstructured.NestedString(res, "name")
+				if !ok || err != nil {
+					return params, fmt.Errorf("unexpected scoringStrategy.resources[%d].name data (err=%v)", idx, err)
+				}
+
+				weight, ok, err := unstructured.NestedFloat64(res, "weight")
+				if !ok || err != nil {
+					return params, fmt.Errorf("unexpected scoringStrategy.resources[%d].weight data (err=%v)", idx, err)
+				}
+
+				resources = append(resources, ResourceSpecParams{
+					Name:   name,
+					Weight: int64(weight),
+				})
+			}
+			params.ScoringStrategy.Resources = resources
+		}
+	}
+
 	return params, nil
 }

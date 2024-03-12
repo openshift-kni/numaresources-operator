@@ -30,6 +30,7 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/images"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/options"
 )
 
 const (
@@ -69,7 +70,7 @@ func ContainerConfig(podSpec *corev1.PodSpec, cnt *corev1.Container, configMapNa
 	)
 }
 
-func DaemonSet(ds *appsv1.DaemonSet, plat platform.Platform, configMapName string, opts objectupdate.DaemonSetOptions) {
+func DaemonSet(ds *appsv1.DaemonSet, plat platform.Platform, configMapName string, opts options.DaemonSet) {
 	podSpec := &ds.Spec.Template.Spec
 	if cntSpec := objectupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, manifests.ContainerNameRTE); cntSpec != nil {
 		cntSpec.Image = images.ResourceTopologyExporterImage
@@ -122,7 +123,7 @@ func DaemonSet(ds *appsv1.DaemonSet, plat platform.Platform, configMapName strin
 			})
 		}
 
-		flags := flagcodec.ParseArgvKeyValue(cntSpec.Args)
+		flags := flagcodec.ParseArgvKeyValue(cntSpec.Args, flagcodec.WithFlagNormalization)
 		flags.SetOption("-v", fmt.Sprintf("%d", opts.Verbose))
 		if opts.UpdateInterval > 0 {
 			flags.SetOption("--sleep-interval", fmt.Sprintf("%v", opts.UpdateInterval))

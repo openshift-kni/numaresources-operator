@@ -31,11 +31,16 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 	cacheResyncDebug := defaultCacheResyncDebug
 	cacheResyncDetection := defaultCacheResyncDetection
 	schedInformer := defaultSchedulerInformer
+	scoringStrategyType := defaultScoringStrategy
 
 	cacheResyncPeriodCustom := 42 * time.Second
 	cacheResyncDebugCustom := CacheResyncDebugDisabled
 	cacheResyncDetectionCustom := CacheResyncDetectionAggressive
 	schedInformerCustom := SchedulerInformerShared
+	scoringStrategyCustom := ScoringStrategyParams{
+		Type:      MostAllocated,
+		Resources: []ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}},
+	}
 
 	type testCase struct {
 		description string
@@ -53,6 +58,9 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebug,
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetection,
+				ScoringStrategy: &ScoringStrategyParams{
+					Type: scoringStrategyType,
+				},
 			},
 		},
 		{
@@ -70,6 +78,9 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebug,
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetection,
+				ScoringStrategy: &ScoringStrategyParams{
+					Type: scoringStrategyType,
+				},
 			},
 		},
 		{
@@ -90,6 +101,9 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebug,
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetection,
+				ScoringStrategy: &ScoringStrategyParams{
+					Type: scoringStrategyType,
+				},
 			},
 		},
 		{
@@ -111,6 +125,9 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebug,
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetection,
+				ScoringStrategy: &ScoringStrategyParams{
+					Type: scoringStrategyType,
+				},
 			},
 		},
 		{
@@ -132,6 +149,32 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebug,
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
+				ScoringStrategy: &ScoringStrategyParams{
+					Type: scoringStrategyType,
+				},
+			},
+		},
+
+		{
+			description: "preserving already set and partially optional fields (4)",
+			current: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				LogLevel:       operatorv1.Trace,
+				CacheResyncPeriod: &metav1.Duration{
+					Duration: cacheResyncPeriodCustom,
+				},
+				ScoringStrategy: &scoringStrategyCustom,
+			},
+			expected: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				LogLevel:       operatorv1.Trace,
+				CacheResyncPeriod: &metav1.Duration{
+					Duration: cacheResyncPeriodCustom,
+				},
+				CacheResyncDebug:     &cacheResyncDebug,
+				SchedulerInformer:    &schedInformer,
+				CacheResyncDetection: &cacheResyncDetection,
+				ScoringStrategy:      &scoringStrategyCustom,
 			},
 		},
 
@@ -144,6 +187,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebugCustom,
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
+				ScoringStrategy:      &scoringStrategyCustom,
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				CacheResyncPeriod: &metav1.Duration{
@@ -152,6 +196,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebugCustom,
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
+				ScoringStrategy:      &scoringStrategyCustom,
 			},
 		},
 		{
@@ -171,6 +216,9 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebug,
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetection,
+				ScoringStrategy: &ScoringStrategyParams{
+					Type: scoringStrategyType,
+				},
 			},
 		},
 		{
@@ -185,6 +233,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebugCustom,
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
+				ScoringStrategy:      &scoringStrategyCustom,
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
@@ -196,6 +245,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDebug:     &cacheResyncDebugCustom,
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
+				ScoringStrategy:      &scoringStrategyCustom,
 			},
 		},
 	}

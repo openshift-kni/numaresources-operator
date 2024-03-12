@@ -190,6 +190,30 @@ func updateArgs(args map[string]interface{}, params *manifests.ConfigParams) (bo
 			return updated > 0, err
 		}
 	}
+
+	scoringStratArgs, ok, err := unstructured.NestedMap(args, "scoringStrategy")
+	if !ok {
+		scoringStratArgs = make(map[string]interface{})
+	}
+	if err != nil {
+		return updated > 0, err
+	}
+
+	var scoringStratArgsUpdated int
+	if params.ScoringStrategy != nil {
+		scoringStratArgsUpdated, err = updateScoringStrategyArgs(scoringStratArgs, params)
+		if err != nil {
+			return updated > 0, err
+		}
+	}
+	updated += scoringStratArgsUpdated
+
+	if scoringStratArgsUpdated > 0 {
+		if err := unstructured.SetNestedMap(args, scoringStratArgs, "scoringStrategy"); err != nil {
+			return updated > 0, err
+		}
+	}
+
 	return updated > 0, ensureBackwardCompatibility(args)
 }
 
@@ -229,6 +253,40 @@ func updateCacheArgs(args map[string]interface{}, params *manifests.ConfigParams
 		}
 		err = unstructured.SetNestedField(args, informerMode, "informerMode")
 		if err != nil {
+			return updated, err
+		}
+		updated++
+	}
+
+	return updated, nil
+}
+
+func updateScoringStrategyArgs(args map[string]interface{}, params *manifests.ConfigParams) (int, error) {
+	var updated int
+	var err error
+
+	if params.ScoringStrategy.Type != "" {
+		scoringStratType := params.ScoringStrategy.Type // shortcut
+		err = manifests.ValidateScoringStrategyType(scoringStratType)
+		if err != nil {
+			return updated, err
+		}
+		err = unstructured.SetNestedField(args, scoringStratType, "type")
+		if err != nil {
+			return updated, err
+		}
+		updated++
+	}
+
+	if len(params.ScoringStrategy.Resources) > 0 {
+		var resources []interface{}
+		for _, scRes := range params.ScoringStrategy.Resources {
+			resources = append(resources, map[string]interface{}{
+				"name":   scRes.Name,
+				"weight": scRes.Weight,
+			})
+		}
+		if err := unstructured.SetNestedSlice(args, resources, "resources"); err != nil {
 			return updated, err
 		}
 		updated++

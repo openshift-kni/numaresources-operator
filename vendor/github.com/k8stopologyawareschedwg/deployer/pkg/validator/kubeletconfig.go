@@ -42,10 +42,9 @@ const (
 )
 
 const (
-	ExpectedPodResourcesFeatureGate = "KubeletPodResourcesGetAllocatable"
-	ExpectedCPUManagerPolicy        = "static"
-	ExpectedMemoryManagerPolicy     = kubeletconfigv1beta1.StaticMemoryManagerPolicy
-	ExpectedTopologyManagerPolicy   = kubeletconfigv1beta1.SingleNumaNodeTopologyManagerPolicy
+	ExpectedCPUManagerPolicy      = "static"
+	ExpectedMemoryManagerPolicy   = kubeletconfigv1beta1.StaticMemoryManagerPolicy
+	ExpectedTopologyManagerPolicy = kubeletconfigv1beta1.SingleNumaNodeTopologyManagerPolicy
 )
 
 const (
@@ -110,30 +109,6 @@ func ValidateClusterNodeKubeletConfig(nodeName string, nodeVersion *version.Info
 			Detected: "no configuration",
 		})
 		return vrs
-	}
-
-	if needCheckFeatureGates(nodeVersion) {
-		if kubeletConf.FeatureGates == nil {
-			vrs = append(vrs, ValidationResult{
-				Node:      nodeName,
-				Area:      AreaKubelet,
-				Component: ComponentFeatureGates,
-				/* no specific Setting: all are missing! */
-				Expected: "present",
-				Detected: "missing data",
-			})
-		} else {
-			if enabled := kubeletConf.FeatureGates[ExpectedPodResourcesFeatureGate]; !enabled {
-				vrs = append(vrs, ValidationResult{
-					Node:      nodeName,
-					Area:      AreaKubelet,
-					Component: ComponentFeatureGates,
-					Setting:   ExpectedPodResourcesFeatureGate,
-					Expected:  "enabled",
-					Detected:  "disabled",
-				})
-			}
-		}
 	}
 
 	if kubeletConf.CPUManagerPolicy != ExpectedCPUManagerPolicy {
@@ -202,17 +177,4 @@ func ValidateClusterNodeKubeletConfig(nodeName string, nodeVersion *version.Info
 		})
 	}
 	return vrs
-}
-
-func needCheckFeatureGates(nodeVersion *version.Info) bool {
-	if nodeVersion == nil {
-		// we don't know, we don't take any risk
-		return true
-	}
-	if nodeVersion.GitVersion == "" {
-		// ditto
-		return true
-	}
-	ok, _ := isAPIVersionAtLeast(nodeVersion.GitVersion, kubeMinVersionGetAllocatable)
-	return !ok // note NOT
 }

@@ -460,6 +460,120 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, depmanifests.CacheInformerDedicated)
 
 		})
+
+		ginkgo.It("should configure by default the ScoringStrategy to be LeastAllocated", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			var resources []depmanifests.ResourceSpecParams
+			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyLeastAllocated, resources)
+
+		})
+
+		ginkgo.It("should allow to change the ScoringStrategy resources", func() {
+			nrs := nrs.DeepCopy()
+			nrs.Spec.ScoringStrategy = &nropv1.ScoringStrategyParams{}
+			ResourceSpecParams := []nropv1.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
+			nrs.Spec.ScoringStrategy.Resources = ResourceSpecParams
+			gomega.Eventually(func() bool {
+				if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+					klog.Warningf("failed to update the scheduler object; err: %v", err)
+					return false
+				}
+				return true
+			}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			resources := []depmanifests.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
+			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyLeastAllocated, resources)
+
+		})
+
+		ginkgo.It("should allow to change the ScoringStrategy to BalancedAllocation", func() {
+			nrs := nrs.DeepCopy()
+			nrs.Spec.ScoringStrategy = &nropv1.ScoringStrategyParams{}
+			nrs.Spec.ScoringStrategy.Type = nropv1.BalancedAllocation
+			gomega.Eventually(func() bool {
+				if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+					klog.Warningf("failed to update the scheduler object; err: %v", err)
+					return false
+				}
+				return true
+			}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			var resources []depmanifests.ResourceSpecParams
+			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyBalancedAllocation, resources)
+
+		})
+
+		ginkgo.It("should allow to change the ScoringStrategy to MostAllocated", func() {
+			nrs := nrs.DeepCopy()
+			nrs.Spec.ScoringStrategy = &nropv1.ScoringStrategyParams{}
+			nrs.Spec.ScoringStrategy.Type = nropv1.MostAllocated
+			gomega.Eventually(func() bool {
+				if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+					klog.Warningf("failed to update the scheduler object; err: %v", err)
+					return false
+				}
+				return true
+			}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			var resources []depmanifests.ResourceSpecParams
+			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyMostAllocated, resources)
+
+		})
+
+		ginkgo.It("should allow to change the ScoringStrategy to BalancedAllocation with resources", func() {
+			nrs := nrs.DeepCopy()
+			nrs.Spec.ScoringStrategy = &nropv1.ScoringStrategyParams{}
+			nrs.Spec.ScoringStrategy.Type = nropv1.BalancedAllocation
+			ResourceSpecParams := []nropv1.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
+			nrs.Spec.ScoringStrategy.Resources = ResourceSpecParams
+			gomega.Eventually(func() bool {
+				if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+					klog.Warningf("failed to update the scheduler object; err: %v", err)
+					return false
+				}
+				return true
+			}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			resources := []depmanifests.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
+			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyBalancedAllocation, resources)
+
+		})
+
+		ginkgo.It("should allow to change the ScoringStrategy to MostAllocated with resources", func() {
+			nrs := nrs.DeepCopy()
+			nrs.Spec.ScoringStrategy = &nropv1.ScoringStrategyParams{}
+			nrs.Spec.ScoringStrategy.Type = nropv1.MostAllocated
+			ResourceSpecParams := []nropv1.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
+			nrs.Spec.ScoringStrategy.Resources = ResourceSpecParams
+			gomega.Eventually(func() bool {
+				if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+					klog.Warningf("failed to update the scheduler object; err: %v", err)
+					return false
+				}
+				return true
+			}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			resources := []depmanifests.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
+			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyMostAllocated, resources)
+
+		})
 	})
 })
 
@@ -504,4 +618,23 @@ func expectCacheParams(cli client.Client, resyncMethod, foreignPodsDetect string
 	gomega.ExpectWithOffset(1, *cfg.Cache.ForeignPodsDetectMode).To(gomega.Equal(foreignPodsDetect))
 	gomega.ExpectWithOffset(1, cfg.Cache.InformerMode).ToNot(gomega.BeNil())
 	gomega.ExpectWithOffset(1, *cfg.Cache.InformerMode).To(gomega.Equal(informerMode))
+}
+
+func expectScoringStrategyParams(cli client.Client, ScoringStrategyType string, resources []depmanifests.ResourceSpecParams) {
+	key := client.ObjectKey{
+		Name:      "topo-aware-scheduler-config",
+		Namespace: testNamespace,
+	}
+
+	cm := corev1.ConfigMap{}
+	gomega.ExpectWithOffset(1, cli.Get(context.TODO(), key, &cm)).To(gomega.Succeed())
+
+	confRaw := cm.Data[sched.SchedulerConfigFileName]
+	cfgs, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(confRaw))
+	gomega.ExpectWithOffset(1, err).ToNot(gomega.HaveOccurred())
+	gomega.ExpectWithOffset(1, cfgs).To(gomega.HaveLen(1), "unexpected config params count: %d", len(cfgs))
+	cfg := cfgs[0]
+
+	gomega.ExpectWithOffset(1, cfg.ScoringStrategy.Type).To(gomega.Equal(ScoringStrategyType))
+	gomega.ExpectWithOffset(1, cfg.ScoringStrategy.Resources).To(gomega.Equal(resources))
 }

@@ -248,11 +248,13 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 		Cache: &k8swgmanifests.ConfigCacheParams{
 			ResyncPeriodSeconds: &resyncPeriod,
 		},
+		ScoringStrategy: &k8swgmanifests.ScoringStrategyParams{},
 	}
 
 	var foreignPodsDetect string
 	var resyncMethod string = k8swgmanifests.CacheResyncAutodetect
 	var informerMode string
+	var scoringStrategyType string
 	if *schedSpec.CacheResyncDetection == nropv1.CacheResyncDetectionRelaxed {
 		foreignPodsDetect = k8swgmanifests.ForeignPodsDetectOnlyExclusiveResources
 	} else {
@@ -263,6 +265,25 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 	} else {
 		informerMode = k8swgmanifests.CacheInformerShared
 	}
+	if schedSpec.ScoringStrategy.Type == nropv1.LeastAllocated {
+		scoringStrategyType = k8swgmanifests.ScoringStrategyLeastAllocated
+	} else if schedSpec.ScoringStrategy.Type == nropv1.BalancedAllocation {
+		scoringStrategyType = k8swgmanifests.ScoringStrategyBalancedAllocation
+	} else if schedSpec.ScoringStrategy.Type == nropv1.MostAllocated {
+		scoringStrategyType = k8swgmanifests.ScoringStrategyMostAllocated
+	} else {
+		scoringStrategyType = k8swgmanifests.ScoringStrategyLeastAllocated
+	}
+	params.ScoringStrategy.Type = scoringStrategyType
+
+	var resources []k8swgmanifests.ResourceSpecParams
+	for _, resource := range schedSpec.ScoringStrategy.Resources {
+		resources = append(resources, k8swgmanifests.ResourceSpecParams{
+			Name:   resource.Name,
+			Weight: resource.Weight,
+		})
+	}
+	params.ScoringStrategy.Resources = resources
 	params.Cache.ResyncMethod = &resyncMethod
 	params.Cache.ForeignPodsDetectMode = &foreignPodsDetect
 	params.Cache.InformerMode = &informerMode
