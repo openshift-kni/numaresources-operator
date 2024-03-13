@@ -23,13 +23,17 @@ import (
 )
 
 type ObjectState struct {
-	Existing client.Object
-	Desired  client.Object
-	Error    error
-	Compare  func(existing, desired client.Object) (bool, error)
-	Merge    func(existing, desired client.Object) (client.Object, error)
+	Existing    client.Object
+	Desired     client.Object
+	Error       error // error loading the object (store or cluster)
+	UpdateError error // error updating the object (merge or update)
+	Compare     func(existing, desired client.Object) (bool, error)
+	Merge       func(existing, desired client.Object) (client.Object, error)
 }
 
 func (obst ObjectState) IsNotFoundError() bool {
-	return obst.Error != nil && apierrors.IsNotFound(obst.Error)
+	if obst.Error == nil {
+		return false
+	}
+	return apierrors.IsNotFound(obst.Error)
 }
