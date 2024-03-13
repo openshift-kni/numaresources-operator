@@ -48,6 +48,7 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
+	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
@@ -772,8 +773,102 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				return kcCmNamesCur
 			}).WithContext(ctx).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Equal(kcCmNamesPre))
 		})
+
+		It("should enable to change tolerations in the RTE daemonsets", func(ctx context.Context) {
+			By("getting RTE manifests object")
+			// TODO: this is similar but not quite what the main operator does
+			rteManifests, err := rtemanifests.GetManifests(configuration.Plat, configuration.PlatVersion, "", true)
+			Expect(err).ToNot(HaveOccurred(), "cannot get the RTE manifests")
+
+			By("getting NROP object")
+			nroKey := objects.NROObjectKey()
+			nroOperObj := nropv1.NUMAResourcesOperator{}
+
+			err = fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
+
+			if len(nroOperObj.Spec.NodeGroups) != 1 {
+				// TODO: this is the simplest case, there is no hard requirement really
+				// but we took the simplest option atm
+				e2efixture.Skipf(fxt, "more than one NodeGroup not yet supported, found %d", len(nroOperObj.Spec.NodeGroups))
+			}
+
+			By("checking the DSs owned by NROP")
+			dsObj := appsv1.DaemonSet{}
+			dsKey := wait.ObjectKey{
+				Namespace: nroOperObj.Status.DaemonSets[0].Namespace,
+				Name:      nroOperObj.Status.DaemonSets[0].Name,
+			}
+
+			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Namespace: dsKey.Namespace, Name: dsKey.Name}, &dsObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", dsKey.String())
+			expectedTolerations := rteManifests.DaemonSet.Spec.Template.Spec.Tolerations // shortcut
+			gotTolerations := dsObj.Spec.Template.Spec.Tolerations                       // shortcut
+			expectEqualTolerations(gotTolerations, expectedTolerations)
+
+			By("adding extra tolerations")
+			updatedNropObj := setRTETolerations(context.TODO(), fxt.Client, nroKey, []corev1.Toleration{sriovToleration()})
+			By("waiting for DaemonSet to be ready")
+			_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetUpdateByKey(context.TODO(), dsKey)
+			Expect(err).ToNot(HaveOccurred(), "daemonset %s did not start updated: %v", dsKey.String(), err)
+			_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(context.TODO(), dsKey)
+			Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+
+			defer func(ctx context.Context) {
+				By("removing extra tolerations")
+				_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{})
+				By("waiting for DaemonSet to be ready")
+				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetUpdateByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "daemonset %s did not start updated: %v", dsKey.String(), err)
+				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+			}(context.TODO())
+
+			By("checking the tolerations in the owned DaemonSet")
+			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Namespace: dsKey.Namespace, Name: dsKey.Name}, &dsObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", dsKey.String())
+
+			expectedTolerations = updatedNropObj.Spec.NodeGroups[0].Config.Tolerations // shortcut
+			gotTolerations = dsObj.Spec.Template.Spec.Tolerations                      // shortcut
+			expectEqualTolerations(gotTolerations, expectedTolerations)
+		})
 	})
 })
+
+func expectEqualTolerations(tolsA, tolsB []corev1.Toleration) {
+	GinkgoHelper()
+
+	// TODO: sort, then check
+	Expect(tolsA).To(Equal(tolsB), "mismatched tolerations")
+}
+
+func setRTETolerations(ctx context.Context, cli client.Client, nroKey client.ObjectKey, tols []corev1.Toleration) *nropv1.NUMAResourcesOperator {
+	GinkgoHelper()
+
+	nropOperObj := nropv1.NUMAResourcesOperator{}
+	Eventually(func(g Gomega) {
+		err := cli.Get(ctx, nroKey, &nropOperObj)
+		g.Expect(err).ToNot(HaveOccurred())
+
+		if nropOperObj.Spec.NodeGroups[0].Config == nil {
+			nropOperObj.Spec.NodeGroups[0].Config = &nropv1.NodeGroupConfig{}
+		}
+		nropOperObj.Spec.NodeGroups[0].Config.Tolerations = tols
+		err = cli.Update(ctx, &nropOperObj)
+		g.Expect(err).ToNot(HaveOccurred())
+	}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+	return &nropOperObj
+}
+
+func sriovToleration() corev1.Toleration {
+	return corev1.Toleration{
+		Key:      "sriov",
+		Operator: corev1.TolerationOpEqual,
+		Value:    "true",
+		Effect:   corev1.TaintEffectNoSchedule,
+	}
+}
 
 func daemonSetListToNamespacedNameList(dss []*appsv1.DaemonSet) []nropv1.NamespacedName {
 	ret := make([]nropv1.NamespacedName, 0, len(dss))
