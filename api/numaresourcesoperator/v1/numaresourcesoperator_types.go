@@ -17,6 +17,7 @@
 package v1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -86,6 +87,11 @@ type NodeGroupConfig struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Topology info refresh period setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	InfoRefreshPeriod *metav1.Duration `json:"infoRefreshPeriod,omitempty"`
+	// Tolerations overrides tolerations to be set into RTE daemonsets for this NodeGroup. If not empty, the tolerations will be the one set here.
+	// Leave empty to make the system use the default tolerations.
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Extra tolerations for the topology updater daemonset",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
 // NodeGroup defines group of nodes that will run resource topology exporter daemon set

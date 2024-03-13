@@ -157,6 +157,117 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 	}
 }
 
+func TestUpdateDaemonSetTolerations(t *testing.T) {
+	type testCase struct {
+		name         string
+		conf         nropv1.NodeGroupConfig
+		existingTols []corev1.Toleration
+		expectedTols []corev1.Toleration
+	}
+
+	testCases := []testCase{
+		{
+			name:         "defaults",
+			conf:         nropv1.NodeGroupConfig{},
+			expectedTols: []corev1.Toleration{},
+		},
+		{
+			name: "add tolerations",
+			conf: nropv1.NodeGroupConfig{
+				Tolerations: []corev1.Toleration{
+					{
+						Key:    "foo",
+						Value:  "1",
+						Effect: corev1.TaintEffectNoSchedule,
+					},
+					{
+						Key:    "bar",
+						Value:  "A",
+						Effect: corev1.TaintEffectNoSchedule,
+					},
+				},
+			},
+			expectedTols: []corev1.Toleration{
+				{
+					Key:    "foo",
+					Value:  "1",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
+				{
+					Key:    "bar",
+					Value:  "A",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
+			},
+		},
+		{
+			name: "overrides existing tolerations",
+			conf: nropv1.NodeGroupConfig{
+				Tolerations: []corev1.Toleration{
+					{
+						Key:    "bar",
+						Value:  "A",
+						Effect: corev1.TaintEffectNoSchedule,
+					},
+				},
+			},
+			existingTols: []corev1.Toleration{
+				{
+					Key:    "foo",
+					Value:  "1",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
+			},
+			expectedTols: []corev1.Toleration{
+				{
+					Key:    "bar",
+					Value:  "A",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
+			},
+		},
+		{
+			name: "conflicting with existing tolerations",
+			conf: nropv1.NodeGroupConfig{
+				Tolerations: []corev1.Toleration{
+					{
+						Key:    "foo",
+						Value:  "42",
+						Effect: corev1.TaintEffectNoSchedule,
+					},
+				},
+			},
+			existingTols: []corev1.Toleration{
+				{
+					Key:    "foo",
+					Value:  "1",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
+			},
+			expectedTols: []corev1.Toleration{
+				{
+					Key:    "foo",
+					Value:  "42",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			origDs := testDs.DeepCopy()
+			origDs.Spec.Template.Spec.Tolerations = nropv1.CloneTolerations(tc.existingTols)
+			ds := origDs.DeepCopy()
+
+			DaemonSetTolerations(ds, tc.conf.Tolerations)
+			if !reflect.DeepEqual(ds.Spec.Template.Spec.Tolerations, tc.expectedTols) {
+				t.Fatalf("update failed: expected=%v got=%v", tc.expectedTols, ds.Spec.Template.Spec.Tolerations)
+			}
+		})
+	}
+}
+
 func expectCommandLine(t *testing.T, ds, origDs *appsv1.DaemonSet, testName string, expectedArgs []string) {
 	for _, arg := range expectedArgs {
 		if idx := sliceIndex(ds.Spec.Template.Spec.Containers[0].Args, arg); idx == -1 {

@@ -172,6 +172,14 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 	return nil
 }
 
+func DaemonSetTolerations(ds *appsv1.DaemonSet, userTolerations []corev1.Toleration) {
+	if len(userTolerations) == 0 {
+		return
+	}
+	podSpec := &ds.Spec.Template.Spec // shortcut
+	podSpec.Tolerations = nropv1.CloneTolerations(userTolerations)
+}
+
 func ContainerConfig(ds *appsv1.DaemonSet, name string) error {
 	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
 	if cnt == nil {

@@ -683,7 +683,14 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 		return err
 	}
 
-	return rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config)
+	err = rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config)
+	if err != nil {
+		klog.V(5).InfoS("DaemonSet update: cannot update arguments", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
+		return err
+	}
+
+	rteupdate.DaemonSetTolerations(gdm.DaemonSet, gdm.NodeGroup.Config.Tolerations)
+	return nil
 }
 
 func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
