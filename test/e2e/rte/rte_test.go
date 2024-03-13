@@ -24,7 +24,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
+
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
