@@ -643,6 +643,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			mcp = testobjs.NewMachineConfigPool("test", labels, &metav1.LabelSelector{MatchLabels: labels}, &metav1.LabelSelector{MatchLabels: labels})
 		})
+
 		It("should set defaults in the DS objects", func() {
 			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, nil)
 
@@ -949,12 +950,139 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			// we need to do the first iteration here because the DS object is created in the second
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-			ExpectWithOffset(1, err).ToNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
 
 			args = ds.Spec.Template.Spec.Containers[0].Args
 			Expect(args).To(ContainElement("--pods-fingerprint-method=all"), "malformed args: %v", args)
+		})
+
+		It("should keep the manifest tolerations if not set", func() {
+			conf := nropv1.DefaultNodeGroupConfig()
+			Expect(conf.Tolerations).To(BeEmpty())
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			mcpDSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
+
+			Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(reconciler.RTEManifests.DaemonSet.Spec.Template.Spec.Tolerations), "mismatched DS default tolerations")
+		})
+
+		It("should add the extra tolerations in the DS objects", func() {
+			conf := nropv1.DefaultNodeGroupConfig()
+			conf.Tolerations = []corev1.Toleration{
+				{
+					Key:    "foo",
+					Value:  "1",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
+			}
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			mcpDSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
+
+			Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(conf.Tolerations), "mismatched DS tolerations")
+		})
+
+		It("should replace the extra tolerations in the DS objects", func() {
+			conf := nropv1.DefaultNodeGroupConfig()
+			conf.Tolerations = []corev1.Toleration{
+				{
+					Key:    "foo",
+					Value:  "1",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
+			}
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			mcpDSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
+
+			Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(conf.Tolerations), "mismatched DS tolerations (round 1)")
+
+			key := client.ObjectKeyFromObject(nro)
+
+			nroUpdated := &nropv1.NUMAResourcesOperator{}
+			Eventually(func() error {
+				Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).To(Succeed())
+				nroUpdated.Spec.NodeGroups[0].Config.Tolerations = []corev1.Toleration{
+					{
+						Key:    "bar",
+						Value:  "2",
+						Effect: corev1.TaintEffectNoSchedule,
+					},
+					{
+						Key:    "baz",
+						Value:  "3",
+						Effect: corev1.TaintEffectNoSchedule,
+					},
+				}
+				return reconciler.Client.Update(context.TODO(), nroUpdated)
+			}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
+			Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(nroUpdated.Spec.NodeGroups[0].Config.Tolerations), "mismatched DS tolerations (round 2)")
+		})
+
+		It("should remove the extra tolerations in the DS objects", func() {
+			conf := nropv1.DefaultNodeGroupConfig()
+			conf.Tolerations = []corev1.Toleration{
+				{
+					Key:    "foo",
+					Value:  "1",
+					Effect: corev1.TaintEffectNoSchedule,
+				},
+			}
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			mcpDSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
+
+			Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(conf.Tolerations), "mismatched DS tolerations")
+
+			key := client.ObjectKeyFromObject(nro)
+
+			Eventually(func() error {
+				nroUpdated := &nropv1.NUMAResourcesOperator{}
+				Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).To(Succeed())
+				nroUpdated.Spec.NodeGroups[0].Config.Tolerations = nil
+				return reconciler.Client.Update(context.TODO(), nroUpdated)
+			}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
+			Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(reconciler.RTEManifests.DaemonSet.Spec.Template.Spec.Tolerations), "DS tolerations not restored to defaults")
 		})
 	})
 })

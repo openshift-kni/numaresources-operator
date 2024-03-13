@@ -21,8 +21,30 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+func TestNodeGroupNormalizeConfigKeepsTolerations(t *testing.T) {
+	expectedTols := []corev1.Toleration{
+		{
+			Key:    "foo",
+			Value:  "1",
+			Effect: corev1.TaintEffectNoSchedule,
+		},
+	}
+
+	ng := NodeGroup{
+		Config: &NodeGroupConfig{
+			Tolerations: CloneTolerations(expectedTols),
+		},
+	}
+
+	ngConf := ng.NormalizeConfig()
+	if !reflect.DeepEqual(expectedTols, ngConf.Tolerations) {
+		t.Fatalf("tolerations lost: from=%+v to=%+v", expectedTols, ngConf.Tolerations)
+	}
+}
 
 func TestNodeGroupConfigMerge(t *testing.T) {
 	podsFp := PodsFingerprintingEnabledExclusiveResources
