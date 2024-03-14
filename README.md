@@ -53,7 +53,7 @@ See `tests/e2e/serial/README.md` for fine details about the suite and developer 
 PRs fixing issues may link either
 1. [the project issues](https://github.com/openshift-kni/numaresources-operator/issues) per standard github flow (preferred)
    Please link the PR using `Fixes: #12345` in the PR description and/or link using the github UI
-2. [the OCPBUGS jira board](https://issues.redhat.com/projects/OCPBUGS/issues).
-   Please link the PR using the `OCPBUGS-12345: ` prefix in the PR description.
+2. The Red Hat issues boards: [OCPBUGS](https://issues.redhat.com/projects/OCPBUGS/issues), [RFE](https://issues.redhat.com/projects/RFE/issues).
+   Please link the PR using the `OCPBUGS-12345: ` or `RFE-9876: ` prefix in the PR description.
 
 we currently don't support other issue trackers.
