@@ -36,7 +36,8 @@ import (
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
+
 	"github.com/google/go-cmp/cmp"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"

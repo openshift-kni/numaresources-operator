@@ -24,8 +24,8 @@ import (
 	"strings"
 
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/yaml"
 
-	"github.com/ghodss/yaml"
 	"github.com/jaypipes/ghw/pkg/option"
 	"github.com/jaypipes/ghw/pkg/topology"
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
