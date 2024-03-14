@@ -416,12 +416,22 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
 	for _, objState := range existing.State(r.RTEManifests, daemonsetUpdater) {
-		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
-			return nil, errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
+		if objState.Error != nil {
+			// We are likely in the bootstrap scenario. In this case, which is expected once, everything is fine.
+			// If it happens past bootstrap, still carry on. We know what to do, and we do want to enforce the desired state.
+			klog.Warningf("error loading object: %v", objState.Error)
+		}
+		if objState.UpdateError != nil {
+			// this is an internal error. Should not happen. But if it happen, we don't want to send garbage to the cluster, so we abort
+			return nil, errors.Wrapf(err, "failed to update (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
+		}
+		err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
 		obj, err := apply.ApplyObject(ctx, r.Client, objState)
 		if err != nil {
-			return nil, errors.Wrapf(err, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
+			return nil, errors.Wrapf(err, "failed to apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
 
 		if nname, ok := rtestate.DaemonSetNamespacedNameFromObject(obj); ok {

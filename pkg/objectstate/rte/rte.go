@@ -18,6 +18,7 @@ package rte
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -193,15 +194,27 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 
 	for _, tree := range em.trees {
 		for _, mcp := range tree.MachineConfigPools {
-			if mcp.Spec.NodeSelector == nil {
-				klog.Warningf("the machine config pool %q does not have node selector", mcp.Name)
-				continue
-			}
+			var existingDs client.Object
+			var loadError error
 
 			generatedName := objectnames.GetComponentName(em.instance.Name, mcp.Name)
+			existingDaemonSet, ok := em.daemonSets[generatedName]
+			if ok {
+				existingDs = existingDaemonSet.daemonSet
+				loadError = existingDaemonSet.daemonSetError
+			} else {
+				loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.DaemonSet.Namespace, mf.DaemonSet.Name)
+			}
+
 			desiredDaemonSet := mf.DaemonSet.DeepCopy()
 			desiredDaemonSet.Name = generatedName
-			desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
+
+			var updateError error
+			if mcp.Spec.NodeSelector != nil {
+				desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
+			} else {
+				updateError = fmt.Errorf("the machine config pool %q does not have node selector", mcp.Name)
+			}
 
 			if updater != nil {
 				gdm := GeneratedDesiredManifest{
@@ -213,24 +226,18 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 
 				err := updater(mcp.Name, &gdm)
 				if err != nil {
-					klog.Warningf("skipped daemonset for MCP %q: update failed: %v", mcp.Name, err)
-					continue
+					updateError = fmt.Errorf("daemonset for MCP %q: update failed: %w", mcp.Name, err)
 				}
-			}
-
-			existingDaemonSet, ok := em.daemonSets[generatedName]
-			if !ok {
-				klog.Warningf("failed to find daemon set %q under the namespace %q", desiredDaemonSet.Name, desiredDaemonSet.Namespace)
-				continue
 			}
 
 			ret = append(ret,
 				objectstate.ObjectState{
-					Existing: existingDaemonSet.daemonSet,
-					Error:    existingDaemonSet.daemonSetError,
-					Desired:  desiredDaemonSet,
-					Compare:  compare.Object,
-					Merge:    merge.ObjectForUpdate,
+					Existing:    existingDs,
+					Error:       loadError,
+					UpdateError: updateError,
+					Desired:     desiredDaemonSet,
+					Compare:     compare.Object,
+					Merge:       merge.ObjectForUpdate,
 				},
 			)
 		}
