@@ -85,6 +85,41 @@ func loadClusterRoleBinding(crbName, namespace string) (*rbacv1.ClusterRoleBindi
 	return crb, nil
 }
 
+func Role(namespace string) (*rbacv1.Role, error) {
+	obj, err := loadObject(filepath.Join("yaml", "role.yaml"))
+	if err != nil {
+		return nil, err
+	}
+
+	ro, ok := obj.(*rbacv1.Role)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type, got %t", obj)
+	}
+	if namespace != "" {
+		ro.Namespace = namespace
+	}
+	return ro, nil
+}
+
+func RoleBinding(namespace string) (*rbacv1.RoleBinding, error) {
+	obj, err := loadObject(filepath.Join("yaml", "rolebinding.yaml"))
+	if err != nil {
+		return nil, err
+	}
+
+	rb, ok := obj.(*rbacv1.RoleBinding)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type, got %t", obj)
+	}
+	if namespace != "" {
+		for idx := 0; idx < len(rb.Subjects); idx++ {
+			rb.Subjects[idx].Namespace = namespace
+		}
+		rb.Namespace = namespace
+	}
+	return rb, nil
+}
+
 func ConfigMap(namespace string) (*corev1.ConfigMap, error) {
 	obj, err := loadObject(filepath.Join("yaml", "configmap.nrt.yaml"))
 	if err != nil {

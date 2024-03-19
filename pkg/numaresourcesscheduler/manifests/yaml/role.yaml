@@ -1,0 +1,19 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: topology-aware-scheduler-leader-elect
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create"]
+- apiGroups: ["coordination.k8s.io"]
+  resourceNames: ["nrtmatch-scheduler"]
+  resources: ["leases"]
+  verbs: ["get", "update"]
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resourceNames: ["nrtmatch-scheduler"]
+  resources: ["endpoints"]
+  verbs: ["get", "update"]

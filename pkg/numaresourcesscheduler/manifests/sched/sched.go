@@ -31,6 +31,8 @@ type Manifests struct {
 	ClusterRole           *rbacv1.ClusterRole
 	ClusterRoleBindingK8S *rbacv1.ClusterRoleBinding
 	ClusterRoleBindingNRT *rbacv1.ClusterRoleBinding
+	Role                  *rbacv1.Role
+	RoleBinding           *rbacv1.RoleBinding
 	Deployment            *appsv1.Deployment
 }
 
@@ -41,6 +43,8 @@ func (mf Manifests) ToObjects() []client.Object {
 		mf.ClusterRole,
 		mf.ClusterRoleBindingK8S,
 		mf.ClusterRoleBindingNRT,
+		mf.Role,
+		mf.RoleBinding,
 		mf.Deployment,
 	}
 }
@@ -52,6 +56,8 @@ func (mf Manifests) Clone() Manifests {
 		ClusterRole:           mf.ClusterRole.DeepCopy(),
 		ClusterRoleBindingK8S: mf.ClusterRoleBindingK8S.DeepCopy(),
 		ClusterRoleBindingNRT: mf.ClusterRoleBindingNRT.DeepCopy(),
+		Role:                  mf.Role.DeepCopy(),
+		RoleBinding:           mf.RoleBinding.DeepCopy(),
 		Deployment:            mf.Deployment.DeepCopy(),
 	}
 }
@@ -81,6 +87,16 @@ func GetManifests(namespace string) (Manifests, error) {
 	}
 
 	mf.ClusterRoleBindingNRT, err = manifests.ClusterRoleBindingNRT(namespace)
+	if err != nil {
+		return mf, err
+	}
+
+	mf.Role, err = manifests.Role(namespace)
+	if err != nil {
+		return mf, err
+	}
+
+	mf.RoleBinding, err = manifests.RoleBinding(namespace)
 	if err != nil {
 		return mf, err
 	}

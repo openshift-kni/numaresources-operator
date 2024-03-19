@@ -197,8 +197,9 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		},
 	}
 
-	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
+	r.SchedulerManifests.Deployment.Spec.Replicas = instance.Spec.Replicas
 	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, schedSpec.SchedulerImage)
+	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
 	schedupdate.DeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
 	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, "", schedSpec.LogLevel); err != nil {
 		return schedStatus, err
