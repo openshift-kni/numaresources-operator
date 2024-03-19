@@ -193,6 +193,7 @@ github.com/k8stopologyawareschedwg/deployer/pkg/kubeletconfig
 github.com/k8stopologyawareschedwg/deployer/pkg/manifests
 github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api
 github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte
+github.com/k8stopologyawareschedwg/deployer/pkg/manifests/sched
 github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate
 github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/ocp
 github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rbac

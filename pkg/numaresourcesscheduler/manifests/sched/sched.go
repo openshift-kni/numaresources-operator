@@ -22,6 +22,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests"
 )
 
@@ -31,6 +33,8 @@ type Manifests struct {
 	ClusterRole           *rbacv1.ClusterRole
 	ClusterRoleBindingK8S *rbacv1.ClusterRoleBinding
 	ClusterRoleBindingNRT *rbacv1.ClusterRoleBinding
+	Role                  *rbacv1.Role
+	RoleBinding           *rbacv1.RoleBinding
 	Deployment            *appsv1.Deployment
 }
 
@@ -41,6 +45,8 @@ func (mf Manifests) ToObjects() []client.Object {
 		mf.ClusterRole,
 		mf.ClusterRoleBindingK8S,
 		mf.ClusterRoleBindingNRT,
+		mf.Role,
+		mf.RoleBinding,
 		mf.Deployment,
 	}
 }
@@ -52,6 +58,8 @@ func (mf Manifests) Clone() Manifests {
 		ClusterRole:           mf.ClusterRole.DeepCopy(),
 		ClusterRoleBindingK8S: mf.ClusterRoleBindingK8S.DeepCopy(),
 		ClusterRoleBindingNRT: mf.ClusterRoleBindingNRT.DeepCopy(),
+		Role:                  mf.Role.DeepCopy(),
+		RoleBinding:           mf.RoleBinding.DeepCopy(),
 		Deployment:            mf.Deployment.DeepCopy(),
 	}
 }
@@ -81,6 +89,15 @@ func GetManifests(namespace string) (Manifests, error) {
 	}
 
 	mf.ClusterRoleBindingNRT, err = manifests.ClusterRoleBindingNRT(namespace)
+	if err != nil {
+		return mf, err
+	}
+
+	mf.Role, err = k8swgmanifests.Role(k8swgmanifests.ComponentSchedulerPlugin, k8swgmanifests.SubComponentSchedulerPluginScheduler, namespace)
+	if err != nil {
+		return mf, err
+	}
+	mf.RoleBinding, err = k8swgmanifests.RoleBinding(k8swgmanifests.ComponentSchedulerPlugin, k8swgmanifests.SubComponentSchedulerPluginScheduler, k8swgmanifests.RoleNameLeaderElect, namespace)
 	if err != nil {
 		return mf, err
 	}

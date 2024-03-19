@@ -47,6 +47,8 @@ type ExistingManifests struct {
 	clusterRoleError           error
 	clusterRoleBindingK8SError error
 	clusterRoleBindingNRTError error
+	roleError                  error
+	roleBindingError           error
 	deploymentError            error
 }
 
@@ -88,6 +90,20 @@ func (em ExistingManifests) State(mf schedmanifests.Manifests) []objectstate.Obj
 			Merge:    merge.MetadataForUpdate,
 		},
 		{
+			Existing: em.Existing.Role,
+			Error:    em.roleError,
+			Desired:  mf.Role.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.MetadataForUpdate,
+		},
+		{
+			Existing: em.Existing.RoleBinding,
+			Error:    em.roleBindingError,
+			Desired:  mf.RoleBinding.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.MetadataForUpdate,
+		},
+		{
 			Existing: em.Existing.Deployment,
 			Error:    em.deploymentError,
 			Desired:  mf.Deployment.DeepCopy(),
@@ -124,6 +140,16 @@ func FromClient(ctx context.Context, cli client.Client, mf schedmanifests.Manife
 	crbNRT := &rbacv1.ClusterRoleBinding{}
 	if ret.clusterRoleBindingNRTError = cli.Get(ctx, client.ObjectKeyFromObject(mf.ClusterRoleBindingNRT), crbNRT); ret.clusterRoleBindingNRTError == nil {
 		ret.Existing.ClusterRoleBindingNRT = crbNRT
+	}
+
+	ro := &rbacv1.Role{}
+	if ret.roleError = cli.Get(ctx, client.ObjectKeyFromObject(mf.Role), ro); ret.roleError == nil {
+		ret.Existing.Role = ro
+	}
+
+	rb := &rbacv1.RoleBinding{}
+	if ret.roleBindingError = cli.Get(ctx, client.ObjectKeyFromObject(mf.RoleBinding), rb); ret.roleBindingError == nil {
+		ret.Existing.RoleBinding = rb
 	}
 
 	dp := &appsv1.Deployment{}

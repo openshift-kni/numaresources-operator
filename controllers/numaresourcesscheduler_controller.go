@@ -40,6 +40,7 @@ import (
 	"github.com/pkg/errors"
 
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	k8swgrbacupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rbac"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
@@ -51,6 +52,10 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
+)
+
+const (
+	leaderElectionResourceName = "numa-scheduler-leader"
 )
 
 const (
@@ -176,7 +181,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 
 	schedSpec := instance.Spec.Normalize()
 	cacheResyncPeriod := unpackAPIResyncPeriod(schedSpec.CacheResyncPeriod)
-	params := configParamsFromSchedSpec(schedSpec, cacheResyncPeriod)
+	params := configParamsFromSchedSpec(schedSpec, cacheResyncPeriod, r.Namespace)
 
 	schedName, ok := schedstate.SchedulerNameFromObject(r.SchedulerManifests.ConfigMap)
 	if !ok {
@@ -197,14 +202,17 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		},
 	}
 
-	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
+	r.SchedulerManifests.Deployment.Spec.Replicas = instance.Spec.Replicas
 	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, schedSpec.SchedulerImage)
+	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
 	schedupdate.DeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
 	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, "", schedSpec.LogLevel); err != nil {
 		return schedStatus, err
 	}
 
 	schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec)
+
+	k8swgrbacupdate.RoleForLeaderElection(r.SchedulerManifests.Role, r.Namespace, leaderElectionResourceName)
 
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
 	for _, objState := range existing.State(r.SchedulerManifests) {
@@ -240,7 +248,7 @@ func unpackAPIResyncPeriod(reconcilePeriod *metav1.Duration) time.Duration {
 	return period
 }
 
-func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cacheResyncPeriod time.Duration) k8swgmanifests.ConfigParams {
+func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cacheResyncPeriod time.Duration, namespace string) k8swgmanifests.ConfigParams {
 	resyncPeriod := int64(cacheResyncPeriod.Seconds())
 
 	params := k8swgmanifests.ConfigParams{
@@ -249,6 +257,14 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 			ResyncPeriodSeconds: &resyncPeriod,
 		},
 		ScoringStrategy: &k8swgmanifests.ScoringStrategyParams{},
+	}
+
+	if schedSpec.Replicas != nil && *schedSpec.Replicas > 1 {
+		params.LeaderElection = &k8swgmanifests.LeaderElectionParams{
+			LeaderElect:       true,
+			ResourceNamespace: namespace,
+			ResourceName:      leaderElectionResourceName,
+		}
 	}
 
 	var foreignPodsDetect string
