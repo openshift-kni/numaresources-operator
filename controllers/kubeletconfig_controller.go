@@ -123,10 +123,15 @@ func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 type InvalidKubeletConfig struct {
 	ObjectName string
+	Err        error
 }
 
 func (e *InvalidKubeletConfig) Error() string {
 	return "invalid KubeletConfig object: " + e.ObjectName
+}
+
+func (e *InvalidKubeletConfig) Unwrap() error {
+	return e.Err
 }
 
 func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*corev1.ConfigMap, error) {
@@ -134,6 +139,26 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 	if err := r.Client.Get(ctx, kcKey, mcoKc); err != nil {
 		return nil, err
 	}
+
+	mcps, err := machineconfigpools.GetListByNodeGroupsV1(ctx, r.Client, instance.Spec.NodeGroups)
+	if err != nil {
+		return nil, err
+	}
+
+	mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
+	if err != nil {
+		klog.ErrorS(err, "cannot find a matching mcp for MCO KubeletConfig", "name", kcKey.Name)
+		var notFound *machineconfigpools.NotFound
+		if errors.As(err, &notFound) {
+			return nil, &InvalidKubeletConfig{
+				ObjectName: kcKey.Name,
+				Err:        notFound,
+			}
+		}
+		return nil, err
+	}
+
+	klog.V(3).InfoS("matched MCP to MCO KubeletConfig", "kubeletconfig name", kcKey.Name, "MCP name", mcp.Name)
 
 	// nothing we care about, and we can't do much anyway
 	if mcoKc.Spec.KubeletConfig == nil {
@@ -147,38 +172,27 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 		return nil, err
 	}
 
-	mcps, err := machineconfigpools.GetListByNodeGroupsV1(ctx, r.Client, instance.Spec.NodeGroups)
-	if err != nil {
-		return nil, err
-	}
+	return r.syncConfigMap(ctx, mcoKc, kubeletConfig, instance, mcp.Name)
+}
 
-	mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
-	if err != nil {
-		klog.ErrorS(err, "cannot find a matching mcp for MCO KubeletConfig", "name", kcKey.Name)
-		return nil, err
-	}
-	klog.InfoS("matched MCP to MCO KubeletConfig", "kubeletconfig name", kcKey.Name, "MCP name", mcp.Name)
-
-	generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
+func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov1.KubeletConfig, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, instance *nropv1.NUMAResourcesOperator, mcpName string) (*corev1.ConfigMap, error) {
+	generatedName := objectnames.GetComponentName(instance.Name, mcpName)
 	klog.V(3).InfoS("generated configMap name", "generatedName", generatedName)
 
 	podExcludes := podExcludesListToMap(instance.Spec.PodExcludes)
-
 	klog.V(5).InfoS("using podExcludes", "podExcludes", podExcludes)
-	return r.syncConfigMap(ctx, mcoKc, kubeletConfig, generatedName, podExcludes)
-}
 
-func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov1.KubeletConfig, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, name string, podExcludes map[string]string) (*corev1.ConfigMap, error) {
 	data, err := rteconfig.Render(kubeletConfig, podExcludes)
 	if err != nil {
-		klog.ErrorS(err, "rendering config", "namespace", r.Namespace, "name", name)
+		klog.ErrorS(err, "rendering config", "namespace", r.Namespace, "name", generatedName)
 		return nil, err
 	}
-	rendered := rteconfig.CreateConfigMap(r.Namespace, name, data)
+
+	rendered := rteconfig.CreateConfigMap(r.Namespace, generatedName, data)
 	cfgManifests := cfgstate.Manifests{
-		Config: rendered,
+		Config: rteconfig.AddSoftRefLabels(rendered, instance.Name, mcpName),
 	}
-	existing := cfgstate.FromClient(ctx, r.Client, r.Namespace, name)
+	existing := cfgstate.FromClient(ctx, r.Client, r.Namespace, generatedName)
 	for _, objState := range existing.State(cfgManifests) {
 		// the owner should be the KubeletConfig object and not the NUMAResourcesOperator CR
 		// this means that when KubeletConfig will get deleted, the ConfigMap gets deleted as well
