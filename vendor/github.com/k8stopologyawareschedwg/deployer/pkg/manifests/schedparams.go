@@ -18,6 +18,7 @@ package manifests
 
 import (
 	"fmt"
+	"time"
 
 	"sigs.k8s.io/yaml"
 
@@ -51,6 +52,11 @@ const (
 	ScoringStrategyMostAllocated      = "MostAllocated"
 	ScoringStrategyBalancedAllocation = "BalancedAllocation"
 	ScoringStrategyLeastAllocated     = "LeastAllocated"
+)
+
+const (
+	LeaderElectionDefaultName      = "nrtmatch-scheduler"
+	LeaderElectionDefaultNamespace = "tas-scheduler"
 )
 
 func ValidateForeignPodsDetectMode(value string) error {
@@ -91,10 +97,23 @@ func ValidateCacheInformerMode(value string) error {
 }
 
 type ConfigCacheParams struct {
-	ResyncPeriodSeconds   *int64
-	ResyncMethod          *string
-	ForeignPodsDetectMode *string
-	InformerMode          *string
+	ResyncPeriodSeconds   *int64  `json:"-"`
+	ResyncMethod          *string `json:"resyncMethod,omitempty"`
+	ForeignPodsDetectMode *string `json:"foreignPodsDetect,omitempty"`
+	InformerMode          *string `json:"informerMode,omitempty"`
+}
+
+func SetDefaultsConfigCacheParams(params *ConfigCacheParams) {
+	params.ResyncPeriodSeconds = newInt64(int64(5 * time.Second))
+	params.ResyncMethod = newString(CacheResyncAutodetect)
+	params.ForeignPodsDetectMode = newString(ForeignPodsDetectOnlyExclusiveResources)
+	// InformerMode support intentionally left unspecified
+}
+
+func NewConfigCacheParams() *ConfigCacheParams {
+	params := ConfigCacheParams{}
+	SetDefaultsConfigCacheParams(&params)
+	return &params
 }
 
 type ResourceSpecParams struct {
@@ -122,10 +141,27 @@ func ValidateScoringStrategyType(value string) error {
 	}
 }
 
+type LeaderElectionParams struct {
+	LeaderElect       bool   `json:"leaderElect"`
+	ResourceNamespace string `json:"resourceNamespace,omitempty"`
+	ResourceName      string `json:"resourceName,omitempty"`
+}
+
+func SetDefaultsLeaderElection(lep *LeaderElectionParams) {
+	if lep.ResourceName == "" {
+		lep.ResourceName = LeaderElectionDefaultName
+	}
+	if lep.ResourceNamespace == "" {
+		lep.ResourceNamespace = LeaderElectionDefaultNamespace
+	}
+}
+
 type ConfigParams struct {
-	ProfileName     string // can't be empty, so no need for pointer
-	Cache           *ConfigCacheParams
-	ScoringStrategy *ScoringStrategyParams
+	// can't be empty, so no need for pointer
+	ProfileName     string                 `json:"profileName"`
+	Cache           *ConfigCacheParams     `json:"cache"`
+	ScoringStrategy *ScoringStrategyParams `json:"scoringStrategy,omitempty"`
+	LeaderElection  *LeaderElectionParams  `json:"leaderElection"`
 }
 
 func DecodeSchedulerProfilesFromData(data []byte) ([]ConfigParams, error) {
@@ -135,6 +171,20 @@ func DecodeSchedulerProfilesFromData(data []byte) ([]ConfigParams, error) {
 	if err := yaml.Unmarshal(data, &r.Object); err != nil {
 		klog.ErrorS(err, "cannot unmarshal scheduler config")
 		return params, nil
+	}
+
+	lead, ok, err := unstructured.NestedMap(r.Object, "leaderElection")
+	if err != nil {
+		klog.ErrorS(err, "failed to process unstructured data")
+		return params, err
+	}
+	var electParams *LeaderElectionParams
+	if ok {
+		electParams, err = extractLeaderElectionParams(lead)
+		if err != nil {
+			klog.ErrorS(err, "failed to extract leader election params")
+			return params, nil
+		}
 	}
 
 	profiles, ok, err := unstructured.NestedSlice(r.Object, "profiles")
@@ -186,6 +236,10 @@ func DecodeSchedulerProfilesFromData(data []byte) ([]ConfigParams, error) {
 				klog.ErrorS(err, "failed to extract params", "name", name, "profile", profileName)
 				continue
 			}
+			// since Leader Election Params is a global setting (independent from profiles),
+			// all profiles must share the same data. This is a modelization error which
+			// we should fix on later releases.
+			profileParams.LeaderElection = electParams
 
 			params = append(params, profileParams)
 		}
@@ -308,4 +362,40 @@ func extractParams(profileName string, args map[string]interface{}) (ConfigParam
 	}
 
 	return params, nil
+}
+
+func extractLeaderElectionParams(lead map[string]interface{}) (*LeaderElectionParams, error) {
+	var params LeaderElectionParams
+
+	enabled, ok, err := unstructured.NestedBool(lead, "leaderElect")
+	if !ok || err != nil {
+		return &params, fmt.Errorf("unexpected leaderElect data (err=%v)", err)
+	}
+	params.LeaderElect = enabled
+
+	resourceNamespace, ok, err := unstructured.NestedString(lead, "resourceNamespace")
+	if err != nil {
+		return &params, fmt.Errorf("unexpected resourceNamespace data: %w", err)
+	}
+	if ok {
+		params.ResourceNamespace = resourceNamespace
+	}
+
+	resourceName, ok, err := unstructured.NestedString(lead, "resourceName")
+	if err != nil {
+		return &params, fmt.Errorf("unexpected resourceName data: %w", err)
+	}
+	if ok {
+		params.ResourceName = resourceName
+	}
+
+	return &params, nil
+}
+
+func newInt64(v int64) *int64 {
+	return &v
+}
+
+func newString(v string) *string {
+	return &v
 }

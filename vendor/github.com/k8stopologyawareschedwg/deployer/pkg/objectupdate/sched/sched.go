@@ -28,9 +28,10 @@ import (
 )
 
 func SchedulerDeployment(dp *appsv1.Deployment, pullIfNotPresent, ctrlPlaneAffinity bool, verbose int) {
+	imgs := images.Get()
 	cnt := &dp.Spec.Template.Spec.Containers[0] // shortcut
 
-	cnt.Image = images.SchedulerPluginSchedulerImage
+	cnt.Image = imgs.SchedulerPluginScheduler
 	cnt.ImagePullPolicy = pullPolicy(pullIfNotPresent)
 
 	flags := flagcodec.ParseArgvKeyValue(cnt.Args, flagcodec.WithFlagNormalization)
@@ -43,7 +44,8 @@ func SchedulerDeployment(dp *appsv1.Deployment, pullIfNotPresent, ctrlPlaneAffin
 }
 
 func ControllerDeployment(dp *appsv1.Deployment, pullIfNotPresent, ctrlPlaneAffinity bool) {
-	dp.Spec.Template.Spec.Containers[0].Image = images.SchedulerPluginControllerImage
+	imgs := images.Get()
+	dp.Spec.Template.Spec.Containers[0].Image = imgs.SchedulerPluginController
 	dp.Spec.Template.Spec.Containers[0].ImagePullPolicy = pullPolicy(pullIfNotPresent)
 
 	if ctrlPlaneAffinity {

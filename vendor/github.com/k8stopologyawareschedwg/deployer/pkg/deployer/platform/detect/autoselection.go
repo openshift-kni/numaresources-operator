@@ -41,6 +41,22 @@ type ClusterInfo struct {
 	Version  VersionInfo  `json:"version"`
 }
 
+type ControlPlaneInfo struct {
+	NodeCount int `json:"nodeCount"`
+}
+
+func (cpi ControlPlaneInfo) String() string {
+	return fmt.Sprintf("nodes=%d", cpi.NodeCount)
+}
+
+func (cpi ControlPlaneInfo) ToJSON() string {
+	data, err := json.Marshal(cpi)
+	if err != nil {
+		return `{"error":` + fmt.Sprintf("%q", err) + `}`
+	}
+	return string(data)
+}
+
 func (ci ClusterInfo) String() string {
 	return fmt.Sprintf("%s:%s", ci.Platform.Discovered, ci.Version.Discovered)
 }
