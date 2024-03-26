@@ -29,16 +29,19 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
+	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/utils/k8simported/taints"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 
@@ -166,7 +169,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources RTE tolerations suppo
 			})
 		})
 
-		It("should enable to change tolerations in the RTE daemonsets", func(ctx context.Context) {
+		It("should enable to change tolerations in the RTE daemonsets [tier3]", func(ctx context.Context) {
 			By("getting RTE manifests object")
 			// TODO: this is similar but not quite what the main operator does
 			rteManifests, err := rtemanifests.GetManifests(configuration.Plat, configuration.PlatVersion, "", true)
@@ -201,6 +204,114 @@ var _ = Describe("[serial][disruptive][slow] numaresources RTE tolerations suppo
 			expectedTolerations = updatedNropObj.Spec.NodeGroups[0].Config.Tolerations // shortcut
 			gotTolerations = dsObj.Spec.Template.Spec.Tolerations                      // shortcut
 			expectEqualTolerations(gotTolerations, expectedTolerations)
+		})
+
+		When("adding tolerations to the target MCP", func() {
+			var tnt *corev1.Taint
+			var workers []corev1.Node
+			var targetNodeNames []string
+			var extraTols bool
+
+			AfterEach(func(ctx context.Context) {
+				if tnt != nil && len(targetNodeNames) > 0 {
+					By("untainting nodes")
+					untaintNodes(fxt.Client, targetNodeNames, tnt)
+				}
+
+				if extraTols {
+					var err error
+					By("removing extra tolerations")
+					_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{})
+					By("waiting for DaemonSet to be ready")
+					_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetUpdateByKey(ctx, dsKey)
+					Expect(err).ToNot(HaveOccurred(), "daemonset %s did not start updated: %v", dsKey.String(), err)
+					_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+				}
+
+				By(fmt.Sprintf("ensuring the RTE DS was restored - expected pods=%d", len(workers)))
+				updatedDs, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+				// note we still have the taint
+				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)), "RTE DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers))
+			})
+
+			It("should handle untolerations of tainted nodes while RTEs are running [tier2][test_id:OCP-72857]", func(ctx context.Context) {
+				var err error
+				By("getting the worker nodes")
+				workers, err = nodes.GetWorkerNodes(fxt.Client, context.TODO())
+				Expect(err).ToNot(HaveOccurred())
+
+				By(fmt.Sprintf("randomly picking the target node (among %d)", len(workers)))
+				targetIdx, ok := e2efixture.PickNodeIndex(workers)
+				Expect(ok).To(BeTrue())
+				targetNode := &workers[targetIdx]
+
+				By("parsing the taint")
+				tnts, _, err := taints.ParseTaints([]string{testTaint()})
+				Expect(err).ToNot(HaveOccurred())
+				tnt = &tnts[0] // must be one anyway
+
+				By("applying the taint")
+				Eventually(func() error {
+					var err error
+					node := &corev1.Node{}
+					err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetNode), node)
+					if err != nil {
+						return err
+					}
+
+					updatedNode, updated, err := taints.AddOrUpdateTaint(node, tnt)
+					if err != nil {
+						return err
+					}
+					if !updated {
+						return nil
+					}
+
+					klog.Infof("adding taint: %q to node: %q", tnt.String(), updatedNode.Name)
+					err = fxt.Client.Update(ctx, updatedNode)
+					if err != nil {
+						return err
+					}
+					targetNodeNames = append(targetNodeNames, updatedNode.Name)
+					klog.Infof("added taint: %q to node: %q", tnt.String(), updatedNode.Name)
+					return nil
+				}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(Succeed())
+
+				By("adding extra tolerations")
+				_ = setRTETolerations(ctx, fxt.Client, nroKey, testToleration())
+				extraTols = true
+
+				By(fmt.Sprintf("waiting for DaemonSet to be ready - should match worker nodes count %d", len(workers)))
+				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetUpdateByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "daemonset %s did not start updated: %v", dsKey.String(), err)
+				updatedDs, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)), "updated DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers))
+
+				// extra check, not required by the test case
+				By("deleting the DS to force the system recreate the pod")
+				// hack! remove the DS object to make the operator recreate the DS and thus restart all the pods
+				Expect(fxt.Client.Delete(ctx, updatedDs)).Should(Succeed())
+				By(fmt.Sprintf("checking that the DaemonSet is still ready - should match worker nodes count %d", len(workers)))
+				// the key will remain the same, the DS namespaced name is predictable and fixed
+				updatedDs, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)), "updated DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers))
+
+				By("removing extra tolerations")
+				_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{})
+				extraTols = false
+				By("waiting for DaemonSet to be ready")
+				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetUpdateByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "daemonset %s did not start updated: %v", dsKey.String(), err)
+				updatedDs, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+				// note we still have the taint
+				By(fmt.Sprintf("ensuring the RTE DS is running with less pods because taints (expected pods=%d)", len(workers)-1))
+				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)-1), "updated DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers)-1)
+			})
 		})
 	})
 })
