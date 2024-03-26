@@ -106,3 +106,180 @@ func TestNodeGroupConfigMerge(t *testing.T) {
 		})
 	}
 }
+
+func TestSortedTolerations(t *testing.T) {
+	type testCase struct {
+		name     string
+		tols     []corev1.Toleration
+		expected []corev1.Toleration
+	}
+
+	testCases := []testCase{
+		{
+			name:     "nil",
+			expected: []corev1.Toleration{},
+		},
+		{
+			name:     "empty",
+			tols:     []corev1.Toleration{},
+			expected: []corev1.Toleration{},
+		},
+		{
+			name: "1 element",
+			tols: []corev1.Toleration{
+				{
+					Key:      "sriov",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			},
+			expected: []corev1.Toleration{
+				{
+					Key:      "sriov",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "true",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			},
+		},
+		{
+			name: "shortlist",
+			tols: []corev1.Toleration{
+				{
+					Key:      "foo",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "1",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+				{
+					Key:      "abc",
+					Operator: corev1.TolerationOpExists,
+					Value:    "def",
+					Effect:   corev1.TaintEffectNoExecute,
+				},
+				{
+					Key:      "bar",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "bar",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			},
+			expected: []corev1.Toleration{
+				{
+					Key:      "abc",
+					Operator: corev1.TolerationOpExists,
+					Value:    "def",
+					Effect:   corev1.TaintEffectNoExecute,
+				},
+				{
+					Key:      "bar",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "bar",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+				{
+					Key:      "foo",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "1",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			},
+		},
+		{
+			name: "presorted",
+			tols: []corev1.Toleration{
+				{
+					Key:      "abc",
+					Operator: corev1.TolerationOpExists,
+					Value:    "def",
+					Effect:   corev1.TaintEffectNoExecute,
+				},
+				{
+					Key:      "bar",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "bar",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+				{
+					Key:      "foo",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "1",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			},
+			expected: []corev1.Toleration{
+				{
+					Key:      "abc",
+					Operator: corev1.TolerationOpExists,
+					Value:    "def",
+					Effect:   corev1.TaintEffectNoExecute,
+				},
+				{
+					Key:      "bar",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "bar",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+				{
+					Key:      "foo",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "1",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			},
+		},
+		{
+			name: "inverted",
+			tols: []corev1.Toleration{
+				{
+					Key:      "foo",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "1",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+				{
+					Key:      "bar",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "bar",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+				{
+					Key:      "abc",
+					Operator: corev1.TolerationOpExists,
+					Value:    "def",
+					Effect:   corev1.TaintEffectNoExecute,
+				},
+			},
+			expected: []corev1.Toleration{
+				{
+					Key:      "abc",
+					Operator: corev1.TolerationOpExists,
+					Value:    "def",
+					Effect:   corev1.TaintEffectNoExecute,
+				},
+				{
+					Key:      "bar",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "bar",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+				{
+					Key:      "foo",
+					Operator: corev1.TolerationOpEqual,
+					Value:    "1",
+					Effect:   corev1.TaintEffectNoSchedule,
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := SortedTolerations(tc.tols)
+			if !reflect.DeepEqual(got, tc.expected) {
+				t.Errorf("mismatched tolerations:\ngot=%+v\nexpected=%+v", got, tc.expected)
+			}
+		})
+	}
+}

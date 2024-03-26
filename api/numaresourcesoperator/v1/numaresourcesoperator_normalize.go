@@ -16,7 +16,11 @@
 
 package v1
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	"sort"
+
+	corev1 "k8s.io/api/core/v1"
+)
 
 func (nodeGroup NodeGroup) NormalizeConfig() NodeGroupConfig {
 	conf := DefaultNodeGroupConfig()
@@ -50,5 +54,23 @@ func CloneTolerations(tols []corev1.Toleration) []corev1.Toleration {
 	for _, tol := range tols {
 		ret = append(ret, *tol.DeepCopy())
 	}
+	return ret
+}
+
+// SortedTolerations return a sorted clone of the provided toleration slice
+func SortedTolerations(tols []corev1.Toleration) []corev1.Toleration {
+	ret := CloneTolerations(tols)
+	sort.SliceStable(ret, func(i, j int) bool {
+		if ret[i].Key != ret[j].Key {
+			return ret[i].Key < ret[j].Key
+		}
+		if ret[i].Operator != ret[j].Operator {
+			return ret[i].Operator < ret[j].Operator
+		}
+		if ret[i].Value != ret[j].Value {
+			return ret[i].Value < ret[j].Value
+		}
+		return ret[i].Effect < ret[j].Effect
+	})
 	return ret
 }
