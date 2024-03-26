@@ -19,6 +19,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -27,6 +28,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
@@ -34,6 +36,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
@@ -42,7 +45,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive][slow] numaresources configuration management", Serial, func() {
+var _ = Describe("[serial][disruptive][slow] numaresources RTE tolerations support", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 	var nrts []nrtv1alpha2.NodeResourceTopology
@@ -75,17 +78,17 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 	})
 
 	Context("cluster has at least one suitable node", func() {
-		It("should enable to change tolerations in the RTE daemonsets", func(ctx context.Context) {
-			By("getting RTE manifests object")
-			// TODO: this is similar but not quite what the main operator does
-			rteManifests, err := rtemanifests.GetManifests(configuration.Plat, configuration.PlatVersion, "", true)
-			Expect(err).ToNot(HaveOccurred(), "cannot get the RTE manifests")
+		var dsKey wait.ObjectKey
+		var nroKey client.ObjectKey
+		var dsObj appsv1.DaemonSet
+		var nroOperObj nropv1.NUMAResourcesOperator
 
+		BeforeEach(func(ctx context.Context) {
 			By("getting NROP object")
-			nroKey := objects.NROObjectKey()
-			nroOperObj := nropv1.NUMAResourcesOperator{}
+			nroKey = objects.NROObjectKey()
+			nroOperObj = nropv1.NUMAResourcesOperator{}
 
-			err = fxt.Client.Get(ctx, nroKey, &nroOperObj)
+			err := fxt.Client.Get(ctx, nroKey, &nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 
 			if len(nroOperObj.Spec.NodeGroups) != 1 {
@@ -95,14 +98,80 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			}
 
 			By("checking the DSs owned by NROP")
-			dsObj := appsv1.DaemonSet{}
-			dsKey := wait.ObjectKey{
+			dsKey = wait.ObjectKey{
 				Namespace: nroOperObj.Status.DaemonSets[0].Namespace,
 				Name:      nroOperObj.Status.DaemonSets[0].Name,
 			}
-
 			err = fxt.Client.Get(ctx, client.ObjectKey{Namespace: dsKey.Namespace, Name: dsKey.Name}, &dsObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", dsKey.String())
+		})
+
+		When("[tier2] invalid tolerations are submitted ", func() {
+			It("should handle invalid field: operator", func(ctx context.Context) {
+				By("adding extra invalid tolerations with wrong operator field")
+				_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{
+					{
+						Key:      "invalid",
+						Operator: corev1.TolerationOperator("foo"),
+						Value:    "abc",
+						Effect:   corev1.TaintEffectNoSchedule,
+					},
+				})
+
+				defer func(ctx context.Context) {
+					var err error
+					By("resetting tolerations")
+					_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{})
+					// no need to wait for update - the original change must not have went through
+					By("waiting for DaemonSet to be ready")
+					_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+				}(ctx)
+
+				var updatedNropObj nropv1.NUMAResourcesOperator
+				Eventually(func(g Gomega) {
+					err := fxt.Client.Get(ctx, nroKey, &updatedNropObj)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(isDegradedRTESync(updatedNropObj.Status.Conditions)).To(BeTrue(), "Condition not degraded because RTE sync")
+				}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+			})
+
+			It("should handle invalid field: effect [test_id:OCP-72862]", func(ctx context.Context) {
+				By("adding extra invalid tolerations with wrong effect field")
+				_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{
+					{
+						Key:      "invalid",
+						Operator: corev1.TolerationOpEqual,
+						Value:    "abc",
+						Effect:   corev1.TaintEffect("__foobar__"),
+					},
+				})
+
+				defer func(ctx context.Context) {
+					var err error
+					By("resetting tolerations")
+					_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{})
+					// no need to wait for update - the original change must not have went through
+					By("waiting for DaemonSet to be ready")
+					_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+				}(ctx)
+
+				var updatedNropObj nropv1.NUMAResourcesOperator
+				Eventually(func(g Gomega) {
+					err := fxt.Client.Get(ctx, nroKey, &updatedNropObj)
+					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(isDegradedRTESync(updatedNropObj.Status.Conditions)).To(BeTrue(), "Condition not degraded because RTE sync")
+				}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+			})
+		})
+
+		It("should enable to change tolerations in the RTE daemonsets", func(ctx context.Context) {
+			By("getting RTE manifests object")
+			// TODO: this is similar but not quite what the main operator does
+			rteManifests, err := rtemanifests.GetManifests(configuration.Plat, configuration.PlatVersion, "", true)
+			Expect(err).ToNot(HaveOccurred(), "cannot get the RTE manifests")
+
 			expectedTolerations := rteManifests.DaemonSet.Spec.Template.Spec.Tolerations // shortcut
 			gotTolerations := dsObj.Spec.Template.Spec.Tolerations                       // shortcut
 			expectEqualTolerations(gotTolerations, expectedTolerations)
@@ -135,6 +204,17 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 		})
 	})
 })
+
+func isDegradedRTESync(conds []metav1.Condition) bool {
+	cond := status.FindCondition(conds, status.ConditionDegraded)
+	if cond == nil {
+		return false
+	}
+	if cond.Status != metav1.ConditionTrue {
+		return false
+	}
+	return strings.Contains(cond.Message, "FailedRTESync") // TODO: magic constant
+}
 
 func expectEqualTolerations(tolsA, tolsB []corev1.Toleration) {
 	GinkgoHelper()
