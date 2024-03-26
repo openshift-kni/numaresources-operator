@@ -26,8 +26,8 @@ RUN mkdir -p $HOME && \
     tar -C /usr/local -xzf go.tar.gz && \
     rm go.tar.gz && \
     # get required golang tools and OC client
-    go install golang.org/x/lint/golint@latest && \
-    go install github.com/mattn/goveralls@latest && \
+    go install golang.org/x/lint/golint@v0.0.0-20210508222113-6edffad5e616 && \
+    go install github.com/mattn/goveralls@v0.0.12 && \
     go clean -cache -modcache && \
     rm -rf ${GOPATH}/src/* && \
     rm -rf ${GOPATH}/pkg/* && \
