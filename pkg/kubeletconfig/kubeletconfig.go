@@ -18,19 +18,30 @@ package kubeletconfig
 
 import (
 	"encoding/json"
+	"errors"
 
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
+var (
+	MissingPayloadError = errors.New("missing kubeletconfig payload")
+)
+
 func MCOKubeletConfToKubeletConf(mcoKc *mcov1.KubeletConfig) (*kubeletconfigv1beta1.KubeletConfiguration, error) {
+	if mcoKc.Spec.KubeletConfig == nil {
+		return nil, MissingPayloadError
+	}
 	kc := &kubeletconfigv1beta1.KubeletConfiguration{}
 	err := json.Unmarshal(mcoKc.Spec.KubeletConfig.Raw, kc)
 	return kc, err
 }
 
 func KubeletConfToMCKubeletConf(kcObj *kubeletconfigv1beta1.KubeletConfiguration, kcAsMc *mcov1.KubeletConfig) error {
+	if kcAsMc.Spec.KubeletConfig == nil {
+		return MissingPayloadError
+	}
 	rawKc, err := json.Marshal(kcObj)
 	kcAsMc.Spec.KubeletConfig.Raw = rawKc
 	return err

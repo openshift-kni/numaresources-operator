@@ -89,15 +89,19 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	cm, err := r.reconcileConfigMap(ctx, instance, req.NamespacedName)
 	if err != nil {
+		var klErr *InvalidKubeletConfig
+		if errors.As(err, &klErr) {
+			r.Recorder.Event(instance, "Normal", "ProcessSkip", "ignored kubelet config "+klErr.ObjectName)
+			return ctrl.Result{}, nil
+		}
+
 		klog.ErrorS(err, "failed to reconcile configmap", "controller", "kubeletconfig")
 
-		msg := fmt.Sprintf("Failed to update RTE config from kubelet config %s/%s", req.NamespacedName.Namespace, req.NamespacedName.Name)
-		r.Recorder.Event(instance, "Warning", "ProcessFailed", msg)
+		r.Recorder.Event(instance, "Warning", "ProcessFailed", "Failed to update RTE config from kubelet config "+req.NamespacedName.String())
 		return ctrl.Result{}, err
 	}
 
-	msg := fmt.Sprintf("Updated RTE config %s/%s from kubelet config %s/%s", cm.Namespace, cm.Name, req.NamespacedName.Namespace, req.NamespacedName.Name)
-	r.Recorder.Event(instance, "Normal", "ProcessOK", msg)
+	r.Recorder.Event(instance, "Normal", "ProcessOK", fmt.Sprintf("Updated RTE config %s/%s from kubelet config %s", cm.Namespace, cm.Name, req.NamespacedName.String()))
 	return ctrl.Result{}, nil
 }
 
@@ -117,10 +121,24 @@ func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+type InvalidKubeletConfig struct {
+	ObjectName string
+}
+
+func (e *InvalidKubeletConfig) Error() string {
+	return "invalid KubeletConfig object: " + e.ObjectName
+}
+
 func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*corev1.ConfigMap, error) {
 	mcoKc := &mcov1.KubeletConfig{}
 	if err := r.Client.Get(ctx, kcKey, mcoKc); err != nil {
 		return nil, err
+	}
+
+	// nothing we care about, and we can't do much anyway
+	if mcoKc.Spec.KubeletConfig == nil {
+		klog.InfoS("detected KubeletConfig with empty payload, ignoring", "name", kcKey.Name)
+		return nil, &InvalidKubeletConfig{ObjectName: kcKey.Name}
 	}
 
 	kubeletConfig, err := kubeletconfig.MCOKubeletConfToKubeletConf(mcoKc)
