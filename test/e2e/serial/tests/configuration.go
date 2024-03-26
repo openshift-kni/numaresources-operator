@@ -840,9 +840,9 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 func expectEqualTolerations(tolsA, tolsB []corev1.Toleration) {
 	GinkgoHelper()
-
-	// TODO: sort, then check
-	Expect(tolsA).To(Equal(tolsB), "mismatched tolerations")
+	tA := nropv1.SortedTolerations(tolsA)
+	tB := nropv1.SortedTolerations(tolsB)
+	Expect(tA).To(Equal(tB), "mismatched tolerations")
 }
 
 func setRTETolerations(ctx context.Context, cli client.Client, nroKey client.ObjectKey, tols []corev1.Toleration) *nropv1.NUMAResourcesOperator {
