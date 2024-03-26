@@ -139,7 +139,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 			})
 
-			It("should handle invalid field: effect [test_id:OCP-72862]", func(ctx context.Context) {
+			It("[test_id:72862] should handle invalid field: effect", func(ctx context.Context) {
 				By("adding extra invalid tolerations with wrong effect field")
 				_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{
 					{
@@ -169,7 +169,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 			})
 		})
 
-		It("should enable to change tolerations in the RTE daemonsets [tier3]", func(ctx context.Context) {
+		It("[tier3] should enable to change tolerations in the RTE daemonsets", func(ctx context.Context) {
 			By("getting RTE manifests object")
 			// TODO: this is similar but not quite what the main operator does
 			rteManifests, err := rtemanifests.GetManifests(configuration.Plat, configuration.PlatVersion, "", true)
@@ -236,7 +236,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)), "RTE DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers))
 			})
 
-			It("should handle untolerations of tainted nodes while RTEs are running [tier2][test_id:OCP-72857]", func(ctx context.Context) {
+			It("[tier2][test_id:72857] should handle untolerations of tainted nodes while RTEs are running", func(ctx context.Context) {
 				var err error
 				By("adding extra tolerations")
 				_ = setRTETolerations(ctx, fxt.Client, nroKey, testToleration())
@@ -312,7 +312,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)), "RTE DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers))
 			})
 
-			It("should tolerate partial taints and not schedule or evict the pod on the tainted node [tier2][test_id:OCP-72861]", func(ctx context.Context) {
+			It("[tier2][test_id:72861] should tolerate partial taints and not schedule or evict the pod on the tainted node", func(ctx context.Context) {
 				var err error
 				By("getting the worker nodes")
 				workers, err = nodes.GetWorkerNodes(fxt.Client, context.TODO())
