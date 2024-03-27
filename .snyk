@@ -11,6 +11,7 @@ exclude:
     - "vendor/github.com/k8stopologyawareschedwg/deployer/pkg/kubeletconfig/*"
     - "vendor/github.com/golang/**"
     - "vendor/github.com/google/**"
+    - "vendor/github.com/gorilla/websocket/util.go"
     - "vendor/github.com/go-task/slim-sprig/**"
     - "vendor/github.com/openshift/**"
     - "vendor/github.com/onsi/gomega**"
