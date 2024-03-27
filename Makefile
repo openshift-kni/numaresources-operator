@@ -48,7 +48,7 @@ CRD_MACHINE_CONFIG_POOL_URL ?= "https://raw.githubusercontent.com/openshift/mach
 # Specify the URL link to the kubeletconfig CRD
 CRD_KUBELET_CONFIG_URL ?= https://raw.githubusercontent.com/openshift/machine-config-operator/master/install/0000_80_machine-config-operator_01_kubeletconfig.crd.yaml
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.27
+ENVTEST_K8S_VERSION = 1.29
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -294,9 +294,9 @@ KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
 	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.4)
 
+# use the last version before the bump golang 1.20 -> 1.22. We want to avoid the go.mod version format changes - for now.
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
-	# this is the last version before the bump golang 1.20 -> 1.22. We want to avoid the go.mod version format changes - for now.
 	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20230927023946-553bd00cfec5)
 
 # go-install-tool will 'go get' any package $2 and install it to $1.
