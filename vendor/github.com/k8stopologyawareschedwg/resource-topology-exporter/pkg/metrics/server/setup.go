@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -28,19 +29,41 @@ import (
 	"k8s.io/klog/v2"
 )
 
-const prometheusDefaultPort = 2112
+const PortDefault = 2112
+
+type TLSConfig struct {
+	CertFile    string `json:"certFile,omitempty"`
+	KeyFile     string `json:"keyFile,omitempty"`
+	CACertFile  string `json:"caCertFile,omitempty"`
+	WantCliAuth bool   `json:"wantCliAuth,omitempty"`
+}
 
 type Config struct {
 	Port       int
+	TLS        TLSConfig
 	Registerer prometheus.Registerer
 	Gatherer   prometheus.Gatherer
 }
 
-func NewDefaultConfig() Config {
+func NewConfig(port int, tlsConf TLSConfig) Config {
 	return Config{
-		Port:       prometheusDefaultPort,
+		Port:       port,
+		TLS:        tlsConf,
 		Registerer: prometheus.DefaultRegisterer,
 		Gatherer:   prometheus.DefaultGatherer,
+	}
+}
+
+func NewDefaultConfig() Config {
+	return NewConfig(PortDefault, NewDefaultTLSConfig())
+}
+
+func (conf TLSConfig) Clone() TLSConfig {
+	return TLSConfig{
+		CertFile:    conf.CertFile,
+		KeyFile:     conf.KeyFile,
+		CACertFile:  conf.CACertFile,
+		WantCliAuth: conf.WantCliAuth,
 	}
 }
 
@@ -56,8 +79,10 @@ func (conf Config) Validate() error {
 }
 
 const (
+	ServingDefault  = ServingDisabled
 	ServingDisabled = "disabled"
 	ServingHTTP     = "http" // plaintext
+	ServingHTTPTLS  = "httptls"
 )
 
 func ServingModeIsSupported(value string) (string, error) {
@@ -66,6 +91,8 @@ func ServingModeIsSupported(value string) (string, error) {
 	case ServingDisabled:
 		return val, nil
 	case ServingHTTP:
+		return val, nil
+	case ServingHTTPTLS:
 		return val, nil
 	default:
 		return val, fmt.Errorf("unsupported method  %q", value)
@@ -76,8 +103,22 @@ func ServingModeSupported() string {
 	modes := []string{
 		ServingDisabled,
 		ServingHTTP,
+		ServingHTTPTLS,
 	}
 	return strings.Join(modes, ",")
+}
+
+func PortFromEnv() int {
+	envValue, ok := os.LookupEnv("METRICS_PORT")
+	if !ok {
+		return 0
+	}
+	port, err := strconv.Atoi(envValue)
+	if err != nil {
+		klog.Warningf("the env variable METRICS_PORT has inccorrect value %q: %w", envValue, err)
+		return 0
+	}
+	return port
 }
 
 func Setup(mode string, conf Config) error {
@@ -86,25 +127,16 @@ func Setup(mode string, conf Config) error {
 		return nil
 	}
 
-	if envValue, ok := os.LookupEnv("METRICS_PORT"); ok {
-		if _, err := strconv.Atoi(envValue); err != nil {
-			return fmt.Errorf("the env variable PROMETHEUS_PORT has inccorrect value %q: %w", envValue, err)
-		}
-		port, err := strconv.Atoi(envValue)
-		if err != nil {
-			return err
-		}
-
-		klog.V(2).InfoS("overriding metrics port", "from", conf.Port, "to", port)
-		conf.Port = port
-	}
-
 	if err := conf.Validate(); err != nil {
 		return err
 	}
 
 	if mode == ServingHTTP {
 		return SetupHTTP(conf)
+	}
+
+	if mode == ServingHTTPTLS {
+		return SetupHTTPTLS(conf, context.Background())
 	}
 
 	return fmt.Errorf("unknown mode: %v", mode)
