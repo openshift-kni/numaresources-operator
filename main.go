@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -73,6 +74,10 @@ const (
 	defaultProbeAddr   = ":8081"
 	defaultImage       = ""
 	defaultNamespace   = "numaresources-operator"
+	defaultCertsDir    = "/etc/secrets/nrop"
+	defaultTLSCert     = defaultCertsDir + "tls.crt"
+	defaultTLSKey      = defaultCertsDir + "tls.key"
+	caCert             = defaultCertsDir + "/ca.crt"
 )
 
 var (
@@ -100,6 +105,9 @@ type RenderParams struct {
 type Params struct {
 	webhookPort           int
 	metricsAddr           string
+	CACertFile            string
+	CertFile              string
+	KeyFile               string
 	enableLeaderElection  bool
 	probeAddr             string
 	platformName          string
@@ -139,6 +147,9 @@ func (pa *Params) FromFlags() {
 	flag.BoolVar(&pa.enableWebhooks, "enable-webhooks", pa.enableWebhooks, "enable conversion webhooks")
 	flag.IntVar(&pa.webhookPort, "webhook-port", defaultWebhookPort, "The port the operator webhook should listen to.")
 	flag.BoolVar(&pa.enableMetrics, "enable-metrics", pa.enableMetrics, "enable metrics server")
+	flag.StringVar(&pa.CACertFile, "metrics-cacert-file", pa.CACertFile, "CA certificate file path for TLS metrics serving ")
+	flag.StringVar(&pa.CertFile, "metrics-cert-file", pa.CertFile, "certificate file name for TLS metrics serving")
+	flag.StringVar(&pa.KeyFile, "metrics-key-file", pa.KeyFile, "key file name for TLS metrics serving")
 	flag.BoolVar(&pa.enableHTTP2, "enable-http2", pa.enableHTTP2, "If HTTP/2 should be enabled for the webhook servers.")
 	flag.BoolVar(&pa.enableMCPCondsForward, "enable-mcp-conds-fwd", pa.enableMCPCondsForward, "enable MCP Status Condition forwarding")
 
@@ -209,8 +220,11 @@ func main() {
 		Cache:  cache.Options{}, // TODO: restrict namespace here?
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
-			// TODO: secureServing?
 			BindAddress: params.metricsAddr,
+			CertDir:     filepath.Dir(params.CACertFile),
+			CertName:    params.CertFile,
+			KeyName:     params.KeyFile,
+			// TODO: Figure out if we need to add TLSOpts here?
 		},
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port:    params.webhookPort,

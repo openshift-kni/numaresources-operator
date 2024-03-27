@@ -12,9 +12,12 @@ spec:
     - path: /metrics
       port: https
       scheme: https
-      bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+      bearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token"
       tlsConfig:
-        insecureSkipVerify: true
+        caFile: /etc/tls/client/client-ca-file
+        certFile: /etc/tls/private/tls.crt
+        insecureSkipVerify: false
+        keyFile: /etc/tls/private/tls.key
   selector:
     matchLabels:
       control-plane: controller-manager

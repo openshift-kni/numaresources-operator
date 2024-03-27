@@ -14,15 +14,55 @@ spec:
         args:
         - "--secure-listen-address=0.0.0.0:8443"
         - "--upstream=http://127.0.0.1:8080/"
+        - "--config-file=/etc/kube-rbac-proxy/config.yaml"
+        - "--tls-cert-file=/etc/tls/private/tls.crt"
+        - "--tls-private-key-file=/etc/tls/private/tls.key"
+        - "--client-ca-file=/etc/tls/client/client-ca-file"
+        - "--allow-paths=/metrics"
         - "--logtostderr=true"
         - "-v=10"
         ports:
         - containerPort: 8443
           protocol: TCP
           name: https
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /etc/kube-rbac-proxy
+          name: secret-kube-rbac-proxy-metric
+          readOnly: true
+        - mountPath: /etc/tls/private
+          name: secret-kube-rbac-proxy-tls
+          readOnly: true
+        - mountPath: /etc/tls/client
+          name: metrics-client-ca
+          readOnly: true
+      - volumes:
+        # Secret created by the service CA operator.
+        # We assume that the Kubernetes service exposing the application's pods has the
+        # "service.beta.openshift.io/serving-cert-secret-name: kube-rbac-proxy-tls"
+        # annotation.
+        - name: secret-kube-rbac-proxy-tls
+          secret:
+            secretName: kube-rbac-proxy-tls
+        # Secret containing the kube-rbac-proxy configuration (see below).
+        - name: secret-kube-rbac-proxy-metric
+          secret:
+            secretName: secret-kube-rbac-proxy-metric
+        # ConfigMap containing the CA used to verify the client certificate.
+        - name: metrics-client-ca
+          configMap:
+            name: metrics-client-ca
       - name: manager
         args:
         - "--platform=kubernetes"
         - "--health-probe-bind-address=:8081"
         - "--metrics-bind-address=127.0.0.1:8080"
+        - "--metrics-cacert-file=/etc/tls/client/client-ca-file"
+        - "--metrics-cert-file=/etc/tls/private/tls.crt"
+        - "--metrics-key-file=/etc/tls/private/tls.key"
         - "--leader-elect"
