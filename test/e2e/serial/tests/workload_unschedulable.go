@@ -253,7 +253,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create daemonset %q", ds.Name)
 
 			By("wait for the daemonset to be up with its pods created")
-			ds, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(context.TODO(), ds, len(nrtCandidates))
+			ds, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(context.TODO(), wait.ObjectKeyFromObject(ds), len(nrtCandidates))
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("checking daemonset pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
@@ -397,7 +397,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create daemonset %q", ds.Name)
 
 			By("wait for the daemonset to be up with its pods created")
-			ds, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(context.TODO(), ds, len(nrtCandidates))
+			ds, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(context.TODO(), wait.ObjectKeyFromObject(ds), len(nrtCandidates))
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("checking daemonset pods have been scheduled with the topology aware scheduler %q ", serialconfig.Config.SchedulerName))
@@ -903,7 +903,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create daemonset %q", ds.Name)
 
 			By("wait for the daemonset to be up with its pods created")
-			ds, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(context.TODO(), ds, len(nrtCandidates))
+			ds, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(context.TODO(), wait.ObjectKeyFromObject(ds), len(nrtCandidates))
 			Expect(err).NotTo(HaveOccurred())
 
 			By("check the daemonset pods are still pending")

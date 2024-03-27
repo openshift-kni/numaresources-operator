@@ -59,8 +59,7 @@ func AreDaemonSetPodsReady(newStatus *appsv1.DaemonSetStatus) bool {
 		newStatus.DesiredNumberScheduled == newStatus.NumberReady
 }
 
-func (wt Waiter) ForDaemonsetPodsCreation(ctx context.Context, ds *appsv1.DaemonSet, expectedPods int) (*appsv1.DaemonSet, error) {
-	key := ObjectKeyFromObject(ds)
+func (wt Waiter) ForDaemonsetPodsCreation(ctx context.Context, key ObjectKey, expectedPods int) (*appsv1.DaemonSet, error) {
 	updatedDs := &appsv1.DaemonSet{}
 	immediate := true
 	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(ctx context.Context) (bool, error) {
