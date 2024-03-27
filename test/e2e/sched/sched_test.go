@@ -98,7 +98,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 				// find deployment by the ownerReference
 				deploy, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), uid)
 				if err != nil {
-					klog.Warningf("%w", err)
+					klog.Warningf("deployment pod listing failed: %v", err)
 					return false
 				}
 

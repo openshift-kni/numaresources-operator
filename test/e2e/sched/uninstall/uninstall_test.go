@@ -42,7 +42,7 @@ var _ = Describe("[Scheduler] uninstall", func() {
 			// failed to get the NROScheduler object, nothing else we can do
 			if err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj); err != nil {
 				if !errors.IsNotFound(err) {
-					klog.Warningf("failed to get the NUMA resource scheduler %q: %w", nroSchedObj.Name, err)
+					klog.Warningf("failed to get the NUMA resource scheduler %q: %v", nroSchedObj.Name, err)
 				}
 				return
 			}

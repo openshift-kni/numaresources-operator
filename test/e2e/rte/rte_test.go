@@ -73,7 +73,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 					return false
 				}
 				if len(rteDss) == 0 {
-					klog.Warningf("expect the numaresourcesoperator to own at least one DaemonSet: %v")
+					klog.Warningf("expect the numaresourcesoperator to own at least one DaemonSet")
 					return false
 				}
 
@@ -112,7 +112,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 					return false
 				}
 				if len(rteDss) == 0 {
-					klog.Warningf("expect the numaresourcesoperator to own at least one DaemonSet: %v")
+					klog.Warningf("expect the numaresourcesoperator to own at least one DaemonSet")
 					return false
 				}
 
@@ -236,7 +236,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				if !reflect.DeepEqual(cm.Data, desiredMapState) {
-					klog.Warningf("ConfigMap %q data is not in it's desired state, waiting for controller to update it")
+					klog.Warningf("ConfigMap %q data is not in it's desired state, waiting for controller to update it", cm.Name)
 					return false
 				}
 				return true
