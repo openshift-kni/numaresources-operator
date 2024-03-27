@@ -18,7 +18,6 @@ package version
 
 import (
 	"context"
-	"runtime"
 
 	"k8s.io/klog/v2"
 
@@ -26,9 +25,7 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
 )
 
-func DiscoverCluster(ctx context.Context, programName, platformName, platformVersion string) (platform.Platform, platform.Version, error) {
-	klog.InfoS("starting", "program", programName, "version", Get(), "gitcommit", GetGitCommit(), "golang", runtime.Version())
-
+func DiscoverCluster(ctx context.Context, platformName, platformVersion string) (platform.Platform, platform.Version, error) {
 	// if it is unknown, it's fine
 	userPlatform, _ := platform.ParsePlatform(platformName)
 	userPlatformVersion, _ := platform.ParseVersion(platformVersion)

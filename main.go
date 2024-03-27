@@ -38,7 +38,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/klogr"
+	"k8s.io/klog/v2/textlogger"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -162,12 +162,13 @@ func main() {
 		os.Exit(0)
 	}
 
-	logh := klogr.NewWithOptions(klogr.WithFormat(klogr.FormatKlog))
-	ctrl.SetLogger(logh)
+	klogV := getKlogLevel()
+	config := textlogger.NewConfig(textlogger.Verbosity(klogV))
+	ctrl.SetLogger(textlogger.NewLogger(config))
 
-	ctx := context.Background()
+	klog.InfoS("starting", "program", version.ProgramName(), "version", version.Get(), "gitcommit", version.GetGitCommit(), "golang", runtime.Version(), "vl", klogV, "auxv", config.Verbosity().String())
 
-	clusterPlatform, clusterPlatformVersion, err := version.DiscoverCluster(ctx, version.ProgramName(), params.platformName, params.platformVersion)
+	clusterPlatform, clusterPlatformVersion, err := version.DiscoverCluster(context.Background(), params.platformName, params.platformVersion)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -431,4 +432,16 @@ func webhookTLSOpts(enableHTTP2 bool) []func(config *tls.Config) {
 	}
 
 	return []func(config *tls.Config){disableHTTP2}
+}
+
+// getKlogLevel reconstructs the klog verb level, because
+// the klog package doesn't give a clean easy way to access
+// the setting, so we have to jumps through some hoops.
+func getKlogLevel() int {
+	for j := 1; j < 15; j++ {
+		if !klog.V(klog.Level(j)).Enabled() {
+			return j - 1
+		}
+	}
+	return 0
 }
