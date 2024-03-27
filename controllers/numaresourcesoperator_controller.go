@@ -673,6 +673,14 @@ func validateMachineConfigLabels(mc client.Object, trees []nodegroupv1.Tree) err
 }
 
 func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) error {
+	rteupdate.DaemonSetTolerations(gdm.DaemonSet, gdm.NodeGroup.Config.Tolerations)
+
+	err := rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config)
+	if err != nil {
+		klog.V(5).InfoS("DaemonSet update: cannot update arguments", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
+		return err
+	}
+
 	// on kubernetes we can just mount the kubeletconfig (no SCC/Selinux),
 	// so handling the kubeletconfig configmap is not needed at all.
 	// We cannot do this at GetManifests time because we need to mount
@@ -683,20 +691,12 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 		// nothing to do!
 		return nil
 	}
-	err := rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
+	err = rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
 	if err != nil {
 		// intentionally info because we want to keep going
 		klog.V(5).InfoS("DaemonSet update: cannot update config", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
 		return err
 	}
-
-	err = rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config)
-	if err != nil {
-		klog.V(5).InfoS("DaemonSet update: cannot update arguments", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
-		return err
-	}
-
-	rteupdate.DaemonSetTolerations(gdm.DaemonSet, gdm.NodeGroup.Config.Tolerations)
 	return nil
 }
 
