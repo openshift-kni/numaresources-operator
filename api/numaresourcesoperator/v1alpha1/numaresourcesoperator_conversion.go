@@ -192,6 +192,7 @@ func convertNodeGroupConfigV1Alpha1ToV1(src NodeGroupConfig) *nropv1.NodeGroupCo
 	if src.InfoRefreshPeriod != nil {
 		dst.InfoRefreshPeriod = src.InfoRefreshPeriod.DeepCopy()
 	}
+	// v1alpha1 does not have tolerations, so nothing to do
 	return &dst
 }
 
@@ -220,6 +221,7 @@ func convertNodeGroupConfigV1ToV1Alpha1(src nropv1.NodeGroupConfig) *NodeGroupCo
 	if src.InfoRefreshPeriod != nil {
 		dst.InfoRefreshPeriod = src.InfoRefreshPeriod.DeepCopy()
 	}
+	// v1alpha1 does not have tolerations, so nothing to do
 	return &dst
 }
 
