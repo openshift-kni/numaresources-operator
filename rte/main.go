@@ -86,7 +86,7 @@ func main() {
 
 	k8scli, err := k8shelpers.GetK8sClient("")
 	if err != nil {
-		klog.Fatalf("failed to get k8s client: %w", err)
+		klog.Fatalf("failed to get k8s client: %v", err)
 	}
 
 	cli, cleanup, err := podres.GetClient(parsedArgs.RTE.PodResourcesSocketPath)

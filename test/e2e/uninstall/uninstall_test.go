@@ -64,7 +64,7 @@ var _ = Describe("[Uninstall]", func() {
 			// failed to get the NRO object, nothing else we can do
 			if err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj); err != nil {
 				if !errors.IsNotFound(err) {
-					klog.Warningf("failed to get the NUMA resource operator %q: %w", nroObj.Name, err)
+					klog.Warningf("failed to get the NUMA resource operator %q: %v", nroObj.Name, err)
 				}
 
 				return
@@ -96,7 +96,7 @@ var _ = Describe("[Uninstall]", func() {
 				Eventually(func() bool {
 					mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
 					if err != nil {
-						klog.Warningf("failed to get machine config pools: %w", err)
+						klog.Warningf("failed to get machine config pools: %v", err)
 						return false
 					}
 

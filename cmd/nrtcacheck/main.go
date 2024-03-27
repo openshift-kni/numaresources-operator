@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/klogr"
+	"k8s.io/klog/v2/textlogger"
 
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -70,8 +70,6 @@ type ProgArgs struct {
 }
 
 func main() {
-	logh := klogr.NewWithOptions(klogr.WithFormat(klogr.FormatKlog))
-
 	parsedArgs, err := parseArgs(os.Args[1:]...)
 	if err != nil {
 		klog.V(1).ErrorS(err, "parsing args")
@@ -82,6 +80,8 @@ func main() {
 		fmt.Println(version.ProgramName(), version.Get())
 		os.Exit(0)
 	}
+
+	logCfg := textlogger.NewConfig(textlogger.Verbosity(getKlogLevel()))
 
 	cli, err := NewClientWithScheme(scheme)
 	if err != nil {
@@ -111,7 +111,7 @@ func main() {
 		Ctx:    context.Background(),
 		Cli:    cli,
 		K8sCli: k8sCli,
-		Log:    logh,
+		Log:    textlogger.NewLogger(logCfg),
 	}
 
 	var nodeNames []string
@@ -251,4 +251,16 @@ func NewClientWithScheme(scheme *k8sruntime.Scheme) (client.Client, error) {
 		return nil, err
 	}
 	return client.New(cfg, client.Options{Scheme: scheme})
+}
+
+// getKlogLevel reconstructs the klog verb level, because
+// the klog package doesn't give a clean easy way to access
+// the setting, so we have to jumps through some hoops.
+func getKlogLevel() int {
+	for j := 1; j < 15; j++ {
+		if !klog.V(klog.Level(j)).Enabled() {
+			return j - 1
+		}
+	}
+	return 0
 }

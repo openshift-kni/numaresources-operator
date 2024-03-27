@@ -61,7 +61,7 @@ func init() {
 		panic(fmt.Errorf("failed to parse machine config pool update interval: %w", err))
 	}
 
-	Plat, PlatVersion, _ = version.DiscoverCluster(ctx, "NROPtests", os.Getenv(envVarPlatform), os.Getenv(envVarPlatformVersion))
+	Plat, PlatVersion, _ = version.DiscoverCluster(ctx, os.Getenv(envVarPlatform), os.Getenv(envVarPlatformVersion))
 }
 
 func getMachineConfigPoolUpdateValueFromEnv(envVar string, fallback time.Duration) (time.Duration, error) {

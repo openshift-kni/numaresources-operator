@@ -343,7 +343,7 @@ func filterByAttribute(nrts []nrtv1alpha2.NodeResourceTopology, attrInfo nrtv1al
 	for _, nrt := range nrts {
 		attr, ok := attribute.Get(nrt.Attributes, attrInfo.Name)
 		if !ok {
-			klog.Error("SKIP: node %q doesn't have required attribute %q", nrt.Name, attrInfo.Name)
+			klog.Errorf("SKIP: node %q doesn't have required attribute %s", nrt.Name, attrInfo.Name)
 			continue
 		}
 		if attr.Value != attrInfo.Value {

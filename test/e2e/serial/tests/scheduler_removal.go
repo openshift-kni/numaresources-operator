@@ -26,7 +26,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2/klogr"
+	"k8s.io/klog/v2/textlogger"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	depwait "github.com/k8stopologyawareschedwg/deployer/pkg/deployer/wait"
@@ -153,7 +153,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restar
 			Expect(err).ToNot(HaveOccurred())
 
 			// make sure scheduler deployment is gone
-			err = depwait.With(fxt.Client, klogr.New()).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(context.TODO(), dpNName.Namespace, dpNName.Name)
+			config := textlogger.NewConfig(textlogger.Verbosity(1))
+			err = depwait.With(fxt.Client, textlogger.NewLogger(config)).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(context.TODO(), dpNName.Namespace, dpNName.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			dp := createDeployment(fxt, "testdp", schedulerName)

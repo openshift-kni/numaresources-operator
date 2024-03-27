@@ -188,7 +188,7 @@ func WaitForMCPUpdatedAfterNRODeleted(offset int, nroObj *nropv1.NUMAResourcesOp
 	EventuallyWithOffset(offset, func() bool {
 		updated, err := isMachineConfigPoolsUpdatedAfterDeletion(nroObj)
 		if err != nil {
-			klog.Errorf("failed to retrieve information about machine config pools: %w", err)
+			klog.Errorf("failed to retrieve information about machine config pools: %v", err)
 			return false
 		}
 		return updated
@@ -237,7 +237,7 @@ func WaitForMCPUpdatedAfterNROCreated(offset int, nroObj *nropv1.NUMAResourcesOp
 	EventuallyWithOffset(offset, func() bool {
 		updated, err := isMachineConfigPoolsUpdated(nroObj)
 		if err != nil {
-			klog.Errorf("failed to information about machine config pools: %w", err)
+			klog.Errorf("failed to information about machine config pools: %v", err)
 			return false
 		}
 
