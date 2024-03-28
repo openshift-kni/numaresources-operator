@@ -222,7 +222,6 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				By(fmt.Sprintf("ensuring the RTE DS was restored - expected pods=%d", len(workers)))
 				updatedDs, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
-				// note we still have the taint
 				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)), "RTE DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers))
 			})
 
@@ -300,7 +299,6 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				By(fmt.Sprintf("ensuring the RTE DS was restored - expected pods=%d", len(workers)))
 				updatedDs, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
-				// note we still have the taint
 				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)), "RTE DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers))
 			})
 
