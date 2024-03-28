@@ -362,7 +362,12 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(err).ToNot(HaveOccurred())
 
 				tnt := &tnts[0]
-				taintedNode := &workers[0]
+
+				By(fmt.Sprintf("randomly picking the target node (among %d)", len(workers)))
+				targetIdx, ok := e2efixture.PickNodeIndex(workers)
+				Expect(ok).To(BeTrue())
+				taintedNode := &workers[targetIdx]
+
 				Eventually(func() error {
 					var err error
 					node := &corev1.Node{}
