@@ -303,9 +303,10 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				}
 
 				By(fmt.Sprintf("ensuring the RTE DS was restored - expected pods=%d", len(workers)))
-				updatedDs, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
+				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.DesiredNumberScheduled)
+				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
-				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)), "RTE DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers))
 			})
 
 			It("[tier2][test_id:72861] should tolerate partial taints and not schedule or evict the pod on the tainted node", func(ctx context.Context) {
