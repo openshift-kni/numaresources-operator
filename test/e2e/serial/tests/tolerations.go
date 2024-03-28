@@ -34,7 +34,6 @@ import (
 
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -42,7 +41,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/k8simported/taints"
-	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
@@ -51,7 +49,6 @@ import (
 var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerations support", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
-	var nrts []nrtv1alpha2.NodeResourceTopology
 
 	BeforeEach(func(ctx context.Context) {
 		Expect(serialconfig.Config).ToNot(BeNil())
@@ -63,13 +60,6 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 
 		err = fxt.Client.List(ctx, &nrtList)
 		Expect(err).ToNot(HaveOccurred())
-
-		// we're ok with any TM policy as long as the updater can handle it,
-		// we use this as proxy for "there is valid NRT data for at least X nodes
-		nrts = e2enrt.FilterByTopologyManagerPolicy(nrtList.Items, intnrt.SingleNUMANode)
-		if len(nrts) < 2 {
-			Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
-		}
 
 		// Note that this test, being part of "serial", expects NO OTHER POD being scheduled
 		// in between, so we consider this information current and valid when the It()s run.
