@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -27,13 +28,17 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -426,26 +431,181 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset ready: %v", err)
 
 				klog.Info("verify there is no RTE pod running on the tainted node")
-				pods, err = podlist.With(fxt.Client).OnNode(ctx, taintedNode.Name)
-				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from node %q: %v", taintedNode.Name, err)
-				found := false
-				for _, pod := range pods {
-					podLabels := pod.ObjectMeta.GetLabels()
-					if len(podLabels) == 0 {
-						continue
-					}
-					if podLabels["name"] == "resource-topology" {
-						found = true
-						klog.Warningf("RTE pod is found: %s/%s", pod.Namespace, pod.Name)
-						break
-					}
-				}
-				Expect(found).To(BeFalse(), "RTE pod was found on node %q while expected not to be found", taintedNode.Name)
+				Expect(isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)).To(BeFalse(), "RTE pod was found on node %q while expected not to be found", taintedNode.Name)
 			})
 
+			When("RTE pods are not running yet", func() {
+				var taintedNode *corev1.Node
+
+				BeforeEach(func(ctx context.Context) {
+
+					By("delete current NROP CR from the cluster")
+					err := fxt.Client.Delete(ctx, &nroOperObj)
+					Expect(err).ToNot(HaveOccurred())
+
+					mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, nroOperObj.Spec.NodeGroups)
+					Expect(err).ToNot(HaveOccurred())
+					waitForMcpUpdate(fxt.Client, ctx, mcps)
+
+					By("taint one worker node")
+					workers, err = nodes.GetWorkerNodes(fxt.Client, ctx)
+					Expect(err).ToNot(HaveOccurred())
+
+					tnts, _, err = taints.ParseTaints([]string{testTaint()})
+					Expect(err).ToNot(HaveOccurred())
+
+					tnt := &tnts[0]
+
+					By(fmt.Sprintf("randomly picking the target node (among %d)", len(workers)))
+					targetIdx, ok := e2efixture.PickNodeIndex(workers)
+					Expect(ok).To(BeTrue())
+					taintedNode = &workers[targetIdx]
+
+					Eventually(func() error {
+						var err error
+						node := &corev1.Node{}
+						err = fxt.Client.Get(ctx, client.ObjectKeyFromObject(taintedNode), node)
+						if err != nil {
+							return err
+						}
+
+						updatedNode, updated, err := taints.AddOrUpdateTaint(node, tnt)
+						if err != nil {
+							return err
+						}
+						if !updated {
+							return nil
+						}
+
+						klog.Infof("adding taint: %q to node: %q", tnt.String(), updatedNode.Name)
+						err = fxt.Client.Update(ctx, updatedNode)
+						if err != nil {
+							return err
+						}
+						return nil
+					}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).ShouldNot(HaveOccurred())
+					targetNodeNames = append(targetNodeNames, taintedNode.Name)
+					klog.Infof("considering node: %q tainted with %q", taintedNode.Name, tnt.String())
+				})
+
+				AfterEach(func(ctx context.Context) {
+					klog.Info("restore initial NROP object")
+					nropNewObj := &nropv1.NUMAResourcesOperator{}
+					err := fxt.Client.Get(ctx, nroKey, nropNewObj)
+					if errors.IsNotFound(err) {
+						klog.Warning("NROP CR is not found on the cluster")
+						nropNewObj := nroOperObj.DeepCopy()
+						nropNewObj.ObjectMeta = metav1.ObjectMeta{
+							Name: nroOperObj.Name,
+						}
+						err = fxt.Client.Create(ctx, nropNewObj)
+						Expect(err).ToNot(HaveOccurred())
+
+						mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, nropNewObj.Spec.NodeGroups)
+						Expect(err).ToNot(HaveOccurred())
+						waitForMcpUpdate(fxt.Client, ctx, mcps)
+					} else {
+						Eventually(func(g Gomega) {
+							err := fxt.Client.Get(ctx, nroKey, nropNewObj)
+							Expect(err).ToNot(HaveOccurred())
+
+							nropNewObj.Spec = nroOperObj.Spec
+							err = fxt.Client.Update(ctx, nropNewObj)
+							g.Expect(err).ToNot(HaveOccurred())
+						}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+						//the current set of tests does not update the mcplabels in the NROP CR,
+						//thus there is no need to wait for MCP updates after updating the CR
+
+					}
+				})
+
+				It("[test_id:72854][reboot_required][slow][tier2] should add tolerations in-place while RTEs are running", func(ctx context.Context) {
+					fxt.IsRebootTest = true
+					By("create NROP CR with no tolerations to the tainted node")
+					nropNewObj := nroOperObj.DeepCopy()
+					nropNewObj.ObjectMeta = metav1.ObjectMeta{
+						Name: nroOperObj.Name,
+					}
+					err := fxt.Client.Create(ctx, nropNewObj)
+					Expect(err).ToNot(HaveOccurred())
+
+					mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, nropNewObj.Spec.NodeGroups)
+					Expect(err).ToNot(HaveOccurred())
+					waitForMcpUpdate(fxt.Client, ctx, mcps)
+
+					klog.Info("waiting for DaemonSet to be ready")
+					ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
+					Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers)-1, ds.Status.DesiredNumberScheduled)
+					_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+
+					By("verify there is no RTE pod running on the tainted node")
+					Expect(isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)).To(BeFalse(), "found RTE pod running on tainted node without toleration on NROP obj")
+
+					By("add tolerations to NROP CR to tolerate the taint")
+					_ = setRTETolerations(ctx, fxt.Client, nroKey, testToleration())
+					klog.Info("waiting for DaemonSet pods to scale up and be ready")
+					_, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
+					Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.DesiredNumberScheduled)
+					_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+
+					By("verify there is a running RTE pod on the tainted node")
+					Expect(isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)).To(BeTrue(), "no RTE pod was found on node %q", taintedNode.Name)
+				})
+
+				It("[test_id:72855][reboot_required][slow][tier2] should tolerate node taint on NROP CR creation", func(ctx context.Context) {
+					fxt.IsRebootTest = true
+					By("add tolerations to NROP CR to tolerate the taint - no RTE running yet on any node")
+					nropNewObj := nroOperObj.DeepCopy()
+					nropNewObj.ObjectMeta = metav1.ObjectMeta{
+						Name: nroOperObj.Name,
+					}
+					if nropNewObj.Spec.NodeGroups[0].Config == nil {
+						nropNewObj.Spec.NodeGroups[0].Config = &nropv1.NodeGroupConfig{}
+					}
+					nropNewObj.Spec.NodeGroups[0].Config.Tolerations = testToleration()
+
+					err := fxt.Client.Create(ctx, nropNewObj)
+					Expect(err).ToNot(HaveOccurred())
+
+					mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, nropNewObj.Spec.NodeGroups)
+					Expect(err).ToNot(HaveOccurred())
+					waitForMcpUpdate(fxt.Client, ctx, mcps)
+
+					klog.Info("waiting for DaemonSet to be ready")
+					ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
+					Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.DesiredNumberScheduled)
+					_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+
+					By("verify RTE pods are running on all worker nodes including the tainted node")
+					Expect(isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)).To(BeTrue(), "RTE pod is not found on node %q", taintedNode.Name)
+				})
+			})
 		})
 	})
 })
+
+func isRTEPodFoundOnNode(cli client.Client, ctx context.Context, nodeName string) bool {
+	pods, err := podlist.With(cli).OnNode(ctx, nodeName)
+	Expect(err).NotTo(HaveOccurred(), "Unable to get pods from node %q: %v", nodeName, err)
+
+	found := false
+	for _, pod := range pods {
+		podLabels := pod.ObjectMeta.GetLabels()
+		if len(podLabels) == 0 {
+			continue
+		}
+		if podLabels["name"] == "resource-topology" {
+			found = true
+			klog.Infof("RTE pod is found: %s/%s", pod.Namespace, pod.Name)
+			break
+		}
+	}
+	return found
+}
 
 func isDegradedRTESync(conds []metav1.Condition) bool {
 	cond := status.FindCondition(conds, status.ConditionDegraded)
@@ -491,4 +651,40 @@ func sriovToleration() corev1.Toleration {
 		Value:    "true",
 		Effect:   corev1.TaintEffectNoSchedule,
 	}
+}
+
+func waitForMcpUpdate(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool) {
+	var wg sync.WaitGroup
+	var err error
+	By("waiting for mcp to start updating")
+	for _, mcp := range mcps {
+		wg.Add(1)
+		klog.Infof("wait for mcp %q to start updating", mcp.Name)
+		go func(mcpool *machineconfigv1.MachineConfigPool) {
+			defer GinkgoRecover()
+			defer wg.Done()
+			err = wait.With(cli).
+				Interval(configuration.MachineConfigPoolUpdateInterval).
+				Timeout(configuration.MachineConfigPoolUpdateTimeout).
+				ForMachineConfigPoolCondition(ctx, mcpool, machineconfigv1.MachineConfigPoolUpdating)
+			Expect(err).ToNot(HaveOccurred())
+		}(mcp)
+	}
+	wg.Wait()
+
+	By("wait for mcp to get updated")
+	for _, mcp := range mcps {
+		klog.Infof("wait for mcp %q to get updated", mcp.Name)
+		wg.Add(1)
+		go func(mcpool *machineconfigv1.MachineConfigPool) {
+			defer GinkgoRecover()
+			defer wg.Done()
+			err = wait.With(cli).
+				Interval(configuration.MachineConfigPoolUpdateInterval).
+				Timeout(configuration.MachineConfigPoolUpdateTimeout).
+				ForMachineConfigPoolCondition(ctx, mcpool, machineconfigv1.MachineConfigPoolUpdated)
+			Expect(err).ToNot(HaveOccurred())
+		}(mcp)
+	}
+	wg.Wait()
 }
