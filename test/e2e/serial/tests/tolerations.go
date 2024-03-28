@@ -24,20 +24,21 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/k8simported/taints"
@@ -352,6 +353,93 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 					g.Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(pods)), "updated DS ready=%v expected pods", updatedDs.Status.NumberReady, len(pods))
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 			})
+
+			It("[tier3][test_id:72859] should not restart a running RTE pod on tainted node with NoSchedule effect", func(ctx context.Context) {
+				By("taint one worker node")
+				var err error
+				workers, err = nodes.GetWorkerNodes(fxt.Client, ctx)
+				Expect(err).ToNot(HaveOccurred())
+
+				tnts, _, err = taints.ParseTaints([]string{testTaint()})
+				Expect(err).ToNot(HaveOccurred())
+
+				tnt := &tnts[0]
+				taintedNode := &workers[0]
+				Eventually(func() error {
+					var err error
+					node := &corev1.Node{}
+					err = fxt.Client.Get(ctx, client.ObjectKeyFromObject(taintedNode), node)
+					if err != nil {
+						return err
+					}
+
+					updatedNode, updated, err := taints.AddOrUpdateTaint(node, tnt)
+					if err != nil {
+						return err
+					}
+					if !updated {
+						return nil
+					}
+
+					klog.Infof("adding taint: %q to node: %q", tnt.String(), updatedNode.Name)
+					err = fxt.Client.Update(ctx, updatedNode)
+					if err != nil {
+						return err
+					}
+					return nil
+				}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).ShouldNot(HaveOccurred())
+				targetNodeNames = append(targetNodeNames, taintedNode.Name)
+				klog.Infof("considering node: %q tainted with %q", taintedNode.Name, tnt.String())
+
+				By("trigger an RTE pod restart on the tainted node by deleting the pod")
+				ds := appsv1.DaemonSet{}
+				err = fxt.Client.Get(ctx, client.ObjectKey(dsKey), &ds)
+				Expect(err).ToNot(HaveOccurred())
+
+				klog.Info("verify RTE pods before triggering the restart still include the pod on the tainted node")
+				pods, err := podlist.With(fxt.Client).ByDaemonset(ctx, ds)
+				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from daemonset %q: %v", ds.Name, err)
+				Expect(len(pods)).To(Equal(len(workers)), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers), ds.Status.DesiredNumberScheduled)
+
+				var podToDelete corev1.Pod
+				for _, pod := range pods {
+					if pod.Spec.NodeName == taintedNode.Name {
+						podToDelete = pod
+						break
+					}
+				}
+				Expect(podToDelete.Name).NotTo(Equal(""), "RTE pod was not found on node %q", taintedNode.Name)
+
+				klog.Infof("delete the pod %s/%s of the tainted node", podToDelete.Namespace, podToDelete.Name)
+				err = fxt.Client.Delete(ctx, &podToDelete)
+				Expect(err).ToNot(HaveOccurred())
+				err = wait.With(fxt.Client).Timeout(2*time.Minute).ForPodDeleted(ctx, podToDelete.Namespace, podToDelete.Name)
+				Expect(err).ToNot(HaveOccurred(), "pod %s/%s still exists", podToDelete.Namespace, podToDelete.Name)
+
+				klog.Info(fmt.Sprintf("waiting for daemonset %v to report correct pods' number", dsKey.String()))
+				updatedDs, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
+				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers)-1, updatedDs)
+				updatedDs, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset ready: %v", err)
+
+				klog.Info("verify there is no RTE pod running on the tainted node")
+				pods, err = podlist.With(fxt.Client).OnNode(ctx, taintedNode.Name)
+				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from node %q: %v", taintedNode.Name, err)
+				found := false
+				for _, pod := range pods {
+					podLabels := pod.ObjectMeta.GetLabels()
+					if len(podLabels) == 0 {
+						continue
+					}
+					if podLabels["name"] == "resource-topology" {
+						found = true
+						klog.Warningf("RTE pod is found: %s/%s", pod.Namespace, pod.Name)
+						break
+					}
+				}
+				Expect(found).To(BeFalse(), "RTE pod was found on node %q while expected not to be found", taintedNode.Name)
+			})
+
 		})
 	})
 })
