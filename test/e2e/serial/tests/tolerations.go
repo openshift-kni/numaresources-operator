@@ -302,7 +302,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 
 				By(fmt.Sprintf("ensuring the RTE DS was restored - expected pods=%d", len(workers)))
 				ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
-				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.DesiredNumberScheduled)
+				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
 				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 			})
@@ -326,7 +326,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(err).ToNot(HaveOccurred())
 				tnts = append(tnts, tntNoSched[0], tntNoExec[0])
 
-				By("applying the taint 1")
+				By("applying the taint 1 - NoSchedule")
 				applyTaintToNode(ctx, fxt.Client, targetNode, &tntNoSched[0])
 
 				// no DS/pod recreation is expected
@@ -334,14 +334,12 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				updatedDs, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
-				// so, when we taint with NoExecute a node on which a DS is running pods, the desired/ready drops to 1 but the
-				// actual pod is not killed, which makes some sense but still was surprising (k8s 1.28.6)
 				pods, err := podlist.With(fxt.Client).ByDaemonset(ctx, *updatedDs)
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset pods %s: %v", dsKey.String(), err)
 				By(fmt.Sprintf("ensuring the RTE DS is running with the same pods count (expected pods=%d)", len(workers)))
 				Expect(len(pods)).To(Equal(len(workers)), "updated DS ready=%v original worker nodes=%d", len(pods), len(workers))
 
-				By("applying the taint 2")
+				By("applying the taint 2 - NoExecute")
 				applyTaintToNode(ctx, fxt.Client, targetNode, &tntNoExec[0])
 				By("waiting for DaemonSet to be ready")
 				updatedDs, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
@@ -408,7 +406,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				klog.Info("verify RTE pods before triggering the restart still include the pod on the tainted node")
 				pods, err := podlist.With(fxt.Client).ByDaemonset(ctx, ds)
 				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from daemonset %q: %v", ds.Name, err)
-				Expect(len(pods)).To(Equal(len(workers)), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers), ds.Status.DesiredNumberScheduled)
+				Expect(len(pods)).To(Equal(len(workers)), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
 
 				var podToDelete corev1.Pod
 				for _, pod := range pods {
@@ -427,8 +425,8 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 
 				klog.Info(fmt.Sprintf("waiting for daemonset %v to report correct pods' number", dsKey.String()))
 				updatedDs, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
-				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers)-1, updatedDs)
-				updatedDs, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers)-1, updatedDs.Status.CurrentNumberScheduled)
+				_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset ready: %v", err)
 
 				klog.Info("verify there is no RTE pod running on the tainted node")
@@ -537,7 +535,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 
 					klog.Info("waiting for DaemonSet to be ready")
 					ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
-					Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers)-1, ds.Status.DesiredNumberScheduled)
+					Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers)-1, ds.Status.CurrentNumberScheduled)
 					_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
@@ -548,7 +546,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 					_ = setRTETolerations(ctx, fxt.Client, nroKey, testToleration())
 					klog.Info("waiting for DaemonSet pods to scale up and be ready")
 					_, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
-					Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.DesiredNumberScheduled)
+					Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
 					_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
@@ -577,7 +575,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 
 					klog.Info("waiting for DaemonSet to be ready")
 					ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
-					Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.DesiredNumberScheduled)
+					Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
 					_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
@@ -630,8 +628,8 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 
 				By(fmt.Sprintf("waiting for daemonset %v to report correct pods' number", dsKey.String()))
 				updatedDs, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
-				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers)-1, updatedDs)
-				updatedDs, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers)-1, updatedDs.Status.CurrentNumberScheduled)
+				_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset ready: %v", err)
 
 				klog.Info("wait for evicted RTE pod to be deleted")
@@ -653,8 +651,8 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 
 				By(fmt.Sprintf("watch for daemonset %v pods scale up", dsKey.String()))
 				updatedDs, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
-				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers), updatedDs)
-				updatedDs, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers), updatedDs.Status.CurrentNumberScheduled)
+				_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset ready: %v", err)
 
 				klog.Info("verify that the RTE pod is restored on the un-tainted node")
