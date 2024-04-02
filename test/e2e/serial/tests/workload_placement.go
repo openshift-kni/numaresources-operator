@@ -568,7 +568,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			// calculate base load on the target node
-			baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
+			baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 			klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 
