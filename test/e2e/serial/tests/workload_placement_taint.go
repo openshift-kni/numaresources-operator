@@ -131,31 +131,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			var updatedNodeNames []string
 			for i := range nodes {
 				refNode := &nodes[i]
-
-				Eventually(func() error {
-					var err error
-					node := &corev1.Node{}
-					err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(refNode), node)
-					if err != nil {
-						return err
-					}
-
-					updatedNode, updated, err := taints.AddOrUpdateTaint(node, tnt)
-					if err != nil {
-						return err
-					}
-					if !updated {
-						return nil
-					}
-
-					klog.Infof("adding taint: %q to node: %q", tnt.String(), updatedNode.Name)
-					err = fxt.Client.Update(context.TODO(), updatedNode)
-					if err != nil {
-						return err
-					}
-					updatedNodeNames = append(updatedNodeNames, updatedNode.Name)
-					return nil
-				}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).ShouldNot(HaveOccurred())
+				applyTaintToNode(context.TODO(), fxt.Client, refNode, tnt)
+				updatedNodeNames = append(updatedNodeNames, refNode.Name)
 			}
 			taintedNodeNames = updatedNodeNames
 
