@@ -337,7 +337,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			for _, nodeName := range e2efixture.ListNodeNames(nrtNames) {
 
 				//calculate base load on the node
-				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
+				baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 				klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 

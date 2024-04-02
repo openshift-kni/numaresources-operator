@@ -23,12 +23,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 
 	"github.com/openshift-kni/numaresources-operator/internal/baseload"
+	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 )
 
 const (
@@ -83,18 +83,15 @@ func GetControlPlane(cli client.Client, ctx context.Context, plat platform.Platf
 	return nodeList.Items, nil
 }
 
-func GetLoad(k8sCli *kubernetes.Clientset, ctx context.Context, nodeName string) (baseload.Load, error) {
+func GetLoad(cli client.Client, ctx context.Context, nodeName string) (baseload.Load, error) {
 	nl := baseload.Load{
 		Name: nodeName,
 	}
-	pods, err := k8sCli.CoreV1().Pods("").List(ctx, metav1.ListOptions{
-		FieldSelector: "spec.nodeName=" + nodeName,
-	})
+	pods, err := podlist.With(cli).OnNode(ctx, nodeName)
 	if err != nil {
 		return nl, err
 	}
-
-	return baseload.FromPods(nodeName, pods.Items), nil
+	return baseload.FromPods(nodeName, pods), nil
 }
 
 func GetLabelRoleWorker() string {

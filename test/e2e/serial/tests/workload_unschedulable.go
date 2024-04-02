@@ -139,7 +139,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
+				baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), nodeName)
 				Expect(err).NotTo(HaveOccurred(), "cannot get base load for %q", nodeName)
 
 				for idx, zone := range nrtInfo.Zones {
@@ -351,7 +351,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
+				baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), nodeName)
 				Expect(err).NotTo(HaveOccurred(), "cannot get base load for %q", nodeName)
 
 				for zoneIdx, zone := range nrtInfo.Zones {
@@ -499,7 +499,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
+				baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 
 				paddingResources, err := e2enrt.SaturateNodeUntilLeft(*nrtInfo, baseload.Resources)
@@ -521,7 +521,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			By("Padding target node")
 			//calculate base load on the target node
-			targetNodeBaseLoad, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
+			targetNodeBaseLoad, err := nodes.GetLoad(fxt.Client, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 
 			// Pad the zones so no one could handle both containers
@@ -811,7 +811,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			for _, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 
 				//calculate base load on the node
-				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
+				baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 				klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 
