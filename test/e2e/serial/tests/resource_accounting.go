@@ -342,7 +342,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			klog.Infof("initial NRT target: %s", intnrt.ToString(*targetNrtInitial))
 
 			//calculate base load on the target node
-			baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
+			baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 			By(fmt.Sprintf("considering the computed base load: %s", baseload))
 
@@ -366,7 +366,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 				Expect(err).NotTo(HaveOccurred())
 
 				//calculate base load on the node
-				baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), nodeName)
+				baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 				klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 
@@ -518,7 +518,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			}
 
 			//calculate base load on the target node
-			baseload, err := nodes.GetLoad(fxt.K8sClient, context.TODO(), targetNodeName)
+			baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 			klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 
