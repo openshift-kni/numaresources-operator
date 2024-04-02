@@ -372,29 +372,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(ok).To(BeTrue())
 				taintedNode := &workers[targetIdx]
 
-				Eventually(func() error {
-					var err error
-					node := &corev1.Node{}
-					err = fxt.Client.Get(ctx, client.ObjectKeyFromObject(taintedNode), node)
-					if err != nil {
-						return err
-					}
-
-					updatedNode, updated, err := taints.AddOrUpdateTaint(node, tnt)
-					if err != nil {
-						return err
-					}
-					if !updated {
-						return nil
-					}
-
-					klog.Infof("adding taint: %q to node: %q", tnt.String(), updatedNode.Name)
-					err = fxt.Client.Update(ctx, updatedNode)
-					if err != nil {
-						return err
-					}
-					return nil
-				}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).ShouldNot(HaveOccurred())
+				applyTaintToNode(ctx, fxt.Client, taintedNode, tnt)
 				targetNodeNames = append(targetNodeNames, taintedNode.Name)
 				klog.Infof("considering node: %q tainted with %q", taintedNode.Name, tnt.String())
 
@@ -460,29 +438,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 					Expect(ok).To(BeTrue())
 					taintedNode = &workers[targetIdx]
 
-					Eventually(func() error {
-						var err error
-						node := &corev1.Node{}
-						err = fxt.Client.Get(ctx, client.ObjectKeyFromObject(taintedNode), node)
-						if err != nil {
-							return err
-						}
-
-						updatedNode, updated, err := taints.AddOrUpdateTaint(node, tnt)
-						if err != nil {
-							return err
-						}
-						if !updated {
-							return nil
-						}
-
-						klog.Infof("adding taint: %q to node: %q", tnt.String(), updatedNode.Name)
-						err = fxt.Client.Update(ctx, updatedNode)
-						if err != nil {
-							return err
-						}
-						return nil
-					}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).ShouldNot(HaveOccurred())
+					applyTaintToNode(ctx, fxt.Client, taintedNode, tnt)
 					targetNodeNames = append(targetNodeNames, taintedNode.Name)
 					klog.Infof("considering node: %q tainted with %q", taintedNode.Name, tnt.String())
 				})
@@ -600,29 +556,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(ok).To(BeTrue())
 				taintedNode := &workers[targetIdx]
 
-				Eventually(func() error {
-					var err error
-					node := &corev1.Node{}
-					err = fxt.Client.Get(ctx, client.ObjectKeyFromObject(taintedNode), node)
-					if err != nil {
-						return err
-					}
-
-					updatedNode, updated, err := taints.AddOrUpdateTaint(node, tnt)
-					if err != nil {
-						return err
-					}
-					if !updated {
-						return nil
-					}
-
-					klog.Infof("adding taint: %q to node: %q", tnt.String(), updatedNode.Name)
-					err = fxt.Client.Update(ctx, updatedNode)
-					if err != nil {
-						return err
-					}
-					return nil
-				}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).ShouldNot(HaveOccurred())
+				applyTaintToNode(ctx, fxt.Client, taintedNode, tnt)
 				targetNodeNames = append(targetNodeNames, taintedNode.Name)
 				klog.Infof("considering node: %q tainted with %q", taintedNode.Name, tnt.String())
 
