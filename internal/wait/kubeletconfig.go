@@ -24,8 +24,7 @@ import (
 )
 
 func (wt Waiter) ForMCOKubeletConfigDeleted(ctx context.Context, kcName string) error {
-	immediate := true
-	return k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(ctx2 context.Context) (bool, error) {
+	return k8swait.PollImmediateWithContext(ctx, wt.PollInterval, wt.PollTimeout, func(ctx2 context.Context) (bool, error) {
 		kc := &machineconfigv1.KubeletConfig{}
 		key := ObjectKey{Name: kcName}
 		err := wt.Cli.Get(ctx2, key.AsKey(), kc)
