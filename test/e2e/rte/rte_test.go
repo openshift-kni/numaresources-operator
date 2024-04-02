@@ -45,6 +45,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
+	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
@@ -269,7 +270,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		for _, rteDs := range rteDss {
 			ginkgo.By(fmt.Sprintf("checking DS: %s/%s status=[%v]", rteDs.Namespace, rteDs.Name, toJSON(rteDs.Status)))
 
-			rtePods, err := podlistByDaemonset(clients.K8sClient, rteDs)
+			rtePods, err := podlist.With(clients.Client).ByDaemonset(context.TODO(), rteDs)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(rtePods).ToNot(gomega.BeEmpty(), "no RTE pods found for %s/%s", rteDs.Namespace, rteDs.Name)
 
@@ -335,20 +336,6 @@ func rteConfigMapToRTEConfig(cm *corev1.ConfigMap) (*rteconfig.Config, error) {
 	// TODO constant
 	err := yaml.Unmarshal([]byte(cm.Data["config.yaml"]), rc)
 	return rc, err
-}
-
-func podlistByDaemonset(cs kubernetes.Interface, ds appsv1.DaemonSet) ([]corev1.Pod, error) {
-	sel, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
-	if err != nil {
-		return nil, err
-	}
-
-	podList, err := cs.CoreV1().Pods(ds.Namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: sel.String()})
-	if err != nil {
-		return nil, err
-	}
-
-	return podList.Items, nil
 }
 
 func toJSON(obj interface{}) string {
