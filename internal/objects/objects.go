@@ -136,6 +136,19 @@ func NewKubeletConfigWithoutData(name string, labels map[string]string, machineC
 	}
 }
 
+func NewKubeletConfigAutoresizeControlPlane() *machineconfigv1.KubeletConfig {
+	ctrlPlaneLabSel := &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			// must NOT be picked up by MCP controller so the cluster state is not actually altered
+			"pools.operator.machineconfiguration.openshift.io/ctrplane-invalid-test": "",
+		},
+	}
+	var true_ bool = true
+	ctrlPlaneKc := NewKubeletConfigWithoutData("autoresize-ctrlplane", nil, ctrlPlaneLabSel)
+	ctrlPlaneKc.Spec.AutoSizingReserved = &true_
+	return ctrlPlaneKc
+}
+
 func NewNamespace(name string) *corev1.Namespace {
 	return &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{
