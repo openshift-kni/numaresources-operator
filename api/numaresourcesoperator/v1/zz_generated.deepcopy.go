@@ -24,6 +24,7 @@ package v1
 import (
 	configv1 "github.com/openshift/api/config/v1"
 	machineconfiguration_openshift_iov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
@@ -359,6 +360,13 @@ func (in *NodeGroupConfig) DeepCopyInto(out *NodeGroupConfig) {
 		in, out := &in.InfoRefreshPeriod, &out.InfoRefreshPeriod
 		*out = new(metav1.Duration)
 		**out = **in
+	}
+	if in.Tolerations != nil {
+		in, out := &in.Tolerations, &out.Tolerations
+		*out = make([]corev1.Toleration, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 }
 

@@ -51,6 +51,13 @@ spec:
         path: nodeGroups[0].config.podsFingerprinting
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
+      - description: Tolerations overrides tolerations to be set into RTE daemonsets
+          for this NodeGroup. If not empty, the tolerations will be the one set here.
+          Leave empty to make the system use the default tolerations.
+        displayName: Extra tolerations for the topology updater daemonset
+        path: nodeGroups[0].config.tolerations
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: Optional Namespace/Name glob patterns of pod to ignore at node
           level
         displayName: Optional ignore pod namespace/name glob patterns
