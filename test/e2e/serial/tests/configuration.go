@@ -617,7 +617,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			By("recording the current kubeletconfig and configmap status")
 			kcCmsPre, err := getKubeletConfigMapsSoftOwnedBy(ctx, fxt.Client, nroOperObj.Name)
 			Expect(err).ToNot(HaveOccurred(), "cannot list KubeletConfig ConfigMaps in the cluster (PRE)")
-			kcCmNamesPre := sets.List[string](accumulateKubeletConfigNames(kcCmsPre))
+			kcCmNamesPre := accumulateKubeletConfigNames(kcCmsPre).List()
 			klog.Infof("initial set of configmaps from kubeletconfigs: %v", strings.Join(kcCmNamesPre, ","))
 
 			By("creating extra ctrplane kubeletconfig")
@@ -636,7 +636,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Consistently(func() []string {
 				kcCmsCur, err := getKubeletConfigMapsSoftOwnedBy(ctx, fxt.Client, nroOperObj.Name)
 				Expect(err).ToNot(HaveOccurred(), "cannot list KubeletConfig ConfigMaps in the cluster (current)")
-				kcCmNamesCur := sets.List[string](accumulateKubeletConfigNames(kcCmsCur))
+				kcCmNamesCur := accumulateKubeletConfigNames(kcCmsCur).List()
 				klog.Infof("current set of configmaps from kubeletconfigs: %v", strings.Join(kcCmNamesCur, ","))
 				return kcCmNamesCur
 			}).WithContext(ctx).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Equal(kcCmNamesPre))
@@ -698,8 +698,8 @@ func getKubeletConfigMapsSoftOwnedBy(ctx context.Context, cli client.Client, nro
 	return cmList.Items, nil
 }
 
-func accumulateKubeletConfigNames(cms []corev1.ConfigMap) sets.Set[string] {
-	cmNames := sets.New[string]()
+func accumulateKubeletConfigNames(cms []corev1.ConfigMap) sets.String {
+	cmNames := sets.NewString()
 	for _, cm := range cms {
 		cmNames.Insert(cm.Name)
 	}
