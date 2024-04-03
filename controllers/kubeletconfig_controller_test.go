@@ -34,6 +34,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
@@ -96,7 +97,24 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
 				}
 				Expect(reconciler.Client.Get(context.TODO(), key, cm)).ToNot(HaveOccurred())
+			})
+			It("with NRO present, the created configmap should have the linking labels", func() {
+				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, mcoKc1)
+				Expect(err).ToNot(HaveOccurred())
 
+				key := client.ObjectKeyFromObject(mcoKc1)
+				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				cm := &corev1.ConfigMap{}
+				key = client.ObjectKey{
+					Namespace: testNamespace,
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+				}
+				Expect(reconciler.Client.Get(context.TODO(), key, cm)).ToNot(HaveOccurred())
+				Expect(cm.Labels).To(HaveKeyWithValue(rteconfig.LabelOperatorName, nro.Name))
+				Expect(cm.Labels).To(HaveKeyWithValue(rteconfig.LabelNodeGroupName+"/"+rteconfig.LabelNodeGroupKindMachineConfigPool, mcp1.Name))
 			})
 			It("should send events when NRO present and operation succesfull", func() {
 				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, mcoKc1)
@@ -115,11 +133,11 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 			})
 
 			It("should send events when NRO present and operation failure", func() {
-				brokenMcoKc := testobjs.NewKubeletConfigWithData("test1", label1, mcp1.Spec.MachineConfigSelector, []byte(""))
+				brokenMcoKc := testobjs.NewKubeletConfigWithData("broken", label1, mcp1.Spec.MachineConfigSelector, []byte(""))
 				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, brokenMcoKc)
 				Expect(err).ToNot(HaveOccurred())
 
-				key := client.ObjectKeyFromObject(mcoKc1)
+				key := client.ObjectKeyFromObject(brokenMcoKc)
 				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).To(HaveOccurred())
 
@@ -131,11 +149,11 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 			})
 
 			It("should skip invalid kubeletconfig", func() {
-				invalidMcoKc := testobjs.NewKubeletConfigWithoutData("test1", label1, mcp1.Spec.MachineConfigSelector)
+				invalidMcoKc := testobjs.NewKubeletConfigWithoutData("payloadless", label1, mcp1.Spec.MachineConfigSelector)
 				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, invalidMcoKc)
 				Expect(err).ToNot(HaveOccurred())
 
-				key := client.ObjectKeyFromObject(mcoKc1)
+				key := client.ObjectKeyFromObject(invalidMcoKc)
 				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).ToNot(HaveOccurred())
 
@@ -144,6 +162,67 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 				Expect(ok).To(BeTrue())
 				event := <-fakeRecorder.Events
 				Expect(event).To(ContainSubstring("ProcessSkip"))
+				Expect(event).To(ContainSubstring(invalidMcoKc.Name))
+			})
+
+			It("should ignore non-matching kubeketconfigs", func() {
+				ctrlPlaneKc := testobjs.NewKubeletConfigAutoresizeControlPlane()
+
+				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1, mcoKc1, ctrlPlaneKc)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(ctrlPlaneKc)
+				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				// verify creation event
+				fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
+				Expect(ok).To(BeTrue())
+				event := <-fakeRecorder.Events
+				Expect(event).To(ContainSubstring("ProcessSkip"))
+				Expect(event).To(ContainSubstring(ctrlPlaneKc.Name))
+			})
+
+			It("should process matching kubeletconfig, then ignore non-matching kubeketconfig", func() {
+				reconciler, err := NewFakeKubeletConfigReconciler(nro, mcp1)
+				Expect(err).ToNot(HaveOccurred())
+
+				fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
+				Expect(ok).To(BeTrue())
+
+				err = reconciler.Client.Create(context.TODO(), mcoKc1)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(mcoKc1)
+				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				cm := &corev1.ConfigMap{}
+				key = client.ObjectKey{
+					Namespace: testNamespace,
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+				}
+				Expect(reconciler.Client.Get(context.TODO(), key, cm)).ToNot(HaveOccurred())
+				// verify creation event
+				event := <-fakeRecorder.Events
+				Expect(event).To(ContainSubstring("ProcessOK"))
+				Expect(event).To(ContainSubstring(mcoKc1.Name))
+
+				ctrlPlaneKc := testobjs.NewKubeletConfigAutoresizeControlPlane()
+				err = reconciler.Client.Create(context.TODO(), ctrlPlaneKc)
+				Expect(err).ToNot(HaveOccurred())
+
+				key = client.ObjectKeyFromObject(ctrlPlaneKc)
+				result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				// verify creation event
+				event = <-fakeRecorder.Events
+				Expect(event).To(ContainSubstring("ProcessSkip"))
+				Expect(event).To(ContainSubstring(ctrlPlaneKc.Name))
 			})
 		})
 	})
