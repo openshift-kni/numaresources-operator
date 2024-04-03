@@ -277,6 +277,14 @@ func testTaint() string {
 	return fmt.Sprintf("%s:%s", testKey, corev1.TaintEffectNoSchedule)
 }
 
+func testTaintNoSchedule() string {
+	return fmt.Sprintf("%s:%s", testKey+"NoSched", corev1.TaintEffectNoSchedule)
+}
+
+func testTaintNoExecute() string {
+	return fmt.Sprintf("%s:%s", testKey+"NoExec", corev1.TaintEffectNoExecute)
+}
+
 func testToleration() []corev1.Toleration {
 	return []corev1.Toleration{
 		{
@@ -338,4 +346,35 @@ func accumulateNodeNames(nodes []corev1.Node) []string {
 		names = append(names, nodes[idx].Name)
 	}
 	return names
+}
+
+func applyTaintToNode(ctx context.Context, cli client.Client, targetNode *corev1.Node, tnt *corev1.Taint) *corev1.Node {
+	GinkgoHelper()
+	var updatedNode *corev1.Node
+	Eventually(func() error {
+		var err error
+		node := &corev1.Node{}
+		err = cli.Get(ctx, client.ObjectKeyFromObject(targetNode), node)
+		if err != nil {
+			return err
+		}
+
+		var updated bool
+		updatedNode, updated, err = taints.AddOrUpdateTaint(node, tnt)
+		if err != nil {
+			return err
+		}
+		if !updated {
+			return nil
+		}
+
+		klog.Infof("adding taint: %q to node: %q", tnt.String(), updatedNode.Name)
+		err = cli.Update(ctx, updatedNode)
+		if err != nil {
+			return err
+		}
+		klog.Infof("added taint: %q to node: %q", tnt.String(), updatedNode.Name)
+		return nil
+	}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(Succeed())
+	return updatedNode
 }
