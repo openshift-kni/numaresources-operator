@@ -215,17 +215,13 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				}
 
 				if extraTols {
-					var err error
 					By("removing extra tolerations")
 					_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{})
-					By("waiting for DaemonSet to be ready")
-					_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetUpdateByKey(ctx, dsKey)
-					Expect(err).ToNot(HaveOccurred(), "daemonset %s did not start updated: %v", dsKey.String(), err)
-					_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
-					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 				}
 
 				By(fmt.Sprintf("ensuring the RTE DS was restored - expected pods=%d", len(workers)))
+				ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
+				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
 				updatedDs, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)), "RTE DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers))
@@ -286,6 +282,123 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				By(fmt.Sprintf("ensuring the RTE DS is running with less pods because taints (expected pods=%d)", len(workers)-1))
 				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)-1), "updated DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers)-1)
 			})
+
+			It("[tier3] should evict running RTE pod if taint-tolartion matching criteria is shaken - NROP CR toleration update", func(ctx context.Context) {
+				By("add toleration with value to the NROP CR")
+				tolerateVal := corev1.Toleration{
+					Key:      testKey,
+					Operator: corev1.TolerationOpEqual,
+					Value:    "val1",
+					Effect:   corev1.TaintEffectNoExecute,
+				}
+
+				_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{tolerateVal})
+				extraTols = true
+
+				By("taint one node with value and NoExecute effect")
+				var err error
+				workers, err = nodes.GetWorkerNodes(fxt.Client, ctx)
+				Expect(err).ToNot(HaveOccurred())
+
+				taintVal1 := fmt.Sprintf("%s=val1:%s", testKey, corev1.TaintEffectNoExecute)
+				tnts, _, err := taints.ParseTaints([]string{taintVal1})
+				Expect(err).ToNot(HaveOccurred())
+				tnt = &tnts[0]
+
+				klog.Infof("randomly picking the target node (among %d)", len(workers))
+				targetIdx, ok := e2efixture.PickNodeIndex(workers)
+				Expect(ok).To(BeTrue())
+				taintedNode := &workers[targetIdx]
+
+				applyTaintToNode(ctx, fxt.Client, taintedNode, tnt)
+				targetNodeNames = append(targetNodeNames, taintedNode.Name)
+				klog.Infof("considering node: %q tainted with %q", taintedNode.Name, tnt.String())
+
+				By(fmt.Sprintf("ensuring the RTE DS was created with expected pods count=%d", len(workers)))
+				ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(3*time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
+				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
+				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+
+				podOnNode, found := isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)
+				Expect(found).To(BeTrue())
+
+				By("update toleration value so that is it no longer tolerating the taint")
+				tolerateVal.Value = "val2"
+				_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{tolerateVal})
+
+				By(fmt.Sprintf("ensuring the RTE DS was created with expected pods count=%d", len(workers)-1))
+				ds, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
+				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers)-1, ds.Status.CurrentNumberScheduled)
+				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+
+				klog.Infof("verify the rte pod on node %q is evicted", taintedNode.Name)
+				err = wait.With(fxt.Client).Timeout(2*time.Minute).ForPodDeleted(ctx, podOnNode.Namespace, podOnNode.Name)
+				Expect(err).ToNot(HaveOccurred(), "pod %s/%s still exists", podOnNode.Namespace, podOnNode.Name)
+			})
+
+			It("[tier3] should evict running RTE pod if taint-tolartion matching criteria is shaken - node taints update", func(ctx context.Context) {
+				By("taint one node with taint value and NoExecute effect")
+				var err error
+				workers, err = nodes.GetWorkerNodes(fxt.Client, ctx)
+				Expect(err).ToNot(HaveOccurred())
+
+				taintVal1 := fmt.Sprintf("%s=val1:%s", testKey, corev1.TaintEffectNoExecute)
+				tnts, _, err := taints.ParseTaints([]string{taintVal1})
+				Expect(err).ToNot(HaveOccurred())
+				tnt = &tnts[0]
+
+				klog.Infof("randomly picking the target node (among %d)", len(workers))
+				targetIdx, ok := e2efixture.PickNodeIndex(workers)
+				Expect(ok).To(BeTrue())
+				taintedNode := &workers[targetIdx]
+
+				applyTaintToNode(ctx, fxt.Client, taintedNode, tnt)
+				targetNodeNames = append(targetNodeNames, taintedNode.Name)
+				klog.Infof("considering node: %q tainted with %q", taintedNode.Name, tnt.String())
+
+				By("add toleration to the NROP CR")
+				tolerateVal1 := []corev1.Toleration{
+					{
+						Key:      testKey,
+						Operator: corev1.TolerationOpEqual,
+						Value:    "val1",
+						Effect:   corev1.TaintEffectNoExecute,
+					},
+				}
+				_ = setRTETolerations(ctx, fxt.Client, nroKey, tolerateVal1)
+				extraTols = true
+
+				By(fmt.Sprintf("ensuring the RTE DS was created with expected pods count=%d", len(workers)))
+				ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(3*time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
+				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
+				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+
+				podOnNode, found := isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)
+				Expect(found).To(BeTrue())
+
+				By("update taint's value so that the node no longer host un-tolerating pods")
+				taintVal2 := fmt.Sprintf("%s=val2:%s", testKey, corev1.TaintEffectNoExecute)
+				tnts, _, err = taints.ParseTaints([]string{taintVal2})
+				Expect(err).ToNot(HaveOccurred())
+				tnt = &tnts[0]
+
+				applyTaintToNode(ctx, fxt.Client, taintedNode, tnt)
+				klog.Infof("considering node: %q tainted with %q", taintedNode.Name, tnt.String())
+
+				By(fmt.Sprintf("waiting for daemonset %v to report correct pods' number", dsKey.String()))
+				updatedDs, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
+				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers)-1, updatedDs.Status.CurrentNumberScheduled)
+				_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset ready: %v", err)
+
+				klog.Infof("verify the rte pod on node %q is evicted", taintedNode.Name)
+				err = wait.With(fxt.Client).Timeout(2*time.Minute).ForPodDeleted(ctx, podOnNode.Namespace, podOnNode.Name)
+				Expect(err).ToNot(HaveOccurred(), "pod %s/%s still exists", podOnNode.Namespace, podOnNode.Name)
+			})
+
 		})
 
 		When("adding taints to nodes in the target MCP", func() {
@@ -410,7 +523,8 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset ready: %v", err)
 
 				klog.Info("verify there is no RTE pod running on the tainted node")
-				Expect(isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)).To(BeFalse(), "RTE pod was found on node %q while expected not to be found", taintedNode.Name)
+				_, found := isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)
+				Expect(found).To(BeFalse(), "RTE pod was found on node %q while expected not to be found", taintedNode.Name)
 			})
 
 			When("RTE pods are not running yet", func() {
@@ -498,7 +612,8 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
 					By("verify there is no RTE pod running on the tainted node")
-					Expect(isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)).To(BeFalse(), "found RTE pod running on tainted node without toleration on NROP obj")
+					_, found := isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)
+					Expect(found).To(BeFalse(), "found RTE pod running on tainted node without toleration on NROP obj")
 
 					By("add tolerations to NROP CR to tolerate the taint")
 					_ = setRTETolerations(ctx, fxt.Client, nroKey, testToleration())
@@ -509,7 +624,8 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
 					By("verify there is a running RTE pod on the tainted node")
-					Expect(isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)).To(BeTrue(), "no RTE pod was found on node %q", taintedNode.Name)
+					_, found = isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)
+					Expect(found).To(BeTrue(), "no RTE pod was found on node %q", taintedNode.Name)
 				})
 
 				It("[test_id:72855][reboot_required][slow][tier2] should tolerate node taint on NROP CR creation", func(ctx context.Context) {
@@ -538,7 +654,8 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
 					By("verify RTE pods are running on all worker nodes including the tainted node")
-					Expect(isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)).To(BeTrue(), "RTE pod is not found on node %q", taintedNode.Name)
+					_, found := isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)
+					Expect(found).To(BeTrue(), "RTE pod is not found on node %q", taintedNode.Name)
 				})
 			})
 
@@ -592,18 +709,20 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset ready: %v", err)
 
 				klog.Info("verify that the RTE pod is restored on the un-tainted node")
-				Expect(isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)).To(BeTrue(), "RTE pod is not found on node %q", taintedNode.Name)
+				_, found := isRTEPodFoundOnNode(fxt.Client, ctx, taintedNode.Name)
+				Expect(found).To(BeTrue(), "RTE pod is not found on node %q", taintedNode.Name)
 			})
 
 		})
 	})
 })
 
-func isRTEPodFoundOnNode(cli client.Client, ctx context.Context, nodeName string) bool {
+func isRTEPodFoundOnNode(cli client.Client, ctx context.Context, nodeName string) (corev1.Pod, bool) {
 	pods, err := podlist.With(cli).OnNode(ctx, nodeName)
 	Expect(err).NotTo(HaveOccurred(), "Unable to get pods from node %q: %v", nodeName, err)
 
 	found := false
+	var matchingPod corev1.Pod
 	for _, pod := range pods {
 		podLabels := pod.ObjectMeta.GetLabels()
 		if len(podLabels) == 0 {
@@ -611,11 +730,12 @@ func isRTEPodFoundOnNode(cli client.Client, ctx context.Context, nodeName string
 		}
 		if podLabels["name"] == "resource-topology" {
 			found = true
+			matchingPod = pod
 			klog.Infof("RTE pod is found: %s/%s", pod.Namespace, pod.Name)
 			break
 		}
 	}
-	return found
+	return matchingPod, found
 }
 
 func isDegradedRTESync(conds []metav1.Condition) bool {
