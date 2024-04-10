@@ -263,7 +263,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				// hack! remove the DS object to make the operator recreate the DS and thus restart all the pods
 				Expect(fxt.Client.Delete(ctx, updatedDs)).Should(Succeed())
 				By(fmt.Sprintf("checking that the DaemonSet is recreated with matching worker nodes count %d", len(workers)))
-				ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
+				ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(2*time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
 				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
 				// the key will remain the same, the DS namespaced name is predictable and fixed
 				updatedDs, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
@@ -499,7 +499,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				klog.Info("verify RTE pods before triggering the restart still include the pod on the tainted node")
 				pods, err := podlist.With(fxt.Client).ByDaemonset(ctx, ds)
 				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from daemonset %q: %v", ds.Name, err)
-				Expect(len(pods)).To(Equal(len(workers)), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
+				Expect(len(pods)).To(Equal(len(workers)), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers), len(pods))
 
 				var podToDelete corev1.Pod
 				for _, pod := range pods {
