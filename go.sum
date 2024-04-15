@@ -1158,8 +1158,8 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.1 h1:BI3L7hNqRv
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.1/go.mod h1:AkACMQGiTgCt0lQw3m7TTU8PLH9lYKNK5e9DqFf5VuM=
 github.com/k8stopologyawareschedwg/podfingerprint v0.2.2 h1:iFHPfZInM9pz2neye5RdmORMp1hPmte1EGJYpOOzZVg=
 github.com/k8stopologyawareschedwg/podfingerprint v0.2.2/go.mod h1:C23pM15t06dXg/OihGlqBvnYzLr+MXDXJ7zMfbNAyXI=
-github.com/k8stopologyawareschedwg/resource-topology-exporter v0.16.1-0.20231211140359-6dba655b8b2a h1:b10VBRUSkuFgcKl2IoVpuyamC7xGl7gxx1UiW57hCC8=
-github.com/k8stopologyawareschedwg/resource-topology-exporter v0.16.1-0.20231211140359-6dba655b8b2a/go.mod h1:sDgwGXVhjm+sRHouO8yHlFsCJcqVnD4Yg/rl1mvAwf8=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.16.1 h1:MOGtEVdtm5mJBjx8dXZqXmbspWil1KosoZ6NaObuLXM=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.16.1/go.mod h1:nTCBvqGj29Y6iVUDCwo+2gGUKgDTWGatUmQfcr5/N5E=
 github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51/go.mod h1:CzGEWj7cYgsdH8dAjBGEr58BoE7ScuLd+fwFZ44+/x8=
 github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvWXihfKN4Q=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
