@@ -67,7 +67,7 @@ func (wt Waiter) ForDaemonsetPodsCreation(ctx context.Context, key ObjectKey, ex
 		err := wt.Cli.Get(ctx, key.AsKey(), updatedDs)
 		if err != nil {
 			klog.Warningf("failed to get the daemonset %s: %v", key.String(), err)
-			return false, err
+			return false, nil
 		}
 
 		if int(updatedDs.Status.DesiredNumberScheduled) != expectedPods {
