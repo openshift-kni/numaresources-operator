@@ -69,15 +69,16 @@ const (
 )
 
 const (
-	defaultWebhookPort = 9443
-	defaultMetricsAddr = ":8080"
-	defaultProbeAddr   = ":8081"
-	defaultImage       = ""
-	defaultNamespace   = "numaresources-operator"
-	defaultCertsDir    = "/etc/secrets/nrop"
-	defaultTLSCert     = defaultCertsDir + "tls.crt"
-	defaultTLSKey      = defaultCertsDir + "tls.key"
-	caCert             = defaultCertsDir + "/ca.crt"
+	defaultWebhookPort    = 9443
+	defaultMetricsAddr    = ":8080"
+	defaultMetricsEnabled = true
+	defaultProbeAddr      = ":8081"
+	defaultImage          = ""
+	defaultNamespace      = "numaresources-operator"
+	defaultCertsDir       = "/etc/secrets/nrop"
+	defaultTLSCert        = defaultCertsDir + "tls.crt"
+	defaultTLSKey         = defaultCertsDir + "tls.key"
+	caCert                = defaultCertsDir + "/ca.crt"
 )
 
 var (
@@ -128,6 +129,8 @@ func (pa *Params) SetDefaults() {
 	pa.probeAddr = defaultProbeAddr
 	pa.render.Namespace = defaultNamespace
 	pa.render.Image = defaultImage
+	pa.enableMetrics = defaultMetricsEnabled
+
 }
 
 func (pa *Params) FromFlags() {
