@@ -18,10 +18,12 @@ package sched
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -56,14 +58,14 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			Eventually(func() bool {
 				err := e2eclient.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
 				if err != nil {
-					klog.Warningf("failed to get %q", nroSchedKey)
+					klog.Warningf("failed to get NUMAResourcesScheduler %s; err: %v", nroSchedObj.Name, err)
 					return false
 				}
 
 				nroSchedObj.Spec = objects.TestNROScheduler().Spec
 				err = e2eclient.Client.Update(context.TODO(), nroSchedObj)
 				if err != nil {
-					klog.Warningf("failed to update %q", nroSchedKey)
+					klog.Warningf("failed to update NUMAResourcesScheduler %s; err: %v", nroSchedObj.Name, err)
 					return false
 				}
 				return true
@@ -81,14 +83,21 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			var err error
 			nroSchedObj := objects.TestNROScheduler()
 
-			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			uid := nroSchedObj.GetUID()
-			nroSchedObj.Spec.SchedulerImage = e2eimages.SchedTestImageCI
-
-			err = e2eclient.Client.Update(context.TODO(), nroSchedObj)
-			Expect(err).ToNot(HaveOccurred())
+			var uid types.UID
+			By(fmt.Sprintf("switching the NROS image to %s", e2eimages.SchedTestImageCI))
+			Eventually(func() bool {
+				if err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj); err != nil {
+					klog.Warningf("failed to get NUMAResourcesScheduler %s; err: %v", nroSchedObj.Name, err)
+					return false
+				}
+				nroSchedObj.Spec.SchedulerImage = e2eimages.SchedTestImageCI
+				if err := e2eclient.Client.Update(context.TODO(), nroSchedObj); err != nil {
+					klog.Warningf("failed to update NUMAResourcesScheduler %s; err: %v", nroSchedObj.Name, err)
+					return false
+				}
+				uid = nroSchedObj.GetUID()
+				return true
+			}).WithTimeout(time.Minute).WithPolling(time.Second * 10).Should(BeTrue())
 
 			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
@@ -101,17 +110,16 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 					klog.Warningf("deployment pod listing failed: %v", err)
 					return false
 				}
-
 				return deploy.Spec.Template.Spec.Containers[0].Image == e2eimages.SchedTestImageCI
 			}).WithTimeout(time.Minute).WithPolling(time.Second * 10).Should(BeTrue())
 
 			By("reverting NROS changes")
-			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			nroSchedObj.Spec = objects.TestNROScheduler().Spec
-
 			Eventually(func() bool {
+				if err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj); err != nil {
+					klog.Warningf("failed to get NUMAResourcesScheduler %s; err: %v", nroSchedObj.Name, err)
+					return false
+				}
+				nroSchedObj.Spec = objects.TestNROScheduler().Spec
 				if err = e2eclient.Client.Update(context.TODO(), nroSchedObj); err != nil {
 					klog.Warningf("failed to update NUMAResourcesScheduler %s; err: %v", nroSchedObj.Name, err)
 					return false
@@ -134,21 +142,29 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
-			cmList := &corev1.ConfigMapList{}
-			err = e2eclient.Client.List(context.TODO(), cmList)
-			Expect(err).ToNot(HaveOccurred())
-
 			var nroCM *corev1.ConfigMap
-			for i := 0; i < len(cmList.Items); i++ {
-				if e2eobjects.IsOwnedBy(cmList.Items[i].ObjectMeta, nroSchedObj.ObjectMeta) {
-					nroCM = &cmList.Items[i]
-				}
-			}
-
-			initialCM := nroCM.DeepCopy()
-			nroCM.Data["somekey"] = "somevalue"
+			var initialCM *corev1.ConfigMap
 
 			Eventually(func() bool {
+				cmList := &corev1.ConfigMapList{}
+				if err := e2eclient.Client.List(context.TODO(), cmList); err != nil {
+					klog.Warningf("failed to list ConfigMaps: %v", err)
+					return false
+				}
+
+				for i := 0; i < len(cmList.Items); i++ {
+					if e2eobjects.IsOwnedBy(cmList.Items[i].ObjectMeta, nroSchedObj.ObjectMeta) {
+						nroCM = &cmList.Items[i]
+					}
+				}
+				if nroCM == nil {
+					klog.Warningf("cannot match ConfigMap")
+					return false
+				}
+
+				initialCM = nroCM.DeepCopy()
+				nroCM.Data["somekey"] = "somevalue"
+
 				err = e2eclient.Client.Update(context.TODO(), nroCM)
 				if err != nil {
 					klog.Warningf("failed to update ConfigMap %s/%s; err: %v", nroCM.Namespace, nroCM.Name, err)
