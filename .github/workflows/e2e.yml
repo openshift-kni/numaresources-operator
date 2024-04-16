@@ -52,7 +52,7 @@ jobs:
         kubectl label node kind-worker node-role.kubernetes.io/worker=''
         kind load docker-image ${built_image}
 
-    - name: Deploy RTE Operator
+    - name: Deploy NUMA Resources Operator
       run: |
         IMG=${built_image} KUSTOMIZE_DEPLOY_DIR="config/kind-ci/" make deploy
 
