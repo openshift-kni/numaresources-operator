@@ -55,6 +55,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
+	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
@@ -74,7 +75,7 @@ type NUMAResourcesOperatorReconciler struct {
 	APIManifests    apimanifests.Manifests
 	RTEManifests    rtemanifests.Manifests
 	Namespace       string
-	ImageSpec       string
+	Images          images.Data
 	ImagePullPolicy corev1.PullPolicy
 	Recorder        record.EventRecorder
 	ForwardMCPConds bool
@@ -390,7 +391,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	var err error
 	var daemonSetsNName []nropv1.NamespacedName
 
-	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.ImageSpec, r.ImagePullPolicy)
+	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
 	if err != nil {
 		return daemonSetsNName, err
 	}
