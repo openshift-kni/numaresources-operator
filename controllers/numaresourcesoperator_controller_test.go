@@ -46,6 +46,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -80,8 +81,10 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 		APIManifests: apiManifests,
 		RTEManifests: rteManifests,
 		Namespace:    testNamespace,
-		ImageSpec:    testImageSpec,
-		Recorder:     recorder,
+		Images: images.Data{
+			Builtin: testImageSpec,
+		},
+		Recorder: recorder,
 	}, nil
 }
 

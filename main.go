@@ -71,7 +71,6 @@ const (
 	defaultWebhookPort = 9443
 	defaultMetricsAddr = ":8080"
 	defaultProbeAddr   = ":8081"
-	defaultImage       = ""
 	defaultNamespace   = "numaresources-operator"
 )
 
@@ -90,11 +89,15 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
+type ImageParams struct {
+	Exporter  string
+	Scheduler string
+}
+
 type RenderParams struct {
-	NRTCRD         bool
-	Namespace      string
-	Image          string
-	ImageScheduler string
+	NRTCRD    bool
+	Namespace string
+	Image     ImageParams
 }
 
 type Params struct {
@@ -113,13 +116,13 @@ type Params struct {
 	enableMetrics         bool
 	enableHTTP2           bool
 	enableMCPCondsForward bool
+	image                 ImageParams
 }
 
 func (pa *Params) SetDefaults() {
 	pa.metricsAddr = defaultMetricsAddr
 	pa.probeAddr = defaultProbeAddr
 	pa.render.Namespace = defaultNamespace
-	pa.render.Image = defaultImage
 }
 
 func (pa *Params) FromFlags() {
@@ -132,8 +135,8 @@ func (pa *Params) FromFlags() {
 	flag.BoolVar(&pa.renderMode, "render", pa.renderMode, "outputs the rendered manifests, then exits")
 	flag.BoolVar(&pa.render.NRTCRD, "render-nrt-crd", pa.render.NRTCRD, "outputs only the rendered NodeResourceTopology CRD manifest, then exits")
 	flag.StringVar(&pa.render.Namespace, "render-namespace", pa.render.Namespace, "outputs the manifests rendered using the given namespace")
-	flag.StringVar(&pa.render.Image, "render-image", pa.render.Image, "outputs the manifests rendered using the given image")
-	flag.StringVar(&pa.render.ImageScheduler, "render-image-scheduler", pa.render.ImageScheduler, "outputs the manifests rendered using the given image for the scheduler")
+	flag.StringVar(&pa.render.Image.Exporter, "render-image", pa.render.Image.Exporter, "outputs the manifests rendered using the given image")
+	flag.StringVar(&pa.render.Image.Scheduler, "render-image-scheduler", pa.render.Image.Scheduler, "outputs the manifests rendered using the given image for the scheduler")
 	flag.BoolVar(&pa.showVersion, "version", pa.showVersion, "outputs the version and exit")
 	flag.BoolVar(&pa.enableScheduler, "enable-scheduler", pa.enableScheduler, "enable support for the NUMAResourcesScheduler object")
 	flag.BoolVar(&pa.enableWebhooks, "enable-webhooks", pa.enableWebhooks, "enable conversion webhooks")
@@ -141,6 +144,8 @@ func (pa *Params) FromFlags() {
 	flag.BoolVar(&pa.enableMetrics, "enable-metrics", pa.enableMetrics, "enable metrics server")
 	flag.BoolVar(&pa.enableHTTP2, "enable-http2", pa.enableHTTP2, "If HTTP/2 should be enabled for the webhook servers.")
 	flag.BoolVar(&pa.enableMCPCondsForward, "enable-mcp-conds-fwd", pa.enableMCPCondsForward, "enable MCP Status Condition forwarding")
+	flag.StringVar(&pa.image.Exporter, "image-exporter", pa.image.Exporter, "use this image as default for the RTE")
+	flag.StringVar(&pa.image.Scheduler, "image-scheduler", pa.image.Scheduler, "use this image as default for the scheduler")
 
 	flag.Parse()
 
@@ -226,14 +231,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	imageSpec, pullPolicy, err := images.GetCurrentImage(context.Background())
-	if err != nil {
-		// intentionally continue
-		klog.InfoS("unable to find current image, using hardcoded", "error", err)
-	}
-	klog.InfoS("using RTE image", "spec", imageSpec)
+	imgs, pullPolicy := images.Discover(context.Background(), params.image.Exporter)
 
-	rteManifestsRendered, err := renderRTEManifests(rteManifests, namespace, imageSpec)
+	rteManifestsRendered, err := renderRTEManifests(rteManifests, namespace, imgs)
 	if err != nil {
 		klog.ErrorS(err, "unable to render RTE manifests", "controller", "NUMAResourcesOperator")
 		os.Exit(1)
@@ -246,7 +246,7 @@ func main() {
 		APIManifests:    apiManifests,
 		RTEManifests:    rteManifestsRendered,
 		Platform:        clusterPlatform,
-		ImageSpec:       imageSpec,
+		Images:          imgs,
 		ImagePullPolicy: pullPolicy,
 		Namespace:       namespace,
 		ForwardMCPConds: params.enableMCPCondsForward,
@@ -321,7 +321,7 @@ func manageRendering(render RenderParams, clusterPlatform platform.Platform, api
 
 	var objs []client.Object
 	if enableScheduler {
-		if render.ImageScheduler == "" {
+		if render.Image.Scheduler == "" {
 			klog.Errorf("missing scheduler image")
 			return 1
 		}
@@ -333,7 +333,7 @@ func manageRendering(render RenderParams, clusterPlatform platform.Platform, api
 		}
 		klog.InfoS("manifests loaded", "component", "Scheduler")
 
-		mf, err := renderSchedulerManifests(schedMf, render.ImageScheduler)
+		mf, err := renderSchedulerManifests(schedMf, render.Image.Scheduler)
 		if err != nil {
 			klog.ErrorS(err, "unable to render scheduler manifests")
 			return 1
@@ -341,7 +341,11 @@ func manageRendering(render RenderParams, clusterPlatform platform.Platform, api
 		objs = append(objs, mf.ToObjects()...)
 	}
 
-	mf, err := renderRTEManifests(rteMf, render.Namespace, render.Image)
+	imgs := images.Data{
+		User:    render.Image.Exporter,
+		Builtin: images.SpecPath(),
+	}
+	mf, err := renderRTEManifests(rteMf, render.Namespace, imgs)
 	if err != nil {
 		klog.ErrorS(err, "unable to render RTE manifests")
 		return 1
@@ -368,7 +372,7 @@ func renderObjects(objs []client.Object) error {
 }
 
 // renderRTEManifests renders the reconciler manifests so they can be deployed on the cluster.
-func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, imageSpec string) (rtemanifests.Manifests, error) {
+func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, imgs images.Data) (rtemanifests.Manifests, error) {
 	klog.InfoS("Updating RTE manifests")
 	mf, err := rteManifests.Render(options.UpdaterDaemon{
 		Namespace: namespace,
@@ -382,7 +386,7 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 		return mf, err
 	}
 
-	err = rteupdate.DaemonSetUserImageSettings(mf.DaemonSet, "", imageSpec, images.NullPolicy)
+	err = rteupdate.DaemonSetUserImageSettings(mf.DaemonSet, imgs.Discovered(), imgs.Builtin, images.NullPolicy)
 	if err != nil {
 		return mf, err
 	}
