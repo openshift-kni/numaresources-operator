@@ -368,6 +368,18 @@ func FilterZoneCountEqual(nrts []nrtv1alpha2.NodeResourceTopology, count int) []
 	return ret
 }
 
+func FilterOnlyNUMAAffineResources(rl corev1.ResourceList, tag string) corev1.ResourceList {
+	res := make(corev1.ResourceList)
+	for resName, resQty := range rl {
+		if resName == corev1.ResourceStorage || resName == corev1.ResourceEphemeralStorage {
+			klog.Infof("%s: resource %q is host-local (hostlevel) not numa-local", tag, resName)
+			continue
+		}
+		res[resName] = resQty
+	}
+	return res
+}
+
 func FilterAnyZoneMatchingResources(nrts []nrtv1alpha2.NodeResourceTopology, requests corev1.ResourceList) []nrtv1alpha2.NodeResourceTopology {
 	reqStr := e2ereslist.ToString(requests)
 	ret := []nrtv1alpha2.NodeResourceTopology{}
