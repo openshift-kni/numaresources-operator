@@ -86,13 +86,14 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 		// the same code with a different test_id per tmscope
 		DescribeTable("[tier0][ressched] a guaranteed pod with one container should be placed and aligned on the node",
 			func(tmPolicy, tmScope string, requiredRes, expectedFreeRes corev1.ResourceList) {
-				nrtCandidates, targetNodeName := setupNodes(fxt, desiredNodesState{
+				ctx := context.TODO()
+
+				nrtCandidates, targetNodeName := setupNodes(fxt, ctx, desiredNodesState{
 					NRTList:           nrtList,
 					RequiredNodes:     2,
 					RequiredNUMAZones: 2,
 					RequiredResources: requiredRes,
-					FreeResources:     expectedFreeRes,
-				})
+				}, expectedFreeRes)
 
 				nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtCandidates, tmPolicy, tmScope)
 				if len(nrts) != len(nrtCandidates) {
@@ -104,11 +105,11 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 				pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
 				pod.Spec.Containers[0].Resources.Limits = requiredRes
 
-				err := fxt.Client.Create(context.TODO(), pod)
+				err := fxt.Client.Create(ctx, pod)
 				Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
 
 				By("waiting for pod to be up and running")
-				updatedPod, err := wait.With(fxt.Client).Timeout(time.Minute).ForPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodRunning)
+				updatedPod, err := wait.With(fxt.Client).Timeout(time.Minute).ForPodPhase(ctx, pod.Namespace, pod.Name, corev1.PodRunning)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 				}
@@ -162,33 +163,15 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 	})
 })
 
-type desiredNodesState struct {
-	NRTList       nrtv1alpha2.NodeResourceTopologyList
-	RequiredNodes int
-	// The following is Per Node
-	RequiredNUMAZones int
-	RequiredResources corev1.ResourceList
-	FreeResources     corev1.ResourceList
-}
+func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nodesState desiredNodesState, expectedFreeResources corev1.ResourceList) ([]nrtv1alpha2.NodeResourceTopology, string) {
+	GinkgoHelper()
 
-func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1alpha2.NodeResourceTopology, string) {
-	By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", nodesState.RequiredNUMAZones))
-	nrtCandidates := e2enrt.FilterZoneCountEqual(nodesState.NRTList.Items, nodesState.RequiredNUMAZones)
-
-	if len(nrtCandidates) < nodesState.RequiredNodes {
-		e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), nodesState.RequiredNodes)
-	}
-
-	By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
-	nrtCandidates = e2enrt.FilterAnyZoneMatchingResources(nrtCandidates, nodesState.RequiredResources)
-	if len(nrtCandidates) < nodesState.RequiredNodes {
-		e2efixture.Skipf(fxt, "not enough nodes with NUMA zones each of them can match requests: found %d, needed: %d", len(nrtCandidates), nodesState.RequiredNodes)
-	}
+	nrtCandidates := filterNodes(fxt, nodesState)
 	nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
 	var ok bool
 	targetNodeName, ok := e2efixture.PopNodeName(nrtCandidateNames)
-	ExpectWithOffset(1, ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
+	Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
 	By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
 	// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
 	// but have enough allocatable resources at node level to shedule the pod on it.
@@ -197,43 +180,42 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 	// resources but they won't have enough resources in only one NUMA zone.
 
 	By("Padding all other candidate nodes")
-
 	var paddingPods []*corev1.Pod
 	for nIdx, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 		nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
-		ExpectWithOffset(1, err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
+		Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-		baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), nodeName)
-		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
+		baseload, err := nodes.GetLoad(fxt.Client, ctx, nodeName)
+		Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 		By(fmt.Sprintf("computed base load: %s", baseload))
 
 		for zIdx, zone := range nrtInfo.Zones {
-			padRes := nodesState.FreeResources.DeepCopy()
+			padRes := expectedFreeResources.DeepCopy()
 
 			if zIdx == 0 { // any random zone is actually fine
 				baseload.Apply(padRes)
 			}
 
-			paddingPods = append(paddingPods, createPaddingPod(1, fxt, fmt.Sprintf("padding-%d-%d", nIdx, zIdx), nodeName, zone, padRes))
+			paddingPods = append(paddingPods, createPaddingPod(fxt, ctx, fmt.Sprintf("padding-%d-%d", nIdx, zIdx), nodeName, zone, padRes))
 		}
 	}
 
 	By("Padding the target node")
 
-	baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), targetNodeName)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
+	baseload, err := nodes.GetLoad(fxt.Client, ctx, targetNodeName)
+	Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 	By(fmt.Sprintf("computed base load: %s", baseload))
 
 	targetNrtInfo, err := e2enrt.FindFromList(nrtCandidates, targetNodeName)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred(), "missing NRT info for target node %q", targetNodeName)
+	Expect(err).NotTo(HaveOccurred(), "missing NRT info for target node %q", targetNodeName)
 
-	paddingPods = append(paddingPods, createPaddingPod(1, fxt, "padding-tgt-0", targetNodeName, targetNrtInfo.Zones[0], baseload.Resources))
+	paddingPods = append(paddingPods, createPaddingPod(fxt, ctx, "padding-tgt-0", targetNodeName, targetNrtInfo.Zones[0], baseload.Resources))
 	// any is fine, we hardcode zone#1 but we can do it smarter in the future
-	paddingPods = append(paddingPods, createPaddingPod(1, fxt, "padding-tgt-1", targetNodeName, targetNrtInfo.Zones[1], nodesState.RequiredResources))
+	paddingPods = append(paddingPods, createPaddingPod(fxt, ctx, "padding-tgt-1", targetNodeName, targetNrtInfo.Zones[1], nodesState.RequiredResources))
 
 	By("Waiting for padding pods to be ready")
 	failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
-	ExpectWithOffset(1, failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
+	Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 	By("waiting for the NRT data to settle")
 	e2efixture.MustSettleNRT(fxt)
@@ -241,17 +223,18 @@ func setupNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) ([]nrtv1a
 	return nrtCandidates, targetNodeName
 }
 
-func createPaddingPod(offset int, fxt *e2efixture.Fixture, podName, nodeName string, zone nrtv1alpha2.Zone, expectedFreeRes corev1.ResourceList) *corev1.Pod {
+func createPaddingPod(fxt *e2efixture.Fixture, ctx context.Context, podName, nodeName string, zone nrtv1alpha2.Zone, expectedFreeRes corev1.ResourceList) *corev1.Pod {
+	GinkgoHelper()
 	By(fmt.Sprintf("creating padding pod %q for node %q zone %q with resource target %s", podName, nodeName, zone.Name, e2ereslist.ToString(expectedFreeRes)))
 
 	padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, expectedFreeRes)
-	ExpectWithOffset(offset+1, err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
+	Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
 
 	padPod, err = pinPodTo(padPod, nodeName, zone.Name)
-	ExpectWithOffset(offset+1, err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
+	Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
 
-	err = fxt.Client.Create(context.TODO(), padPod)
-	ExpectWithOffset(offset+1, err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", podName, zone.Name)
+	err = fxt.Client.Create(ctx, padPod)
+	Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", podName, zone.Name)
 
 	return padPod
 }
