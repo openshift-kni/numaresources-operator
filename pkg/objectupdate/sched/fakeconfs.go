@@ -24,14 +24,14 @@ import (
 )
 
 const (
-	schedConfig = `apiVersion: kubescheduler.config.k8s.io/v1beta3
+	schedConfig = `apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 leaderElection:
   leaderElect: false
 profiles:
 - pluginConfig:
   - args:
-      apiVersion: kubescheduler.config.k8s.io/v1beta3
+      apiVersion: kubescheduler.config.k8s.io/v1
       cacheResyncPeriodSeconds: 3
       kind: NodeResourceTopologyMatchArgs
       scoringStrategy:
@@ -54,14 +54,14 @@ profiles:
       - name: NodeResourceTopologyMatch
   schedulerName: test-topo-aware-sched`
 
-	schedConfigWithPeriod = `apiVersion: kubescheduler.config.k8s.io/v1beta3
+	schedConfigWithPeriod = `apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 leaderElection:
   leaderElect: false
 profiles:
   - pluginConfig:
     - args:
-        apiVersion: kubescheduler.config.k8s.io/v1beta3
+        apiVersion: kubescheduler.config.k8s.io/v1
         cacheResyncPeriodSeconds: 3
         kind: NodeResourceTopologyMatchArgs
         scoringStrategy:
@@ -86,14 +86,14 @@ profiles:
 )
 
 const (
-	expectedYAMLWithReconcilePeriod = `apiVersion: kubescheduler.config.k8s.io/v1beta3
+	expectedYAMLWithReconcilePeriod = `apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 leaderElection:
   leaderElect: false
 profiles:
 - pluginConfig:
   - args:
-      apiVersion: kubescheduler.config.k8s.io/v1beta3
+      apiVersion: kubescheduler.config.k8s.io/v1
       cacheResyncPeriodSeconds: 3
       kind: NodeResourceTopologyMatchArgs
       scoringStrategy:
@@ -117,14 +117,14 @@ profiles:
   schedulerName: test-topo-aware-sched
 `
 
-	expectedYAMLWithoutReconcile = `apiVersion: kubescheduler.config.k8s.io/v1beta3
+	expectedYAMLWithoutReconcile = `apiVersion: kubescheduler.config.k8s.io/v1
 kind: KubeSchedulerConfiguration
 leaderElection:
   leaderElect: false
 profiles:
 - pluginConfig:
   - args:
-      apiVersion: kubescheduler.config.k8s.io/v1beta3
+      apiVersion: kubescheduler.config.k8s.io/v1
       kind: NodeResourceTopologyMatchArgs
       scoringStrategy:
         resources:
