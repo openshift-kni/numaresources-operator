@@ -56,8 +56,6 @@ var _ = Describe("[serial] numaresources host-level resources", Serial, func() {
 
 	AfterEach(func() {
 		Expect(e2efixture.Teardown(fxt)).To(Succeed())
-		By("waiting for the NRT data to settle")
-		e2efixture.MustSettleNRT(fxt)
 	})
 
 	Context("with at least two nodes suitable", func() {
