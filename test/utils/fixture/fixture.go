@@ -171,14 +171,10 @@ func Cooldown(ft *Fixture) {
 }
 
 func MustSettleNRT(fxt *Fixture) {
-	_, err := WaitForNRTSettle(fxt)
-	gomega.ExpectWithOffset(1, err).ToNot(gomega.HaveOccurred(), "NRTs have not settled during the provided cooldown time: %v", err)
-}
-
-func WaitForNRTSettle(fxt *Fixture) (*nrtv1alpha2.NodeResourceTopologyList, error) {
+	ginkgo.GinkgoHelper()
 	klog.Infof("cooldown by verifying NRTs data is settled (interval=%v timeout=%v)", settleInterval, settleTimeout)
-	settledNRT, err := intwait.With(fxt.Client).Interval(settleInterval).Timeout(settleTimeout).ForNodeResourceTopologiesSettled(context.TODO(), cooldownThreshold, intwait.NRTIgnoreNothing)
-	return &settledNRT, err
+	_, err := intwait.With(fxt.Client).Interval(settleInterval).Timeout(settleTimeout).ForNodeResourceTopologiesSettled(context.Background(), cooldownThreshold, intwait.NRTIgnoreNothing)
+	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "NRTs have not settled during the provided cooldown time: %v", err)
 }
 
 func setupNamespace(cli client.Client, baseName string, randomize bool) (corev1.Namespace, error) {
