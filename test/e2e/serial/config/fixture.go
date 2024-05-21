@@ -66,7 +66,7 @@ var Config *E2EConfig
 
 func SetupFixture() error {
 	var err error
-	Config, err = NewFixtureWithOptions("e2e-test-infra", e2efixture.OptionRandomizeName|e2efixture.OptionAvoidCooldown)
+	Config, err = NewFixtureWithOptions("e2e-test-infra", e2efixture.OptionRandomizeName|e2efixture.OptionAvoidCooldown|e2efixture.OptionStaticClusterData)
 	return err
 }
 
