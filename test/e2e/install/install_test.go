@@ -283,7 +283,7 @@ var _ = Describe("[Install] durability", func() {
 
 			deleteNROPSync(e2eclient.Client, nroObj)
 
-			deploy.WaitForMCPUpdatedAfterNRODeleted(1, nroObj)
+			deploy.WaitForMCPUpdatedAfterNRODeleted(nroObj)
 
 			By("checking there are no leftovers")
 			// by taking the ns from the ds we're avoiding the need to figure out in advanced
@@ -316,7 +316,7 @@ var _ = Describe("[Install] durability", func() {
 			err = e2eclient.Client.Create(context.TODO(), nroObjRedep)
 			Expect(err).ToNot(HaveOccurred())
 
-			deploy.WaitForMCPUpdatedAfterNROCreated(1, nroObj)
+			deploy.WaitForMCPUpdatedAfterNROCreated(nroObj)
 
 			Eventually(func() bool {
 				updatedNroObj := &nropv1.NUMAResourcesOperator{}
@@ -357,11 +357,12 @@ func findContainerByName(daemonset appsv1.DaemonSet, containerName string) (*cor
 }
 
 func deleteNROPSync(cli client.Client, nropObj *nropv1.NUMAResourcesOperator) {
+	GinkgoHelper()
 	var err error
 	err = cli.Delete(context.TODO(), nropObj)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 	err = nrowait.With(cli).Interval(10*time.Second).Timeout(2*time.Minute).ForNUMAResourcesOperatorDeleted(context.TODO(), nropObj)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
+	Expect(err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
 }
 
 func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {

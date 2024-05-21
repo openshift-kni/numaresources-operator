@@ -255,8 +255,8 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			}).Should(BeTrue(), "failed to update %s's CacheResyncPeriod value", nroSchedKey)
 
 			By("checking cacheResyncPeriod under the CR's Status")
-			Eventually(func() bool {
-				ExpectWithOffset(1, e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)).ToNot(HaveOccurred())
+			Eventually(func(g Gomega) bool {
+				g.Expect(e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)).To(Succeed())
 				return nroSchedObj.Spec.CacheResyncPeriod.Duration == nroSchedObj.Status.CacheResyncPeriod.Duration
 			}).WithTimeout(time.Minute*2).WithPolling(time.Second*10).Should(BeTrue(), "cacheResyncPeriod not updated under the status; want: %d, got %d",
 				nroSchedObj.Spec.CacheResyncPeriod.Duration, nroSchedObj.Status.CacheResyncPeriod.Duration)

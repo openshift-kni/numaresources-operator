@@ -273,17 +273,19 @@ func testToleration() []corev1.Toleration {
 }
 
 func untaintNodes(cli client.Client, taintedNodeNames []string, taint *corev1.Taint) []string {
+	GinkgoHelper()
+
 	var untaintedNodeNames []string
 	// TODO: remove taints in parallel
 	for _, taintedNodeName := range taintedNodeNames {
-		EventuallyWithOffset(1, func() error {
+		Eventually(func() error {
 			var err error
 			node := &corev1.Node{}
 			err = cli.Get(context.TODO(), client.ObjectKey{Name: taintedNodeName}, node)
-			ExpectWithOffset(1, err).ToNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			updatedNode, updated, err := taints.RemoveTaint(node, taint)
-			ExpectWithOffset(1, err).ToNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			if !updated {
 				return nil
 			}
@@ -301,13 +303,15 @@ func untaintNodes(cli client.Client, taintedNodeNames []string, taint *corev1.Ta
 }
 
 func checkNodesUntainted(cli client.Client, nodeNames []string) {
+	GinkgoHelper()
+
 	// TODO: check taints in parallel
 	for _, nodeName := range nodeNames {
-		EventuallyWithOffset(1, func() error {
+		Eventually(func() error {
 			var err error
 			node := &corev1.Node{}
 			err = cli.Get(context.TODO(), client.ObjectKey{Name: nodeName}, node)
-			ExpectWithOffset(1, err).ToNot(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			if len(node.Spec.Taints) > 0 {
 				return fmt.Errorf("node %q has unexpected taints: %v", nodeName, node.Spec.Taints)

@@ -94,6 +94,8 @@ var _ = Describe("[rte][local][config] RTE configuration", func() {
 })
 
 func runConfig(argv []string, env map[string]string) ProgArgs {
+	GinkgoHelper()
+
 	cmdline := []string{
 		binaryPath,
 		"--dump-config",
@@ -111,11 +113,11 @@ func runConfig(argv []string, env map[string]string) ProgArgs {
 	}
 
 	out, err := cmd.Output()
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	var args ProgArgs
 	err = json.Unmarshal(out, &args)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	return args
 }
@@ -129,6 +131,8 @@ func flattenEnv(env map[string]string) []string {
 }
 
 func expectExecutableExists(path string) {
+	GinkgoHelper()
+
 	cmdline := []string{
 		path,
 		"-h",
@@ -136,6 +140,6 @@ func expectExecutableExists(path string) {
 
 	cmd := exec.Command(cmdline[0], cmdline[1:]...)
 	out, err := cmd.CombinedOutput()
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-	ExpectWithOffset(1, out).ToNot(BeEmpty())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(out).ToNot(BeEmpty())
 }

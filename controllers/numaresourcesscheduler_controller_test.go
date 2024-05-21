@@ -596,45 +596,49 @@ func diffYAML(want, got string) (string, error) {
 }
 
 func expectCacheParams(cli client.Client, resyncMethod, foreignPodsDetect string, informerMode string) {
+	ginkgo.GinkgoHelper()
+
 	key := client.ObjectKey{
 		Name:      "topo-aware-scheduler-config",
 		Namespace: testNamespace,
 	}
 
 	cm := corev1.ConfigMap{}
-	gomega.ExpectWithOffset(1, cli.Get(context.TODO(), key, &cm)).To(gomega.Succeed())
+	gomega.Expect(cli.Get(context.TODO(), key, &cm)).To(gomega.Succeed())
 
 	confRaw := cm.Data[sched.SchedulerConfigFileName]
 	cfgs, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(confRaw))
-	gomega.ExpectWithOffset(1, err).ToNot(gomega.HaveOccurred())
-	gomega.ExpectWithOffset(1, cfgs).To(gomega.HaveLen(1), "unexpected config params count: %d", len(cfgs))
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(cfgs).To(gomega.HaveLen(1), "unexpected config params count: %d", len(cfgs))
 	cfg := cfgs[0]
 
 	klog.InfoS("config", dumpConfigCacheParams(cfg.Cache)...)
 
-	gomega.ExpectWithOffset(1, cfg.Cache.ResyncMethod).ToNot(gomega.BeNil())
-	gomega.ExpectWithOffset(1, *cfg.Cache.ResyncMethod).To(gomega.Equal(resyncMethod))
-	gomega.ExpectWithOffset(1, cfg.Cache.ForeignPodsDetectMode).ToNot(gomega.BeNil())
-	gomega.ExpectWithOffset(1, *cfg.Cache.ForeignPodsDetectMode).To(gomega.Equal(foreignPodsDetect))
-	gomega.ExpectWithOffset(1, cfg.Cache.InformerMode).ToNot(gomega.BeNil())
-	gomega.ExpectWithOffset(1, *cfg.Cache.InformerMode).To(gomega.Equal(informerMode))
+	gomega.Expect(cfg.Cache.ResyncMethod).ToNot(gomega.BeNil())
+	gomega.Expect(*cfg.Cache.ResyncMethod).To(gomega.Equal(resyncMethod))
+	gomega.Expect(cfg.Cache.ForeignPodsDetectMode).ToNot(gomega.BeNil())
+	gomega.Expect(*cfg.Cache.ForeignPodsDetectMode).To(gomega.Equal(foreignPodsDetect))
+	gomega.Expect(cfg.Cache.InformerMode).ToNot(gomega.BeNil())
+	gomega.Expect(*cfg.Cache.InformerMode).To(gomega.Equal(informerMode))
 }
 
 func expectScoringStrategyParams(cli client.Client, ScoringStrategyType string, resources []depmanifests.ResourceSpecParams) {
+	ginkgo.GinkgoHelper()
+
 	key := client.ObjectKey{
 		Name:      "topo-aware-scheduler-config",
 		Namespace: testNamespace,
 	}
 
 	cm := corev1.ConfigMap{}
-	gomega.ExpectWithOffset(1, cli.Get(context.TODO(), key, &cm)).To(gomega.Succeed())
+	gomega.Expect(cli.Get(context.TODO(), key, &cm)).To(gomega.Succeed())
 
 	confRaw := cm.Data[sched.SchedulerConfigFileName]
 	cfgs, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(confRaw))
-	gomega.ExpectWithOffset(1, err).ToNot(gomega.HaveOccurred())
-	gomega.ExpectWithOffset(1, cfgs).To(gomega.HaveLen(1), "unexpected config params count: %d", len(cfgs))
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(cfgs).To(gomega.HaveLen(1), "unexpected config params count: %d", len(cfgs))
 	cfg := cfgs[0]
 
-	gomega.ExpectWithOffset(1, cfg.ScoringStrategy.Type).To(gomega.Equal(ScoringStrategyType))
-	gomega.ExpectWithOffset(1, cfg.ScoringStrategy.Resources).To(gomega.Equal(resources))
+	gomega.Expect(cfg.ScoringStrategy.Type).To(gomega.Equal(ScoringStrategyType))
+	gomega.Expect(cfg.ScoringStrategy.Resources).To(gomega.Equal(resources))
 }
