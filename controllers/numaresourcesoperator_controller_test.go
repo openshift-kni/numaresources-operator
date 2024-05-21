@@ -1102,17 +1102,19 @@ func getConditionByType(conditions []metav1.Condition, conditionType string) *me
 }
 
 func reconcileObjects(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.MachineConfigPool) *NUMAResourcesOperatorReconciler {
+	GinkgoHelper()
+
 	reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	key := client.ObjectKeyFromObject(nro)
 
 	// we need to do the first iteration here because the DS object is created in the second
 	_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
 	By("Ensure MachineConfigPools is ready")
-	ExpectWithOffset(1, reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp), mcp)).ToNot(HaveOccurred())
+	Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp), mcp)).ToNot(HaveOccurred())
 	mcp.Status.Configuration.Source = []corev1.ObjectReference{
 		{
 			Name: objectnames.GetMachineConfigName(nro.Name, mcp.Name),
@@ -1124,12 +1126,12 @@ func reconcileObjects(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.Ma
 			Status: corev1.ConditionTrue,
 		},
 	}
-	ExpectWithOffset(1, reconciler.Client.Update(context.TODO(), mcp)).Should(Succeed())
+	Expect(reconciler.Client.Update(context.TODO(), mcp)).Should(Succeed())
 
 	var secondLoopResult reconcile.Result
 	secondLoopResult, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 
-	ExpectWithOffset(1, secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+	Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
 	return reconciler
 }

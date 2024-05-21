@@ -45,6 +45,8 @@ var _ = BeforeSuite(func() {
 })
 
 func expectExecutableExists(path string) {
+	GinkgoHelper()
+
 	cmdline := []string{
 		path,
 		"-h",
@@ -52,6 +54,6 @@ func expectExecutableExists(path string) {
 
 	cmd := exec.Command(cmdline[0], cmdline[1:]...)
 	out, err := cmd.CombinedOutput()
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
-	ExpectWithOffset(1, out).ToNot(BeEmpty())
+	Expect(err).ToNot(HaveOccurred())
+	Expect(out).ToNot(BeEmpty())
 }

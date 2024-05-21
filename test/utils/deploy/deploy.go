@@ -60,6 +60,8 @@ type NroDeploymentWithSched struct {
 // OverallDeployment returns a struct containing all the deployed objects,
 // so it will be easier to introspect and delete them later.
 func OverallDeployment() NroDeployment {
+	GinkgoHelper()
+
 	var matchLabels map[string]string
 	var deployedObj NroDeployment
 
@@ -67,7 +69,7 @@ func OverallDeployment() NroDeployment {
 		mcpObj := objects.TestMCP()
 		By(fmt.Sprintf("creating the machine config pool object: %s", mcpObj.Name))
 		err := e2eclient.Client.Create(context.TODO(), mcpObj)
-		ExpectWithOffset(1, err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 		deployedObj.McpObj = mcpObj
 		matchLabels = map[string]string{"test": "test"}
 	}
@@ -79,33 +81,33 @@ func OverallDeployment() NroDeployment {
 
 	nroObj := objects.TestNRO(matchLabels)
 	kcObj, err := objects.TestKC(matchLabels)
-	ExpectWithOffset(1, err).To(Not(HaveOccurred()))
+	Expect(err).To(Not(HaveOccurred()))
 
 	unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	if _, ok := os.LookupEnv("E2E_NROP_INSTALL_SKIP_KC"); ok {
 		By("using cluster kubeletconfig (if any)")
 	} else {
 		By(fmt.Sprintf("creating the KC object: %s", kcObj.Name))
 		err = e2eclient.Client.Create(context.TODO(), kcObj)
-		ExpectWithOffset(1, err).NotTo(HaveOccurred())
+		Expect(err).NotTo(HaveOccurred())
 		deployedObj.KcObj = kcObj
 	}
 
 	By(fmt.Sprintf("creating the NRO object: %s", nroObj.Name))
 	err = e2eclient.Client.Create(context.TODO(), nroObj)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 	deployedObj.NroObj = nroObj
 
 	Eventually(unpause).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).ShouldNot(HaveOccurred())
 
 	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj)
-	ExpectWithOffset(1, err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 	deployedObj.NroObj = nroObj
 
 	By("waiting for MCP to get updated")
-	WaitForMCPUpdatedAfterNROCreated(2, nroObj)
+	WaitForMCPUpdatedAfterNROCreated(nroObj)
 
 	return deployedObj
 }
@@ -134,10 +136,12 @@ func GetDeploymentWithSched() (NroDeploymentWithSched, error) {
 
 // TODO: what if timeout < period?
 func TeardownDeployment(nrod NroDeployment, timeout time.Duration) {
+	GinkgoHelper()
+
 	var wg sync.WaitGroup
 	if nrod.McpObj != nil {
 		err := e2eclient.Client.Delete(context.TODO(), nrod.McpObj)
-		ExpectWithOffset(1, err).ToNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		wg.Add(1)
 		go func(mcpObj *machineconfigv1.MachineConfigPool) {
@@ -145,47 +149,49 @@ func TeardownDeployment(nrod NroDeployment, timeout time.Duration) {
 			defer wg.Done()
 			klog.Infof("waiting for MCP %q to be gone", mcpObj.Name)
 			err := wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(timeout).ForMachineConfigPoolDeleted(context.TODO(), mcpObj)
-			ExpectWithOffset(1, err).ToNot(HaveOccurred(), "MCP %q failed to be deleted", mcpObj.Name)
+			Expect(err).ToNot(HaveOccurred(), "MCP %q failed to be deleted", mcpObj.Name)
 		}(nrod.McpObj)
 	}
 
 	var err error
 	if nrod.KcObj != nil {
 		err = e2eclient.Client.Delete(context.TODO(), nrod.KcObj)
-		ExpectWithOffset(1, err).ToNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 		wg.Add(1)
 		go func(kcObj *machineconfigv1.KubeletConfig) {
 			defer GinkgoRecover()
 			defer wg.Done()
 			klog.Infof("waiting for KC %q to be gone", kcObj.Name)
 			err := wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(timeout).ForKubeletConfigDeleted(context.TODO(), kcObj)
-			ExpectWithOffset(1, err).ToNot(HaveOccurred(), "KC %q failed to be deleted", kcObj.Name)
+			Expect(err).ToNot(HaveOccurred(), "KC %q failed to be deleted", kcObj.Name)
 		}(nrod.KcObj)
 	}
 
 	err = e2eclient.Client.Delete(context.TODO(), nrod.NroObj)
-	ExpectWithOffset(1, err).ToNot(HaveOccurred())
+	Expect(err).ToNot(HaveOccurred())
 	wg.Add(1)
 	go func(nropObj *nropv1.NUMAResourcesOperator) {
 		defer GinkgoRecover()
 		defer wg.Done()
 		klog.Infof("waiting for NROP %q to be gone", nropObj.Name)
 		err := wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(timeout).ForNUMAResourcesOperatorDeleted(context.TODO(), nropObj)
-		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
+		Expect(err).ToNot(HaveOccurred(), "NROP %q failed to be deleted", nropObj.Name)
 	}(nrod.NroObj)
 
 	wg.Wait()
 
-	WaitForMCPUpdatedAfterNRODeleted(2, nrod.NroObj)
+	WaitForMCPUpdatedAfterNRODeleted(nrod.NroObj)
 }
 
-func WaitForMCPUpdatedAfterNRODeleted(offset int, nroObj *nropv1.NUMAResourcesOperator) {
+func WaitForMCPUpdatedAfterNRODeleted(nroObj *nropv1.NUMAResourcesOperator) {
+	GinkgoHelper()
+
 	if configuration.Plat != platform.OpenShift {
 		// nothing to do
 		return
 	}
 
-	EventuallyWithOffset(offset, func() bool {
+	Eventually(func() bool {
 		updated, err := isMachineConfigPoolsUpdatedAfterDeletion(nroObj)
 		if err != nil {
 			klog.Errorf("failed to retrieve information about machine config pools: %v", err)
@@ -228,13 +234,15 @@ func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1.NUMAResourcesOperator)
 	return true, nil
 }
 
-func WaitForMCPUpdatedAfterNROCreated(offset int, nroObj *nropv1.NUMAResourcesOperator) {
+func WaitForMCPUpdatedAfterNROCreated(nroObj *nropv1.NUMAResourcesOperator) {
+	GinkgoHelper()
+
 	if configuration.Plat != platform.OpenShift {
 		// nothing to do
 		return
 	}
 
-	EventuallyWithOffset(offset, func() bool {
+	Eventually(func() bool {
 		updated, err := isMachineConfigPoolsUpdated(nroObj)
 		if err != nil {
 			klog.Errorf("failed to information about machine config pools: %v", err)
@@ -250,13 +258,15 @@ func WaitForMCPUpdatedAfterNROCreated(offset int, nroObj *nropv1.NUMAResourcesOp
 //
 // see: `TestNROScheduler` to see the specific object characteristics.
 func DeployNROScheduler() *nropv1.NUMAResourcesScheduler {
+	GinkgoHelper()
+
 	nroSchedObj := objects.TestNROScheduler()
 
 	err := e2eclient.Client.Create(context.TODO(), nroSchedObj)
-	Expect(err).WithOffset(1).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
-	Expect(err).WithOffset(1).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred())
 
 	Eventually(func() bool {
 		updatedNROObj := &nropv1.NUMAResourcesScheduler{}
@@ -276,16 +286,18 @@ func DeployNROScheduler() *nropv1.NUMAResourcesScheduler {
 		klog.Infof("condition: %v", cond)
 
 		return cond.Status == metav1.ConditionTrue
-	}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).WithOffset(1).Should(BeTrue(), "NRO Scheduler condition did not become available")
+	}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "NRO Scheduler condition did not become available")
 	return nroSchedObj
 }
 
 func TeardownNROScheduler(nroSched *nropv1.NUMAResourcesScheduler, timeout time.Duration) {
+	GinkgoHelper()
+
 	if nroSched != nil {
 		err := e2eclient.Client.Delete(context.TODO(), nroSched)
-		ExpectWithOffset(1, err).ToNot(HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(timeout).ForNUMAResourcesSchedulerDeleted(context.TODO(), nroSched)
-		ExpectWithOffset(1, err).ToNot(HaveOccurred(), "NROScheduler %q failed to be deleted", nroSched.Name)
+		Expect(err).ToNot(HaveOccurred(), "NROScheduler %q failed to be deleted", nroSched.Name)
 	}
 }
