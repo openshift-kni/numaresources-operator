@@ -561,3 +561,22 @@ func ResourceInfoProvidingAtMost(resources []nrtv1alpha2.ResourceInfo, resName s
 	}
 	return true
 }
+
+func EqualNRTListsItems(nrtListA, nrtListB nrtv1alpha2.NodeResourceTopologyList) (bool, error) {
+	for _, nrtA := range nrtListA.Items {
+		nrtB, err := FindFromList(nrtListB.Items, nrtA.Name)
+		if err != nil {
+			return false, fmt.Errorf("failed to find NRT data for node %q in both lists: %v", nrtA.Name, err)
+		}
+		rebootTest := false
+		ok, err := e2enrt.EqualZones(nrtB.Zones, nrtA.Zones, rebootTest)
+		if err != nil {
+			return false, fmt.Errorf("failed while comparing %q NRT zones: %v", nrtA.Name, err)
+		}
+		if !ok {
+			klog.Infof("NRT mismatch for node %q", nrtA.Name)
+			return false, nil
+		}
+	}
+	return true, nil
+}

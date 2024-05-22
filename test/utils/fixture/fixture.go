@@ -41,6 +41,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/objects"
 	intwait "github.com/openshift-kni/numaresources-operator/internal/wait"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
+	"github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -67,9 +68,10 @@ const (
 type Options uint
 
 const (
-	OptionNone          = 0
-	OptionRandomizeName = 1 << iota
-	OptionAvoidCooldown = 2 << iota
+	OptionNone              = 0
+	OptionRandomizeName     = 1 << iota
+	OptionAvoidCooldown     = 2 << iota
+	OptionStaticClusterData = 4 << iota
 )
 
 var (
@@ -89,18 +91,42 @@ func init() {
 }
 
 func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList, options Options) (*Fixture, error) {
+	ctx := context.Background()
 	if !e2eclient.ClientsEnabled {
 		return nil, fmt.Errorf("clients not enabled")
 	}
 	randomizeName := (options & OptionRandomizeName) == OptionRandomizeName
 	avoidCooldown := (options & OptionAvoidCooldown) == OptionAvoidCooldown
+	staticClusterData := (options & OptionStaticClusterData) == OptionStaticClusterData
+	ginkgo.By("set up the test namespace")
 	ns, err := setupNamespace(e2eclient.Client, name, randomizeName)
 	if err != nil {
 		klog.Errorf("cannot setup namespace %q: %v", name, err)
 		return nil, err
 	}
-	ginkgo.By(fmt.Sprintf("set up the test namespace %q", ns.Name))
+	klog.Infof("test namespace %q was set up successfully", ns.Name)
+	if !staticClusterData {
+		ginkgo.By("pull NRT data before test starts")
+		var nrtAtTestSetup nrtv1alpha2.NodeResourceTopologyList
+		immediate := true
+		err := wait.PollUntilContextTimeout(ctx, 10*time.Second, 30*time.Second, immediate, func(ctx context.Context) (bool, error) {
+			err := e2eclient.Client.List(ctx, &nrtAtTestSetup)
+			return err == nil, nil
+		})
+		if err != nil {
+			klog.Errorf("failed to pull NRT items: %v", err)
+			return nil, err
+		}
 
+		ginkgo.By("verify the collected NRT data is similar to the data gathered in the beginning of the suite")
+		ok, _ := noderesourcetopologies.EqualNRTListsItems(nrtAtTestSetup, nrtList)
+		if !ok {
+			klog.Warning("WARNING! NRT MISMATCH:\n")
+			klog.Infof(intnrt.ListToString(nrtList.Items, "-----NRT at Suite Setup"))
+			klog.Infof(intnrt.ListToString(nrtAtTestSetup.Items, "-----NRT at Test Setup"))
+		}
+		nrtList = nrtAtTestSetup
+	}
 	klog.Infof("set up the fixture reference NRT List: %s", intnrt.ListToString(nrtList.Items, " fixture initial"))
 
 	return &Fixture{
