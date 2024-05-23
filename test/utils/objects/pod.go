@@ -33,23 +33,29 @@ import (
 )
 
 func NewTestPodPause(namespace, name string) *corev1.Pod {
+	return NewTestPodPauseMultiContainer(namespace, name, 1)
+}
+
+func NewTestPodPauseMultiContainer(namespace, name string, cntCount int) *corev1.Pod {
 	var zero int64
-	return &corev1.Pod{
+	pod := corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
 		Spec: corev1.PodSpec{
 			TerminationGracePeriodSeconds: &zero,
-			Containers: []corev1.Container{
-				{
-					Name:    name + "-cnt",
-					Image:   images.GetPauseImage(),
-					Command: []string{images.PauseCommand},
-				},
-			},
+			Containers:                    make([]corev1.Container, 0, cntCount),
 		},
 	}
+	for idx := 0; idx < cntCount; idx++ {
+		pod.Spec.Containers = append(pod.Spec.Containers, corev1.Container{
+			Name:    fmt.Sprintf("%s-cnt-%d", name, idx),
+			Image:   images.GetPauseImage(),
+			Command: []string{images.PauseCommand},
+		})
+	}
+	return &pod
 }
 
 const (

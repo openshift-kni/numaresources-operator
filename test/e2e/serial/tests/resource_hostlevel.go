@@ -26,10 +26,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/klog/v2"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
+	intreslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
@@ -38,7 +40,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
-var _ = Describe("[serial] numaresources host-level resources", Serial, func() {
+var _ = Describe("[serial][hostlevel] numaresources host-level resources", Serial, func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
@@ -59,25 +61,35 @@ var _ = Describe("[serial] numaresources host-level resources", Serial, func() {
 	})
 
 	Context("with at least two nodes suitable", func() {
-		DescribeTable("[tier0][hostlevel] a guaranteed pod with one container should be placed and aligned on the node",
-			func(tmPolicy, tmScope string, requiredRes corev1.ResourceList) {
+		// testing scope=container is pointless in this case: 1 pod with 1 container.
+		// It should behave exactly like scope=pod. But we keep these tests as non-regression
+		// to have a signal the system is behaving as expected.
+		// This is the reason we don't filter for scope, but only by policy.
+		DescribeTable("[tier0][hostlevel] a pod should be placed and aligned on the node",
+			func(tmPolicy string, requiredRes []corev1.ResourceList, expectedQOS corev1.PodQOSClass) {
 				ctx := context.TODO()
 				nrtCandidates := filterNodes(fxt, desiredNodesState{
 					NRTList:           nrtList,
 					RequiredNodes:     2,
 					RequiredNUMAZones: 2,
-					RequiredResources: requiredRes,
+					RequiredResources: intreslist.Accumulate(requiredRes),
 				})
 
-				nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtCandidates, tmPolicy, tmScope)
+				nrts := e2enrt.FilterByTopologyManagerPolicy(nrtCandidates, tmPolicy)
 				if len(nrts) != len(nrtCandidates) {
-					e2efixture.Skipf(fxt, "not enough nodes with policy %q scope %q - found %d", tmPolicy, tmScope, len(nrts))
+					e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", tmPolicy, len(nrts))
 				}
 
 				By("Scheduling the testing pod")
-				pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
+				pod := objects.NewTestPodPauseMultiContainer(fxt.Namespace.Name, "testpod", len(requiredRes))
 				pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
-				pod.Spec.Containers[0].Resources.Limits = requiredRes
+				for idx := 0; idx < len(requiredRes); idx++ {
+					if expectedQOS == corev1.PodQOSGuaranteed {
+						pod.Spec.Containers[idx].Resources.Limits = requiredRes[idx]
+					} else {
+						pod.Spec.Containers[idx].Resources.Requests = requiredRes[idx]
+					}
+				}
 
 				err := fxt.Client.Create(ctx, pod)
 				Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
@@ -89,30 +101,47 @@ var _ = Describe("[serial] numaresources host-level resources", Serial, func() {
 				}
 				Expect(err).NotTo(HaveOccurred(), "Pod %q not up&running after %v", pod.Name, time.Minute)
 
+				klog.Infof("pod %s/%s resources: %s", updatedPod.Namespace, updatedPod.Name, intreslist.ToString(intreslist.FromContainerRequests(pod.Spec.Containers)))
+				Expect(updatedPod.Status.QOSClass).To(Equal(expectedQOS), "pod QOS mismatch")
+
 				By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
 				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			},
-			Entry("[tmscope:pod] with ephemeral storage",
+			Entry("[qos:gu] with ephemeral storage, single-container",
 				intnrt.SingleNUMANode,
-				intnrt.Pod,
 				// required resources for the test pod
-				corev1.ResourceList{
-					corev1.ResourceCPU:              resource.MustParse("2"),
-					corev1.ResourceMemory:           resource.MustParse("256Mi"),
-					corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+				[]corev1.ResourceList{
+					{
+						corev1.ResourceCPU:              resource.MustParse("2"),
+						corev1.ResourceMemory:           resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
 				},
+				corev1.PodQOSGuaranteed,
 			),
-			Entry("[tmscope:cnt] with ephemeral storage",
+			Entry("[qos:bu] with ephemeral storage, single-container",
 				intnrt.SingleNUMANode,
-				intnrt.Container,
 				// required resources for the test pod
-				corev1.ResourceList{
-					corev1.ResourceCPU:              resource.MustParse("2"),
-					corev1.ResourceMemory:           resource.MustParse("256Mi"),
-					corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+				[]corev1.ResourceList{
+					{
+						corev1.ResourceCPU:              resource.MustParse("2"),
+						corev1.ResourceMemory:           resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
 				},
+				corev1.PodQOSBurstable,
+			),
+			Entry("[qos:be] with ephemeral storage, single-container",
+				intnrt.SingleNUMANode,
+				// required resources for the test pod
+				[]corev1.ResourceList{
+					{
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+				},
+				corev1.PodQOSBestEffort,
 			),
 		)
 	})

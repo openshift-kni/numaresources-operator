@@ -44,7 +44,7 @@ func ToString(res corev1.ResourceList) string {
 }
 
 func FromReplicaSet(rs appsv1.ReplicaSet) corev1.ResourceList {
-	rl := FromContainers(rs.Spec.Template.Spec.Containers)
+	rl := FromContainerLimits(rs.Spec.Template.Spec.Containers)
 	replicas := rs.Spec.Replicas
 	for resName, resQty := range rl {
 		replicaResQty := resQty.DeepCopy()
@@ -58,14 +58,27 @@ func FromReplicaSet(rs appsv1.ReplicaSet) corev1.ResourceList {
 }
 
 func FromGuaranteedPod(pod corev1.Pod) corev1.ResourceList {
-	return FromContainers(pod.Spec.Containers)
+	return FromContainerLimits(pod.Spec.Containers)
 }
 
-func FromContainers(containers []corev1.Container) corev1.ResourceList {
+func FromContainerLimits(containers []corev1.Container) corev1.ResourceList {
 	res := make(corev1.ResourceList)
 	for idx := 0; idx < len(containers); idx++ {
 		cnt := &containers[idx] // shortcut
 		for resName, resQty := range cnt.Resources.Limits {
+			qty := res[resName]
+			qty.Add(resQty)
+			res[resName] = qty
+		}
+	}
+	return res
+}
+
+func FromContainerRequests(containers []corev1.Container) corev1.ResourceList {
+	res := make(corev1.ResourceList)
+	for idx := 0; idx < len(containers); idx++ {
+		cnt := &containers[idx] // shortcut
+		for resName, resQty := range cnt.Resources.Requests {
 			qty := res[resName]
 			qty.Add(resQty)
 			res[resName] = qty
@@ -92,6 +105,34 @@ func SubCoreResources(res, resToSub corev1.ResourceList) error {
 		res[resName] = qty
 	}
 	return nil
+}
+
+func Accumulate(ress []corev1.ResourceList) corev1.ResourceList {
+	ret := corev1.ResourceList{}
+	for _, rr := range ress {
+		for resName, resQty := range rr {
+			qty := ret[resName]
+			qty.Add(resQty)
+			ret[resName] = qty
+		}
+	}
+	return ret
+}
+
+func Equal(ra, rb corev1.ResourceList) bool {
+	if len(ra) != len(rb) {
+		return false
+	}
+	for key, valA := range ra {
+		valB, ok := rb[key]
+		if !ok {
+			return false
+		}
+		if !valA.Equal(valB) {
+			return false
+		}
+	}
+	return true
 }
 
 func RoundUpCoreResources(cpu, mem resource.Quantity) (resource.Quantity, resource.Quantity) {

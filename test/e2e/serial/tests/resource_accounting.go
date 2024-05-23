@@ -678,7 +678,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 
 			rl := e2ereslist.FromGuaranteedPod(*updatedPod2)
-			klog.Infof("post-create pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainers(podGuanranteed.Spec.Containers)), e2ereslist.ToString(rl))
+			klog.Infof("post-create pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainerLimits(podGuanranteed.Spec.Containers)), e2ereslist.ToString(rl))
 
 			scope, ok := attribute.Get(targetNrtInitial.Attributes, intnrt.TopologyManagerScopeAttribute)
 			Expect(ok).To(BeTrue(), fmt.Sprintf("Unable to find required attribute %q on NRT %q", intnrt.TopologyManagerScopeAttribute, targetNrtInitial.Name))
@@ -764,7 +764,6 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			err = fxt.Client.Delete(context.TODO(), ds)
 			Expect(err).ToNot(HaveOccurred())
 		})
-
 	})
 })
 
