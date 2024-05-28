@@ -143,6 +143,88 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				},
 				corev1.PodQOSBestEffort,
 			),
+			Entry("[qos:gu] with ephemeral storage, multi-container",
+				intnrt.SingleNUMANode,
+				// required resources for the test pod
+				[]corev1.ResourceList{
+					{
+						corev1.ResourceCPU:              resource.MustParse("2"),
+						corev1.ResourceMemory:           resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+					{
+						corev1.ResourceCPU:              resource.MustParse("2"),
+						corev1.ResourceMemory:           resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+					{
+						corev1.ResourceCPU:              resource.MustParse("2"),
+						corev1.ResourceMemory:           resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+					{
+						corev1.ResourceCPU:              resource.MustParse("2"),
+						corev1.ResourceMemory:           resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+				},
+				corev1.PodQOSGuaranteed,
+			),
+			Entry("[qos:gu] with ephemeral storage, multi-container, fractional",
+				intnrt.SingleNUMANode,
+				// required resources for the test pod
+				[]corev1.ResourceList{
+					{
+						corev1.ResourceCPU:              resource.MustParse("1500m"),
+						corev1.ResourceMemory:           resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+					{
+						corev1.ResourceCPU:              resource.MustParse("2"),
+						corev1.ResourceMemory:           resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+					{
+						corev1.ResourceCPU:              resource.MustParse("1500m"),
+						corev1.ResourceMemory:           resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+					{
+						corev1.ResourceCPU:              resource.MustParse("2"),
+						corev1.ResourceMemory:           resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+				},
+				corev1.PodQOSGuaranteed,
+			),
+
+			Entry("[qos:bu] with ephemeral storage, single-container",
+				intnrt.SingleNUMANode,
+				// required resources for the test pod
+				[]corev1.ResourceList{
+					{
+						corev1.ResourceCPU:              resource.MustParse("1200m"),
+						corev1.ResourceMemory:           resource.MustParse("384Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+					{
+						corev1.ResourceCPU:              resource.MustParse("1200m"),
+						corev1.ResourceMemory:           resource.MustParse("384Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+					{
+						corev1.ResourceCPU:              resource.MustParse("1600m"),
+						corev1.ResourceMemory:           resource.MustParse("384Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+					{
+						corev1.ResourceCPU:              resource.MustParse("1500m"),
+						corev1.ResourceMemory:           resource.MustParse("384Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+				},
+				corev1.PodQOSBurstable,
+			),
 		)
 	})
 })
