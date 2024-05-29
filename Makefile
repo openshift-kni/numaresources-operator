@@ -142,14 +142,14 @@ binary: build-tools
 	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)"; \
 	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version)"; \
 	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/images.tag=$(VERSION)"; \
-	go build -mod=vendor -o bin/manager -ldflags "$$LDFLAGS" main.go
+	go build -mod=vendor -o bin/manager -ldflags "$$LDFLAGS" -tags=strictfipsruntime main.go
 
 binary-rte: build-tools
 	LDFLAGS="-s -w"; \
 	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)"; \
 	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version)"; \
 	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/images.tag=$(VERSION)"; \
-	go build -mod=vendor -o bin/exporter -ldflags "$$LDFLAGS" rte/main.go
+	go build -mod=vendor -o bin/exporter -ldflags "$$LDFLAGS" -tags=strictfipsruntime rte/main.go
 
 binary-nrovalidate: build-tools
 	LDFLAGS="-s -w"; \
