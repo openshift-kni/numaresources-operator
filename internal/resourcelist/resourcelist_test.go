@@ -223,3 +223,168 @@ func TestRoundUpCoreResources(t *testing.T) {
 		})
 	}
 }
+
+func TestEqual(t *testing.T) {
+	type testCase struct {
+		name     string
+		ra       corev1.ResourceList
+		rb       corev1.ResourceList
+		expected bool
+	}
+
+	testCases := []testCase{
+		{
+			name:     "empty",
+			expected: true,
+		},
+		{
+			name: "same size, different values",
+			ra: corev1.ResourceList{
+				corev1.ResourceCPU: resource.MustParse("1"),
+			},
+			rb: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		{
+			name: "subset A",
+			ra: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			rb: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		{
+			name: "subset B",
+			ra: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			rb: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		{
+			name: "equal",
+			ra: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			rb: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			expected: true,
+		},
+		{
+			name: "different value",
+			ra: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("2Gi"),
+			},
+			rb: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("2064Mi"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Equal(tc.ra, tc.rb)
+			if got != tc.expected {
+				t.Errorf("expected %v got %v", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestAccumulate(t *testing.T) {
+	type testCase struct {
+		name     string
+		resLists []corev1.ResourceList
+		expected corev1.ResourceList
+	}
+
+	testCases := []testCase{
+		{
+			name: "empty",
+		},
+		{
+			name: "single operand",
+			resLists: []corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+			},
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceMemory: resource.MustParse("8Gi"),
+			},
+		},
+		{
+			name: "overlapping operands",
+			resLists: []corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("3Gi"),
+				},
+			},
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("5"),
+				corev1.ResourceMemory: resource.MustParse("11Gi"),
+			},
+		},
+		{
+			name: "partially overlapping operands",
+			resLists: []corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("4"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				{
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+			},
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceMemory: resource.MustParse("12Gi"),
+			},
+		},
+		{
+			name: "disjoint operands",
+			resLists: []corev1.ResourceList{
+				{
+					corev1.ResourceCPU: resource.MustParse("4"),
+				},
+				{
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				{
+					corev1.ResourceStorage: resource.MustParse("256Gi"),
+				},
+			},
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:     resource.MustParse("4"),
+				corev1.ResourceMemory:  resource.MustParse("8Gi"),
+				corev1.ResourceStorage: resource.MustParse("256Gi"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Accumulate(tc.resLists)
+			if !Equal(got, tc.expected) {
+				t.Errorf("expected %v got %v", tc.expected, got)
+			}
+		})
+	}
+}

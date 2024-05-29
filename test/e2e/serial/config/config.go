@@ -18,9 +18,9 @@ package config
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -157,12 +157,9 @@ func CheckNodesTopology(ctx context.Context) error {
 
 	errorMap := getTopologyConsistencyErrors(kconfigs, nrtList.Items)
 	if len(errorMap) != 0 {
-		klog.Infof("incoeherent NRT/KubeletConfig data: %v", errorMap)
-		prettyMap, err := json.MarshalIndent(errorMap, "", "  ")
-		if err != nil {
-			return fmt.Errorf("Found some nodes with incoherent info in KubeletConfig/NRT data")
-		}
-		return fmt.Errorf("Following nodes have incoherent info in KubeletConfig/NRT data:\n%s\n", string(prettyMap))
+		errText := errorMapToString(errorMap)
+		klog.Infof("incoeherent NRT/KubeletConfig data: %v", errText)
+		return fmt.Errorf("Following nodes have incoherent info in KubeletConfig/NRT data:\n%#v\n", errText)
 	}
 
 	singleNUMANodeNRTs := e2enrt.FilterByTopologyManagerPolicy(nrtList.Items, intnrt.SingleNUMANode)
@@ -171,4 +168,12 @@ func CheckNodesTopology(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func errorMapToString(errs map[string]error) string {
+	var sb strings.Builder
+	for node, err := range errs {
+		fmt.Fprintf(&sb, "%s: %v\n", node, err)
+	}
+	return sb.String()
 }
