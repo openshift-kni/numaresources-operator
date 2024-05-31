@@ -381,7 +381,7 @@ func TestAccumulate(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Accumulate(tc.resLists)
+			got := Accumulate(tc.resLists, AllowAll)
 			if !Equal(got, tc.expected) {
 				t.Errorf("expected %v got %v", tc.expected, got)
 			}

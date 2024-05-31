@@ -107,16 +107,23 @@ func SubCoreResources(res, resToSub corev1.ResourceList) error {
 	return nil
 }
 
-func Accumulate(ress []corev1.ResourceList) corev1.ResourceList {
+func Accumulate(ress []corev1.ResourceList, filterFunc func(corev1.ResourceName, resource.Quantity) bool) corev1.ResourceList {
 	ret := corev1.ResourceList{}
 	for _, rr := range ress {
 		for resName, resQty := range rr {
+			if !filterFunc(resName, resQty) {
+				continue
+			}
 			qty := ret[resName]
 			qty.Add(resQty)
 			ret[resName] = qty
 		}
 	}
 	return ret
+}
+
+func AllowAll(_ corev1.ResourceName, _ resource.Quantity) bool {
+	return true
 }
 
 func Equal(ra, rb corev1.ResourceList) bool {
