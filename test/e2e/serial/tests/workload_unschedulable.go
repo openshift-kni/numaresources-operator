@@ -542,7 +542,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					targetNodeBaseLoad.Apply(zoneRes)
 				}
 
-				paddingRes, err := e2enrt.SaturateZoneUntilLeft(zone, zoneRes)
+				paddingRes, err := e2enrt.SaturateZoneUntilLeft(zone, zoneRes, e2enrt.DropHostLevelRes)
 				Expect(err).NotTo(HaveOccurred(), "could not get padding resources for node %q", targetNrt.Name)
 
 				podName := fmt.Sprintf("padding-tgt-%d", zoneIdx)

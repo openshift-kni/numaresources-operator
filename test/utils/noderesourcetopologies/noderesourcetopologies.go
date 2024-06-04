@@ -225,8 +225,11 @@ func accumulateNodeAvailableResources(nrt nrtv1alpha2.NodeResourceTopology, reas
 	klog.Infof("resInfoList available %s: %s", reason, e2enrt.ResourceInfoListToString(resInfoList))
 	return resInfoList, nil
 }
-func SaturateZoneUntilLeft(zone nrtv1alpha2.Zone, requiredRes corev1.ResourceList) (corev1.ResourceList, error) {
+func SaturateZoneUntilLeft(zone nrtv1alpha2.Zone, requiredRes corev1.ResourceList, filter func(*corev1.ResourceList)) (corev1.ResourceList, error) {
 	paddingRes := make(corev1.ResourceList)
+
+	filter(&requiredRes)
+
 	for resName, resQty := range requiredRes {
 		zoneQty, ok := FindResourceAvailableByName(zone.Resources, string(resName))
 		if !ok {
@@ -246,6 +249,14 @@ func SaturateZoneUntilLeft(zone nrtv1alpha2.Zone, requiredRes corev1.ResourceLis
 	return paddingRes, nil
 }
 
+func AllowAll(res *corev1.ResourceList) {
+	return
+}
+
+func DropHostLevelRes(res *corev1.ResourceList) {
+	klog.Info("drop host level resources")
+	delete(*res, corev1.ResourceEphemeralStorage)
+}
 func SaturateNodeUntilLeft(nrtInfo nrtv1alpha2.NodeResourceTopology, requiredRes corev1.ResourceList) (map[string]corev1.ResourceList, error) {
 	//TODO: support splitting the requiredRes on multiple numas
 	//corrently the function deducts the requiredRes from the first Numa
@@ -260,9 +271,9 @@ func SaturateNodeUntilLeft(nrtInfo nrtv1alpha2.NodeResourceTopology, requiredRes
 	var err error
 	for ind, zone := range nrtInfo.Zones {
 		if ind == 0 {
-			zonePadRes, err = SaturateZoneUntilLeft(zone, zeroRes)
+			zonePadRes, err = SaturateZoneUntilLeft(zone, zeroRes, DropHostLevelRes)
 		} else {
-			zonePadRes, err = SaturateZoneUntilLeft(zone, requiredRes)
+			zonePadRes, err = SaturateZoneUntilLeft(zone, requiredRes, DropHostLevelRes)
 		}
 		if err != nil {
 			klog.Errorf(fmt.Sprintf("could not make padding pod for zone %q leaving 0 resources available.", zone.Name))

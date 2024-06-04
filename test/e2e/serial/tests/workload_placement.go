@@ -1003,7 +1003,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 func makePaddingPod(namespace, nodeName string, zone nrtv1alpha2.Zone, podReqs corev1.ResourceList) (*corev1.Pod, error) {
 	klog.Infof("want to have zone %q with allocatable: %s", zone.Name, e2ereslist.ToString(podReqs))
 
-	paddingReqs, err := e2enrt.SaturateZoneUntilLeft(zone, podReqs)
+	paddingReqs, err := e2enrt.SaturateZoneUntilLeft(zone, podReqs, e2enrt.DropHostLevelRes)
 	if err != nil {
 		return nil, err
 	}
