@@ -305,6 +305,7 @@ func TestAccumulate(t *testing.T) {
 	type testCase struct {
 		name     string
 		resLists []corev1.ResourceList
+		filter   func(resName corev1.ResourceName, resQty resource.Quantity) bool
 		expected corev1.ResourceList
 	}
 
@@ -320,6 +321,7 @@ func TestAccumulate(t *testing.T) {
 					corev1.ResourceMemory: resource.MustParse("8Gi"),
 				},
 			},
+			filter: AllowAll,
 			expected: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("4"),
 				corev1.ResourceMemory: resource.MustParse("8Gi"),
@@ -337,6 +339,7 @@ func TestAccumulate(t *testing.T) {
 					corev1.ResourceMemory: resource.MustParse("3Gi"),
 				},
 			},
+			filter: AllowAll,
 			expected: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("5"),
 				corev1.ResourceMemory: resource.MustParse("11Gi"),
@@ -353,6 +356,7 @@ func TestAccumulate(t *testing.T) {
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 				},
 			},
+			filter: AllowAll,
 			expected: corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("4"),
 				corev1.ResourceMemory: resource.MustParse("12Gi"),
@@ -371,17 +375,55 @@ func TestAccumulate(t *testing.T) {
 					corev1.ResourceStorage: resource.MustParse("256Gi"),
 				},
 			},
+			filter: AllowAll,
 			expected: corev1.ResourceList{
 				corev1.ResourceCPU:     resource.MustParse("4"),
 				corev1.ResourceMemory:  resource.MustParse("8Gi"),
 				corev1.ResourceStorage: resource.MustParse("256Gi"),
 			},
 		},
+		{
+			name: "milli cpu value is integral cpus",
+			resLists: []corev1.ResourceList{
+				{
+					corev1.ResourceCPU: resource.MustParse("3000m"),
+				},
+				{
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				{
+					corev1.ResourceStorage: resource.MustParse("256Gi"),
+				},
+			},
+			filter: FilterExclusive,
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3000m"),
+				corev1.ResourceMemory: resource.MustParse("8Gi"),
+			},
+		},
+		{
+			name: "milli cpu value is fractional cpus",
+			resLists: []corev1.ResourceList{
+				{
+					corev1.ResourceCPU: resource.MustParse("2500m"),
+				},
+				{
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+				{
+					corev1.ResourceEphemeralStorage: resource.MustParse("256Gi"),
+				},
+			},
+			filter: FilterExclusive,
+			expected: corev1.ResourceList{
+				corev1.ResourceMemory: resource.MustParse("8Gi"),
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := Accumulate(tc.resLists, AllowAll)
+			got := Accumulate(tc.resLists, tc.filter)
 			if !Equal(got, tc.expected) {
 				t.Errorf("expected %v got %v", tc.expected, got)
 			}

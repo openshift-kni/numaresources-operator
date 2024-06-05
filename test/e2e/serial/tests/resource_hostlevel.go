@@ -116,20 +116,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 
 				accumulatedRes := corev1.ResourceList{}
 				if expectedQOS == corev1.PodQOSGuaranteed {
-					filter := func(resName corev1.ResourceName, resQty resource.Quantity) bool {
-						if resName == corev1.ResourceEphemeralStorage {
-							return false
-						}
-
-						if resName == corev1.ResourceCPU {
-							if resQty.MilliValue()%1000 > 0 {
-								return false
-							}
-						}
-						return true
-					}
-					accumulatedRes = intreslist.Accumulate(requiredRes, filter)
-
+					accumulatedRes = intreslist.Accumulate(requiredRes, intreslist.FilterExclusive)
 				}
 				klog.Infof("expected required resources to reflect in NRT: %+v", accumulatedRes)
 				expectNRTConsumedResources(fxt, *targetNrtInitial, accumulatedRes, updatedPod)

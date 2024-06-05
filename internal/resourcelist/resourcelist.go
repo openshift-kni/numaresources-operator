@@ -126,6 +126,19 @@ func AllowAll(_ corev1.ResourceName, _ resource.Quantity) bool {
 	return true
 }
 
+func FilterExclusive(resName corev1.ResourceName, resQty resource.Quantity) bool {
+	if resName == corev1.ResourceEphemeralStorage || resName == corev1.ResourceStorage {
+		return false
+	}
+
+	if resName == corev1.ResourceCPU {
+		if resQty.MilliValue()%1000 > 0 {
+			return false
+		}
+	}
+	return true
+}
+
 func Equal(ra, rb corev1.ResourceList) bool {
 	if len(ra) != len(rb) {
 		return false
