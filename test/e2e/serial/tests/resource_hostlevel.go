@@ -29,7 +29,6 @@ import (
 	"k8s.io/klog/v2"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
-
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	intreslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -72,7 +71,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 					NRTList:           nrtList,
 					RequiredNodes:     2,
 					RequiredNUMAZones: 2,
-					RequiredResources: intreslist.Accumulate(requiredRes),
+					RequiredResources: intreslist.Accumulate(requiredRes, intreslist.AllowAll),
 				})
 
 				nrts := e2enrt.FilterByTopologyManagerPolicy(nrtCandidates, tmPolicy)
@@ -108,6 +107,19 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+
+				By("wait for NRT data to settle")
+				e2efixture.MustSettleNRT(fxt)
+
+				targetNrtInitial, err := e2enrt.FindFromList(nrtList.Items, updatedPod.Spec.NodeName)
+				Expect(err).NotTo(HaveOccurred())
+
+				accumulatedRes := corev1.ResourceList{}
+				if expectedQOS == corev1.PodQOSGuaranteed {
+					accumulatedRes = intreslist.Accumulate(requiredRes, intreslist.FilterExclusive)
+				}
+				klog.Infof("expected required resources to reflect in NRT: %+v", accumulatedRes)
+				expectNRTConsumedResources(fxt, *targetNrtInitial, accumulatedRes, updatedPod)
 			},
 			Entry("[qos:gu] with ephemeral storage, single-container",
 				intnrt.SingleNUMANode,
@@ -175,14 +187,14 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				// required resources for the test pod
 				[]corev1.ResourceList{
 					{
-						corev1.ResourceCPU:              resource.MustParse("1500m"),
+						corev1.ResourceCPU:              resource.MustParse("3000m"),
 						corev1.ResourceMemory:           resource.MustParse("256Mi"),
-						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("16777216"),
 					},
 					{
 						corev1.ResourceCPU:              resource.MustParse("2"),
 						corev1.ResourceMemory:           resource.MustParse("256Mi"),
-						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("16777216"),
 					},
 					{
 						corev1.ResourceCPU:              resource.MustParse("1500m"),
@@ -198,14 +210,14 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				corev1.PodQOSGuaranteed,
 			),
 
-			Entry("[qos:bu] with ephemeral storage, single-container",
+			Entry("[qos:bu] with ephemeral storage, multi-container, fractional",
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
 				[]corev1.ResourceList{
 					{
 						corev1.ResourceCPU:              resource.MustParse("1200m"),
 						corev1.ResourceMemory:           resource.MustParse("384Mi"),
-						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("16777216"),
 					},
 					{
 						corev1.ResourceCPU:              resource.MustParse("1200m"),
@@ -218,12 +230,25 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
 					},
 					{
-						corev1.ResourceCPU:              resource.MustParse("1500m"),
+						corev1.ResourceCPU:              resource.MustParse("2"),
 						corev1.ResourceMemory:           resource.MustParse("384Mi"),
-						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("16777216"),
 					},
 				},
 				corev1.PodQOSBurstable,
+			),
+			Entry("[qos:be] with ephemeral storage, multi-container",
+				intnrt.SingleNUMANode,
+				// required resources for the test pod
+				[]corev1.ResourceList{
+					{
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+					{
+						corev1.ResourceEphemeralStorage: resource.MustParse("16777216"),
+					},
+				},
+				corev1.PodQOSBestEffort,
 			),
 		)
 	})
