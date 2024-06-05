@@ -383,7 +383,10 @@ goversion:
 	@go version
 
 .PHONY: build-tools
-build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap
+build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform
+
+.PHONY: build-tools-all
+build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap bin/watchnrtattr
 
 bin/buildhelper:
 	@go build -o bin/buildhelper tools/buildhelper/buildhelper.go
@@ -396,6 +399,9 @@ bin/lsplatform:
 
 bin/catkubeletconfmap:
 	@go build -o bin/catkubeletconfmap tools/catkubeletconfmap/catkubeletconfmap.go
+
+bin/watchnrtattr:
+	@go build -o bin/watchnrtattr tools/watchnrtattr/watchnrtattr.go
 
 verify-generated: bundle generate
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
