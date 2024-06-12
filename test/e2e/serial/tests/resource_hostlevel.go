@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
@@ -155,7 +156,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				},
 				corev1.PodQOSBestEffort,
 			),
-			Entry("[qos:gu] with ephemeral storage, multi-container",
+			Entry("[test_id:74249][qos:gu] with ephemeral storage, multi-container",
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
 				[]corev1.ResourceList{
@@ -182,7 +183,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				},
 				corev1.PodQOSGuaranteed,
 			),
-			Entry("[qos:gu] with ephemeral storage, multi-container, fractional",
+			Entry("[test_id:74250][qos:gu] with ephemeral storage, multi-container, fractional",
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
 				[]corev1.ResourceList{
@@ -210,7 +211,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				corev1.PodQOSGuaranteed,
 			),
 
-			Entry("[qos:bu] with ephemeral storage, multi-container, fractional",
+			Entry("[test_id:74251][qos:bu] with ephemeral storage, multi-container, fractional",
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
 				[]corev1.ResourceList{
@@ -237,7 +238,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				},
 				corev1.PodQOSBurstable,
 			),
-			Entry("[qos:be] with ephemeral storage, multi-container",
+			Entry("[test_id:74252][qos:be] with ephemeral storage, multi-container", //TODO test with devices and hugepages requests and fix automation
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
 				[]corev1.ResourceList{
@@ -252,6 +253,137 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 			),
 		)
 	})
+
+	Context("[unsched] without suitable nodes with enough host level resources", func() {
+		DescribeTable("[hostlevel][failalign] a pod with multi containers should be pending due to unavailable host-level resources",
+			func(tmPolicy string, requiredRes []corev1.ResourceList, expectedQOS corev1.PodQOSClass) {
+				ctx := context.TODO()
+				nrtCandidates := filterNodes(fxt, desiredNodesState{
+					NRTList:           nrtList,
+					RequiredNodes:     1,
+					RequiredNUMAZones: 2,
+				})
+				candidateNodeNames := e2enrt.AccumulateNames(nrtCandidates)
+
+				By("pad all nodes consuming ephemeral-storage")
+				keepHostLevelResources := func(resName corev1.ResourceName, resQty resource.Quantity) bool {
+					if resName == corev1.ResourceEphemeralStorage || resName == corev1.ResourceStorage {
+						return true
+					}
+					return false
+				}
+				rl := intreslist.Accumulate(requiredRes, keepHostLevelResources)
+				paddingPods := []*corev1.Pod{}
+				for nodeName := range candidateNodeNames {
+					var node corev1.Node
+					err := fxt.Client.Get(ctx, client.ObjectKey{Name: nodeName}, &node)
+					Expect(err).ToNot(HaveOccurred())
+
+					storageEphemeralQty := node.Status.Allocatable.StorageEphemeral()
+
+					qtyToKeep := rl.StorageEphemeral()
+					// we reduce additional small amount to ensure there is no place for both containers
+					qtyToKeep.Sub(resource.MustParse("1Mi"))
+
+					storageEphemeralQty.Sub(*qtyToKeep)
+					paddingResources := corev1.ResourceList{
+						corev1.ResourceEphemeralStorage: *storageEphemeralQty,
+					}
+
+					klog.Infof("pad node %s with:\n%s", nodeName, intreslist.ToString(paddingResources))
+					pod := objects.NewTestPodPauseMultiContainer(fxt.Namespace.Name, fmt.Sprintf("padding-pod-%s", nodeName), 1)
+					pod.Spec.Containers[0].Resources.Limits = paddingResources
+					pod.Spec.NodeName = nodeName
+
+					err = fxt.Client.Create(ctx, pod)
+					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
+
+					paddingPods = append(paddingPods, pod)
+				}
+
+				By("wait for padding pods to be running")
+				failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
+				Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
+
+				// no need to wait for NRT to settle because padding pods are BE
+
+				By("create the test pod")
+				pod := objects.NewTestPodPauseMultiContainer(fxt.Namespace.Name, "testpod", len(requiredRes))
+				pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
+				for idx := 0; idx < len(requiredRes); idx++ {
+					if expectedQOS != corev1.PodQOSBurstable {
+						pod.Spec.Containers[idx].Resources.Limits = requiredRes[idx]
+					} else {
+						pod.Spec.Containers[idx].Resources.Requests = requiredRes[idx]
+					}
+				}
+
+				err := fxt.Client.Create(ctx, pod)
+				Expect(err).NotTo(HaveOccurred(), "unable to create test pod %q", pod.Name)
+
+				var updatedPod corev1.Pod
+				err = fxt.Client.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: pod.Name}, &updatedPod)
+				Expect(err).ToNot(HaveOccurred())
+
+				klog.Infof("pod %s/%s resources: %s", updatedPod.Namespace, updatedPod.Name, intreslist.ToString(intreslist.FromContainerRequests(pod.Spec.Containers)))
+				Expect(updatedPod.Status.QOSClass).To(Equal(expectedQOS), "pod QoS mismatch")
+				By(fmt.Sprintf("checking the pod is handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
+				isFailed, err := nrosched.CheckPodSchedulingFailedWithMsg(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName, fmt.Sprintf("%d Insufficient ephemeral-storage", len(candidateNodeNames)))
+				Expect(err).ToNot(HaveOccurred())
+				Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", updatedPod.Namespace, updatedPod.Name, updatedPod.Spec.SchedulerName)
+			},
+			Entry("[test_id:74253][tier2][qos:gu][unsched] with ephemeral storage, multi-container",
+				intnrt.SingleNUMANode,
+				// required resources for the test pod
+				[]corev1.ResourceList{
+					{
+						corev1.ResourceCPU:              resource.MustParse("2"),
+						corev1.ResourceMemory:           resource.MustParse("16Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+					{
+						corev1.ResourceCPU:              resource.MustParse("1500m"),
+						corev1.ResourceMemory:           resource.MustParse("16Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("128Mi"),
+					},
+				},
+				corev1.PodQOSGuaranteed,
+			),
+			Entry("[test_id:74254][tier2][qos:bu][unsched] with ephemeral storage, multi-container",
+				intnrt.SingleNUMANode,
+				// required resources for the test pod
+				[]corev1.ResourceList{
+					{
+						corev1.ResourceCPU:              resource.MustParse("2500m"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+					{
+						corev1.ResourceCPU:              resource.MustParse("2"),
+						corev1.ResourceMemory:           resource.MustParse("64Mi"),
+						corev1.ResourceEphemeralStorage: resource.MustParse("16Mi"),
+					},
+				},
+				corev1.PodQOSBurstable,
+			),
+			Entry("[test_id:74255][tier3][qos:be][unsched] with ephemeral storage, multi-container",
+				intnrt.SingleNUMANode,
+				// required resources for the test pod
+				[]corev1.ResourceList{
+					{
+						corev1.ResourceEphemeralStorage: resource.MustParse("256Mi"),
+					},
+					{
+						corev1.ResourceEphemeralStorage: resource.MustParse("32Mi"),
+					},
+					{
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("2"),
+					},
+				},
+				corev1.PodQOSBestEffort,
+			),
+		)
+	})
+
 })
 
 type desiredNodesState struct {

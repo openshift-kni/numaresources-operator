@@ -19,6 +19,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -104,7 +105,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	// note we hardcode the values we need here and when we pad node.
 	// This is ugly, but automatically computing the values is not straightforward
 	// and will we want to start lean and mean.
-
 	Context("with at least two nodes suitable", func() {
 		var targetNodeName string
 		var nrtCandidates []nrtv1alpha2.NodeResourceTopology
@@ -1194,7 +1194,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[test_id:55450][tmscope:pod][tier2][devices] should make a burstable pod requesting devices land on a node with enough resources on a specific NUMA zone",
+		Entry("[test_id:55450][tmscope:pod][tier2][devices][hostlevel] should make a burstable pod requesting devices land on a node with enough resources on a specific NUMA zone",
 			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -1202,6 +1202,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 						corev1.ResourceCPU: resource.MustParse("1"),
 						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
 						corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("3"),
+						corev1.ResourceEphemeralStorage:                      resource.MustParse("32Mi"),
+					},
+					{
+						corev1.ResourceEphemeralStorage: resource.MustParse("32Mi"),
 					},
 				},
 			},
@@ -1227,7 +1231,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[test_id:54024][tmscope:cnt][tier2][devices] should make a burstable pod requesting devices land on a node with enough resources on a specific NUMA zone, containers should be spread on a different zone",
+		Entry("[test_id:54024][tmscope:cnt][tier2][devices][hostlevel] should make a burstable pod requesting devices land on a node with enough resources on a specific NUMA zone, containers should be spread on a different zone",
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -1235,10 +1239,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 						corev1.ResourceCPU: resource.MustParse("1"),
 						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("5"),
 						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("2"),
+						corev1.ResourceEphemeralStorage:                      resource.MustParse("32Mi"),
 					},
 					{
 						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
 						corev1.ResourceName(e2efixture.GetDeviceType3Name()): resource.MustParse("3"),
+						corev1.ResourceEphemeralStorage:                      resource.MustParse("32Mi"),
 					},
 				},
 			},
@@ -1381,7 +1387,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					klog.Errorf("failed to get events for pod %s/%s; error: %v", pod.Namespace, pod.Name, err)
 				}
 				for _, e := range events {
-					if e.Reason == "FailedScheduling" && strings.Contains(e.Message, errMsg) {
+					ok, err := regexp.MatchString(errMsg, e.Message)
+					if err != nil {
+						klog.Errorf("bad message regex %s", errMsg)
+					}
+					if e.Reason == "FailedScheduling" && ok {
 						return true
 					}
 				}
@@ -1465,6 +1475,91 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),
+				},
+			},
+		),
+		Entry("[test_id:74256][tier3][unsched][tmscope:pod][cpu] guaranteed pod with multi cnt with fractional cpus keep on pending because cannot align the second container to a single numa node",
+			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
+			nrosched.ErrorCannotAlignPod,
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU:    resource.MustParse("4300m"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("7500m"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+						"hugepages-2Mi":       resource.MustParse("32Mi"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("2500m"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				},
+			},
+			// available resources on non-target nodes
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU: resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceCPU: resource.MustParse("1"),
+				},
+			},
+			// available resources on target node
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("11"),
+					corev1.ResourceMemory: resource.MustParse("12Gi"),
+					"hugepages-2Mi":       resource.MustParse("128Mi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("6"),
+					corev1.ResourceMemory: resource.MustParse("12Gi"),
+					"hugepages-2Mi":       resource.MustParse("128Mi"),
+				},
+			},
+		),
+		Entry("[test_id:74257][tier3][unsched][tmscope:pod][cpu][nonreg] burstable pod with multi cnt with fractional cpus keep on pending because of not enough free cpus",
+			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
+			"0.* nodes are available: [0-9]* Insufficient cpu",
+			podResourcesRequest{
+				appCnt: []corev1.ResourceList{
+					{
+						corev1.ResourceCPU: resource.MustParse("4300m"),
+						"hugepages-2Mi":    resource.MustParse("32Mi"),
+					},
+					{
+						corev1.ResourceCPU: resource.MustParse("10"),
+					},
+					{
+						corev1.ResourceCPU:    resource.MustParse("3500m"),
+						corev1.ResourceMemory: resource.MustParse("4Gi"),
+					},
+				},
+			},
+			// available resources on non-target nodes
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU: resource.MustParse("1"),
+				},
+				{
+					corev1.ResourceCPU: resource.MustParse("1"),
+				},
+			},
+			// available resources on target node
+			[]corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("12Gi"),
+					"hugepages-2Mi":       resource.MustParse("128Mi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("7"),
+					corev1.ResourceMemory: resource.MustParse("12Gi"),
+					"hugepages-2Mi":       resource.MustParse("128Mi"),
 				},
 			},
 		),

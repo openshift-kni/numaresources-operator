@@ -125,7 +125,11 @@ func CheckPODSchedulingFailedForAlignment(k8sCli *kubernetes.Clientset, podNames
 		alignmentErr = ErrorCannotAlignPod
 	}
 
-	isFailedSchedulingForAlignment := func(item corev1.Event) bool {
+	return CheckPodSchedulingFailedWithMsg(k8sCli, podNamespace, podName, schedulerName, alignmentErr)
+}
+
+func CheckPodSchedulingFailedWithMsg(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName, eventMsg string) (bool, error) {
+	isFailedSchedulingWithMsg := func(item corev1.Event) bool {
 		if item.Reason != ReasonFailedScheduling {
 			klog.Warningf("pod %s/%s reason %q expected %q", podNamespace, podName, item.Reason, ReasonFailedScheduling)
 			return false
@@ -135,13 +139,13 @@ func CheckPODSchedulingFailedForAlignment(k8sCli *kubernetes.Clientset, podNames
 			return false
 		}
 		// workaround kubelet race/confusing behavior
-		if !strings.Contains(item.Message, alignmentErr) {
-			klog.Warningf("pod %s/%s message %q expected %q", podNamespace, podName, item.Message, alignmentErr)
+		if !strings.Contains(item.Message, eventMsg) {
+			klog.Warningf("pod %s/%s message %q expected %q", podNamespace, podName, item.Message, eventMsg)
 			return false
 		}
 		return true
 	}
-	return checkPODEvents(k8sCli, podNamespace, podName, isFailedSchedulingForAlignment)
+	return checkPODEvents(k8sCli, podNamespace, podName, isFailedSchedulingWithMsg)
 }
 
 func CheckPODWasScheduledWith(k8sCli *kubernetes.Clientset, podNamespace, podName, schedulerName string) (bool, error) {

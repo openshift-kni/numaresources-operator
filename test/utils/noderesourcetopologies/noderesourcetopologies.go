@@ -156,6 +156,8 @@ func logPFP(nrt nrtv1alpha2.NodeResourceTopology, tag string) {
 }
 
 func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourceTopology, required corev1.ResourceList, podQoS corev1.PodQOSClass) (string, error) {
+	// NRTs do not reflect host-level resources topology thus drop them when verifying the consumed ones
+	filteredRes := DropHostLevelResources(required)
 	for idx := 0; idx < len(nrtInitial.Zones); idx++ {
 		zoneInitial := &nrtInitial.Zones[idx] // shortcut
 		zoneUpdated, err := findZoneByName(nrtUpdated, zoneInitial.Name)
@@ -163,7 +165,7 @@ func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha2.NodeRe
 			klog.Errorf("missing updated zone %q: %v", zoneInitial.Name, err)
 			return "", err
 		}
-		ok, err := checkConsumedResourcesAtLeast(zoneInitial.Resources, zoneUpdated.Resources, required, podQoS)
+		ok, err := checkConsumedResourcesAtLeast(zoneInitial.Resources, zoneUpdated.Resources, filteredRes, podQoS)
 		if err != nil {
 			klog.Errorf("error checking zone %q: %v", zoneInitial.Name, err)
 			return "", err
@@ -177,6 +179,8 @@ func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha2.NodeRe
 }
 
 func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourceTopology, required corev1.ResourceList, podQoS corev1.PodQOSClass) (string, error) {
+	// NRTs do not reflect host-level resources topology thus drop them when verifying the consumed ones
+	filteredRes := DropHostLevelResources(required)
 	nodeResInitialInfo, err := accumulateNodeAvailableResources(nrtInitial, "initial")
 	if err != nil {
 		return "", err
@@ -185,7 +189,7 @@ func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha2.NodeRe
 	if err != nil {
 		return "", err
 	}
-	ok, err := checkConsumedResourcesAtLeast(nodeResInitialInfo, nodeResUpdatedInfo, required, podQoS)
+	ok, err := checkConsumedResourcesAtLeast(nodeResInitialInfo, nodeResUpdatedInfo, filteredRes, podQoS)
 	if err != nil {
 		klog.Errorf("error checking node %q: %v", nrtInitial.Name, err)
 		return "", err
@@ -225,9 +229,10 @@ func accumulateNodeAvailableResources(nrt nrtv1alpha2.NodeResourceTopology, reas
 	klog.Infof("resInfoList available %s: %s", reason, e2enrt.ResourceInfoListToString(resInfoList))
 	return resInfoList, nil
 }
-func SaturateZoneUntilLeft(zone nrtv1alpha2.Zone, requiredRes corev1.ResourceList) (corev1.ResourceList, error) {
+func SaturateZoneUntilLeft(zone nrtv1alpha2.Zone, requiredRes corev1.ResourceList, filter func(corev1.ResourceList) corev1.ResourceList) (corev1.ResourceList, error) {
 	paddingRes := make(corev1.ResourceList)
-	for resName, resQty := range requiredRes {
+	filteredRes := filter(requiredRes)
+	for resName, resQty := range filteredRes {
 		zoneQty, ok := FindResourceAvailableByName(zone.Resources, string(resName))
 		if !ok {
 			return nil, fmt.Errorf("resource %q not found in zone %q", string(resName), zone.Name)
@@ -246,6 +251,12 @@ func SaturateZoneUntilLeft(zone nrtv1alpha2.Zone, requiredRes corev1.ResourceLis
 	return paddingRes, nil
 }
 
+func DropHostLevelResources(res corev1.ResourceList) corev1.ResourceList {
+	newList := res.DeepCopy() // since res is a map, updating it directly would mutate its instance in all places
+	klog.Info("drop host-level resources")
+	delete(newList, corev1.ResourceEphemeralStorage)
+	return newList
+}
 func SaturateNodeUntilLeft(nrtInfo nrtv1alpha2.NodeResourceTopology, requiredRes corev1.ResourceList) (map[string]corev1.ResourceList, error) {
 	//TODO: support splitting the requiredRes on multiple numas
 	//corrently the function deducts the requiredRes from the first Numa
@@ -260,9 +271,9 @@ func SaturateNodeUntilLeft(nrtInfo nrtv1alpha2.NodeResourceTopology, requiredRes
 	var err error
 	for ind, zone := range nrtInfo.Zones {
 		if ind == 0 {
-			zonePadRes, err = SaturateZoneUntilLeft(zone, zeroRes)
+			zonePadRes, err = SaturateZoneUntilLeft(zone, zeroRes, DropHostLevelResources)
 		} else {
-			zonePadRes, err = SaturateZoneUntilLeft(zone, requiredRes)
+			zonePadRes, err = SaturateZoneUntilLeft(zone, requiredRes, DropHostLevelResources)
 		}
 		if err != nil {
 			klog.Errorf(fmt.Sprintf("could not make padding pod for zone %q leaving 0 resources available.", zone.Name))
@@ -382,12 +393,14 @@ func FilterOnlyNUMAAffineResources(rl corev1.ResourceList, tag string) corev1.Re
 
 func FilterAnyZoneMatchingResources(nrts []nrtv1alpha2.NodeResourceTopology, requests corev1.ResourceList) []nrtv1alpha2.NodeResourceTopology {
 	reqStr := e2ereslist.ToString(requests)
+	// NRTs do not reflect host-level resources topology thus drop them when verifying the consumed ones
+	filteredReq := DropHostLevelResources(requests)
 	ret := []nrtv1alpha2.NodeResourceTopology{}
 	for _, nrt := range nrts {
 		matches := 0
 		for _, zone := range nrt.Zones {
 			klog.Infof(" ----> node %q zone %q provides %s request %s", nrt.Name, zone.Name, e2ereslist.ToString(AvailableFromZone(zone)), reqStr)
-			if !ResourceInfoMatchesRequest(zone.Resources, requests) {
+			if !ResourceInfoMatchesRequest(zone.Resources, filteredReq) {
 				continue
 			}
 			matches++
@@ -405,6 +418,8 @@ func FilterAnyZoneMatchingResources(nrts []nrtv1alpha2.NodeResourceTopology, req
 func FilterAnyNodeMatchingResources(nrts []nrtv1alpha2.NodeResourceTopology, requests corev1.ResourceList) []nrtv1alpha2.NodeResourceTopology {
 	reqStr := e2ereslist.ToString(requests)
 	ret := []nrtv1alpha2.NodeResourceTopology{}
+	// NRTs do not reflect host-level resources topology thus drop them when verifying the consumed ones
+	filteredReq := DropHostLevelResources(requests)
 	for _, nrt := range nrts {
 		nodeRes, err := accumulateNodeAvailableResources(nrt, "initial")
 		if err != nil {
@@ -413,7 +428,7 @@ func FilterAnyNodeMatchingResources(nrts []nrtv1alpha2.NodeResourceTopology, req
 		}
 		klog.Infof(" ----> node %q provides %s request %s", nrt.Name, e2ereslist.ToString(ResourceInfoListToResourceList(nodeRes)), reqStr)
 		// abuse the ResourceInfoMatchesRequest for checking the complete node's resources
-		if !ResourceInfoMatchesRequest(nodeRes, requests) {
+		if !ResourceInfoMatchesRequest(nodeRes, filteredReq) {
 			klog.Warningf("SKIP: node %q can't provide %s", nrt.Name, reqStr)
 			continue
 		}
