@@ -2,8 +2,6 @@ module github.com/openshift-kni/numaresources-operator
 
 go 1.21
 
-toolchain go1.21.8
-
 require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 	github.com/drone/envsubst v1.0.3
