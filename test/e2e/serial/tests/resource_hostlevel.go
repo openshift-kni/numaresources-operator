@@ -321,14 +321,19 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				err := fxt.Client.Create(ctx, pod)
 				Expect(err).NotTo(HaveOccurred(), "unable to create test pod %q", pod.Name)
 
-				var updatedPod corev1.Pod
-				err = fxt.Client.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: pod.Name}, &updatedPod)
-				Expect(err).ToNot(HaveOccurred())
+				updatedPod, err := wait.With(fxt.Client).Timeout(time.Minute).ForPodPhase(ctx, pod.Namespace, pod.Name, corev1.PodPending)
+				if err != nil {
+					_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
+				}
+				Expect(err).NotTo(HaveOccurred(), "Pod %s/%s was found  in state %q while expected to be Pending", updatedPod.Namespace, updatedPod.Name, updatedPod.Status.Phase)
 
 				klog.Infof("pod %s/%s resources: %s", updatedPod.Namespace, updatedPod.Name, intreslist.ToString(intreslist.FromContainerRequests(pod.Spec.Containers)))
 				Expect(updatedPod.Status.QOSClass).To(Equal(expectedQOS), "pod QoS mismatch")
 				By(fmt.Sprintf("checking the pod is handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
 				isFailed, err := nrosched.CheckPodSchedulingFailedWithMsg(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName, fmt.Sprintf("%d Insufficient ephemeral-storage", len(candidateNodeNames)))
+				if err != nil {
+					_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
+				}
 				Expect(err).ToNot(HaveOccurred())
 				Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", updatedPod.Namespace, updatedPod.Name, updatedPod.Spec.SchedulerName)
 			},
