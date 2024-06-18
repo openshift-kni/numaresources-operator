@@ -30,7 +30,7 @@ they found it before they run.
   wait between checks for MCP updates.
 - `E2E_NROP_PLATFORM` (accepts a string, e.g. `Kubernetes`, `OpenShift`) instructs the suite to *disable* the
   autodetection of the platform name and force it to the provided value.
-- `E2E_NROP_PLATFORM_VERSION` (accepts a string, e.g. `1.30`, `4.16`) instructs the suite to *disable* the
+- `E2E_NROP_PLATFORM_VERSION` (accepts a string, e.g. `1.30`, `4.17`) instructs the suite to *disable* the
   autodetection of the platform version and force it to the provided value.
 - `E2E_NROP_DUMP_EVENTS` (accepts boolean, e.g. `true`) requests the suite to dump events pertaining to pods
   failed unexpectedly on standard output, alongside (not replacing) the logging of the said events.

@@ -10,4 +10,4 @@
    destination data directory (will be logged when running), useful for troubleshooting.
 - `E2E_NROP_MUSTGATHER_IMAGE` (accepts string, e.g. `quay.io/openshift-kni/numaresources-must-gather`) overrides
    the hardcoded must-gather image to use.
-- `E2E_NROP_MUSTGATHER_TAG` (accepts string, e.g. `4.16-snapshot`) overrides the hardcoded must-gather tag to use.
+- `E2E_NROP_MUSTGATHER_TAG` (accepts string, e.g. `4.17-snapshot`) overrides the hardcoded must-gather tag to use.
