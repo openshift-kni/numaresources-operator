@@ -29,7 +29,7 @@ jobs:
         uses: actions/setup-go@v3
         id: go
         with:
-          go-version: 1.22.1
+          go-version: 1.22.4
 
       - name: Set release version env var
         run: |
