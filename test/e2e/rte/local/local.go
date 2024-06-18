@@ -98,7 +98,7 @@ func runConfig(argv []string, env map[string]string) ProgArgs {
 
 	cmdline := []string{
 		binaryPath,
-		"--dump-config",
+		"--dump-config", ".andexit",
 	}
 	cmdline = append(cmdline, argv...)
 
