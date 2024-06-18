@@ -88,17 +88,18 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 			func(tmPolicy, tmScope string, requiredRes, expectedFreeRes corev1.ResourceList) {
 				ctx := context.TODO()
 
-				nrtCandidates, targetNodeName := setupNodes(fxt, ctx, desiredNodesState{
+				nrtCandidates := filterNodes(fxt, desiredNodesState{
 					NRTList:           nrtList,
 					RequiredNodes:     2,
 					RequiredNUMAZones: 2,
 					RequiredResources: requiredRes,
-				}, expectedFreeRes)
-
+				})
 				nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtCandidates, tmPolicy, tmScope)
 				if len(nrts) != len(nrtCandidates) {
 					e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", tmPolicy, len(nrts))
 				}
+
+				targetNodeName := setupNodes(fxt, ctx, nrtCandidates, requiredRes, expectedFreeRes)
 
 				By("Scheduling the testing pod")
 				pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
@@ -163,10 +164,9 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 	})
 })
 
-func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nodesState desiredNodesState, expectedFreeResources corev1.ResourceList) ([]nrtv1alpha2.NodeResourceTopology, string) {
+func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nrtCandidates []nrtv1alpha2.NodeResourceTopology, requiredResources, expectedFreeResources corev1.ResourceList) string {
 	GinkgoHelper()
 
-	nrtCandidates := filterNodes(fxt, nodesState)
 	nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
 	var ok bool
@@ -211,7 +211,7 @@ func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nodesState desired
 
 	paddingPods = append(paddingPods, createPaddingPod(fxt, ctx, "padding-tgt-0", targetNodeName, targetNrtInfo.Zones[0], baseload.Resources))
 	// any is fine, we hardcode zone#1 but we can do it smarter in the future
-	paddingPods = append(paddingPods, createPaddingPod(fxt, ctx, "padding-tgt-1", targetNodeName, targetNrtInfo.Zones[1], nodesState.RequiredResources))
+	paddingPods = append(paddingPods, createPaddingPod(fxt, ctx, "padding-tgt-1", targetNodeName, targetNrtInfo.Zones[1], requiredResources))
 
 	By("Waiting for padding pods to be ready")
 	failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
@@ -220,7 +220,7 @@ func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nodesState desired
 	By("waiting for the NRT data to settle")
 	e2efixture.MustSettleNRT(fxt)
 
-	return nrtCandidates, targetNodeName
+	return targetNodeName
 }
 
 func createPaddingPod(fxt *e2efixture.Fixture, ctx context.Context, podName, nodeName string, zone nrtv1alpha2.Zone, expectedFreeRes corev1.ResourceList) *corev1.Pod {
