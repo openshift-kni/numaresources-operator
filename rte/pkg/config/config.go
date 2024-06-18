@@ -17,16 +17,18 @@
 package config
 
 import (
-	"errors"
 	"fmt"
-	"os"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	"sigs.k8s.io/yaml"
+
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
+
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
 const (
@@ -38,36 +40,33 @@ const (
 	LabelNodeGroupKindMachineConfigPool string = "machineconfigpool"
 )
 
+type KubeletParams struct {
+	TopologyManagerPolicy string `json:"topologyManagerPolicy,omitempty"`
+	TopologyManagerScope  string `json:"topologyManagerScope,omitempty"`
+}
+
 type Config struct {
-	ExcludeList           map[string][]string `json:"excludeList,omitempty"`
-	TopologyManagerPolicy string              `json:"topologyManagerPolicy,omitempty"`
-	TopologyManagerScope  string              `json:"topologyManagerScope,omitempty"`
-	PodExcludes           map[string]string   `json:"podExcludes"`
+	Kubelet         KubeletParams                   `json:"kubelet,omitempty"`
+	ResourceExclude resourcemonitor.ResourceExclude `json:"resourceExclude,omitempty"`
+	PodExclude      podexclude.List                 `json:"podExclude,omitempty"`
 }
 
-func ReadFile(configPath string) (Config, error) {
-	conf := Config{}
-	// TODO modernize using os.ReadFile
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		// config is optional
-		if errors.Is(err, os.ErrNotExist) {
-			klog.Warningf("Info: couldn't find configuration in %q", configPath)
-			return conf, nil
-		}
-		return conf, err
+func Render(klConfig *kubeletconfigv1beta1.KubeletConfiguration, podExcludes []nropv1.NamespacedName) (string, error) {
+	var podExcl podexclude.List
+	for _, pex := range podExcludes {
+		podExcl = append(podExcl, podexclude.Item{
+			NamespacePattern: pex.Namespace,
+			NamePattern:      pex.Name,
+		})
 	}
-	err = yaml.Unmarshal(data, &conf)
-	return conf, err
-}
 
-func Render(klConfig *kubeletconfigv1beta1.KubeletConfiguration, podExcludes map[string]string) (string, error) {
 	conf := Config{
-		TopologyManagerPolicy: klConfig.TopologyManagerPolicy,
-		TopologyManagerScope:  klConfig.TopologyManagerScope,
-	}
-	if len(podExcludes) > 0 {
-		conf.PodExcludes = podExcludes
+		Kubelet: KubeletParams{
+			TopologyManagerPolicy: klConfig.TopologyManagerPolicy,
+			TopologyManagerScope:  klConfig.TopologyManagerScope,
+		},
+		PodExclude: podExcl,
+		// ResourceExclude intentionally not used
 	}
 	data, err := yaml.Marshal(conf)
 	return string(data), err

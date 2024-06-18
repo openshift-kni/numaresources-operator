@@ -600,7 +600,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				conf, err := rteConfigFrom(data)
 				Expect(err).ToNot(HaveOccurred(), "failed to obtain rteConfig from ConfigMap %q error: %v", cmKey.String(), err)
 
-				if conf.TopologyManagerScope == initialTMScope {
+				if conf.Kubelet.TopologyManagerScope == initialTMScope {
 					klog.Warningf("ConfigMap %q has not been updated with new TopologyManagerScope after kubeletconfig modification", cmKey.String())
 					return false
 				}

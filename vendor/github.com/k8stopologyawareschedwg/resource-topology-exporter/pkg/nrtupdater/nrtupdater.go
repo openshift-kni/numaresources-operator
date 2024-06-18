@@ -16,7 +16,6 @@ import (
 
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/dump"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8sannotations"
-	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8shelpers"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/metrics"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podreadiness"
 )
@@ -28,9 +27,18 @@ const (
 
 // Command line arguments
 type Args struct {
-	NoPublish bool
-	Oneshot   bool
-	Hostname  string
+	NoPublish  bool   `json:"noPublish,omitempty"`
+	Oneshot    bool   `json:"oneShot,omitempty"`
+	Hostname   string `json:"hostname,omitempty"`
+	KubeConfig string `json:"kubeConfig,omitempty"`
+}
+
+func (args Args) Clone() Args {
+	return Args{
+		NoPublish: args.NoPublish,
+		Oneshot:   args.Oneshot,
+		Hostname:  args.Hostname,
+	}
 }
 
 type TMConfig struct {
@@ -47,6 +55,7 @@ type NRTUpdater struct {
 	tmConfig   TMConfig
 	stopChan   chan struct{}
 	nodeGetter NodeGetter
+	nrtCli     topologyclientset.Interface
 }
 
 type MonitorInfo struct {
@@ -63,28 +72,53 @@ func (mi MonitorInfo) UpdateReason() string {
 	return RTEUpdateReactive
 }
 
-func NewNRTUpdater(nodeGetter NodeGetter, args Args, tmconf TMConfig) *NRTUpdater {
+func NewNRTUpdater(nodeGetter NodeGetter, nrtCli topologyclientset.Interface, args Args, tmconf TMConfig) (*NRTUpdater, error) {
+	if nrtCli == nil {
+		return nil, fmt.Errorf("missing NRT client interface")
+	}
 	return &NRTUpdater{
 		args:       args,
 		tmConfig:   tmconf,
 		stopChan:   make(chan struct{}),
 		nodeGetter: nodeGetter,
-	}
+		nrtCli:     nrtCli,
+	}, nil
 }
 
 func (te *NRTUpdater) Update(info MonitorInfo) error {
-	// early check to avoid creating the client if we can help it
-	if te.args.NoPublish {
-		return nil
-	}
-	cli, err := k8shelpers.GetTopologyClient("")
-	if err != nil {
-		return err
-	}
-	return te.UpdateWithClient(cli, info)
+	return te.updateWithClient(te.nrtCli, info)
 }
 
-func (te *NRTUpdater) UpdateWithClient(cli topologyclientset.Interface, info MonitorInfo) error {
+func (te *NRTUpdater) Stop() {
+	te.stopChan <- struct{}{}
+}
+
+func (te *NRTUpdater) Run(infoChannel <-chan MonitorInfo, condChan chan v1.PodCondition) {
+	for {
+		select {
+		case info := <-infoChannel:
+			tsBegin := time.Now()
+			condStatus := v1.ConditionTrue
+			if err := te.Update(info); err != nil {
+				klog.Warningf("failed to update: %v", err)
+				condStatus = v1.ConditionFalse
+			}
+			tsEnd := time.Now()
+
+			tsDiff := tsEnd.Sub(tsBegin)
+			metrics.UpdateOperationDelayMetric("node_resource_object_update", RTEUpdateReactive, float64(tsDiff.Milliseconds()))
+			if te.args.Oneshot {
+				break
+			}
+			podreadiness.SetCondition(condChan, podreadiness.NodeTopologyUpdated, condStatus)
+		case <-te.stopChan:
+			klog.Infof("update stop at %v", time.Now())
+			return
+		}
+	}
+}
+
+func (te *NRTUpdater) updateWithClient(cli topologyclientset.Interface, info MonitorInfo) error {
 	klog.V(7).Infof("update: sending zone: %v", dump.Object(info.Zones))
 
 	if te.args.NoPublish {
@@ -127,7 +161,7 @@ func (te *NRTUpdater) UpdateWithClient(cli topologyclientset.Interface, info Mon
 }
 
 func (te *NRTUpdater) updateNRTInfo(nrt *v1alpha2.NodeResourceTopology, info MonitorInfo) {
-	nrt.Annotations = mergeAnnotations(nrt.Annotations, info.Annotations)
+	nrt.Annotations = k8sannotations.Merge(nrt.Annotations, info.Annotations)
 	nrt.Annotations[k8sannotations.RTEUpdate] = info.UpdateReason()
 	nrt.Zones = info.Zones.DeepCopy()
 	nrt.Attributes = info.Attributes.DeepCopy()
@@ -171,43 +205,4 @@ func (te *NRTUpdater) makeAttributes() v1alpha2.AttributeList {
 			Value: te.tmConfig.Policy,
 		},
 	}
-}
-
-func (te *NRTUpdater) Stop() {
-	te.stopChan <- struct{}{}
-}
-
-func (te *NRTUpdater) Run(infoChannel <-chan MonitorInfo, condChan chan v1.PodCondition) {
-	for {
-		select {
-		case info := <-infoChannel:
-			tsBegin := time.Now()
-			condStatus := v1.ConditionTrue
-			if err := te.Update(info); err != nil {
-				klog.Warningf("failed to update: %v", err)
-				condStatus = v1.ConditionFalse
-			}
-			tsEnd := time.Now()
-
-			tsDiff := tsEnd.Sub(tsBegin)
-			metrics.UpdateOperationDelayMetric("node_resource_object_update", RTEUpdateReactive, float64(tsDiff.Milliseconds()))
-			if te.args.Oneshot {
-				break
-			}
-			podreadiness.SetCondition(condChan, podreadiness.NodeTopologyUpdated, condStatus)
-		case <-te.stopChan:
-			klog.Infof("update stop at %v", time.Now())
-			return
-		}
-	}
-}
-
-func mergeAnnotations(kvs ...map[string]string) map[string]string {
-	ret := make(map[string]string)
-	for _, kv := range kvs {
-		for key, value := range kv {
-			ret[key] = value
-		}
-	}
-	return ret
 }

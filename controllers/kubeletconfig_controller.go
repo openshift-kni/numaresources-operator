@@ -199,10 +199,7 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, kubeletConf
 	generatedName := objectnames.GetComponentName(instance.Name, kcHandler.poolName)
 	klog.V(3).InfoS("generated configMap name", "generatedName", generatedName)
 
-	podExcludes := podExcludesListToMap(instance.Spec.PodExcludes)
-	klog.V(5).InfoS("using podExcludes", "podExcludes", podExcludes)
-
-	data, err := rteconfig.Render(kubeletConfig, podExcludes)
+	data, err := rteconfig.Render(kubeletConfig, instance.Spec.PodExcludes)
 	if err != nil {
 		klog.ErrorS(err, "rendering config", "namespace", r.Namespace, "name", generatedName)
 		return nil, err
@@ -338,14 +335,6 @@ func removeDeletedOwner(kcKey client.ObjectKey, ownerConfigMaps []*corev1.Config
 		}
 	}
 	return ownerConfigMaps
-}
-
-func podExcludesListToMap(podExcludes []nropv1.NamespacedName) map[string]string {
-	ret := make(map[string]string)
-	for _, pe := range podExcludes {
-		ret[pe.Namespace] = pe.Name
-	}
-	return ret
 }
 
 func decodeKCFrom(data []byte, scheme *runtime.Scheme, mcoKc *mcov1.KubeletConfig) error {

@@ -184,8 +184,8 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				klog.Infof("RTE config: %#v", rc)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				gomega.Expect(rc.TopologyManagerPolicy).To(gomega.Equal(kc.TopologyManagerPolicy), "TopologyManager Policy mismatch")
-				gomega.Expect(rc.TopologyManagerScope).To(gomega.Equal(kc.TopologyManagerScope), "TopologyManager Scope mismatch")
+				gomega.Expect(rc.Kubelet.TopologyManagerPolicy).To(gomega.Equal(kc.TopologyManagerPolicy), "TopologyManager Policy mismatch")
+				gomega.Expect(rc.Kubelet.TopologyManagerScope).To(gomega.Equal(kc.TopologyManagerScope), "TopologyManager Scope mismatch")
 			}
 		})
 
