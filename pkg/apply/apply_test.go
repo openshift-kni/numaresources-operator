@@ -20,13 +20,15 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
@@ -34,13 +36,8 @@ import (
 
 const testNamespace = "test-namespace"
 
-func TestApplyObject(t *testing.T) {
-	type testCase struct {
-		name        string
-		objectState objectstate.ObjectState
-	}
-
-	cmExist := &corev1.ConfigMap{
+var (
+	cmExist = &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: testNamespace,
 			Name:      "test-configmap",
@@ -51,10 +48,7 @@ func TestApplyObject(t *testing.T) {
 		},
 	}
 
-	cmDesired := cmExist.DeepCopy()
-	cmDesired.Data["foo3"] = "new-data"
-
-	dsExist := &appsv1.DaemonSet{
+	dsExist = &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: testNamespace,
 			Name:      "test-daemonset",
@@ -71,36 +65,79 @@ func TestApplyObject(t *testing.T) {
 			},
 		},
 	}
+)
 
+func mutateCM(cm *corev1.ConfigMap) client.Object {
+	cmDesired := cmExist.DeepCopy()
+	cmDesired.Data["foo3"] = "new-data"
+	return cmDesired
+}
+
+func mutateDS(ds *appsv1.DaemonSet) client.Object {
 	dsDesired := dsExist.DeepCopy()
 	dsDesired.Spec.Template.Spec.Containers[0].Name = "new-container-name"
+	return dsDesired
+}
+
+func TestApplyObject(t *testing.T) {
+	type testCase struct {
+		name          string
+		objectState   objectstate.ObjectState
+		expectApplied bool
+	}
 
 	testCases := []testCase{
 		{
-			name: "configmap state",
+			name: "configmap state update",
 			objectState: objectstate.ObjectState{
 				Existing: cmExist,
-				Desired:  cmDesired,
+				Desired:  mutateCM(cmExist),
 				Compare:  compare.Object,
 				Merge:    merge.MetadataForUpdate,
 			},
+			expectApplied: true,
 		},
 		{
-			name: "daemonset state",
+			name: "daemonset state update",
 			objectState: objectstate.ObjectState{
 				Existing: dsExist,
-				Desired:  dsDesired,
+				Desired:  mutateDS(dsExist),
 				Compare:  compare.Object,
 				Merge:    merge.MetadataForUpdate,
 			},
+			expectApplied: true,
+		},
+		{
+			name: "configmap state update",
+			objectState: objectstate.ObjectState{
+				Existing: cmExist,
+				Desired:  mutateCM(cmExist),
+				Compare:  compare.Object,
+				Merge:    merge.MetadataForUpdate,
+			},
+			expectApplied: true,
+		},
+
+		{
+			name: "daemonset state update skip",
+			objectState: objectstate.ObjectState{
+				Existing: dsExist,
+				Desired:  dsExist,
+				Compare:  compare.Object,
+				Merge:    merge.MetadataForUpdate,
+			},
+			expectApplied: false,
 		},
 	}
 
 	for _, tc := range testCases {
 		fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(tc.objectState.Existing).Build()
-		obj, err := ApplyObject(context.TODO(), fakeClient, tc.objectState)
+		obj, gotApplied, err := ApplyObject(context.TODO(), fakeClient, tc.objectState)
 		if err != nil {
 			t.Errorf("%q failed to apply object with error: %v", tc.name, err)
+		}
+		if gotApplied != tc.expectApplied {
+			t.Errorf("%q failed to apply: got=%v expected=%v", tc.name, gotApplied, tc.expectApplied)
 		}
 		if diff := cmp.Diff(obj, tc.objectState.Desired); diff != "" {
 			t.Errorf("%q failed to set object into its desired state, diff %v", tc.name, diff)

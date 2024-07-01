@@ -211,7 +211,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
 			return schedStatus, errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
-		obj, err := apply.ApplyObject(ctx, r.Client, objState)
+		obj, _, err := apply.ApplyObject(ctx, r.Client, objState)
 		if err != nil {
 			return schedStatus, errors.Wrapf(err, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
