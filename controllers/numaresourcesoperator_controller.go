@@ -195,54 +195,79 @@ func messageFromError(err error) string {
 	return unwErr.Error()
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, string, error) {
-
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
 	applied, err := r.syncNodeResourceTopologyAPI(ctx)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedCRDInstall", "Failed to install Node Resource Topology CRD: %v", err)
-		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedAPISync")
+		return true, ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedAPISync")
 	}
 	if applied {
 		r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulCRDInstall", "Node Resource Topology CRD installed")
 	}
+	return false, ctrl.Result{}, "", nil
+}
 
-	if r.Platform == platform.OpenShift {
-		// we need to sync machine configs first and wait for the MachineConfigPool updates
-		// before checking additional components for updates
-		_, err := r.syncMachineConfigs(ctx, instance, trees)
-		if err != nil {
-			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
-			return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "failed to sync machine configs")
-		}
-		r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulMCSync", "Enabled machine configuration for worker nodes")
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
+	// we need to sync machine configs first and wait for the MachineConfigPool updates
+	// before checking additional components for updates
+	_, err := r.syncMachineConfigs(ctx, instance, trees)
+	if err != nil {
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
+		return true, ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "failed to sync machine configs")
+	}
+	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulMCSync", "Enabled machine configuration for worker nodes")
 
-		// MCO need to update SELinux context and other stuff, and need to trigger a reboot.
-		// It can take a while.
-		mcpStatuses, allMCPsUpdated := syncMachineConfigPoolsStatuses(instance.Name, trees, r.ForwardMCPConds)
-		instance.Status.MachineConfigPools = mcpStatuses
-		if !allMCPsUpdated {
-			// the Machine Config Pool still did not apply the machine config, wait for one minute
-			return ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, status.ConditionProgressing, nil
-		}
+	// MCO need to update SELinux context and other stuff, and need to trigger a reboot.
+	// It can take a while.
+	mcpStatuses, allMCPsUpdated := syncMachineConfigPoolsStatuses(instance.Name, trees, r.ForwardMCPConds)
+	instance.Status.MachineConfigPools = mcpStatuses
+	if !allMCPsUpdated {
+		// the Machine Config Pool still did not apply the machine config, wait for one minute
+		return true, ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, status.ConditionProgressing, nil
 	}
 
+	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
+	return false, ctrl.Result{}, "", nil
+}
+
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
 	daemonSetsInfo, err := r.syncNUMAResourcesOperatorResources(ctx, instance, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECreate", "Failed to create Resource-Topology-Exporter DaemonSets: %v", err)
-		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedRTESync")
+		return true, ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedRTESync")
 	}
-	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
+	if len(daemonSetsInfo) == 0 {
+		return false, ctrl.Result{}, "", nil
+	}
 
-	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
+	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
 
 	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, daemonSetsInfo)
 	instance.Status.DaemonSets = dsStatuses
 	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dsStatuses)
 	if err != nil {
-		return ctrl.Result{}, status.ConditionDegraded, err
+		return true, ctrl.Result{}, status.ConditionDegraded, err
 	}
 	if !allDSsUpdated {
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
+		return true, ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
+	}
+
+	return false, ctrl.Result{}, "", nil
+}
+
+func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, string, error) {
+	if done, res, cond, err := r.reconcileResourceAPI(ctx, instance, trees); done {
+		return res, cond, err
+	}
+
+	if r.Platform == platform.OpenShift {
+		if done, res, cond, err := r.reconcileResourceMachineConfig(ctx, instance, trees); done {
+			return res, cond, err
+		}
+	}
+
+	if done, res, cond, err := r.reconcileResourceDaemonSet(ctx, instance, trees); done {
+		return res, cond, err
 	}
 
 	return ctrl.Result{}, status.ConditionAvailable, nil
