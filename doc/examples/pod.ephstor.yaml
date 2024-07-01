@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: ephstor-pod-
+spec:
+  schedulerName: topo-aware-scheduler
+  containers:
+  - name: workload-1
+    image: quay.io/fromani/numalign
+    imagePullPolicy: IfNotPresent
+    command: ["/usr/local/bin/numalign"]
+    env:
+      - name: NUMALIGN_SLEEP_HOURS
+        value: "127"
+    resources:
+      limits:
+        cpu: 2
+        memory: 2Gi
+        ephemeral-storage: 1Gi
+      requests:
+        cpu: 2
+        memory: 2Gi
+        ephemeral-storage: 1Gi
+  - name: workload-2
+    image: quay.io/fromani/numalign
+    imagePullPolicy: IfNotPresent
+    command: ["/usr/local/bin/numalign"]
+    env:
+      - name: NUMALIGN_SLEEP_HOURS
+        value: "127"
+    resources:
+      limits:
+        cpu: 2
+        memory: 2Gi
+        ephemeral-storage: 1Gi
+      requests:
+        cpu: 2
+        memory: 2Gi
+        ephemeral-storage: 1Gi
+  - name: auxiliary
+    image: quay.io/fromani/numalign
+    imagePullPolicy: IfNotPresent
+    command: ["/usr/local/bin/numalign"]
+    env:
+      - name: NUMALIGN_SLEEP_HOURS
+        value: "127"
+    resources:
+      limits:
+        cpu: 1
+        memory: 1Gi
+        ephemeral-storage: 4Gi
+      requests:
+        cpu: 1
+        memory: 1Gi
+        ephemeral-storage: 4Gi
