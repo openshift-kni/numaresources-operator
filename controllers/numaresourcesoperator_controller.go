@@ -195,51 +195,79 @@ func messageFromError(err error) string {
 	return unwErr.Error()
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, string, error) {
-	var err error
-	err = r.syncNodeResourceTopologyAPI(ctx)
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
+	applied, err := r.syncNodeResourceTopologyAPI(ctx)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedCRDInstall", "Failed to install Node Resource Topology CRD: %v", err)
-		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedAPISync")
+		return true, ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedAPISync")
 	}
-	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulCRDInstall", "Node Resource Topology CRD installed")
+	if applied {
+		r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulCRDInstall", "Node Resource Topology CRD installed")
+	}
+	return false, ctrl.Result{}, "", nil
+}
 
-	if r.Platform == platform.OpenShift {
-		// we need to sync machine configs first and wait for the MachineConfigPool updates
-		// before checking additional components for updates
-		if err := r.syncMachineConfigs(ctx, instance, trees); err != nil {
-			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
-			return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "failed to sync machine configs")
-		}
-		r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulMCSync", "Enabled machine configuration for worker nodes")
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
+	// we need to sync machine configs first and wait for the MachineConfigPool updates
+	// before checking additional components for updates
+	_, err := r.syncMachineConfigs(ctx, instance, trees)
+	if err != nil {
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
+		return true, ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "failed to sync machine configs")
+	}
+	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulMCSync", "Enabled machine configuration for worker nodes")
 
-		// MCO need to update SELinux context and other stuff, and need to trigger a reboot.
-		// It can take a while.
-		mcpStatuses, allMCPsUpdated := syncMachineConfigPoolsStatuses(instance.Name, trees, r.ForwardMCPConds)
-		instance.Status.MachineConfigPools = mcpStatuses
-		if !allMCPsUpdated {
-			// the Machine Config Pool still did not apply the machine config, wait for one minute
-			return ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, status.ConditionProgressing, nil
-		}
+	// MCO need to update SELinux context and other stuff, and need to trigger a reboot.
+	// It can take a while.
+	mcpStatuses, allMCPsUpdated := syncMachineConfigPoolsStatuses(instance.Name, trees, r.ForwardMCPConds)
+	instance.Status.MachineConfigPools = mcpStatuses
+	if !allMCPsUpdated {
+		// the Machine Config Pool still did not apply the machine config, wait for one minute
+		return true, ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, status.ConditionProgressing, nil
 	}
 
+	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
+	return false, ctrl.Result{}, "", nil
+}
+
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
 	daemonSetsInfo, err := r.syncNUMAResourcesOperatorResources(ctx, instance, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECreate", "Failed to create Resource-Topology-Exporter DaemonSets: %v", err)
-		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedRTESync")
+		return true, ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedRTESync")
 	}
-	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
+	if len(daemonSetsInfo) == 0 {
+		return false, ctrl.Result{}, "", nil
+	}
 
-	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
+	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
 
 	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, daemonSetsInfo)
 	instance.Status.DaemonSets = dsStatuses
 	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dsStatuses)
 	if err != nil {
-		return ctrl.Result{}, status.ConditionDegraded, err
+		return true, ctrl.Result{}, status.ConditionDegraded, err
 	}
 	if !allDSsUpdated {
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
+		return true, ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
+	}
+
+	return false, ctrl.Result{}, "", nil
+}
+
+func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, string, error) {
+	if done, res, cond, err := r.reconcileResourceAPI(ctx, instance, trees); done {
+		return res, cond, err
+	}
+
+	if r.Platform == platform.OpenShift {
+		if done, res, cond, err := r.reconcileResourceMachineConfig(ctx, instance, trees); done {
+			return res, cond, err
+		}
+	}
+
+	if done, res, cond, err := r.reconcileResourceDaemonSet(ctx, instance, trees); done {
+		return res, cond, err
 	}
 
 	return ctrl.Result{}, status.ConditionAvailable, nil
@@ -266,43 +294,61 @@ func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Con
 	return dsStatuses, true, nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx context.Context) error {
+func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx context.Context) (bool, error) {
 	klog.V(4).Info("APISync start")
 	defer klog.V(4).Info("APISync stop")
 
 	existing := apistate.FromClient(ctx, r.Client, r.Platform, r.APIManifests)
 
-	for _, objState := range existing.State(r.APIManifests) {
-		if _, err := apply.ApplyObject(ctx, r.Client, objState); err != nil {
-			return errors.Wrapf(err, "could not create %s", objState.Desired.GetObjectKind().GroupVersionKind().String())
+	var err error
+	var updatedCount int
+	objStates := existing.State(r.APIManifests)
+	for _, objState := range objStates {
+		_, updated, err2 := apply.ApplyObject(ctx, r.Client, objState)
+		if err2 != nil {
+			err = errors.Wrapf(err2, "could not create %s", objState.Desired.GetObjectKind().GroupVersionKind().String())
+			break
 		}
+		if !updated {
+			continue
+		}
+		updatedCount++
 	}
-	return nil
+	return (updatedCount == len(objStates)), err
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) error {
+func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, error) {
 	klog.V(4).InfoS("Machine Config Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Sync stop")
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
 
-	// create MC objects first
-	for _, objState := range existing.MachineConfigsState(r.RTEManifests) {
-		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
-			return errors.Wrapf(err, "failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
+	var err error
+	var updatedCount int
+	objStates := existing.MachineConfigsState(r.RTEManifests)
+	for _, objState := range objStates {
+		if err2 := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err2 != nil {
+			err = errors.Wrapf(err2, "failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
+			break
 		}
 
-		if err := validateMachineConfigLabels(objState.Desired, trees); err != nil {
-			return errors.Wrapf(err, "machine conig %q labels validation failed", objState.Desired.GetName())
+		if err2 := validateMachineConfigLabels(objState.Desired, trees); err2 != nil {
+			err = errors.Wrapf(err2, "machine conig %q labels validation failed", objState.Desired.GetName())
+			break
 		}
 
-		_, err := apply.ApplyObject(ctx, r.Client, objState)
-		if err != nil {
-			return errors.Wrapf(err, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
+		_, updated, err2 := apply.ApplyObject(ctx, r.Client, objState)
+		if err2 != nil {
+			err = errors.Wrapf(err2, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
+			break
 		}
+		if !updated {
+			continue
+		}
+		updatedCount++
 	}
 
-	return nil
+	return (updatedCount == len(objStates)), err
 }
 
 func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree, forwardMCPConds bool) ([]nropv1.MachineConfigPool, bool) {
@@ -430,7 +476,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
-		obj, err := apply.ApplyObject(ctx, r.Client, objState)
+		obj, _, err := apply.ApplyObject(ctx, r.Client, objState)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}

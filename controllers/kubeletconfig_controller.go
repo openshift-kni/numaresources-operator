@@ -199,7 +199,7 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov
 		if err := controllerutil.SetControllerReference(mcoKc, objState.Desired, r.Scheme); err != nil {
 			return nil, errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
 		}
-		if _, err := apply.ApplyObject(ctx, r.Client, objState); err != nil {
+		if _, _, err := apply.ApplyObject(ctx, r.Client, objState); err != nil {
 			return nil, errors.Wrapf(err, "could not create %s", objState.Desired.GetObjectKind().GroupVersionKind().String())
 		}
 	}
