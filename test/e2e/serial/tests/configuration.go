@@ -504,9 +504,26 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				g.Expect(err).ToNot(HaveOccurred())
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-			By("waiting for MachineConfigPools to get updated")
 			var wg sync.WaitGroup
+			By("waiting for mcp to start updating")
 			for _, mcp := range mcps {
+				wg.Add(1)
+				klog.Infof("wait for mcp %q to start updating", mcp.Name)
+				go func(mcpool *machineconfigv1.MachineConfigPool) {
+					defer GinkgoRecover()
+					defer wg.Done()
+					err = wait.With(fxt.Client).
+						Interval(configuration.MachineConfigPoolUpdateInterval).
+						Timeout(configuration.MachineConfigPoolUpdateTimeout).
+						ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdating)
+					Expect(err).ToNot(HaveOccurred())
+				}(mcp)
+			}
+			wg.Wait()
+
+			By("wait for mcp to get updated")
+			for _, mcp := range mcps {
+				klog.Infof("wait for mcp %q to get updated", mcp.Name)
 				wg.Add(1)
 				go func(mcpool *machineconfigv1.MachineConfigPool) {
 					defer GinkgoRecover()
@@ -537,8 +554,25 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					g.Expect(err).ToNot(HaveOccurred())
 				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-				By("waiting for MachineConfigPools to get updated")
+				By("waiting for mcp to start updating")
 				for _, mcp := range mcps {
+					wg.Add(1)
+					klog.Infof("wait for mcp %q to start updating", mcp.Name)
+					go func(mcpool *machineconfigv1.MachineConfigPool) {
+						defer GinkgoRecover()
+						defer wg.Done()
+						err = wait.With(fxt.Client).
+							Interval(configuration.MachineConfigPoolUpdateInterval).
+							Timeout(configuration.MachineConfigPoolUpdateTimeout).
+							ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdating)
+						Expect(err).ToNot(HaveOccurred())
+					}(mcp)
+				}
+				wg.Wait()
+
+				By("wait for mcp to get updated")
+				for _, mcp := range mcps {
+					klog.Infof("wait for mcp %q to get updated", mcp.Name)
 					wg.Add(1)
 					go func(mcpool *machineconfigv1.MachineConfigPool) {
 						defer GinkgoRecover()
@@ -551,6 +585,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					}(mcp)
 				}
 				wg.Wait()
+
 			}()
 
 			By("checking that NUMAResourcesOperator's ConfigMap has changed")
