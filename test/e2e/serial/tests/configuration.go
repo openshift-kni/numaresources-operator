@@ -128,14 +128,65 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			defer func() {
-				By(fmt.Sprintf("Restore initial labels of node %q with %q", targetedNode.Name, nodes.GetLabelRoleWorker()))
+				By(fmt.Sprintf("CLEANUP: restore initial labels of node %q with %q", targetedNode.Name, nodes.GetLabelRoleWorker()))
 				err = unlabelFunc()
 				Expect(err).ToNot(HaveOccurred())
 
 				err = labelFunc()
 				Expect(err).ToNot(HaveOccurred())
+			}()
 
-				By("reverting the changes under the NUMAResourcesOperator object")
+			mcp := objects.TestMCP()
+			By(fmt.Sprintf("creating new MCP: %q", mcp.Name))
+			// we must have this label in order to match other machine configs that are necessary for proper functionality
+			mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": nodes.RoleMCPTest}
+			mcp.Spec.MachineConfigSelector = &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "machineconfiguration.openshift.io/role",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{nodes.RoleWorker, nodes.RoleMCPTest},
+					},
+				},
+			}
+			mcp.Spec.NodeSelector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{nodes.GetLabelRoleMCPTest(): ""},
+			}
+
+			err = fxt.Client.Create(context.TODO(), mcp)
+			Expect(err).ToNot(HaveOccurred())
+
+			defer func() {
+				By(fmt.Sprintf("CLEANUP: deleting mcp: %q", mcp.Name))
+				err = fxt.Client.Delete(context.TODO(), mcp)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = wait.With(fxt.Client).
+					Interval(configuration.MachineConfigPoolUpdateInterval).
+					Timeout(configuration.MachineConfigPoolUpdateTimeout).
+					ForMachineConfigPoolDeleted(context.TODO(), mcp)
+				Expect(err).ToNot(HaveOccurred())
+			}()
+
+			// save the initial nrop mcp to use it later while waiting for mcp to get updated
+			initialMcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
+			Expect(err).ToNot(HaveOccurred())
+
+			By(fmt.Sprintf("modifying the NUMAResourcesOperator nodeGroups field to match new mcp: %q labels %q", mcp.Name, mcp.Labels))
+			Eventually(func(g Gomega) {
+				// we need that for the current ResourceVersion
+				err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				for i := range nroOperObj.Spec.NodeGroups {
+					nroOperObj.Spec.NodeGroups[i].MachineConfigPoolSelector.MatchLabels = mcp.Labels
+				}
+				err = fxt.Client.Update(context.TODO(), nroOperObj)
+				g.Expect(err).ToNot(HaveOccurred())
+			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+			defer func() {
+				By("CLEANUP: reverting the changes under the NUMAResourcesOperator object")
 				// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3
 				nroOperObj := &nropv1.NUMAResourcesOperator{}
 				Eventually(func(g Gomega) {
@@ -183,55 +234,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					}(mcp)
 				}
 				wg.Wait()
-
-				testMcp := objects.TestMCP()
-				By(fmt.Sprintf("deleting mcp: %q", testMcp.Name))
-				err = fxt.Client.Delete(context.TODO(), testMcp)
-				Expect(err).ToNot(HaveOccurred())
-
-				err = wait.With(fxt.Client).
-					Interval(configuration.MachineConfigPoolUpdateInterval).
-					Timeout(configuration.MachineConfigPoolUpdateTimeout).
-					ForMachineConfigPoolDeleted(context.TODO(), testMcp)
-				Expect(err).ToNot(HaveOccurred())
-			}() // end of defer
-
-			mcp := objects.TestMCP()
-			By(fmt.Sprintf("creating new MCP: %q", mcp.Name))
-			// we must have this label in order to match other machine configs that are necessary for proper functionality
-			mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": nodes.RoleMCPTest}
-			mcp.Spec.MachineConfigSelector = &metav1.LabelSelector{
-				MatchExpressions: []metav1.LabelSelectorRequirement{
-					{
-						Key:      "machineconfiguration.openshift.io/role",
-						Operator: metav1.LabelSelectorOpIn,
-						Values:   []string{nodes.RoleWorker, nodes.RoleMCPTest},
-					},
-				},
-			}
-			mcp.Spec.NodeSelector = &metav1.LabelSelector{
-				MatchLabels: map[string]string{nodes.GetLabelRoleMCPTest(): ""},
-			}
-
-			err = fxt.Client.Create(context.TODO(), mcp)
-			Expect(err).ToNot(HaveOccurred())
-
-			// save the initial nrop mcp to use it later while waiting for mcp to get updated
-			initialMcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
-			Expect(err).ToNot(HaveOccurred())
-
-			By(fmt.Sprintf("modifying the NUMAResourcesOperator nodeGroups field to match new mcp: %q labels %q", mcp.Name, mcp.Labels))
-			Eventually(func(g Gomega) {
-				// we need that for the current ResourceVersion
-				err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
-				g.Expect(err).ToNot(HaveOccurred())
-
-				for i := range nroOperObj.Spec.NodeGroups {
-					nroOperObj.Spec.NodeGroups[i].MachineConfigPoolSelector.MatchLabels = mcp.Labels
-				}
-				err = fxt.Client.Update(context.TODO(), nroOperObj)
-				g.Expect(err).ToNot(HaveOccurred())
-			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+			}() //end of defer
 
 			// here we expect mcp-test and worker mcps to get updated.
 			// worker will take much longer to get updated as a node reboot will
