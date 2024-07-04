@@ -1369,14 +1369,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("verify the pod keep on pending")
-			err = wait.With(fxt.Client).Interval(10*time.Second).Steps(5).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
+			_, err = wait.With(fxt.Client).Interval(10*time.Second).Steps(5).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				dumpNRTForNode(fxt.Client, targetNodeName, "target")
 			}
-			Expect(err).ToNot(HaveOccurred())
-			updatedPod := &corev1.Pod{}
-			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Namespace: pod.Namespace, Name: pod.Name}, updatedPod)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the scheduler report the expected error in the pod events`")
@@ -1401,14 +1398,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					loggedEvents = true
 				}
 				return false
-			}).WithTimeout(2*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "pod %s/%s doesn't contains the expected event error", updatedPod.Namespace, updatedPod.Name)
+			}).WithTimeout(2*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "pod %s/%s doesn't contains the expected event error", pod.Namespace, pod.Name)
 
 			By("deleting the test pod")
-			err = fxt.Client.Delete(context.TODO(), updatedPod)
+			err = fxt.Client.Delete(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the test pod is removed")
-			err = wait.With(fxt.Client).Timeout(3*time.Minute).ForPodDeleted(context.TODO(), updatedPod.Namespace, updatedPod.Name)
+			err = wait.With(fxt.Client).Timeout(3*time.Minute).ForPodDeleted(context.TODO(), pod.Namespace, pod.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			// we don't need to wait for NRT update since we already checked it hasn't changed in prior step
