@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -785,37 +784,9 @@ func sriovToleration() corev1.Toleration {
 }
 
 func waitForMcpUpdate(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool) {
-	var wg sync.WaitGroup
-	var err error
 	By("waiting for mcp to start updating")
-	for _, mcp := range mcps {
-		wg.Add(1)
-		klog.Infof("wait for mcp %q to start updating", mcp.Name)
-		go func(mcpool *machineconfigv1.MachineConfigPool) {
-			defer GinkgoRecover()
-			defer wg.Done()
-			err = wait.With(cli).
-				Interval(configuration.MachineConfigPoolUpdateInterval).
-				Timeout(configuration.MachineConfigPoolUpdateTimeout).
-				ForMachineConfigPoolCondition(ctx, mcpool, machineconfigv1.MachineConfigPoolUpdating)
-			Expect(err).ToNot(HaveOccurred())
-		}(mcp)
-	}
-	wg.Wait()
+	waitForMcpsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdating)
 
 	By("wait for mcp to get updated")
-	for _, mcp := range mcps {
-		klog.Infof("wait for mcp %q to get updated", mcp.Name)
-		wg.Add(1)
-		go func(mcpool *machineconfigv1.MachineConfigPool) {
-			defer GinkgoRecover()
-			defer wg.Done()
-			err = wait.With(cli).
-				Interval(configuration.MachineConfigPoolUpdateInterval).
-				Timeout(configuration.MachineConfigPoolUpdateTimeout).
-				ForMachineConfigPoolCondition(ctx, mcpool, machineconfigv1.MachineConfigPoolUpdated)
-			Expect(err).ToNot(HaveOccurred())
-		}(mcp)
-	}
-	wg.Wait()
+	waitForMcpsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated)
 }

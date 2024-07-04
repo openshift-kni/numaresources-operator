@@ -202,38 +202,12 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
 				Expect(err).ToNot(HaveOccurred())
 
-				var wg sync.WaitGroup
 				By("waiting for mcp to start updating")
-				for _, mcp := range mcps {
-					wg.Add(1)
-					klog.Infof("wait for mcp %q to start updating", mcp.Name)
-					go func(mcpool *machineconfigv1.MachineConfigPool) {
-						defer GinkgoRecover()
-						defer wg.Done()
-						err = wait.With(fxt.Client).
-							Interval(configuration.MachineConfigPoolUpdateInterval).
-							Timeout(configuration.MachineConfigPoolUpdateTimeout).
-							ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdating)
-						Expect(err).ToNot(HaveOccurred())
-					}(mcp)
-				}
-				wg.Wait()
+				waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
 
 				By("wait for mcp to get updated")
-				for _, mcp := range mcps {
-					klog.Infof("wait for mcp %q to get updated", mcp.Name)
-					wg.Add(1)
-					go func(mcpool *machineconfigv1.MachineConfigPool) {
-						defer GinkgoRecover()
-						defer wg.Done()
-						err = wait.With(fxt.Client).
-							Interval(configuration.MachineConfigPoolUpdateInterval).
-							Timeout(configuration.MachineConfigPoolUpdateTimeout).
-							ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
-						Expect(err).ToNot(HaveOccurred())
-					}(mcp)
-				}
-				wg.Wait()
+				waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
+
 			}() //end of defer
 
 			// here we expect mcp-test and worker mcps to get updated.
@@ -250,53 +224,13 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for the new mcps to get updated")
-			var wg sync.WaitGroup
-			for _, mcp := range newMcps {
-				wg.Add(1)
-				klog.Infof("wait for mcp %q to get updated", mcp.Name)
-				go func(mcpool *machineconfigv1.MachineConfigPool) {
-					defer GinkgoRecover()
-					defer wg.Done()
-					err = wait.With(fxt.Client).
-						Interval(configuration.MachineConfigPoolUpdateInterval).
-						Timeout(configuration.MachineConfigPoolUpdateTimeout).
-						ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
-					Expect(err).ToNot(HaveOccurred())
-				}(mcp)
-			}
-			wg.Wait()
+			waitForMcpsCondition(fxt.Client, context.TODO(), newMcps, machineconfigv1.MachineConfigPoolUpdated)
 
 			By("waiting for the old mcps to start updating")
-			for _, mcp := range initialMcps {
-				wg.Add(1)
-				klog.Infof("wait for mcp %q to start updating", mcp.Name)
-				go func(mcpool *machineconfigv1.MachineConfigPool) {
-					defer GinkgoRecover()
-					defer wg.Done()
-					err = wait.With(fxt.Client).
-						Interval(configuration.MachineConfigPoolUpdateInterval).
-						Timeout(configuration.MachineConfigPoolUpdateTimeout).
-						ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdating)
-					Expect(err).ToNot(HaveOccurred())
-				}(mcp)
-			}
-			wg.Wait()
+			waitForMcpsCondition(fxt.Client, context.TODO(), initialMcps, machineconfigv1.MachineConfigPoolUpdating)
 
 			By("waiting for the old mcps to get updated")
-			for _, mcp := range initialMcps {
-				wg.Add(1)
-				klog.Infof("wait for mcp %q to get updated", mcp.Name)
-				go func(mcpool *machineconfigv1.MachineConfigPool) {
-					defer GinkgoRecover()
-					defer wg.Done()
-					err = wait.With(fxt.Client).
-						Interval(configuration.MachineConfigPoolUpdateInterval).
-						Timeout(configuration.MachineConfigPoolUpdateTimeout).
-						ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
-					Expect(err).ToNot(HaveOccurred())
-				}(mcp)
-			}
-			wg.Wait()
+			waitForMcpsCondition(fxt.Client, context.TODO(), initialMcps, machineconfigv1.MachineConfigPoolUpdated)
 
 			By(fmt.Sprintf("Verify RTE daemonsets have the updated node selector matching to the new mcp %q", mcp.Name))
 			Eventually(func() (bool, error) {
@@ -507,38 +441,11 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				g.Expect(err).ToNot(HaveOccurred())
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-			var wg sync.WaitGroup
 			By("waiting for mcp to start updating")
-			for _, mcp := range mcps {
-				wg.Add(1)
-				klog.Infof("wait for mcp %q to start updating", mcp.Name)
-				go func(mcpool *machineconfigv1.MachineConfigPool) {
-					defer GinkgoRecover()
-					defer wg.Done()
-					err = wait.With(fxt.Client).
-						Interval(configuration.MachineConfigPoolUpdateInterval).
-						Timeout(configuration.MachineConfigPoolUpdateTimeout).
-						ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdating)
-					Expect(err).ToNot(HaveOccurred())
-				}(mcp)
-			}
-			wg.Wait()
+			waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
 
 			By("wait for mcp to get updated")
-			for _, mcp := range mcps {
-				klog.Infof("wait for mcp %q to get updated", mcp.Name)
-				wg.Add(1)
-				go func(mcpool *machineconfigv1.MachineConfigPool) {
-					defer GinkgoRecover()
-					defer wg.Done()
-					err = wait.With(fxt.Client).
-						Interval(configuration.MachineConfigPoolUpdateInterval).
-						Timeout(configuration.MachineConfigPoolUpdateTimeout).
-						ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
-					Expect(err).ToNot(HaveOccurred())
-				}(mcp)
-			}
-			wg.Wait()
+			waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
 
 			defer func() {
 				By("reverting kubeletconfig changes")
@@ -558,37 +465,10 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 				By("waiting for mcp to start updating")
-				for _, mcp := range mcps {
-					wg.Add(1)
-					klog.Infof("wait for mcp %q to start updating", mcp.Name)
-					go func(mcpool *machineconfigv1.MachineConfigPool) {
-						defer GinkgoRecover()
-						defer wg.Done()
-						err = wait.With(fxt.Client).
-							Interval(configuration.MachineConfigPoolUpdateInterval).
-							Timeout(configuration.MachineConfigPoolUpdateTimeout).
-							ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdating)
-						Expect(err).ToNot(HaveOccurred())
-					}(mcp)
-				}
-				wg.Wait()
+				waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
 
 				By("wait for mcp to get updated")
-				for _, mcp := range mcps {
-					klog.Infof("wait for mcp %q to get updated", mcp.Name)
-					wg.Add(1)
-					go func(mcpool *machineconfigv1.MachineConfigPool) {
-						defer GinkgoRecover()
-						defer wg.Done()
-						err = wait.With(fxt.Client).
-							Interval(configuration.MachineConfigPoolUpdateInterval).
-							Timeout(configuration.MachineConfigPoolUpdateTimeout).
-							ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
-						Expect(err).ToNot(HaveOccurred())
-					}(mcp)
-				}
-				wg.Wait()
-
+				waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
 			}()
 
 			By("checking that NUMAResourcesOperator's ConfigMap has changed")
@@ -905,4 +785,22 @@ func accumulateKubeletConfigNames(cms []corev1.ConfigMap) sets.Set[string] {
 		cmNames.Insert(cm.Name)
 	}
 	return cmNames
+}
+
+func waitForMcpsCondition(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool, condition machineconfigv1.MachineConfigPoolConditionType) {
+	var wg sync.WaitGroup
+	for _, mcp := range mcps {
+		wg.Add(1)
+		klog.Infof("wait for mcp %q to start updating", mcp.Name)
+		go func(mcpool *machineconfigv1.MachineConfigPool) {
+			defer GinkgoRecover()
+			defer wg.Done()
+			err := wait.With(cli).
+				Interval(configuration.MachineConfigPoolUpdateInterval).
+				Timeout(configuration.MachineConfigPoolUpdateTimeout).
+				ForMachineConfigPoolCondition(ctx, mcpool, condition)
+			Expect(err).ToNot(HaveOccurred())
+		}(mcp)
+	}
+	wg.Wait()
 }
