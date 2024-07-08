@@ -21,6 +21,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.1.0
 	github.com/stretchr/testify v1.8.4
+	golang.org/x/sync v0.5.0
 	k8s.io/api v0.29.3
 	k8s.io/apiextensions-apiserver v0.29.3
 	k8s.io/apimachinery v0.29.3

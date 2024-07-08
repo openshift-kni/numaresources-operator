@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -41,6 +40,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/sync/errgroup"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
@@ -788,19 +788,20 @@ func accumulateKubeletConfigNames(cms []corev1.ConfigMap) sets.Set[string] {
 }
 
 func waitForMcpsCondition(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool, condition machineconfigv1.MachineConfigPoolConditionType) {
-	var wg sync.WaitGroup
+	var eg errgroup.Group
 	for _, mcp := range mcps {
-		wg.Add(1)
-		klog.Infof("wait for mcp %q to start updating", mcp.Name)
-		go func(mcpool *machineconfigv1.MachineConfigPool) {
+		klog.Infof("wait for mcp %q to meet condition %q", mcp.Name, condition)
+		mcp := mcp
+		eg.Go(func() error {
 			defer GinkgoRecover()
-			defer wg.Done()
 			err := wait.With(cli).
 				Interval(configuration.MachineConfigPoolUpdateInterval).
 				Timeout(configuration.MachineConfigPoolUpdateTimeout).
-				ForMachineConfigPoolCondition(ctx, mcpool, condition)
-			Expect(err).ToNot(HaveOccurred())
-		}(mcp)
+				ForMachineConfigPoolCondition(ctx, mcp, condition)
+			return err
+		})
 	}
-	wg.Wait()
+	if err := eg.Wait(); err != nil {
+		fmt.Printf("An error occurred: %v\n", err)
+	}
 }
