@@ -39,7 +39,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
-var _ = Describe("[serial] numaresources profile update", Serial, func() {
+var _ = Describe("[serial] numaresources profile update", Serial, Label("no-4.13", "no-4.14", "no-4.15"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
