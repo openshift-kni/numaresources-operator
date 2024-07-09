@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -41,6 +40,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/sync/errgroup"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
@@ -128,73 +128,13 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			defer func() {
-				By(fmt.Sprintf("Restore initial labels of node %q with %q", targetedNode.Name, nodes.GetLabelRoleWorker()))
+				By(fmt.Sprintf("CLEANUP: restore initial labels of node %q with %q", targetedNode.Name, nodes.GetLabelRoleWorker()))
 				err = unlabelFunc()
 				Expect(err).ToNot(HaveOccurred())
 
 				err = labelFunc()
 				Expect(err).ToNot(HaveOccurred())
-
-				By("reverting the changes under the NUMAResourcesOperator object")
-				// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3
-				nroOperObj := &nropv1.NUMAResourcesOperator{}
-				Eventually(func(g Gomega) {
-					// we need that for the current ResourceVersion
-					err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
-					g.Expect(err).ToNot(HaveOccurred())
-
-					nroOperObj.Spec = initialNroOperObj.Spec
-					err = fxt.Client.Update(context.TODO(), nroOperObj)
-					g.Expect(err).ToNot(HaveOccurred())
-				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
-
-				mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
-				Expect(err).ToNot(HaveOccurred())
-
-				var wg sync.WaitGroup
-				By("waiting for mcp to start updating")
-				for _, mcp := range mcps {
-					wg.Add(1)
-					klog.Infof("wait for mcp %q to start updating", mcp.Name)
-					go func(mcpool *machineconfigv1.MachineConfigPool) {
-						defer GinkgoRecover()
-						defer wg.Done()
-						err = wait.With(fxt.Client).
-							Interval(configuration.MachineConfigPoolUpdateInterval).
-							Timeout(configuration.MachineConfigPoolUpdateTimeout).
-							ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdating)
-						Expect(err).ToNot(HaveOccurred())
-					}(mcp)
-				}
-				wg.Wait()
-
-				By("wait for mcp to get updated")
-				for _, mcp := range mcps {
-					klog.Infof("wait for mcp %q to get updated", mcp.Name)
-					wg.Add(1)
-					go func(mcpool *machineconfigv1.MachineConfigPool) {
-						defer GinkgoRecover()
-						defer wg.Done()
-						err = wait.With(fxt.Client).
-							Interval(configuration.MachineConfigPoolUpdateInterval).
-							Timeout(configuration.MachineConfigPoolUpdateTimeout).
-							ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
-						Expect(err).ToNot(HaveOccurred())
-					}(mcp)
-				}
-				wg.Wait()
-
-				testMcp := objects.TestMCP()
-				By(fmt.Sprintf("deleting mcp: %q", testMcp.Name))
-				err = fxt.Client.Delete(context.TODO(), testMcp)
-				Expect(err).ToNot(HaveOccurred())
-
-				err = wait.With(fxt.Client).
-					Interval(configuration.MachineConfigPoolUpdateInterval).
-					Timeout(configuration.MachineConfigPoolUpdateTimeout).
-					ForMachineConfigPoolDeleted(context.TODO(), testMcp)
-				Expect(err).ToNot(HaveOccurred())
-			}() // end of defer
+			}()
 
 			mcp := objects.TestMCP()
 			By(fmt.Sprintf("creating new MCP: %q", mcp.Name))
@@ -216,6 +156,18 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			err = fxt.Client.Create(context.TODO(), mcp)
 			Expect(err).ToNot(HaveOccurred())
 
+			defer func() {
+				By(fmt.Sprintf("CLEANUP: deleting mcp: %q", mcp.Name))
+				err = fxt.Client.Delete(context.TODO(), mcp)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = wait.With(fxt.Client).
+					Interval(configuration.MachineConfigPoolUpdateInterval).
+					Timeout(configuration.MachineConfigPoolUpdateTimeout).
+					ForMachineConfigPoolDeleted(context.TODO(), mcp)
+				Expect(err).ToNot(HaveOccurred())
+			}()
+
 			// save the initial nrop mcp to use it later while waiting for mcp to get updated
 			initialMcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
 			Expect(err).ToNot(HaveOccurred())
@@ -233,6 +185,31 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				g.Expect(err).ToNot(HaveOccurred())
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
+			defer func() {
+				By("CLEANUP: reverting the changes under the NUMAResourcesOperator object")
+				// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3
+				nroOperObj := &nropv1.NUMAResourcesOperator{}
+				Eventually(func(g Gomega) {
+					// we need that for the current ResourceVersion
+					err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
+					g.Expect(err).ToNot(HaveOccurred())
+
+					nroOperObj.Spec = initialNroOperObj.Spec
+					err = fxt.Client.Update(context.TODO(), nroOperObj)
+					g.Expect(err).ToNot(HaveOccurred())
+				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+				mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("waiting for mcp to start updating")
+				waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
+
+				By("wait for mcp to get updated")
+				waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
+
+			}() //end of defer
+
 			// here we expect mcp-test and worker mcps to get updated.
 			// worker will take much longer to get updated as a node reboot will
 			// be triggered on the node labeled with mcp-test.
@@ -247,53 +224,13 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for the new mcps to get updated")
-			var wg sync.WaitGroup
-			for _, mcp := range newMcps {
-				wg.Add(1)
-				klog.Infof("wait for mcp %q to get updated", mcp.Name)
-				go func(mcpool *machineconfigv1.MachineConfigPool) {
-					defer GinkgoRecover()
-					defer wg.Done()
-					err = wait.With(fxt.Client).
-						Interval(configuration.MachineConfigPoolUpdateInterval).
-						Timeout(configuration.MachineConfigPoolUpdateTimeout).
-						ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
-					Expect(err).ToNot(HaveOccurred())
-				}(mcp)
-			}
-			wg.Wait()
+			waitForMcpsCondition(fxt.Client, context.TODO(), newMcps, machineconfigv1.MachineConfigPoolUpdated)
 
 			By("waiting for the old mcps to start updating")
-			for _, mcp := range initialMcps {
-				wg.Add(1)
-				klog.Infof("wait for mcp %q to start updating", mcp.Name)
-				go func(mcpool *machineconfigv1.MachineConfigPool) {
-					defer GinkgoRecover()
-					defer wg.Done()
-					err = wait.With(fxt.Client).
-						Interval(configuration.MachineConfigPoolUpdateInterval).
-						Timeout(configuration.MachineConfigPoolUpdateTimeout).
-						ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdating)
-					Expect(err).ToNot(HaveOccurred())
-				}(mcp)
-			}
-			wg.Wait()
+			waitForMcpsCondition(fxt.Client, context.TODO(), initialMcps, machineconfigv1.MachineConfigPoolUpdating)
 
 			By("waiting for the old mcps to get updated")
-			for _, mcp := range initialMcps {
-				wg.Add(1)
-				klog.Infof("wait for mcp %q to get updated", mcp.Name)
-				go func(mcpool *machineconfigv1.MachineConfigPool) {
-					defer GinkgoRecover()
-					defer wg.Done()
-					err = wait.With(fxt.Client).
-						Interval(configuration.MachineConfigPoolUpdateInterval).
-						Timeout(configuration.MachineConfigPoolUpdateTimeout).
-						ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
-					Expect(err).ToNot(HaveOccurred())
-				}(mcp)
-			}
-			wg.Wait()
+			waitForMcpsCondition(fxt.Client, context.TODO(), initialMcps, machineconfigv1.MachineConfigPoolUpdated)
 
 			By(fmt.Sprintf("Verify RTE daemonsets have the updated node selector matching to the new mcp %q", mcp.Name))
 			Eventually(func() (bool, error) {
@@ -504,21 +441,11 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 				g.Expect(err).ToNot(HaveOccurred())
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-			By("waiting for MachineConfigPools to get updated")
-			var wg sync.WaitGroup
-			for _, mcp := range mcps {
-				wg.Add(1)
-				go func(mcpool *machineconfigv1.MachineConfigPool) {
-					defer GinkgoRecover()
-					defer wg.Done()
-					err = wait.With(fxt.Client).
-						Interval(configuration.MachineConfigPoolUpdateInterval).
-						Timeout(configuration.MachineConfigPoolUpdateTimeout).
-						ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
-					Expect(err).ToNot(HaveOccurred())
-				}(mcp)
-			}
-			wg.Wait()
+			By("waiting for mcp to start updating")
+			waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
+
+			By("wait for mcp to get updated")
+			waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
 
 			defer func() {
 				By("reverting kubeletconfig changes")
@@ -537,20 +464,11 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 					g.Expect(err).ToNot(HaveOccurred())
 				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-				By("waiting for MachineConfigPools to get updated")
-				for _, mcp := range mcps {
-					wg.Add(1)
-					go func(mcpool *machineconfigv1.MachineConfigPool) {
-						defer GinkgoRecover()
-						defer wg.Done()
-						err = wait.With(fxt.Client).
-							Interval(configuration.MachineConfigPoolUpdateInterval).
-							Timeout(configuration.MachineConfigPoolUpdateTimeout).
-							ForMachineConfigPoolCondition(context.TODO(), mcpool, machineconfigv1.MachineConfigPoolUpdated)
-						Expect(err).ToNot(HaveOccurred())
-					}(mcp)
-				}
-				wg.Wait()
+				By("waiting for mcp to start updating")
+				waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
+
+				By("wait for mcp to get updated")
+				waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
 			}()
 
 			By("checking that NUMAResourcesOperator's ConfigMap has changed")
@@ -867,4 +785,23 @@ func accumulateKubeletConfigNames(cms []corev1.ConfigMap) sets.Set[string] {
 		cmNames.Insert(cm.Name)
 	}
 	return cmNames
+}
+
+func waitForMcpsCondition(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool, condition machineconfigv1.MachineConfigPoolConditionType) {
+	var eg errgroup.Group
+	for _, mcp := range mcps {
+		klog.Infof("wait for mcp %q to meet condition %q", mcp.Name, condition)
+		mcp := mcp
+		eg.Go(func() error {
+			defer GinkgoRecover()
+			err := wait.With(cli).
+				Interval(configuration.MachineConfigPoolUpdateInterval).
+				Timeout(configuration.MachineConfigPoolUpdateTimeout).
+				ForMachineConfigPoolCondition(ctx, mcp, condition)
+			return err
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		fmt.Printf("An error occurred: %v\n", err)
+	}
 }

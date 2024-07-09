@@ -321,11 +321,11 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				err := fxt.Client.Create(ctx, pod)
 				Expect(err).NotTo(HaveOccurred(), "unable to create test pod %q", pod.Name)
 
-				updatedPod, err := wait.With(fxt.Client).Timeout(time.Minute).ForPodPhase(ctx, pod.Namespace, pod.Name, corev1.PodPending)
+				updatedPod, err := wait.With(fxt.Client).Interval(5*time.Second).Steps(3).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
 				if err != nil {
-					_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
+					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
-				Expect(err).NotTo(HaveOccurred(), "Pod %s/%s was found  in state %q while expected to be Pending", updatedPod.Namespace, updatedPod.Name, updatedPod.Status.Phase)
+				Expect(err).NotTo(HaveOccurred(), "Pod %s/%s was found in state %q while expected to be Pending", updatedPod.Namespace, updatedPod.Name, updatedPod.Status.Phase)
 
 				klog.Infof("pod %s/%s resources: %s", updatedPod.Namespace, updatedPod.Name, intreslist.ToString(intreslist.FromContainerRequests(pod.Spec.Containers)))
 				Expect(updatedPod.Status.QOSClass).To(Equal(expectedQOS), "pod QoS mismatch")

@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (wt Waiter) WhileInPodPhase(ctx context.Context, podNamespace, podName string, phase corev1.PodPhase) error {
+func (wt Waiter) WhileInPodPhase(ctx context.Context, podNamespace, podName string, phase corev1.PodPhase) (*corev1.Pod, error) {
 	updatedPod := &corev1.Pod{}
 	key := ObjectKey{Name: podName, Namespace: podNamespace}
 	for step := 0; step < wt.PollSteps; step++ {
@@ -39,15 +39,15 @@ func (wt Waiter) WhileInPodPhase(ctx context.Context, podNamespace, podName stri
 
 		err := wt.Cli.Get(ctx, client.ObjectKey{Namespace: podNamespace, Name: podName}, updatedPod)
 		if err != nil {
-			return err
+			return updatedPod, err
 		}
 
 		if updatedPod.Status.Phase != phase {
 			klog.Warningf("pod %s unexpected phase %q expected %q", key.String(), updatedPod.Status.Phase, string(phase))
-			return fmt.Errorf("pod %s unexpected phase %q expected %q", key.String(), updatedPod.Status.Phase, string(phase))
+			return updatedPod, fmt.Errorf("pod %s unexpected phase %q expected %q", key.String(), updatedPod.Status.Phase, string(phase))
 		}
 	}
-	return nil
+	return updatedPod, nil
 }
 
 func (wt Waiter) ForPodPhase(ctx context.Context, podNamespace, podName string, phase corev1.PodPhase) (*corev1.Pod, error) {

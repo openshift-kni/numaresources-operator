@@ -252,7 +252,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			// TODO: lacking better ways, let's monitor the pod "long enough" and let's check it stays Pending
 			// if it stays Pending "long enough" it still means little, but OTOH if it goes Running or Failed we
 			// can tell for sure something's wrong
-			err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
+			_, err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
@@ -277,7 +277,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			By("waiting for the pod to be scheduled")
 			updatedPod, err := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodRunning)
 			if err != nil {
-				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
+				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
 			Expect(err).ToNot(HaveOccurred())
 
@@ -640,7 +640,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			By("check the pod is still pending")
 
-			err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), podGuanranteed.Namespace, podGuanranteed.Name, corev1.PodPending)
+			_, err = wait.With(fxt.Client).Interval(10*time.Second).Steps(3).WhileInPodPhase(context.TODO(), podGuanranteed.Namespace, podGuanranteed.Name, corev1.PodPending)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, podGuanranteed.Namespace, podGuanranteed.Name)
 			}
@@ -659,7 +659,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			// 3 minutes is plenty, should never timeout
 			updatedPod2, err := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodPhase(context.TODO(), podGuanranteed.Namespace, podGuanranteed.Name, corev1.PodRunning)
 			if err != nil {
-				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod2.Namespace, updatedPod2.Name)
+				_ = objects.LogEventsForPod(fxt.K8sClient, podGuanranteed.Namespace, podGuanranteed.Name)
 			}
 			Expect(err).ToNot(HaveOccurred())
 
