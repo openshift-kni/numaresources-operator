@@ -390,9 +390,18 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			}
 		})
 
-		ginkgo.It("should allow to change the informerMode to Dedicated", func() {
+		ginkgo.It("should set the default informerMode to Dedicated", func() {
 			nrs := nrs.DeepCopy()
-			informerMode := nropv1.SchedulerInformerDedicated
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			expectCacheParams(reconciler.Client, depmanifests.CacheInformerDedicated, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectOnlyExclusiveResources)
+		})
+
+		ginkgo.It("should allow to change the informerMode to Shared", func() {
+			nrs := nrs.DeepCopy()
+			informerMode := nropv1.SchedulerInformerShared
 			nrs.Spec.SchedulerInformer = &informerMode
 			gomega.Eventually(func() bool {
 				if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
@@ -406,7 +415,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			expectCacheParams(reconciler.Client, depmanifests.InformerModeDedicated, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectOnlyExclusiveResources)
+			expectCacheParams(reconciler.Client, depmanifests.CacheInformerShared, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectOnlyExclusiveResources)
 		})
 
 		ginkgo.It("should allow to set aggressive resync detection mode in configmap", func() {
@@ -421,7 +430,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			expectCacheParams(reconciler.Client, depmanifests.InformerModeShared, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectAll)
+			expectCacheParams(reconciler.Client, depmanifests.CacheInformerDedicated, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectAll)
 		})
 	})
 })
