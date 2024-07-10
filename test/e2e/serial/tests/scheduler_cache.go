@@ -64,7 +64,7 @@ type interferenceDesc struct {
 	ratio int
 }
 
-var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, Label("scheduler", "cache", "tier0"), func() {
+var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, Label("scheduler", "cache", "tier0"), Label("feature:cache"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 

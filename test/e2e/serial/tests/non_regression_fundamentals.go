@@ -42,7 +42,7 @@ import (
 
 type setupPodFunc func(pod *corev1.Pod)
 
-var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundamentals non-regression", Serial, func() {
+var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundamentals non-regression", Serial, Label("fundamentals", "scheduler", "nonreg"), Label("feature:nonreg"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 

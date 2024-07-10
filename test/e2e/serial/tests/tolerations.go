@@ -51,7 +51,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations support", Serial, Label("disruptive", "rtetols"), func() {
+var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations support", Serial, Label("disruptive", "rtetols"), Label("feature:rtetols"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 

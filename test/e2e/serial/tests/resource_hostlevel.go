@@ -40,7 +40,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
-var _ = Describe("[serial][hostlevel] numaresources host-level resources", Serial, Label("hostlevel"), func() {
+var _ = Describe("[serial][hostlevel] numaresources host-level resources", Serial, Label("hostlevel"), Label("feature:hostlevel"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
@@ -60,7 +60,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 		Expect(e2efixture.Teardown(fxt)).To(Succeed())
 	})
 
-	Context("with at least two nodes suitable", func() {
+	Context("with at least two nodes suitable", Label("tier0"), func() {
 		// testing scope=container is pointless in this case: 1 pod with 1 container.
 		// It should behave exactly like scope=pod. But we keep these tests as non-regression
 		// to have a signal the system is behaving as expected.
@@ -262,7 +262,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 	})
 
 	Context("[unsched] without suitable nodes with enough host level resources", func() {
-		DescribeTable("[hostlevel][failalign] a pod with multi containers should be pending due to unavailable host-level resources", Label("hostlevel", "failalign"),
+		DescribeTable("[hostlevel][failalign] a pod with multi containers should be pending due to unavailable host-level resources", Label("hostlevel", "failalign"), Label("feature:unsched"),
 			func(tmPolicy string, requiredRes []corev1.ResourceList, expectedQOS corev1.PodQOSClass) {
 				ctx := context.TODO()
 				nrtCandidates := filterNodes(fxt, desiredNodesState{

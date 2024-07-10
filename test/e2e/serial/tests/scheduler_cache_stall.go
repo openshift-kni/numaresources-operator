@@ -45,7 +45,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
-var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("scheduler", "cache", "stall"), func() {
+var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("scheduler", "cache", "stall"), Label("feature:cache", "feature:stall"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 

@@ -52,7 +52,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workload resource accounting", Serial, Label("disruptive", "scheduler", "resacct"), func() {
+var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workload resource accounting", Serial, Label("disruptive", "scheduler", "resacct"), Label("feature:resacct"), func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
