@@ -396,7 +396,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			expectCacheParams(reconciler.Client, depmanifests.CacheInformerDedicated, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectOnlyExclusiveResources)
+			expectCacheParams(reconciler.Client, depmanifests.CacheInformerDedicated, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectAll)
 		})
 
 		ginkgo.It("should allow to change the informerMode to Shared", func() {
@@ -415,7 +415,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			expectCacheParams(reconciler.Client, depmanifests.CacheInformerShared, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectOnlyExclusiveResources)
+			expectCacheParams(reconciler.Client, depmanifests.CacheInformerShared, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectAll)
 		})
 
 		ginkgo.It("should allow to set aggressive resync detection mode in configmap", func() {

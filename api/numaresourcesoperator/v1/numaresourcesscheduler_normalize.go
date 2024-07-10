@@ -27,7 +27,7 @@ const (
 	defaultCacheResyncPeriod    = 5 * time.Second
 	defaultCacheResyncDebug     = CacheResyncDebugDumpJSONFile
 	defaultSchedulerInformer    = SchedulerInformerDedicated
-	defaultCacheResyncDetection = CacheResyncDetectionRelaxed
+	defaultCacheResyncDetection = CacheResyncDetectionAggressive
 )
 
 func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
