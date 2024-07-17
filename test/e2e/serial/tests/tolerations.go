@@ -51,7 +51,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerations support", Serial, Label("disruptive", "slow", "rtetols"), func() {
+var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations support", Serial, Label("disruptive", "rtetols"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
@@ -226,7 +226,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)), "RTE DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers))
 			})
 
-			It("[tier2][test_id:72857] should handle untolerations of tainted nodes while RTEs are running", Label("tier2"), func(ctx context.Context) {
+			It("[tier2][slow][test_id:72857] should handle untolerations of tainted nodes while RTEs are running", Label("slow", "tier2"), func(ctx context.Context) {
 				var err error
 				By("adding extra tolerations")
 				_ = setRTETolerations(ctx, fxt.Client, nroKey, testToleration())
@@ -282,7 +282,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)-1), "updated DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers)-1)
 			})
 
-			It("[tier3] should evict running RTE pod if taint-tolartion matching criteria is shaken - NROP CR toleration update", Label("tier3"), func(ctx context.Context) {
+			It("[tier3][slow] should evict running RTE pod if taint-toleration matching criteria is shaken - NROP CR toleration update", Label("tier3", "slow"), func(ctx context.Context) {
 				By("add toleration with value to the NROP CR")
 				tolerateVal := corev1.Toleration{
 					Key:      testKey,
@@ -337,7 +337,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(err).ToNot(HaveOccurred(), "pod %s/%s still exists", podOnNode.Namespace, podOnNode.Name)
 			})
 
-			It("[tier3] should evict running RTE pod if taint-tolartion matching criteria is shaken - node taints update", Label("tier3"), func(ctx context.Context) {
+			It("[tier3][slow] should evict running RTE pod if taint-tolartion matching criteria is shaken - node taints update", Label("tier3", "slow"), func(ctx context.Context) {
 				By("taint one node with taint value and NoExecute effect")
 				var err error
 				workers, err = nodes.GetWorkerNodes(fxt.Client, ctx)
