@@ -52,7 +52,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workload resource accounting", Serial, func() {
+var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workload resource accounting", Serial, Label("disruptive", "scheduler", "resacct"), func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
@@ -112,7 +112,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			}
 		})
 
-		It("[placement][test_id:49068][tier2] should keep the pod pending if not enough resources available, then schedule when resources are freed", func() {
+		It("[placement][test_id:49068][tier2] should keep the pod pending if not enough resources available, then schedule when resources are freed", Label("placement", "tier2"), func() {
 			// make sure this is > 1 and LESS than required Res!
 			unsuitableFreeRes := corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("2"),
@@ -408,7 +408,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			klog.Infof("reference NRT target: %s", intnrt.ToString(*targetNrtReference))
 		})
 
-		It("[test_id:48685][tier1] should properly schedule a best-effort pod with no changes in NRTs", func() {
+		It("[test_id:48685][tier1] should properly schedule a best-effort pod with no changes in NRTs", Label("tier1"), func() {
 			By("create a best-effort pod")
 
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod-be")
@@ -437,7 +437,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("[test_id:48686][tier1] should properly schedule a burstable pod with no changes in NRTs", func() {
+		It("[test_id:48686][tier1] should properly schedule a burstable pod with no changes in NRTs", Label("tier1"), func() {
 			By("create a burstable pod")
 
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod-bu")
@@ -468,7 +468,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("[test_id:47618][tier2] should properly schedule deployment with burstable pod with no changes in NRTs", func() {
+		It("[test_id:47618][tier2] should properly schedule deployment with burstable pod with no changes in NRTs", Label("tier2"), func() {
 			By("create a deployment with one burstable pod")
 			deploymentName := "test-dp"
 			var replicas int32 = 1
@@ -509,7 +509,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(e2enrt.CheckEqualAvailableResources(*targetNrtReference, *targetNrtCurrent)).To(BeTrue(), "new resources are accounted in NRT although scheduling burstable pod")
 		})
 
-		It("[tier2] should properly schedule a burstable pod when one of the containers is asking for requests=limits, with no changes in NRTs", func() {
+		It("[tier2] should properly schedule a burstable pod when one of the containers is asking for requests=limits, with no changes in NRTs", Label("tier2"), func() {
 			By("create a burstable pod")
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod-bu")
 			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
@@ -579,7 +579,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("[test_id:47620][tier2] should properly schedule a burstable pod with no changes in NRTs followed by a guaranteed pod that stays pending till burstable pod is deleted", func() {
+		It("[test_id:47620][tier2] should properly schedule a burstable pod with no changes in NRTs followed by a guaranteed pod that stays pending till burstable pod is deleted", Label("tier2"), func() {
 			By("create a burstable pod")
 
 			podBurstable := objects.NewTestPodPause(fxt.Namespace.Name, "testpod-first-bu")
@@ -718,7 +718,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 		})
 
-		It("[test_id:49071][tier2] should properly schedule daemonset with burstable pod with no changes in NRTs", func() {
+		It("[test_id:49071][tier2] should properly schedule daemonset with burstable pod with no changes in NRTs", Label("tier2"), func() {
 			By("create a daemonset with one burstable pod")
 			dsName := "test-ds"
 

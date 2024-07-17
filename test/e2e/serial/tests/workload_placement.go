@@ -66,7 +66,7 @@ import (
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
 )
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement", Serial, func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement", Serial, Label("disruptive", "scheduler"), func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
@@ -153,7 +153,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 		})
 
-		It("[test_id:47591][tier1] should modify workload post scheduling while keeping the resource requests available", func() {
+		It("[test_id:47591][tier1] should modify workload post scheduling while keeping the resource requests available", Label("tier1"), func() {
 			paddedNodeNames := sets.New[string](padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
@@ -543,7 +543,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 		})
 
-		It("[test_id:48746][tier2] should modify workload post scheduling while keeping the resource requests available across all NUMA node", func() {
+		It("[test_id:48746][tier2] should modify workload post scheduling while keeping the resource requests available across all NUMA node", Label("tier2"), func() {
 			paddedNodeNames := sets.New[string](padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode

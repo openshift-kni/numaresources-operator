@@ -52,7 +52,7 @@ import (
 
 type getNodeAffinityFunc func(labelName string, labelValue []string, selectOperator corev1.NodeSelectorOperator) *corev1.Affinity
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering node selector", Serial, func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering node selector", Serial, Label("disruptive", "scheduler"), func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
@@ -182,7 +182,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("[test_id:47598][tier2] should place the pod in the node with available resources in one NUMA zone and fulfilling node selector", func() {
+		It("[test_id:47598][tier2] should place the pod in the node with available resources in one NUMA zone and fulfilling node selector", Label("tier2"), func() {
 			By(fmt.Sprintf("Labeling nodes %q and %q with label %q:%q", targetNodeName, alternativeNodeName, labelName, labelValueMedium))
 
 			unlabelTarget, err := labelNodeWithValue(fxt.Client, labelName, labelValueMedium, targetNodeName)
@@ -278,7 +278,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 			})
 
-			DescribeTable("[tier2] a guaranteed deployment pod with nodeAffinity should be scheduled on one NUMA zone on a matching labeled node with enough resources", Serial,
+			DescribeTable("[tier2] a guaranteed deployment pod with nodeAffinity should be scheduled on one NUMA zone on a matching labeled node with enough resources", Serial, Label("tier2"),
 				func(getNodeAffFunc getNodeAffinityFunc) {
 					affinity := getNodeAffFunc(labelName, []string{labelValueLarge, labelValueMedium}, corev1.NodeSelectorOpIn)
 					By(fmt.Sprintf("create a deployment with one guaranteed pod with node affinity property: %+v ", affinity.NodeAffinity))

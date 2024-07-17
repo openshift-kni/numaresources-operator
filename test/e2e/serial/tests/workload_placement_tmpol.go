@@ -74,7 +74,7 @@ type tmScopeFuncs struct {
 
 type tmScopeFuncsHandler map[string]tmScopeFuncs
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering TM policy", Serial, func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering TM policy", Serial, Label("disruptive", "scheduler"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 	tmSingleNUMANodeFuncsHandler := tmScopeFuncsHandler{
@@ -173,6 +173,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		// FIXME: this is a slight abuse of DescribeTable, but we need to run
 		// the same code which a different test_id per tmscope
 		DescribeTable("[tier1] a guaranteed pod with one container should be scheduled into one NUMA zone",
+			Label("tier1"),
 			func(tmPolicy, tmScope string, requiredRes, paddingRes corev1.ResourceList) {
 				setupCluster(requiredRes, paddingRes, tmPolicy, tmScope)
 
@@ -210,6 +211,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				expectNRTConsumedResources(fxt, targetNrtInitial, requiredRes, updatedPod)
 			},
 			Entry("[test_id:48713][tmscope:cnt] with topology-manager-scope: container",
+				Label("tmscope:cnt"),
 				intnrt.SingleNUMANode,
 				intnrt.Container,
 				corev1.ResourceList{
@@ -222,6 +224,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			),
 			Entry("[test_id:50156][tmscope:pod] with topology-manager-scope: pod",
+				Label("tmscope:pod"),
 				intnrt.SingleNUMANode,
 				intnrt.Pod,
 				corev1.ResourceList{
@@ -234,6 +237,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			),
 			Entry("[test_id:50158][tmscope:cnt][hugepages] with topology-manager-scope: container with hugepages",
+				Label("tmscope:cnt", "hugepages"),
 				intnrt.SingleNUMANode,
 				intnrt.Container,
 				corev1.ResourceList{
@@ -248,6 +252,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			),
 			Entry("[test_id:50157][tmscope:pod][hugepages] with topology-manager-scope: pod with hugepages",
+				Label("tmscope:pod", "hugepages"),
 				intnrt.SingleNUMANode,
 				intnrt.Pod,
 				corev1.ResourceList{
@@ -266,6 +271,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		// FIXME: this is a slight abuse of DescribeTable, but we need to run
 		// the same code which a different test_id per tmscope
 		DescribeTable("[tier0] a deployment with a guaranteed pod with one container should be scheduled into one NUMA zone",
+			Label("tier0"),
 			func(tmPolicy, tmScope string, requiredRes, paddingRes corev1.ResourceList) {
 				setupCluster(requiredRes, paddingRes, tmPolicy, tmScope)
 
@@ -311,6 +317,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				expectNRTConsumedResources(fxt, targetNrtInitial, requiredRes, &pods[0])
 			},
 			Entry("[test_id:47583][tmscope:cnt] with topology-manager-scope: container",
+				Label("tmscope:cnt"),
 				intnrt.SingleNUMANode,
 				intnrt.Container,
 				corev1.ResourceList{
@@ -323,6 +330,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			),
 			Entry("[test_id:50159][tmscope:pod] with topology-manager-scope: pod",
+				Label("tmscope:pod"),
 				intnrt.SingleNUMANode,
 				intnrt.Pod,
 				corev1.ResourceList{
@@ -335,6 +343,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			),
 			Entry("[test_id:50165][tmscope:cnt][hugepages] with topology-manager-scope: container and with hugepages",
+				Label("tmscope:cnt", "hugepages"),
 				intnrt.SingleNUMANode,
 				intnrt.Container,
 				corev1.ResourceList{
@@ -349,6 +358,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			),
 			Entry("[test_id:50182][tmscope:pod][hugepages] with topology-manager-scope: pod and with hugepages",
+				Label("tmscope:pod", "hugepages"),
 				intnrt.SingleNUMANode,
 				intnrt.Pod,
 				corev1.ResourceList{
@@ -365,7 +375,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		)
 	})
 
-	DescribeTable("[placement] cluster with multiple worker nodes suitable",
+	DescribeTable("[placement] cluster with multiple worker nodes suitable", Label("placement"),
 		func(policyFuncs tmScopeFuncs, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
 
 			hostsRequired := 2
@@ -510,6 +520,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		},
 
 		Entry("[test_id:47575][tmscope:cnt][tier0] should make a pod with two gu cnt land on a node with enough resources on a specific NUMA zone, each cnt on a different zone",
+			Label("tmscope:cnt", "tier0"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -539,6 +550,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			[]corev1.ResourceList{},
 		),
 		Entry("[test_id:47577][tmscope:pod][tier0] should make a pod with two gu cnt land on a node with enough resources on a specific NUMA zone, all cnt on the same zone",
+			Label("tmscope:pod", "tier0"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -574,6 +586,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:50183][tmscope:cnt][hugepages] should make a pod with two gu cnt land on a node with enough resources with hugepages on a specific NUMA zone, each cnt on a different zone",
+			Label("tmscope:cnt", "hugepages"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -606,6 +619,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			[]corev1.ResourceList{},
 		),
 		Entry("[test_id:50184][tmscope:pod][hugepages] should make a pod with two gu cnt land on a node with enough resources with hugepages on a specific NUMA zone, all cnt on the same zone",
+			Label("tmscope:pod", "hugepages"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -646,6 +660,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[tier1][testtype4][tmscope:container] should make a pod with three gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			Label("tier1", "tmscope:cnt"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -689,6 +704,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[tier1][testtype4][tmscope:container][cpu] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			Label("tier1", "tmscope:cnt", "cpu"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -740,6 +756,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[tier1][testtype4][tmscope:container][memory] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			Label("tier1", "tmscope:cnt", "memory"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -791,6 +808,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[tier1][testtype4][tmscope:container][hugepages2Mi] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			Label("tier1", "tmscope:cnt", "hugepages2Mi"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -842,6 +860,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[tier1][testtype4][tmscope:container][hugepages1Gi] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			Label("tier1", "tmscope:cnt", "hugepages1Gi"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -892,6 +911,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:54021][tier1][testtype4][tmscope:container][devices] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			Label("tier1", "tmscope:cnt", "devices"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -941,6 +961,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[tier1][testtype11][tmscope:container] should make a pod with one init cnt and three gu cnt land on a node with enough resources, containers should be spread on a different zone",
+			Label("tier1", "tmscope:cnt"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				initCnt: []corev1.ResourceList{
@@ -990,6 +1011,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[tier1][testtype29][tmscope:container] should make a pod with 3 gu cnt and 3 init cnt land on a node with enough resources, when sum of init and app cnt resources are more than node resources",
+			Label("tier1", "tmscope:cnt"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				initCnt: []corev1.ResourceList{
@@ -1047,6 +1069,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:54018][tmscope:cnt][devices] should make a pod with two gu cnt land on a node with enough resources with devices on a specific NUMA zone,  containers should be spread on a different zone",
+			Label("tmscope:cnt", "devices"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -1091,6 +1114,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:54016][tmscope:pod][tier0][devices] should make a pod with one gu cnt requesting devices land on a node with enough resources on a specific NUMA zone",
+			Label("tier0", "tmscope:pod", "devices"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -1126,6 +1150,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:54025][tmscope:cnt][tier2][devices] should make a besteffort pod requesting devices land on a node with enough resources on a specific NUMA zone, containers should be spread on a different zone",
+			Label("tier2", "tmscope:cnt", "devices"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -1163,6 +1188,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:55431][tmscope:pod][tier0][devices] should make a besteffort pod requesting devices land on a node with enough resources on a specific NUMA zone",
+			Label("tier0", "tmscope:pod", "devices"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -1195,6 +1221,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:55450][tmscope:pod][tier2][devices][hostlevel] should make a burstable pod requesting devices land on a node with enough resources on a specific NUMA zone",
+			Label("tier2", "tmscope:pod", "devices", "hostlevel"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -1232,6 +1259,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:54024][tmscope:cnt][tier2][devices][hostlevel] should make a burstable pod requesting devices land on a node with enough resources on a specific NUMA zone, containers should be spread on a different zone",
+			Label("tier2", "tmscope:cnt", "devices", "hostlevel"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -1273,7 +1301,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		),
 	)
 
-	DescribeTable("[placement][unsched] cluster with one worker nodes suitable",
+	DescribeTable("[placement][unsched] cluster with one worker nodes suitable", Label("placement", "unsched"),
 		func(policyFuncs tmScopeFuncs, errMsg string, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
 
 			hostsRequired := 2
@@ -1416,6 +1444,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		// to see the reason for not scheduling the pod on that target node as "cannot align container: testcnt-1", because the other worker nodes have insufficient
 		// free resources to accommodate the pod thus they will be rejected as candidates at earlier stage
 		Entry("[tier0][unsched][tmscope:container][cpu] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+			Label("tier0", "unsched", "tmscope:cnt", "cpu"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			nrosched.ErrorCannotAlignContainer,
 			podResourcesRequest{
@@ -1476,6 +1505,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:74256][tier3][unsched][tmscope:pod][cpu] guaranteed pod with multi cnt with fractional cpus keep on pending because cannot align the second container to a single numa node",
+			Label("tier3", "unsched", "tmscope:pod", "cpu"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
 			nrosched.ErrorCannotAlignPod,
 			podResourcesRequest{
@@ -1520,6 +1550,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:74257][tier3][unsched][tmscope:pod][cpu][nonreg] burstable pod with multi cnt with fractional cpus keep on pending because of not enough free cpus",
+			Label("tier3", "unsched", "tmscope:pod", "cpu", "nonreg"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
 			"0.* nodes are available: [0-9]* Insufficient cpu",
 			podResourcesRequest{
@@ -1561,6 +1592,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[tier0][unsched][tmscope:container][memory] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+			Label("tier0", "unsched", "tmscope:cnt", "memory"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			nrosched.ErrorCannotAlignContainer,
 			podResourcesRequest{
@@ -1619,6 +1651,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[tier0][unsched][tmscope:container][hugepages2Mi] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+			Label("tier0", "unsched", "tmscope:cnt", "hugepages2Mi"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			nrosched.ErrorCannotAlignContainer,
 			podResourcesRequest{
@@ -1676,6 +1709,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[tier0][unsched][tmscope:container][hugepages1Gi] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+			Label("tier0", "unsched", "tmscope:cnt", "hugepages1Gi"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			nrosched.ErrorCannotAlignContainer,
 			podResourcesRequest{
@@ -1732,6 +1766,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:54020][tier2][unsched][tmscope:container][devices] pod with two gu cnt requesting multiple device types keep on pending because cannot align the second container to a single numa node",
+			Label("tier2", "unsched", "tmscope:cnt", "devices"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			nrosched.ErrorCannotAlignContainer,
 			podResourcesRequest{
@@ -1784,6 +1819,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:54019][tier1][unsched][tmscope:container][devices] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+			Label("tier1", "unsched", "tmscope:cnt", "devices"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			nrosched.ErrorCannotAlignContainer,
 			podResourcesRequest{
@@ -1828,6 +1864,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:54017][tier1][unsched][tmscope:pod][devices] pod with two gu cnt keep on pending because cannot align the both containers on single numa",
+			Label("tier1", "unsched", "tmscope:pod", "devices"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
 			nrosched.ErrorCannotAlignPod,
 			podResourcesRequest{
@@ -1872,6 +1909,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:55430][tier2][unsched][tmscope:pod][devices] besteffort pod requesting multiple device types keep on pending because cannot align the container to a single numa node",
+			Label("tier2", "unsched", "tmscope:pod", "devices"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
 			nrosched.ErrorCannotAlignPod,
 			podResourcesRequest{
@@ -1917,6 +1955,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:55429][tier2][unsched][tmscope:pod][devices] burstable pod requesting multiple device types keep on pending because cannot align the container to a single numa node",
+			Label("tier2", "unsched", "tmscope:pod", "devices"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
 			nrosched.ErrorCannotAlignPod,
 			podResourcesRequest{
@@ -1967,6 +2006,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:54023][tier2][unsched][tmscope:container][devices] besteffort pod requesting multiple device types keep on pending because cannot align the container to a single numa node",
+			Label("tier2", "unsched", "tmscope:cnt", "devices"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			nrosched.ErrorCannotAlignContainer,
 			podResourcesRequest{
@@ -2013,6 +2053,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:54022][tier2][unsched][tmscope:container][devices] burstable pod requesting multiple device types keep on pending because cannot align the container to a single numa node",
+			Label("tier2", "unsched", "tmscope:cnt", "devices"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			nrosched.ErrorCannotAlignContainer,
 			podResourcesRequest{

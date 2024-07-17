@@ -53,7 +53,7 @@ import (
  * rinse and repeat for CPUs, devices, hugepages...
  */
 
-var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload placement considering specific resources requests", Serial, func() {
+var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload placement considering specific resources requests", Serial, Label("disruptive", "scheduler", "byres"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
@@ -85,6 +85,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 		// FIXME: this is a slight abuse of DescribeTable, but we need to run
 		// the same code with a different test_id per tmscope
 		DescribeTable("[tier0][ressched] a guaranteed pod with one container should be placed and aligned on the node",
+			Label("tier0", "ressched"),
 			func(tmPolicy, tmScope string, requiredRes, expectedFreeRes corev1.ResourceList) {
 				ctx := context.TODO()
 
@@ -125,6 +126,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			},
 			Entry("[tmscope:pod] with topology-manager-scope: pod, using memory as deciding factor",
+				Label("tmscope:pod"),
 				intnrt.SingleNUMANode,
 				intnrt.Pod,
 				// required resources for the test pod
@@ -147,6 +149,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 				},
 			),
 			Entry("[tmscope:pod] with topology-manager-scope: pod, using CPU as the deciding factor",
+				Label("tmscope:pod"),
 				intnrt.SingleNUMANode,
 				intnrt.Pod,
 				// required resources for the test pod

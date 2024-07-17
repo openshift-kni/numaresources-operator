@@ -51,7 +51,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerations support", Serial, func() {
+var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerations support", Serial, Label("disruptive", "slow", "rtetols"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
@@ -104,7 +104,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", dsKey.String())
 		})
 
-		When("[tier2] invalid tolerations are submitted ", func() {
+		When("[tier2] invalid tolerations are submitted ", Label("tier2"), func() {
 			It("should handle invalid field: operator", func(ctx context.Context) {
 				By("adding extra invalid tolerations with wrong operator field")
 				_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{
@@ -164,7 +164,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 			})
 		})
 
-		It("[tier3] should enable to change tolerations in the RTE daemonsets", func(ctx context.Context) {
+		It("[tier3] should enable to change tolerations in the RTE daemonsets", Label("tier3"), func(ctx context.Context) {
 			By("getting RTE manifests object")
 			// TODO: this is similar but not quite what the main operator does
 			rteManifests, err := rtemanifests.GetManifests(configuration.Plat, configuration.PlatVersion, "", true)
@@ -226,7 +226,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)), "RTE DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers))
 			})
 
-			It("[tier2][test_id:72857] should handle untolerations of tainted nodes while RTEs are running", func(ctx context.Context) {
+			It("[tier2][test_id:72857] should handle untolerations of tainted nodes while RTEs are running", Label("tier2"), func(ctx context.Context) {
 				var err error
 				By("adding extra tolerations")
 				_ = setRTETolerations(ctx, fxt.Client, nroKey, testToleration())
@@ -282,7 +282,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)-1), "updated DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers)-1)
 			})
 
-			It("[tier3] should evict running RTE pod if taint-tolartion matching criteria is shaken - NROP CR toleration update", func(ctx context.Context) {
+			It("[tier3] should evict running RTE pod if taint-tolartion matching criteria is shaken - NROP CR toleration update", Label("tier3"), func(ctx context.Context) {
 				By("add toleration with value to the NROP CR")
 				tolerateVal := corev1.Toleration{
 					Key:      testKey,
@@ -337,7 +337,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(err).ToNot(HaveOccurred(), "pod %s/%s still exists", podOnNode.Namespace, podOnNode.Name)
 			})
 
-			It("[tier3] should evict running RTE pod if taint-tolartion matching criteria is shaken - node taints update", func(ctx context.Context) {
+			It("[tier3] should evict running RTE pod if taint-tolartion matching criteria is shaken - node taints update", Label("tier3"), func(ctx context.Context) {
 				By("taint one node with taint value and NoExecute effect")
 				var err error
 				workers, err = nodes.GetWorkerNodes(fxt.Client, ctx)
@@ -421,7 +421,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 			})
 
-			It("[tier2][test_id:72861] should tolerate partial taints and not schedule or evict the pod on the tainted node", func(ctx context.Context) {
+			It("[tier2][test_id:72861] should tolerate partial taints and not schedule or evict the pod on the tainted node", Label("tier2"), func(ctx context.Context) {
 				var err error
 				By("getting the worker nodes")
 				workers, err = nodes.GetWorkerNodes(fxt.Client, context.TODO())
@@ -470,7 +470,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 			})
 
-			It("[tier3][test_id:72859] should not restart a running RTE pod on tainted node with NoSchedule effect", func(ctx context.Context) {
+			It("[tier3][test_id:72859] should not restart a running RTE pod on tainted node with NoSchedule effect", Label("tier3"), func(ctx context.Context) {
 				By("taint one worker node")
 				var err error
 				workers, err = nodes.GetWorkerNodes(fxt.Client, ctx)
@@ -590,7 +590,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 					}
 				})
 
-				It("[test_id:72854][reboot_required][slow][tier2] should add tolerations in-place while RTEs are running", func(ctx context.Context) {
+				It("[test_id:72854][reboot_required][slow][tier2] should add tolerations in-place while RTEs are running", Label("reboot_required", "slow", "tier2"), func(ctx context.Context) {
 					fxt.IsRebootTest = true
 					By("create NROP CR with no tolerations to the tainted node")
 					nropNewObj := nroOperObj.DeepCopy()
@@ -627,7 +627,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 					Expect(found).To(BeTrue(), "no RTE pod was found on node %q", taintedNode.Name)
 				})
 
-				It("[test_id:72855][reboot_required][slow][tier2] should tolerate node taint on NROP CR creation", func(ctx context.Context) {
+				It("[test_id:72855][reboot_required][slow][tier2] should tolerate node taint on NROP CR creation", Label("reboot_required", "slow", "tier2"), func(ctx context.Context) {
 					fxt.IsRebootTest = true
 					By("add tolerations to NROP CR to tolerate the taint - no RTE running yet on any node")
 					nropNewObj := nroOperObj.DeepCopy()
@@ -658,7 +658,7 @@ var _ = Describe("[serial][disruptive][slow][rtetols] numaresources RTE tolerati
 				})
 			})
 
-			It("[tier3] should evict RTE pod on tainted node with NoExecute effect and restore it when taint is removed", func(ctx context.Context) {
+			It("[tier3] should evict RTE pod on tainted node with NoExecute effect and restore it when taint is removed", Label("tier3"), func(ctx context.Context) {
 				By("taint one worker node with NoExecute effect")
 				var err error
 				workers, err = nodes.GetWorkerNodes(fxt.Client, ctx)

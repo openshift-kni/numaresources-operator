@@ -229,7 +229,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 				}
 			})
 
-			DescribeTable("[nodeAll] against all the available worker nodes",
+			DescribeTable("[nodeAll] against all the available worker nodes", Label("nodeAll"),
 				// like non-regression tests, but with jobs present
 
 				func(setupPod setupPodFunc) {
@@ -302,13 +302,13 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					}
 				},
-				Entry("should handle a burst of qos=guaranteed pods [tier0]", func(pod *corev1.Pod) {
+				Entry("should handle a burst of qos=guaranteed pods [tier0]", Label("tier0"), func(pod *corev1.Pod) {
 					pod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 						corev1.ResourceMemory: resource.MustParse("64Mi"),
 					}
 				}),
-				Entry("should handle a burst of qos=burstable pods [tier0]", func(pod *corev1.Pod) {
+				Entry("should handle a burst of qos=burstable pods [tier0]", Label("tier0"), func(pod *corev1.Pod) {
 					pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 						corev1.ResourceMemory: resource.MustParse("64Mi"),

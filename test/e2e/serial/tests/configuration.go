@@ -70,7 +70,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive][slow] numaresources configuration management", Serial, func() {
+var _ = Describe("[serial][disruptive][slow] numaresources configuration management", Serial, Label("disruptive", "slow"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 	var nrts []nrtv1alpha2.NodeResourceTopology
@@ -105,7 +105,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 	Context("cluster has at least one suitable node", func() {
 		timeout := 5 * time.Minute
 
-		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator CR", func() {
+		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator CR", Label("reboot_required", "slow", "images", "tier2"), func() {
 			fxt.IsRebootTest = true
 			nroOperObj := &nropv1.NUMAResourcesOperator{}
 			nroKey := objects.NROObjectKey()
@@ -321,7 +321,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 
 		})
 
-		It("[test_id:54916][tier2] should be able to modify the configurable values under the NUMAResourcesScheduler CR", func() {
+		It("[test_id:54916][tier2] should be able to modify the configurable values under the NUMAResourcesScheduler CR", Label("tier2"), func() {
 			initialNroSchedObj := &nropv1.NUMAResourcesScheduler{}
 			nroSchedKey := objects.NROSchedObjectKey()
 			err := fxt.Client.Get(context.TODO(), nroSchedKey, initialNroSchedObj)
@@ -387,7 +387,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
 		})
 
-		It("[test_id:47585][reboot_required][slow] can change kubeletconfig and controller should adapt", func() {
+		It("[test_id:47585][reboot_required][slow] can change kubeletconfig and controller should adapt", Label("reboot_required", "slow"), func() {
 			fxt.IsRebootTest = true
 			nroOperObj := &nropv1.NUMAResourcesOperator{}
 			nroKey := objects.NROObjectKey()
@@ -659,7 +659,7 @@ var _ = Describe("[serial][disruptive][slow] numaresources configuration managem
 			Expect(nrsGot).To(Equal(nrsExpected), "mismatching related objects for NUMAResourcesScheduler")
 		})
 
-		It("[slow][tier1] ignores non-matching kubeletconfigs", func(ctx context.Context) {
+		It("[slow][tier1] ignores non-matching kubeletconfigs", Label("slow", "tier1"), func(ctx context.Context) {
 			By("getting the NROP object")
 			nroOperObj := &nropv1.NUMAResourcesOperator{}
 			nroKey := objects.NROObjectKey()
