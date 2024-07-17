@@ -50,7 +50,7 @@ echo "---"
 # list commits
 for commitish in $( git log --oneline --no-merges "$latest_upstream_commit"..HEAD | cut -d' ' -f 1); do
   echo "CHECK: $commitish"
-  git log --pretty=format:'{"commit":"%H","author":"%aN","authorEmail":"<%aE>","authorEmailLocal":"<%al>","dcoSignTag":"%(trailers:key=Signed-off-by,separator=)"}' -1 "$commitish" | go run tools/verify-commit/verify-commit.go
+  git log --pretty=format:'{"commit":"%H","author":"%aN","authorEmail":"<%aE>","authorEmailLocal":"<%al>","dcoSignTag":"%(trailers:key=Signed-off-by,separator=)","dcoCoauthorTag":"%(trailers:key=Co-authored-by,separator=)"}' -1 "$commitish" | go run tools/verify-commit/verify-commit.go
   if [[ "$?" != "0" ]]; then
     echo "-> FAIL: $commitish"
     exit 20

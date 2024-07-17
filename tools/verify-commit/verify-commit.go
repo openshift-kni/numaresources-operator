@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type GitCommit struct {
@@ -29,6 +30,7 @@ type GitCommit struct {
 	AuthorEmail      string `json:"authorEmail"`
 	AuthorEmailLocal string `json:"authorEmailLocal"`
 	DCOSignTag       string `json:"dcoSignTag"`
+	DCOCoauthorTag   string `json:"dcoCoauthorTag"`
 }
 
 func validate(commit GitCommit) []error {
@@ -40,8 +42,15 @@ func validate(commit GitCommit) []error {
 		errors = append(errors, fmt.Errorf("DCO signoff trailer missing"))
 	} else {
 		expectedDCO := expectedDCOSignTag(commit)
-		if commit.DCOSignTag != expectedDCO {
-			errors = append(errors, fmt.Errorf("DCO signoff malformed: %q (expected: %q)", commit.DCOSignTag, expectedDCO))
+		if strings.Contains(commit.DCOSignTag, expectedDCO) {
+			fmt.Printf("git commit email found in sign off list\n")
+		} else {
+			expectedDCOAuth := expectedDCOCoauthorTag(commit)
+			if strings.Contains(commit.DCOCoauthorTag, expectedDCOAuth) {
+				fmt.Printf("git commit email not in sign off list, but found in co-author list\n")
+			} else {
+				errors = append(errors, fmt.Errorf("DCO signoff malformed: %q does not contain expected %q", commit.DCOSignTag, expectedDCO))
+			}
 		}
 	}
 	return errors
@@ -49,6 +58,10 @@ func validate(commit GitCommit) []error {
 
 func expectedDCOSignTag(commit GitCommit) string {
 	return fmt.Sprintf("Signed-off-by: %s %s", commit.Author, commit.AuthorEmail)
+}
+
+func expectedDCOCoauthorTag(commit GitCommit) string {
+	return fmt.Sprintf("Co-authored-by: %s %s", commit.Author, commit.AuthorEmail)
 }
 
 func main() {
