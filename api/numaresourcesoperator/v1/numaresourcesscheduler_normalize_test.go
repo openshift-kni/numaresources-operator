@@ -29,10 +29,12 @@ import (
 func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 	cacheResyncPeriod := defaultCacheResyncPeriod
 	cacheResyncDebug := defaultCacheResyncDebug
+	cacheResyncDetection := defaultCacheResyncDetection
 	schedInformer := defaultSchedulerInformer
 
 	cacheResyncPeriodCustom := 42 * time.Second
 	cacheResyncDebugCustom := CacheResyncDebugDisabled
+	cacheResyncDetectionCustom := CacheResyncDetectionAggressive
 	schedInformerCustom := SchedulerInformerShared
 
 	type testCase struct {
@@ -48,8 +50,9 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriod,
 				},
-				CacheResyncDebug:  &cacheResyncDebug,
-				SchedulerInformer: &schedInformer,
+				CacheResyncDebug:     &cacheResyncDebug,
+				SchedulerInformer:    &schedInformer,
+				CacheResyncDetection: &cacheResyncDetection,
 			},
 		},
 		{
@@ -64,8 +67,9 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriod,
 				},
-				CacheResyncDebug:  &cacheResyncDebug,
-				SchedulerInformer: &schedInformer,
+				CacheResyncDebug:     &cacheResyncDebug,
+				SchedulerInformer:    &schedInformer,
+				CacheResyncDetection: &cacheResyncDetection,
 			},
 		},
 		{
@@ -83,8 +87,9 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriodCustom,
 				},
-				CacheResyncDebug:  &cacheResyncDebug,
-				SchedulerInformer: &schedInformer,
+				CacheResyncDebug:     &cacheResyncDebug,
+				SchedulerInformer:    &schedInformer,
+				CacheResyncDetection: &cacheResyncDetection,
 			},
 		},
 		{
@@ -103,25 +108,50 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriodCustom,
 				},
-				CacheResyncDebug:  &cacheResyncDebug,
-				SchedulerInformer: &schedInformerCustom,
+				CacheResyncDebug:     &cacheResyncDebug,
+				SchedulerInformer:    &schedInformerCustom,
+				CacheResyncDetection: &cacheResyncDetection,
 			},
 		},
+		{
+			description: "preserving already set and partially optional fields (3)",
+			current: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				LogLevel:       operatorv1.Trace,
+				CacheResyncPeriod: &metav1.Duration{
+					Duration: cacheResyncPeriodCustom,
+				},
+				CacheResyncDetection: &cacheResyncDetectionCustom,
+			},
+			expected: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				LogLevel:       operatorv1.Trace,
+				CacheResyncPeriod: &metav1.Duration{
+					Duration: cacheResyncPeriodCustom,
+				},
+				CacheResyncDebug:     &cacheResyncDebug,
+				SchedulerInformer:    &schedInformer,
+				CacheResyncDetection: &cacheResyncDetectionCustom,
+			},
+		},
+
 		{
 			description: "all optional fields already set",
 			current: NUMAResourcesSchedulerSpec{
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriodCustom,
 				},
-				CacheResyncDebug:  &cacheResyncDebugCustom,
-				SchedulerInformer: &schedInformerCustom,
+				CacheResyncDebug:     &cacheResyncDebugCustom,
+				SchedulerInformer:    &schedInformerCustom,
+				CacheResyncDetection: &cacheResyncDetectionCustom,
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriodCustom,
 				},
-				CacheResyncDebug:  &cacheResyncDebugCustom,
-				SchedulerInformer: &schedInformerCustom,
+				CacheResyncDebug:     &cacheResyncDebugCustom,
+				SchedulerInformer:    &schedInformerCustom,
+				CacheResyncDetection: &cacheResyncDetectionCustom,
 			},
 		},
 		{
@@ -138,8 +168,9 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriod,
 				},
-				CacheResyncDebug:  &cacheResyncDebug,
-				SchedulerInformer: &schedInformer,
+				CacheResyncDebug:     &cacheResyncDebug,
+				SchedulerInformer:    &schedInformer,
+				CacheResyncDetection: &cacheResyncDetection,
 			},
 		},
 		{
@@ -151,8 +182,9 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriodCustom,
 				},
-				CacheResyncDebug:  &cacheResyncDebugCustom,
-				SchedulerInformer: &schedInformerCustom,
+				CacheResyncDebug:     &cacheResyncDebugCustom,
+				SchedulerInformer:    &schedInformerCustom,
+				CacheResyncDetection: &cacheResyncDetectionCustom,
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
@@ -161,8 +193,9 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncPeriod: &metav1.Duration{
 					Duration: cacheResyncPeriodCustom,
 				},
-				CacheResyncDebug:  &cacheResyncDebugCustom,
-				SchedulerInformer: &schedInformerCustom,
+				CacheResyncDebug:     &cacheResyncDebugCustom,
+				SchedulerInformer:    &schedInformerCustom,
+				CacheResyncDetection: &cacheResyncDetectionCustom,
 			},
 		},
 	}

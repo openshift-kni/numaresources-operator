@@ -390,12 +390,13 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			}
 		})
 
-		ginkgo.It("should configure by default the informerMode to be Dedicated", func() {
+		ginkgo.It("should set the default informerMode to Dedicated", func() {
+			nrs := nrs.DeepCopy()
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			expectCacheParams(reconciler.Client, depmanifests.CacheInformerDedicated)
 
+			expectCacheParams(reconciler.Client, depmanifests.CacheInformerDedicated, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectAll)
 		})
 
 		ginkgo.It("should allow to change the informerMode to Shared", func() {
@@ -414,28 +415,22 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			expectCacheParams(reconciler.Client, depmanifests.CacheInformerShared)
-
+			expectCacheParams(reconciler.Client, depmanifests.CacheInformerShared, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectAll)
 		})
 
-		ginkgo.It("should allow to change the informerMode to Dedicated", func() {
-			nrs := nrs.DeepCopy()
-			informerMode := nropv1.SchedulerInformerDedicated
-			nrs.Spec.SchedulerInformer = &informerMode
-			gomega.Eventually(func() bool {
-				if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
-					klog.Warningf("failed to update the scheduler object; err: %v", err)
-					return false
-				}
-				return true
-			}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
-
+		ginkgo.It("should allow to set aggressive resync detection mode in configmap", func() {
 			key := client.ObjectKeyFromObject(nrs)
+			nrsUpdated := &nropv1.NUMAResourcesScheduler{}
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrsUpdated)).To(gomega.Succeed())
+
+			resyncDetect := nropv1.CacheResyncDetectionAggressive
+			nrsUpdated.Spec.CacheResyncDetection = &resyncDetect
+			gomega.Expect(reconciler.Client.Update(context.TODO(), nrsUpdated)).To(gomega.Succeed())
+
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-			expectCacheParams(reconciler.Client, depmanifests.CacheInformerDedicated)
-
+			expectCacheParams(reconciler.Client, depmanifests.CacheInformerDedicated, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectAll)
 		})
 	})
 })
@@ -458,7 +453,7 @@ func diffYAML(want, got string) (string, error) {
 	return cmp.Diff(cfgWant, cfgGot), nil
 }
 
-func expectCacheParams(cli client.Client, informerMode string) {
+func expectCacheParams(cli client.Client, informerMode, resyncMethod, foreignPodsDetect string) {
 	key := client.ObjectKey{
 		Name:      "topo-aware-scheduler-config",
 		Namespace: testNamespace,
@@ -477,4 +472,8 @@ func expectCacheParams(cli client.Client, informerMode string) {
 
 	gomega.ExpectWithOffset(1, cfg.Cache.InformerMode).ToNot(gomega.BeNil())
 	gomega.ExpectWithOffset(1, *cfg.Cache.InformerMode).To(gomega.Equal(informerMode))
+	gomega.ExpectWithOffset(1, cfg.Cache.ResyncMethod).ToNot(gomega.BeNil())
+	gomega.ExpectWithOffset(1, *cfg.Cache.ResyncMethod).To(gomega.Equal(resyncMethod))
+	gomega.ExpectWithOffset(1, cfg.Cache.ForeignPodsDetectMode).ToNot(gomega.BeNil())
+	gomega.ExpectWithOffset(1, *cfg.Cache.ForeignPodsDetectMode).To(gomega.Equal(foreignPodsDetect))
 }
