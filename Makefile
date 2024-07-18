@@ -185,7 +185,7 @@ binary-e2e-sched:
 binary-e2e-serial:
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)"; \
-	CGO_ENABLED=0 go test -c -v -o bin/e2e-nrop-serial.test -ldflags "$$LDFLAGS" ./test/e2e/serial
+	CGO_ENABLED=0 go test -race -c -v -o bin/e2e-nrop-serial.test -ldflags "$$LDFLAGS" ./test/e2e/serial
 
 binary-e2e-tools:
 	go test -c -v -o bin/e2e-nrop-tools.test ./test/e2e/tools
