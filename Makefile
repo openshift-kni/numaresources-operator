@@ -121,7 +121,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 test-unit: test-unit-pkgs test-controllers
 
 test-unit-pkgs:
-	go test ./api/... ./pkg/... ./rte/pkg/... ./internal/...
+	go test -race ./api/... ./pkg/... ./rte/pkg/... ./internal/...
 
 test-controllers: envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/...
@@ -171,13 +171,13 @@ binary-e2e-rte-local:
 	go test -c -v -o bin/e2e-nrop-rte-local.test ./test/e2e/rte/local
 
 binary-e2e-rte: binary-e2e-rte-local
-	go test -c -v -o bin/e2e-nrop-rte.test ./test/e2e/rte
+	go test -race -c -v -o bin/e2e-nrop-rte.test ./test/e2e/rte
 
 binary-e2e-install:
-	go test -v -c -o bin/e2e-nrop-install.test ./test/e2e/install && go test -v -c -o bin/e2e-nrop-sched-install.test ./test/e2e/sched/install
+	go test -race -v -c -o bin/e2e-nrop-install.test ./test/e2e/install && go test -v -c -o bin/e2e-nrop-sched-install.test ./test/e2e/sched/install
 
 binary-e2e-uninstall:
-	go test -v -c -o bin/e2e-nrop-uninstall.test ./test/e2e/uninstall && go test -v -c -o bin/e2e-nrop-sched-uninstall.test ./test/e2e/sched/uninstall
+	go test -race -v -c -o bin/e2e-nrop-uninstall.test ./test/e2e/uninstall && go test -v -c -o bin/e2e-nrop-sched-uninstall.test ./test/e2e/sched/uninstall
 
 binary-e2e-sched:
 	go test -c -v -o bin/e2e-nrop-sched.test ./test/e2e/sched
