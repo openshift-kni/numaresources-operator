@@ -49,7 +49,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering taints", Serial, func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering taints", Serial, Label("disruptive", "scheduler"), func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
@@ -163,7 +163,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			checkNodesUntainted(fxt.Client, nodeNames)
 		})
 
-		It("[test_id:47594][tier1] should make a pod with a toleration land on a node with enough resources on a specific NUMA zone", func() {
+		It("[test_id:47594][tier1] should make a pod with a toleration land on a node with enough resources on a specific NUMA zone", Label("tier1"), func() {
 			paddedNodeNames := sets.New[string](padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode

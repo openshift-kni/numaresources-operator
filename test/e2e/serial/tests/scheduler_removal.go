@@ -42,7 +42,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive][scheduler][rmsched] numaresources scheduler removal on a live cluster", Serial, func() {
+var _ = Describe("[serial][disruptive][scheduler][rmsched] numaresources scheduler removal on a live cluster", Serial, Label("disruptive", "scheduler", "rmsched"), func() {
 	var fxt *e2efixture.Fixture
 
 	BeforeEach(func() {
@@ -65,7 +65,7 @@ var _ = Describe("[serial][disruptive][scheduler][rmsched] numaresources schedul
 	})
 
 	When("removing the topology aware scheduler from a live cluster", func() {
-		It("[case:1][test_id:47593][tier1] should keep existing workloads running", func() {
+		It("[case:1][test_id:47593][tier1] should keep existing workloads running", Label("tier1"), func() {
 			var err error
 
 			dp := createDeploymentSync(fxt, "testdp", serialconfig.Config.SchedulerName)
@@ -88,7 +88,7 @@ var _ = Describe("[serial][disruptive][scheduler][rmsched] numaresources schedul
 			}
 		})
 
-		It("[case:2][test_id:49093][tier1][unsched] should keep new scheduled workloads pending", func() {
+		It("[case:2][test_id:49093][tier1][unsched] should keep new scheduled workloads pending", Label("tier1", "unsched"), func() {
 			var err error
 
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name))
@@ -113,7 +113,7 @@ var _ = Describe("[serial][disruptive][scheduler][rmsched] numaresources schedul
 	})
 })
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restart on a live cluster", Serial, func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restart on a live cluster", Serial, Label("disruptive", "scheduler"), func() {
 	var fxt *e2efixture.Fixture
 	var nroSchedObj *nropv1.NUMAResourcesScheduler
 	var schedulerName string
@@ -140,7 +140,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources scheduler restar
 	})
 
 	When("restarting the topology aware scheduler in a live cluster", func() {
-		It("[case:1][test_id:48069][tier2] should schedule any pending workloads submitted while the scheduler was unavailable", func() {
+		It("[case:1][test_id:48069][tier2] should schedule any pending workloads submitted while the scheduler was unavailable", Label("tier2"), func() {
 			var err error
 
 			dpNName := nroSchedObj.Status.Deployment // shortcut

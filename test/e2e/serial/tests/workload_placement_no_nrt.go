@@ -60,7 +60,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	Context("[no_nrt] using the NUMA-aware scheduler without updated NRT data", func() {
+	Context("[no_nrt] using the NUMA-aware scheduler without updated NRT data", Label("no_nrt"), func() {
 		var testPod *corev1.Pod
 		nropObjInitial := &nropv1.NUMAResourcesOperator{}
 		initialInfoRefreshPause := *nropv1.DefaultNodeGroupConfig().InfoRefreshPause
@@ -88,7 +88,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, func() {
 			updateInfoRefreshPause(fxt, initialInfoRefreshPause, nropObjInitial)
 		})
 
-		It("[tier1] should make a best-effort pod running", func() {
+		It("[tier1] should make a best-effort pod running", Label("tier1"), func() {
 			By("create best-effort pod expect it to start running")
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
@@ -102,7 +102,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("[tier1] should make a burstable pod running", func() {
+		It("[tier1] should make a burstable pod running", Label("tier1"), func() {
 			By("create burstable pod and expect it to run")
 			testPod = objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
@@ -119,7 +119,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("[tier1][test_id:47611] should make a guaranteed pod running", func() {
+		It("[tier1][test_id:47611] should make a guaranteed pod running", Label("tier1"), func() {
 			By("create guaranteed pod and expect it to run")
 			testPod = objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName

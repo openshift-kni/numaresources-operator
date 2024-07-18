@@ -64,7 +64,7 @@ type interferenceDesc struct {
 	ratio int
 }
 
-var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Label("scheduler", "cache", "tier0"), func() {
+var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, Label("scheduler", "cache", "tier0"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
@@ -311,6 +311,7 @@ var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Label("sch
 					}
 				},
 				Entry("from GU pods, low",
+					Label("qos:gu"),
 					machineDesc{
 						coresPerCPU:            2,
 						desiredPodsPerNUMAZone: 2,
@@ -321,6 +322,7 @@ var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Label("sch
 						qos:   corev1.PodQOSGuaranteed,
 					}),
 				Entry("from BU pods, moderate",
+					Label("qos:bu"),
 					machineDesc{
 						coresPerCPU:            2,
 						desiredPodsPerNUMAZone: 4,
