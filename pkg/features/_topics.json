@@ -1,0 +1,17 @@
+{
+  "metadata":{
+    "version":"v1.0.0"
+  },
+  "active": [
+    "config",
+    "nonreg",
+    "hostlevel",
+    "resacct",
+    "rmsched",
+    "unsched",
+    "nonrt",
+    "rtetols",
+    "taint",
+    "scheduler"
+  ]
+}

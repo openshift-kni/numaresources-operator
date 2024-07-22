@@ -386,7 +386,7 @@ goversion:
 build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform
 
 .PHONY: build-tools-all
-build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap bin/watchnrtattr
+build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap bin/watchnrtattr bin/mkginkgolabelfilter
 
 bin/buildhelper:
 	@go build -o bin/buildhelper tools/buildhelper/buildhelper.go
@@ -402,6 +402,9 @@ bin/catkubeletconfmap:
 
 bin/watchnrtattr:
 	@go build -o bin/watchnrtattr tools/watchnrtattr/watchnrtattr.go
+
+bin/mkginkgolabelfilter:
+	@go build -o bin/mkginkgolabelfilter tools/mkginkgolabelfilter/mkginkgolabelfilter.go
 
 verify-generated: bundle generate
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
