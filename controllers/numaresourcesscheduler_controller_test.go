@@ -411,6 +411,22 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectAll)
 		})
+
+		ginkgo.It("should allow to set aggressive resync detection mode in configmap", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			nrsUpdated := &nropv1.NUMAResourcesScheduler{}
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrsUpdated)).To(gomega.Succeed())
+
+			resyncDetect := nropv1.CacheResyncDetectionRelaxed
+			nrsUpdated.Spec.CacheResyncDetection = &resyncDetect
+			gomega.Expect(reconciler.Client.Update(context.TODO(), nrsUpdated)).To(gomega.Succeed())
+
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectOnlyExclusiveResources)
+		})
+
 	})
 })
 
