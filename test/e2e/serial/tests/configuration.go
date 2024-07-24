@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+	"k8s.io/kubelet/config/v1beta1"
 
 	"sigs.k8s.io/yaml"
 
@@ -50,6 +52,7 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
+	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
@@ -63,6 +66,7 @@ import (
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
@@ -693,8 +697,221 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				return kcCmNamesCur
 			}).WithContext(ctx).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Equal(kcCmNamesPre))
 		})
+
+		It("[reboot_required][slow][unsched][schedrst] should be able to correctly identify topology manager policy without scheduler restarting", Label("reboot_required", "slow", "unsched", "schedrst"), func(ctx context.Context) {
+			// https://issues.redhat.com/browse/OCPBUGS-34583
+			fxt.IsRebootTest = true
+			By("getting the number of cpus that is required for a numa zone to create a topology affinity error deployment")
+			const (
+				NUMAZonesRequired     = 2
+				hostsRequired         = 1
+				cpuResourcePercentage = 1.5 // 1.5 meaning 150 percent
+			)
+			var nrtCandidates []nrtv1alpha2.NodeResourceTopology
+			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
+			nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
+			if len(nrtCandidates) < hostsRequired {
+				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
+			}
+
+			// choosing the first node because the nodes should be similar in topology so it doesnt matter which one we choose
+			referenceNode := nrtCandidates[0]
+			referenceZone := referenceNode.Zones[0]
+
+			cpuQty, ok := e2enrt.FindResourceAvailableByName(referenceZone.Resources, string(corev1.ResourceCPU))
+			Expect(ok).To(BeTrue(), "no CPU resource in zone %q node %q", referenceZone.Name, referenceNode.Name)
+
+			cpuNum, ok := cpuQty.AsInt64()
+			Expect(ok).To(BeTrue(), "invalid CPU resource in zone %q node %q: %v", referenceZone.Name, referenceNode.Name, cpuQty)
+			klog.Infof("available CPUs per numa on the node: %d, ", cpuNum)
+
+			cpuResources := strconv.Itoa(int(float64(cpuNum) * cpuResourcePercentage))
+			klog.Infof("CPU resources requested to create a topology affinity error deployment %s", cpuResources)
+
+			By("fetching the matching kubeletconfig for the numaresources-operator cr")
+			var nroOperObj nropv1.NUMAResourcesOperator
+			nroKey := objects.NROObjectKey()
+			err := fxt.Client.Get(ctx, nroKey, &nroOperObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
+
+			mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, fxt.Client, nroOperObj.Spec.NodeGroups)
+			Expect(err).ToNot(HaveOccurred(), "cannot get MCPs associated with NUMAResourcesOperator %q", nroOperObj.Name)
+
+			kcList := &machineconfigv1.KubeletConfigList{}
+			err = fxt.Client.List(ctx, kcList)
+			Expect(err).ToNot(HaveOccurred())
+
+			var targetedKC *machineconfigv1.KubeletConfig
+			for _, mcp := range mcps {
+				for i := 0; i < len(kcList.Items); i++ {
+					kc := &kcList.Items[i]
+					kcMcpSel, err := metav1.LabelSelectorAsSelector(kc.Spec.MachineConfigPoolSelector)
+					Expect(err).ToNot(HaveOccurred())
+
+					if kcMcpSel.Matches(labels.Set(mcp.Labels)) {
+						targetedKC = kc
+					}
+				}
+			}
+			Expect(targetedKC).ToNot(BeNil(), "there should be at least one kubeletconfig.machineconfiguration object")
+
+			kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
+			Expect(err).ToNot(HaveOccurred())
+			initialTopologyManagerPolicy := kcObj.TopologyManagerPolicy
+
+			if initialTopologyManagerPolicy != v1beta1.NoneTopologyManagerPolicy {
+				By("modifying topology manager policy under kubeletconfig to none")
+				Eventually(func(g Gomega) {
+					err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(targetedKC), targetedKC)
+					Expect(err).ToNot(HaveOccurred())
+
+					kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
+					Expect(err).ToNot(HaveOccurred())
+
+					// Before restarting the scheduler, we change here the topology manager policy to 'none'.
+					// This ensures that if we later change it to 'single NUMA node' and attempt to create
+					// a deployment that is expected to fail due to TopologyAffinityError it will otherwise fail for failed scheduling.
+					// We expect that failure to occur only when the bug is present.
+					kcObj.TopologyManagerPolicy = v1beta1.NoneTopologyManagerPolicy
+					err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
+					Expect(err).ToNot(HaveOccurred())
+
+					err = fxt.Client.Update(ctx, targetedKC)
+					g.Expect(err).ToNot(HaveOccurred())
+				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+				waitForMcpUpdate(fxt.Client, ctx, mcps)
+			}
+
+			defer func() {
+				err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(targetedKC), targetedKC)
+				Expect(err).ToNot(HaveOccurred())
+
+				kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
+				Expect(err).ToNot(HaveOccurred())
+
+				if initialTopologyManagerPolicy != kcObj.TopologyManagerPolicy {
+					By("reverting kubeletconfig changes")
+					Eventually(func(g Gomega) {
+						err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(targetedKC), targetedKC)
+						Expect(err).ToNot(HaveOccurred())
+
+						kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
+						Expect(err).ToNot(HaveOccurred())
+
+						// changing the topology manager policy back to the initial state when the test has finished or failed
+						kcObj.TopologyManagerPolicy = initialTopologyManagerPolicy
+						err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
+						Expect(err).ToNot(HaveOccurred())
+
+						err = fxt.Client.Update(ctx, targetedKC)
+						g.Expect(err).ToNot(HaveOccurred())
+					}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+					waitForMcpUpdate(fxt.Client, ctx, mcps)
+				}
+			}()
+
+			var schedulerName string
+			var nroSchedObj nropv1.NUMAResourcesScheduler
+			nroSchedKey := objects.NROSchedObjectKey()
+			err = fxt.Client.Get(ctx, nroSchedKey, &nroSchedObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
+
+			schedDeployment, err := podlist.With(fxt.Client).DeploymentByOwnerReference(ctx, nroSchedObj.GetUID())
+			Expect(err).ToNot(HaveOccurred(), "failed to get the scheduler deployment")
+
+			schedPods, err := podlist.With(fxt.Client).ByDeployment(ctx, *schedDeployment)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(len(schedPods)).To(Equal(1))
+
+			schedulerName = nroSchedObj.Status.SchedulerName
+			Expect(schedulerName).ToNot(BeEmpty(), "cannot autodetect the TAS scheduler name from the cluster")
+
+			By(fmt.Sprintf("deleting the NRO Scheduler object to trigger the pod to restart: %s", nroSchedObj.Name))
+			err = fxt.Client.Delete(ctx, &schedPods[0])
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(ctx, schedDeployment)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("modifying the topology manager policy under kubeletconfig to single-numa-node")
+			Eventually(func(g Gomega) {
+				err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(targetedKC), targetedKC)
+				Expect(err).ToNot(HaveOccurred())
+
+				kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
+				Expect(err).ToNot(HaveOccurred())
+
+				// Here we're changing the topology manager policy to to single-numa-node
+				// after the scheduler has been deleted and restarted so now we can create a
+				// topology affinity error deployment to see if the deployment's pod will be pending or not
+				kcObj.TopologyManagerPolicy = v1beta1.SingleNumaNodeTopologyManagerPolicy
+				err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = fxt.Client.Update(ctx, targetedKC)
+				g.Expect(err).ToNot(HaveOccurred())
+			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+			waitForMcpUpdate(fxt.Client, ctx, mcps)
+
+			By("creating a topology affinity error deployment and check if the pod status is pending")
+			deployment := createTAEDeployment(fxt, ctx, "testdp", serialconfig.Config.SchedulerName, cpuResources)
+
+			maxStep := 3
+			updatedDeployment := &appsv1.Deployment{}
+			for step := 0; step < maxStep; step++ {
+				time.Sleep(10 * time.Second)
+
+				By(fmt.Sprintf("ensuring the deployment %q keep being pending %d/%d", deployment.Name, step+1, maxStep))
+
+				err = fxt.Client.Get(ctx, client.ObjectKeyFromObject(deployment), updatedDeployment)
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(wait.IsDeploymentComplete(deployment, &updatedDeployment.Status)).To(BeFalse(), "deployment %q become ready", deployment.Name)
+			}
+
+			By("checking the deployment pod has failed scheduling and its at the pending status")
+			pods, err := podlist.With(fxt.Client).ByDeployment(ctx, *updatedDeployment)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(len(pods)).To(Equal(1))
+
+			pod := &pods[0]
+			Expect(pod.Status.Phase).To(Equal(corev1.PodPending))
+
+			schedulerName = nroSchedObj.Status.SchedulerName
+			Expect(schedulerName).ToNot(BeEmpty(), "cannot autodetect the TAS scheduler name from the cluster")
+
+			isFailed, err := nrosched.CheckPodSchedulingFailedWithMsg(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName, fmt.Sprintf("cannot align %s", kcObj.TopologyManagerScope))
+			Expect(err).ToNot(HaveOccurred())
+			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, schedulerName)
+		})
 	})
 })
+
+func createTAEDeployment(fxt *e2efixture.Fixture, ctx context.Context, name, schedulerName, cpus string) *appsv1.Deployment {
+	var err error
+	var replicas int32 = 1
+
+	podLabels := map[string]string{
+		"test": "test-dp",
+	}
+	nodeSelector := map[string]string{}
+	deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, name, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
+	deployment.Spec.Template.Spec.SchedulerName = schedulerName
+	deployment.Spec.Template.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse(cpus),
+		corev1.ResourceMemory: resource.MustParse("256Mi"),
+	}
+
+	By(fmt.Sprintf("creating a topology affinity error deployment %q", name))
+	err = fxt.Client.Create(ctx, deployment)
+	Expect(err).ToNot(HaveOccurred())
+
+	return deployment
+}
 
 func daemonSetListToNamespacedNameList(dss []*appsv1.DaemonSet) []nropv1.NamespacedName {
 	ret := make([]nropv1.NamespacedName, 0, len(dss))
