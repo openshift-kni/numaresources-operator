@@ -13,10 +13,12 @@ metadata:
   name: controller-manager
   namespace: system
   labels:
+    app: numaresources-operator
     control-plane: controller-manager
 spec:
   selector:
     matchLabels:
+      app: numaresources-operator
       control-plane: controller-manager
   replicas: 1
   template:
@@ -24,6 +26,7 @@ spec:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
+        app: numaresources-operator
         control-plane: controller-manager
     spec:
       securityContext:
