@@ -45,6 +45,17 @@ const (
 	SchedulerInformerDedicated SchedulerInformerMode = "Dedicated"
 )
 
+// +kubebuilder:validation:Enum=Relaxed;Aggressive
+type CacheResyncDetectionMode string
+
+const (
+	// CacheResyncDetectionRelaxed makes the NodeResourceTopologyMatch plugin reconcile the node state only when detecting guaranteed QoS pods request NUMA-specific resources.
+	CacheResyncDetectionRelaxed CacheResyncDetectionMode = "Relaxed"
+
+	// CacheResyncDetectionRelaxed makes the NodeResourceTopologyMatch plugin reconcile the node state when detecting any guaranteed QoS pods.
+	CacheResyncDetectionAggressive CacheResyncDetectionMode = "Aggressive"
+)
+
 // NUMAResourcesSchedulerSpec defines the desired state of NUMAResourcesScheduler
 type NUMAResourcesSchedulerSpec struct {
 	// Scheduler container image URL
@@ -71,6 +82,10 @@ type NUMAResourcesSchedulerSpec struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler cache apiserver informer setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	SchedulerInformer *SchedulerInformerMode `json:"schedulerInformer,omitempty"`
+	// Set the cache resync detection mode. Default is to trigger resyncs only when detected guaranteed QoS pods which require NUMA-specific resources.
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler cache resync detection setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	CacheResyncDetection *CacheResyncDetectionMode `json:"cacheResyncDetection,omitempty"`
 }
 
 // NUMAResourcesSchedulerStatus defines the observed state of NUMAResourcesScheduler
