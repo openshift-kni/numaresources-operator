@@ -48,3 +48,9 @@ they found it before they run.
 - `E2E_RTE_CI_IMAGE` (accepts string, e.g `quay.io/openshift-kni/resource-topology-exporter:test-ci`) sets the 
   RTE image to be used for testing purposes particularly for modifying the operator object.
   
+### Tests tagging 
+
+- Tagging tests to a specific feature functionality were done by adding tags in the spec description like `It("[rtetols][distruptive]...")`.
+Starting Jul 2024, while the master branch is pointing to 4.17, the new preferred way to tag tests is using ginkgo `Label("")` such as `Context("should run pods requesting host-level resources", Label("hostlevel","distruptive"), func(){..})`. Tags aren't forbidden yet; they are just deprecated, so whenever a tag is added, a label is also required.
+- Each test should have the importance tag which is one of the below:
+`tier0` means critical; `tier1` means important; `tier2` means medium priority; `tier3` means low priority test.
