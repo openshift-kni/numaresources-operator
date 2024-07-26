@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -55,6 +56,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
+	"github.com/openshift-kni/numaresources-operator/internal/api/features"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
@@ -117,6 +119,7 @@ type Params struct {
 	enableHTTP2           bool
 	enableMCPCondsForward bool
 	image                 ImageParams
+	inspectFeatures       bool
 }
 
 func (pa *Params) SetDefaults() {
@@ -132,6 +135,7 @@ func (pa *Params) FromFlags() {
 	flag.StringVar(&pa.platformName, "platform", pa.platformName, "platform to deploy on - leave empty to autodetect")
 	flag.StringVar(&pa.platformVersion, "platform-version", pa.platformVersion, "platform version to deploy on - leave empty to autodetect")
 	flag.BoolVar(&pa.detectPlatformOnly, "detect-platform-only", pa.detectPlatformOnly, "detect and report the platform, then exits")
+	flag.BoolVar(&pa.inspectFeatures, "inspect-features", pa.inspectFeatures, "outputs the supported features as JSON, then exits")
 	flag.BoolVar(&pa.renderMode, "render", pa.renderMode, "outputs the rendered manifests, then exits")
 	flag.BoolVar(&pa.render.NRTCRD, "render-nrt-crd", pa.render.NRTCRD, "outputs only the rendered NodeResourceTopology CRD manifest, then exits")
 	flag.StringVar(&pa.render.Namespace, "render-namespace", pa.render.Namespace, "outputs the manifests rendered using the given namespace")
@@ -165,6 +169,10 @@ func main() {
 	if params.showVersion {
 		fmt.Printf("%s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
 		os.Exit(0)
+	}
+
+	if params.inspectFeatures {
+		os.Exit(manageIntrospection())
 	}
 
 	klogV := getKlogLevel()
@@ -308,6 +316,15 @@ func main() {
 		klog.ErrorS(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func manageIntrospection() int {
+	err := json.NewEncoder(os.Stdout).Encode(features.GetTopics())
+	if err != nil {
+		klog.ErrorS(err, "getting feature topics")
+		return 1
+	}
+	return 0
 }
 
 func manageRendering(render RenderParams, clusterPlatform platform.Platform, apiMf apimanifests.Manifests, rteMf rtemanifests.Manifests, namespace string, enableScheduler bool) int {
