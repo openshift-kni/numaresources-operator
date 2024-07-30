@@ -35,7 +35,7 @@ func main() {
 	if help {
 		e := features.NewTopicInfo()
 		e.Active = []string{"feature_1", "feature_2"}
-		filter := fmt.Sprintf("feature: consistAny {%s}\n", strings.Join(e.Active, ","))
+		filter := fmt.Sprintf("feature: containsAny {%s}\n", strings.Join(e.Active, ","))
 		fmt.Printf("The tool expects a json format text and parses it into TopicInfo struct, then prints out a ginkgo label filter for the active features.\nExample: for input\n%+v\nthe tool will print\n%s\n", e, filter)
 		os.Exit(0)
 	}
@@ -45,5 +45,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("error decoding topics data: %v", err)
 	}
-	fmt.Printf("feature: consistAny {%s}\n", strings.Join(topics.Active, ","))
+	fmt.Printf("feature: containsAny {%s}\n", strings.Join(topics.Active, ","))
 }
