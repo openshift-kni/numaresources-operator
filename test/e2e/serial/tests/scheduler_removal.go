@@ -113,7 +113,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 	})
 })
 
-var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources scheduler restart on a live cluster", Serial, Label("disruptive", "scheduler", "schedrst"), func() {
+var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources scheduler restart on a live cluster", Serial, Label("disruptive", "scheduler", "schedrst"), Label("feature:schedrst"), func() {
 	var fxt *e2efixture.Fixture
 	var nroSchedObj *nropv1.NUMAResourcesScheduler
 	var schedulerName string
