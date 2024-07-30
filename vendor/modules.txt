@@ -200,8 +200,8 @@ github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte
 github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/sched
 github.com/k8stopologyawareschedwg/deployer/pkg/options
 github.com/k8stopologyawareschedwg/deployer/pkg/validator
-# github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.1
-## explicit; go 1.16
+# github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2
+## explicit; go 1.20
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha1
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2
