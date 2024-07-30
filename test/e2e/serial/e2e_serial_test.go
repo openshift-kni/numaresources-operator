@@ -33,7 +33,7 @@ var setupExecuted = false
 
 func TestSerial(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "NUMAResources serial e2e tests")
+	RunSpecs(t, "NUMAResources serial e2e tests", Label("e2e:serial"))
 }
 
 var _ = BeforeSuite(func() {

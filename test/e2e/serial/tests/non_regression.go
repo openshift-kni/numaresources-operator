@@ -50,7 +50,7 @@ import (
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
 )
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement", Serial, Label("disruptive", "scheduler"), func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement", Serial, Label("disruptive", "scheduler"), Label("feature:nonreg"), func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
@@ -322,7 +322,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	})
 
 	Context("Requesting resources that are greater than allocatable at numa level", func() {
-		It("[test_id:47613][tier3][nonreg][unsched] should not schedule a pod requesting resources that are not allocatable at numa level", Label("tier3", "nonreg", "unsched"), func() {
+		It("[test_id:47613][tier3][nonreg][unsched] should not schedule a pod requesting resources that are not allocatable at numa level", Label("tier3", "nonreg", "unsched"), Label("feature:unsched"), func() {
 			//the test can run on node with any numa number, so no need to filter the nrts
 			nrtNames := e2enrt.AccumulateNames(nrts)
 

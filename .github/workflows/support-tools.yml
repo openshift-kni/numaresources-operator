@@ -1,0 +1,43 @@
+name: Build support tools binaries
+
+on:
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout sources
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: setup golang
+        uses: actions/setup-go@v2
+        id: go
+        with:
+          go-version: 1.22.4
+
+  build:
+    needs: [setup]
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout sources
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: build tools' binaries
+        run: |
+          make bin/mkginkgolabelfilter
+          make bin/catkubeletconfmap
+
+      - name: release the binaries
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: bin/*
+          tag: support-tools

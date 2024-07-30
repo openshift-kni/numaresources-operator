@@ -52,7 +52,7 @@ import (
 
 type getNodeAffinityFunc func(labelName string, labelValue []string, selectOperator corev1.NodeSelectorOperator) *corev1.Affinity
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering node selector", Serial, Label("disruptive", "scheduler"), func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering node selector", Serial, Label("disruptive", "scheduler"), Label("feature:wlplacement", "feature:nodelabel"), func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
 	var nrtList nrtv1alpha2.NodeResourceTopologyList

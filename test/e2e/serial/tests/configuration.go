@@ -74,7 +74,7 @@ import (
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )
 
-var _ = Describe("[serial][disruptive] numaresources configuration management", Serial, Label("disruptive"), func() {
+var _ = Describe("[serial][disruptive] numaresources configuration management", Serial, Label("disruptive"), Label("feature:config"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 	var nrts []nrtv1alpha2.NodeResourceTopology
@@ -617,7 +617,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(err).ToNot(HaveOccurred(), "failed to check the NodeGroupConfig status for %q", nroKey.String())
 		})
 
-		It("should report relatedObjects in the status", func(ctx context.Context) {
+		It("should report relatedObjects in the status", Label("related_objects"), func(ctx context.Context) {
 			By("getting NROP object")
 			nroKey := objects.NROObjectKey()
 			nroOperObj := nropv1.NUMAResourcesOperator{}

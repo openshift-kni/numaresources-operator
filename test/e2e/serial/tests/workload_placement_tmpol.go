@@ -74,7 +74,7 @@ type tmScopeFuncs struct {
 
 type tmScopeFuncsHandler map[string]tmScopeFuncs
 
-var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering TM policy", Serial, Label("disruptive", "scheduler"), func() {
+var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering TM policy", Serial, Label("disruptive", "scheduler"), Label("feature:wlplacement", "feature:tmpol"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 	tmSingleNUMANodeFuncsHandler := tmScopeFuncsHandler{
@@ -1301,7 +1301,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		),
 	)
 
-	DescribeTable("[placement][unsched] cluster with one worker nodes suitable", Label("placement", "unsched"),
+	DescribeTable("[placement][unsched] cluster with one worker nodes suitable", Label("placement", "unsched"), Label("feature:unsched"),
 		func(policyFuncs tmScopeFuncs, errMsg string, podRes podResourcesRequest, unsuitableFreeRes, targetFreeResPerNUMA []corev1.ResourceList) {
 
 			hostsRequired := 2
@@ -1551,6 +1551,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		),
 		Entry("[test_id:74257][tier3][unsched][tmscope:pod][cpu][nonreg] burstable pod with multi cnt with fractional cpus keep on pending because of not enough free cpus",
 			Label("tier3", "unsched", "tmscope:pod", "cpu", "nonreg"),
+			Label("feature:nonreg"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Pod],
 			"0.* nodes are available: [0-9]* Insufficient cpu",
 			podResourcesRequest{

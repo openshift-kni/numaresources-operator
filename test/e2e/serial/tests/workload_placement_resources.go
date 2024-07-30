@@ -53,7 +53,7 @@ import (
  * rinse and repeat for CPUs, devices, hugepages...
  */
 
-var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload placement considering specific resources requests", Serial, Label("disruptive", "scheduler", "byres"), func() {
+var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload placement considering specific resources requests", Serial, Label("disruptive", "scheduler", "byres"), Label("feature:wlplacement", "feature:byres"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
