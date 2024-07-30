@@ -40,7 +40,7 @@ var _ = Describe("[tools][mkginkgolabelfilter] Auxiliary tools", Label("tools", 
 				{
 					name:        "should create a filter that matches the a valid input",
 					input:       `{"active":["foo","bar","foobar"]}`,
-					expectedOut: "feature: consistAny {foo,bar,foobar}\n",
+					expectedOut: "feature: containsAny {foo,bar,foobar}\n",
 				},
 				{
 					name:        "should fail on an invalid json format",
@@ -50,12 +50,12 @@ var _ = Describe("[tools][mkginkgolabelfilter] Auxiliary tools", Label("tools", 
 				{
 					name:        "should return empty features on a valid json format and non-matching topic info - no active",
 					input:       `{"supported":["foo","bar","foobar"]}`,
-					expectedOut: "feature: consistAny {}\n",
+					expectedOut: "feature: containsAny {}\n",
 				},
 				{
 					name:        "should fail on a valid json format and partially matching topic info",
 					input:       `{"supported":["foo","bar"],"active":["foobar"]}`,
-					expectedOut: "feature: consistAny {foobar}\n",
+					expectedOut: "feature: containsAny {foobar}\n",
 				},
 			}
 
