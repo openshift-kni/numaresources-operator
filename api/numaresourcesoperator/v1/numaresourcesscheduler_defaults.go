@@ -28,7 +28,7 @@ const (
 	defaultSchedulerInformer    = SchedulerInformerDedicated
 	defaultCacheResyncDetection = CacheResyncDetectionRelaxed
 	defaultScoringStrategy      = LeastAllocated
-	defaultReplicas             = int32(3)
+	defaultReplicas             = int32(1)
 )
 
 func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
