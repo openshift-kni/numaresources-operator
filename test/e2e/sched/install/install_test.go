@@ -29,12 +29,14 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	"github.com/openshift-kni/numaresources-operator/internal/nodes"
+	intnodes "github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/crds"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
@@ -97,11 +99,11 @@ var _ = Describe("[Scheduler] install", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(podList).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
-			nodeList, err := nodes.GetControlPlane(e2eclient.Client, context.TODO(), configuration.Plat)
+			nodeList, err := nodes.GetControlPlane(&deployer.Environment{Cli: e2eclient.Client, Ctx: context.TODO()})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(nodeList).ToNot(BeEmpty())
 
-			nodeNames := nodes.GetNames(nodeList)
+			nodeNames := intnodes.GetNames(nodeList)
 			for _, pod := range podList {
 				Expect(pod.Spec.NodeName).To(BeElementOf(nodeNames), "pod: %q landed on node: %q, which is not part of the master nodes group: %v", pod.Name, pod.Spec.NodeName, nodeNames)
 			}

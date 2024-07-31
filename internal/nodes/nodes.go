@@ -17,13 +17,7 @@
 package nodes
 
 import (
-	"context"
-
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 )
 
 const (
@@ -39,29 +33,6 @@ const (
 	// LabelWorker contains the key for the worker role label
 	LabelWorkerRole = "node-role.kubernetes.io/worker"
 )
-
-func GetControlPlane(cli client.Client, ctx context.Context, plat platform.Platform) ([]corev1.Node, error) {
-	nodeList := &corev1.NodeList{}
-	labels := metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			LabelControlPlaneRole: "",
-		},
-	}
-	if plat == platform.Kubernetes {
-		labels.MatchLabels[LabelControlPlaneRole] = ""
-	}
-
-	selNodes, err := metav1.LabelSelectorAsSelector(&labels)
-	if err != nil {
-		return nil, err
-	}
-
-	err = cli.List(ctx, nodeList, &client.ListOptions{LabelSelector: selNodes})
-	if err != nil {
-		return nil, err
-	}
-	return nodeList.Items, nil
-}
 
 func GetNames(nodes []corev1.Node) []string {
 	var nodeNames []string
