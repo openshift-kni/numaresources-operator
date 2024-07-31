@@ -31,7 +31,6 @@ import (
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
-	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -59,6 +58,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/api/features"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/controlplane"
+	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
@@ -120,12 +121,14 @@ type Params struct {
 	enableMCPCondsForward bool
 	image                 ImageParams
 	inspectFeatures       bool
+	enableReplicasDetect  bool
 }
 
 func (pa *Params) SetDefaults() {
 	pa.metricsAddr = defaultMetricsAddr
 	pa.probeAddr = defaultProbeAddr
 	pa.render.Namespace = defaultNamespace
+	pa.enableReplicasDetect = true
 }
 
 func (pa *Params) FromFlags() {
@@ -150,6 +153,7 @@ func (pa *Params) FromFlags() {
 	flag.BoolVar(&pa.enableMCPCondsForward, "enable-mcp-conds-fwd", pa.enableMCPCondsForward, "enable MCP Status Condition forwarding")
 	flag.StringVar(&pa.image.Exporter, "image-exporter", pa.image.Exporter, "use this image as default for the RTE")
 	flag.StringVar(&pa.image.Scheduler, "image-scheduler", pa.image.Scheduler, "use this image as default for the scheduler")
+	flag.BoolVar(&pa.enableReplicasDetect, "detect-replicas", pa.enableReplicasDetect, "autodetect optimal replica count")
 
 	flag.Parse()
 
@@ -181,7 +185,9 @@ func main() {
 
 	klog.InfoS("starting", "program", version.ProgramName(), "version", version.Get(), "gitcommit", version.GetGitCommit(), "golang", runtime.Version(), "vl", klogV, "auxv", config.Verbosity().String())
 
-	clusterPlatform, clusterPlatformVersion, err := version.DiscoverCluster(context.Background(), params.platformName, params.platformVersion)
+	ctx := context.Background()
+
+	clusterPlatform, clusterPlatformVersion, err := version.DiscoverCluster(ctx, params.platformName, params.platformVersion)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -273,6 +279,11 @@ func main() {
 	}
 
 	if params.enableScheduler {
+		info := controlplane.Defaults()
+		if params.enableReplicasDetect {
+			info = controlplane.Discover(ctx)
+		}
+
 		schedMf, err := schedmanifests.GetManifests(namespace)
 		if err != nil {
 			klog.ErrorS(err, "unable to load the Scheduler manifests")
@@ -285,6 +296,7 @@ func main() {
 			Scheme:             mgr.GetScheme(),
 			SchedulerManifests: schedMf,
 			Namespace:          namespace,
+			AutodetectReplicas: info.NodeCount,
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
 			os.Exit(1)

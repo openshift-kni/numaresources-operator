@@ -68,6 +68,7 @@ type NUMAResourcesSchedulerReconciler struct {
 	Scheme             *runtime.Scheme
 	SchedulerManifests schedmanifests.Manifests
 	Namespace          string
+	AutodetectReplicas int
 }
 
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
@@ -175,6 +176,15 @@ func isDeploymentRunning(ctx context.Context, c client.Client, key nropv1.Namesp
 	return false, nil
 }
 
+func (r *NUMAResourcesSchedulerReconciler) computeSchedulerReplicas(schedSpec nropv1.NUMAResourcesSchedulerSpec) *int32 {
+	// the api validation/normalization layer must ensure this value is != nil
+	if *schedSpec.Replicas >= 0 { // 0 is legit value to disable the deployment
+		return schedSpec.Replicas
+	}
+	v := int32(r.AutodetectReplicas)
+	return &v
+}
+
 func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (nropv1.NUMAResourcesSchedulerStatus, error) {
 	klog.V(4).Info("SchedulerSync start")
 	defer klog.V(4).Info("SchedulerSync stop")
@@ -202,7 +212,11 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		},
 	}
 
-	r.SchedulerManifests.Deployment.Spec.Replicas = instance.Spec.Replicas
+	r.SchedulerManifests.Deployment.Spec.Replicas = r.computeSchedulerReplicas(schedSpec)
+	klog.V(4).InfoS("using scheduler replicas", "replicas", *r.SchedulerManifests.Deployment.Spec.Replicas)
+	// TODO: if replicas doesn't make sense (autodetect disabled and user set impossible value) then we
+	// should set a degraded state
+
 	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, schedSpec.SchedulerImage)
 	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
 	schedupdate.DeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
