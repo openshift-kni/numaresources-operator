@@ -40,6 +40,7 @@ import (
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
+	"github.com/openshift-kni/numaresources-operator/internal/baseload"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
@@ -337,7 +338,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			for _, nodeName := range e2efixture.ListNodeNames(nrtNames) {
 
 				//calculate base load on the node
-				baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), nodeName)
+				baseload, err := baseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 				klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 

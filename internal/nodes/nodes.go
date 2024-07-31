@@ -25,9 +25,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-
-	"github.com/openshift-kni/numaresources-operator/internal/baseload"
-	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 )
 
 const (
@@ -80,17 +77,6 @@ func GetControlPlane(cli client.Client, ctx context.Context, plat platform.Platf
 		return nil, err
 	}
 	return nodeList.Items, nil
-}
-
-func GetLoad(cli client.Client, ctx context.Context, nodeName string) (baseload.Load, error) {
-	nl := baseload.Load{
-		Name: nodeName,
-	}
-	pods, err := podlist.With(cli).OnNode(ctx, nodeName)
-	if err != nil {
-		return nl, err
-	}
-	return baseload.FromPods(nodeName, pods), nil
 }
 
 func GetNames(nodes []corev1.Node) []string {

@@ -36,12 +36,13 @@ import (
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
-	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
+	intbaseload "github.com/openshift-kni/numaresources-operator/internal/baseload"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
+
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
@@ -2107,7 +2108,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 func setupPadding(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod {
 	GinkgoHelper()
 
-	baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), padInfo.targetNodeName)
+	baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), padInfo.targetNodeName)
 	Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", padInfo.targetNodeName)
 	By(fmt.Sprintf("computed base load: %s", baseload))
 
@@ -2154,7 +2155,7 @@ func setupPaddingForUnsuitableNodes(fxt *e2efixture.Fixture, nrtList nrtv1alpha2
 		nrtInfo, err := e2enrt.FindFromList(nrtList.Items, unsuitableNodeName)
 		Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", unsuitableNodeName)
 
-		baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), unsuitableNodeName)
+		baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), unsuitableNodeName)
 		Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", unsuitableNodeName)
 		By(fmt.Sprintf("computed base load: %s", baseload))
 

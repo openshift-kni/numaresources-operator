@@ -34,8 +34,8 @@ import (
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
+	intbaseload "github.com/openshift-kni/numaresources-operator/internal/baseload"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
-	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
@@ -187,7 +187,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 					Expect(err).NotTo(HaveOccurred(), "missing NRT Info for node %q", nodeName)
 
-					baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), nodeName)
+					baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 					Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", nodeName)
 
 					for zIdx, zone := range nrtInfo.Zones {
@@ -341,7 +341,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					nrtInfo, err := e2enrt.FindFromList(nrtTwoZoneCandidates, nodeName)
 					Expect(err).NotTo(HaveOccurred(), "missing NRT Info for node %q", nodeName)
 
-					baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), nodeName)
+					baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 					Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", nodeName)
 
 					for zIdx, zone := range nrtInfo.Zones {
@@ -371,7 +371,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				By("padding a NUMA node on the target node")
 				var paddingPodsTargetNode []*corev1.Pod
 
-				baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), targetNodeName)
+				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), targetNodeName)
 				Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", targetNodeName)
 
 				for zIdx, zone := range targetNrtInitial.Zones {

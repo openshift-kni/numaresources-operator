@@ -29,11 +29,12 @@ import (
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
-	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
+	intbaseload "github.com/openshift-kni/numaresources-operator/internal/baseload"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
+
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
@@ -188,7 +189,7 @@ func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nrtCandidates []nr
 		nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 		Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-		baseload, err := nodes.GetLoad(fxt.Client, ctx, nodeName)
+		baseload, err := intbaseload.ForNode(fxt.Client, ctx, nodeName)
 		Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 		By(fmt.Sprintf("computed base load: %s", baseload))
 
@@ -205,7 +206,7 @@ func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nrtCandidates []nr
 
 	By("Padding the target node")
 
-	baseload, err := nodes.GetLoad(fxt.Client, ctx, targetNodeName)
+	baseload, err := intbaseload.ForNode(fxt.Client, ctx, targetNodeName)
 	Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 	By(fmt.Sprintf("computed base load: %s", baseload))
 
