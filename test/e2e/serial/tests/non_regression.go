@@ -26,6 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,7 +37,6 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 
-	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -207,7 +208,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err := fxt.Client.List(context.TODO(), &nrtInitialList)
 			Expect(err).ToNot(HaveOccurred())
 
-			workers, err := nodes.GetWorkerNodes(fxt.Client, context.TODO())
+			workers, err := nodes.GetWorkers(fxt.DEnv())
 			Expect(err).ToNot(HaveOccurred())
 
 			targetIdx, ok := e2efixture.PickNodeIndex(workers)

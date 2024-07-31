@@ -39,13 +39,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 
-	"github.com/openshift-kni/numaresources-operator/internal/nodes"
+	intnodes "github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/schedcache"
 )
@@ -119,12 +122,12 @@ func main() {
 		nodeNames = sets.List(parsedArgs.NodeNames)
 		klog.V(2).Infof("using provided node list with %d items", len(nodeNames))
 	} else {
-		workers, err := nodes.GetWorkerNodes(cli, ctx)
+		workers, err := nodes.GetWorkers(&deployer.Environment{Cli: cli, Ctx: ctx})
 		if err != nil {
 			klog.V(1).ErrorS(err, "getting worker nodes")
 			os.Exit(1)
 		}
-		nodeNames = nodes.GetNames(workers)
+		nodeNames = intnodes.GetNames(workers)
 		klog.V(2).Infof("using autodetected node list with %d items", len(nodeNames))
 	}
 

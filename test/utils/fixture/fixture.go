@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -35,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
@@ -194,6 +196,18 @@ func Cooldown(ft *Fixture) {
 	}
 	klog.Warningf("cooling down for %v", cooldownTime)
 	time.Sleep(cooldownTime)
+}
+
+func (fxt *Fixture) DEnv() *deployer.Environment {
+	return fxt.DEnvWithContext(context.TODO())
+}
+
+func (fxt *Fixture) DEnvWithContext(ctx context.Context) *deployer.Environment {
+	return &deployer.Environment{
+		Cli: fxt.Client,
+		Ctx: ctx,
+		Log: logr.Discard(),
+	}
 }
 
 func MustSettleNRT(fxt *Fixture) {

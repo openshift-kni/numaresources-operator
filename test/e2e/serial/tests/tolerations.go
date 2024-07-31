@@ -25,6 +25,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -38,7 +40,6 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
-	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -233,7 +234,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				extraTols = true
 
 				By("getting the worker nodes")
-				workers, err = nodes.GetWorkerNodes(fxt.Client, context.TODO())
+				workers, err = nodes.GetWorkers(fxt.DEnv())
 				Expect(err).ToNot(HaveOccurred())
 
 				By(fmt.Sprintf("randomly picking the target node (among %d)", len(workers)))
@@ -296,7 +297,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 				By("taint one node with value and NoExecute effect")
 				var err error
-				workers, err = nodes.GetWorkerNodes(fxt.Client, ctx)
+				workers, err = nodes.GetWorkers(fxt.DEnv())
 				Expect(err).ToNot(HaveOccurred())
 
 				taintVal1 := fmt.Sprintf("%s=val1:%s", testKey, corev1.TaintEffectNoExecute)
@@ -340,7 +341,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 			It("[tier3][slow] should evict running RTE pod if taint-tolartion matching criteria is shaken - node taints update", Label("tier3", "slow"), func(ctx context.Context) {
 				By("taint one node with taint value and NoExecute effect")
 				var err error
-				workers, err = nodes.GetWorkerNodes(fxt.Client, ctx)
+				workers, err = nodes.GetWorkers(fxt.DEnv())
 				Expect(err).ToNot(HaveOccurred())
 
 				taintVal1 := fmt.Sprintf("%s=val1:%s", testKey, corev1.TaintEffectNoExecute)
@@ -424,7 +425,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 			It("[tier2][test_id:72861] should tolerate partial taints and not schedule or evict the pod on the tainted node", Label("tier2"), func(ctx context.Context) {
 				var err error
 				By("getting the worker nodes")
-				workers, err = nodes.GetWorkerNodes(fxt.Client, context.TODO())
+				workers, err = nodes.GetWorkers(fxt.DEnv())
 				Expect(err).ToNot(HaveOccurred())
 
 				By(fmt.Sprintf("randomly picking the target node (among %d)", len(workers)))
@@ -473,7 +474,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 			It("[tier3][test_id:72859] should not restart a running RTE pod on tainted node with NoSchedule effect", Label("tier3"), func(ctx context.Context) {
 				By("taint one worker node")
 				var err error
-				workers, err = nodes.GetWorkerNodes(fxt.Client, ctx)
+				workers, err = nodes.GetWorkers(fxt.DEnv())
 				Expect(err).ToNot(HaveOccurred())
 
 				tnts, _, err = taints.ParseTaints([]string{testTaint()})
@@ -540,7 +541,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					waitForMcpUpdate(fxt.Client, ctx, mcps)
 
 					By("taint one worker node")
-					workers, err = nodes.GetWorkerNodes(fxt.Client, ctx)
+					workers, err = nodes.GetWorkers(fxt.DEnv())
 					Expect(err).ToNot(HaveOccurred())
 
 					tnts, _, err = taints.ParseTaints([]string{testTaint()})
@@ -661,7 +662,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 			It("[tier3] should evict RTE pod on tainted node with NoExecute effect and restore it when taint is removed", Label("tier3"), func(ctx context.Context) {
 				By("taint one worker node with NoExecute effect")
 				var err error
-				workers, err = nodes.GetWorkerNodes(fxt.Client, ctx)
+				workers, err = nodes.GetWorkers(fxt.DEnv())
 				Expect(err).ToNot(HaveOccurred())
 
 				tnts, _, err = taints.ParseTaints([]string{testTaintNoExecute()})

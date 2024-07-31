@@ -59,7 +59,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
-	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -119,7 +118,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 			initialNroOperObj := nroOperObj.DeepCopy()
 
-			workers, err := nodes.GetWorkerNodes(fxt.Client, context.TODO())
+			workers, err := depnodes.GetWorkers(fxt.DEnv())
 			Expect(err).ToNot(HaveOccurred())
 
 			targetIdx, ok := e2efixture.PickNodeIndex(workers)
@@ -145,13 +144,13 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			mcp := objects.TestMCP()
 			By(fmt.Sprintf("creating new MCP: %q", mcp.Name))
 			// we must have this label in order to match other machine configs that are necessary for proper functionality
-			mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": nodes.RoleMCPTest}
+			mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": getLabelRoleMCPTest()}
 			mcp.Spec.MachineConfigSelector = &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
 						Key:      "machineconfiguration.openshift.io/role",
 						Operator: metav1.LabelSelectorOpIn,
-						Values:   []string{nodes.RoleWorker, nodes.RoleMCPTest},
+						Values:   []string{depnodes.RoleWorker, getLabelRoleMCPTest()},
 					},
 				},
 			}

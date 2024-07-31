@@ -21,7 +21,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
@@ -40,21 +39,6 @@ const (
 	// LabelWorker contains the key for the worker role label
 	LabelWorkerRole = "node-role.kubernetes.io/worker"
 )
-
-func GetWorkerNodes(cli client.Client, ctx context.Context) ([]corev1.Node, error) {
-	nodes := &corev1.NodeList{}
-	selector, err := labels.Parse(LabelWorkerRole + "=")
-	if err != nil {
-		return nil, err
-	}
-
-	err = cli.List(ctx, nodes, &client.ListOptions{LabelSelector: selector})
-	if err != nil {
-		return nil, err
-	}
-
-	return nodes.Items, nil
-}
 
 func GetControlPlane(cli client.Client, ctx context.Context, plat platform.Platform) ([]corev1.Node, error) {
 	nodeList := &corev1.NodeList{}
