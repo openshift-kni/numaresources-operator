@@ -26,7 +26,7 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
-func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
+func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 	cacheResyncPeriod := defaultCacheResyncPeriod
 	cacheResyncDebug := defaultCacheResyncDebug
 	cacheResyncDetection := defaultCacheResyncDetection
@@ -309,14 +309,19 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			bkp := tc.current.DeepCopy()
-			got := tc.current.Normalize()
-			if !reflect.DeepEqual(*bkp, tc.current) {
-				t.Errorf("current was mutated val=%s expected %s", toJSON(bkp), toJSON(tc.current))
-			}
-			if !reflect.DeepEqual(got, tc.expected) {
+			got := tc.current.DeepCopy()
+			SetDefaults_NUMAResourcesSchedulerSpec(got)
+			if !reflect.DeepEqual(*got, tc.expected) {
 				t.Errorf("got=%s expected %s", toJSON(got), toJSON(tc.expected))
 			}
 		})
 	}
+}
+
+func newInt32(v int32) *int32 {
+	return &v
+}
+
+func newDefaultReplicas() *int32 {
+	return newInt32(defaultReplicas)
 }

@@ -16,51 +16,6 @@
 
 package v1
 
-import (
-	"time"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
-// TODO: move into _defaults.go? expose?
-const (
-	defaultCacheResyncPeriod    = 5 * time.Second
-	defaultCacheResyncDebug     = CacheResyncDebugDumpJSONFile
-	defaultSchedulerInformer    = SchedulerInformerDedicated
-	defaultCacheResyncDetection = CacheResyncDetectionRelaxed
-	defaultScoringStrategy      = LeastAllocated
-	defaultReplicas             = int32(3)
-)
-
-func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
-	if spec.CacheResyncPeriod == nil {
-		spec.CacheResyncPeriod = &metav1.Duration{
-			Duration: defaultCacheResyncPeriod,
-		}
-	}
-	if spec.CacheResyncDebug == nil {
-		resyncDebug := defaultCacheResyncDebug
-		spec.CacheResyncDebug = &resyncDebug
-	}
-	if spec.SchedulerInformer == nil {
-		infMode := defaultSchedulerInformer
-		spec.SchedulerInformer = &infMode
-	}
-	if spec.CacheResyncDetection == nil {
-		resyncDetection := defaultCacheResyncDetection
-		spec.CacheResyncDetection = &resyncDetection
-	}
-	if spec.ScoringStrategy == nil {
-		spec.ScoringStrategy = &ScoringStrategyParams{
-			Type: defaultScoringStrategy,
-		}
-	}
-	if spec.Replicas == nil {
-		replicas := defaultReplicas
-		spec.Replicas = &replicas
-	}
-}
-
 func (current NUMAResourcesSchedulerSpec) Normalize() NUMAResourcesSchedulerSpec {
 	spec := NUMAResourcesSchedulerSpec{}
 	current.DeepCopyInto(&spec)
