@@ -18,7 +18,6 @@ package nodes
 
 import (
 	"context"
-	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -92,14 +91,6 @@ func GetLoad(cli client.Client, ctx context.Context, nodeName string) (baseload.
 		return nl, err
 	}
 	return baseload.FromPods(nodeName, pods), nil
-}
-
-func GetLabelRoleWorker() string {
-	return fmt.Sprintf("%s/%s", LabelRole, RoleWorker)
-}
-
-func GetLabelRoleMCPTest() string {
-	return fmt.Sprintf("%s/%s", LabelRole, RoleMCPTest)
 }
 
 func GetNames(nodes []corev1.Node) []string {

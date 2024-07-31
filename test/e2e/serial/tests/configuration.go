@@ -44,6 +44,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sync/errgroup"
 
+	depnodes "github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
+
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 
@@ -124,15 +126,15 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(ok).To(BeTrue())
 			targetedNode := workers[targetIdx]
 
-			By(fmt.Sprintf("Label node %q with %q and remove the label %q from it", targetedNode.Name, nodes.GetLabelRoleMCPTest(), nodes.GetLabelRoleWorker()))
-			unlabelFunc, err := labelNode(fxt.Client, nodes.GetLabelRoleMCPTest(), targetedNode.Name)
+			By(fmt.Sprintf("Label node %q with %q and remove the label %q from it", targetedNode.Name, getLabelRoleMCPTest(), getLabelRoleWorker()))
+			unlabelFunc, err := labelNode(fxt.Client, getLabelRoleMCPTest(), targetedNode.Name)
 			Expect(err).ToNot(HaveOccurred())
 
-			labelFunc, err := unlabelNode(fxt.Client, nodes.GetLabelRoleWorker(), "", targetedNode.Name)
+			labelFunc, err := unlabelNode(fxt.Client, getLabelRoleWorker(), "", targetedNode.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			defer func() {
-				By(fmt.Sprintf("CLEANUP: restore initial labels of node %q with %q", targetedNode.Name, nodes.GetLabelRoleWorker()))
+				By(fmt.Sprintf("CLEANUP: restore initial labels of node %q with %q", targetedNode.Name, getLabelRoleWorker()))
 				err = unlabelFunc()
 				Expect(err).ToNot(HaveOccurred())
 
@@ -154,7 +156,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				},
 			}
 			mcp.Spec.NodeSelector = &metav1.LabelSelector{
-				MatchLabels: map[string]string{nodes.GetLabelRoleMCPTest(): ""},
+				MatchLabels: map[string]string{getLabelRoleMCPTest(): ""},
 			}
 
 			err = fxt.Client.Create(context.TODO(), mcp)
@@ -1021,4 +1023,16 @@ func waitForMcpsCondition(cli client.Client, ctx context.Context, mcps []*machin
 	if err := eg.Wait(); err != nil {
 		fmt.Printf("An error occurred: %v\n", err)
 	}
+}
+
+const (
+	roleMCPTest = "mcp-test"
+)
+
+func getLabelRoleWorker() string {
+	return fmt.Sprintf("%s/%s", depnodes.LabelRole, depnodes.RoleWorker)
+}
+
+func getLabelRoleMCPTest() string {
+	return fmt.Sprintf("%s/%s", depnodes.LabelRole, roleMCPTest)
 }
