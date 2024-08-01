@@ -216,9 +216,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			updatedDp, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(context.TODO(), dp)
 			Expect(err).ToNot(HaveOccurred())
 
-			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Minute)
-			Expect(err).ToNot(HaveOccurred())
-
 			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(len(pods)).To(Equal(1))
@@ -244,6 +241,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			By("wait for NRT data to settle")
 			e2efixture.MustSettleNRT(fxt)
+
+			nrtPostCreateDeploymentList, err := e2enrt.GetUpdated(fxt.Client, nrtInitialList, time.Minute)
+			Expect(err).ToNot(HaveOccurred())
 
 			nrtPostCreate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
