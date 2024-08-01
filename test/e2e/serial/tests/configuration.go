@@ -1015,13 +1015,21 @@ func accumulateKubeletConfigNames(cms []corev1.ConfigMap) sets.Set[string] {
 
 func waitForMcpsCondition(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool, condition machineconfigv1.MachineConfigPoolConditionType) error {
 	var eg errgroup.Group
+	interval := configuration.MachineConfigPoolUpdateInterval
+	if condition == machineconfigv1.MachineConfigPoolUpdating {
+		// the transition from updated to updating to updated can be very fast sometimes. so if
+		// the status changed to updating and then to updated while on wait it will miss the updating
+		// status, and it will keep waiting and lastly fail the test. to avoid that decrease the interval
+		// to allow more often checks for the status
+		interval = 2 * time.Second
+	}
 	for _, mcp := range mcps {
 		klog.Infof("wait for mcp %q to meet condition %q", mcp.Name, condition)
 		mcp := mcp
 		eg.Go(func() error {
 			defer GinkgoRecover()
 			err := wait.With(cli).
-				Interval(configuration.MachineConfigPoolUpdateInterval).
+				Interval(interval).
 				Timeout(configuration.MachineConfigPoolUpdateTimeout).
 				ForMachineConfigPoolCondition(ctx, mcp, condition)
 			return err
