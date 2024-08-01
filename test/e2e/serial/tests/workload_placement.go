@@ -1119,39 +1119,6 @@ func labelNodeWithValue(cli client.Client, key, val, nodeName string) (func() er
 	return unlabelFunc, nil
 }
 
-func unlabelNode(cli client.Client, key, val, nodeName string) (func() error, error) {
-	nodeObj := &corev1.Node{}
-	nodeKey := client.ObjectKey{Name: nodeName}
-	if err := cli.Get(context.TODO(), nodeKey, nodeObj); err != nil {
-		return nil, err
-	}
-	sel, err := labels.Parse(fmt.Sprintf("%s=%s", key, val))
-	if err != nil {
-		return nil, err
-	}
-
-	delete(nodeObj.Labels, key)
-	klog.Infof("remove label %q from node: %q", sel.String(), nodeName)
-	if err := cli.Update(context.TODO(), nodeObj); err != nil {
-		return nil, err
-	}
-
-	labelFunc := func() error {
-		nodeObj := &corev1.Node{}
-		nodeKey := client.ObjectKey{Name: nodeName}
-		if err := cli.Get(context.TODO(), nodeKey, nodeObj); err != nil {
-			return err
-		}
-		nodeObj.Labels[key] = val
-		klog.Infof("add label %q to node: %q", sel.String(), nodeName)
-		if err := cli.Update(context.TODO(), nodeObj); err != nil {
-			return err
-		}
-		return nil
-	}
-	return labelFunc, nil
-}
-
 func availableResourceType(nrtInfo nrtv1alpha2.NodeResourceTopology, resName corev1.ResourceName) resource.Quantity {
 	var res resource.Quantity
 
