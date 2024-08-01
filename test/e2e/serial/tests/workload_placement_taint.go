@@ -37,9 +37,9 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
-	intnodes "github.com/openshift-kni/numaresources-operator/internal/nodes"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/k8simported/taints"
@@ -152,7 +152,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nodes, err := nodes.GetWorkers(fxt.DEnv())
 			Expect(err).ToNot(HaveOccurred())
 
-			nodeNames := intnodes.GetNames(nodes)
+			nodeNames := objectnames.Nodes(nodes)
 			doubleCheckedNodeNames := untaintNodes(fxt.Client, nodeNames, tnt)
 			By(fmt.Sprintf("cleaned taint %q from the nodes %v", tnt.String(), doubleCheckedNodeNames))
 

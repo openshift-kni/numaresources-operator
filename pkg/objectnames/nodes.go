@@ -14,27 +14,13 @@
  * limitations under the License.
  */
 
-package nodes
+package objectnames
 
 import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-const (
-	LabelRole = "node-role.kubernetes.io"
-
-	RoleControlPlane = "control-plane"
-	RoleWorker       = "worker"
-	RoleMCPTest      = "mcp-test"
-
-	// LabelControlPlaneRole contains the key for the control-plane role label
-	LabelControlPlaneRole = "node-role.kubernetes.io/control-plane"
-
-	// LabelWorker contains the key for the worker role label
-	LabelWorkerRole = "node-role.kubernetes.io/worker"
-)
-
-func GetNames(nodes []corev1.Node) []string {
+func Nodes(nodes []corev1.Node) []string {
 	var nodeNames []string
 	for _, node := range nodes {
 		nodeNames = append(nodeNames, node.Name)

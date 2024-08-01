@@ -33,8 +33,8 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	intnodes "github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/crds"
@@ -103,7 +103,7 @@ var _ = Describe("[Scheduler] install", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(nodeList).ToNot(BeEmpty())
 
-			nodeNames := intnodes.GetNames(nodeList)
+			nodeNames := objectnames.Nodes(nodeList)
 			for _, pod := range podList {
 				Expect(pod.Spec.NodeName).To(BeElementOf(nodeNames), "pod: %q landed on node: %q, which is not part of the master nodes group: %v", pod.Name, pod.Spec.NodeName, nodeNames)
 			}

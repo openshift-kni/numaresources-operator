@@ -24,8 +24,8 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
-	intnodes "github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/schedcache"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -52,7 +52,7 @@ func CollectSchedCache(ctx context.Context, cli client.Client, data *ValidatorDa
 		Log:    logr.Discard(),
 	}
 
-	_, unsynced, err := schedcache.HasSynced(&env, intnodes.GetNames(workers))
+	_, unsynced, err := schedcache.HasSynced(&env, objectnames.Nodes(workers))
 	if err != nil {
 		return err
 	}

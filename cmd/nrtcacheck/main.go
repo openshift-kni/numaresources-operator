@@ -48,7 +48,6 @@ import (
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 
-	intnodes "github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/schedcache"
 )
@@ -127,7 +126,7 @@ func main() {
 			klog.V(1).ErrorS(err, "getting worker nodes")
 			os.Exit(1)
 		}
-		nodeNames = intnodes.GetNames(workers)
+		nodeNames = objectnames.Nodes(workers)
 		klog.V(2).Infof("using autodetected node list with %d items", len(nodeNames))
 	}
 
