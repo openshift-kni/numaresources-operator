@@ -208,11 +208,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Expect(err).ToNot(HaveOccurred())
 
 				By("waiting for mcp to start updating")
-				waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
+				err = waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
+				Expect(err).ToNot(HaveOccurred())
 
 				By("wait for mcp to get updated")
-				waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
-
+				err = waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
+				Expect(err).ToNot(HaveOccurred())
 			}() //end of defer
 
 			// here we expect mcp-test and worker mcps to get updated.
@@ -229,13 +230,16 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for the new mcps to get updated")
-			waitForMcpsCondition(fxt.Client, context.TODO(), newMcps, machineconfigv1.MachineConfigPoolUpdated)
+			err = waitForMcpsCondition(fxt.Client, context.TODO(), newMcps, machineconfigv1.MachineConfigPoolUpdated)
+			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for the old mcps to start updating")
-			waitForMcpsCondition(fxt.Client, context.TODO(), initialMcps, machineconfigv1.MachineConfigPoolUpdating)
+			err = waitForMcpsCondition(fxt.Client, context.TODO(), initialMcps, machineconfigv1.MachineConfigPoolUpdating)
+			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for the old mcps to get updated")
-			waitForMcpsCondition(fxt.Client, context.TODO(), initialMcps, machineconfigv1.MachineConfigPoolUpdated)
+			err = waitForMcpsCondition(fxt.Client, context.TODO(), initialMcps, machineconfigv1.MachineConfigPoolUpdated)
+			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("Verify RTE daemonsets have the updated node selector matching to the new mcp %q", mcp.Name))
 			Eventually(func() (bool, error) {
@@ -447,10 +451,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 			By("waiting for mcp to start updating")
-			waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
+			err = waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
+			Expect(err).ToNot(HaveOccurred())
 
 			By("wait for mcp to get updated")
-			waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
+			err = waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
+			Expect(err).ToNot(HaveOccurred())
 
 			defer func() {
 				By("reverting kubeletconfig changes")
@@ -470,10 +476,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 				By("waiting for mcp to start updating")
-				waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
+				err = waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
+				Expect(err).ToNot(HaveOccurred())
 
 				By("wait for mcp to get updated")
-				waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
+				err = waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
+				Expect(err).ToNot(HaveOccurred())
 			}()
 
 			By("checking that NUMAResourcesOperator's ConfigMap has changed")
@@ -1005,7 +1013,7 @@ func accumulateKubeletConfigNames(cms []corev1.ConfigMap) sets.Set[string] {
 	return cmNames
 }
 
-func waitForMcpsCondition(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool, condition machineconfigv1.MachineConfigPoolConditionType) {
+func waitForMcpsCondition(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool, condition machineconfigv1.MachineConfigPoolConditionType) error {
 	var eg errgroup.Group
 	for _, mcp := range mcps {
 		klog.Infof("wait for mcp %q to meet condition %q", mcp.Name, condition)
@@ -1019,9 +1027,7 @@ func waitForMcpsCondition(cli client.Client, ctx context.Context, mcps []*machin
 			return err
 		})
 	}
-	if err := eg.Wait(); err != nil {
-		fmt.Printf("An error occurred: %v\n", err)
-	}
+	return eg.Wait()
 }
 
 const (
