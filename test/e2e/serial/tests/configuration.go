@@ -698,7 +698,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}).WithContext(ctx).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Equal(kcCmNamesPre))
 		})
 
-		It("[reboot_required][slow][unsched][schedrst] should be able to correctly identify topology manager policy without scheduler restarting", Label("reboot_required", "slow", "unsched", "schedrst"), func(ctx context.Context) {
+		It("[reboot_required][slow][unsched][schedrst] should be able to correctly identify topology manager policy without scheduler restarting", Label("reboot_required", "slow", "unsched", "schedrst"), Label("feature:schedattrwatch"), func(ctx context.Context) {
 			// https://issues.redhat.com/browse/OCPBUGS-34583
 			fxt.IsRebootTest = true
 			By("getting the number of cpus that is required for a numa zone to create a topology affinity error deployment")

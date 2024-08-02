@@ -20,7 +20,7 @@ Provide a way to identify the active features for every supported operator versi
         - Should not consist of any of `&|!,()/`
 - Define the list of supported features for each version.
 - Allow the user to list the supported features by adding new flag, `-inspect-features` which if passed the numaresources-operator binary on the controller pod will list the active features for the deployed version of the operator.
-- For automated bugs' scenarios that their fix is not back-ported to all versions use keywords tags that briefly describes the bug's main check.
+- For automated bugs' scenarios that their fix is not back-ported to all versions use keywords tags that briefly describes the feature that the bug fix addresses.
 
 **List active features**
 
