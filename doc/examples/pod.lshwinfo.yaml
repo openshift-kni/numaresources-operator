@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: lshwinfo-pod-
+spec:
+  schedulerName: topo-aware-scheduler
+  containers:
+  - name: ctrreschk
+    image: quay.io/fromani/ctrreschk:v0.0.2024080204
+    imagePullPolicy: Always
+    command: ["/usr/local/bin/ctrreschk", "-S", "info"]
