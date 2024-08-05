@@ -18,44 +18,48 @@ package images
 
 import "os"
 
-func init() {
-	_, ok := os.LookupEnv("TAS_IMAGES_USE_SHA")
-	SetDefaults(ok)
-	Setup(os.LookupEnv)
+type Images struct {
+	SchedulerPluginScheduler  string
+	SchedulerPluginController string
+	ResourceTopologyExporter  string
+	NodeFeatureDiscovery      string
 }
 
-func SetDefaults(useSHA bool) {
+func Defaults(useSHA bool) Images {
 	if useSHA {
-		SchedulerPluginSchedulerImage = SchedulerPluginSchedulerDefaultImageSHA
-		SchedulerPluginControllerImage = SchedulerPluginControllerDefaultImageSHA
-		ResourceTopologyExporterImage = ResourceTopologyExporterDefaultImageSHA
-		NodeFeatureDiscoveryImage = NodeFeatureDiscoveryDefaultImageSHA
-	} else {
-		SchedulerPluginSchedulerImage = SchedulerPluginSchedulerDefaultImageTag
-		SchedulerPluginControllerImage = SchedulerPluginControllerDefaultImageTag
-		ResourceTopologyExporterImage = ResourceTopologyExporterDefaultImageTag
-		NodeFeatureDiscoveryImage = NodeFeatureDiscoveryDefaultImageTag
+		return Images{
+			SchedulerPluginScheduler:  SchedulerPluginSchedulerDefaultImageSHA,
+			SchedulerPluginController: SchedulerPluginControllerDefaultImageSHA,
+			ResourceTopologyExporter:  ResourceTopologyExporterDefaultImageSHA,
+			NodeFeatureDiscovery:      NodeFeatureDiscoveryDefaultImageSHA,
+		}
+	}
+	return Images{
+		SchedulerPluginScheduler:  SchedulerPluginSchedulerDefaultImageTag,
+		SchedulerPluginController: SchedulerPluginControllerDefaultImageTag,
+		ResourceTopologyExporter:  ResourceTopologyExporterDefaultImageTag,
+		NodeFeatureDiscovery:      NodeFeatureDiscoveryDefaultImageTag,
 	}
 }
 
-func Setup(getImage func(string) (string, bool)) {
+func Get() Images {
+	_, ok := os.LookupEnv("TAS_IMAGES_USE_SHA")
+	return GetWithFunc(ok, os.LookupEnv)
+}
+
+func GetWithFunc(useSHA bool, getImage func(string) (string, bool)) Images {
+	images := Defaults(useSHA)
 	if schedImage, ok := getImage("TAS_SCHEDULER_PLUGIN_IMAGE"); ok {
-		SchedulerPluginSchedulerImage = schedImage
+		images.SchedulerPluginScheduler = schedImage
 	}
 	if schedCtrlImage, ok := getImage("TAS_SCHEDULER_PLUGIN_CONTROLLER_IMAGE"); ok {
-		SchedulerPluginControllerImage = schedCtrlImage
+		images.SchedulerPluginController = schedCtrlImage
 	}
 	if rteImage, ok := getImage("TAS_RESOURCE_EXPORTER_IMAGE"); ok {
-		ResourceTopologyExporterImage = rteImage
+		images.ResourceTopologyExporter = rteImage
 	}
 	if nfdImage, ok := getImage("TAS_NODE_FEATURE_DISCOVERY_IMAGE"); ok {
-		NodeFeatureDiscoveryImage = nfdImage
+		images.NodeFeatureDiscovery = nfdImage
 	}
+	return images
 }
-
-var (
-	SchedulerPluginSchedulerImage  = SchedulerPluginSchedulerDefaultImageTag
-	SchedulerPluginControllerImage = SchedulerPluginControllerDefaultImageTag
-	ResourceTopologyExporterImage  = ResourceTopologyExporterDefaultImageTag
-	NodeFeatureDiscoveryImage      = NodeFeatureDiscoveryDefaultImageTag
-)

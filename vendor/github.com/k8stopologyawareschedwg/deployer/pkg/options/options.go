@@ -40,12 +40,14 @@ type Options struct {
 	SchedResyncPeriod           time.Duration
 	SchedVerbose                int
 	SchedCtrlPlaneAffinity      bool
+	SchedLeaderElectResource    string
 	WaitInterval                time.Duration
 	WaitTimeout                 time.Duration
 	ClusterPlatform             platform.Platform
 	ClusterVersion              platform.Version
 	WaitCompletion              bool
 	SchedScoringStratConfigData string
+	SchedCacheParamsConfigData  string
 }
 
 type API struct {
@@ -60,8 +62,12 @@ type Scheduler struct {
 	PullIfNotPresent       bool
 	CacheResyncPeriod      time.Duration
 	CtrlPlaneAffinity      bool
+	LeaderElection         bool
+	LeaderElectionResource string
 	Verbose                int
 	ScoringStratConfigData string
+	CacheParamsConfigData  string
+	Namespace              string
 }
 
 type DaemonSet struct {

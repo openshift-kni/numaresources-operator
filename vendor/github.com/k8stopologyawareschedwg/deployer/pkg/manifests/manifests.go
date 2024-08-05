@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"text/template"
+	"time"
 
 	igntypes "github.com/coreos/ignition/v2/config/v3_2/types"
 	securityv1 "github.com/openshift/api/security/v1"
@@ -55,8 +56,17 @@ const (
 )
 
 const (
+	RoleNameAuthReader  = "authreader"
+	RoleNameLeaderElect = "leaderelect"
+)
+
+const (
 	ContainerNameRTE                = "resource-topology-exporter"
 	ContainerNameNFDTopologyUpdater = "nfd-topology-updater"
+)
+const (
+	DefaultUpdaterSyncPeriod = 10 * time.Second
+	DefaultUpdaterVerbose    = 1
 )
 
 const (
@@ -143,15 +153,23 @@ func Role(component, subComponent, namespace string) (*rbacv1.Role, error) {
 	return role, nil
 }
 
-func RoleBinding(component, subComponent, namespace string) (*rbacv1.RoleBinding, error) {
+func RoleBinding(component, subComponent, roleName, namespace string) (*rbacv1.RoleBinding, error) {
 	if err := validateComponent(component); err != nil {
 		return nil, err
 	}
 	if err := validateSubComponent(component, subComponent); err != nil {
 		return nil, err
 	}
-
-	obj, err := loadObject(filepath.Join("yaml", component, subComponent, "rolebinding.yaml"))
+	var fileName string
+	if roleName == "" {
+		fileName = "rolebinding.yaml"
+	} else {
+		if err := validateRoleName(roleName); err != nil {
+			return nil, err
+		}
+		fileName = "rolebinding_" + roleName + ".yaml"
+	}
+	obj, err := loadObject(filepath.Join("yaml", component, subComponent, fileName))
 	if err != nil {
 		return nil, err
 	}
@@ -462,6 +480,13 @@ func validateSubComponent(component, subComponent string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown subComponent %q for component: %q", subComponent, component)
+}
+
+func validateRoleName(roleName string) error {
+	if roleName == RoleNameAuthReader || roleName == RoleNameLeaderElect {
+		return nil
+	}
+	return fmt.Errorf("unknown roleName %q", roleName)
 }
 
 func Service(component, subComponent, namespace string) (*corev1.Service, error) {

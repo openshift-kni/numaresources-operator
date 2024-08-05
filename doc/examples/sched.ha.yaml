@@ -1,0 +1,9 @@
+apiVersion: nodetopology.openshift.io/v1
+kind: NUMAResourcesScheduler
+metadata:
+  name: numaresourcesscheduler
+spec:
+  imageSpec: "quay.io/openshift-kni/scheduler-plugins:4.17-snapshot"
+  logLevel: "Trace"
+  schedulerName: topo-aware-scheduler
+  replicas: 3

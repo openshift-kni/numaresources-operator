@@ -24,17 +24,22 @@ import (
 	"strings"
 )
 
+const (
+	RTE string = "RTE"
+	NFD string = "NFD"
+)
+
 type Output struct {
 	TopologyUpdater     string `json:"topology_updater"`
 	SchedulerPlugin     string `json:"scheduler_plugin"`
 	SchedulerController string `json:"scheduler_controller"`
 }
 
-func NewOutput(updaterImage string) Output {
+func NewOutput(imgs Images, updaterType string) Output {
 	imo := Output{
-		SchedulerPlugin:     SchedulerPluginSchedulerImage,
-		SchedulerController: SchedulerPluginControllerImage,
-		TopologyUpdater:     updaterImage,
+		SchedulerPlugin:     imgs.SchedulerPluginScheduler,
+		SchedulerController: imgs.SchedulerPluginController,
+		TopologyUpdater:     getUpdaterImage(imgs, updaterType),
 	}
 	return imo
 }
@@ -90,4 +95,11 @@ func (imo Output) Format(kind int, w io.Writer) {
 	} else {
 		imo.EncodeText(w)
 	}
+}
+
+func getUpdaterImage(imgs Images, updaterType string) string {
+	if updaterType == RTE {
+		return imgs.ResourceTopologyExporter
+	}
+	return imgs.NodeFeatureDiscovery
 }

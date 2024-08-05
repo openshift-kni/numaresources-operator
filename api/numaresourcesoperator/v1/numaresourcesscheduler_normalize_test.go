@@ -61,6 +61,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
+				Replicas: newDefaultReplicas(),
 			},
 		},
 		{
@@ -81,6 +82,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
+				Replicas: newDefaultReplicas(),
 			},
 		},
 		{
@@ -104,6 +106,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
+				Replicas: newDefaultReplicas(),
 			},
 		},
 		{
@@ -128,6 +131,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
+				Replicas: newDefaultReplicas(),
 			},
 		},
 		{
@@ -152,9 +156,9 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
+				Replicas: newDefaultReplicas(),
 			},
 		},
-
 		{
 			description: "preserving already set and partially optional fields (4)",
 			current: NUMAResourcesSchedulerSpec{
@@ -175,9 +179,57 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetection,
 				ScoringStrategy:      &scoringStrategyCustom,
+				Replicas:             newDefaultReplicas(),
 			},
 		},
-
+		{
+			description: "preserving already set and partially optional fields (5)",
+			current: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				LogLevel:       operatorv1.Trace,
+				CacheResyncPeriod: &metav1.Duration{
+					Duration: cacheResyncPeriodCustom,
+				},
+				ScoringStrategy: &scoringStrategyCustom,
+				Replicas:        newInt32(1),
+			},
+			expected: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				LogLevel:       operatorv1.Trace,
+				CacheResyncPeriod: &metav1.Duration{
+					Duration: cacheResyncPeriodCustom,
+				},
+				CacheResyncDebug:     &cacheResyncDebug,
+				SchedulerInformer:    &schedInformer,
+				CacheResyncDetection: &cacheResyncDetection,
+				ScoringStrategy:      &scoringStrategyCustom,
+				Replicas:             newInt32(1),
+			},
+		},
+		{
+			description: "preserving already set and partially optional fields (5A)",
+			current: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				LogLevel:       operatorv1.Trace,
+				CacheResyncPeriod: &metav1.Duration{
+					Duration: cacheResyncPeriodCustom,
+				},
+				ScoringStrategy: &scoringStrategyCustom,
+				Replicas:        newInt32(5),
+			},
+			expected: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				LogLevel:       operatorv1.Trace,
+				CacheResyncPeriod: &metav1.Duration{
+					Duration: cacheResyncPeriodCustom,
+				},
+				CacheResyncDebug:     &cacheResyncDebug,
+				SchedulerInformer:    &schedInformer,
+				CacheResyncDetection: &cacheResyncDetection,
+				ScoringStrategy:      &scoringStrategyCustom,
+				Replicas:             newInt32(5),
+			},
+		},
 		{
 			description: "all optional fields already set",
 			current: NUMAResourcesSchedulerSpec{
@@ -188,6 +240,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
 				ScoringStrategy:      &scoringStrategyCustom,
+				Replicas:             newInt32(5),
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				CacheResyncPeriod: &metav1.Duration{
@@ -197,6 +250,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
 				ScoringStrategy:      &scoringStrategyCustom,
+				Replicas:             newInt32(5),
 			},
 		},
 		{
@@ -219,6 +273,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
+				Replicas: newDefaultReplicas(),
 			},
 		},
 		{
@@ -234,6 +289,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
 				ScoringStrategy:      &scoringStrategyCustom,
+				Replicas:             newInt32(5),
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
@@ -246,13 +302,18 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
 				ScoringStrategy:      &scoringStrategyCustom,
+				Replicas:             newInt32(5),
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
+			bkp := tc.current.DeepCopy()
 			got := tc.current.Normalize()
+			if !reflect.DeepEqual(*bkp, tc.current) {
+				t.Errorf("current was mutated val=%s expected %s", toJSON(bkp), toJSON(tc.current))
+			}
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got=%s expected %s", toJSON(got), toJSON(tc.expected))
 			}

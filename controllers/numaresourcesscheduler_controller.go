@@ -40,6 +40,7 @@ import (
 	"github.com/pkg/errors"
 
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	k8swgrbacupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rbac"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
@@ -54,6 +55,10 @@ import (
 )
 
 const (
+	leaderElectionResourceName = "numa-scheduler-leader"
+)
+
+const (
 	conditionTypeIncorrectNUMAResourcesSchedulerResourceName = "IncorrectNUMAResourcesSchedulerResourceName"
 )
 
@@ -63,6 +68,7 @@ type NUMAResourcesSchedulerReconciler struct {
 	Scheme             *runtime.Scheme
 	SchedulerManifests schedmanifests.Manifests
 	Namespace          string
+	AutodetectReplicas int
 }
 
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
@@ -170,13 +176,22 @@ func isDeploymentRunning(ctx context.Context, c client.Client, key nropv1.Namesp
 	return false, nil
 }
 
+func (r *NUMAResourcesSchedulerReconciler) computeSchedulerReplicas(schedSpec nropv1.NUMAResourcesSchedulerSpec) *int32 {
+	// the api validation/normalization layer must ensure this value is != nil
+	if *schedSpec.Replicas >= 0 { // 0 is legit value to disable the deployment
+		return schedSpec.Replicas
+	}
+	v := int32(r.AutodetectReplicas)
+	return &v
+}
+
 func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (nropv1.NUMAResourcesSchedulerStatus, error) {
 	klog.V(4).Info("SchedulerSync start")
 	defer klog.V(4).Info("SchedulerSync stop")
 
 	schedSpec := instance.Spec.Normalize()
 	cacheResyncPeriod := unpackAPIResyncPeriod(schedSpec.CacheResyncPeriod)
-	params := configParamsFromSchedSpec(schedSpec, cacheResyncPeriod)
+	params := configParamsFromSchedSpec(schedSpec, cacheResyncPeriod, r.Namespace)
 
 	schedName, ok := schedstate.SchedulerNameFromObject(r.SchedulerManifests.ConfigMap)
 	if !ok {
@@ -197,14 +212,21 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		},
 	}
 
-	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
+	r.SchedulerManifests.Deployment.Spec.Replicas = r.computeSchedulerReplicas(schedSpec)
+	klog.V(4).InfoS("using scheduler replicas", "replicas", *r.SchedulerManifests.Deployment.Spec.Replicas)
+	// TODO: if replicas doesn't make sense (autodetect disabled and user set impossible value) then we
+	// should set a degraded state
+
 	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, schedSpec.SchedulerImage)
+	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
 	schedupdate.DeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
 	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, "", schedSpec.LogLevel); err != nil {
 		return schedStatus, err
 	}
 
 	schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec)
+
+	k8swgrbacupdate.RoleForLeaderElection(r.SchedulerManifests.Role, r.Namespace, leaderElectionResourceName)
 
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
 	for _, objState := range existing.State(r.SchedulerManifests) {
@@ -240,7 +262,7 @@ func unpackAPIResyncPeriod(reconcilePeriod *metav1.Duration) time.Duration {
 	return period
 }
 
-func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cacheResyncPeriod time.Duration) k8swgmanifests.ConfigParams {
+func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cacheResyncPeriod time.Duration, namespace string) k8swgmanifests.ConfigParams {
 	resyncPeriod := int64(cacheResyncPeriod.Seconds())
 
 	params := k8swgmanifests.ConfigParams{
@@ -249,6 +271,14 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 			ResyncPeriodSeconds: &resyncPeriod,
 		},
 		ScoringStrategy: &k8swgmanifests.ScoringStrategyParams{},
+	}
+
+	if schedSpec.Replicas != nil && *schedSpec.Replicas > 1 {
+		params.LeaderElection = &k8swgmanifests.LeaderElectionParams{
+			LeaderElect:       true,
+			ResourceNamespace: namespace,
+			ResourceName:      leaderElectionResourceName,
+		}
 	}
 
 	var foreignPodsDetect string

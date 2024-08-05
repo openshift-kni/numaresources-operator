@@ -20,6 +20,32 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 )
 
+// TODO replace with k8s constants if/when available
+const (
+	apiGroupCore         = ""
+	apiGroupCoordination = "coordination.k8s.io"
+)
+
+// TODO replace with k8s constants if/when available
+const (
+	resourceEndpoints = "endpoints"
+	resourceLeases    = "leases"
+)
+
+func RoleForLeaderElection(ro *rbacv1.Role, namespace, resourceName string) {
+	ro.Namespace = namespace
+
+	for idx := 0; idx < len(ro.Rules); idx++ {
+		ru := &ro.Rules[idx] // shortcut
+		if ru.APIGroups[0] == apiGroupCore && ru.Resources[0] == resourceEndpoints {
+			ru.ResourceNames = []string{resourceName}
+		}
+		if ru.APIGroups[0] == apiGroupCoordination && ru.Resources[0] == resourceLeases {
+			ru.ResourceNames = []string{resourceName}
+		}
+	}
+}
+
 func RoleBinding(rb *rbacv1.RoleBinding, serviceAccount, namespace string) {
 	for idx := 0; idx < len(rb.Subjects); idx++ {
 		if serviceAccount != "" {

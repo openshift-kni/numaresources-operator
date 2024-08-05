@@ -20,15 +20,44 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/client-go/discovery"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	ocpconfigv1 "github.com/openshift/api/config/v1"
 )
+
+func ControlPlane(ctx context.Context) (ControlPlaneInfo, error) {
+	cli, err := clientutil.New()
+	if err != nil {
+		return ControlPlaneInfo{}, err
+	}
+	return ControlPlaneFromLister(ctx, cli)
+}
+
+func ControlPlaneFromLister(ctx context.Context, cli client.Client) (ControlPlaneInfo, error) {
+	info := ControlPlaneInfo{}
+	env := deployer.Environment{
+		Ctx: ctx,
+		Cli: cli,
+		Log: logr.Discard(), // TODO
+	}
+	nodes, err := nodes.GetControlPlane(&env)
+	if err != nil {
+		return info, err
+	}
+	info.NodeCount = len(nodes)
+	return info, nil
+}
 
 func Platform(ctx context.Context) (platform.Platform, error) {
 	ocpCli, err := clientutil.NewOCPClientSet()

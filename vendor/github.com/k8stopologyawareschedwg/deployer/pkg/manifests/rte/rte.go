@@ -197,7 +197,7 @@ func GetManifests(plat platform.Platform, version platform.Version, namespace st
 	if err != nil {
 		return mf, err
 	}
-	mf.RoleBinding, err = manifests.RoleBinding(manifests.ComponentResourceTopologyExporter, "", namespace)
+	mf.RoleBinding, err = manifests.RoleBinding(manifests.ComponentResourceTopologyExporter, "", "", namespace)
 	if err != nil {
 		return mf, err
 	}
