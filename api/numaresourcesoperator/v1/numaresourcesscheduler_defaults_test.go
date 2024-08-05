@@ -22,6 +22,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 )
@@ -61,7 +62,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: newDefaultReplicas(),
+				Replicas: ptr.To[int32](defaultReplicas),
 			},
 		},
 		{
@@ -82,7 +83,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: newDefaultReplicas(),
+				Replicas: ptr.To[int32](defaultReplicas),
 			},
 		},
 		{
@@ -106,7 +107,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: newDefaultReplicas(),
+				Replicas: ptr.To[int32](defaultReplicas),
 			},
 		},
 		{
@@ -131,7 +132,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: newDefaultReplicas(),
+				Replicas: ptr.To[int32](defaultReplicas),
 			},
 		},
 		{
@@ -156,7 +157,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: newDefaultReplicas(),
+				Replicas: ptr.To[int32](defaultReplicas),
 			},
 		},
 		{
@@ -179,7 +180,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetection,
 				ScoringStrategy:      &scoringStrategyCustom,
-				Replicas:             newDefaultReplicas(),
+				Replicas:             ptr.To[int32](defaultReplicas),
 			},
 		},
 		{
@@ -191,7 +192,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 					Duration: cacheResyncPeriodCustom,
 				},
 				ScoringStrategy: &scoringStrategyCustom,
-				Replicas:        newInt32(1),
+				Replicas:        ptr.To[int32](1),
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
@@ -203,7 +204,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetection,
 				ScoringStrategy:      &scoringStrategyCustom,
-				Replicas:             newInt32(1),
+				Replicas:             ptr.To[int32](1),
 			},
 		},
 		{
@@ -215,7 +216,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 					Duration: cacheResyncPeriodCustom,
 				},
 				ScoringStrategy: &scoringStrategyCustom,
-				Replicas:        newInt32(5),
+				Replicas:        ptr.To[int32](5),
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
@@ -227,7 +228,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetection,
 				ScoringStrategy:      &scoringStrategyCustom,
-				Replicas:             newInt32(5),
+				Replicas:             ptr.To[int32](5),
 			},
 		},
 		{
@@ -240,7 +241,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
 				ScoringStrategy:      &scoringStrategyCustom,
-				Replicas:             newInt32(5),
+				Replicas:             ptr.To[int32](5),
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				CacheResyncPeriod: &metav1.Duration{
@@ -250,7 +251,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
 				ScoringStrategy:      &scoringStrategyCustom,
-				Replicas:             newInt32(5),
+				Replicas:             ptr.To[int32](5),
 			},
 		},
 		{
@@ -273,7 +274,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: newDefaultReplicas(),
+				Replicas: ptr.To[int32](defaultReplicas),
 			},
 		},
 		{
@@ -289,7 +290,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
 				ScoringStrategy:      &scoringStrategyCustom,
-				Replicas:             newInt32(5),
+				Replicas:             ptr.To[int32](5),
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
@@ -302,7 +303,7 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				SchedulerInformer:    &schedInformerCustom,
 				CacheResyncDetection: &cacheResyncDetectionCustom,
 				ScoringStrategy:      &scoringStrategyCustom,
-				Replicas:             newInt32(5),
+				Replicas:             ptr.To[int32](5),
 			},
 		},
 	}
@@ -316,12 +317,4 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 			}
 		})
 	}
-}
-
-func newInt32(v int32) *int32 {
-	return &v
-}
-
-func newDefaultReplicas() *int32 {
-	return newInt32(defaultReplicas)
 }
