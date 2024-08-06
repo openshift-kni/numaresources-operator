@@ -3,5 +3,5 @@ COPY e2e-nrop-*.test /usr/local/bin/
 COPY run-e2e-nrop-*.sh /usr/local/bin
 COPY numacell /bin
 COPY pause /
-COPY topics.json /usr/local/var
+COPY topics.json /usr/local/share
 ENTRYPOINT ["/usr/local/bin/run-e2e-nrop-serial.sh"]

@@ -13,5 +13,5 @@ COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/run-e2e-nrop*.sh .
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/numacell /bin/numacell
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/pause /pause
-COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/topics.json /usr/local/var/topics.json
+COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/topics.json /usr/local/share/topics.json
 CMD ["./run-e2e-nrop-serial.sh"]
