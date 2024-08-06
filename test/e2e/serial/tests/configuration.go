@@ -427,13 +427,8 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				g.Expect(err).ToNot(HaveOccurred())
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-			By("waiting for mcp to start updating")
-			err = waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("wait for mcp to get updated")
-			err = waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
-			Expect(err).ToNot(HaveOccurred())
+			By("waiting for mcp to update")
+			waitForMcpUpdate(fxt.Client, context.TODO(), mcps)
 
 			defer func() {
 				By("reverting kubeletconfig changes")
@@ -452,13 +447,8 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					g.Expect(err).ToNot(HaveOccurred())
 				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-				By("waiting for mcp to start updating")
-				err = waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)
-				Expect(err).ToNot(HaveOccurred())
-
-				By("wait for mcp to get updated")
-				err = waitForMcpsCondition(fxt.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)
-				Expect(err).ToNot(HaveOccurred())
+				By("waiting for mcp to update")
+				waitForMcpUpdate(fxt.Client, context.TODO(), mcps)
 			}()
 
 			By("checking that NUMAResourcesOperator's ConfigMap has changed")
