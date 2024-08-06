@@ -20,7 +20,7 @@ Provide a way to identify the active features for every supported operator versi
         - Should not consist of any of `&|!,()/`
 - Define the list of supported features for each version.
 - Allow the user to list the supported features by adding new flag, `-inspect-features` which if passed the numaresources-operator binary on the controller pod will list the active features for the deployed version of the operator.
-- For automated bugs' scenarios that their fix is not back-ported to all versions use keywords tags that briefly describes the bug's main check.
+- For automated bugs' scenarios that their fix is not back-ported to all versions use keywords tags that briefly describes the feature that the bug fix addresses.
 
 **List active features**
 
@@ -46,7 +46,7 @@ To use the helper tool perform the following:
 # chmod 755 mkginkgolabelfilter
 # ./mkginkgolabelfilter # This will wait to read the input which should be the output of the --inspect-features above
 {"active":["config","nonreg","hostlevel","resacct","cache","stall","rmsched","rtetols","overhead","wlplacement","unsched","nonrt","taint","nodelabel","byres","tmpol"]}
-feature: consistAny {config,nonreg,hostlevel,resacct,cache,stall,rmsched,rtetols,overhead,wlplacement,unsched,nonrt,taint,nodelabel,byres,tmpol}
+feature: containsAny {config,nonreg,hostlevel,resacct,cache,stall,rmsched,rtetols,overhead,wlplacement,unsched,nonrt,taint,nodelabel,byres,tmpol}
 ```
 
 Then later in the podman command of running the tests use `--filter-label` with the output of the tool to run tests of supported features only.  

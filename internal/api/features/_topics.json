@@ -15,6 +15,7 @@
     "taint",
     "nodelabel",
     "byres",
-    "tmpol"
+    "tmpol",
+    "schedattrwatch"
   ]
 }
