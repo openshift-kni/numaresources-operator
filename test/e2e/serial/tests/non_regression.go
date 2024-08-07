@@ -26,6 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
@@ -35,11 +37,11 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 
-	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
+	"github.com/openshift-kni/numaresources-operator/internal/baseload"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
@@ -206,7 +208,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			err := fxt.Client.List(context.TODO(), &nrtInitialList)
 			Expect(err).ToNot(HaveOccurred())
 
-			workers, err := nodes.GetWorkerNodes(fxt.Client, context.TODO())
+			workers, err := nodes.GetWorkers(fxt.DEnv())
 			Expect(err).ToNot(HaveOccurred())
 
 			targetIdx, ok := e2efixture.PickNodeIndex(workers)
@@ -337,7 +339,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			for _, nodeName := range e2efixture.ListNodeNames(nrtNames) {
 
 				//calculate base load on the node
-				baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), nodeName)
+				baseload, err := baseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 				klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 

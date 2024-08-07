@@ -17,17 +17,29 @@
 package baseload
 
 import (
+	"context"
 	"fmt"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
+	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 )
 
 type Load struct {
 	Name      string
 	Resources corev1.ResourceList
+}
+
+func ForNode(cli client.Client, ctx context.Context, nodeName string) (Load, error) {
+	pods, err := podlist.With(cli).OnNode(ctx, nodeName)
+	if err != nil {
+		return Load{Name: nodeName}, err
+	}
+	return FromPods(nodeName, pods), nil
 }
 
 func FromPods(nodeName string, pods []corev1.Pod) Load {

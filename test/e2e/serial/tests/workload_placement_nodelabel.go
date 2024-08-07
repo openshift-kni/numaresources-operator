@@ -34,8 +34,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	intbaseload "github.com/openshift-kni/numaresources-operator/internal/baseload"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
-	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -149,7 +149,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-				baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), nodeName)
+				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).NotTo(HaveOccurred(), "cannot get the base load for %q", nodeName)
 
 				for zIdx, zone := range nrtInfo.Zones {

@@ -47,8 +47,7 @@ import (
 
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 
-	"github.com/openshift-kni/numaresources-operator/internal/baseload"
-	"github.com/openshift-kni/numaresources-operator/internal/nodes"
+	intbaseload "github.com/openshift-kni/numaresources-operator/internal/baseload"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -568,7 +567,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			// calculate base load on the target node
-			baseload, err := nodes.GetLoad(fxt.Client, context.TODO(), targetNodeName)
+			baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 			klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
 
@@ -1188,12 +1187,12 @@ func allocatableResourceType(nrtInfo nrtv1alpha2.NodeResourceTopology, resName c
 // deployment where the number of replicas is the same as the number of
 // NUMA nodes so that all the replicas can successfully obtain resources
 // from all the NUMA nodes.
-func leastAvailableResourceQtyInAllZone(nrtInfo nrtv1alpha2.NodeResourceTopology, baseload baseload.Load, resName corev1.ResourceName) resource.Quantity {
+func leastAvailableResourceQtyInAllZone(nrtInfo nrtv1alpha2.NodeResourceTopology, baseload intbaseload.Load, resName corev1.ResourceName) resource.Quantity {
 	maxResAllocatable := e2enrt.GetMaxAllocatableResourceNumaLevel(nrtInfo, resName)
 	return getLeastAvailableResourceQty(maxResAllocatable, nrtInfo.Zones, resName, baseload)
 }
 
-func getLeastAvailableResourceQty(res resource.Quantity, zones nrtv1alpha2.ZoneList, resName corev1.ResourceName, baseload baseload.Load) resource.Quantity {
+func getLeastAvailableResourceQty(res resource.Quantity, zones nrtv1alpha2.ZoneList, resName corev1.ResourceName, baseload intbaseload.Load) resource.Quantity {
 	var zeroVal resource.Quantity
 
 	// We need to take baseload into consideration here. There is no way to

@@ -32,12 +32,14 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
+
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
-	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/k8simported/taints"
@@ -120,7 +122,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			})
 			Expect(err).ToNot(HaveOccurred())
 
-			nodes, err := nodes.GetWorkerNodes(fxt.Client, context.TODO())
+			nodes, err := nodes.GetWorkers(fxt.DEnv())
 			Expect(err).ToNot(HaveOccurred())
 
 			tnts, _, err := taints.ParseTaints([]string{testTaint()})
@@ -147,10 +149,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			// leaking taints is especially bad AND we had some bugs in the pass, so let's try our very bes
 			// to be really really sure we didn't pollute the cluster.
-			nodes, err := nodes.GetWorkerNodes(fxt.Client, context.TODO())
+			nodes, err := nodes.GetWorkers(fxt.DEnv())
 			Expect(err).ToNot(HaveOccurred())
 
-			nodeNames := accumulateNodeNames(nodes)
+			nodeNames := objectnames.Nodes(nodes)
 			doubleCheckedNodeNames := untaintNodes(fxt.Client, nodeNames, tnt)
 			By(fmt.Sprintf("cleaned taint %q from the nodes %v", tnt.String(), doubleCheckedNodeNames))
 
@@ -319,14 +321,6 @@ func checkNodesUntainted(cli client.Client, nodeNames []string) {
 			return nil
 		}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
 	}
-}
-
-func accumulateNodeNames(nodes []corev1.Node) []string {
-	var names []string
-	for idx := range nodes {
-		names = append(names, nodes[idx].Name)
-	}
-	return names
 }
 
 func applyTaintToNode(ctx context.Context, cli client.Client, targetNode *corev1.Node, tnt *corev1.Taint) *corev1.Node {

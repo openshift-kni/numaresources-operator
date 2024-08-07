@@ -44,6 +44,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"golang.org/x/sync/errgroup"
 
+	depnodes "github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
+
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 
@@ -57,7 +59,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
-	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -117,22 +118,22 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 			initialNroOperObj := nroOperObj.DeepCopy()
 
-			workers, err := nodes.GetWorkerNodes(fxt.Client, context.TODO())
+			workers, err := depnodes.GetWorkers(fxt.DEnv())
 			Expect(err).ToNot(HaveOccurred())
 
 			targetIdx, ok := e2efixture.PickNodeIndex(workers)
 			Expect(ok).To(BeTrue())
 			targetedNode := workers[targetIdx]
 
-			By(fmt.Sprintf("Label node %q with %q and remove the label %q from it", targetedNode.Name, nodes.GetLabelRoleMCPTest(), nodes.GetLabelRoleWorker()))
-			unlabelFunc, err := labelNode(fxt.Client, nodes.GetLabelRoleMCPTest(), targetedNode.Name)
+			By(fmt.Sprintf("Label node %q with %q and remove the label %q from it", targetedNode.Name, getLabelRoleMCPTest(), getLabelRoleWorker()))
+			unlabelFunc, err := labelNode(fxt.Client, getLabelRoleMCPTest(), targetedNode.Name)
 			Expect(err).ToNot(HaveOccurred())
 
-			labelFunc, err := unlabelNode(fxt.Client, nodes.GetLabelRoleWorker(), "", targetedNode.Name)
+			labelFunc, err := unlabelNode(fxt.Client, getLabelRoleWorker(), "", targetedNode.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			defer func() {
-				By(fmt.Sprintf("CLEANUP: restore initial labels of node %q with %q", targetedNode.Name, nodes.GetLabelRoleWorker()))
+				By(fmt.Sprintf("CLEANUP: restore initial labels of node %q with %q", targetedNode.Name, getLabelRoleWorker()))
 				err = unlabelFunc()
 				Expect(err).ToNot(HaveOccurred())
 
@@ -143,18 +144,18 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			mcp := objects.TestMCP()
 			By(fmt.Sprintf("creating new MCP: %q", mcp.Name))
 			// we must have this label in order to match other machine configs that are necessary for proper functionality
-			mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": nodes.RoleMCPTest}
+			mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": getLabelRoleMCPTest()}
 			mcp.Spec.MachineConfigSelector = &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
 						Key:      "machineconfiguration.openshift.io/role",
 						Operator: metav1.LabelSelectorOpIn,
-						Values:   []string{nodes.RoleWorker, nodes.RoleMCPTest},
+						Values:   []string{depnodes.RoleWorker, getLabelRoleMCPTest()},
 					},
 				},
 			}
 			mcp.Spec.NodeSelector = &metav1.LabelSelector{
-				MatchLabels: map[string]string{nodes.GetLabelRoleMCPTest(): ""},
+				MatchLabels: map[string]string{getLabelRoleMCPTest(): ""},
 			}
 
 			err = fxt.Client.Create(context.TODO(), mcp)
@@ -1021,4 +1022,16 @@ func waitForMcpsCondition(cli client.Client, ctx context.Context, mcps []*machin
 	if err := eg.Wait(); err != nil {
 		fmt.Printf("An error occurred: %v\n", err)
 	}
+}
+
+const (
+	roleMCPTest = "mcp-test"
+)
+
+func getLabelRoleWorker() string {
+	return fmt.Sprintf("%s/%s", depnodes.LabelRole, depnodes.RoleWorker)
+}
+
+func getLabelRoleMCPTest() string {
+	return fmt.Sprintf("%s/%s", depnodes.LabelRole, roleMCPTest)
 }
