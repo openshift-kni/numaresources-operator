@@ -31,6 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -531,14 +532,15 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				var taintedNode *corev1.Node
 
 				BeforeEach(func(ctx context.Context) {
-
 					By("delete current NROP CR from the cluster")
-					err := fxt.Client.Delete(ctx, &nroOperObj)
+					mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, nroOperObj)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(len(mcpsInfo)).To(BeNumerically(">", 0))
+
+					err = fxt.Client.Delete(ctx, &nroOperObj)
 					Expect(err).ToNot(HaveOccurred())
 
-					mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, nroOperObj.Spec.NodeGroups)
-					Expect(err).ToNot(HaveOccurred())
-					waitForMcpUpdate(fxt.Client, ctx, mcps)
+					waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineConfig)
 
 					By("taint one worker node")
 					workers, err = nodes.GetWorkers(fxt.DEnv())
@@ -569,12 +571,15 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 						nropNewObj.ObjectMeta = metav1.ObjectMeta{
 							Name: nroOperObj.Name,
 						}
+
 						err = fxt.Client.Create(ctx, nropNewObj)
 						Expect(err).ToNot(HaveOccurred())
 
-						mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, nropNewObj.Spec.NodeGroups)
+						mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
 						Expect(err).ToNot(HaveOccurred())
-						waitForMcpUpdate(fxt.Client, ctx, mcps)
+						Expect(len(mcpsInfo)).To(BeNumerically(">", 0))
+
+						waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineCount)
 					} else {
 						Eventually(func(g Gomega) {
 							err := fxt.Client.Get(ctx, nroKey, nropNewObj)
@@ -598,12 +603,15 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					nropNewObj.ObjectMeta = metav1.ObjectMeta{
 						Name: nroOperObj.Name,
 					}
+
 					err := fxt.Client.Create(ctx, nropNewObj)
 					Expect(err).ToNot(HaveOccurred())
 
-					mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, nropNewObj.Spec.NodeGroups)
+					mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
 					Expect(err).ToNot(HaveOccurred())
-					waitForMcpUpdate(fxt.Client, ctx, mcps)
+					Expect(len(mcpsInfo)).To(BeNumerically(">", 0))
+
+					waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineCount)
 
 					klog.Info("waiting for DaemonSet to be ready")
 					ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
@@ -643,9 +651,11 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					err := fxt.Client.Create(ctx, nropNewObj)
 					Expect(err).ToNot(HaveOccurred())
 
-					mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, nropNewObj.Spec.NodeGroups)
+					mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
 					Expect(err).ToNot(HaveOccurred())
-					waitForMcpUpdate(fxt.Client, ctx, mcps)
+					Expect(len(mcpsInfo)).To(BeNumerically(">", 0))
+
+					waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineCount)
 
 					klog.Info("waiting for DaemonSet to be ready")
 					ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
@@ -717,6 +727,42 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 	})
 })
 
+func buildMCPsInfo(cli client.Client, ctx context.Context, nroObj nropv1.NUMAResourcesOperator) ([]mcpInfo, error) {
+	mcpsInfo := []mcpInfo{}
+	var updatedNroObj nropv1.NUMAResourcesOperator
+
+	err := cli.Get(ctx, client.ObjectKeyFromObject(&nroObj), &updatedNroObj)
+	if err != nil {
+		return mcpsInfo, err
+	}
+	mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, cli, updatedNroObj.Spec.NodeGroups)
+	if err != nil {
+		return mcpsInfo, err
+	}
+
+	for _, mcp := range mcps {
+		klog.InfoS("construct mcp info", "mcp name", mcp.Name)
+		nodeLabels := mcp.Spec.NodeSelector.MatchLabels
+		nodes := &corev1.NodeList{}
+		err := cli.List(ctx, nodes, &client.ListOptions{LabelSelector: labels.SelectorFromSet(nodeLabels)})
+		if err != nil {
+			return mcpsInfo, err
+		}
+		if len(nodes.Items) == 0 {
+			return mcpsInfo, fmt.Errorf("empty node list for mcp %s", mcp.Name)
+		}
+		// TODO: support correlated labels on nodes for different MCPs
+
+		mcpInfo := mcpInfo{
+			obj:           mcp,
+			initialConfig: mcp.Status.Configuration.Name,
+			sampleNode:    nodes.Items[0],
+		}
+		mcpsInfo = append(mcpsInfo, mcpInfo)
+	}
+	return mcpsInfo, nil
+}
+
 func isRTEPodFoundOnNode(cli client.Client, ctx context.Context, nodeName string) (corev1.Pod, bool) {
 	pods, err := podlist.With(cli).OnNode(ctx, nodeName)
 	Expect(err).NotTo(HaveOccurred(), "Unable to get pods from node %q: %v", nodeName, err)
@@ -784,10 +830,63 @@ func sriovToleration() corev1.Toleration {
 	}
 }
 
-func waitForMcpUpdate(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool) {
-	By("waiting for mcp to start updating")
-	waitForMcpsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdating)
+func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo, updateType MCPUpdateType) {
+	for _, info := range mcpsInfo {
+		/*
+				For every mcp check the following:
+				1. soft requirement: loop over until condition Updating==true
+			    2. loop over until condition Updated==true, is a must
+				3. check the sample node is updated with new config in its annotations, both for desired and current, is a must
+		*/
 
-	By("wait for mcp to get updated")
-	waitForMcpsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated)
+		By(fmt.Sprintf("verify updates for mcp %q", info.obj.Name))
+		klog.Info("waiting for mcp to start updating")
+		err := waitForMcpsCondition(cli, ctx, []*machineconfigv1.MachineConfigPool{info.obj}, machineconfigv1.MachineConfigPoolUpdating)
+		if err != nil {
+			// just warn here because the switch between the mcp conditions: updated->updating->updated can be faster
+			// and may be missed while the condition was actually met at some point
+			klog.Warningf("failed to find mcps while in updating status")
+		}
+
+		klog.Info("wait for mcp to get updated")
+		//here we must fail on errors
+		Expect(waitForMcpsCondition(cli, ctx, []*machineconfigv1.MachineConfigPool{info.obj}, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
+
+		var updatedMcp machineconfigv1.MachineConfigPool
+		Expect(cli.Get(ctx, client.ObjectKeyFromObject(info.obj), &updatedMcp)).To(Succeed())
+		// Note: when update type is MachineCount, don't check for difference between initial config and current config
+		// on the updated mcp because mcp going into an update doesn't always it goes into a configuration update and
+		// thus associated to different MC, it could be because new nodes are joining the pool so the MC update is
+		// happening on those nodes
+		updatedConfig := updatedMcp.Status.Configuration.Name
+		if updateType == MachineConfig {
+			Expect(updatedConfig).ToNot(Equal(info.initialConfig))
+		}
+
+		// MachineConfig update type will also update the node currentConfig so check that anyway
+		klog.Info("verify mcp config is updated by ensuring the sample node has updated MC")
+		ok, err := verifyUpdatedMCOnNodes(cli, ctx, info.sampleNode, updatedConfig)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(ok).To(BeTrue())
+	}
+}
+
+func verifyUpdatedMCOnNodes(cli client.Client, ctx context.Context, node corev1.Node, desired string) (bool, error) {
+	var updatedNode corev1.Node
+	err := cli.Get(ctx, client.ObjectKeyFromObject(&node), &updatedNode)
+	if err != nil {
+		return false, err
+	}
+
+	nodeDesired := updatedNode.Annotations[wait.DesiredConfigNodeAnnotation]
+	if nodeDesired != desired {
+		return false, fmt.Errorf("desired mc mismatch for node %q", node.Name)
+	}
+	nodeCurrent := updatedNode.Annotations[wait.CurrentConfigNodeAnnotation]
+	if nodeCurrent != desired {
+		return false, fmt.Errorf("current mc mismatch for node %q", node.Name)
+	}
+
+	klog.Infof("node %q is updated with mc %q", node.Name, desired)
+	return true, nil
 }

@@ -27,6 +27,11 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
+const (
+	CurrentConfigNodeAnnotation = "machineconfiguration.openshift.io/currentConfig"
+	DesiredConfigNodeAnnotation = "machineconfiguration.openshift.io/desiredConfig"
+)
+
 func (wt Waiter) ForMachineConfigPoolDeleted(ctx context.Context, mcp *machineconfigv1.MachineConfigPool) error {
 	immediate := false
 	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
