@@ -56,6 +56,7 @@ import (
 
 const (
 	leaderElectionResourceName = "numa-scheduler-leader"
+	schedulerPriorityClassName = "system-node-critical"
 )
 
 const (
@@ -216,6 +217,9 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	klog.V(4).InfoS("using scheduler replicas", "replicas", *r.SchedulerManifests.Deployment.Spec.Replicas)
 	// TODO: if replicas doesn't make sense (autodetect disabled and user set impossible value) then we
 	// should set a degraded state
+
+	// node-critical so the pod won't be preempted by pods having the most critical priority class
+	r.SchedulerManifests.Deployment.Spec.Template.Spec.PriorityClassName = schedulerPriorityClassName
 
 	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, schedSpec.SchedulerImage)
 	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)

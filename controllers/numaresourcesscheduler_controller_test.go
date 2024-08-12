@@ -208,6 +208,22 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(nrs.Status.CacheResyncPeriod.Seconds()).To(gomega.Equal(resyncPeriod.Seconds()))
 		})
 
+		ginkgo.It("should have the correct priority class", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			key = client.ObjectKey{
+				Name:      "secondary-scheduler",
+				Namespace: testNamespace,
+			}
+
+			dp := &appsv1.Deployment{}
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, dp)).ToNot(gomega.HaveOccurred())
+
+			gomega.Expect(dp.Spec.Template.Spec.PriorityClassName).To(gomega.BeEquivalentTo(schedulerPriorityClassName))
+		})
+
 		ginkgo.It("should have a config hash annotation under deployment", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
