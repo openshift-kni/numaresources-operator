@@ -1067,6 +1067,15 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			By("checking the deployment pod has failed scheduling and its at the pending status")
 			pods, err := podlist.With(fxt.Client).ByDeployment(ctx, updatedDeployment)
 			Expect(err).ToNot(HaveOccurred())
+			Expect(len(pods)).To(BeNumerically("<", 10), "")
+
+			podsPending := 0
+			for _, pod := range pods {
+				if pod.Status.Phase == corev1.PodPending {
+					podsPending++
+				}
+			}
+			Expect(podsPending).To(Equal(1))
 
 			pod := &pods[0]
 			Expect(pod.Status.Phase).To(Equal(corev1.PodPending))
