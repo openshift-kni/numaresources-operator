@@ -55,6 +55,7 @@ import (
 
 const (
 	conditionTypeIncorrectNUMAResourcesSchedulerResourceName = "IncorrectNUMAResourcesSchedulerResourceName"
+	schedulerPriorityClassName                               = "system-node-critical"
 )
 
 // NUMAResourcesSchedulerReconciler reconciles a NUMAResourcesScheduler object
@@ -203,6 +204,9 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, "", schedSpec.LogLevel); err != nil {
 		return schedStatus, err
 	}
+
+	// node-critical so the pod won't be preempted by pods having the most critical priority class
+	r.SchedulerManifests.Deployment.Spec.Template.Spec.PriorityClassName = schedulerPriorityClassName
 
 	schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec)
 
