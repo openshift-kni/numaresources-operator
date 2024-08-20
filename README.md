@@ -17,7 +17,7 @@ Assuming you can push container images to a container registry and you are in th
 For further details, please refer to the [operator-sdk documentation](https://sdk.operatorframework.io/docs/olm-integration/tutorial-bundle/)
 
 ## roadmap
-
+ 
 The NUMA Resources operator is meant to have a limited lifetime, because all the operands it manages have a path towards
 integration in core k8s or towards replacement with other established components:
 1. The NodResourceTopology API is meant to be proposed to be accepted among the k8s APIs
