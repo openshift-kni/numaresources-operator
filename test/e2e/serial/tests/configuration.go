@@ -354,7 +354,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 		})
 
-		It("[test_id:54916][tier2] should be able to modify the configurable values under the NUMAResourcesScheduler CR", Label("tier2"), func() {
+		It("[test_id:54916][tier2][schedrst] should be able to modify the configurable values under the NUMAResourcesScheduler CR", Label("tier2", "schedrst"), Label("feature:schedrst"), func() {
 			initialNroSchedObj := &nropv1.NUMAResourcesScheduler{}
 			nroSchedKey := objects.NROSchedObjectKey()
 			err := fxt.Client.Get(context.TODO(), nroSchedKey, initialNroSchedObj)
@@ -792,7 +792,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}).WithContext(ctx).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Equal(kcCmNamesPre))
 		})
 
-		It("[test_id:75354][reboot_required][slow][unsched][schedrst][tier2] should be able to correctly identify topology manager policy without scheduler restarting", Label("reboot_required", "slow", "unsched", "schedrst", "tier2"), Label("feature:schedattrwatch"), func(ctx context.Context) {
+		It("[test_id:75354][reboot_required][slow][unsched][schedrst][tier2] should be able to correctly identify topology manager policy without scheduler restarting", Label("reboot_required", "slow", "unsched", "schedrst", "tier2"), Label("feature:schedattrwatch", "feature:schedrst"), func(ctx context.Context) {
 			// https://issues.redhat.com/browse/OCPBUGS-34583
 			fxt.IsRebootTest = true
 			By("getting the number of cpus that is required for a numa zone to create a Topology Affinity Error deployment")
