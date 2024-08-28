@@ -201,6 +201,69 @@ func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha2.NodeRe
 	return "", nil
 }
 
+func CheckTotalConsumedResources(nrtListInitial, nrtListUpdated nrtv1alpha2.NodeResourceTopologyList, required corev1.ResourceList, podQoS corev1.PodQOSClass) error {
+	consumedResourcesFromNodes := corev1.ResourceList{}
+	for _, nrtInitial := range nrtListInitial.Items {
+		nrtInitialResInfo, err := accumulateNodeAvailableResources(nrtInitial, "initial")
+		if err != nil {
+			klog.Errorf("error getting initial resources info for NRT %q: %v", nrtInitial.Name, err)
+			return err
+		}
+
+		nrtUpdated, err := findNRTByName(nrtListUpdated.Items, nrtInitial.Name)
+		if err != nil {
+			klog.Errorf("error finding updated NRT %q: %v", nrtInitial.Name, err)
+			return err
+		}
+		nrtUpdatedResInfo, err := accumulateNodeAvailableResources(*nrtUpdated, "updated")
+		if err != nil {
+			klog.Errorf("error getting updated resources info for nrt %q: %v", nrtUpdated.Name, err)
+			return err
+		}
+
+		for _, nrtInitialRes := range nrtInitialResInfo {
+			nrtUpdatedRes, err := findResourceByName(nrtUpdatedResInfo, nrtInitialRes.Name)
+			if err != nil {
+				klog.Errorf("error finding resource %q in updated nrt %q: %v", nrtInitialRes.Name, nrtInitial.Name, err)
+				return err
+			}
+
+			consumedResQty := nrtInitialRes.DeepCopy()
+			consumedResQty.Available.Sub(nrtUpdatedRes.Available)
+			quantity := consumedResourcesFromNodes[corev1.ResourceName(nrtUpdatedRes.Name)]
+			quantity.Add(consumedResQty.Available)
+			klog.InfoS("found consumed so far:", nrtUpdatedRes.Name, quantity.String())
+			consumedResourcesFromNodes[corev1.ResourceName(nrtUpdatedRes.Name)] = quantity // do we need this??
+		}
+	}
+
+	// consumedResourcesFromNodes now contains accumulated consumed resources from all nodes, compare that to the required resources
+
+	updatedRequired := DropHostLevelResources(required)
+
+	klog.InfoS("compare expected vs actual consumed resources", "QoS", podQoS, "expected required resources", e2ereslist.ToString(updatedRequired), "actual consumed", e2ereslist.ToString(consumedResourcesFromNodes))
+	for name, qty := range consumedResourcesFromNodes {
+		requiredQty, ok := updatedRequired[name]
+		if !ok {
+			if qty.Value() != 0 {
+				return fmt.Errorf("resource %q capacity was used while not required: consumed %+v", name, qty)
+			}
+			continue
+		}
+		if podQoS != corev1.PodQOSGuaranteed && (name == corev1.ResourceCPU || name == corev1.ResourceMemory) {
+			if qty.Value() != 0 {
+				return fmt.Errorf("unexpected resources consumption: pod with QoS %q should not reflect consumption of resource %q in NRT, but it's found that %+v was reflected", podQoS, name, qty)
+			}
+			continue
+		}
+		if qty.Cmp(requiredQty) != 0 {
+			return fmt.Errorf("total consumption of resource %q mismatch: expected %v found %v", name, requiredQty.String(), qty.String())
+		}
+	}
+
+	return nil
+}
+
 func accumulateNodeAvailableResources(nrt nrtv1alpha2.NodeResourceTopology, reason string) ([]nrtv1alpha2.ResourceInfo, error) {
 	resList := make(corev1.ResourceList, 2)
 	for _, zone := range nrt.Zones {
@@ -594,4 +657,22 @@ func EqualNRTListsItems(nrtListA, nrtListB nrtv1alpha2.NodeResourceTopologyList)
 		}
 	}
 	return true, nil
+}
+
+func findNRTByName(nrts []nrtv1alpha2.NodeResourceTopology, name string) (*nrtv1alpha2.NodeResourceTopology, error) {
+	for idx := 0; idx < len(nrts); idx++ {
+		if nrts[idx].Name == name {
+			return &nrts[idx], nil
+		}
+	}
+	return nil, fmt.Errorf("failed to find NRT for %q", name)
+}
+
+func findResourceByName(resources []nrtv1alpha2.ResourceInfo, name string) (*nrtv1alpha2.ResourceInfo, error) {
+	for idx := 0; idx < len(resources); idx++ {
+		if resources[idx].Name == name {
+			return &resources[idx], nil
+		}
+	}
+	return nil, fmt.Errorf("failed to find resource for %q", name)
 }

@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+	corev1qos "k8s.io/kubectl/pkg/util/qos"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
@@ -241,6 +242,12 @@ var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, La
 
 					klog.Infof("using %d pods total each requiring %s", desiredPods, e2ereslist.ToString(podRequiredRes))
 
+					totalRequired := podRequiredRes.DeepCopy()
+					for _, qty := range totalRequired {
+						Expect(qty.Mul(int64(desiredPods))).To(BeTrue())
+					}
+					klog.Infof("total required resources: %s", e2ereslist.ToString(totalRequired))
+
 					tag := podQOSClassToTag(interference.qos)
 
 					By("creating the test pods")
@@ -308,7 +315,17 @@ var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, La
 						schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 						Expect(err).ToNot(HaveOccurred())
 						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+
+						Expect(corev1qos.GetPodQOS(updatedPod)).To(Equal(interference.qos))
 					}
+
+					By("verify NRT updates")
+					e2efixture.MustSettleNRT(fxt)
+
+					nrtUpdatedList := nrtv1alpha2.NodeResourceTopologyList{}
+					Expect(fxt.Client.List(context.TODO(), &nrtUpdatedList)).To(Succeed())
+
+					Expect(e2enrt.CheckTotalConsumedResources(nrtList, nrtUpdatedList, totalRequired, interference.qos)).To(Succeed())
 				},
 				Entry("from GU pods, low",
 					Label("qos:gu"),
