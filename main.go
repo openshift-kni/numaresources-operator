@@ -71,11 +71,11 @@ const (
 )
 
 const (
-	defaultWebhookPort = 9443
-	defaultMetricsAddr = ":8080"
+	defaultWebhookPort    = 9443
+	defaultMetricsAddr    = ":8080"
 	defaultMetricsEnabled = true
-	defaultProbeAddr   = ":8081"
-	defaultNamespace   = "numaresources-operator"
+	defaultProbeAddr      = ":8081"
+	defaultNamespace      = "numaresources-operator"
 )
 
 var (
