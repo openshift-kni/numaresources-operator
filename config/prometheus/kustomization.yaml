@@ -1,2 +1,5 @@
 resources:
-- monitor.yaml
+- rbac.yaml
+- secret-kube-rbac-proxy.yaml
+# Please uncomment monitor.yaml to enable prometheus pods to scrape the metrics periodically.
+# - monitor.yaml
