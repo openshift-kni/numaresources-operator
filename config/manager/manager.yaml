@@ -18,7 +18,6 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app: numaresources-operator
       control-plane: controller-manager
   replicas: 1
   template:
