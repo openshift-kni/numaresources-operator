@@ -17,20 +17,28 @@
 package tools
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"k8s.io/klog/v2"
+
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+
+	"github.com/openshift-kni/numaresources-operator/internal/api/features"
 )
 
-var _ = Describe("[tools] Auxiliary tools", func() {
+var _ = Describe("[tools] Auxiliary tools", Label("tools"), func() {
 	Context("with the binary available", func() {
-		It("[lsplatform] lsplatform should detect the cluster", func() {
+		It("[lsplatform] lsplatform should detect the cluster", Label("lsplatform"), func() {
 			cmdline := []string{
 				filepath.Join(BinariesPath, "lsplatform"),
 			}
@@ -47,6 +55,38 @@ var _ = Describe("[tools] Auxiliary tools", func() {
 			text := strings.TrimSpace(string(out))
 			_, ok := platform.ParsePlatform(text)
 			Expect(ok).To(BeTrue(), "cannot recognize detected platform: %s", text)
+		})
+
+		It("[api][manager][inspectfeatures] should expose correct active features", Label("api", "inspectfeatures"), func(ctx context.Context) {
+			By("inspect active features from local binary")
+			cmdline := []string{
+				filepath.Join(BinariesPath, "manager"),
+				"--inspect-features",
+			}
+			expectExecutableExists(cmdline[0])
+
+			fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
+
+			cmd := exec.Command(cmdline[0], cmdline[1:]...)
+			cmd.Stderr = GinkgoWriter
+			out, err := cmd.Output()
+			Expect(err).ToNot(HaveOccurred())
+
+			var tp features.TopicInfo
+			err = json.Unmarshal(out, &tp)
+			Expect(err).ToNot(HaveOccurred())
+			klog.Infof("active features from the deployed operator:\n%s", string(out))
+
+			By("validate api output vs the expected")
+			// set the version to pass Validate()
+			tp.Metadata.Version = features.Version
+			err = tp.Validate()
+			Expect(err).ToNot(HaveOccurred(), "api output %+v failed validation:%v\n", tp, err)
+
+			expected := features.GetTopics()
+			sort.Strings(expected.Active)
+			sort.Strings(tp.Active)
+			Expect(reflect.DeepEqual(expected.Active, tp.Active)).To(BeTrue(), "different topics found:%v, expected %v", tp.Active, expected.Active)
 		})
 	})
 })
