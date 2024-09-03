@@ -1,0 +1,18 @@
+{
+  "active": [
+    "config",
+    "nonreg",
+    "hostlevel",
+    "resacct",
+    "cache",
+    "stall",
+    "schedrst",
+    "overhead",
+    "wlplacement",
+    "unsched",
+    "taint",
+    "nodelabel",
+    "byres",
+    "tmpol"
+  ]
+}

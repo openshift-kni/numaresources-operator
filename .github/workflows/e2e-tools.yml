@@ -43,7 +43,7 @@ jobs:
 
     - name: Build tools
       run: |
-        make build-tools binary-nrovalidate
+        make build-tools binary-nrovalidate bin/mkginkgolabelfilter binary
 
     - name: Create K8s Kind Cluster
       run: |
