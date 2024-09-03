@@ -62,7 +62,7 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			Metadata: Metadata{
-				Version: "4.17",
+				Version: "4.18",
 			},
 			Active: nonEmpty,
 		},

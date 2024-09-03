@@ -30,7 +30,7 @@ they found it before they run.
   wait between checks for MCP updates.
 - `E2E_NROP_PLATFORM` (accepts a string, e.g. `Kubernetes`, `OpenShift`) instructs the suite to *disable* the
   autodetection of the platform name and force it to the provided value.
-- `E2E_NROP_PLATFORM_VERSION` (accepts a string, e.g. `1.30`, `4.17`) instructs the suite to *disable* the
+- `E2E_NROP_PLATFORM_VERSION` (accepts a string, e.g. `1.30`, `4.18`) instructs the suite to *disable* the
   autodetection of the platform version and force it to the provided value.
 - `E2E_NROP_DUMP_EVENTS` (accepts boolean, e.g. `true`) requests the suite to dump events pertaining to pods
   failed unexpectedly on standard output, alongside (not replacing) the logging of the said events.
@@ -58,6 +58,6 @@ they found it before they run.
 ### Tests tagging 
 
 - Tagging tests to a specific feature functionality were done by adding tags in the spec description like `It("[rtetols][distruptive]...")`.
-Starting Jul 2024, while the master branch is pointing to 4.17, the new preferred way to tag tests is using ginkgo `Label("")` such as `Context("should run pods requesting host-level resources", Label("hostlevel","distruptive"), func(){..})`. Tags aren't forbidden yet; they are just deprecated, so whenever a tag is added, a label is also required.
+Starting Jul 2024, while the master branch is pointing to 4.18, the new preferred way to tag tests is using ginkgo `Label("")` such as `Context("should run pods requesting host-level resources", Label("hostlevel","distruptive"), func(){..})`. Tags aren't forbidden yet; they are just deprecated, so whenever a tag is added, a label is also required.
 - Each test should have the importance tag which is one of the below:
 `tier0` means critical; `tier1` means important; `tier2` means medium priority; `tier3` means low priority test.
