@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -61,6 +62,8 @@ import (
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
+	"github.com/openshift-kni/numaresources-operator/pkg/status"
+	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
@@ -1098,6 +1101,132 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			isFailed, err := nrosched.CheckPodSchedulingFailedWithMsg(fxt.K8sClient, pendingPod.Namespace, pendingPod.Name, schedulerName, fmt.Sprintf("cannot align %s", kcObj.TopologyManagerScope))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pendingPod.Namespace, pendingPod.Name, schedulerName)
+		})
+
+		It("[ngnodeselector][tier1] should be able to configure under nodeGroup under the NUMAResourcesOperator CR", Label("ngnodeselector", "tier2"), Label("feature:ngnodeselector"), func(ctx context.Context) {
+			// to avoid reboot and yet verify nodegroup is supported and doesn't conflict with MCP selector, this test is omitting the mcp
+			// selector and configuring the nodeSelector with same node  but with different label so we don't trigger nodes reboot (mcp update)
+			nrOperObj := &nropv1.NUMAResourcesOperator{}
+			nroKey := objects.NROObjectKey()
+			err := fxt.Client.Get(ctx, nroKey, nrOperObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
+
+			for _, ng := range nrOperObj.Spec.NodeGroups {
+				if ng.NodeSelector != nil {
+					e2efixture.Skipf(fxt, "NROP CR already uses nodeSelector %s", ng.NodeSelector.String())
+				}
+			}
+
+			By(fmt.Sprintf("replace MCP selector with NodeSelector under %q", nrOperObj.Name))
+			// choose a random nodeGroup
+			rand.Seed(time.Now().UnixNano())
+			ngIdx := rand.Intn(len(nrOperObj.Spec.NodeGroups))
+			klog.Infof("randomly selected nodeGroup %d", ngIdx)
+			mcp, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, []nropv1.NodeGroup{nrOperObj.Spec.NodeGroups[ngIdx]})
+			Expect(err).ToNot(HaveOccurred())
+
+			initialNG := nrOperObj.Spec.NodeGroups[ngIdx]
+			newNG := initialNG.DeepCopy()
+			newNG.MachineConfigPoolSelector = nil
+			newNG.NodeSelector = mcp[0].Spec.NodeSelector
+
+			By("modifying the NUMAResourcesOperator NodeGroup with NodeSelector")
+			var updatedNRO nropv1.NUMAResourcesOperator
+			Eventually(func(g Gomega) {
+				err := fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				updatedNRO.Spec.NodeGroups[ngIdx] = *newNG
+				err = fxt.Client.Update(context.TODO(), &updatedNRO)
+				g.Expect(err).ToNot(HaveOccurred())
+			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+			defer func() {
+				By(fmt.Sprintf("revert initial NodeGroup in NUMAResourcesOperator object %q", nrOperObj.Name))
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Eventually(func(g Gomega) {
+					err := fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)
+					g.Expect(err).ToNot(HaveOccurred())
+
+					updatedNRO.Spec.NodeGroups[0] = initialNG
+					err = fxt.Client.Update(context.TODO(), &updatedNRO)
+					g.Expect(err).ToNot(HaveOccurred())
+				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+			}()
+
+			By("verify the NROP CR conditions are healthy with no failures")
+			Expect(fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)).To(Succeed())
+			cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionDegraded)
+			Expect(cond).To(BeNil())
+		})
+
+		It("[ngnodeselector][tier2] should not allow configuring NodeSelector and MCP selector that both point to different MCPs", Label("ngnodeselector", "tier2"), Label("feature:ngnodeselector"), func(ctx context.Context) {
+			nrOperObj := &nropv1.NUMAResourcesOperator{}
+			nroKey := objects.NROObjectKey()
+			err := fxt.Client.Get(ctx, nroKey, nrOperObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
+
+			By("find MCP that is different from the one configured with the NROP CR")
+			// choose a random nodeGroup
+			rand.Seed(time.Now().UnixNano())
+			ngIdx := rand.Intn(len(nrOperObj.Spec.NodeGroups))
+			klog.Infof("randomly selected nodeGroup %d", ngIdx)
+			matchingMCPs, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, []nropv1.NodeGroup{nrOperObj.Spec.NodeGroups[ngIdx]})
+			Expect(err).ToNot(HaveOccurred())
+
+			allMCPs := &machineconfigv1.MachineConfigPoolList{}
+			Expect(fxt.Client.List(ctx, allMCPs)).To(Succeed())
+
+			var mcp2 *machineconfigv1.MachineConfigPool
+			for _, item := range allMCPs.Items {
+				found := false
+				for _, matching := range matchingMCPs {
+					if item.Name == matching.Name {
+						found = true
+						break
+					}
+				}
+				if !found {
+					mcp2 = item.DeepCopy()
+					break
+				}
+			}
+
+			if mcp2 == nil {
+				e2efixture.Skip(fxt, "this tests needs 2 different MCPs on the cluster that at least one is not configured with NROP")
+			}
+
+			klog.Infof("MCP %q is selected as the different MCP to set for nodeGroup %d", mcp2.Name, ngIdx)
+
+			By("modifying the NUMAResourcesOperator NodeGroup with mismatching NodeSelector")
+			var updatedNRO nropv1.NUMAResourcesOperator
+			Eventually(func(g Gomega) {
+				err := fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)
+				g.Expect(err).ToNot(HaveOccurred())
+
+				updatedNRO.Spec.NodeGroups[ngIdx].NodeSelector = mcp2.Spec.NodeSelector
+				err = fxt.Client.Update(context.TODO(), &updatedNRO)
+				g.Expect(err).ToNot(HaveOccurred())
+			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+			defer func() {
+				By(fmt.Sprintf("revert initial NodeGroup in NUMAResourcesOperator object %q", nrOperObj.Name))
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Eventually(func(g Gomega) {
+					err := fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)
+					g.Expect(err).ToNot(HaveOccurred())
+
+					updatedNRO.Spec.NodeGroups[0] = nrOperObj.Spec.NodeGroups[ngIdx]
+					err = fxt.Client.Update(context.TODO(), &updatedNRO)
+					g.Expect(err).ToNot(HaveOccurred())
+				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+			}()
+
+			By("verify degraded condition is found due to mismatching MCPs by NodeSelector and MCPSelector")
+			Expect(fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)).To(Succeed())
+			cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionDegraded)
+			Expect(cond).NotTo(BeNil(), "expected operators conditions to be degraded but found")
+			Expect(cond.Reason).To(Equal(validation.NodeGroupsError))
 		})
 	})
 })

@@ -106,25 +106,39 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 	Context("with unexpected NRO CR name", func() {
 		It("should updated the CR condition to degraded", func() {
-			nro := testobjs.NewNUMAResourcesOperator("test", nil)
+			nro := testobjs.NewNUMAResourcesOperator("test", []nropv1.NodeGroup{})
 			verifyDegradedCondition(nro, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName)
 		})
 	})
 
-	Context("with NRO empty machine config pool selector node group", func() {
+	Context("with NRO empty selectors node group", func() {
 		It("should updated the CR condition to degraded", func() {
-			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{nil})
+			ng := nropv1.NodeGroup{MachineConfigPoolSelector: nil, NodeSelector: nil}
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []nropv1.NodeGroup{ng})
 			verifyDegradedCondition(nro, validation.NodeGroupsError)
 		})
 	})
 
 	Context("without available machine config pools", func() {
 		It("should updated the CR condition to degraded", func() {
-			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
-				{
+			ng := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"test": "test"},
 				},
-			})
+			}
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []nropv1.NodeGroup{ng})
+			verifyDegradedCondition(nro, validation.NodeGroupsError)
+		})
+	})
+
+	Context("without available machine config pools with nodeSelector", func() {
+		It("should updated the CR condition to degraded", func() {
+			ng := nropv1.NodeGroup{
+				NodeSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"test": "test"},
+				},
+			}
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []nropv1.NodeGroup{ng})
 			verifyDegradedCondition(nro, validation.NodeGroupsError)
 		})
 	})
@@ -136,6 +150,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 		var reconciler *NUMAResourcesOperatorReconciler
 		var label1, label2 map[string]string
+		var ng1, ng2 nropv1.NodeGroup
 
 		BeforeEach(func() {
 			label1 = map[string]string{
@@ -145,10 +160,19 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				"test2": "test2",
 			}
 
-			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
-				{MatchLabels: label1},
-				{MatchLabels: label2},
-			})
+			ng1 = nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: label1,
+				},
+			}
+
+			ng2 = nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: label2,
+				},
+			}
+
+			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []nropv1.NodeGroup{ng1, ng2})
 
 			mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
 			mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
@@ -210,6 +234,38 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			}
 			Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).To(Succeed())
 		})
+		When("update NodeGroup with matching NodeSelector", func() {
+			It("should allow matching configuration from different nodeGroup selectors ", func(ctx context.Context) {
+				ng1WithNodeSelector := ng1.DeepCopy()
+				ng1WithNodeSelector.NodeSelector = ng1WithNodeSelector.MachineConfigPoolSelector
+				key := client.ObjectKeyFromObject(nro)
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(ctx, key, nroUpdated))
+					nroUpdated.Spec.NodeGroups[0] = *ng1WithNodeSelector
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
+
+				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+			})
+		})
+		When("update NodeGroup with conflicting NodeSelector", func() {
+			It("should updated the CR condition to degraded", func(ctx context.Context) {
+				ng1WithNodeSelector := ng1.DeepCopy()
+				ng1WithNodeSelector.NodeSelector = ng2.MachineConfigPoolSelector
+
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nroUpdated))
+					nroUpdated.Spec.NodeGroups[0] = *ng1WithNodeSelector
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
+
+				verifyDegradedCondition(nro, validation.NodeGroupsError)
+			})
+		})
 		When("a NodeGroup is deleted", func() {
 			BeforeEach(func() {
 				// check we have at least two NodeGroups
@@ -220,9 +276,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				nro := &nropv1.NUMAResourcesOperator{}
 				Expect(reconciler.Client.Get(context.TODO(), key, nro)).NotTo(HaveOccurred())
 
-				nro.Spec.NodeGroups = []nropv1.NodeGroup{{
-					MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: label1},
-				}}
+				nro.Spec.NodeGroups = []nropv1.NodeGroup{ng1}
 				Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
 
 				thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
@@ -230,7 +284,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
 			})
 			It("should delete also the corresponding DaemonSet", func() {
-
 				ds := &appsv1.DaemonSet{}
 
 				// Check ds1 still exist
@@ -248,7 +301,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(reconciler.Client.Get(context.TODO(), ds2Key, ds)).To(HaveOccurred(), "error: Daemonset %v should have been deleted", ds2Key)
 			})
 			It("should delete also the corresponding Machineconfig", func() {
-
 				mc := &machineconfigv1.MachineConfig{}
 
 				// Check ds1 still exist
@@ -305,20 +357,28 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		var mcp2 *machineconfigv1.MachineConfigPool
 
 		var reconciler *NUMAResourcesOperatorReconciler
-		var label1 map[string]string
 
 		BeforeEach(func() {
-			label1 = map[string]string{
+			label1 := map[string]string{
 				"test1": "test1",
 			}
 			label2 := map[string]string{
 				"test2": "test2",
 			}
 
-			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
-				{MatchLabels: label1},
-				{MatchLabels: label2},
-			})
+			ng1 := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: label1,
+				},
+			}
+
+			ng2 := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: label2,
+				},
+			}
+
+			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []nropv1.NodeGroup{ng1, ng2})
 
 			mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
 			mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
@@ -497,7 +557,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							Expect(err).ToNot(HaveOccurred())
 						})
 						It(" operator status should report RelatedObjects as expected", func() {
-
 							By("Getting updated NROP Status")
 							key := client.ObjectKeyFromObject(nro)
 							nroUpdated := &nropv1.NUMAResourcesOperator{}

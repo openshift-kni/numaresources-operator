@@ -17,6 +17,7 @@
 package objects
 
 import (
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"testing"
 	"time"
 
@@ -25,15 +26,14 @@ import (
 
 func TestNewNUMAResourcesOperator(t *testing.T) {
 	name := "test-nrop"
-	labelSelectors := []*metav1.LabelSelector{
-		{
+
+	ng := nropv1.NodeGroup{
+		MachineConfigPoolSelector: &metav1.LabelSelector{
 			MatchLabels: map[string]string{
 				"unit-test-nrop-obj": "foobar",
-			},
-		},
+			}},
 	}
-
-	obj := NewNUMAResourcesOperator(name, labelSelectors)
+	obj := NewNUMAResourcesOperator(name, []nropv1.NodeGroup{ng})
 
 	if obj == nil {
 		t.Fatalf("null object")

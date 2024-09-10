@@ -117,6 +117,9 @@ type NodeGroup struct {
 	// MachineConfigPoolSelector defines label selector for the machine config pool
 	// +optional
 	MachineConfigPoolSelector *metav1.LabelSelector `json:"machineConfigPoolSelector,omitempty"`
+	// NodeSelector defines the label selector by which a node would be targeted by the RTE daemonset
+	// +optional
+	NodeSelector *metav1.LabelSelector `json:"nodeSelector,omitempty"`
 	// Config defines the RTE behavior for this NodeGroup
 	// +optional
 	Config *NodeGroupConfig `json:"config,omitempty"`

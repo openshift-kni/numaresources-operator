@@ -340,6 +340,11 @@ func (in *NodeGroup) DeepCopyInto(out *NodeGroup) {
 		*out = new(metav1.LabelSelector)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.NodeSelector != nil {
+		in, out := &in.NodeSelector, &out.NodeSelector
+		*out = new(metav1.LabelSelector)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Config != nil {
 		in, out := &in.Config, &out.Config
 		*out = new(NodeGroupConfig)
