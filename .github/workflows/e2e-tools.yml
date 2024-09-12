@@ -76,7 +76,7 @@ jobs:
 
     - name: Archive E2E Tests logs
       if: ${{ failure() }}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: test_e2e_logs
         path: ${LOG_DIR}/
@@ -88,7 +88,7 @@ jobs:
 
     - name: Archive kind logs
       if: ${{ failure() }}
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: kind_logs
         path: /tmp/kind_logs
