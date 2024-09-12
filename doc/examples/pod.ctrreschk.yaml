@@ -6,7 +6,7 @@ spec:
   schedulerName: topo-aware-scheduler
   containers:
   - name: ctrreschk
-    image: quay.io/fromani/ctrreschk:v0.0.2024080204
+    image: quay.io/fromani/ctrreschk:v0.0.3
     imagePullPolicy: Always
     command: ["/usr/local/bin/ctrreschk", "-S", "align"]
     resources:

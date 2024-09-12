@@ -6,11 +6,8 @@ spec:
   schedulerName: topo-aware-scheduler
   containers:
   - name: testcnt1
-    command: ["/usr/local/bin/numalign"]
-    env:
-      - name: NUMALIGN_SLEEP_HOURS
-        value: "127"
-    image: quay.io/fromani/numalign
+    command: ["/usr/local/bin/ctrreschk", "-S", "align"]
+    image: quay.io/fromani/ctrreschk:v0.0.3
     resources:
       limits:
         cpu: '32'
@@ -25,11 +22,8 @@ spec:
   schedulerName: topo-aware-scheduler
   containers:
   - name: testcnt2
-    command: ["/usr/local/bin/numalign"]
-    env:
-      - name: NUMALIGN_SLEEP_HOURS
-        value: "127"
-    image: quay.io/fromani/numalign
+    command: ["/usr/local/bin/ctrreschk", "-S", "align"]
+    image: quay.io/fromani/ctrreschk:v0.0.3
     resources:
       limits:
         cpu: '32'
@@ -44,11 +38,8 @@ spec:
   schedulerName: topo-aware-scheduler
   containers:
   - name: testcnt3
-    command: ["/usr/local/bin/numalign"]
-    env:
-      - name: NUMALIGN_SLEEP_HOURS
-        value: "127"
-    image: quay.io/fromani/numalign
+    command: ["/usr/local/bin/ctrreschk", "-S", "align"]
+    image: quay.io/fromani/ctrreschk:v0.0.3
     resources:
       limits:
         cpu: '32'
