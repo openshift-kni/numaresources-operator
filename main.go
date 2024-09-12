@@ -73,6 +73,7 @@ const (
 const (
 	defaultWebhookPort = 9443
 	defaultMetricsAddr = ":8080"
+	defaultMetricsEnabled = true
 	defaultProbeAddr   = ":8081"
 	defaultNamespace   = "numaresources-operator"
 )
@@ -129,6 +130,7 @@ func (pa *Params) SetDefaults() {
 	pa.probeAddr = defaultProbeAddr
 	pa.render.Namespace = defaultNamespace
 	pa.enableReplicasDetect = true
+	pa.enableMetrics = defaultMetricsEnabled
 }
 
 func (pa *Params) FromFlags() {
