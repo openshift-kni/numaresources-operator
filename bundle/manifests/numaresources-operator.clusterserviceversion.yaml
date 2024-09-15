@@ -465,6 +465,18 @@ spec:
           - get
           - list
           - update
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
         serviceAccountName: numaresources-controller-manager
       deployments:
       - label:
@@ -528,6 +540,35 @@ spec:
                     memory: 20Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+              - args:
+                - --secure-listen-address=0.0.0.0:8443
+                - --upstream=http://127.0.0.1:8080/
+                - --config-file=/etc/kube-rbac-proxy/config.yaml
+                - --tls-cert-file=/etc/tls/private/tls.crt
+                - --tls-private-key-file=/etc/tls/private/tls.key
+                - --allow-paths=/metrics
+                - --logtostderr=true
+                - -v=10
+                image: gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0
+                name: kube-rbac-proxy
+                ports:
+                - containerPort: 8443
+                  name: https
+                  protocol: TCP
+                resources: {}
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+                terminationMessagePolicy: FallbackToLogsOnError
+                volumeMounts:
+                - mountPath: /etc/kube-rbac-proxy
+                  name: secret-kube-rbac-proxy-metric
+                  readOnly: true
+                - mountPath: /etc/tls/private
+                  name: secret-kube-rbac-proxy-tls
+                  readOnly: true
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: numaresources-controller-manager
@@ -537,6 +578,13 @@ spec:
                 key: node-role.kubernetes.io/control-plane
               - effect: NoSchedule
                 key: node-role.kubernetes.io/master
+              volumes:
+              - name: secret-kube-rbac-proxy-tls
+                secret:
+                  secretName: secret-kube-rbac-proxy-tls
+              - name: secret-kube-rbac-proxy-metric
+                secret:
+                  secretName: numaresources-secret-kube-rbac-proxy-metric
       permissions:
       - rules:
         - apiGroups:
