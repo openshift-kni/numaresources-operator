@@ -64,6 +64,13 @@ type KubeletConfigReconciler struct {
 	Platform  platform.Platform
 }
 
+type kubeletConfigHandler struct {
+	ownerObject client.Object
+	mcoKc       *mcov1.KubeletConfig
+	// mcp or nodePool name
+	poolName string
+}
+
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
 //+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=kubeletconfigs,verbs=get;list;watch
