@@ -274,7 +274,7 @@ func main() {
 		Recorder:  mgr.GetEventRecorderFor("kubeletconfig-controller"),
 		Namespace: namespace,
 		Platform:  clusterPlatform,
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr, clusterPlatform); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "KubeletConfig")
 		os.Exit(1)
 	}

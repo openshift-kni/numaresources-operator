@@ -51,7 +51,8 @@ import (
 )
 
 const (
-	kubeletConfigRetryPeriod = 30 * time.Second
+	kubeletConfigRetryPeriod              = 30 * time.Second
+	HypershiftKubeletConfigConfigMapLabel = "hypershift.openshift.io/kubeletconfig-config"
 )
 
 // KubeletConfigReconciler reconciles a KubeletConfig object
@@ -108,18 +109,30 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// we have nothing to do in case of deletion
-	p := predicate.Funcs{
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			kubelet := e.Object.(*mcov1.KubeletConfig)
-			klog.InfoS("KubeletConfig object got deleted", "KubeletConfig", kubelet.Name)
-			return false
-		},
+func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager, clusterPlatform platform.Platform) error {
+	var o client.Object
+	var p predicate.Funcs
+	if clusterPlatform == platform.OpenShift {
+		o = &mcov1.KubeletConfig{}
+		// we have nothing to do in case of deletion
+		p = predicate.Funcs{
+			DeleteFunc: func(e event.DeleteEvent) bool {
+				kubelet := e.Object.(*mcov1.KubeletConfig)
+				klog.InfoS("KubeletConfig object got deleted", "KubeletConfig", kubelet.Name)
+				return false
+			},
+		}
 	}
-
+	if clusterPlatform == platform.HyperShift {
+		o = &corev1.ConfigMap{}
+		p = predicate.NewPredicateFuncs(func(o client.Object) bool {
+			kubelet := o.(*corev1.ConfigMap)
+			_, ok := kubelet.Labels[HypershiftKubeletConfigConfigMapLabel]
+			return ok
+		})
+	}
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&mcov1.KubeletConfig{}, builder.WithPredicates(p)).
+		For(o, builder.WithPredicates(p)).
 		Owns(&corev1.ConfigMap{}).
 		Complete(r)
 }
