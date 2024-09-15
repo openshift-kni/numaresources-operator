@@ -26,8 +26,9 @@ spec:
         path: imageSpec
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
-      - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll". Defaults
-          to "Normal".'
+      - description: |-
+          Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+          Defaults to "Normal".
         displayName: RTE log verbosity
         path: logLevel
       - description: Group of Nodes to enable RTE on
@@ -57,8 +58,8 @@ spec:
         path: nodeGroups[0].config.podsFingerprinting
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
-      - description: Tolerations overrides tolerations to be set into RTE daemonsets
-          for this NodeGroup. If not empty, the tolerations will be the one set here.
+      - description: |-
+          Tolerations overrides tolerations to be set into RTE daemonsets for this NodeGroup. If not empty, the tolerations will be the one set here.
           Leave empty to make the system use the default tolerations.
         displayName: Extra tolerations for the topology updater daemonset
         path: nodeGroups[0].config.tolerations
@@ -106,8 +107,9 @@ spec:
         path: imageSpec
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
-      - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll". Defaults
-          to "Normal".'
+      - description: |-
+          Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+          Defaults to "Normal".
         displayName: RTE log verbosity
         path: logLevel
       - description: Group of Nodes to enable RTE on
@@ -186,8 +188,9 @@ spec:
         path: imageSpec
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
-      - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll". Defaults
-          to "Normal".'
+      - description: |-
+          Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+          Defaults to "Normal".
         displayName: Scheduler log verbosity
         path: logLevel
       - description: Replicas control how many scheduler pods must be configured for
@@ -247,8 +250,9 @@ spec:
         path: imageSpec
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
-      - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll". Defaults
-          to "Normal".'
+      - description: |-
+          Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+          Defaults to "Normal".
         displayName: Scheduler log verbosity
         path: logLevel
       - description: Scheduler name to be used in pod templates
