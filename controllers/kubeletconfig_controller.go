@@ -39,6 +39,7 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
@@ -58,6 +59,7 @@ type KubeletConfigReconciler struct {
 	Scheme    *runtime.Scheme
 	Recorder  record.EventRecorder
 	Namespace string
+	Platform  platform.Platform
 }
 
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
