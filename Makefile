@@ -60,7 +60,7 @@ CONTAINER_ENGINE ?= docker
 
 BIN_DIR="bin"
 
-OPERATOR_SDK_VERSION="v1.25.0"
+OPERATOR_SDK_VERSION="v1.36.1"
 OPERATOR_SDK_BIN="operator-sdk_$(GOOS)_$(GOARCH)"
 OPERATOR_SDK="$(BIN_DIR)/$(OPERATOR_SDK_BIN)"
 
@@ -289,11 +289,11 @@ undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/confi
 
 CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
 controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.14.0)
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.3)
 
 KUSTOMIZE = $(shell pwd)/bin/kustomize
 kustomize: ## Download kustomize locally if necessary.
-	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v4@v4.5.4)
+	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@v5.4.3)
 
 # use the last version before the bump golang 1.20 -> 1.22. We want to avoid the go.mod version format changes - for now.
 ENVTEST = $(shell pwd)/bin/setup-envtest
