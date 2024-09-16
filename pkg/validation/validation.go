@@ -58,7 +58,7 @@ func MachineConfigPoolDuplicates(trees []nodegroupv1.Tree) error {
 // NodeGroups validates the node groups for nil values and duplicates.
 // TODO: move it under the validation webhook once we will have one
 func NodeGroups(nodeGroups []nropv1.NodeGroup) error {
-	if err := nodeGroupsMachineConfigPoolSelector(nodeGroups); err != nil {
+	if err := nodeGroupsSelector(nodeGroups); err != nil {
 		return err
 	}
 
@@ -66,7 +66,7 @@ func NodeGroups(nodeGroups []nropv1.NodeGroup) error {
 		return err
 	}
 
-	if err := nodeGroupMachineConfigPoolSelector(nodeGroups); err != nil {
+	if err := nodeGroupLabelSelector(nodeGroups); err != nil {
 		return err
 	}
 
@@ -74,35 +74,70 @@ func NodeGroups(nodeGroups []nropv1.NodeGroup) error {
 }
 
 // TODO: move it under the validation webhook once we will have one
-func nodeGroupsMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
+func nodeGroupsSelector(nodeGroups []nropv1.NodeGroup) error {
 	for _, nodeGroup := range nodeGroups {
-		if nodeGroup.MachineConfigPoolSelector == nil {
-			return fmt.Errorf("one of the node groups does not have machineConfigPoolSelector")
+		if nodeGroup.MachineConfigPoolSelector == nil && (nodeGroup.NodeSelector == nil || nodeGroup.NodeSelector.LabelSelector == nil) {
+			return fmt.Errorf("one of the node groups does not specify a selector")
+		}
+		if nodeGroup.MachineConfigPoolSelector != nil && (nodeGroup.NodeSelector != nil && nodeGroup.NodeSelector.LabelSelector != nil) {
+			return fmt.Errorf("only one selector is allowed to be specified under a node group")
 		}
 	}
-
 	return nil
 }
 
 // TODO: move it under the validation webhook once we will have one
 func nodeGroupsDuplicates(nodeGroups []nropv1.NodeGroup) error {
-	duplicates := map[string]int{}
+	mcpDuplicates := map[string]int{}
+	nsLabelDuplicates := map[string]int{}
+	nsNameDuplicates := map[string]int{}
+
 	for _, nodeGroup := range nodeGroups {
-		if nodeGroup.MachineConfigPoolSelector == nil {
-			continue
+		if nodeGroup.MachineConfigPoolSelector != nil {
+			key := nodeGroup.MachineConfigPoolSelector.String()
+			if _, ok := mcpDuplicates[key]; !ok {
+				mcpDuplicates[key] = 0
+			}
+			mcpDuplicates[key] += 1
 		}
 
-		key := nodeGroup.MachineConfigPoolSelector.String()
-		if _, ok := duplicates[key]; !ok {
-			duplicates[key] = 0
+		if nodeGroup.NodeSelector != nil {
+			nsName := nodeGroup.NodeSelector.Name
+			if nsName == "" {
+				return fmt.Errorf("node selector is missing a name: %+v", nodeGroup)
+			}
+
+			if _, ok := nsNameDuplicates[nsName]; !ok {
+				nsNameDuplicates[nsName] = 0
+			}
+			nsNameDuplicates[nsName] += 1
+
+			if nodeGroup.NodeSelector.LabelSelector != nil {
+				key := nodeGroup.NodeSelector.LabelSelector.String()
+				if _, ok := nsLabelDuplicates[key]; !ok {
+					nsLabelDuplicates[key] = 0
+				}
+				nsLabelDuplicates[key] += 1
+			}
 		}
-		duplicates[key] += 1
 	}
 
 	var duplicateErrors []string
-	for selector, count := range duplicates {
+	for selector, count := range mcpDuplicates {
 		if count > 1 {
 			duplicateErrors = append(duplicateErrors, fmt.Sprintf("the node group with the machineConfigPoolSelector %q has duplicates", selector))
+		}
+	}
+
+	for selector, count := range nsLabelDuplicates {
+		if count > 1 {
+			duplicateErrors = append(duplicateErrors, fmt.Sprintf("the node group with the nodeSelector %q has duplicates", selector))
+		}
+	}
+
+	for name, count := range nsNameDuplicates {
+		if count > 1 {
+			duplicateErrors = append(duplicateErrors, fmt.Sprintf("the nodeSelector name %q has duplicates", name))
 		}
 	}
 
@@ -114,14 +149,19 @@ func nodeGroupsDuplicates(nodeGroups []nropv1.NodeGroup) error {
 }
 
 // TODO: move it under the validation webhook once we will have one
-func nodeGroupMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
+func nodeGroupLabelSelector(nodeGroups []nropv1.NodeGroup) error {
 	var selectorsErrors []string
+	var selector metav1.LabelSelector
 	for _, nodeGroup := range nodeGroups {
-		if nodeGroup.MachineConfigPoolSelector == nil {
-			continue
+		if nodeGroup.MachineConfigPoolSelector != nil {
+			selector = *nodeGroup.MachineConfigPoolSelector
 		}
 
-		if _, err := metav1.LabelSelectorAsSelector(nodeGroup.MachineConfigPoolSelector); err != nil {
+		if nodeGroup.NodeSelector != nil && nodeGroup.NodeSelector.LabelSelector != nil {
+			selector = *nodeGroup.NodeSelector.LabelSelector
+		}
+
+		if _, err := metav1.LabelSelectorAsSelector(&selector); err != nil {
 			selectorsErrors = append(selectorsErrors, err.Error())
 		}
 	}

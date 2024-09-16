@@ -92,10 +92,11 @@ func TestNodeGroupsSanity(t *testing.T) {
 
 	testCases := []testCase{
 		{
-			name: "nil MCP selector",
+			name: "both nil selectors",
 			nodeGroups: []nropv1.NodeGroup{
 				{
 					MachineConfigPoolSelector: nil,
+					NodeSelector:              nil,
 				},
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
@@ -106,10 +107,80 @@ func TestNodeGroupsSanity(t *testing.T) {
 				},
 			},
 			expectedError:        true,
-			expectedErrorMessage: "one of the node groups does not have machineConfigPoolSelector",
+			expectedErrorMessage: "one of the node groups does not specify a selector",
 		},
 		{
-			name: "with duplicates",
+			name: "empty name of node selector",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					NodeSelector: &nropv1.NodeSelector{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"test2": "test2",
+							},
+						},
+					},
+				},
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "test",
+						},
+					},
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "node selector is missing a name",
+		},
+		{
+			name: "empty label selector of node selector",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					NodeSelector: &nropv1.NodeSelector{
+						Name: "ns1",
+					},
+				},
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "test",
+						},
+					},
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "one of the node groups does not specify a selector",
+		},
+		{
+			name: "both selectors are set",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "test",
+						},
+					},
+					NodeSelector: &nropv1.NodeSelector{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"test2": "test2",
+							},
+						},
+					},
+				},
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "test",
+						},
+					},
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "only one selector is allowed to be specified under a node group",
+		},
+		{
+			name: "with duplicates - mcp",
 			nodeGroups: []nropv1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
@@ -128,6 +199,87 @@ func TestNodeGroupsSanity(t *testing.T) {
 			},
 			expectedError:        true,
 			expectedErrorMessage: "has duplicates",
+		},
+		{
+			name: "with duplicates - node selector name",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					NodeSelector: &nropv1.NodeSelector{
+						Name: "ns1",
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"test": "test",
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: &nropv1.NodeSelector{
+						Name: "ns1",
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"test2": "test2",
+							},
+						},
+					},
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "has duplicates",
+		},
+		{
+			name: "with duplicates - node selector label",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					NodeSelector: &nropv1.NodeSelector{
+						Name: "ns1",
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"test": "test",
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: &nropv1.NodeSelector{
+						Name: "ns2",
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"test": "test",
+							},
+						},
+					},
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "has duplicates",
+		},
+		{
+			name: "overlapping but different labels - node selector",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					NodeSelector: &nropv1.NodeSelector{
+						Name: "ns1",
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"test": "test",
+							},
+						},
+					},
+				},
+				{
+					NodeSelector: &nropv1.NodeSelector{
+						Name: "ns2",
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"test":  "test",
+								"test1": "test1",
+							},
+						},
+					},
+				},
+			},
+			expectedError: false,
 		},
 		{
 			name: "bad MCP selector",

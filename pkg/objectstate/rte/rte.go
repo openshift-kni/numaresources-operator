@@ -193,6 +193,57 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 	}
 
 	for _, tree := range em.trees {
+		if tree.NodeGroup.NodeSelector != nil && tree.NodeGroup.NodeSelector.LabelSelector != nil {
+			var existingDs client.Object
+			var loadError error
+
+			ngSelector := tree.NodeGroup.NodeSelector
+
+			generatedName := objectnames.GetComponentName(em.instance.Name, ngSelector.Name)
+			existingDaemonSet, ok := em.daemonSets[generatedName]
+			if ok {
+				existingDs = existingDaemonSet.daemonSet
+				loadError = existingDaemonSet.daemonSetError
+			} else {
+				loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.DaemonSet.Namespace, mf.DaemonSet.Name)
+			}
+
+			desiredDaemonSet := mf.DaemonSet.DeepCopy()
+			desiredDaemonSet.Name = generatedName
+
+			var updateError error
+			if ngSelector.LabelSelector != nil {
+				desiredDaemonSet.Spec.Template.Spec.NodeSelector = ngSelector.LabelSelector.MatchLabels
+			} else {
+				updateError = fmt.Errorf("the nodeSelector %q does not have label selector", ngSelector.Name)
+			}
+
+			if updater != nil {
+				gdm := GeneratedDesiredManifest{
+					ClusterPlatform:   em.plat,
+					MachineConfigPool: nil,
+					NodeGroup:         tree.NodeGroup.DeepCopy(),
+					DaemonSet:         desiredDaemonSet,
+				}
+
+				err := updater(ngSelector.Name, &gdm)
+				if err != nil {
+					updateError = fmt.Errorf("daemonset for nodeSelector %q: update failed: %w", ngSelector.Name, err)
+				}
+			}
+
+			ret = append(ret,
+				objectstate.ObjectState{
+					Existing:    existingDs,
+					Error:       loadError,
+					UpdateError: updateError,
+					Desired:     desiredDaemonSet,
+					Compare:     compare.Object,
+					Merge:       merge.ObjectForUpdate,
+				},
+			)
+		}
+
 		for _, mcp := range tree.MachineConfigPools {
 			var existingDs client.Object
 			var loadError error
@@ -292,6 +343,21 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 
 	// should have the amount of resources equals to the amount of node groups
 	for _, tree := range trees {
+		if tree.NodeGroup.NodeSelector != nil && tree.NodeGroup.NodeSelector.LabelSelector != nil {
+			generatedName := objectnames.GetComponentName(instance.Name, tree.NodeGroup.NodeSelector.Name)
+			key := client.ObjectKey{
+				Name:      generatedName,
+				Namespace: namespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			dsm := daemonSetManifest{}
+			if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
+				dsm.daemonSet = ds
+			}
+			ret.daemonSets[generatedName] = dsm
+			continue
+		}
+
 		for _, mcp := range tree.MachineConfigPools {
 			generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
 			key := client.ObjectKey{

@@ -117,9 +117,20 @@ type NodeGroup struct {
 	// MachineConfigPoolSelector defines label selector for the machine config pool
 	// +optional
 	MachineConfigPoolSelector *metav1.LabelSelector `json:"machineConfigPoolSelector,omitempty"`
+	// NodeSelector defines label selector for the nodes that will host RTE pods
+	// +optional
+	NodeSelector *NodeSelector `json:"nodeSelector,omitempty"`
 	// Config defines the RTE behavior for this NodeGroup
 	// +optional
 	Config *NodeGroupConfig `json:"config,omitempty"`
+}
+
+type NodeSelector struct {
+	// Name the name of the nodes group matching the LabelSelector
+	Name string `json:"name"`
+	// LabelSelector defines label selector of the desired nodes
+	// +optional
+	LabelSelector *metav1.LabelSelector `json:"Selector,omitempty"`
 }
 
 // NUMAResourcesOperatorStatus defines the observed state of NUMAResourcesOperator

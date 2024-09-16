@@ -21,19 +21,20 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
 func TestNewNUMAResourcesOperator(t *testing.T) {
 	name := "test-nrop"
-	labelSelectors := []*metav1.LabelSelector{
-		{
-			MatchLabels: map[string]string{
-				"unit-test-nrop-obj": "foobar",
-			},
-		},
-	}
 
-	obj := NewNUMAResourcesOperator(name, labelSelectors)
+	ng := nropv1.NodeGroup{MachineConfigPoolSelector: &metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"unit-test-nrop-obj": "foobar",
+		},
+	},
+	}
+	obj := NewNUMAResourcesOperator(name, []nropv1.NodeGroup{ng})
 
 	if obj == nil {
 		t.Fatalf("null object")

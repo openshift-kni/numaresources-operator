@@ -195,7 +195,7 @@ func messageFromError(err error) string {
 	return unwErr.Error()
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator) (bool, ctrl.Result, string, error) {
 	applied, err := r.syncNodeResourceTopologyAPI(ctx)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedCRDInstall", "Failed to install Node Resource Topology CRD: %v", err)
@@ -256,7 +256,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, string, error) {
-	if done, res, cond, err := r.reconcileResourceAPI(ctx, instance, trees); done {
+	if done, res, cond, err := r.reconcileResourceAPI(ctx, instance); done {
 		return res, cond, err
 	}
 
@@ -500,6 +500,10 @@ func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Con
 
 	expectedDaemonSetNames := sets.NewString()
 	for _, tree := range trees {
+		if tree.NodeGroup.NodeSelector != nil && tree.NodeGroup.NodeSelector.LabelSelector != nil {
+			expectedDaemonSetNames = expectedDaemonSetNames.Insert(objectnames.GetComponentName(instance.Name, tree.NodeGroup.NodeSelector.Name))
+			continue
+		}
 		for _, mcp := range tree.MachineConfigPools {
 			expectedDaemonSetNames = expectedDaemonSetNames.Insert(objectnames.GetComponentName(instance.Name, mcp.Name))
 		}
@@ -730,12 +734,12 @@ func validateMachineConfigLabels(mc client.Object, trees []nodegroupv1.Tree) err
 	return nil
 }
 
-func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) error {
+func daemonsetUpdater(selectorName string, gdm *rtestate.GeneratedDesiredManifest) error {
 	rteupdate.DaemonSetTolerations(gdm.DaemonSet, gdm.NodeGroup.Config.Tolerations)
 
 	err := rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config)
 	if err != nil {
-		klog.V(5).InfoS("DaemonSet update: cannot update arguments", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
+		klog.V(5).InfoS("DaemonSet update: cannot update arguments", "selector", selectorName, "daemonset", gdm.DaemonSet.Name, "error", err)
 		return err
 	}
 
@@ -745,14 +749,14 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 	// a specific configmap for each daemonset, whose name we know only
 	// when we instantiate the daemonset from the MCP.
 	if gdm.ClusterPlatform != platform.OpenShift {
-		klog.V(5).InfoS("DaemonSet update: unsupported platform", "mcp", mcpName, "platform", gdm.ClusterPlatform)
+		klog.V(5).InfoS("DaemonSet update: unsupported platform", "selector", selectorName, "platform", gdm.ClusterPlatform)
 		// nothing to do!
 		return nil
 	}
 	err = rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
 	if err != nil {
 		// intentionally info because we want to keep going
-		klog.V(5).InfoS("DaemonSet update: cannot update config", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
+		klog.V(5).InfoS("DaemonSet update: cannot update config", "selector", selectorName, "daemonset", gdm.DaemonSet.Name, "error", err)
 		return err
 	}
 	return nil

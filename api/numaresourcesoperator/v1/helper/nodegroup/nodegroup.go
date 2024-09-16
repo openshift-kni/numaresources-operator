@@ -49,9 +49,22 @@ func FindTrees(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup)
 	for idx := range nodeGroups {
 		nodeGroup := &nodeGroups[idx] // shortcut
 
-		if nodeGroup.MachineConfigPoolSelector == nil {
+		// it's impossible to get true for the next two checks because these validations are done earlier for a given []NodeGroup and relevant error will be reported in the operator status.
+		// Still add them for the completeness of the unit tests for this function
+		if nodeGroup.MachineConfigPoolSelector == nil && nodeGroup.NodeSelector == nil {
 			continue
 		}
+		if nodeGroup.MachineConfigPoolSelector != nil && nodeGroup.NodeSelector != nil {
+			continue
+		}
+
+		if nodeGroup.NodeSelector != nil {
+			result = append(result, Tree{
+				NodeGroup: nodeGroup,
+			})
+			continue
+		}
+
 		selector, err := metav1.LabelSelectorAsSelector(nodeGroup.MachineConfigPoolSelector)
 		if err != nil {
 			klog.Errorf("bad node group machine config pool selector %q", nodeGroup.MachineConfigPoolSelector.String())
