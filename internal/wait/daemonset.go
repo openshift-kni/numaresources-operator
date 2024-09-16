@@ -107,3 +107,12 @@ func (wt Waiter) ForDaemonSetUpdateByKey(ctx context.Context, key ObjectKey) (*a
 	})
 	return updatedDs, err
 }
+
+func (wt Waiter) ForDaemonSetDeleted(ctx context.Context, dskey ObjectKey) error {
+	immediate := true
+	return k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(ctx context.Context) (bool, error) {
+		ds := &appsv1.DaemonSet{}
+		err := wt.Cli.Get(ctx, dskey.AsKey(), ds)
+		return deletionStatusFromError("DaemonSet", dskey, err)
+	})
+}
