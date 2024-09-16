@@ -171,11 +171,11 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 		return nil, err
 	}
 
-	return r.syncConfigMap(ctx, mcoKc, kubeletConfig, instance, mcp.Name)
+	return r.syncConfigMap(ctx, kubeletConfig, instance, kcHandler)
 }
 
-func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov1.KubeletConfig, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, instance *nropv1.NUMAResourcesOperator, mcpName string) (*corev1.ConfigMap, error) {
-	generatedName := objectnames.GetComponentName(instance.Name, mcpName)
+func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, instance *nropv1.NUMAResourcesOperator, kcHandler *kubeletConfigHandler) (*corev1.ConfigMap, error) {
+	generatedName := objectnames.GetComponentName(instance.Name, kcHandler.poolName)
 	klog.V(3).InfoS("generated configMap name", "generatedName", generatedName)
 
 	podExcludes := podExcludesListToMap(instance.Spec.PodExcludes)
@@ -189,13 +189,13 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov
 
 	rendered := rteconfig.CreateConfigMap(r.Namespace, generatedName, data)
 	cfgManifests := cfgstate.Manifests{
-		Config: rteconfig.AddSoftRefLabels(rendered, instance.Name, mcpName),
+		Config: rteconfig.AddSoftRefLabels(rendered, instance.Name, kcHandler.poolName),
 	}
 	existing := cfgstate.FromClient(ctx, r.Client, r.Namespace, generatedName)
 	for _, objState := range existing.State(cfgManifests) {
 		// the owner should be the KubeletConfig object and not the NUMAResourcesOperator CR
 		// this means that when KubeletConfig will get deleted, the ConfigMap gets deleted as well
-		if err := controllerutil.SetControllerReference(mcoKc, objState.Desired, r.Scheme); err != nil {
+		if err := controllerutil.SetControllerReference(kcHandler.ownerObject, objState.Desired, r.Scheme); err != nil {
 			return nil, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 		if _, _, err := apply.ApplyObject(ctx, r.Client, objState); err != nil {
