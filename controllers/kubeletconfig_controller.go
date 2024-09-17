@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -38,8 +39,6 @@ import (
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
-	"github.com/pkg/errors"
-
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
@@ -51,8 +50,13 @@ import (
 )
 
 const (
-	kubeletConfigRetryPeriod              = 30 * time.Second
+	kubeletConfigRetryPeriod = 30 * time.Second
+)
+
+const (
 	HypershiftKubeletConfigConfigMapLabel = "hypershift.openshift.io/kubeletconfig-config"
+	HyperShiftNodePoolLabel               = "hypershift.openshift.io/nodePool"
+	HyperShiftConfigMapConfigKey          = "config"
 )
 
 // KubeletConfigReconciler reconciles a KubeletConfig object
@@ -97,7 +101,6 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// KubeletConfig changes are expected to be sporadic, yet are important enough
 	// to be made visible at kubernetes level. So we generate events to handle them
-
 	cm, err := r.reconcileConfigMap(ctx, instance, req.NamespacedName)
 	if err != nil {
 		var klErr *InvalidKubeletConfig
@@ -158,38 +161,11 @@ func (e *InvalidKubeletConfig) Unwrap() error {
 }
 
 func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*corev1.ConfigMap, error) {
-	mcoKc := &mcov1.KubeletConfig{}
-	if err := r.Client.Get(ctx, kcKey, mcoKc); err != nil {
-		return nil, err
-	}
-
-	mcps, err := machineconfigpools.GetListByNodeGroupsV1(ctx, r.Client, instance.Spec.NodeGroups)
+	kcHandler, err := r.makeKCHandlerForPlatform(ctx, instance, kcKey)
 	if err != nil {
 		return nil, err
 	}
-
-	mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
-	if err != nil {
-		klog.ErrorS(err, "cannot find a matching mcp for MCO KubeletConfig", "name", kcKey.Name)
-		var notFound *machineconfigpools.NotFound
-		if errors.As(err, &notFound) {
-			return nil, &InvalidKubeletConfig{
-				ObjectName: kcKey.Name,
-				Err:        notFound,
-			}
-		}
-		return nil, err
-	}
-
-	klog.V(3).InfoS("matched MCP to MCO KubeletConfig", "kubeletconfig name", kcKey.Name, "MCP name", mcp.Name)
-
-	// nothing we care about, and we can't do much anyway
-	if mcoKc.Spec.KubeletConfig == nil {
-		klog.InfoS("detected KubeletConfig with empty payload, ignoring", "name", kcKey.Name)
-		return nil, &InvalidKubeletConfig{ObjectName: kcKey.Name}
-	}
-
-	kubeletConfig, err := kubeletconfig.MCOKubeletConfToKubeletConf(mcoKc)
+	kubeletConfig, err := kubeletconfig.MCOKubeletConfToKubeletConf(kcHandler.mcoKc)
 	if err != nil {
 		klog.ErrorS(err, "cannot extract KubeletConfiguration from MCO KubeletConfig", "name", kcKey.Name)
 		return nil, err
@@ -229,10 +205,86 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov
 	return rendered, nil
 }
 
+func (r *KubeletConfigReconciler) makeKCHandlerForPlatform(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*kubeletConfigHandler, error) {
+	switch r.Platform {
+	case platform.OpenShift:
+		mcoKc := &mcov1.KubeletConfig{}
+		if err := r.Client.Get(ctx, kcKey, mcoKc); err != nil {
+			return nil, err
+		}
+
+		mcps, err := machineconfigpools.GetListByNodeGroupsV1(ctx, r.Client, instance.Spec.NodeGroups)
+		if err != nil {
+			return nil, err
+		}
+
+		mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
+		if err != nil {
+			klog.ErrorS(err, "cannot find a matching mcp for MCO KubeletConfig", "name", kcKey.Name)
+			var notFound *machineconfigpools.NotFound
+			if errors.As(err, &notFound) {
+				return nil, &InvalidKubeletConfig{
+					ObjectName: kcKey.Name,
+					Err:        notFound,
+				}
+			}
+			return nil, err
+		}
+
+		klog.V(3).InfoS("matched MCP to MCO KubeletConfig", "kubeletconfig name", kcKey.Name, "MCP name", mcp.Name)
+
+		// nothing we care about, and we can't do much anyway
+		if mcoKc.Spec.KubeletConfig == nil {
+			klog.InfoS("detected KubeletConfig with empty payload, ignoring", "name", kcKey.Name)
+			return nil, &InvalidKubeletConfig{ObjectName: kcKey.Name}
+		}
+		return &kubeletConfigHandler{
+			ownerObject: mcoKc,
+			mcoKc:       mcoKc,
+			poolName:    mcp.Name,
+		}, nil
+
+	case platform.HyperShift:
+		cmKc := &corev1.ConfigMap{}
+		if err := r.Client.Get(ctx, kcKey, cmKc); err != nil {
+			return nil, err
+		}
+
+		nodePoolName := cmKc.Labels[HyperShiftNodePoolLabel]
+		kcData := cmKc.Data[HyperShiftConfigMapConfigKey]
+		mcoKc := &mcov1.KubeletConfig{}
+		err := decodeKCFrom([]byte(kcData), r.Scheme, mcoKc)
+		if err != nil {
+			return nil, err
+		}
+
+		// nothing we care about, and we can't do much anyway
+		if mcoKc.Spec.KubeletConfig == nil {
+			klog.InfoS("detected KubeletConfig with empty payload, ignoring", "name", kcKey.Name)
+			return nil, &InvalidKubeletConfig{ObjectName: kcKey.Name}
+		}
+		return &kubeletConfigHandler{
+			ownerObject: cmKc,
+			mcoKc:       mcoKc,
+			poolName:    nodePoolName,
+		}, nil
+	}
+	return nil, fmt.Errorf("unsupported platform: %s", r.Platform)
+}
+
 func podExcludesListToMap(podExcludes []nropv1.NamespacedName) map[string]string {
 	ret := make(map[string]string)
 	for _, pe := range podExcludes {
 		ret[pe.Namespace] = pe.Name
 	}
 	return ret
+}
+
+func decodeKCFrom(data []byte, scheme *runtime.Scheme, mcoKc *mcov1.KubeletConfig) error {
+	yamlSerializer := serializer.NewSerializerWithOptions(
+		serializer.DefaultMetaFactory, scheme, scheme,
+		serializer.SerializerOptions{Yaml: true, Pretty: true, Strict: true})
+
+	_, _, err := yamlSerializer.Decode(data, nil, mcoKc)
+	return err
 }
