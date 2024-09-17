@@ -27,6 +27,9 @@ import (
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
+// TODO v2:
+// NodeGroup -> rename NodeGroupSpec, we introduced NodeGroupStatus already
+
 // NUMAResourcesOperatorSpec defines the desired state of NUMAResourcesOperator
 type NUMAResourcesOperatorSpec struct {
 	// Group of Nodes to enable RTE on
@@ -114,7 +117,22 @@ type NodeGroupConfig struct {
 // NodeGroup defines group of nodes that will run resource topology exporter daemon set
 // You can choose the group of node by MachineConfigPoolSelector or by NodeSelector
 type NodeGroup struct {
-	// MachineConfigPoolSelector defines label selector for the machine config pool
+	// Name is the name used to identify this node group. Has to be unique among node groups.
+	// If not provided, is determined by the system.
+	// If MachineConfigPoolSelector is used and the name is not provided, the system will use
+	// the name of the matched MachineConfigPool.
+	// If NodeSelector is used and the name is not provided, the system will determine a unique
+	// opaque name automatically.
+	// +optional
+	Name string `json:"name,omitempty"`
+	// NodeSelector allows to set directly the labels which nodes belonging to this nodegroup must match.
+	// This offer greater flexibility than using a MachineConfigPoolSelector, and it is supported only on Hypershift
+	// at the moment. You can use either NodeSelector or machineConfigPoolSelector, not both at the same time.
+	// +optional
+	NodeSelector *metav1.LabelSelector `json:"nodeSelector,omitempty"`
+	// MachineConfigPoolSelector defines label selector for the Machine Config Pool. If used, a NodeGroup will
+	// match the same nodes this Machine Config Pool is matching.
+	// You can use either NodeSelector or machineConfigPoolSelector, not both at the same time.
 	// +optional
 	MachineConfigPoolSelector *metav1.LabelSelector `json:"machineConfigPoolSelector,omitempty"`
 	// Config defines the RTE behavior for this NodeGroup
@@ -122,14 +140,42 @@ type NodeGroup struct {
 	Config *NodeGroupConfig `json:"config,omitempty"`
 }
 
+// NodeGroupStatus reports the status of a NodeGroup once matches an actual set of nodes and it is correctly processed
+// by the system. In other words, is not possible to have a NodeGroupStatus which does not represent a valid NodeGroup
+// which in turn correctly references unambiguously a set of nodes in the cluster.
+// Hence, if a NodeGroupStatus is published, its `Name` must be present, because it refers back to a NodeGroup whose
+// config was correctly processed in the Spec. And its DaemonSet will be nonempty, because matches correctly a set
+// of nodes in the cluster. The Config is best-effort always represented, possibly reflecting the system defaults.
+// If the system cannot process a NodeGroup correctly from the Spec, it will report Degraded state in the top-level
+// condition, and will provide details using the aforementioned conditions.
+type NodeGroupStatus struct {
+	// Name matches the name of a configured NodeGroup
+	Name string `json:"name"`
+	// DaemonSet of the configured RTEs, for this node group
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="RTE DaemonSets"
+	DaemonSet NamespacedName `json:"daemonsets,omitempty"`
+	// NodeGroupConfig represents the latest available configuration applied to this NodeGroup
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Optional configuration enforced on this NodeGroup"
+	Config *NodeGroupConfig `json:"config,omitempty"`
+}
+
 // NUMAResourcesOperatorStatus defines the observed state of NUMAResourcesOperator
 type NUMAResourcesOperatorStatus struct {
-	// DaemonSets of the configured RTEs, one per node group
+	// DaemonSets of the configured RTEs, one per node group.
+	// This field is not populated on HyperShift. Use NodeGroups instead.
+	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="RTE DaemonSets"
 	DaemonSets []NamespacedName `json:"daemonsets,omitempty"`
 	// MachineConfigPools resolved from configured node groups
+	// This field is not populated on HyperShift. Use NodeGroups instead.
+	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="RTE MCPs from node groups"
 	MachineConfigPools []MachineConfigPool `json:"machineconfigpools,omitempty"`
+	// NodeGroups report the observed status of the configured NodeGroups, matching by their name
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Node groups observed status"
+	NodeGroups []NodeGroupStatus `json:"nodeGroups,omitempty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Condition reported"
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
