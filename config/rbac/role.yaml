@@ -8,6 +8,7 @@ rules:
   - ""
   resources:
   - configmaps
+  - serviceaccounts
   verbs:
   - '*'
 - apiGroups:
@@ -26,12 +27,6 @@ rules:
   - list
   - watch
 - apiGroups:
-  - ""
-  resources:
-  - serviceaccounts
-  verbs:
-  - '*'
-- apiGroups:
   - apiextensions.k8s.io
   resources:
   - customresourcedefinitions
@@ -41,11 +36,6 @@ rules:
   - apps
   resources:
   - daemonsets
-  verbs:
-  - '*'
-- apiGroups:
-  - apps
-  resources:
   - deployments
   verbs:
   - '*'
@@ -65,6 +55,7 @@ rules:
   - machineconfiguration.openshift.io
   resources:
   - kubeletconfigs
+  - machineconfigpools
   verbs:
   - get
   - list
@@ -75,14 +66,6 @@ rules:
   - kubeletconfigs/finalizers
   verbs:
   - update
-- apiGroups:
-  - machineconfiguration.openshift.io
-  resources:
-  - machineconfigpools
-  verbs:
-  - get
-  - list
-  - watch
 - apiGroups:
   - machineconfiguration.openshift.io
   resources:
@@ -99,12 +82,14 @@ rules:
   - nodetopology.openshift.io
   resources:
   - numaresourcesoperators/finalizers
+  - numaresourcesschedulers/finalizers
   verbs:
   - update
 - apiGroups:
   - nodetopology.openshift.io
   resources:
   - numaresourcesoperators/status
+  - numaresourcesschedulers/status
   verbs:
   - get
   - patch
@@ -122,40 +107,11 @@ rules:
   - update
   - watch
 - apiGroups:
-  - nodetopology.openshift.io
-  resources:
-  - numaresourcesschedulers/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - nodetopology.openshift.io
-  resources:
-  - numaresourcesschedulers/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - clusterrolebindings
-  verbs:
-  - '*'
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
   - clusterroles
-  verbs:
-  - '*'
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
   - rolebindings
-  verbs:
-  - '*'
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
   - roles
   verbs:
   - '*'
