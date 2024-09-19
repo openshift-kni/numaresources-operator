@@ -1,0 +1,92 @@
+name: CI Base
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up golang
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.22.4
+
+    - name: format
+      run: ./hack/check-format.sh
+
+  verify-commits:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up golang
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.22.4
+
+      - name: Get branch name (pull request)
+        shell: bash
+        run: echo "BRANCH_NAME=$(echo ${GITHUB_HEAD_REF} | tr / -)" >> $GITHUB_ENV
+
+      - name: Debug
+        run: echo ${{ env.BRANCH_NAME }}
+
+      - name: Verify commits
+        run: TRIGGER_BRANCH=${{ env.BRANCH_NAME }} ./hack/verify-commits.sh
+
+  test-units:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up golang
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.22.4
+
+    - name: Verify modules
+      run: go mod verify
+
+    - name: Verify generated content
+      run: make verify-generated
+
+    - name: Vetting
+      run: make vet
+
+    - name: Build operand
+      run: make binary
+
+    - name: Build operator
+      run: make binary-rte
+
+    - name: Run unit tests
+      run: make test-unit
+
+  golangci-lint:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+
+    - name: Set up golang
+      uses: actions/setup-go@v4
+      with:
+        go-version: 1.22.4
+
+    - name: Run Linter
+      run: make golangci-lint
