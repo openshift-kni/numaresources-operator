@@ -21,8 +21,11 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	k8swait "k8s.io/apimachinery/pkg/util/wait"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,12 +35,17 @@ import (
 )
 
 func main() {
-	var prefix string
-	var cmNamespace string
-	var cmName string
-	flag.StringVar(&cmNamespace, "namespace", "numaresources", "namespace to look the configmap into")
-	flag.StringVar(&cmName, "name", "numaresourcesoperator-worker", "name of the configmap to look for")
-	flag.StringVar(&prefix, "prefix", "", "prefix for the output")
+	prefix := ""
+	cmNamespace := "numaresources"
+	cmName := "numaresourcesoperator-worker"
+	waitTimeout := 0 * time.Second  // no wait
+	waitInterval := 2 * time.Second // if we wait at all, this is the intervall between polls
+	waitImmediate := true           // guarantee to call at least once, necessary with default timout
+
+	flag.StringVar(&cmNamespace, "namespace", cmNamespace, "namespace to look the configmap into")
+	flag.StringVar(&cmName, "name", cmName, "name of the configmap to look for")
+	flag.StringVar(&prefix, "prefix", prefix, "prefix for the output")
+	flag.DurationVar(&waitTimeout, "wait", waitTimeout, "retry till this time limit")
 	flag.Parse()
 
 	cli, err := clientutil.New()
@@ -45,13 +53,29 @@ func main() {
 		log.Fatalf("error creating a client: %v", err)
 	}
 
+	log.Printf("trying to fetch %s/%s...", cmNamespace, cmName)
+
 	ctx := context.Background()
-	key := client.ObjectKey{
-		Namespace: cmNamespace,
-		Name:      cmName,
-	}
 	cm := corev1.ConfigMap{}
-	err = cli.Get(ctx, key, &cm)
+
+	err = k8swait.PollUntilContextTimeout(ctx, waitInterval, waitTimeout, waitImmediate, func(fctx context.Context) (bool, error) {
+		key := client.ObjectKey{
+			Namespace: cmNamespace,
+			Name:      cmName,
+		}
+		ferr := cli.Get(fctx, key, &cm)
+		if ferr != nil {
+			if apierrors.IsNotFound(ferr) {
+				log.Printf("failed to get %s/%s - not found, retrying...", cmNamespace, cmName)
+				return false, nil
+			}
+			log.Printf("failed to get %s/%s: %v, aborting", cmNamespace, cmName, ferr)
+			return false, ferr
+		}
+		log.Printf("got %s/%s!", cmNamespace, cmName)
+		return true, nil
+	})
+
 	if err != nil {
 		log.Fatalf("error getting the ConfigMap %s/%s: %v", cmNamespace, cmName, err)
 	}
