@@ -19,7 +19,6 @@ package rte
 import (
 	"context"
 	"fmt"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -128,7 +127,8 @@ type GeneratedDesiredManifest struct {
 	MachineConfigPool *machineconfigv1.MachineConfigPool
 	NodeGroup         *nropv1.NodeGroup
 	// generated manifests
-	DaemonSet *appsv1.DaemonSet
+	DaemonSet             *appsv1.DaemonSet
+	IsCustomPolicyEnabled bool
 }
 
 type GenerateDesiredManifestUpdater func(mcpName string, gdm *GeneratedDesiredManifest) error
@@ -137,7 +137,7 @@ func SkipManifestUpdate(gdm *GeneratedDesiredManifest) error {
 	return nil
 }
 
-func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDesiredManifestUpdater) []objectstate.ObjectState {
+func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDesiredManifestUpdater, isCustomPolicyEnabled bool) []objectstate.ObjectState {
 	ret := []objectstate.ObjectState{
 		// service account
 		{
@@ -217,10 +217,11 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 
 			if updater != nil {
 				gdm := GeneratedDesiredManifest{
-					ClusterPlatform:   em.plat,
-					MachineConfigPool: mcp.DeepCopy(),
-					NodeGroup:         tree.NodeGroup.DeepCopy(),
-					DaemonSet:         desiredDaemonSet,
+					ClusterPlatform:       em.plat,
+					MachineConfigPool:     mcp.DeepCopy(),
+					NodeGroup:             tree.NodeGroup.DeepCopy(),
+					DaemonSet:             desiredDaemonSet,
+					IsCustomPolicyEnabled: isCustomPolicyEnabled,
 				}
 
 				err := updater(mcp.Name, &gdm)

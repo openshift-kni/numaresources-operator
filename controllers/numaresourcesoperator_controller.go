@@ -479,9 +479,10 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		}
 		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
 	}
+	rteupdate.SecurityContextConstraint(r.RTEManifests.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
-	for _, objState := range existing.State(r.RTEManifests, daemonsetUpdater) {
+	for _, objState := range existing.State(r.RTEManifests, daemonsetUpdater, annotations.IsCustomPolicyEnabled(instance.Annotations)) {
 		if objState.Error != nil {
 			// We are likely in the bootstrap scenario. In this case, which is expected once, everything is fine.
 			// If it happens past bootstrap, still carry on. We know what to do, and we do want to enforce the desired state.
@@ -773,6 +774,15 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 		// intentionally info because we want to keep going
 		klog.V(5).InfoS("DaemonSet update: cannot update config", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
 		return err
+	}
+	if gdm.ClusterPlatform != platform.Kubernetes {
+		if gdm.IsCustomPolicyEnabled && gdm.ClusterPlatform == platform.OpenShift {
+			k8swgrteupdate.SecurityContext(gdm.DaemonSet, selinux.RTEContextTypeLegacy)
+			klog.V(5).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextTypeLegacy)
+		} else {
+			k8swgrteupdate.SecurityContext(gdm.DaemonSet, selinux.RTEContextType)
+			klog.V(5).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextType)
+		}
 	}
 	return nil
 }
