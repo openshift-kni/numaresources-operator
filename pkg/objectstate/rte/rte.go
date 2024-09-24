@@ -91,7 +91,6 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) []ob
 				klog.Warningf("failed to find machine config %q under the namespace %q", mcName, desiredMachineConfig.Namespace)
 				continue
 			}
-
 			ret = append(ret,
 				objectstate.ObjectState{
 					Existing: existingMachineConfig.machineConfig,
@@ -281,7 +280,7 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		ret.existing.ServiceAccount = sa
 	}
 
-	if plat == platform.OpenShift {
+	if plat != platform.Kubernetes {
 		scc := &securityv1.SecurityContextConstraints{}
 		if ret.sccError = cli.Get(ctx, client.ObjectKeyFromObject(mf.SecurityContextConstraint), scc); ret.sccError == nil {
 			ret.existing.SecurityContextConstraint = scc
