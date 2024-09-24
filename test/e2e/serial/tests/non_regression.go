@@ -341,10 +341,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				//calculate base load on the node
 				baseload, err := baseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
-				klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
+				klog.Infof("computed base load: %s", baseload)
 
 				//get nrt info of the node
-				klog.Infof(fmt.Sprintf("preparing node %q to fit the test case", nodeName))
+				klog.Infof("preparing node %q to fit the test case", nodeName)
 				nrtInfo, err := e2enrt.FindFromList(nrts, nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", nodeName)
 

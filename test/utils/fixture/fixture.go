@@ -124,8 +124,8 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 		ok, _ := noderesourcetopologies.EqualNRTListsItems(nrtAtTestSetup, nrtList)
 		if !ok {
 			klog.Warning("WARNING! NRT MISMATCH:\n")
-			klog.Infof(intnrt.ListToString(nrtList.Items, "-----NRT at Suite Setup"))
-			klog.Infof(intnrt.ListToString(nrtAtTestSetup.Items, "-----NRT at Test Setup"))
+			klog.Info(intnrt.ListToString(nrtList.Items, "-----NRT at Suite Setup"))
+			klog.Info(intnrt.ListToString(nrtAtTestSetup.Items, "-----NRT at Test Setup"))
 		}
 		nrtList = nrtAtTestSetup
 	}

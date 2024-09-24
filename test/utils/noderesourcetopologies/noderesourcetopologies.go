@@ -276,7 +276,7 @@ func SaturateNodeUntilLeft(nrtInfo nrtv1alpha2.NodeResourceTopology, requiredRes
 			zonePadRes, err = SaturateZoneUntilLeft(zone, requiredRes, DropHostLevelResources)
 		}
 		if err != nil {
-			klog.Errorf(fmt.Sprintf("could not make padding pod for zone %q leaving 0 resources available.", zone.Name))
+			klog.Error(fmt.Sprintf("could not make padding pod for zone %q leaving 0 resources available.", zone.Name))
 			return nil, err
 		}
 		klog.Infof("Padding resources for zone %q: %s", zone.Name, e2ereslist.ToString(zonePadRes))
