@@ -59,7 +59,7 @@ jobs:
     - name: E2E Tests
       run: |
         export KUBECONFIG=${HOME}/.kube/config
-        bin/catkubeletconfigmap --namespace ${E2E_NAMESPACE_NAME} --prefix 'E2E_' >> $GITHUB_ENV
+        bin/catkubeletconfmap --namespace ${E2E_NAMESPACE_NAME} --prefix 'E2E_' >> $GITHUB_ENV
         make test-e2e
 
     - name: Export E2E Tests logs
