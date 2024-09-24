@@ -56,6 +56,7 @@ import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	"github.com/openshift-kni/numaresources-operator/internal/api/features"
+	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/controlplane"
@@ -179,8 +180,13 @@ func main() {
 		os.Exit(manageIntrospection())
 	}
 
-	klogV := getKlogLevel()
-	config := textlogger.NewConfig(textlogger.Verbosity(klogV))
+	klogV, err := intkloglevel.Get()
+	if err != nil {
+		klog.V(1).ErrorS(err, "setting up the logger")
+		os.Exit(1)
+	}
+
+	config := textlogger.NewConfig(textlogger.Verbosity(int(klogV)))
 	ctrl.SetLogger(textlogger.NewLogger(config))
 
 	klog.InfoS("starting", "program", version.ProgramName(), "version", version.Get(), "gitcommit", version.GetGitCommit(), "golang", runtime.Version(), "vl", klogV, "auxv", config.Verbosity().String())
@@ -466,16 +472,4 @@ func webhookTLSOpts(enableHTTP2 bool) []func(config *tls.Config) {
 	}
 
 	return []func(config *tls.Config){disableHTTP2}
-}
-
-// getKlogLevel reconstructs the klog verb level, because
-// the klog package doesn't give a clean easy way to access
-// the setting, so we have to jumps through some hoops.
-func getKlogLevel() int {
-	for j := 1; j < 15; j++ {
-		if !klog.V(klog.Level(j)).Enabled() {
-			return j - 1
-		}
-	}
-	return 0
 }
