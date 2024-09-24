@@ -38,7 +38,8 @@ jobs:
 
     - name: build test binary
       run: |
-        make build-tools binary-e2e-rte binary-e2e-install binary-e2e-uninstall
+        make build-tools-all binary-e2e-rte binary-e2e-install binary-e2e-uninstall bin/catkubeletconfmap
+        ls -lh bin/
 
     - name: Build image
       run: |
