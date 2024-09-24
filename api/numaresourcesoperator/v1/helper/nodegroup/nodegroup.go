@@ -28,11 +28,19 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
+// Tree maps a NodeGroup to the MachineConfigPool identified by the NodeGroup's MCPSelector.
+// It is meant to use internally to bind the two concepts. Should be never exposed to users - hence
+// it has not nor must have a JSON mapping.
+// NOTE: because of historical accident we have a 1:N mapping between NodeGroup and MCPs (MachineConfigPool*s* is a slice!)
+// Unfortunately this is with very, very high probability a refactoring mistake which slipped in unchecked.
+// One of the key design assumptions in NROP is the 1:1 mapping between NodeGroups and MCPs.
+// This historical accident should be fixed in future versions.
 type Tree struct {
 	NodeGroup          *nropv1.NodeGroup
 	MachineConfigPools []*mcov1.MachineConfigPool
 }
 
+// Clone creates a deepcopy of a Tree
 func (ttr Tree) Clone() Tree {
 	ret := Tree{
 		NodeGroup:          ttr.NodeGroup.DeepCopy(),
@@ -44,6 +52,12 @@ func (ttr Tree) Clone() Tree {
 	return ret
 }
 
+// FindTrees binds the provided mcps from their list to the given nodegroups.
+// Note that if no nodegroup match, the result slice may be empty.
+// / NOTE: because of historical accident we have a 1:N mapping between NodeGroup and MCPs (MachineConfigPool*s* is a slice!)
+// Unfortunately this is with very, very high probability a refactoring mistake which slipped in unchecked.
+// One of the key design assumptions in NROP is the 1:1 mapping between NodeGroups and MCPs.
+// This historical accident should be fixed in future versions.
 func FindTrees(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup) ([]Tree, error) {
 	var result []Tree
 	for idx := range nodeGroups {
@@ -81,6 +95,7 @@ func FindTrees(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup)
 	return result, nil
 }
 
+// FindMachineConfigPools returns a slice of all the MachineConfigPool matching the configured node groups
 func FindMachineConfigPools(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
 	trees, err := FindTrees(mcps, nodeGroups)
 	if err != nil {
