@@ -24,6 +24,7 @@ const (
 	Unknown    = Platform("Unknown")
 	Kubernetes = Platform("Kubernetes")
 	OpenShift  = Platform("OpenShift")
+	HyperShift = Platform("HyperShift")
 )
 
 func (p Platform) String() string {
@@ -37,6 +38,8 @@ func ParsePlatform(plat string) (Platform, bool) {
 		return Kubernetes, true
 	case "openshift":
 		return OpenShift, true
+	case "hypershift":
+		return HyperShift, true
 	default:
 		return Unknown, false
 	}
