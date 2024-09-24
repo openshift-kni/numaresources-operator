@@ -3,9 +3,9 @@
 source hack/common.sh
 
 # Specify the URL link to the machine config pool CRD
-CRD_MACHINE_CONFIG_POOL_URL="https://raw.githubusercontent.com/openshift/machine-config-operator/master/install/0000_80_machine-config_01_machineconfigpools-Default.crd.yaml"
+CRD_MACHINE_CONFIG_POOL_URL="https://raw.githubusercontent.com/openshift/api/refs/heads/master/payload-manifests/crds/0000_80_machine-config_01_machineconfigpools-Default.crd.yaml"
 # Specify the URL link to the kubeletconfig CRD
-CRD_KUBELET_CONFIG_URL="https://raw.githubusercontent.com/openshift/machine-config-operator/master/install/0000_80_machine-config_01_kubeletconfigs.crd.yaml"
+CRD_KUBELET_CONFIG_URL="https://raw.githubusercontent.com/openshift/api/refs/heads/master/payload-manifests/crds/0000_80_machine-config_01_kubeletconfigs.crd.yaml"
 
 [ ! -x ${REPO_DIR}/bin/lsplatform ] && exit 1
 
