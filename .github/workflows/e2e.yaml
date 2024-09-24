@@ -25,7 +25,7 @@ jobs:
         fetch-depth: 0 # Fetch all history for all tags and branches
 
     - name: Set up golang
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v5
       with:
         go-version: 1.22.4
 
@@ -38,7 +38,8 @@ jobs:
 
     - name: build test binary
       run: |
-        make build-tools binary-e2e-rte binary-e2e-install binary-e2e-uninstall
+        make build-tools-all binary-e2e-rte binary-e2e-install binary-e2e-uninstall bin/catkubeletconfmap
+        ls -lh bin/
 
     - name: Build image
       run: |
@@ -48,7 +49,7 @@ jobs:
       run: |
         # kind is part of 20.04 image, see relevant READMEs in https://github.com/actions/virtual-environments/tree/main/images/linux
         kind version
-        kind create cluster --config=hack/kind-config-e2e-no-registry.yaml --image kindest/node:v1.26.6@sha256:6e2d8b28a5b601defe327b98bd1c2d1930b49e5d8c512e1895099e4504007adb
+        kind create cluster --config=hack/kind-config-e2e-no-registry.yaml --image kindest/node:v1.30.4@sha256:976ea815844d5fa93be213437e3ff5754cd599b040946b5cca43ca45c2047114 
         kubectl label node kind-worker node-role.kubernetes.io/worker=''
         kind load docker-image ${built_image}
 
@@ -59,7 +60,7 @@ jobs:
     - name: E2E Tests
       run: |
         export KUBECONFIG=${HOME}/.kube/config
-        bin/catkubeletconfigmap --namespace ${E2E_NAMESPACE_NAME} --prefix 'E2E_' >> $GITHUB_ENV
+        bin/catkubeletconfmap --wait 2m --namespace ${E2E_NAMESPACE_NAME} --prefix 'E2E_' >> $GITHUB_ENV
         make test-e2e
 
     - name: Export E2E Tests logs

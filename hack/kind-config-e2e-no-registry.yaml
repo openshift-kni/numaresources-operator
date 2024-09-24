@@ -8,8 +8,6 @@ kubeadmConfigPatches:
   topologyManagerPolicy: "single-numa-node"
   topologyManagerScope: "container"
   reservedSystemCPUs: "0"
-  featureGates:
-    KubeletPodResourcesGetAllocatable: true
   memoryManagerPolicy: "Static"
   systemReserved: {"memory" :"512Mi"}
   kubeReserved: {"memory" :"512Mi"}
