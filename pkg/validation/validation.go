@@ -17,6 +17,7 @@
 package validation
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -49,7 +50,7 @@ func MachineConfigPoolDuplicates(trees []nodegroupv1.Tree) error {
 	}
 
 	if len(duplicateErrors) > 0 {
-		return fmt.Errorf(strings.Join(duplicateErrors, "; "))
+		return errors.New(strings.Join(duplicateErrors, "; "))
 	}
 
 	return nil
@@ -107,7 +108,7 @@ func nodeGroupsDuplicates(nodeGroups []nropv1.NodeGroup) error {
 	}
 
 	if len(duplicateErrors) > 0 {
-		return fmt.Errorf(strings.Join(duplicateErrors, "; "))
+		return errors.New(strings.Join(duplicateErrors, "; "))
 	}
 
 	return nil
@@ -127,7 +128,7 @@ func nodeGroupMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
 	}
 
 	if len(selectorsErrors) > 0 {
-		return fmt.Errorf(strings.Join(selectorsErrors, "; "))
+		return errors.New(strings.Join(selectorsErrors, "; "))
 	}
 
 	return nil

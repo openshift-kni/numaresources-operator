@@ -569,7 +569,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// calculate base load on the target node
 			baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
-			klog.Infof(fmt.Sprintf("computed base load: %s", baseload))
+			klog.Infof("computed base load: %s", baseload)
 
 			// get least available CPU and Memory on each NUMA node while taking baseload into consideration
 			cpus := leastAvailableResourceQtyInAllZone(*targetNrtInitial, baseload, corev1.ResourceCPU)

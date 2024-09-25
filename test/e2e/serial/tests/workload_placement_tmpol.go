@@ -463,7 +463,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("running the test pod")
-			klog.Infof(objects.DumpPODResourceRequirements(pod))
+			klog.Info(objects.DumpPODResourceRequirements(pod))
 
 			By("running the test pod")
 			err = fxt.Client.Create(context.TODO(), pod)
@@ -1393,7 +1393,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			dumpNRTForNode(fxt.Client, targetNodeName, "target")
 
 			By("running the test pod")
-			klog.Infof(objects.DumpPODResourceRequirements(pod))
+			klog.Info(objects.DumpPODResourceRequirements(pod))
 			err := fxt.Client.Create(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
 
