@@ -17,6 +17,7 @@
 package objects
 
 import (
+	"bytes"
 	"encoding/json"
 	"time"
 
@@ -24,6 +25,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/client-go/kubernetes/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
@@ -147,6 +150,30 @@ func NewKubeletConfigAutoresizeControlPlane() *machineconfigv1.KubeletConfig {
 	ctrlPlaneKc := NewKubeletConfigWithoutData("autoresize-ctrlplane", nil, ctrlPlaneLabSel)
 	ctrlPlaneKc.Spec.AutoSizingReserved = &true_
 	return ctrlPlaneKc
+}
+
+func NewKubeletConfigConfigMap(name string, labels map[string]string, config *machineconfigv1.KubeletConfig) *corev1.ConfigMap {
+	yamlSerializer := serializer.NewSerializerWithOptions(
+		serializer.DefaultMetaFactory, scheme.Scheme, scheme.Scheme,
+		serializer.SerializerOptions{Yaml: true, Pretty: true, Strict: true})
+
+	buff := &bytes.Buffer{}
+	// supervised testing environment
+	// no need to check for error
+	_ = yamlSerializer.Encode(config, buff)
+	return &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Data: map[string]string{
+			"config": buff.String(),
+		},
+	}
 }
 
 func NewNamespace(name string) *corev1.Namespace {

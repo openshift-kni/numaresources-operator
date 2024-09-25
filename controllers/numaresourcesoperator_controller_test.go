@@ -66,7 +66,6 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 	if err != nil {
 		return nil, err
 	}
-
 	rteManifests, err := rtemanifests.GetManifests(plat, platVersion, testNamespace, true)
 	if err != nil {
 		return nil, err
