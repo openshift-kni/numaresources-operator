@@ -43,6 +43,7 @@ rules:
   - config.openshift.io
   resources:
   - clusteroperators
+  - infrastructures
   verbs:
   - get
 - apiGroups:

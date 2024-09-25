@@ -90,6 +90,7 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=topology.node.k8s.io,resources=noderesourcetopologies,verbs=get;list;create;update
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=list
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusteroperators,verbs=get
+//+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=get
 //+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=machineconfigs,verbs=*
 //+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=machineconfigpools,verbs=get;list;watch
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=*

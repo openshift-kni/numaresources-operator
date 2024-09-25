@@ -62,7 +62,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-09-17T08:34:36Z"
+    createdAt: "2024-09-25T14:08:22Z"
     olm.skipRange: '>=4.17.0 <4.18.0'
     operators.operatorframework.io/builder: operator-sdk-v1.36.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -377,6 +377,7 @@ spec:
           - config.openshift.io
           resources:
           - clusteroperators
+          - infrastructures
           verbs:
           - get
         - apiGroups:
