@@ -169,7 +169,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 		It("[tier3] should enable to change tolerations in the RTE daemonsets", Label("tier3"), func(ctx context.Context) {
 			By("getting RTE manifests object")
 			// TODO: this is similar but not quite what the main operator does
-			rteManifests, err := rtemanifests.GetManifests(configuration.Plat, configuration.PlatVersion, "", true)
+			rteManifests, err := rtemanifests.GetManifests(configuration.Plat, configuration.PlatVersion, "", true, true)
 			Expect(err).ToNot(HaveOccurred(), "cannot get the RTE manifests")
 
 			expectedTolerations := rteManifests.DaemonSet.Spec.Template.Spec.Tolerations // shortcut
