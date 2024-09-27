@@ -62,7 +62,7 @@ spec:
                 items:
                   description: |-
                     NodeGroup defines group of nodes that will run resource topology exporter daemon set
-                    You can choose the group of node by MachineConfigPoolSelector or by NodeSelector
+                    You can choose the group of node by MachineConfigPoolSelector or by PoolName
                   properties:
                     config:
                       description: Config defines the RTE behavior for this NodeGroup
@@ -182,6 +182,11 @@ spec:
                           type: object
                       type: object
                       x-kubernetes-map-type: atomic
+                    poolName:
+                      description: PoolName defines the pool name to which the nodes
+                        belong that the config of this node group will be applied
+                        to
+                      type: string
                   type: object
                 type: array
               podExcludes:
