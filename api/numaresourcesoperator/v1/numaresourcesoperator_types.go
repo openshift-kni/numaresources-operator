@@ -112,7 +112,7 @@ type NodeGroupConfig struct {
 }
 
 // NodeGroup defines group of nodes that will run resource topology exporter daemon set
-// You can choose the group of node by MachineConfigPoolSelector or by NodeSelector
+// You can choose the group of node by MachineConfigPoolSelector or by PoolName
 type NodeGroup struct {
 	// MachineConfigPoolSelector defines label selector for the machine config pool
 	// +optional
@@ -120,6 +120,9 @@ type NodeGroup struct {
 	// Config defines the RTE behavior for this NodeGroup
 	// +optional
 	Config *NodeGroupConfig `json:"config,omitempty"`
+	// PoolName defines the pool name to which the nodes belong that the config of this node group will be applied to
+	// +optional
+	PoolName *string `json:"poolName,omitempty"`
 }
 
 // NUMAResourcesOperatorStatus defines the observed state of NUMAResourcesOperator
