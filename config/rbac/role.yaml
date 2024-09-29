@@ -9,6 +9,7 @@ rules:
   resources:
   - configmaps
   - serviceaccounts
+  - services
   verbs:
   - '*'
 - apiGroups:
