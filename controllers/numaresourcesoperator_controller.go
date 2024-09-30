@@ -336,7 +336,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	// so the MachineConfig which applies the custom policy is no longer necessary.
 	// In case of operator upgrade from 4.1X → 4.18, it's necessary to remove the old MachineConfig,
 	// unless an emergency annotation is provided which forces the operator to use custom policy
-	if annotations.IsCustomPolicyEnabled(instance.Annotations) {
+	if !annotations.IsCustomPolicyEnabled(instance.Annotations) {
 		for _, objState := range objStates {
 			if !objState.IsNotFoundError() {
 				klog.V(4).InfoS("delete Machine Config", "MachineConfig", objState.Desired.GetName())
