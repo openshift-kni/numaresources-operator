@@ -1216,7 +1216,7 @@ func accumulateKubeletConfigNames(cms []corev1.ConfigMap) sets.Set[string] {
 	return cmNames
 }
 
-func waitForMcpsCondition(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool, condition machineconfigv1.MachineConfigPoolConditionType) error {
+func WaitForMCPsCondition(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool, condition machineconfigv1.MachineConfigPoolConditionType) error {
 	var eg errgroup.Group
 	interval := configuration.MachineConfigPoolUpdateInterval
 	if condition == machineconfigv1.MachineConfigPoolUpdating {
