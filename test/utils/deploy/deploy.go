@@ -19,6 +19,8 @@ package deploy
 import (
 	"context"
 	"fmt"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	"golang.org/x/sync/errgroup"
 	"os"
 	"sync"
 	"time"
@@ -36,9 +38,8 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
-	"github.com/openshift-kni/numaresources-operator/pkg/status"
-
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
@@ -86,6 +87,7 @@ func OverallDeployment() NroDeployment {
 	unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups)
 	Expect(err).NotTo(HaveOccurred())
 
+	var createKubelet bool
 	if _, ok := os.LookupEnv("E2E_NROP_INSTALL_SKIP_KC"); ok {
 		By("using cluster kubeletconfig (if any)")
 	} else {
@@ -93,6 +95,7 @@ func OverallDeployment() NroDeployment {
 		err = e2eclient.Client.Create(context.TODO(), kcObj)
 		Expect(err).NotTo(HaveOccurred())
 		deployedObj.KcObj = kcObj
+		createKubelet = true
 	}
 
 	By(fmt.Sprintf("creating the NRO object: %s", nroObj.Name))
@@ -106,9 +109,13 @@ func OverallDeployment() NroDeployment {
 	Expect(err).NotTo(HaveOccurred())
 	deployedObj.NroObj = nroObj
 
-	By("waiting for MCP to get updated")
-	WaitForMCPUpdatedAfterNROCreated(nroObj)
-
+	if createKubelet || annotations.IsCustomPolicyEnabled(nroObj.Annotations) {
+		By("waiting for MCP to get updated")
+		mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(WaitForMCPsCondition(e2eclient.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)).To(Succeed())
+		Expect(WaitForMCPsCondition(e2eclient.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
+	}
 	return deployedObj
 }
 
@@ -201,22 +208,6 @@ func WaitForMCPUpdatedAfterNRODeleted(nroObj *nropv1.NUMAResourcesOperator) {
 	}).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
 }
 
-// isMachineConfigPoolsUpdated checks if all related to NUMAResourceOperator CR machines config pools have updated status
-func isMachineConfigPoolsUpdated(nro *nropv1.NUMAResourcesOperator) (bool, error) {
-	mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
-	if err != nil {
-		return false, err
-	}
-
-	for _, mcp := range mcps {
-		if !controllers.IsMachineConfigPoolUpdated(nro.Name, mcp) {
-			return false, nil
-		}
-	}
-
-	return true, nil
-}
-
 // isMachineConfigPoolsUpdatedAfterDeletion checks if all related to NUMAResourceOperator CR machines config pools have updated status
 // after MachineConfig deletion
 func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1.NUMAResourcesOperator) (bool, error) {
@@ -232,25 +223,6 @@ func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1.NUMAResourcesOperator)
 	}
 
 	return true, nil
-}
-
-func WaitForMCPUpdatedAfterNROCreated(nroObj *nropv1.NUMAResourcesOperator) {
-	GinkgoHelper()
-
-	if configuration.Plat != platform.OpenShift {
-		// nothing to do
-		return
-	}
-
-	Eventually(func() bool {
-		updated, err := isMachineConfigPoolsUpdated(nroObj)
-		if err != nil {
-			klog.Errorf("failed to information about machine config pools: %v", err)
-			return false
-		}
-
-		return updated
-	}).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
 }
 
 // Deploy a test NUMAResourcesScheduler and waits until its available
@@ -300,4 +272,29 @@ func TeardownNROScheduler(nroSched *nropv1.NUMAResourcesScheduler, timeout time.
 		err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(timeout).ForNUMAResourcesSchedulerDeleted(context.TODO(), nroSched)
 		Expect(err).ToNot(HaveOccurred(), "NROScheduler %q failed to be deleted", nroSched.Name)
 	}
+}
+
+func WaitForMCPsCondition(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool, condition machineconfigv1.MachineConfigPoolConditionType) error {
+	var eg errgroup.Group
+	interval := configuration.MachineConfigPoolUpdateInterval
+	if condition == machineconfigv1.MachineConfigPoolUpdating {
+		// the transition from updated to updating to updated can be very fast sometimes. so if
+		// the status changed to updating and then to updated while on wait it will miss the updating
+		// status, and it will keep waiting and lastly fail the test. to avoid that decrease the interval
+		// to allow more often checks for the status
+		interval = 2 * time.Second
+	}
+	for _, mcp := range mcps {
+		klog.Infof("wait for mcp %q to meet condition %q", mcp.Name, condition)
+		mcp := mcp
+		eg.Go(func() error {
+			defer GinkgoRecover()
+			err := wait.With(cli).
+				Interval(interval).
+				Timeout(configuration.MachineConfigPoolUpdateTimeout).
+				ForMachineConfigPoolCondition(ctx, mcp, condition)
+			return err
+		})
+	}
+	return eg.Wait()
 }

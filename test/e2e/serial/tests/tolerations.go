@@ -46,6 +46,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
+	"github.com/openshift-kni/numaresources-operator/test/utils/deploy"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/k8simported/taints"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
@@ -841,7 +842,7 @@ func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo
 
 		By(fmt.Sprintf("verify updates for mcp %q", info.obj.Name))
 		klog.Info("waiting for mcp to start updating")
-		err := WaitForMCPsCondition(cli, ctx, []*machineconfigv1.MachineConfigPool{info.obj}, machineconfigv1.MachineConfigPoolUpdating)
+		err := deploy.WaitForMCPsCondition(cli, ctx, []*machineconfigv1.MachineConfigPool{info.obj}, machineconfigv1.MachineConfigPoolUpdating)
 		if err != nil {
 			// just warn here because the switch between the mcp conditions: updated->updating->updated can be faster
 			// and may be missed while the condition was actually met at some point
@@ -850,7 +851,7 @@ func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo
 
 		klog.Info("wait for mcp to get updated")
 		//here we must fail on errors
-		Expect(WaitForMCPsCondition(cli, ctx, []*machineconfigv1.MachineConfigPool{info.obj}, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
+		Expect(deploy.WaitForMCPsCondition(cli, ctx, []*machineconfigv1.MachineConfigPool{info.obj}, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
 
 		var updatedMcp machineconfigv1.MachineConfigPool
 		Expect(cli.Get(ctx, client.ObjectKeyFromObject(info.obj), &updatedMcp)).To(Succeed())
