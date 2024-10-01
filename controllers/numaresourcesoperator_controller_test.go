@@ -23,6 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -70,16 +71,20 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 	if err != nil {
 		return nil, err
 	}
-
+	rtemetricsmanifests, err := rtemetricsmanifests.GetManifests(testNamespace)
+	if err != nil {
+		return nil, err
+	}
 	recorder := record.NewFakeRecorder(bufferSize)
 
 	return &NUMAResourcesOperatorReconciler{
-		Client:       fakeClient,
-		Scheme:       scheme.Scheme,
-		Platform:     plat,
-		APIManifests: apiManifests,
-		RTEManifests: rteManifests,
-		Namespace:    testNamespace,
+		Client:              fakeClient,
+		Scheme:              scheme.Scheme,
+		Platform:            plat,
+		APIManifests:        apiManifests,
+		RTEManifests:        rteManifests,
+		RTEMetricsManifests: rtemetricsmanifests,
+		Namespace:           testNamespace,
 		Images: images.Data{
 			Builtin: testImageSpec,
 		},
@@ -1475,6 +1480,17 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 									Namespace: testNamespace,
 								}
 								Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).ToNot(HaveOccurred())
+
+								By("Check All RTE metrics components are created")
+								for _, obj := range reconciler.RTEMetricsManifests.ToObjects() {
+									objectKey := client.ObjectKeyFromObject(obj)
+									switch obj.(type) {
+									case *corev1.Service:
+										service := &corev1.Service{}
+										Expect(reconciler.Client.Get(context.TODO(), objectKey, service)).ToNot(HaveOccurred())
+									default:
+									}
+								}
 							})
 							When("daemonsets are ready", func() {
 								var dsDesiredNumberScheduled int32
