@@ -17,6 +17,7 @@
 package rte
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -33,6 +34,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
+	"github.com/openshift-kni/numaresources-operator/pkg/images"
 )
 
 // these should be provided by a deployer API
@@ -197,6 +199,80 @@ func ContainerConfig(ds *appsv1.DaemonSet, name string) error {
 	}
 	k8swgrteupdate.ContainerConfig(&ds.Spec.Template.Spec, cnt, name)
 	return nil
+}
+
+func SidecarContainerConfig(ds *appsv1.DaemonSet) {
+	// Define the sidecar container
+	sidecarContainer := corev1.Container{
+		Name:  "kube-rbac-proxy",
+		Image: "gcr.io/kubebuilder/kube-rbac-proxy:v0.15.0",
+		Args: []string{
+			"--secure-listen-address=0.0.0.0:8443",
+			"--upstream=http://127.0.0.1:2112",
+			"--config-file=/etc/kube-rbac-proxy/config.yaml",
+			"--tls-cert-file=/etc/tls/private/tls.crt",
+			"--tls-private-key-file=/etc/tls/private/tls.key",
+			"--logtostderr=true",
+			"--allow-paths=/metrics",
+		},
+		Ports: []corev1.ContainerPort{
+			{
+				ContainerPort: 8443,
+				Name:          "https",
+			},
+		},
+		Resources: corev1.ResourceRequirements{
+			Requests: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1m"),
+				corev1.ResourceMemory: resource.MustParse("15Mi"),
+			},
+		},
+		SecurityContext: &corev1.SecurityContext{
+			AllowPrivilegeEscalation: &[]bool{false}[0],
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+			},
+		},
+		TerminationMessagePolicy: corev1.TerminationMessageFallbackToLogsOnError,
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				MountPath: "/etc/kube-rbac-proxy",
+				Name:      "numaresources-secret-kube-rbac-proxy-metric",
+				ReadOnly:  true,
+			},
+			{
+				MountPath: "/etc/tls/private",
+				Name:      "rte-secret-kube-rbac-proxy-tls",
+				ReadOnly:  true,
+			},
+		},
+	}
+
+	// Define the volumes for the sidecar
+	sidecarVolumes := []corev1.Volume{
+		{
+			Name: "rte-secret-kube-rbac-proxy-tls",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "rte-secret-kube-rbac-proxy-tls",
+				},
+			},
+		},
+		{
+			Name: "numaresources-secret-kube-rbac-proxy-metric",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "numaresources-secret-kube-rbac-proxy-metric",
+				},
+			},
+		},
+	}
+
+	// Add the volumes to the DaemonSet spec
+	ds.Spec.Template.Spec.Volumes = append(ds.Spec.Template.Spec.Volumes, sidecarVolumes...)
+
+	// Add the sidecar container to the DaemonSet spec
+	ds.Spec.Template.Spec.Containers = append(ds.Spec.Template.Spec.Containers, sidecarContainer)
 }
 
 func AddVolumeMountMemory(podSpec *corev1.PodSpec, cnt *corev1.Container, mountName, dirName string, sizeMiB int64) {

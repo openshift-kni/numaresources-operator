@@ -750,6 +750,8 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 		// nothing to do!
 		return nil
 	}
+	rteupdate.SidecarContainerConfig(gdm.DaemonSet)
+	klog.V(5).Info("DaemonSet update: Added daemonset sidecar")
 	err = rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
 	if err != nil {
 		// intentionally info because we want to keep going
