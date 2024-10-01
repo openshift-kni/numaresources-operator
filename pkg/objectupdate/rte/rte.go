@@ -273,6 +273,13 @@ func SidecarContainerConfig(ds *appsv1.DaemonSet) {
 
 	// Add the sidecar container to the DaemonSet spec
 	ds.Spec.Template.Spec.Containers = append(ds.Spec.Template.Spec.Containers, sidecarContainer)
+
+	// Pull kube-rbac-proxy image from operator proxy.
+	if sidecarImage, err := images.GetKubeRbacProxyImage(context.TODO()); err != nil {
+		klog.InfoS("unable to find current image, using hardcoded", "error", err)
+	} else {
+		sidecarContainer.Image = sidecarImage
+	}
 }
 
 func AddVolumeMountMemory(podSpec *corev1.PodSpec, cnt *corev1.Container, mountName, dirName string, sizeMiB int64) {
