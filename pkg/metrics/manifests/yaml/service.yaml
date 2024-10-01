@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: rte-secret-kube-rbac-proxy-tls
+  labels:
+    name: resource-topology
+  name: rte-metrics-service
+  namespace: numaresources
+spec:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: https
+  selector:
+    name: resource-topology
