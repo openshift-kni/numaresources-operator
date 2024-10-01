@@ -581,6 +581,31 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 			return nil, fmt.Errorf("failed to apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 	}
+
+	for _, obj := range r.RTEMetricsManifests.ToObjects() {
+		// Check if the object already exists
+		existingObj := obj.DeepCopyObject().(client.Object)
+		err := r.Client.Get(ctx, client.ObjectKeyFromObject(obj), existingObj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to get %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+		}
+		if apierrors.IsNotFound(err) {
+			err := controllerutil.SetControllerReference(instance, obj, r.Scheme)
+			if err != nil {
+				return nil, fmt.Errorf("failed to set controller reference to %s %s: %w", obj.GetNamespace(), obj.GetName(), err)
+			}
+			err = r.Client.Create(ctx, obj)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+			}
+		} else {
+			err = r.Client.Update(ctx, obj)
+			if err != nil {
+				return nil, fmt.Errorf("failed to update %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+			}
+		}
+	}
+
 	if len(dsPoolPairs) < len(trees) {
 		klog.Warningf("daemonset and tree size mismatch: expected %d got in daemonsets %d", len(trees), len(dsPoolPairs))
 	}
