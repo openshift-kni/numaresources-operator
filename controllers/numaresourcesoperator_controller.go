@@ -489,6 +489,26 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 			daemonSetsNName = append(daemonSetsNName, nname)
 		}
 	}
+
+	for _, obj := range r.RTEMetricsManifests.ToObjects() {
+		// Check if the object already exists
+		existingObj := obj.DeepCopyObject().(client.Object)
+		err := r.Client.Get(ctx, client.ObjectKeyFromObject(obj), existingObj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, errors.Wrapf(err, "failed to get %s/%s", obj.GetNamespace(), obj.GetName())
+		}
+		if apierrors.IsNotFound(err) {
+			err := controllerutil.SetControllerReference(instance, obj, r.Scheme)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to set controller reference to %s %s", obj.GetNamespace(), obj.GetName())
+			}
+			err = r.Client.Create(ctx, obj)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to create %s/%s", obj.GetNamespace(), obj.GetName())
+			}
+		}
+	}
+
 	return daemonSetsNName, nil
 }
 
