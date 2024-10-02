@@ -170,3 +170,14 @@ func NamespaceLabels() map[string]string {
 		"security.openshift.io/scc.podSecurityLabelSync": "false",
 	}
 }
+
+func GetDaemonSetListFromNodeGroupStatuses(groups []nropv1.NodeGroupStatus) []nropv1.NamespacedName {
+	dss := []nropv1.NamespacedName{}
+	for _, group := range groups {
+		if group.DaemonSet == nil {
+			continue
+		}
+		dss = append(dss, *group.DaemonSet)
+	}
+	return dss
+}
