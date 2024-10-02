@@ -107,26 +107,83 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 	Context("with unexpected NRO CR name", func() {
 		It("should updated the CR condition to degraded", func() {
-			nro := testobjs.NewNUMAResourcesOperator("test", nil)
+			nro := testobjs.NewNUMAResourcesOperator("test")
 			verifyDegradedCondition(nro, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName)
 		})
 	})
 
-	Context("with NRO empty machine config pool selector node group", func() {
-		It("should updated the CR condition to degraded", func() {
-			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{nil})
+	Context("with NRO empty selectors node group", func() {
+		It("should update the CR condition to degraded", func() {
+			ng := nropv1.NodeGroup{}
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
+			verifyDegradedCondition(nro, validation.NodeGroupsError)
+		})
+	})
+
+	Context("with NRO mutiple pool specifiers set on same node group", func() {
+		It("should update the CR condition to degraded", func() {
+			pn := "pn-1"
+			ng := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"test": "test"},
+				},
+				PoolName: &pn,
+			}
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
 			verifyDegradedCondition(nro, validation.NodeGroupsError)
 		})
 	})
 
 	Context("without available machine config pools", func() {
-		It("should updated the CR condition to degraded", func() {
-			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
-				{
+		It("should update the CR condition to degraded when MachineConfigPoolSelector is set", func() {
+			ng := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"test": "test"}},
+			}
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
+			verifyDegradedCondition(nro, validation.NodeGroupsError)
+		})
+		It("should update the CR condition to degraded when PoolName set", func() {
+			pn := "pn-1"
+			ng := nropv1.NodeGroup{
+				PoolName: &pn,
+			}
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
+			verifyDegradedCondition(nro, validation.NodeGroupsError)
+		})
+	})
+
+	Context("with two node groups each with different pool specifier type and both point to same MCP", func() {
+		It("should update the CR condition to degraded", func() {
+			mcpName := "test1"
+			label1 := map[string]string{
+				"test1": "test1",
+			}
+
+			ng1 := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{"test": "test"},
 				},
-			})
-			verifyDegradedCondition(nro, validation.NodeGroupsError)
+			}
+			ng2 := nropv1.NodeGroup{
+				PoolName: &mcpName,
+			}
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
+
+			mcp1 := testobjs.NewMachineConfigPool(mcpName, label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
+
+			var err error
+			reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1)
+			Expect(err).ToNot(HaveOccurred())
+
+			key := client.ObjectKeyFromObject(nro)
+			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(reconcile.Result{}))
+
+			Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
+			degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
+			Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+			Expect(degradedCondition.Reason).To(Equal(validation.NodeGroupsError))
 		})
 	})
 
@@ -137,6 +194,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 		var reconciler *NUMAResourcesOperatorReconciler
 		var label1, label2 map[string]string
+		var ng1, ng2 nropv1.NodeGroup
 
 		BeforeEach(func() {
 			label1 = map[string]string{
@@ -146,10 +204,17 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				"test2": "test2",
 			}
 
-			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
-				{MatchLabels: label1},
-				{MatchLabels: label2},
-			})
+			ng1 = nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: label1,
+				},
+			}
+			ng2 = nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: label2,
+				},
+			}
+			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
 			nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 
 			mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
@@ -336,7 +401,55 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				})
 			})
 		})
+		When("add PoolName on existing node group with another specifier already exist", func() {
+			It("should update the CR condition to degraded", func(ctx context.Context) {
+				pn := "pool-1"
+				ng1WithNodeSelector := ng1.DeepCopy()
+				ng1WithNodeSelector.PoolName = &pn
+				key := client.ObjectKeyFromObject(nro)
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(ctx, key, nroUpdated))
+					nroUpdated.Spec.NodeGroups[0] = *ng1WithNodeSelector
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
+				verifyDegradedCondition(nro, validation.NodeGroupsError)
+			})
+		})
 	})
+
+	Context("with correct NRO and PoolName set", func() {
+		It("should create RTE daemonset", func(ctx context.Context) {
+			mcpName := "test1"
+			label := map[string]string{
+				"test1": "test1",
+			}
+			ng := nropv1.NodeGroup{
+				PoolName: &mcpName,
+			}
+
+			mcp := testobjs.NewMachineConfigPool(mcpName, label, &metav1.LabelSelector{MatchLabels: label}, &metav1.LabelSelector{MatchLabels: label})
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
+			nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
+
+			reconciler := reconcileObjects(nro, mcp)
+
+			mcpDSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+
+			nroUpdated := &nropv1.NUMAResourcesOperator{}
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
+
+			Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(1))
+			Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(mcp.Name))
+			// TODO check the actual returned config and the daemonset in status, we need to force the NRO condition as Available for this.
+		})
+	})
+
 	Context("with correct NRO CR", func() {
 		var nro *nropv1.NUMAResourcesOperator
 		var mcp1 *machineconfigv1.MachineConfigPool
@@ -353,10 +466,17 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				"test2": "test2",
 			}
 
-			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
-				{MatchLabels: label1},
-				{MatchLabels: label2},
-			})
+			ng1 := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: label1,
+				},
+			}
+			ng2 := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: label2,
+				},
+			}
+			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
 			nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 
 			mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
@@ -1134,20 +1254,26 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		var mcp2 *machineconfigv1.MachineConfigPool
 
 		var reconciler *NUMAResourcesOperatorReconciler
-		var label1, label2 map[string]string
 
 		BeforeEach(func() {
-			label1 = map[string]string{
+			label1 := map[string]string{
 				"test1": "test1",
 			}
-			label2 = map[string]string{
+			label2 := map[string]string{
 				"test2": "test2",
 			}
 
-			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
-				{MatchLabels: label1},
-				{MatchLabels: label2},
-			})
+			ng1 := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: label1,
+				},
+			}
+			ng2 := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: label2,
+				},
+			}
+			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
 			// reconciling NRO object with custom policy, emulates the old behavior version
 			nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 
@@ -1273,7 +1399,14 @@ func reconcileObjects(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.Ma
 			Status: corev1.ConditionTrue,
 		},
 	}
+	mcName := objectnames.GetMachineConfigName(nro.Name, mcp.Name)
+	mcp.Status.Configuration.Source[0].Name = mcName
+
 	Expect(reconciler.Client.Update(context.TODO(), mcp)).Should(Succeed())
+	Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp), mcp)).ToNot(HaveOccurred())
+	Expect(mcp.Status.Conditions[0].Type).To(Equal(machineconfigv1.MachineConfigPoolUpdated))
+	Expect(mcp.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
+	Expect(mcp.Status.Configuration.Source[0].Name).To(Equal(mcName))
 
 	var secondLoopResult reconcile.Result
 	secondLoopResult, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
