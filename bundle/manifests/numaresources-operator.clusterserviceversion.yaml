@@ -62,7 +62,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-10-14T13:06:40Z"
+    createdAt: "2024-10-16T11:10:10Z"
     olm.skipRange: '>=4.17.0 <4.18.0'
     operators.operatorframework.io/builder: operator-sdk-v1.36.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -149,6 +149,21 @@ spec:
           applied to this MachineConfigPool
         displayName: Optional configuration enforced on this NodeGroup
         path: machineconfigpools[0].config
+      - description: NodeGroups report the observed status of the configured NodeGroups,
+          matching by their name
+        displayName: Node groups observed status
+        path: nodeGroups
+      - description: NodeGroupConfig represents the latest available configuration
+          applied to this NodeGroup
+        displayName: Optional configuration enforced on this NodeGroup
+        path: nodeGroups[0].config
+      - description: DaemonSet of the configured RTEs, for this node group
+        displayName: RTE DaemonSets
+        path: nodeGroups[0].daemonsets
+      - description: PoolName represents the pool name to which the nodes belong that
+          the config of this node group is be applied to
+        displayName: Pool name of nodes in this node group
+        path: nodeGroups[0].selector
       - description: RelatedObjects list of objects of interest for this operator
         displayName: Related Objects
         path: relatedObjects

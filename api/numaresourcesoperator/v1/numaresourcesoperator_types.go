@@ -125,6 +125,26 @@ type NodeGroup struct {
 	PoolName *string `json:"poolName,omitempty"`
 }
 
+// NodeGroupStatus reports the status of a NodeGroup once matches an actual set of nodes and it is correctly processed
+// by the system. In other words, is not possible to have a NodeGroupStatus which does not represent a valid NodeGroup
+// which in turn correctly references unambiguously a set of nodes in the cluster.
+// Hence, if a NodeGroupStatus is published, its `Name` must be present, because it refers back to a NodeGroup whose
+// config was correctly processed in the Spec. And its DaemonSet will be nonempty, because matches correctly a set
+// of nodes in the cluster. The Config is best-effort always represented, possibly reflecting the system defaults.
+// If the system cannot process a NodeGroup correctly from the Spec, it will report Degraded state in the top-level
+// condition, and will provide details using the aforementioned conditions.
+type NodeGroupStatus struct {
+	// DaemonSet of the configured RTEs, for this node group
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="RTE DaemonSets"
+	DaemonSet NamespacedName `json:"daemonsets"`
+	// NodeGroupConfig represents the latest available configuration applied to this NodeGroup
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Optional configuration enforced on this NodeGroup"
+	Config NodeGroupConfig `json:"config"`
+	// PoolName represents the pool name to which the nodes belong that the config of this node group is be applied to
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Pool name of nodes in this node group"
+	PoolName string `json:"selector"`
+}
+
 // NUMAResourcesOperatorStatus defines the observed state of NUMAResourcesOperator
 type NUMAResourcesOperatorStatus struct {
 	// DaemonSets of the configured RTEs, one per node group
@@ -133,6 +153,10 @@ type NUMAResourcesOperatorStatus struct {
 	// MachineConfigPools resolved from configured node groups
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="RTE MCPs from node groups"
 	MachineConfigPools []MachineConfigPool `json:"machineconfigpools,omitempty"`
+	// NodeGroups report the observed status of the configured NodeGroups, matching by their name
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Node groups observed status"
+	NodeGroups []NodeGroupStatus `json:"nodeGroups,omitempty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Condition reported"
 	Conditions []metav1.Condition `json:"conditions,omitempty"`

@@ -406,6 +406,114 @@ spec:
                   - name
                   type: object
                 type: array
+              nodeGroups:
+                description: NodeGroups report the observed status of the configured
+                  NodeGroups, matching by their name
+                items:
+                  description: |-
+                    NodeGroupStatus reports the status of a NodeGroup once matches an actual set of nodes and it is correctly processed
+                    by the system. In other words, is not possible to have a NodeGroupStatus which does not represent a valid NodeGroup
+                    which in turn correctly references unambiguously a set of nodes in the cluster.
+                    Hence, if a NodeGroupStatus is published, its `Name` must be present, because it refers back to a NodeGroup whose
+                    config was correctly processed in the Spec. And its DaemonSet will be nonempty, because matches correctly a set
+                    of nodes in the cluster. The Config is best-effort always represented, possibly reflecting the system defaults.
+                    If the system cannot process a NodeGroup correctly from the Spec, it will report Degraded state in the top-level
+                    condition, and will provide details using the aforementioned conditions.
+                  properties:
+                    config:
+                      description: NodeGroupConfig represents the latest available
+                        configuration applied to this NodeGroup
+                      properties:
+                        infoRefreshMode:
+                          description: InfoRefreshMode sets the mechanism which will
+                            be used to refresh the topology info.
+                          enum:
+                          - Periodic
+                          - Events
+                          - PeriodicAndEvents
+                          type: string
+                        infoRefreshPause:
+                          description: InfoRefreshPause defines if updates to NRTs
+                            are paused for the machines belonging to this group
+                          enum:
+                          - Disabled
+                          - Enabled
+                          type: string
+                        infoRefreshPeriod:
+                          description: InfoRefreshPeriod sets the topology info refresh
+                            period. Use explicit 0 to disable.
+                          type: string
+                        podsFingerprinting:
+                          description: PodsFingerprinting defines if pod fingerprint
+                            should be reported for the machines belonging to this
+                            group
+                          enum:
+                          - Disabled
+                          - Enabled
+                          - EnabledExclusiveResources
+                          type: string
+                        tolerations:
+                          description: |-
+                            Tolerations overrides tolerations to be set into RTE daemonsets for this NodeGroup. If not empty, the tolerations will be the one set here.
+                            Leave empty to make the system use the default tolerations.
+                          items:
+                            description: |-
+                              The pod this Toleration is attached to tolerates any taint that matches
+                              the triple <key,value,effect> using the matching operator <operator>.
+                            properties:
+                              effect:
+                                description: |-
+                                  Effect indicates the taint effect to match. Empty means match all taint effects.
+                                  When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
+                                type: string
+                              key:
+                                description: |-
+                                  Key is the taint key that the toleration applies to. Empty means match all taint keys.
+                                  If the key is empty, operator must be Exists; this combination means to match all values and all keys.
+                                type: string
+                              operator:
+                                description: |-
+                                  Operator represents a key's relationship to the value.
+                                  Valid operators are Exists and Equal. Defaults to Equal.
+                                  Exists is equivalent to wildcard for value, so that a pod can
+                                  tolerate all taints of a particular category.
+                                type: string
+                              tolerationSeconds:
+                                description: |-
+                                  TolerationSeconds represents the period of time the toleration (which must be
+                                  of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default,
+                                  it is not set, which means tolerate the taint forever (do not evict). Zero and
+                                  negative values will be treated as 0 (evict immediately) by the system.
+                                format: int64
+                                type: integer
+                              value:
+                                description: |-
+                                  Value is the taint value the toleration matches to.
+                                  If the operator is Exists, the value should be empty, otherwise just a regular string.
+                                type: string
+                            type: object
+                          type: array
+                      type: object
+                    daemonsets:
+                      description: DaemonSet of the configured RTEs, for this node
+                        group
+                      properties:
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                      type: object
+                    selector:
+                      description: PoolName represents the pool name to which the
+                        nodes belong that the config of this node group is be applied
+                        to
+                      type: string
+                  required:
+                  - config
+                  - daemonsets
+                  - selector
+                  type: object
+                type: array
               relatedObjects:
                 description: RelatedObjects list of objects of interest for this operator
                 items:
