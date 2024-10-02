@@ -20,9 +20,11 @@ import (
 	"fmt"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func TestIsNotFoundError(t *testing.T) {
@@ -53,6 +55,46 @@ func TestIsNotFoundError(t *testing.T) {
 			got := os.IsNotFoundError()
 			if got != tc.isNotFound {
 				t.Fatalf("failed: got=%v expected=%v", got, tc.isNotFound)
+			}
+		})
+	}
+}
+
+func TestIsCreateOrUpdate(t *testing.T) {
+	var pod *corev1.Pod
+
+	type testCase struct {
+		name     string
+		obj      client.Object
+		expected bool
+	}
+
+	testCases := []testCase{
+		{
+			name:     "explicit nil",
+			obj:      nil,
+			expected: false,
+		},
+		{
+			name:     "interface pointing to nil",
+			obj:      pod, // any object is fine, pod is not special
+			expected: false,
+		},
+		{
+			name:     "interface pointing to non-nil",
+			obj:      &corev1.Pod{}, // any object is fine, pod is not special
+			expected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			os := ObjectState{
+				Desired: tc.obj,
+			}
+			got := os.IsCreateOrUpdate()
+			if got != tc.expected {
+				t.Fatalf("failed: got=%v expected=%v", got, tc.expected)
 			}
 		})
 	}

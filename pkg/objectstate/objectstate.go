@@ -17,6 +17,8 @@
 package objectstate
 
 import (
+	"reflect"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,4 +38,15 @@ func (obst ObjectState) IsNotFoundError() bool {
 		return false
 	}
 	return apierrors.IsNotFound(obst.Error)
+}
+
+func (obst ObjectState) IsCreateOrUpdate() bool {
+	if obst.Desired == nil {
+		return false
+	}
+	// this should not be required, but removes a footgun
+	if vobj := reflect.ValueOf(obst.Desired); vobj.IsNil() {
+		return false
+	}
+	return true
 }

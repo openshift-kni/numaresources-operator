@@ -27,24 +27,44 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 )
 
-func describeObject(obj k8sclient.Object) (string, error) {
-	name := obj.GetName()
-	namespace := obj.GetNamespace()
-	if name == "" {
-		return "", fmt.Errorf("Object %s has no name", obj.GetObjectKind().GroupVersionKind().String())
+var (
+	ErrDescribeNil = fmt.Errorf("cannot describe nil object")
+)
+
+func ApplyState(ctx context.Context, cli k8sclient.Client, objState objectstate.ObjectState) (k8sclient.Object, bool, error) {
+	if !objState.IsCreateOrUpdate() { // delete requested
+		// `objState.Desired` should be assumed `nil` in this branch and never be used
+		if objState.IsNotFoundError() { // and nothing found: nothing to do
+			return nil, false, nil
+		}
+		if objState.Existing == nil {
+			err := fmt.Errorf("inconsistent internal state: delete desired, but nil existing object")
+			klog.ErrorS(err, "applyState")
+			return nil, false, err
+		}
+		objDesc, _ := describeObject(objState.Existing)
+		klog.InfoS("deleting", "object", objDesc)
+
+		err := cli.Delete(ctx, objState.Existing)
+		if err != nil {
+			err = errors.Wrapf(err, "could not delete object %s", objDesc)
+			return nil, false, err
+		}
+		klog.InfoS("deleted", "object", objDesc)
+		return objState.Existing, true, nil
 	}
-	gvk := obj.GetObjectKind().GroupVersionKind()
-	// used for logging and errors
-	return fmt.Sprintf("(%s) %s/%s", gvk.String(), namespace, name), nil
+	return ApplyObject(ctx, cli, objState)
 }
 
 func ApplyObject(ctx context.Context, cli k8sclient.Client, objState objectstate.ObjectState) (k8sclient.Object, bool, error) {
+	// both `objState.Existing` and `objState.Desired` are assumed not-nil
 	objDesc, _ := describeObject(objState.Desired)
 
 	if objState.IsNotFoundError() {
 		klog.InfoS("creating", "object", objDesc)
 		err := cli.Create(ctx, objState.Desired)
 		if err != nil {
+			err = errors.Wrapf(err, "could not create object %s", objDesc)
 			return nil, false, err
 		}
 		klog.InfoS("created", "object", objDesc)
@@ -70,4 +90,18 @@ func ApplyObject(ctx context.Context, cli k8sclient.Client, objState objectstate
 		updated = true
 	}
 	return merged, updated, nil
+}
+
+func describeObject(obj k8sclient.Object) (string, error) {
+	if obj == nil {
+		return "", ErrDescribeNil
+	}
+	name := obj.GetName()
+	namespace := obj.GetNamespace()
+	if name == "" {
+		return "", fmt.Errorf("Object %s has no name", obj.GetObjectKind().GroupVersionKind().String())
+	}
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	// used for logging and errors
+	return fmt.Sprintf("(%s) %s/%s", gvk.String(), namespace, name), nil
 }

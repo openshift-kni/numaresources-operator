@@ -18,12 +18,14 @@ package apply
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -131,16 +133,209 @@ func TestApplyObject(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(tc.objectState.Existing).Build()
-		obj, gotApplied, err := ApplyObject(context.TODO(), fakeClient, tc.objectState)
-		if err != nil {
-			t.Errorf("%q failed to apply object with error: %v", tc.name, err)
-		}
-		if gotApplied != tc.expectApplied {
-			t.Errorf("%q failed to apply: got=%v expected=%v", tc.name, gotApplied, tc.expectApplied)
-		}
-		if diff := cmp.Diff(obj, tc.objectState.Desired); diff != "" {
-			t.Errorf("%q failed to set object into its desired state, diff %v", tc.name, diff)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(tc.objectState.Existing).Build()
+			obj, gotApplied, err := ApplyObject(context.TODO(), fakeClient, tc.objectState)
+			if err != nil {
+				t.Errorf("%q failed to apply object with error: %v", tc.name, err)
+			}
+			if gotApplied != tc.expectApplied {
+				t.Errorf("%q failed to apply: got=%v expected=%v", tc.name, gotApplied, tc.expectApplied)
+			}
+			if diff := cmp.Diff(obj, tc.objectState.Desired); diff != "" {
+				t.Errorf("%q failed to set object into its desired state, diff %v", tc.name, diff)
+			}
+		})
+	}
+}
+
+func TestApplyState(t *testing.T) {
+	type testCase struct {
+		name                   string
+		objectState            objectstate.ObjectState
+		scratch                client.Object
+		expectCreatedOrUpdated bool
+		expectDeleted          bool
+		expectSkip             bool
+	}
+
+	testCases := []testCase{
+		{
+			name: "configmap state update",
+			objectState: objectstate.ObjectState{
+				Existing: cmExist,
+				Desired:  mutateCM(cmExist),
+				Compare:  compare.Object,
+				Merge:    merge.MetadataForUpdate,
+			},
+			scratch:                &corev1.ConfigMap{},
+			expectCreatedOrUpdated: true,
+		},
+		{
+			name: "daemonset state update",
+			objectState: objectstate.ObjectState{
+				Existing: dsExist,
+				Desired:  mutateDS(dsExist),
+				Compare:  compare.Object,
+				Merge:    merge.MetadataForUpdate,
+			},
+			scratch:                &appsv1.DaemonSet{},
+			expectCreatedOrUpdated: true,
+		},
+		{
+			name: "configmap state update",
+			objectState: objectstate.ObjectState{
+				Existing: cmExist,
+				Desired:  mutateCM(cmExist),
+				Compare:  compare.Object,
+				Merge:    merge.MetadataForUpdate,
+			},
+			scratch:                &corev1.ConfigMap{},
+			expectCreatedOrUpdated: true,
+		},
+
+		{
+			name: "daemonset state update skip",
+			objectState: objectstate.ObjectState{
+				Existing: dsExist,
+				Desired:  dsExist,
+				Compare:  compare.Object,
+				Merge:    merge.MetadataForUpdate,
+			},
+			scratch:    &appsv1.DaemonSet{},
+			expectSkip: true,
+		},
+		{
+			name: "configmap state delete",
+			objectState: objectstate.ObjectState{
+				Existing: cmExist,
+				Desired:  nil,
+				Compare:  compare.Object,
+				Merge:    merge.MetadataForUpdate,
+			},
+			scratch:       &corev1.ConfigMap{},
+			expectDeleted: true,
+		},
+		{
+			name: "daemonset state update",
+			objectState: objectstate.ObjectState{
+				Existing: dsExist,
+				Desired:  nil,
+				Compare:  compare.Object,
+				Merge:    merge.MetadataForUpdate,
+			},
+			scratch:       &appsv1.DaemonSet{},
+			expectDeleted: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(tc.objectState.Existing).Build()
+			obj, done, err := ApplyState(context.TODO(), fakeClient, tc.objectState)
+			if err != nil {
+				t.Errorf("%q failed to apply object with error: %v", tc.name, err)
+			}
+			if tc.expectCreatedOrUpdated {
+				if !done {
+					t.Errorf("%q failed to apply: done=false", tc.name)
+				}
+				err := fakeClient.Get(context.Background(), client.ObjectKeyFromObject(tc.objectState.Desired), tc.scratch)
+				if err != nil {
+					t.Errorf("%q failed to get back desired object: %v", tc.name, err)
+				}
+				if diff := cmp.Diff(obj, tc.objectState.Desired); diff != "" {
+					t.Errorf("%q failed to set object into its desired state, diff %v", tc.name, diff)
+				}
+				if diff := cmp.Diff(obj, tc.scratch); diff != "" {
+					t.Errorf("%q failed to set object into its desired state, diff %v", tc.name, diff)
+				}
+			} else if tc.expectSkip {
+				if done {
+					t.Errorf("%q failed to skip: done=true", tc.name)
+				}
+				err := fakeClient.Get(context.Background(), client.ObjectKeyFromObject(tc.objectState.Desired), tc.scratch)
+				if err != nil {
+					t.Errorf("%q failed to get back desired object: %v", tc.name, err)
+				}
+				if diff := cmp.Diff(obj, tc.objectState.Desired); diff != "" {
+					t.Errorf("%q failed to set object into its desired state, diff %v", tc.name, diff)
+				}
+				if diff := cmp.Diff(obj, tc.scratch); diff != "" {
+					t.Errorf("%q failed to set object into its desired state, diff %v", tc.name, diff)
+				}
+			} else if tc.expectDeleted {
+				if !done {
+					t.Errorf("%q failed to apply: done=false", tc.name)
+				}
+				err := fakeClient.Get(context.Background(), client.ObjectKeyFromObject(tc.objectState.Existing), tc.scratch)
+				if err == nil || !apierrors.IsNotFound(err) {
+					t.Errorf("%q get succeeded, it should have failed: %v", tc.name, err)
+				}
+			} else {
+				t.Fatalf("inconsistent action in %q", tc.name)
+			}
+		})
+	}
+}
+
+func Test_describeObject(t *testing.T) {
+	type testCase struct {
+		name      string
+		obj       client.Object
+		expString string
+		expError  error
+	}
+
+	testCases := []testCase{
+		{
+			name:     "nil object",
+			expError: ErrDescribeNil,
+		},
+		{
+			name: "nameless object",
+			obj: &corev1.Namespace{ // using namespace for simplicity, any object is fine
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Namespace",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{},
+			},
+			expError: fmt.Errorf("Object /v1, Kind=Namespace has no name"),
+		},
+		{
+			name: "good object",
+			obj: &corev1.Namespace{ // using namespace for simplicity, any object is fine
+				TypeMeta: metav1.TypeMeta{
+					Kind:       "Namespace",
+					APIVersion: "v1",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-ns",
+				},
+			},
+			expString: "(/v1, Kind=Namespace) /test-ns",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := describeObject(tc.obj)
+			gotErr := (err != nil)
+			expErr := (tc.expError != nil)
+			if gotErr != expErr {
+				if !gotErr && expErr {
+					t.Fatalf("expected error, got none")
+				} else if gotErr && !expErr {
+					t.Fatalf("expected no error, got one")
+				}
+			} else if expErr {
+				if err.Error() != tc.expError.Error() {
+					t.Fatalf("got error %v expected %v", err, tc.expError)
+				}
+			} else if got != tc.expString {
+				t.Fatalf("got desc {%q} expected {%q}", got, tc.expString)
+			}
+		})
 	}
 }
