@@ -133,35 +133,30 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	if req.Name != objectnames.DefaultNUMAResourcesOperatorCrName {
 		message := fmt.Sprintf("incorrect NUMAResourcesOperator resource name: %s", instance.Name)
-		return r.updateStatus(ctx, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, message)
+		return r.setStatusDegraded(ctx, instance, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, message)
 	}
 
 	nropv1.NormalizeSpec(&instance.Spec)
 	// can't be API normalization because the value is dynamic
 	normalizeSpecVerboseFromRuntime(&instance.Spec, r.Verbose)
 
-	// do as early as possible, so we don't miss log messages
-	if verb := *instance.Spec.Verbose; verb != r.Verbose {
-		err := intkloglevel.Set(klog.Level(verb))
-		if err != nil {
-			klog.InfoS("cannot updated log level dynamically", "desiredLevel", verb)
-		} else {
-			r.Verbose = verb
-		}
-	}
+	// validation step. This is not expected to fail often, hence log messages, if any, needs to be loud
+	// regardless by verbosiness value, including the value dynamically set.
 
 	if err := validation.NodeGroups(instance.Spec.NodeGroups); err != nil {
-		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
+		return r.setStatusDegraded(ctx, instance, validation.NodeGroupsError, err.Error())
 	}
 
 	trees, err := getTreesByNodeGroup(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
-		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
+		return r.setStatusDegraded(ctx, instance, validation.NodeGroupsError, err.Error())
 	}
 
 	if err := validation.MachineConfigPoolDuplicates(trees); err != nil {
-		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
+		return r.setStatusDegraded(ctx, instance, validation.NodeGroupsError, err.Error())
 	}
+
+	oldStatus := instance.Status.DeepCopy()
 
 	for idx := range trees {
 		conf := trees[idx].NodeGroup.NormalizeConfig()
@@ -169,37 +164,40 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
-	if condition != "" || instance.Status.Verbose != r.Verbose {
-		// TODO: use proper reason
-		reason, message := condition, messageFromError(err)
-		_, _ = r.updateStatus(ctx, instance, condition, reason, message)
+
+	reason, message := condition, messageFromError(err)
+	instance.Status.Conditions = status.NewConditions(condition, reason, message)
+
+	if !status.IsNUMAResourcesChanged(&instance.Status, oldStatus) {
+		// nothing to do!
+		return ctrl.Result{}, nil
 	}
+
+	err = r.Status().Update(ctx, instance)
+	if err != nil {
+		klog.InfoS("Failed to update numaresourcesoperator status", "condition", condition, "reason", reason, "message", message)
+		return ctrl.Result{}, err
+	}
+
+	klog.InfoS("updateStatus", "condition", condition, "reason", reason, "message", message)
 	return result, err
 }
 
-func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (ctrl.Result, error) {
-	klog.InfoS("updateStatus", "condition", condition, "reason", reason, "message", message)
+func (r *NUMAResourcesOperatorReconciler) setStatusDegraded(ctx context.Context, instance *nropv1.NUMAResourcesOperator, reason string, message string) (ctrl.Result, error) {
+	cond := status.ConditionDegraded
+	klog.InfoS("updateStatus", "condition", cond, "reason", reason, "message", message)
 
-	if _, err := updateStatus(ctx, r.Client, instance, condition, reason, message); err != nil {
-		klog.InfoS("Failed to update numaresourcesoperator status", "Desired condition", status.ConditionDegraded, "error", err)
+	instance.Status.Conditions = status.NewConditions(cond, reason, message)
+
+	err := r.Status().Update(ctx, instance)
+	if err != nil {
+		klog.InfoS("Failed to update numaresourcesoperator status", "Desired condition", cond, "object", client.ObjectKeyFromObject(instance))
 		return ctrl.Result{}, err
 	}
+
 	// we do not return an error here because to pass the validation error a user will need to update NRO CR
 	// that will anyway initiate to reconcile loop
 	return ctrl.Result{}, nil
-}
-
-func updateStatus(ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
-	conditions, ok := status.GetUpdatedConditions(instance.Status.Conditions, condition, reason, message)
-	if !ok {
-		return false, nil
-	}
-	instance.Status.Conditions = conditions
-
-	if err := cli.Status().Update(ctx, instance); err != nil {
-		return false, errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(instance))
-	}
-	return true, nil
 }
 
 func messageFromError(err error) string {
@@ -213,6 +211,20 @@ func messageFromError(err error) string {
 	return unwErr.Error()
 }
 
+func (r *NUMAResourcesOperatorReconciler) reconcileInternal(ctx context.Context, instance *nropv1.NUMAResourcesOperator) {
+	// do as early as possible, but always after validation so we don't miss log messages
+	if verb := *instance.Spec.Verbose; verb != r.Verbose {
+		err := intkloglevel.Set(klog.Level(verb))
+		if err != nil {
+			klog.InfoS("cannot updated log level dynamically", "desiredLevel", verb)
+		} else {
+			r.Verbose = verb
+		}
+	}
+
+	instance.Status.Verbose = r.Verbose
+}
+
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
 	applied, err := r.syncNodeResourceTopologyAPI(ctx)
 	if err != nil {
@@ -222,7 +234,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Conte
 	if applied {
 		r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulCRDInstall", "Node Resource Topology CRD installed")
 	}
-	return false, ctrl.Result{}, "", nil
+	return false, ctrl.Result{}, status.ConditionAvailable, nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
@@ -245,7 +257,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 	}
 
 	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
-	return false, ctrl.Result{}, "", nil
+	return false, ctrl.Result{}, status.ConditionAvailable, nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
@@ -255,7 +267,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 		return true, ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedRTESync")
 	}
 	if len(daemonSetsInfo) == 0 {
-		return false, ctrl.Result{}, "", nil
+		return false, ctrl.Result{}, status.ConditionAvailable, nil
 	}
 
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
@@ -263,7 +275,6 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, daemonSetsInfo)
 	instance.Status.DaemonSets = dsStatuses
 	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dsStatuses)
-	instance.Status.Verbose = r.Verbose
 	if err != nil {
 		return true, ctrl.Result{}, status.ConditionDegraded, err
 	}
@@ -271,10 +282,13 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 		return true, ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
 	}
 
-	return false, ctrl.Result{}, "", nil
+	return false, ctrl.Result{}, status.ConditionAvailable, nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, string, error) {
+	// can't fail currently
+	r.reconcileInternal(ctx, instance)
+
 	if done, res, cond, err := r.reconcileResourceAPI(ctx, instance, trees); done {
 		return res, cond, err
 	}

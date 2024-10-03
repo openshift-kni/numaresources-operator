@@ -23,6 +23,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
 // TODO: are we duping these?
@@ -37,6 +39,15 @@ const (
 	ConditionTypeIncorrectNUMAResourcesOperatorResourceName = "IncorrectNUMAResourcesOperatorResourceName"
 	ConditionTypeInternalError                              = "Internal Error"
 )
+
+func IsNUMAResourcesChanged(newStatus, oldStatus *nropv1.NUMAResourcesOperatorStatus) bool {
+	options := []cmp.Option{
+		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime"),
+		cmpopts.IgnoreFields(metav1.Condition{}, "ObservedGeneration"),
+	}
+
+	return cmp.Equal(newStatus, oldStatus, options...)
+}
 
 func GetUpdatedConditions(currentConditions []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
 	conditions := NewConditions(condition, reason, message)
