@@ -36,7 +36,7 @@ func TestUpdate(t *testing.T) {
 		t.Errorf("nropv1.AddToScheme() failed with: %v", err)
 	}
 
-	nro := testobjs.NewNUMAResourcesOperator("test-nro", nil)
+	nro := testobjs.NewNUMAResourcesOperator("test-nro")
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(nro).Build()
 
 	nro.Status.Conditions, _ = GetUpdatedConditions(nro.Status.Conditions, ConditionProgressing, "testReason", "test message")
@@ -64,7 +64,7 @@ func TestUpdateIfNeeded(t *testing.T) {
 		t.Errorf("nropv1.AddToScheme() failed with: %v", err)
 	}
 
-	nro := testobjs.NewNUMAResourcesOperator("test-nro", nil)
+	nro := testobjs.NewNUMAResourcesOperator("test-nro")
 
 	var ok bool
 	nro.Status.Conditions, ok = GetUpdatedConditions(nro.Status.Conditions, ConditionAvailable, "", "")

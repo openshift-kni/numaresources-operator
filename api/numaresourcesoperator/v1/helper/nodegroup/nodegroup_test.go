@@ -185,6 +185,47 @@ func TestFindTrees(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "node group with PoolName and MachineConfigPoolSelector in another node group",
+			mcps: &mcpList,
+			ngs: []nropv1.NodeGroup{
+				{
+					PoolName: &mcpList.Items[0].Name,
+				},
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"mcp-label-3": "test3",
+						},
+					},
+				},
+			},
+			expected: []Tree{
+				{
+					MachineConfigPools: []*mcov1.MachineConfigPool{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "mcp1",
+							},
+						},
+					},
+				},
+				{
+					MachineConfigPools: []*mcov1.MachineConfigPool{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "mcp3",
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "mcp5",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -203,9 +244,9 @@ func TestFindTrees(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error checking backward compat: %v", err)
 			}
-			compatNames := mcpNamesFromList(gotMcps)
-			if !reflect.DeepEqual(gotNames, compatNames) {
-				t.Errorf("Trees mismatch (non backward compatible): got=%v compat=%v", gotNames, compatNames)
+			compatibleNames := mcpNamesFromList(gotMcps)
+			if !containsSliceItems(gotNames, compatibleNames) {
+				t.Errorf("Trees mismatch (non backward compatible): got=%v compat=%v", gotNames, compatibleNames)
 			}
 		})
 	}
@@ -419,4 +460,52 @@ func findListByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1
 	}
 
 	return result, nil
+}
+
+func TestContainsSliceItems(t *testing.T) {
+	testcases := []struct {
+		name     string
+		a        []string
+		b        []string
+		expected bool
+	}{
+		{
+			name:     "b empty",
+			a:        []string{"1", "2", "3", "4", "5", "4"},
+			b:        []string{},
+			expected: true,
+		},
+		{
+			name:     "a,b empty",
+			a:        []string{},
+			b:        []string{},
+			expected: true,
+		},
+		{
+			name:     "a empty",
+			a:        []string{},
+			b:        []string{"1", "2", "3", "4", "5", "4"},
+			expected: false,
+		},
+		{
+			name:     "a contains b's elements",
+			a:        []string{"1", "2", "3", "4", "5", "4"},
+			b:        []string{"1", "4", "3", "1"},
+			expected: true,
+		},
+		{
+			name:     "a doesn't contains all b's elements",
+			a:        []string{"1", "2", "3", "4", "5", "4"},
+			b:        []string{"1", "4", "3", "7"},
+			expected: false,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := containsSliceItems(tc.a, tc.b)
+			if got != tc.expected {
+				t.Errorf("expected %v, got %v", tc.expected, got)
+			}
+		})
+	}
 }

@@ -29,14 +29,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
-func NewNUMAResourcesOperator(name string, labelSelectors []*metav1.LabelSelector) *nropv1.NUMAResourcesOperator {
-	var nodeGroups []nropv1.NodeGroup
-	for _, selector := range labelSelectors {
-		nodeGroups = append(nodeGroups, nropv1.NodeGroup{
-			MachineConfigPoolSelector: selector,
-		})
-	}
-
+func NewNUMAResourcesOperator(name string, nodeGroups ...nropv1.NodeGroup) *nropv1.NUMAResourcesOperator {
 	return &nropv1.NUMAResourcesOperator{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NUMAResourcesOperator",
@@ -169,4 +162,15 @@ func NamespaceLabels() map[string]string {
 		"pod-security.kubernetes.io/warn":                "privileged",
 		"security.openshift.io/scc.podSecurityLabelSync": "false",
 	}
+}
+
+func GetDaemonSetListFromNodeGroupStatuses(groups []nropv1.NodeGroupStatus) []nropv1.NamespacedName {
+	dss := []nropv1.NamespacedName{}
+	for _, group := range groups {
+		if group.DaemonSet == nil {
+			continue
+		}
+		dss = append(dss, *group.DaemonSet)
+	}
+	return dss
 }
