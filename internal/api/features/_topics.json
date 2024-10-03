@@ -18,6 +18,7 @@
     "tmpol",
     "schedattrwatch",
     "ngpoolname",
-    "nganns"
+    "nganns",
+    "opverbctl"
   ]
 }
