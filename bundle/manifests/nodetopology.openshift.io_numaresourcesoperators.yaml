@@ -48,7 +48,7 @@ spec:
               logLevel:
                 default: Normal
                 description: |-
-                  Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+                  RTE log verbosity. Valid values are: "Normal", "Debug", "Trace", "TraceAll".
                   Defaults to "Normal".
                 enum:
                 - ""
@@ -213,6 +213,9 @@ spec:
                       type: string
                   type: object
                 type: array
+              verbose:
+                description: Operator verbosity value, set the same way as the commandline
+                type: integer
             type: object
           status:
             description: NUMAResourcesOperatorStatus defines the observed state of
@@ -548,6 +551,11 @@ spec:
                   - resource
                   type: object
                 type: array
+              verbose:
+                description: Verbose is the current log verbosity of the operator.
+                type: integer
+            required:
+            - verbose
             type: object
         type: object
     served: true

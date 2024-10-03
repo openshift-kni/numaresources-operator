@@ -29,6 +29,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	//+kubebuilder:scaffold:imports
@@ -44,6 +45,7 @@ var k8sClient client.Client
 var testEnv *envtest.Environment
 
 func TestNUMAResourcesOperatorControllers(t *testing.T) {
+	klog.InitFlags(nil) // needed by `feature:opverbctl`
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Controller Suite")
 }

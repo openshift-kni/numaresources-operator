@@ -53,6 +53,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
+	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
@@ -1120,6 +1121,106 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
 				Expect(nro).To(BeDegradedWithReason(validation.NodeGroupsError))
+			})
+		})
+
+		When("the verbosiness level is updated at runtime", Label("feature:opverbctl"), func() {
+			var conf nropv1.NodeGroupConfig
+			var labSel metav1.LabelSelector
+			var mcp *machineconfigv1.MachineConfigPool
+			var pn string
+
+			BeforeEach(func() {
+				pn = "test"
+
+				labSel = metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						pn: pn,
+					},
+				}
+
+				mcp = testobjs.NewMachineConfigPool(pn, labSel.MatchLabels, &labSel, &labSel)
+
+				conf = nropv1.DefaultNodeGroupConfig()
+			})
+
+			It("should report the current level in status", func() {
+				klogV, err := intkloglevel.Get()
+				Expect(err).ToNot(HaveOccurred())
+
+				nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
+				nroKey := client.ObjectKeyFromObject(nro)
+
+				var reconciler *NUMAResourcesOperatorReconciler
+				if platf == platform.HyperShift {
+					reconciler = reconcileObjectsHypershift(nro)
+				} else {
+					reconciler = reconcileObjectsOpenshift(nro, mcp)
+				}
+				reconciler.Verbose = int(klogV) // simulates initialization from command line
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
+
+				By("Check status is updated")
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &updatedNRO)).To(Succeed())
+				Expect(updatedNRO.Status.Verbose).To(Equal(int(klogV)))
+			})
+
+			It("should report a custom explicit value in status", func() {
+				verbLevel := 4
+
+				nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
+				nroKey := client.ObjectKeyFromObject(nro)
+
+				var reconciler *NUMAResourcesOperatorReconciler
+				if platf == platform.HyperShift {
+					reconciler = reconcileObjectsHypershift(nro)
+				} else {
+					reconciler = reconcileObjectsOpenshift(nro, mcp)
+				}
+				reconciler.Verbose = verbLevel // simulates initialization from command line
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
+
+				By("Check status is updated")
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &updatedNRO)).To(Succeed())
+				Expect(updatedNRO.Status.Verbose).To(Equal(verbLevel))
+			})
+
+			It("should allow to change the level dynamically", func() {
+				verbLevel := 2
+
+				nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
+				nroKey := client.ObjectKeyFromObject(nro)
+
+				var reconciler *NUMAResourcesOperatorReconciler
+				if platf == platform.HyperShift {
+					reconciler = reconcileObjectsHypershift(nro)
+				} else {
+					reconciler = reconcileObjectsOpenshift(nro, mcp)
+				}
+				reconciler.Verbose = verbLevel // simulates initialization from command line
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
+
+				By("Check status is updated at runtime")
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &updatedNRO)).To(Succeed())
+				Expect(updatedNRO.Status.Verbose).To(Equal(verbLevel))
+
+				verbLevel = 4
+				updatedNRO.Spec.Verbose = &verbLevel
+				Expect(reconciler.Client.Update(context.TODO(), &updatedNRO)).NotTo(HaveOccurred())
+				// immediate update reflection with no reboot needed -> no need to reconcile after this
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
+
+				By("Check status is updated at runtime")
+				var updatedNROVerb nropv1.NUMAResourcesOperator
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &updatedNROVerb)).To(Succeed())
+				Expect(updatedNROVerb.Status.Verbose).To(Equal(verbLevel))
+				Expect(reconciler.Verbose).To(Equal(verbLevel))
 			})
 		})
 	},
