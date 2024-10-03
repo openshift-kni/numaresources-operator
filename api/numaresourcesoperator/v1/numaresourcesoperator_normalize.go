@@ -20,7 +20,16 @@ import (
 	"sort"
 
 	corev1 "k8s.io/api/core/v1"
+
+	operatorv1 "github.com/openshift/api/operator/v1"
 )
+
+func NormalizeSpec(spec *NUMAResourcesOperatorSpec) {
+	defaultLog := operatorv1.Normal
+	if spec.LogLevel == "" {
+		spec.LogLevel = defaultLog
+	}
+}
 
 func (nodeGroup NodeGroup) NormalizeConfig() NodeGroupConfig {
 	conf := DefaultNodeGroupConfig()

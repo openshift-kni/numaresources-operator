@@ -63,6 +63,8 @@ import (
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
+
+	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 )
 
 const numaResourcesRetryPeriod = 1 * time.Minute
@@ -79,6 +81,7 @@ type NUMAResourcesOperatorReconciler struct {
 	ImagePullPolicy corev1.PullPolicy
 	Recorder        record.EventRecorder
 	ForwardMCPConds bool
+	Verbose         int
 }
 
 // TODO: narrow down
@@ -133,6 +136,20 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, message)
 	}
 
+	nropv1.NormalizeSpec(&instance.Spec)
+	// can't be API normalization because the value is dynamic
+	normalizeSpecVerboseFromRuntime(&instance.Spec, r.Verbose)
+
+	// do as early as possible, so we don't miss log messages
+	if verb := *instance.Spec.Verbose; verb != r.Verbose {
+		err := intkloglevel.Set(klog.Level(verb))
+		if err != nil {
+			klog.InfoS("cannot updated log level dynamically", "desiredLevel", verb)
+		} else {
+			r.Verbose = verb
+		}
+	}
+
 	if err := validation.NodeGroups(instance.Spec.NodeGroups); err != nil {
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
 	}
@@ -152,7 +169,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
-	if condition != "" {
+	if condition != "" || instance.Status.Verbose != r.Verbose {
 		// TODO: use proper reason
 		reason, message := condition, messageFromError(err)
 		_, _ = r.updateStatus(ctx, instance, condition, reason, message)
@@ -246,6 +263,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 	dsStatuses, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, daemonSetsInfo)
 	instance.Status.DaemonSets = dsStatuses
 	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dsStatuses)
+	instance.Status.Verbose = r.Verbose
 	if err != nil {
 		return true, ctrl.Result{}, status.ConditionDegraded, err
 	}
@@ -771,4 +789,11 @@ func getTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nr
 		return nil, err
 	}
 	return nodegroupv1.FindTrees(mcps, nodeGroups)
+}
+
+func normalizeSpecVerboseFromRuntime(spec *nropv1.NUMAResourcesOperatorSpec, verb int) {
+	if spec.Verbose != nil {
+		return
+	}
+	spec.Verbose = &verb
 }

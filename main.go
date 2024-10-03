@@ -259,6 +259,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// the only way this can change from the command line is to restart, so fetching once is the best option
+	verb, err := intkloglevel.Get()
+	if err != nil {
+		klog.ErrorS(err, "unable to acquire verbosiness level", "controller", "NUMAResourcesOperator")
+		os.Exit(1)
+	}
+
 	if err = (&controllers.NUMAResourcesOperatorReconciler{
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
@@ -270,6 +277,7 @@ func main() {
 		ImagePullPolicy: pullPolicy,
 		Namespace:       namespace,
 		ForwardMCPConds: params.enableMCPCondsForward,
+		Verbose:         int(verb),
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesOperator")
 		os.Exit(1)

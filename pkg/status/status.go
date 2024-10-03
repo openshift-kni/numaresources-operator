@@ -35,6 +35,7 @@ const (
 
 const (
 	ConditionTypeIncorrectNUMAResourcesOperatorResourceName = "IncorrectNUMAResourcesOperatorResourceName"
+	ConditionTypeInternalError                              = "Internal Error"
 )
 
 func GetUpdatedConditions(currentConditions []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
