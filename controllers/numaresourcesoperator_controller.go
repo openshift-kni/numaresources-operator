@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -164,9 +163,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
 	if condition != "" {
-		// TODO: use proper reason
-		reason, message := condition, messageFromError(err)
-		_, _ = r.updateStatus(ctx, instance, condition, reason, message)
+		_, _ = r.updateStatus(ctx, instance, condition, reasonFromError(err), messageFromError(err))
 	}
 	return result, err
 }
@@ -194,17 +191,6 @@ func updateStatus(ctx context.Context, cli client.Client, instance *nropv1.NUMAR
 		return false, fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(instance), err)
 	}
 	return true, nil
-}
-
-func messageFromError(err error) string {
-	if err == nil {
-		return ""
-	}
-	unwErr := errors.Unwrap(err)
-	if unwErr == nil {
-		return ""
-	}
-	return unwErr.Error()
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
