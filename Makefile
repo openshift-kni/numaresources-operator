@@ -145,23 +145,23 @@ binary: build-tools
 	LDFLAGS="-s -w "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)"; \
-	go build -mod=vendor -o bin/manager -ldflags "$$LDFLAGS" main.go
+	go build -mod=vendor -o bin/manager -ldflags "$$LDFLAGS" -tags "$$GOTAGS" main.go
 
 binary-rte: build-tools
 	LDFLAGS="-s -w "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)"; \
-	go build -mod=vendor -o bin/exporter -ldflags "$$LDFLAGS" rte/main.go
+	go build -mod=vendor -o bin/exporter -ldflags "$$LDFLAGS" -tags "$$GOTAGS" rte/main.go
 
 binary-nrovalidate: build-tools
 	LDFLAGS="-s -w "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
-	go build -mod=vendor -o bin/nrovalidate -ldflags "$$LDFLAGS" cmd/nrovalidate/main.go
+	go build -mod=vendor -o bin/nrovalidate -ldflags "$$LDFLAGS" -tags "$$GOTAGS" cmd/nrovalidate/main.go
 
 binary-nrtcacheck: build-tools
 	LDFLAGS="-s -w "; \
 	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
-	go build -mod=vendor -o bin/nrtcacheck -ldflags "$$LDFLAGS" cmd/nrtcacheck/main.go
+	go build -mod=vendor -o bin/nrtcacheck -ldflags "$$LDFLAGS" -tags "$$GOTAGS" cmd/nrtcacheck/main.go
 
 binary-numacell: build-tools
 	LDFLAGS="-s -w "; \
