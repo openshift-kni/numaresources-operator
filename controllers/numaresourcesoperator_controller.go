@@ -152,14 +152,26 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
-	if condition != "" {
-		_, _ = r.updateStatus(ctx, instance, condition, reasonFromError(err), err)
+
+	ok := updateStatusConditionsIfNeeded(instance, condition, reasonFromError(err), messageFromError(err))
+	if !ok {
+		return result, err
 	}
+
+	updErr := r.Client.Status().Update(ctx, instance)
+	if updErr != nil {
+		klog.InfoS("Failed to update numaresourcesoperator status", "error", updErr)
+		return ctrl.Result{}, errors.Wrapf(updErr, "could not update status for object %s", client.ObjectKeyFromObject(instance))
+	}
+
 	return result, err
 }
 
 // updateStatusConditionsIfNeeded returns true if conditions were updated.
 func updateStatusConditionsIfNeeded(instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) bool {
+	if condition == "" {
+		return false
+	}
 	klog.InfoS("updateStatus", "condition", condition, "reason", reason, "message", message)
 	conditions, ok := status.UpdateConditions(instance.Status.Conditions, condition, reason, message)
 	if !ok {
