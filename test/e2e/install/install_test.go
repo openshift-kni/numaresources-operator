@@ -34,6 +34,7 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
@@ -132,6 +133,13 @@ var _ = Describe("[Install] continuousIntegration", func() {
 				}
 				return true
 			}).WithTimeout(1*time.Minute).WithPolling(5*time.Second).Should(BeTrue(), "DaemonSet Status was not correct")
+
+			By("checking DaemonSet pods are running with correct SELinux context")
+			ds, err := getDaemonSetByOwnerReference(updatedNROObj.UID)
+			Expect(err).NotTo(HaveOccurred())
+			rteContainer, err := findContainerByName(*ds, containerNameRTE)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(rteContainer.SecurityContext.SELinuxOptions.Type).To(Equal(selinux.RTEContextType), "container %s is running with wrong selinux context", rteContainer.Name)
 		})
 	})
 })
