@@ -140,22 +140,22 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	if req.Name != objectnames.DefaultNUMAResourcesOperatorCrName {
 		err := fmt.Errorf("incorrect NUMAResourcesOperator resource name: %s", instance.Name)
-		return r.updateStatus(ctx, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, err)
+		return r.degradeStatus(ctx, instance, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, err)
 	}
 
 	if err := validation.NodeGroups(instance.Spec.NodeGroups); err != nil {
-		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
+		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
 	}
 
 	trees, err := getTreesByNodeGroup(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
-		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
+		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
 	}
 
 	multiMCPsErr := validation.MultipleMCPsPerTree(instance.Annotations, trees)
 
 	if err := validation.MachineConfigPoolDuplicates(trees); err != nil {
-		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
+		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
 	}
 
 	for idx := range trees {
@@ -168,7 +168,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	_ = updateStatusConditionsIfNeeded(instance, condition, reasonFromError(err), messageFromError(err))
 
 	if condition == status.ConditionAvailable && multiMCPsErr != nil {
-		_, _ = r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, multiMCPsErr)
+		_, _ = r.degradeStatus(ctx, instance, validation.NodeGroupsError, multiMCPsErr)
 	}
 
 	updErr := r.Client.Status().Update(ctx, instance)
@@ -193,10 +193,11 @@ func updateStatusConditionsIfNeeded(instance *nropv1.NUMAResourcesOperator, cond
 	return ok
 }
 
-func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, instance *nropv1.NUMAResourcesOperator, condition string, reason string, stErr error) (ctrl.Result, error) {
+func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, instance *nropv1.NUMAResourcesOperator, reason string, stErr error) (ctrl.Result, error) {
 	message := messageFromError(stErr)
 
-	_ = updateStatusConditionsIfNeeded(instance, condition, reason, message)
+	_ = updateStatusConditionsIfNeeded(instance, status.ConditionDegraded, reason, message)
+	// TODO: if we keep being degraded, we likely (= if we don't, it's too implicit) keep sending possibly redundant updates to the apiserver
 
 	err := r.Client.Status().Update(ctx, instance)
 	if err != nil {
