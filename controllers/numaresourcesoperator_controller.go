@@ -181,7 +181,7 @@ func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, inst
 }
 
 func updateStatus(ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
-	conditions, ok := status.GetUpdatedConditions(instance.Status.Conditions, condition, reason, message)
+	conditions, ok := status.UpdateConditions(instance.Status.Conditions, condition, reason, message)
 	if ok {
 		instance.Status.Conditions = conditions
 	}
