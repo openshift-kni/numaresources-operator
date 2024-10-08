@@ -164,18 +164,27 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
-	if condition != "" {
-		if condition == status.ConditionAvailable && multiMCPsErr != nil {
-			_, _ = r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, multiMCPsErr)
-		} else {
-			_, _ = r.updateStatus(ctx, instance, condition, reasonFromError(err), err)
-		}
+
+	_ = updateStatusConditionsIfNeeded(instance, condition, reasonFromError(err), messageFromError(err))
+
+	if condition == status.ConditionAvailable && multiMCPsErr != nil {
+		_, _ = r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, multiMCPsErr)
 	}
+
+	updErr := r.Client.Status().Update(ctx, instance)
+	if updErr != nil {
+		klog.InfoS("Failed to update numaresourcesoperator status", "error", updErr)
+		return ctrl.Result{}, fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(instance), updErr)
+	}
+
 	return result, err
 }
 
 // updateStatusConditionsIfNeeded returns true if conditions were updated.
 func updateStatusConditionsIfNeeded(instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) bool {
+	if condition == "" {
+		return false
+	}
 	klog.InfoS("updateStatus", "condition", condition, "reason", reason, "message", message)
 	conditions, ok := status.UpdateConditions(instance.Status.Conditions, condition, reason, message)
 	if ok {
