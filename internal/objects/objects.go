@@ -27,6 +27,7 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 )
 
 func NewNUMAResourcesOperator(name string, labelSelectors []*metav1.LabelSelector) *nropv1.NUMAResourcesOperator {
@@ -59,6 +60,10 @@ func NewNUMAResourcesOperatorWithNodeGroupConfig(name string, selector *metav1.L
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
+			// add the custom policy to keep the existing test's behavior consistent
+			Annotations: map[string]string{
+				annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
+			},
 		},
 		Spec: nropv1.NUMAResourcesOperatorSpec{
 			NodeGroups: []nropv1.NodeGroup{
@@ -104,6 +109,20 @@ func NewMachineConfigPool(name string, labels map[string]string, machineConfigSe
 			MachineConfigSelector: machineConfigSelector,
 			NodeSelector:          nodeSelector,
 		},
+	}
+}
+
+func NewMachineConfig(name string, labels map[string]string) *machineconfigv1.MachineConfig {
+	return &machineconfigv1.MachineConfig{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "MachineConfig",
+			APIVersion: machineconfigv1.GroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: machineconfigv1.MachineConfigSpec{},
 	}
 }
 

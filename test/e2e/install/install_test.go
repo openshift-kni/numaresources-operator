@@ -34,12 +34,16 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nrowait "github.com/openshift-kni/numaresources-operator/internal/wait"
 
+	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/crds"
@@ -129,6 +133,13 @@ var _ = Describe("[Install] continuousIntegration", func() {
 				}
 				return true
 			}).WithTimeout(1*time.Minute).WithPolling(5*time.Second).Should(BeTrue(), "DaemonSet Status was not correct")
+
+			By("checking DaemonSet pods are running with correct SELinux context")
+			ds, err := getDaemonSetByOwnerReference(updatedNROObj.UID)
+			Expect(err).NotTo(HaveOccurred())
+			rteContainer, err := findContainerByName(*ds, containerNameRTE)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(rteContainer.SecurityContext.SELinuxOptions.Type).To(Equal(selinux.RTEContextType), "container %s is running with wrong selinux context", rteContainer.Name)
 		})
 	})
 })
@@ -194,7 +205,7 @@ var _ = Describe("[Install] durability", func() {
 
 			nroObj := &nropv1.NUMAResourcesOperator{}
 			immediate := true
-			err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, immediate, func(ctx context.Context) (bool, error) {
+			err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 10*time.Minute, immediate, func(ctx context.Context) (bool, error) {
 				err := e2eclient.Client.Get(ctx, nroKey, nroObj)
 				if err != nil {
 					return false, err
@@ -288,7 +299,7 @@ var _ = Describe("[Install] durability", func() {
 			By("checking there are no leftovers")
 			// by taking the ns from the ds we're avoiding the need to figure out in advanced
 			// at which ns we should look for the resources
-			mf, err := rte.GetManifests(configuration.Plat, configuration.PlatVersion, ds.Namespace, true)
+			mf, err := rte.GetManifests(configuration.Plat, configuration.PlatVersion, ds.Namespace, true, true)
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() bool {
@@ -316,7 +327,12 @@ var _ = Describe("[Install] durability", func() {
 			err = e2eclient.Client.Create(context.TODO(), nroObjRedep)
 			Expect(err).ToNot(HaveOccurred())
 
-			deploy.WaitForMCPUpdatedAfterNROCreated(nroObj)
+			if annotations.IsCustomPolicyEnabled(nroObj.Annotations) {
+				mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(deploy.WaitForMCPsCondition(e2eclient.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)).To(Succeed())
+				Expect(deploy.WaitForMCPsCondition(e2eclient.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
+			}
 
 			Eventually(func() bool {
 				updatedNroObj := &nropv1.NUMAResourcesOperator{}

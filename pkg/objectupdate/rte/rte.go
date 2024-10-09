@@ -25,6 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 
+	securityv1 "github.com/openshift/api/security/v1"
+
+	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
@@ -217,6 +220,14 @@ func AddVolumeMountMemory(podSpec *corev1.PodSpec, cnt *corev1.Container, mountN
 			},
 		},
 	)
+}
+
+func SecurityContextConstraint(scc *securityv1.SecurityContextConstraints, legacyRTEContext bool) {
+	if legacyRTEContext {
+		scc.SELinuxContext.SELinuxOptions.Type = selinux.RTEContextTypeLegacy
+		return
+	}
+	scc.SELinuxContext.SELinuxOptions.Type = selinux.RTEContextType
 }
 
 func isPodFingerprintEnabled(conf *nropv1.NodeGroupConfig) (bool, string) {

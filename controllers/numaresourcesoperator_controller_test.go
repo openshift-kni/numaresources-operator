@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -67,7 +68,7 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 		return nil, err
 	}
 
-	rteManifests, err := rtemanifests.GetManifests(plat, platVersion, testNamespace, true)
+	rteManifests, err := rtemanifests.GetManifests(plat, platVersion, testNamespace, false, true)
 	if err != nil {
 		return nil, err
 	}
@@ -149,6 +150,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				{MatchLabels: label1},
 				{MatchLabels: label2},
 			})
+			nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 
 			mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
 			mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
@@ -210,6 +212,41 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			}
 			Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).To(Succeed())
 		})
+		When("NRO updated to remove the custom policy annotation", func() {
+			BeforeEach(func() {
+				// check we have at least two NodeGroups
+				Expect(len(nro.Spec.NodeGroups)).To(BeNumerically(">", 1))
+
+				By("Update NRO to have both NodeGroups")
+				key := client.ObjectKeyFromObject(nro)
+				nro := &nropv1.NUMAResourcesOperator{}
+				Expect(reconciler.Client.Get(context.TODO(), key, nro)).NotTo(HaveOccurred())
+
+				nro.Annotations = map[string]string{}
+				Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
+
+				thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+			})
+			It("should not create a machine config", func() {
+				mc := &machineconfigv1.MachineConfig{}
+
+				// Check mc1 not created
+				mc1Key := client.ObjectKey{
+					Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
+				}
+				err := reconciler.Client.Get(context.TODO(), mc1Key, mc)
+				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s is expected to not be found", mc1Key.String())
+
+				// Check mc1 not created
+				mc2Key := client.ObjectKey{
+					Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
+				}
+				err = reconciler.Client.Get(context.TODO(), mc2Key, mc)
+				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s is expected to not be found", mc2Key.String())
+			})
+		})
 		When("a NodeGroup is deleted", func() {
 			BeforeEach(func() {
 				// check we have at least two NodeGroups
@@ -223,6 +260,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				nro.Spec.NodeGroups = []nropv1.NodeGroup{{
 					MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: label1},
 				}}
+				nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 				Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
 
 				thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
@@ -319,6 +357,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				{MatchLabels: label1},
 				{MatchLabels: label2},
 			})
+			nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 
 			mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
 			mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
@@ -558,6 +597,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						},
 					},
 				}
+				nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 			})
 
 			When("machine config selector matches machine config labels", func() {
@@ -1086,6 +1126,113 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
 			Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(reconciler.RTEManifests.DaemonSet.Spec.Template.Spec.Tolerations), "DS tolerations not restored to defaults")
+		})
+	})
+	Context("emulating upgrade from 4.1X to 4.18 which has a built-in selinux policy for RTE pods", func() {
+		var nro *nropv1.NUMAResourcesOperator
+		var mcp1 *machineconfigv1.MachineConfigPool
+		var mcp2 *machineconfigv1.MachineConfigPool
+
+		var reconciler *NUMAResourcesOperatorReconciler
+		var label1, label2 map[string]string
+
+		BeforeEach(func() {
+			label1 = map[string]string{
+				"test1": "test1",
+			}
+			label2 = map[string]string{
+				"test2": "test2",
+			}
+
+			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
+				{MatchLabels: label1},
+				{MatchLabels: label2},
+			})
+			// reconciling NRO object with custom policy, emulates the old behavior version
+			nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
+
+			mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
+			mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
+
+			var err error
+			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+			Expect(err).ToNot(HaveOccurred())
+
+			key := client.ObjectKeyFromObject(nro)
+			firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+
+			// Ensure mcp1 is ready
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
+			mcp1.Status.Configuration.Source = []corev1.ObjectReference{
+				{
+					Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
+				},
+			}
+			mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+				{
+					Type:   machineconfigv1.MachineConfigPoolUpdated,
+					Status: corev1.ConditionTrue,
+				},
+			}
+			Expect(reconciler.Client.Update(context.TODO(), mcp1)).To(Succeed())
+
+			// ensure mcp2 is ready
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
+			mcp2.Status.Configuration.Source = []corev1.ObjectReference{
+				{
+					Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
+				},
+			}
+			mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+				{
+					Type:   machineconfigv1.MachineConfigPoolUpdated,
+					Status: corev1.ConditionTrue,
+				},
+			}
+			Expect(reconciler.Client.Update(context.TODO(), mcp2)).To(Succeed())
+
+			secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+
+			By("Check DaemonSets are created")
+			mcp1DSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), mcp1DSKey, ds)).ToNot(HaveOccurred())
+
+			mcp2DSKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+				Namespace: testNamespace,
+			}
+			Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).To(Succeed())
+
+			By("upgrading from 4.1X to 4.18")
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nro)).To(Succeed())
+			nro.Annotations = map[string]string{}
+			Expect(reconciler.Client.Update(context.TODO(), nro)).To(Succeed())
+
+			thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+		})
+		It("should delete existing mc", func() {
+			mc1Key := client.ObjectKey{
+				Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
+			}
+			mc := &machineconfigv1.MachineConfig{}
+			err := reconciler.Client.Get(context.TODO(), mc1Key, mc)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s expected to be deleted; err=%v", mc1Key.Name, err)
+
+			mc2Key := client.ObjectKey{
+				Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
+			}
+			err = reconciler.Client.Get(context.TODO(), mc2Key, mc)
+			Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s expected to be deleted; err=%v", mc2Key.Name, err)
 		})
 	})
 })

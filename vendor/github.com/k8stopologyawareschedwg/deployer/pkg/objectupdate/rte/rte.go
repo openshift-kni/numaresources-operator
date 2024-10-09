@@ -174,7 +174,7 @@ func MetricsPort(ds *appsv1.DaemonSet, pNum int) {
 	cntSpec.Ports = cp
 }
 
-func SecurityContext(ds *appsv1.DaemonSet) {
+func SecurityContext(ds *appsv1.DaemonSet, selinuxContextType string) {
 	cntSpec := objectupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, manifests.ContainerNameRTE)
 	if cntSpec == nil {
 		return
@@ -186,7 +186,7 @@ func SecurityContext(ds *appsv1.DaemonSet) {
 		cntSpec.SecurityContext = &corev1.SecurityContext{}
 	}
 	cntSpec.SecurityContext.SELinuxOptions = &corev1.SELinuxOptions{
-		Type:  selinuxassets.RTEContextType,
+		Type:  selinuxContextType,
 		Level: selinuxassets.RTEContextLevel,
 	}
 }

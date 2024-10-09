@@ -211,7 +211,7 @@ func main() {
 		namespace = defaultNamespace
 	}
 
-	rteManifests, err := rtemanifests.GetManifests(clusterPlatform, clusterPlatformVersion, namespace, true)
+	rteManifests, err := rtemanifests.GetManifests(clusterPlatform, clusterPlatformVersion, namespace, false, true)
 	if err != nil {
 		klog.ErrorS(err, "unable to load the RTE manifests")
 		os.Exit(1)

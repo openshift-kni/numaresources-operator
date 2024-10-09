@@ -112,7 +112,7 @@ func PlatformFromClients(ctx context.Context, cvLister ClusterVersionsLister, in
 }
 
 func Version(ctx context.Context, plat platform.Platform) (platform.Version, error) {
-	if plat == platform.OpenShift {
+	if plat == platform.OpenShift || plat == platform.HyperShift {
 		return OpenshiftVersion(ctx)
 	}
 	return KubernetesVersion(ctx)

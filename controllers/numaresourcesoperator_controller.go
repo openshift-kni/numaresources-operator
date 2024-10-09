@@ -22,10 +22,12 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
@@ -52,6 +54,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
@@ -80,6 +83,8 @@ type NUMAResourcesOperatorReconciler struct {
 	Recorder        record.EventRecorder
 	ForwardMCPConds bool
 }
+
+type mcpWaitForUpdatedFunc func(string, *machineconfigv1.MachineConfigPool) bool
 
 // TODO: narrow down
 
@@ -211,16 +216,16 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Conte
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
 	// we need to sync machine configs first and wait for the MachineConfigPool updates
 	// before checking additional components for updates
-	_, err := r.syncMachineConfigs(ctx, instance, trees)
+	mcpUpdatedFunc, err := r.syncMachineConfigs(ctx, instance, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
 		return true, ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "failed to sync machine configs")
 	}
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulMCSync", "Enabled machine configuration for worker nodes")
 
-	// MCO need to update SELinux context and other stuff, and need to trigger a reboot.
+	// MCO needs to update the SELinux context removal and other stuff, and need to trigger a reboot.
 	// It can take a while.
-	mcpStatuses, allMCPsUpdated := syncMachineConfigPoolsStatuses(instance.Name, trees, r.ForwardMCPConds)
+	mcpStatuses, allMCPsUpdated := syncMachineConfigPoolsStatuses(instance.Name, trees, r.ForwardMCPConds, mcpUpdatedFunc)
 	instance.Status.MachineConfigPools = mcpStatuses
 	if !allMCPsUpdated {
 		// the Machine Config Pool still did not apply the machine config, wait for one minute
@@ -318,41 +323,54 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx contex
 	return (updatedCount == len(objStates)), err
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, error) {
+func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (mcpWaitForUpdatedFunc, error) {
 	klog.V(4).InfoS("Machine Config Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Sync stop")
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
 
 	var err error
-	var updatedCount int
+	var mcpUpdatedFunc mcpWaitForUpdatedFunc
 	objStates := existing.MachineConfigsState(r.RTEManifests)
-	for _, objState := range objStates {
-		if err2 := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err2 != nil {
-			err = errors.Wrapf(err2, "failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
-			break
+	// Since 4.18 we're using a built-in SELinux policy,
+	// so the MachineConfig which applies the custom policy is no longer necessary.
+	// In case of operator upgrade from 4.1X → 4.18, it's necessary to remove the old MachineConfig,
+	// unless an emergency annotation is provided which forces the operator to use custom policy
+	if !annotations.IsCustomPolicyEnabled(instance.Annotations) {
+		for _, objState := range objStates {
+			if !objState.IsNotFoundError() {
+				klog.V(4).InfoS("delete Machine Config", "MachineConfig", objState.Desired.GetName())
+				if err2 := r.Client.Delete(ctx, objState.Desired); err2 != nil {
+					err = errors.Wrapf(err2, "could not delete MachineConfig %s", objState.Desired.GetName())
+				}
+				klog.V(4).InfoS("Machine Config deleted successfully", "MachineConfig", objState.Desired.GetName())
+			} // if not found, it's a fresh installation of 4.18+ (no upgrade)
 		}
+		mcpUpdatedFunc = IsMachineConfigPoolUpdatedAfterDeletion
+	} else {
+		for _, objState := range objStates {
+			if err2 := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err2 != nil {
+				err = errors.Wrapf(err2, "failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
+				break
+			}
 
-		if err2 := validateMachineConfigLabels(objState.Desired, trees); err2 != nil {
-			err = errors.Wrapf(err2, "machine conig %q labels validation failed", objState.Desired.GetName())
-			break
-		}
+			if err2 := validateMachineConfigLabels(objState.Desired, trees); err2 != nil {
+				err = errors.Wrapf(err2, "machine conig %q labels validation failed", objState.Desired.GetName())
+				break
+			}
 
-		_, updated, err2 := apply.ApplyObject(ctx, r.Client, objState)
-		if err2 != nil {
-			err = errors.Wrapf(err2, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
-			break
+			_, _, err2 := apply.ApplyObject(ctx, r.Client, objState)
+			if err2 != nil {
+				err = errors.Wrapf(err2, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
+				break
+			}
 		}
-		if !updated {
-			continue
-		}
-		updatedCount++
+		mcpUpdatedFunc = IsMachineConfigPoolUpdated
 	}
-
-	return (updatedCount == len(objStates)), err
+	return mcpUpdatedFunc, err
 }
 
-func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree, forwardMCPConds bool) ([]nropv1.MachineConfigPool, bool) {
+func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree, forwardMCPConds bool, updatedFunc mcpWaitForUpdatedFunc) ([]nropv1.MachineConfigPool, bool) {
 	klog.V(4).InfoS("Machine Config Status Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Status Sync stop")
 
@@ -361,7 +379,7 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tre
 		for _, mcp := range tree.MachineConfigPools {
 			mcpStatuses = append(mcpStatuses, extractMCPStatus(mcp, forwardMCPConds))
 
-			isUpdated := IsMachineConfigPoolUpdated(instanceName, mcp)
+			isUpdated := updatedFunc(instanceName, mcp)
 			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instanceName, "updated", isUpdated)
 
 			if !isUpdated {
@@ -461,9 +479,10 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		}
 		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
 	}
+	rteupdate.SecurityContextConstraint(r.RTEManifests.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
-	for _, objState := range existing.State(r.RTEManifests, daemonsetUpdater) {
+	for _, objState := range existing.State(r.RTEManifests, daemonsetUpdater, annotations.IsCustomPolicyEnabled(instance.Annotations)) {
 		if objState.Error != nil {
 			// We are likely in the bootstrap scenario. In this case, which is expected once, everything is fine.
 			// If it happens past bootstrap, still carry on. We know what to do, and we do want to enforce the desired state.
@@ -755,6 +774,15 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 		// intentionally info because we want to keep going
 		klog.V(5).InfoS("DaemonSet update: cannot update config", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
 		return err
+	}
+	if gdm.ClusterPlatform != platform.Kubernetes {
+		if gdm.IsCustomPolicyEnabled && gdm.ClusterPlatform == platform.OpenShift {
+			k8swgrteupdate.SecurityContext(gdm.DaemonSet, selinux.RTEContextTypeLegacy)
+			klog.V(5).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextTypeLegacy)
+		} else {
+			k8swgrteupdate.SecurityContext(gdm.DaemonSet, selinux.RTEContextType)
+			klog.V(5).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextType)
+		}
 	}
 	return nil
 }
