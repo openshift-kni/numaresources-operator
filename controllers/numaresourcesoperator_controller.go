@@ -163,12 +163,18 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		trees[idx].NodeGroup.Config = &conf
 	}
 
+	curStatus := instance.Status.DeepCopy()
+
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
 
 	_ = updateStatusConditionsIfNeeded(instance, condition, reasonFromError(err), messageFromError(err))
 
 	if condition == status.ConditionAvailable && multiMCPsErr != nil {
 		_, _ = r.degradeStatus(ctx, instance, validation.NodeGroupsError, multiMCPsErr)
+	}
+
+	if !status.IsUpdatedNUMAResourcesOperator(curStatus, &instance.Status) {
+		return result, err
 	}
 
 	updErr := r.Client.Status().Update(ctx, instance)
