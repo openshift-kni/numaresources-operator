@@ -165,9 +165,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	curStatus := instance.Status.DeepCopy()
 
-	result, condition, err := r.reconcileResource(ctx, instance, trees)
-
-	_ = updateStatusConditionsIfNeeded(instance, condition, reasonFromError(err), messageFromError(err))
+	result, err := r.reconcileResource(ctx, instance, trees)
 
 	if condition == status.ConditionAvailable && multiMCPsErr != nil {
 		_, _ = r.degradeStatus(ctx, instance, validation.NodeGroupsError, multiMCPsErr)
@@ -277,27 +275,31 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 	return daemonSetsInfoPerMCP, false, ctrl.Result{}, "", nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, string, error) {
+func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, error) {
 	if done, res, cond, err := r.reconcileResourceAPI(ctx, instance, trees); done {
-		return res, cond, err
+		_ = updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
+		return res, err
 	}
 
 	if r.Platform == platform.OpenShift {
 		if done, res, cond, err := r.reconcileResourceMachineConfig(ctx, instance, trees); done {
-			return res, cond, err
+			_ = updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
+			return res, err
 		}
 	}
 
 	dsPerMCP, done, res, cond, err := r.reconcileResourceDaemonSet(ctx, instance, trees)
 	if done {
-		return res, cond, err
+		_ = updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
+		return res, err
 	}
 
 	// all fields of NodeGroupStatus are required so publish the status only when all daemonset and MCPs are updated which
 	// is a certain thing if we got to this point otherwise the function would have returned already
 	instance.Status.NodeGroups = syncNodeGroupsStatus(instance, dsPerMCP)
 
-	return ctrl.Result{}, status.ConditionAvailable, nil
+	_ = updateStatusConditionsIfNeeded(instance, status.ConditionAvailable, reasonFromError(nil), messageFromError(nil))
+	return ctrl.Result{}, nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, daemonSetsInfo []poolDaemonSet) ([]nropv1.NamespacedName, bool, error) {
