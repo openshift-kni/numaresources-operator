@@ -155,9 +155,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	curStatus := instance.Status.DeepCopy()
 
-	result, condition, err := r.reconcileResource(ctx, instance, trees)
-
-	_ = updateStatusConditionsIfNeeded(instance, condition, reasonFromError(err), messageFromError(err))
+	result, err := r.reconcileResource(ctx, instance, trees)
 
 	if !status.IsUpdatedNUMAResourcesOperator(curStatus, &instance.Status) {
 		return result, err
@@ -263,22 +261,26 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 	return false, ctrl.Result{}, "", nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, string, error) {
+func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, error) {
 	if done, res, cond, err := r.reconcileResourceAPI(ctx, instance, trees); done {
-		return res, cond, err
+		_ = updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
+		return res, err
 	}
 
 	if r.Platform == platform.OpenShift {
 		if done, res, cond, err := r.reconcileResourceMachineConfig(ctx, instance, trees); done {
-			return res, cond, err
+			_ = updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
+			return res, err
 		}
 	}
 
 	if done, res, cond, err := r.reconcileResourceDaemonSet(ctx, instance, trees); done {
-		return res, cond, err
+		_ = updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
+		return res, err
 	}
 
-	return ctrl.Result{}, status.ConditionAvailable, nil
+	_ = updateStatusConditionsIfNeeded(instance, status.ConditionAvailable, reasonFromError(nil), messageFromError(nil))
+	return ctrl.Result{}, nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, daemonSetsInfo []nropv1.NamespacedName) ([]nropv1.NamespacedName, bool, error) {
