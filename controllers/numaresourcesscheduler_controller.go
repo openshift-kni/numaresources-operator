@@ -108,16 +108,27 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	}
 
 	if req.Name != objectnames.DefaultNUMAResourcesSchedulerCrName {
-		message := fmt.Sprintf("incorrect NUMAResourcesScheduler resource name: %s", instance.Name)
-		return ctrl.Result{}, r.updateStatus(ctx, instance, status.ConditionDegraded, conditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
+		return r.degradeStatus(ctx, instance, conditionTypeIncorrectNUMAResourcesSchedulerResourceName, fmt.Errorf("incorrect NUMAResourcesScheduler resource name: %s", instance.Name))
 	}
 
-	result, condition, err := r.reconcileResource(ctx, instance)
-	if err := r.updateStatus(ctx, instance, condition, reasonFromError(err), messageFromError(err)); err != nil {
-		klog.InfoS("Failed to update numaresourcesscheduler status", "Desired condition", condition, "error", err)
+	result, err := r.reconcileResource(ctx, instance)
+
+	updErr := r.Client.Status().Update(ctx, instance)
+	if updErr != nil {
+		klog.InfoS("Failed to update numaresourcesoperator status", "error", updErr)
+		return ctrl.Result{}, errors.Wrapf(updErr, "could not update status for object %s", client.ObjectKeyFromObject(instance))
 	}
 
 	return result, err
+}
+
+func (r *NUMAResourcesSchedulerReconciler) degradeStatus(ctx context.Context, instance *nropv1.NUMAResourcesScheduler, reason string, stErr error) (ctrl.Result, error) {
+	instance.Status.Conditions = status.NewConditions(status.ConditionDegraded, reason, messageFromError(stErr))
+	err := r.Client.Status().Update(ctx, instance)
+	if err != nil {
+		return ctrl.Result{}, errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(instance))
+	}
+	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -141,7 +152,7 @@ func (r *NUMAResourcesSchedulerReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Complete(r)
 }
 
-func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (reconcile.Result, string, error) {
+func (r *NUMAResourcesSchedulerReconciler) reconcileResourceDeployment(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (ctrl.Result, string, error) {
 	schedStatus, err := r.syncNUMASchedulerResources(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedSchedulerSync")
@@ -159,6 +170,12 @@ func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context
 	}
 
 	return ctrl.Result{}, status.ConditionAvailable, nil
+}
+
+func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (reconcile.Result, error) {
+	res, cond, err := r.reconcileResourceDeployment(ctx, instance)
+	instance.Status.Conditions = status.NewConditions(cond, reasonFromError(err), messageFromError(err))
+	return res, err
 }
 
 func isDeploymentRunning(ctx context.Context, c client.Client, key nropv1.NamespacedName) (bool, error) {
@@ -248,14 +265,6 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		}
 	}
 	return schedStatus, nil
-}
-
-func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
-	sched.Status.Conditions = status.NewConditions(condition, reason, message)
-	if err := r.Client.Status().Update(ctx, sched); err != nil {
-		return errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(sched))
-	}
-	return nil
 }
 
 func unpackAPIResyncPeriod(reconcilePeriod *metav1.Duration) time.Duration {
