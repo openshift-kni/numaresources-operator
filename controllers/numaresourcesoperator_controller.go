@@ -84,8 +84,6 @@ type NUMAResourcesOperatorReconciler struct {
 	ForwardMCPConds bool
 }
 
-type mcpWaitForUpdatedFunc func(string, *machineconfigv1.MachineConfigPool) bool
-
 // TODO: narrow down
 
 // Namespace Scoped
@@ -323,7 +321,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx contex
 	return (updatedCount == len(objStates)), err
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (mcpWaitForUpdatedFunc, error) {
+func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (rtestate.MCPWaitForUpdatedFunc, error) {
 	klog.V(4).InfoS("Machine Config Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Sync stop")
 
@@ -335,7 +333,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	// In case of operator upgrade from 4.1X → 4.18, it's necessary to remove the old MachineConfig,
 	// unless an emergency annotation is provided which forces the operator to use custom policy
 
-	objStates := existing.MachineConfigsState(r.RTEManifests)
+	objStates, waitFunc := existing.MachineConfigsState(r.RTEManifests)
 	for _, objState := range objStates {
 		klog.InfoS("objState", "desired", objState.Desired, "existing", objState.Existing, "createOrUpdate", objState.IsCreateOrUpdate())
 		if objState.IsCreateOrUpdate() {
@@ -355,17 +353,10 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 			break
 		}
 	}
-	return getWaitMCPUpdatedFunc(instance), err
+	return waitFunc, err
 }
 
-func getWaitMCPUpdatedFunc(instance *nropv1.NUMAResourcesOperator) mcpWaitForUpdatedFunc {
-	if annotations.IsCustomPolicyEnabled(instance.Annotations) {
-		return IsMachineConfigPoolUpdated
-	}
-	return IsMachineConfigPoolUpdatedAfterDeletion
-}
-
-func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree, forwardMCPConds bool, updatedFunc mcpWaitForUpdatedFunc) ([]nropv1.MachineConfigPool, bool) {
+func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree, forwardMCPConds bool, updatedFunc rtestate.MCPWaitForUpdatedFunc) ([]nropv1.MachineConfigPool, bool) {
 	klog.V(4).InfoS("Machine Config Status Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Status Sync stop")
 
@@ -682,38 +673,6 @@ func validateUpdateEvent(e *event.UpdateEvent) bool {
 	}
 
 	return true
-}
-
-func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	existing := isMachineConfigExists(instanceName, mcp)
-
-	// the Machine Config Pool still did not apply the machine config wait for one minute
-	if !existing || machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
-		return false
-	}
-
-	return true
-}
-
-func IsMachineConfigPoolUpdatedAfterDeletion(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	existing := isMachineConfigExists(instanceName, mcp)
-
-	// the Machine Config Pool still has the machine config return false
-	if existing || machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
-		return false
-	}
-
-	return true
-}
-
-func isMachineConfigExists(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	mcName := objectnames.GetMachineConfigName(instanceName, mcp.Name)
-	for _, s := range mcp.Status.Configuration.Source {
-		if s.Name == mcName {
-			return true
-		}
-	}
-	return false
 }
 
 func validateMachineConfigLabels(mc client.Object, trees []nodegroupv1.Tree) error {

@@ -19,11 +19,12 @@ package deploy
 import (
 	"context"
 	"fmt"
-	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
-	"golang.org/x/sync/errgroup"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	"golang.org/x/sync/errgroup"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -36,9 +37,9 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	"github.com/openshift-kni/numaresources-operator/controllers"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
@@ -217,7 +218,7 @@ func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1.NUMAResourcesOperator)
 	}
 
 	for _, mcp := range mcps {
-		if !controllers.IsMachineConfigPoolUpdatedAfterDeletion(nro.Name, mcp) {
+		if !rtestate.IsMachineConfigPoolUpdatedAfterDeletion(nro.Name, mcp) {
 			return false, nil
 		}
 	}
