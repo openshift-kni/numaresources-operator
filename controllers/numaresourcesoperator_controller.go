@@ -151,10 +151,13 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		trees[idx].NodeGroup.Config = &conf
 	}
 
+	curStatus := instance.Status.DeepCopy()
+
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
 
-	ok := updateStatusConditionsIfNeeded(instance, condition, reasonFromError(err), messageFromError(err))
-	if !ok { // no status update needed
+	_ = updateStatusConditionsIfNeeded(instance, condition, reasonFromError(err), messageFromError(err))
+
+	if !status.IsUpdatedNUMAResourcesOperator(curStatus, &instance.Status) {
 		return result, err
 	}
 

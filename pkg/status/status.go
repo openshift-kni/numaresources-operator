@@ -23,6 +23,8 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
 // TODO: are we duping these?
@@ -36,6 +38,15 @@ const (
 const (
 	ConditionTypeIncorrectNUMAResourcesOperatorResourceName = "IncorrectNUMAResourcesOperatorResourceName"
 )
+
+func IsUpdatedNUMAResourcesOperator(oldStatus, newStatus *nropv1.NUMAResourcesOperatorStatus) bool {
+	options := []cmp.Option{
+		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime"),
+		cmpopts.IgnoreFields(metav1.Condition{}, "ObservedGeneration"),
+	}
+
+	return !cmp.Equal(newStatus, oldStatus, options...)
+}
 
 // UpdateConditions compute new conditions based on arguments, and then compare with given current conditions.
 // Returns the conditions to use, either current or newly computed, and a boolean flag which is `true` if conditions need
