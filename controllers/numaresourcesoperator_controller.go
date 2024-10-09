@@ -330,44 +330,39 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
 
 	var err error
-	var mcpUpdatedFunc mcpWaitForUpdatedFunc
-	objStates := existing.MachineConfigsState(r.RTEManifests)
 	// Since 4.18 we're using a built-in SELinux policy,
 	// so the MachineConfig which applies the custom policy is no longer necessary.
 	// In case of operator upgrade from 4.1X → 4.18, it's necessary to remove the old MachineConfig,
 	// unless an emergency annotation is provided which forces the operator to use custom policy
-	if !annotations.IsCustomPolicyEnabled(instance.Annotations) {
-		for _, objState := range objStates {
-			if !objState.IsNotFoundError() {
-				klog.V(4).InfoS("delete Machine Config", "MachineConfig", objState.Desired.GetName())
-				if err2 := r.Client.Delete(ctx, objState.Desired); err2 != nil {
-					err = errors.Wrapf(err2, "could not delete MachineConfig %s", objState.Desired.GetName())
-				}
-				klog.V(4).InfoS("Machine Config deleted successfully", "MachineConfig", objState.Desired.GetName())
-			} // if not found, it's a fresh installation of 4.18+ (no upgrade)
-		}
-		mcpUpdatedFunc = IsMachineConfigPoolUpdatedAfterDeletion
-	} else {
-		for _, objState := range objStates {
+
+	objStates := existing.MachineConfigsState(r.RTEManifests)
+	for _, objState := range objStates {
+		klog.InfoS("objState", "desired", objState.Desired, "existing", objState.Existing, "createOrUpdate", objState.IsCreateOrUpdate())
+		if objState.IsCreateOrUpdate() {
 			if err2 := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err2 != nil {
 				err = errors.Wrapf(err2, "failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
 				break
 			}
 
 			if err2 := validateMachineConfigLabels(objState.Desired, trees); err2 != nil {
-				err = errors.Wrapf(err2, "machine conig %q labels validation failed", objState.Desired.GetName())
-				break
-			}
-
-			_, _, err2 := apply.ApplyObject(ctx, r.Client, objState)
-			if err2 != nil {
-				err = errors.Wrapf(err2, "could not apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
+				err = err2
 				break
 			}
 		}
-		mcpUpdatedFunc = IsMachineConfigPoolUpdated
+		_, _, err2 := apply.ApplyState(ctx, r.Client, objState)
+		if err2 != nil {
+			err = err2
+			break
+		}
 	}
-	return mcpUpdatedFunc, err
+	return getWaitMCPUpdatedFunc(instance), err
+}
+
+func getWaitMCPUpdatedFunc(instance *nropv1.NUMAResourcesOperator) mcpWaitForUpdatedFunc {
+	if annotations.IsCustomPolicyEnabled(instance.Annotations) {
+		return IsMachineConfigPoolUpdated
+	}
+	return IsMachineConfigPoolUpdatedAfterDeletion
 }
 
 func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree, forwardMCPConds bool, updatedFunc mcpWaitForUpdatedFunc) ([]nropv1.MachineConfigPool, bool) {
