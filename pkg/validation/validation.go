@@ -23,6 +23,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	multierr "github.com/hashicorp/go-multierror"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 )
@@ -35,25 +37,21 @@ const (
 // MachineConfigPoolDuplicates validates selected MCPs for duplicates
 // TODO: move it under the validation webhook once we will have one
 func MachineConfigPoolDuplicates(trees []nodegroupv1.Tree) error {
+	var multiErr error
 	duplicates := map[string]int{}
+
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
 			duplicates[mcp.Name] += 1
 		}
 	}
 
-	var duplicateErrors []string
 	for mcpName, count := range duplicates {
 		if count > 1 {
-			duplicateErrors = append(duplicateErrors, fmt.Sprintf("the MachineConfigPool %q selected by at least two node groups", mcpName))
+			multiErr = multierr.Append(multiErr, fmt.Errorf("the MachineConfigPool %q selected by at least two node groups", mcpName))
 		}
 	}
-
-	if len(duplicateErrors) > 0 {
-		return errors.New(strings.Join(duplicateErrors, "; "))
-	}
-
-	return nil
+	return multiErr
 }
 
 // NodeGroups validates the node groups for nil values and duplicates.
@@ -87,7 +85,9 @@ func nodeGroupsMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
 
 // TODO: move it under the validation webhook once we will have one
 func nodeGroupsDuplicates(nodeGroups []nropv1.NodeGroup) error {
+	var multiErr error
 	duplicates := map[string]int{}
+
 	for _, nodeGroup := range nodeGroups {
 		if nodeGroup.MachineConfigPoolSelector == nil {
 			continue
@@ -100,18 +100,12 @@ func nodeGroupsDuplicates(nodeGroups []nropv1.NodeGroup) error {
 		duplicates[key] += 1
 	}
 
-	var duplicateErrors []string
 	for selector, count := range duplicates {
 		if count > 1 {
-			duplicateErrors = append(duplicateErrors, fmt.Sprintf("the node group with the machineConfigPoolSelector %q has duplicates", selector))
+			multiErr = multierr.Append(multiErr, fmt.Errorf("the node group with the machineConfigPoolSelector %q has duplicates", selector))
 		}
 	}
-
-	if len(duplicateErrors) > 0 {
-		return errors.New(strings.Join(duplicateErrors, "; "))
-	}
-
-	return nil
+	return multiErr
 }
 
 // TODO: move it under the validation webhook once we will have one
