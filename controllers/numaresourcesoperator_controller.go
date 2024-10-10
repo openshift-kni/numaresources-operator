@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -30,7 +31,6 @@ import (
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-	"github.com/pkg/errors"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -183,7 +183,7 @@ func updateStatus(ctx context.Context, cli client.Client, instance *nropv1.NUMAR
 	instance.Status.Conditions = conditions
 
 	if err := cli.Status().Update(ctx, instance); err != nil {
-		return false, errors.Wrapf(err, "could not update status for object %s", client.ObjectKeyFromObject(instance))
+		return false, fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(instance), err)
 	}
 	return true, nil
 }
@@ -203,7 +203,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Conte
 	applied, err := r.syncNodeResourceTopologyAPI(ctx)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedCRDInstall", "Failed to install Node Resource Topology CRD: %v", err)
-		return true, ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedAPISync")
+		return true, ctrl.Result{}, status.ConditionDegraded, fmt.Errorf("FailedAPISync: %w", err)
 	}
 	if applied {
 		r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulCRDInstall", "Node Resource Topology CRD installed")
@@ -217,7 +217,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 	mcpUpdatedFunc, err := r.syncMachineConfigs(ctx, instance, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
-		return true, ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "failed to sync machine configs")
+		return true, ctrl.Result{}, status.ConditionDegraded, fmt.Errorf("failed to sync machine configs: %w", err)
 	}
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulMCSync", "Enabled machine configuration for worker nodes")
 
@@ -238,7 +238,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 	daemonSetsInfo, err := r.syncNUMAResourcesOperatorResources(ctx, instance, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECreate", "Failed to create Resource-Topology-Exporter DaemonSets: %v", err)
-		return true, ctrl.Result{}, status.ConditionDegraded, errors.Wrapf(err, "FailedRTESync")
+		return true, ctrl.Result{}, status.ConditionDegraded, fmt.Errorf("FailedRTESync: %w", err)
 	}
 	if len(daemonSetsInfo) == 0 {
 		return false, ctrl.Result{}, "", nil
@@ -310,7 +310,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx contex
 	for _, objState := range objStates {
 		_, updated, err2 := apply.ApplyObject(ctx, r.Client, objState)
 		if err2 != nil {
-			err = errors.Wrapf(err2, "could not create %s", objState.Desired.GetObjectKind().GroupVersionKind().String())
+			err = fmt.Errorf("could not create %s: %w", objState.Desired.GetObjectKind().GroupVersionKind().String(), err2)
 			break
 		}
 		if !updated {
@@ -338,7 +338,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 		klog.InfoS("objState", "desired", objState.Desired, "existing", objState.Existing, "createOrUpdate", objState.IsCreateOrUpdate())
 		if objState.IsCreateOrUpdate() {
 			if err2 := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err2 != nil {
-				err = errors.Wrapf(err2, "failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
+				err = fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err2)
 				break
 			}
 
@@ -476,15 +476,15 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		}
 		if objState.UpdateError != nil {
 			// this is an internal error. Should not happen. But if it happen, we don't want to send garbage to the cluster, so we abort
-			return nil, errors.Wrapf(err, "failed to update (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
+			return nil, fmt.Errorf("failed to update (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 		err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
+			return nil, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 		obj, _, err := apply.ApplyObject(ctx, r.Client, objState)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to apply (%s) %s/%s", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName())
+			return nil, fmt.Errorf("failed to apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 
 		if nname, ok := rtestate.DaemonSetNamespacedNameFromObject(obj); ok {

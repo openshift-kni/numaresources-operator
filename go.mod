@@ -20,7 +20,6 @@ require (
 	github.com/openshift/api v0.0.0-20240422085825-2624175e9673
 	github.com/openshift/cluster-node-tuning-operator v0.0.0-20240611064827-2bd8891ead93
 	github.com/openshift/machine-config-operator v0.0.1-0.20230724174830-7b54f1dcce4e
-	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.1.0
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/sync v0.7.0
@@ -82,6 +81,7 @@ require (
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/openshift/client-go v0.0.0-20240415214935-be70f772f157 // indirect
 	github.com/openshift/custom-resource-status v1.1.3-0.20220503160415-f2fdb4999d87 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.19.0 // indirect
 	github.com/prometheus/client_model v0.5.0 // indirect

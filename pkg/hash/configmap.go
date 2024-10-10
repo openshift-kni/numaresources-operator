@@ -25,8 +25,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/pkg/errors"
 )
 
 // hash package purpose is to compute a ConfigMap hash
@@ -45,7 +43,7 @@ func ComputeCurrentConfigMap(ctx context.Context, cli client.Client, cm *corev1.
 		if apierrors.IsNotFound(err) {
 			updatedConfigMap = cm
 		} else {
-			return "", errors.Wrapf(err, "could not calculate ConfigMap %q hash", key.String())
+			return "", fmt.Errorf("could not calculate ConfigMap %q hash: %w", key.String(), err)
 		}
 	}
 	cmHash := ConfigMapData(updatedConfigMap)
