@@ -19,6 +19,7 @@ package rte
 import (
 	"context"
 	"fmt"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -32,6 +33,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -62,16 +64,19 @@ type ExistingManifests struct {
 	clusterRoleError        error
 	clusterRoleBindingError error
 	// internal helpers
-	plat      platform.Platform
-	instance  *nropv1.NUMAResourcesOperator
-	trees     []nodegroupv1.Tree
-	namespace string
+	plat                platform.Platform
+	instance            *nropv1.NUMAResourcesOperator
+	trees               []nodegroupv1.Tree
+	namespace           string
+	enableMachineConfig bool
 }
 
-func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) []objectstate.ObjectState {
+type MCPWaitForUpdatedFunc func(string, *machineconfigv1.MachineConfigPool) bool
+
+func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) ([]objectstate.ObjectState, MCPWaitForUpdatedFunc) {
 	var ret []objectstate.ObjectState
 	if mf.MachineConfig == nil {
-		return ret
+		return ret, nullMachineConfigPoolUpdated
 	}
 	for _, tree := range em.trees {
 		for _, mcp := range tree.MachineConfigPools {
@@ -80,16 +85,33 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) []ob
 				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
 				continue
 			}
+
+			existingMachineConfig, ok := em.machineConfigs[mcName]
+			if !ok {
+				klog.Warningf("failed to find machine config %q in namespace %q", mcName, em.namespace)
+				continue
+			}
+
+			if !em.enableMachineConfig {
+				// caution here: we want a *nil interface value*, not an *interface which points to nil*.
+				// the latter would lead to apparently correct code leading to runtime panics. See:
+				// https://trstringer.com/go-nil-interface-and-interface-with-nil-concrete-value/
+				// (and many other docs like this)
+				ret = append(ret,
+					objectstate.ObjectState{
+						Existing: existingMachineConfig.machineConfig,
+						Error:    existingMachineConfig.machineConfigError,
+						Desired:  nil,
+					},
+				)
+				continue
+			}
+
 			desiredMachineConfig := mf.MachineConfig.DeepCopy()
 			// prefix machine config name to guarantee that we will have an option to override it
 			desiredMachineConfig.Name = mcName
 			desiredMachineConfig.Labels = GetMachineConfigLabel(mcp)
 
-			existingMachineConfig, ok := em.machineConfigs[mcName]
-			if !ok {
-				klog.Warningf("failed to find machine config %q under the namespace %q", mcName, desiredMachineConfig.Namespace)
-				continue
-			}
 			ret = append(ret,
 				objectstate.ObjectState{
 					Existing: existingMachineConfig.machineConfig,
@@ -102,7 +124,50 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) []ob
 		}
 	}
 
-	return ret
+	return ret, em.getWaitMCPUpdatedFunc()
+}
+
+func (em *ExistingManifests) getWaitMCPUpdatedFunc() MCPWaitForUpdatedFunc {
+	if em.enableMachineConfig {
+		return IsMachineConfigPoolUpdated
+	}
+	return IsMachineConfigPoolUpdatedAfterDeletion
+}
+
+func nullMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
+	return true
+}
+
+func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
+	existing := isMachineConfigExists(instanceName, mcp)
+
+	// the Machine Config Pool still did not apply the machine config wait for one minute
+	if !existing || machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
+		return false
+	}
+
+	return true
+}
+
+func IsMachineConfigPoolUpdatedAfterDeletion(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
+	existing := isMachineConfigExists(instanceName, mcp)
+
+	// the Machine Config Pool still has the machine config return false
+	if existing || machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
+		return false
+	}
+
+	return true
+}
+
+func isMachineConfigExists(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
+	mcName := objectnames.GetMachineConfigName(instanceName, mcp.Name)
+	for _, s := range mcp.Status.Configuration.Source {
+		if s.Name == mcName {
+			return true
+		}
+	}
+	return false
 }
 
 // GetMachineConfigLabel returns machine config labels that should be used under the machine config pool
@@ -247,12 +312,13 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 
 func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf rtemanifests.Manifests, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, namespace string) ExistingManifests {
 	ret := ExistingManifests{
-		existing:   rtemanifests.New(plat),
-		daemonSets: make(map[string]daemonSetManifest),
-		plat:       plat,
-		instance:   instance,
-		trees:      trees,
-		namespace:  namespace,
+		existing:            rtemanifests.New(plat),
+		daemonSets:          make(map[string]daemonSetManifest),
+		plat:                plat,
+		instance:            instance,
+		trees:               trees,
+		namespace:           namespace,
+		enableMachineConfig: annotations.IsCustomPolicyEnabled(instance.Annotations),
 	}
 
 	// objects that should present in the single replica
