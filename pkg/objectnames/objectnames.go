@@ -16,7 +16,10 @@
 
 package objectnames
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 const (
 	DefaultNUMAResourcesOperatorCrName  = "numaresourcesoperator"
@@ -29,4 +32,8 @@ func GetMachineConfigName(instanceName, mcpName string) string {
 
 func GetComponentName(instanceName, mcpName string) string {
 	return fmt.Sprintf("%s-%s", instanceName, mcpName)
+}
+
+func ExtractPoolNameFromRTEDaemonset(dsName, instanceName string) string {
+	return strings.Replace(dsName, fmt.Sprintf("%s-", instanceName), "", 1)
 }

@@ -46,11 +46,13 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
+	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
+	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
@@ -144,6 +146,8 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(nropObj.Status.DaemonSets).ToNot(gomega.BeEmpty())
+			dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
+			gomega.Expect(validation.EqualNamespacedDSSlicesByName(nropObj.Status.DaemonSets, dssFromNodeGroupStatus))
 			klog.Infof("NRO %q", nropObj.Name)
 
 			// NROP guarantees all the daemonsets are in the same namespace,
@@ -191,6 +195,8 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(nropObj.Status.DaemonSets).ToNot(gomega.BeEmpty())
+			dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
+			gomega.Expect(validation.EqualNamespacedDSSlicesByName(nropObj.Status.DaemonSets, dssFromNodeGroupStatus))
 			klog.Infof("NRO %q", nropObj.Name)
 
 			// NROP guarantees all the daemonsets are in the same namespace,

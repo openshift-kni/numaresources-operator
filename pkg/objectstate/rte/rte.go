@@ -257,6 +257,55 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 	}
 
 	for _, tree := range em.trees {
+		if tree.NodePoolSelector != nil {
+			var existingDs client.Object
+			var loadError error
+
+			ngSelector := tree.NodePoolSelector
+
+			generatedName := objectnames.GetComponentName(em.instance.Name, *tree.NodeGroup.PoolName)
+			existingDaemonSet, ok := em.daemonSets[generatedName]
+			if ok {
+				existingDs = existingDaemonSet.daemonSet
+				loadError = existingDaemonSet.daemonSetError
+			} else {
+				loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.DaemonSet.Namespace, mf.DaemonSet.Name)
+			}
+
+			desiredDaemonSet := mf.DaemonSet.DeepCopy()
+			desiredDaemonSet.Name = generatedName
+
+			desiredDaemonSet.Spec.Template.Spec.NodeSelector = ngSelector.MatchLabels
+
+			var updateError error
+			if updater != nil {
+				gdm := GeneratedDesiredManifest{
+					ClusterPlatform:   em.plat,
+					MachineConfigPool: nil,
+					NodeGroup:         tree.NodeGroup.DeepCopy(),
+					DaemonSet:         desiredDaemonSet,
+				}
+
+				err := updater(*tree.NodeGroup.PoolName, &gdm)
+				if err != nil {
+					updateError = fmt.Errorf("daemonset for nodeSelector %q: update failed: %w", *tree.NodeGroup.PoolName, err)
+				}
+			}
+
+			ret = append(ret,
+				objectstate.ObjectState{
+					Existing:    existingDs,
+					Error:       loadError,
+					UpdateError: updateError,
+					Desired:     desiredDaemonSet,
+					Compare:     compare.Object,
+					Merge:       merge.ObjectForUpdate,
+				},
+			)
+			continue
+		}
+
+		// TODO process MCPs only on Openshift platform
 		for _, mcp := range tree.MachineConfigPools {
 			var existingDs client.Object
 			var loadError error
@@ -358,6 +407,22 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 
 	// should have the amount of resources equals to the amount of node groups
 	for _, tree := range trees {
+		if tree.NodePoolSelector != nil {
+			generatedName := objectnames.GetComponentName(instance.Name, *tree.NodeGroup.PoolName)
+			key := client.ObjectKey{
+				Name:      generatedName,
+				Namespace: namespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			dsm := daemonSetManifest{}
+			if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
+				dsm.daemonSet = ds
+			}
+			ret.daemonSets[generatedName] = dsm
+			continue
+		}
+
+		// TODO process MCPs only on Openshift platform
 		for _, mcp := range tree.MachineConfigPools {
 			generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
 			key := client.ObjectKey{

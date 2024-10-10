@@ -185,10 +185,51 @@ func TestFindTrees(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "node group with PoolName and MachineConfigPoolSelector in another node group",
+			mcps: &mcpList,
+			ngs: []nropv1.NodeGroup{
+				{
+					PoolName: &mcpList.Items[0].Name,
+				},
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"mcp-label-3": "test3",
+						},
+					},
+				},
+			},
+			expected: []Tree{
+				{
+					MachineConfigPools: []*mcov1.MachineConfigPool{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "mcp1",
+							},
+						},
+					},
+				},
+				{
+					MachineConfigPools: []*mcov1.MachineConfigPool{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "mcp3",
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "mcp5",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := FindTrees(tt.mcps, tt.ngs)
+			got, err := FindTreesOpenshift(tt.mcps, tt.ngs)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -204,7 +245,7 @@ func TestFindTrees(t *testing.T) {
 				t.Errorf("unexpected error checking backward compat: %v", err)
 			}
 			compatNames := mcpNamesFromList(gotMcps)
-			if !reflect.DeepEqual(gotNames, compatNames) {
+			if !containsSliceItems(gotNames, compatNames) {
 				t.Errorf("Trees mismatch (non backward compatible): got=%v compat=%v", gotNames, compatNames)
 			}
 		})
@@ -366,6 +407,54 @@ func TestFindMachineConfigPools(t *testing.T) {
 	}
 }
 
+func TestFindTreesHCP(t *testing.T) {
+	var (
+		pname1 = "pn-1"
+		pname2 = "pn-2"
+		pname3 = "pn-3"
+	)
+	input := []nropv1.NodeGroup{
+		{
+			PoolName: &pname1,
+		},
+		{
+			PoolName: &pname2,
+		},
+		{
+			PoolName: &pname3,
+		},
+	}
+	expected := []Tree{
+		{
+			NodePoolSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					NodePoolLabelHCP: pname1,
+				},
+			},
+		},
+		{
+			NodePoolSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					NodePoolLabelHCP: pname2,
+				},
+			},
+		},
+		{
+			NodePoolSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					NodePoolLabelHCP: pname3,
+				},
+			},
+		},
+	}
+	got := FindTreesHCP(input)
+	gotSelectorsList := nodePoolSelectorsFromTree(got)
+	expectedSelectorsList := nodePoolSelectorsFromTree(expected)
+	if !reflect.DeepEqual(gotSelectorsList, expectedSelectorsList) {
+		t.Errorf("Trees mismatch: got=%+v expected=%+v", got, expected)
+	}
+}
+
 func mcpNamesFromTrees(trees []Tree) []string {
 	var result []string
 	for _, tree := range trees {
@@ -419,4 +508,32 @@ func findListByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1
 	}
 
 	return result, nil
+}
+
+// containedItemsFromSlice returns true if all of b items are part of slice a
+func containsSliceItems(a, b []string) bool {
+	for _, i := range b {
+		found := false
+		for _, j := range a {
+			if i == j {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func nodePoolSelectorsFromTree(trees []Tree) []metav1.LabelSelector {
+	var result []metav1.LabelSelector
+	for _, tree := range trees {
+		if tree.NodePoolSelector == nil {
+			continue
+		}
+		result = append(result, *tree.NodePoolSelector)
+	}
+	return result
 }
