@@ -60,6 +60,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
+	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
@@ -73,15 +74,16 @@ const numaResourcesRetryPeriod = 1 * time.Minute
 // NUMAResourcesOperatorReconciler reconciles a NUMAResourcesOperator object
 type NUMAResourcesOperatorReconciler struct {
 	client.Client
-	Scheme          *runtime.Scheme
-	Platform        platform.Platform
-	APIManifests    apimanifests.Manifests
-	RTEManifests    rtemanifests.Manifests
-	Namespace       string
-	Images          images.Data
-	ImagePullPolicy corev1.PullPolicy
-	Recorder        record.EventRecorder
-	ForwardMCPConds bool
+	Scheme              *runtime.Scheme
+	Platform            platform.Platform
+	APIManifests        apimanifests.Manifests
+	RTEManifests        rtemanifests.Manifests
+	RTEMetricsManifests rtemetricsmanifests.Manifests
+	Namespace           string
+	Images              images.Data
+	ImagePullPolicy     corev1.PullPolicy
+	Recorder            record.EventRecorder
+	ForwardMCPConds     bool
 }
 
 // TODO: narrow down
@@ -108,6 +110,7 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=*
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=services,verbs=*
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -491,6 +494,26 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 			daemonSetsNName = append(daemonSetsNName, nname)
 		}
 	}
+
+	for _, obj := range r.RTEMetricsManifests.ToObjects() {
+		// Check if the object already exists
+		existingObj := obj.DeepCopyObject().(client.Object)
+		err := r.Client.Get(ctx, client.ObjectKeyFromObject(obj), existingObj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, errors.Wrapf(err, "failed to get %s/%s", obj.GetNamespace(), obj.GetName())
+		}
+		if apierrors.IsNotFound(err) {
+			err := controllerutil.SetControllerReference(instance, obj, r.Scheme)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to set controller reference to %s %s", obj.GetNamespace(), obj.GetName())
+			}
+			err = r.Client.Create(ctx, obj)
+			if err != nil {
+				return nil, errors.Wrapf(err, "failed to create %s/%s", obj.GetNamespace(), obj.GetName())
+			}
+		}
+	}
+
 	return daemonSetsNName, nil
 }
 
@@ -723,6 +746,8 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 		// nothing to do!
 		return nil
 	}
+	rteupdate.SidecarContainerConfig(gdm.DaemonSet)
+	klog.V(5).Info("DaemonSet update: Added daemonset sidecar")
 	err = rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
 	if err != nil {
 		// intentionally info because we want to keep going

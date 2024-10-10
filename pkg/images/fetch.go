@@ -28,10 +28,11 @@ import (
 )
 
 const (
-	envVarPodNamespace = "NAMESPACE"
-	envVarPodName      = "PODNAME"
-	NullPolicy         = corev1.PullPolicy("")
-	NullImage          = ""
+	envVarPodNamespace         = "NAMESPACE"
+	envVarPodName              = "PODNAME"
+	NullPolicy                 = corev1.PullPolicy("")
+	NullImage                  = ""
+	kubeRbacProxyContainerName = "kube-rbac-proxy"
 )
 
 func GetCurrentImage(ctx context.Context) (string, corev1.PullPolicy, error) {
@@ -44,6 +45,19 @@ func GetCurrentImage(ctx context.Context) (string, corev1.PullPolicy, error) {
 		return NullImage, NullPolicy, fmt.Errorf("environment variable not set: %q", envVarPodName)
 	}
 	return GetImageFromPod(ctx, podNamespace, podName, "")
+}
+
+func GetKubeRbacProxyImage(ctx context.Context) (string, error) {
+	podNamespace, ok := os.LookupEnv(envVarPodNamespace)
+	if !ok {
+		return NullImage, fmt.Errorf("environment variable not set: %q", envVarPodNamespace)
+	}
+	podName, ok := os.LookupEnv(envVarPodName)
+	if !ok {
+		return NullImage, fmt.Errorf("environment variable not set: %q", envVarPodName)
+	}
+	img, _, err := GetImageFromPod(ctx, podNamespace, podName, kubeRbacProxyContainerName)
+	return img, err
 }
 
 func GetImageFromPod(ctx context.Context, namespace, podName, containerName string) (string, corev1.PullPolicy, error) {
