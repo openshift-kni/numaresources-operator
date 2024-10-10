@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -36,8 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-
-	"github.com/pkg/errors"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
@@ -197,10 +196,10 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov
 		// the owner should be the KubeletConfig object and not the NUMAResourcesOperator CR
 		// this means that when KubeletConfig will get deleted, the ConfigMap gets deleted as well
 		if err := controllerutil.SetControllerReference(mcoKc, objState.Desired, r.Scheme); err != nil {
-			return nil, errors.Wrapf(err, "Failed to set controller reference to %s %s", objState.Desired.GetNamespace(), objState.Desired.GetName())
+			return nil, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 		if _, _, err := apply.ApplyObject(ctx, r.Client, objState); err != nil {
-			return nil, errors.Wrapf(err, "could not create %s", objState.Desired.GetObjectKind().GroupVersionKind().String())
+			return nil, fmt.Errorf("could not create %s: %w", objState.Desired.GetObjectKind().GroupVersionKind().String(), err)
 		}
 	}
 	return rendered, nil

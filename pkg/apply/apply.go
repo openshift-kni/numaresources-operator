@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pkg/errors"
 	"k8s.io/klog/v2"
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -47,8 +46,7 @@ func ApplyState(ctx context.Context, cli k8sclient.Client, objState objectstate.
 
 		err := cli.Delete(ctx, objState.Existing)
 		if err != nil {
-			err = errors.Wrapf(err, "could not delete object %s", objDesc)
-			return nil, false, err
+			return nil, false, fmt.Errorf("could not delete object %s: %w", objDesc, err)
 		}
 		klog.InfoS("deleted", "object", objDesc)
 		return objState.Existing, true, nil
@@ -64,8 +62,7 @@ func ApplyObject(ctx context.Context, cli k8sclient.Client, objState objectstate
 		klog.InfoS("creating", "object", objDesc)
 		err := cli.Create(ctx, objState.Desired)
 		if err != nil {
-			err = errors.Wrapf(err, "could not create object %s", objDesc)
-			return nil, false, err
+			return nil, false, fmt.Errorf("could not create object %s: %w", objDesc, err)
 		}
 		klog.InfoS("created", "object", objDesc)
 		return objState.Desired, true, nil
@@ -74,17 +71,17 @@ func ApplyObject(ctx context.Context, cli k8sclient.Client, objState objectstate
 	// Merge the desired object with what actually exists
 	merged, err := objState.Merge(objState.Existing, objState.Desired)
 	if err != nil {
-		return nil, false, errors.Wrapf(err, "could not merge object %s with existing", objDesc)
+		return nil, false, fmt.Errorf("could not merge object %s with existing: %w", objDesc, err)
 	}
 	ok, err := objState.Compare(objState.Existing, merged)
 	if err != nil {
-		return nil, false, errors.Wrapf(err, "could not compare object %s with existing", objDesc)
+		return nil, false, fmt.Errorf("could not compare object %s with existing: %w", objDesc, err)
 	}
 	updated := false
 	if !ok {
 		klog.InfoS("updating", "object", objDesc)
 		if err := cli.Update(ctx, merged); err != nil {
-			return nil, updated, errors.Wrapf(err, "could not update object %s", objDesc)
+			return nil, updated, fmt.Errorf("could not update object %s: %w", objDesc, err)
 		}
 		klog.InfoS("updated", "object", objDesc)
 		updated = true
