@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/openshift-kni/numaresources-operator/pkg/status"
+	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 	"sort"
 	"strconv"
 	"strings"
@@ -1096,6 +1098,273 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			isFailed, err := nrosched.CheckPodSchedulingFailedWithMsg(fxt.K8sClient, pendingPod.Namespace, pendingPod.Name, schedulerName, fmt.Sprintf("cannot align %s", kcObj.TopologyManagerScope))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pendingPod.Namespace, pendingPod.Name, schedulerName)
+		})
+
+		Context("[ngnodeselector] node group with NodeSelector", Label("ngnodeselector"), Label("feature:ngnodeselector"), func() {
+			It("should report the NodeGroupConfig in the NodeGroupStatus", func() {
+				nroKey := objects.NROObjectKey()
+				nroOperObj := nropv1.NUMAResourcesOperator{}
+
+				err := fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
+				Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
+
+				nsLabel := fmt.Sprintf("%s/%s", depnodes.LabelRole, "ns-test")
+				nsLabelVal := ""
+				ng := nropv1.NodeGroup{
+					NodeSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							nsLabel: nsLabelVal,
+						},
+					},
+				}
+				newNodeGroups := append(nroOperObj.Spec.NodeGroups, ng)
+				By(fmt.Sprintf("modifying the NUMAResourcesOperator by appending a node group with node selector: %+v", ng))
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Eventually(func(g Gomega) {
+					err := fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)
+					g.Expect(err).ToNot(HaveOccurred())
+
+					updatedNRO.Spec.NodeGroups = newNodeGroups
+					err = fxt.Client.Update(context.TODO(), &updatedNRO)
+					g.Expect(err).ToNot(HaveOccurred())
+				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
+
+				seenStatusConf := false
+				immediate := true
+				err = k8swait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, immediate, func(ctx context.Context) (bool, error) {
+					klog.Infof("getting: %q", nroKey.String())
+
+					err := fxt.Client.Get(ctx, nroKey, &nroOperObj)
+					if err != nil {
+						return false, fmt.Errorf("cannot get %q in the cluster: %w", nroKey.String(), err)
+					}
+					if len(nroOperObj.Status.NodeGroups) != len(nroOperObj.Spec.NodeGroups) {
+						return false, fmt.Errorf("NodeGrouups Status mismatch: found %d, expected %d",
+							len(nroOperObj.Status.NodeGroups), len(nroOperObj.Spec.NodeGroups),
+						)
+					}
+					klog.Infof("fetched NRO Object %q", nroKey.String())
+					var ngStatusWithNodeSelIdx int
+					for idx, ngStatus := range updatedNRO.Status.NodeGroups {
+						if cmp.Equal(ngStatus.Selector, ng.NodeSelector) {
+							ngStatusWithNodeSelIdx = idx
+						}
+					}
+					statusConf := nroOperObj.Status.NodeGroups[ngStatusWithNodeSelIdx].Config
+					if statusConf == nil {
+						return false, nil
+					}
+
+					seenStatusConf = true
+
+					var ngSpecWithNodeSelIdx int
+					for idx, ngSpec := range updatedNRO.Spec.NodeGroups {
+						if cmp.Equal(ngSpec.NodeSelector, ng.NodeSelector) {
+							ngSpecWithNodeSelIdx = idx
+						}
+					}
+					// normalize config to handle unspecified defaults
+					specConf := nropv1.DefaultNodeGroupConfig()
+					if nroOperObj.Spec.NodeGroups[ngSpecWithNodeSelIdx].Config != nil {
+						specConf = specConf.Merge(*nroOperObj.Spec.NodeGroups[ngSpecWithNodeSelIdx].Config)
+					}
+
+					// the status must be always populated by the operator.
+					// If the user-provided spec is missing, the status must reflect the compiled-in defaults.
+					// This is wrapped in a Eventually because even in functional, well-behaving clusters,
+					// the operator may take nonzero time to populate the status, and this is still fine.\
+					// NOTE HERE: we need to match the types as well (ptr and ptr)
+					match := cmp.Equal(statusConf, &specConf)
+					klog.InfoS("NRO Object", nroKey.String(), "status", toJSON(statusConf), "spec", toJSON(specConf), "match", match)
+					return match, nil
+				})
+				if !seenStatusConf {
+					e2efixture.Skipf(fxt, "NodeGroupConfig never reported in status, assuming not supported")
+				}
+				Expect(err).ToNot(HaveOccurred(), "failed to check the NodeGroupConfig status for %q", nroKey.String())
+			})
+
+			It("[tier1] should be able to configure nodeselector under nodeGroup of the NUMAResourcesOperator CR and update the node group", Label("tier1"), func(ctx context.Context) {
+				nrOperObj := &nropv1.NUMAResourcesOperator{}
+				nroKey := objects.NROObjectKey()
+				err := fxt.Client.Get(ctx, nroKey, nrOperObj)
+				Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
+
+				workers, err := depnodes.GetWorkers(fxt.DEnv())
+				Expect(err).ToNot(HaveOccurred())
+				// we're taking advantage of the fact that there is no extra validation about whether nodeselector nodegroup and mcpselector node group may address same subset of nodes, thus we are fine with even one node
+				Expect(workers).ToNot(BeEmpty())
+
+				targetIdx, ok := e2efixture.PickNodeIndex(workers)
+				Expect(ok).To(BeTrue())
+				targetedNode := workers[targetIdx]
+
+				nsLabel := fmt.Sprintf("%s/%s", depnodes.LabelRole, "ns-test")
+				nsLabelVal := ""
+				By(fmt.Sprintf("Label node %q with %q", targetedNode.Name, nsLabel))
+				unlabelFunc, err := labelNodeWithValue(fxt.Client, nsLabel, nsLabelVal, targetedNode.Name)
+				Expect(err).ToNot(HaveOccurred())
+
+				defer func() {
+					By(fmt.Sprintf("remove label %q from node %q", nsLabel, targetedNode.Name))
+					err = unlabelFunc()
+					Expect(err).ToNot(HaveOccurred())
+				}()
+
+				ng := nropv1.NodeGroup{
+					NodeSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							nsLabel: nsLabelVal,
+						},
+					},
+				}
+				newNodeGroups := append(nrOperObj.Spec.NodeGroups, ng)
+
+				By(fmt.Sprintf("modifying the NUMAResourcesOperator by appending a node group with node selector: %+v", ng))
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Eventually(func(g Gomega) {
+					err := fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)
+					g.Expect(err).ToNot(HaveOccurred())
+
+					updatedNRO.Spec.NodeGroups = newNodeGroups
+					err = fxt.Client.Update(context.TODO(), &updatedNRO)
+					g.Expect(err).ToNot(HaveOccurred())
+				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
+
+				var ngStatusWithNodeSelIdx int
+				for idx, ngStatus := range updatedNRO.Status.NodeGroups {
+					if cmp.Equal(ngStatus.Selector, ng.NodeSelector) {
+						ngStatusWithNodeSelIdx = idx
+					}
+				}
+
+				ngStatusWithNodeSel := updatedNRO.Status.NodeGroups[ngStatusWithNodeSelIdx]
+				expectedDSName := fmt.Sprintf("%s-%s", updatedNRO.Name, ngStatusWithNodeSel.Name)
+				dsKey := wait.ObjectKey{
+					Namespace: updatedNRO.Status.DaemonSets[0].Namespace, //same ns for all dss
+					Name:      expectedDSName,
+				}
+
+				defer func() {
+					By(fmt.Sprintf("revert initial NodeGroup in NUMAResourcesOperator object %q", nrOperObj.Name))
+					var updatedNRO nropv1.NUMAResourcesOperator
+					Eventually(func(g Gomega) {
+						err := fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)
+						g.Expect(err).ToNot(HaveOccurred())
+
+						updatedNRO.Spec.NodeGroups = nrOperObj.Spec.NodeGroups
+						err = fxt.Client.Update(context.TODO(), &updatedNRO)
+						g.Expect(err).ToNot(HaveOccurred())
+					}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+					By(fmt.Sprintf("verify daemonset %q was deleted", dsKey.String()))
+					err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetDeleted(context.TODO(), dsKey)
+					Expect(err).ToNot(HaveOccurred(), "failed to delete the daemonset %s", dsKey.String())
+				}()
+
+				Expect(ngStatusWithNodeSel.Name).ToNot(BeEmpty(), "generated nodegroup name is empty: %+v", ngStatusWithNodeSel)
+				klog.Infof("generated name of the new node group with node selector is: %s", ngStatusWithNodeSel.Name)
+
+				By("verify the NROP CR conditions are healthy with no failures")
+				Expect(fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)).To(Succeed())
+				cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionDegraded)
+				Expect(cond).To(BeNil())
+
+				By("verify new ds for node group with a node selector is created")
+				ds, err := wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(context.TODO(), dsKey)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String())
+
+				pods, err := podlist.With(fxt.Client).ByDaemonset(ctx, *ds)
+				Expect(err).ToNot(HaveOccurred())
+				By("ensuring the new RTE DS is running on only the labeled node")
+				Expect(len(pods)).To(Equal(1))
+				Expect(pods[0].Spec.NodeName).To(Equal(targetedNode.Name))
+
+				By("verify node group status is updated with the daemonset")
+				Expect(fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)).To(Succeed())
+				updatedStatus := updatedNRO.Status.NodeGroups[ngStatusWithNodeSelIdx]
+				Expect(len(updatedStatus.DaemonSets)).To(Equal(1))
+				Expect(updatedStatus.DaemonSets[0]).To(Equal(nropv1.NamespacedName{Namespace: dsKey.Namespace, Name: dsKey.Name}))
+
+				By("update node group config")
+				currentInfoRefreshPeriod := updatedStatus.Config.InfoRefreshPeriod
+				newInfoRefreshPeriod := metav1.Duration{Duration: time.Duration(currentInfoRefreshPeriod.Size() + 2)}
+
+				updatedNodeGroupConfigNRO := updatedNRO.DeepCopy()
+				var ngSpecWithNodeSelIdx int
+				for idx, ngSpec := range updatedNodeGroupConfigNRO.Spec.NodeGroups {
+					if cmp.Equal(ngSpec.NodeSelector, ng.NodeSelector) {
+						ngSpecWithNodeSelIdx = idx
+					}
+				}
+				updatedNRO.Spec.NodeGroups[ngSpecWithNodeSelIdx].Config.InfoRefreshPeriod = &newInfoRefreshPeriod
+
+				Eventually(func(g Gomega) {
+					err := fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)
+					g.Expect(err).ToNot(HaveOccurred())
+
+					updatedNRO.Spec.NodeGroups = updatedNodeGroupConfigNRO.Spec.NodeGroups
+					err = fxt.Client.Update(context.TODO(), &updatedNRO)
+					g.Expect(err).ToNot(HaveOccurred())
+				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
+				Expect(fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)).To(Succeed())
+				updatedStatus = updatedNRO.Status.NodeGroups[ngStatusWithNodeSelIdx]
+
+				By("verify new config is reflected on node group status")
+				Expect(updatedStatus.Config.InfoRefreshPeriod).To(Equal(newInfoRefreshPeriod))
+				By("verify ds name is preserved")
+				Expect(len(updatedStatus.DaemonSets)).To(Equal(1))
+				Expect(updatedStatus.DaemonSets[0]).To(Equal(nropv1.NamespacedName{Namespace: dsKey.Namespace, Name: dsKey.Name}))
+			})
+
+			It("[ngnodeselector][tier2] should not allow configuring NodeSelector and MCP selector on same node group", Label("tier2"), func(ctx context.Context) {
+				nrOperObj := &nropv1.NUMAResourcesOperator{}
+				nroKey := objects.NROObjectKey()
+				err := fxt.Client.Get(ctx, nroKey, nrOperObj)
+				Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
+
+				labelSel := &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"test2": "test2",
+					},
+				}
+
+				ng := nropv1.NodeGroup{
+					MachineConfigPoolSelector: labelSel,
+					NodeSelector:              labelSel,
+				}
+
+				By(fmt.Sprintf("modifying the NUMAResourcesOperator by appending a node group with several selectors set: %+v", ng))
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Eventually(func(g Gomega) {
+					err := fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)
+					g.Expect(err).ToNot(HaveOccurred())
+
+					updatedNRO.Spec.NodeGroups = append(updatedNRO.Spec.NodeGroups, ng)
+					err = fxt.Client.Update(context.TODO(), &updatedNRO)
+					g.Expect(err).ToNot(HaveOccurred())
+				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
+
+				defer func() {
+					By(fmt.Sprintf("revert initial NodeGroup in NUMAResourcesOperator object %q", nrOperObj.Name))
+					var updatedNRO nropv1.NUMAResourcesOperator
+					Eventually(func(g Gomega) {
+						err := fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)
+						g.Expect(err).ToNot(HaveOccurred())
+
+						updatedNRO.Spec.NodeGroups = nrOperObj.Spec.NodeGroups
+						err = fxt.Client.Update(context.TODO(), &updatedNRO)
+						g.Expect(err).ToNot(HaveOccurred())
+					}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+				}()
+
+				By("verify degraded condition is found due to node group with multiple selectors")
+				Expect(fxt.Client.Get(context.TODO(), nroKey, &updatedNRO)).To(Succeed())
+				cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionDegraded)
+				Expect(cond).NotTo(BeNil(), "expected operators conditions to be degraded but degraded was found false")
+				Expect(cond.Reason).To(Equal(validation.NodeGroupsError))
+				Expect(cond.Message).To(Equal("only one selector is allowed to be specified under a node group"), "different degrade message was found")
+			})
 		})
 	})
 })
