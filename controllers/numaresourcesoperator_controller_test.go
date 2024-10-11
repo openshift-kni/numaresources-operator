@@ -573,6 +573,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 							Expect(len(nroUpdated.Status.RelatedObjects)).To(Equal(len(expected)))
 							Expect(nroUpdated.Status.RelatedObjects).To(ContainElements(expected))
+							Expect(validation.EqualNamespacedDSSlicesByName(nroUpdated.Status.DaemonSets, testobjs.GetDaemonSetListFromNodeGroupStatuses(nroUpdated.Status.NodeGroups)))
 						})
 					})
 				})

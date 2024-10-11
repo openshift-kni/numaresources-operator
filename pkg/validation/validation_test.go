@@ -25,7 +25,6 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
-
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
@@ -90,12 +89,14 @@ func TestNodeGroupsSanity(t *testing.T) {
 		expectedErrorMessage string
 	}
 
+	poolName := "poolname-test"
 	testCases := []testCase{
 		{
-			name: "nil MCP selector",
+			name: "both source pools are nil",
 			nodeGroups: []nropv1.NodeGroup{
 				{
 					MachineConfigPoolSelector: nil,
+					PoolName:                  nil,
 				},
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
@@ -106,10 +107,25 @@ func TestNodeGroupsSanity(t *testing.T) {
 				},
 			},
 			expectedError:        true,
-			expectedErrorMessage: "one of the node groups does not have machineConfigPoolSelector",
+			expectedErrorMessage: "one of the node groups does not set a pool specifier",
 		},
 		{
-			name: "with duplicates",
+			name: "both source pools are set",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "test",
+						},
+					},
+					PoolName: &poolName,
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "one of the node groups specify more than one pool specifier while only one is allowed",
+		},
+		{
+			name: "with duplicates - mcp selector",
 			nodeGroups: []nropv1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
@@ -124,6 +140,19 @@ func TestNodeGroupsSanity(t *testing.T) {
 							"test": "test",
 						},
 					},
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "has duplicates",
+		},
+		{
+			name: "with duplicates - pool name",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					PoolName: &poolName,
+				},
+				{
+					PoolName: &poolName,
 				},
 			},
 			expectedError:        true,
@@ -165,6 +194,9 @@ func TestNodeGroupsSanity(t *testing.T) {
 						},
 					},
 				},
+				{
+					PoolName: &poolName,
+				},
 			},
 		},
 	}
@@ -182,6 +214,110 @@ func TestNodeGroupsSanity(t *testing.T) {
 				if !strings.Contains(err.Error(), tc.expectedErrorMessage) {
 					t.Errorf("unexpected error: %v (expected %q)", err, tc.expectedErrorMessage)
 				}
+			}
+		})
+	}
+}
+
+func TestEqualNamespacedDSSlicesByName(t *testing.T) {
+	type testCase struct {
+		name          string
+		s1            []nropv1.NamespacedName
+		s2            []nropv1.NamespacedName
+		expectedError bool
+	}
+
+	testCases := []testCase{
+		{
+			name:          "nil slices",
+			s1:            []nropv1.NamespacedName{},
+			s2:            []nropv1.NamespacedName{},
+			expectedError: false,
+		},
+		{
+			name: "equal slices by name",
+			s1: []nropv1.NamespacedName{
+				{
+					Name: "foo",
+				},
+				{
+					Namespace: "ns1",
+					Name:      "bar",
+				},
+			},
+			s2: []nropv1.NamespacedName{
+				{
+					Name: "bar",
+				},
+				{
+					Namespace: "ns2",
+					Name:      "foo",
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "different slices by length",
+			s1: []nropv1.NamespacedName{
+				{
+					Namespace: "ns1",
+					Name:      "foo",
+				},
+				{
+					Namespace: "ns1",
+					Name:      "bar",
+				},
+			},
+			s2: []nropv1.NamespacedName{
+				{
+					Namespace: "ns2",
+					Name:      "bar",
+				},
+				{
+					Namespace: "ns2",
+					Name:      "foo",
+				},
+				{
+					Namespace: "ns2",
+					Name:      "foo",
+				},
+			},
+			expectedError: true,
+		},
+		{
+			name: "different slices by name",
+			s1: []nropv1.NamespacedName{
+				{
+					Namespace: "ns1",
+					Name:      "foo",
+				},
+				{
+					Namespace: "ns1",
+					Name:      "bar",
+				},
+			},
+			s2: []nropv1.NamespacedName{
+				{
+					Namespace: "ns1",
+					Name:      "foo",
+				},
+				{
+					Namespace: "ns1",
+					Name:      "foo",
+				},
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := EqualNamespacedDSSlicesByName(tc.s1, tc.s2)
+			if err == nil && tc.expectedError {
+				t.Errorf("expected error, succeeded")
+			}
+			if err != nil && !tc.expectedError {
+				t.Errorf("expected success, failed")
 			}
 		})
 	}

@@ -19,6 +19,8 @@ package validation
 import (
 	"errors"
 	"fmt"
+	"slices"
+	"sort"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,11 +61,15 @@ func MachineConfigPoolDuplicates(trees []nodegroupv1.Tree) error {
 // NodeGroups validates the node groups for nil values and duplicates.
 // TODO: move it under the validation webhook once we will have one
 func NodeGroups(nodeGroups []nropv1.NodeGroup) error {
-	if err := nodeGroupsMachineConfigPoolSelector(nodeGroups); err != nil {
+	if err := nodeGroupPools(nodeGroups); err != nil {
 		return err
 	}
 
-	if err := nodeGroupsDuplicates(nodeGroups); err != nil {
+	if err := nodeGroupsDuplicatesByMCPSelector(nodeGroups); err != nil {
+		return err
+	}
+
+	if err := nodeGroupsDuplicatesByPoolName(nodeGroups); err != nil {
 		return err
 	}
 
@@ -75,10 +81,13 @@ func NodeGroups(nodeGroups []nropv1.NodeGroup) error {
 }
 
 // TODO: move it under the validation webhook once we will have one
-func nodeGroupsMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
+func nodeGroupPools(nodeGroups []nropv1.NodeGroup) error {
 	for _, nodeGroup := range nodeGroups {
-		if nodeGroup.MachineConfigPoolSelector == nil {
-			return fmt.Errorf("one of the node groups does not have machineConfigPoolSelector")
+		if nodeGroup.MachineConfigPoolSelector == nil && nodeGroup.PoolName == nil {
+			return fmt.Errorf("one of the node groups does not set a pool specifier")
+		}
+		if nodeGroup.MachineConfigPoolSelector != nil && nodeGroup.PoolName != nil {
+			return fmt.Errorf("one of the node groups specify more than one pool specifier while only one is allowed")
 		}
 	}
 
@@ -86,7 +95,7 @@ func nodeGroupsMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
 }
 
 // TODO: move it under the validation webhook once we will have one
-func nodeGroupsDuplicates(nodeGroups []nropv1.NodeGroup) error {
+func nodeGroupsDuplicatesByMCPSelector(nodeGroups []nropv1.NodeGroup) error {
 	duplicates := map[string]int{}
 	for _, nodeGroup := range nodeGroups {
 		if nodeGroup.MachineConfigPoolSelector == nil {
@@ -115,6 +124,35 @@ func nodeGroupsDuplicates(nodeGroups []nropv1.NodeGroup) error {
 }
 
 // TODO: move it under the validation webhook once we will have one
+func nodeGroupsDuplicatesByPoolName(nodeGroups []nropv1.NodeGroup) error {
+	duplicates := map[string]int{}
+	for _, nodeGroup := range nodeGroups {
+		if nodeGroup.PoolName == nil {
+			continue
+		}
+
+		key := *nodeGroup.PoolName
+		if _, ok := duplicates[key]; !ok {
+			duplicates[key] = 0
+		}
+		duplicates[key] += 1
+	}
+
+	var duplicateErrors []string
+	for name, count := range duplicates {
+		if count > 1 {
+			duplicateErrors = append(duplicateErrors, fmt.Sprintf("the pool name %q has duplicates", name))
+		}
+	}
+
+	if len(duplicateErrors) > 0 {
+		return errors.New(strings.Join(duplicateErrors, "; "))
+	}
+
+	return nil
+}
+
+// TODO: move it under the validation webhook once we will have one
 func nodeGroupMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
 	var selectorsErrors []string
 	for _, nodeGroup := range nodeGroups {
@@ -131,5 +169,27 @@ func nodeGroupMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
 		return errors.New(strings.Join(selectorsErrors, "; "))
 	}
 
+	return nil
+}
+
+// EqualNamespacedDSSlicesByName validates two slices of type NamespacedName are equal in Names
+func EqualNamespacedDSSlicesByName(s1, s2 []nropv1.NamespacedName) error {
+	sort.SliceStable(s1, func(i, j int) bool { return s1[i].Name > s1[j].Name })
+	sort.SliceStable(s2, func(i, j int) bool { return s2[i].Name > s2[j].Name })
+	equal := slices.EqualFunc(s1, s2, func(a nropv1.NamespacedName, b nropv1.NamespacedName) bool {
+		return a.Name == b.Name
+	})
+	if !equal {
+		return fmt.Errorf("expected RTE daemonsets are different from actual daemonsets")
+	}
+	return nil
+}
+
+func SourcePoolDuplicates(trees []nodegroupv1.Tree) error {
+	for _, tree := range trees {
+		if tree.NodePoolSelector != nil && len(tree.MachineConfigPools) != 0 {
+			return fmt.Errorf("expected one pool source but detected two: NodePoolSelector: %q / MachineConfigPools %+v", tree.NodePoolSelector, tree.MachineConfigPools)
+		}
+	}
 	return nil
 }
