@@ -43,21 +43,24 @@ type NUMAResourcesOperatorSpec struct {
 	PodExcludes []NamespacedName `json:"podExcludes,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Enabled;Disabled
+// +kubebuilder:validation:Enum=Disabled;Enabled;EnabledExclusiveResources
 type PodsFingerprintingMode string
 
-var (
+const (
 	// PodsFingerprintingDisabled disables the pod fingerprinting reporting.
 	PodsFingerprintingDisabled PodsFingerprintingMode = "Disabled"
 
 	// PodsFingerprintingEnabled enables the pod fingerprint considering all the pods running on nodes. It is the default.
 	PodsFingerprintingEnabled PodsFingerprintingMode = "Enabled"
+
+	// PodsFingerprintingEnabledExclusiveResources enables the pod fingerprint considering only pods which have exclusive resources assigned.
+	PodsFingerprintingEnabledExclusiveResources PodsFingerprintingMode = "EnabledExclusiveResources"
 )
 
 // +kubebuilder:validation:Enum=Periodic;Events;PeriodicAndEvents
 type InfoRefreshMode string
 
-var (
+const (
 	// InfoRefreshPeriodic is the default. Periodically polls the state and reports it.
 	InfoRefreshPeriodic InfoRefreshMode = "Periodic"
 
