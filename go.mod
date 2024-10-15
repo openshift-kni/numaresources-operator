@@ -8,6 +8,7 @@ require (
 	github.com/drone/envsubst v1.0.3
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/jaypipes/ghw v0.12.0
 	github.com/k8stopologyawareschedwg/deployer v0.21.0
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2
@@ -67,6 +68,7 @@ require (
 	github.com/google/pprof v0.0.0-20240424215950-a892ee059fd6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
+	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jaypipes/pcidb v1.0.0 // indirect
