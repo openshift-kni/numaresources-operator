@@ -39,7 +39,7 @@ import (
 	e2epause "github.com/openshift-kni/numaresources-operator/test/utils/objects/pause"
 )
 
-var _ = Describe("[Uninstall]", func() {
+var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 	var (
 		initialized bool
 	)

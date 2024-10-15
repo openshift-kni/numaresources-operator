@@ -16,3 +16,6 @@ trap '{ echo "Running NRO uninstall test suite"; ${BIN_DIR}/e2e-nrop-uninstall.t
 # Run install test suite
 echo "Running NRO install test suite"
 ${BIN_DIR}/e2e-nrop-install.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.fail-fast --ginkgo.junit-report=${REPORT_DIR}/install.xml --ginkgo.focus='\[Install\] durability'
+  
+echo "Running NRO uninstall test suite";
+${BIN_DIR}/e2e-nrop-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.junit-report=${REPORT_DIR}/uninstall.xml

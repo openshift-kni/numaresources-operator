@@ -52,6 +52,9 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
+// tests here are not interruptible, so they should not accept contexts.
+// See: https://onsi.github.io/ginkgo/#interruptible-nodes-and-speccontext
+
 const (
 	containerNameRTE = "resource-topology-exporter"
 )
@@ -144,7 +147,7 @@ var _ = Describe("[Install] continuousIntegration", func() {
 	})
 })
 
-var _ = Describe("[Install] durability", func() {
+var _ = Describe("[Install] durability", Serial, func() {
 	var initialized bool
 
 	BeforeEach(func() {
@@ -198,7 +201,6 @@ var _ = Describe("[Install] durability", func() {
 		})
 
 		It("[test_id:47587][tier1] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", func() {
-
 			By("getting up-to-date NRO object")
 			nroKey := client.ObjectKeyFromObject(deployedObj.NroObj)
 			Expect(nroKey.Name).NotTo(BeEmpty())
