@@ -121,7 +121,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 test-unit: test-unit-pkgs test-controllers
 
 test-unit-pkgs:
-	go test ./api/... ./pkg/... ./rte/pkg/... ./internal/...
+	go test ./api/... ./pkg/... ./rte/pkg/... ./internal/... ./nrovalidate/validator/...
 
 test-controllers: envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/...
@@ -154,18 +154,13 @@ binary-rte: build-tools
 binary-nrovalidate: build-tools
 	LDFLAGS="-s -w"; \
 	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version)"; \
-	go build -mod=vendor -o bin/nrovalidate -ldflags "$$LDFLAGS" -tags "$$GOTAGS" cmd/nrovalidate/main.go
-
-binary-nrtcacheck: build-tools
-	LDFLAGS="-s -w" \
-	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version)"; \
-	go build -mod=vendor -o bin/nrtcacheck -ldflags "$$LDFLAGS" -tags "$$GOTAGS" cmd/nrtcacheck/main.go
+	go build -mod=vendor -o bin/nrovalidate -ldflags "$$LDFLAGS" -tags "$$GOTAGS" nrovalidate/main.go
 
 binary-numacell: build-tools
 	LDFLAGS="-s -w" \
 	CGO_ENABLED=0 go build -mod=vendor -o bin/numacell -ldflags "$$LDFLAGS" test/deviceplugin/cmd/numacell/main.go
 
-binary-all: binary binary-rte binary-nrovalidate binary-nrtcacheck
+binary-all: binary binary-rte binary-nrovalidate
 
 binary-e2e-rte-local:
 	go test -c -v -o bin/e2e-nrop-rte-local.test ./test/e2e/rte/local
@@ -389,7 +384,7 @@ goversion:
 build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform
 
 .PHONY: build-tools-all
-build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap bin/watchnrtattr bin/mkginkgolabelfilter
+build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap bin/watchnrtattr bin/mkginkgolabelfilter bin/nrtcacheck
 
 bin/buildhelper:
 	@go build -o bin/buildhelper tools/buildhelper/buildhelper.go
@@ -410,6 +405,11 @@ bin/watchnrtattr:
 bin/mkginkgolabelfilter:
 	LDFLAGS="-static"
 	@go build -o bin/mkginkgolabelfilter -ldflags "$$LDFLAGS" tools/mkginkgolabelfilter/mkginkgolabelfilter.go
+
+bin/nrtcacheck: build-tools
+	LDFLAGS="-s -w" \
+	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version)"; \
+	go build -mod=vendor -o bin/nrtcacheck -ldflags "$$LDFLAGS" -tags "$$GOTAGS" tools/nrtcacheck/nrtcacheck.go
 
 verify-generated: bundle generate
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"

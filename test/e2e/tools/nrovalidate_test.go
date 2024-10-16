@@ -29,7 +29,7 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
-	nrovalidator "github.com/openshift-kni/numaresources-operator/pkg/validator"
+	nrovalidator "github.com/openshift-kni/numaresources-operator/nrovalidate/validator"
 )
 
 // nrovalidate is complex enough to deserve its own separate tests
