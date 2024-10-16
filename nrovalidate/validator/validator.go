@@ -79,6 +79,7 @@ func Available() sets.Set[string] {
 		ValidatorNodeResourceTopologies,
 		ValidatorPodStatus,
 		ValidatorSchedCache,
+		ValidatorDangling,
 	)
 }
 
@@ -89,6 +90,7 @@ type ValidatorData struct {
 	unsynchedCaches      map[string]sets.Set[string]
 	nrtCrdMissing        bool
 	nrtList              *nrtv1alpha2.NodeResourceTopologyList
+	danglingObjects      []client.ObjectKey
 	versionInfo          *version.Info
 	what                 sets.Set[string]
 }
@@ -101,6 +103,7 @@ func Collectors() map[string]CollectFunc {
 		ValidatorNodeResourceTopologies: CollectNodeResourceTopologies,
 		ValidatorPodStatus:              CollectPodStatus,
 		ValidatorSchedCache:             CollectSchedCache,
+		ValidatorDangling:               CollectDangling,
 	}
 }
 
@@ -201,6 +204,7 @@ func Validators() map[string]ValidateFunc {
 		ValidatorNodeResourceTopologies: ValidateNodeResourceTopologies,
 		ValidatorPodStatus:              ValidatePodStatus,
 		ValidatorSchedCache:             ValidateSchedCache,
+		ValidatorDangling:               ValidateDangling,
 	}
 }
 
