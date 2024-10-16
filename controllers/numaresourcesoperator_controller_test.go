@@ -261,7 +261,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+			Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 0}))
 
 			By("Check DaemonSets are created")
 			mcp1DSKey := client.ObjectKey{
@@ -330,7 +330,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 				thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+				Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: 0}))
 			})
 			It("should delete also the corresponding DaemonSet", func() {
 
@@ -587,7 +587,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					})
 					It("should continue with creation of additional components", func() {
 						// check reconcile second loop result
-						Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+						Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 0}))
 
 						By("Check All the additional components are created")
 						rteKey := client.ObjectKey{
@@ -1017,7 +1017,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+			Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: 0}))
 
 			dsUpdated := &appsv1.DaemonSet{}
 			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, dsUpdated)).ToNot(HaveOccurred())
@@ -1069,7 +1069,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+			Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: 0}))
 
 			dsUpdated := &appsv1.DaemonSet{}
 			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, dsUpdated)).ToNot(HaveOccurred())
@@ -1321,7 +1321,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+			Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 0}))
 
 			By("Check DaemonSets are created")
 			mcp1DSKey := client.ObjectKey{
@@ -1412,6 +1412,6 @@ func reconcileObjects(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.Ma
 	secondLoopResult, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 	Expect(err).ToNot(HaveOccurred())
 
-	Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+	Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 0}))
 	return reconciler
 }
