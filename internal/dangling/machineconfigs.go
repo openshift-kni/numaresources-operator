@@ -49,15 +49,17 @@ func MachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUM
 	}
 
 	for _, mc := range machineConfigList.Items {
-		if !expectedMachineConfigNames.Has(mc.Name) {
-			if isOwnedBy(mc.GetObjectMeta(), instance) {
-				if err := cli.Delete(ctx, &mc); err != nil {
-					klog.ErrorS(err, "error while deleting machineconfig", "MachineConfig", mc.Name)
-					errors = append(errors, err)
-				} else {
-					klog.V(3).InfoS("Machineconfig deleted", "name", mc.Name)
-				}
-			}
+		if expectedMachineConfigNames.Has(mc.Name) {
+			continue
+		}
+		if !isOwnedBy(mc.GetObjectMeta(), instance) {
+			continue
+		}
+		if err := cli.Delete(ctx, &mc); err != nil {
+			klog.ErrorS(err, "error while deleting machineconfig", "MachineConfig", mc.Name)
+			errors = append(errors, err)
+		} else {
+			klog.V(3).InfoS("Machineconfig deleted", "name", mc.Name)
 		}
 	}
 	return errors
