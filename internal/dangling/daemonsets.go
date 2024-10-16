@@ -48,15 +48,17 @@ func DaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMARes
 	}
 
 	for _, ds := range daemonSetList.Items {
-		if !expectedDaemonSetNames.Has(ds.Name) {
-			if isOwnedBy(ds.GetObjectMeta(), instance) {
-				if err := cli.Delete(ctx, &ds); err != nil {
-					klog.ErrorS(err, "error while deleting daemonset", "DaemonSet", ds.Name)
-					errors = append(errors, err)
-				} else {
-					klog.V(3).InfoS("Daemonset deleted", "name", ds.Name)
-				}
-			}
+		if expectedDaemonSetNames.Has(ds.Name) {
+			continue
+		}
+		if !isOwnedBy(ds.GetObjectMeta(), instance) {
+			continue
+		}
+		if err := cli.Delete(ctx, &ds); err != nil {
+			klog.ErrorS(err, "error while deleting daemonset", "DaemonSet", ds.Name)
+			errors = append(errors, err)
+		} else {
+			klog.V(3).InfoS("Daemonset deleted", "name", ds.Name)
 		}
 	}
 	return errors
