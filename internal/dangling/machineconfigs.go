@@ -20,7 +20,6 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -30,21 +29,15 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 
-func MachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator) []error {
-	klog.V(3).Info("Delete Machineconfigs start")
-	defer klog.V(3).Info("Delete Machineconfigs end")
-
-	var errors []error
-
-	trees, err := getTreesByNodeGroup(ctx, r.Client, instance.Spec.NodeGroups)
+func MachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator) ([]client.ObjectKey, error) {
+	trees, err := getTreesByNodeGroup(ctx, cli, instance.Spec.NodeGroups)
 	if err != nil {
-		return append(errors, err)
+		return nil, err
 	}
 
 	var machineConfigList machineconfigv1.MachineConfigList
 	if err := cli.List(ctx, &machineConfigList); err != nil {
-		klog.ErrorS(err, "error while getting MachineConfig list")
-		return append(errors, err)
+		return nil, err
 	}
 
 	expectedMachineConfigNames := sets.NewString()
@@ -54,6 +47,7 @@ func MachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUM
 		}
 	}
 
+	var dangling []client.ObjectKey
 	for _, mc := range machineConfigList.Items {
 		if expectedMachineConfigNames.Has(mc.Name) {
 			continue
@@ -61,12 +55,7 @@ func MachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUM
 		if !isOwnedBy(mc.GetObjectMeta(), instance) {
 			continue
 		}
-		if err := cli.Delete(ctx, &mc); err != nil {
-			klog.ErrorS(err, "error while deleting machineconfig", "MachineConfig", mc.Name)
-			errors = append(errors, err)
-		} else {
-			klog.V(3).InfoS("Machineconfig deleted", "name", mc.Name)
-		}
+		dangling = append(dangling, client.ObjectKeyFromObject(&mc))
 	}
-	return errors
+	return dangling, nil
 }
