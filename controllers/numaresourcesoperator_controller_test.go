@@ -89,6 +89,8 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 
 var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 	verifyDegradedCondition := func(nro *nropv1.NUMAResourcesOperator, reason string) {
+		GinkgoHelper()
+
 		reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro)
 		Expect(err).ToNot(HaveOccurred())
 
