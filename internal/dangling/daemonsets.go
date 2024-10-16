@@ -26,14 +26,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 
-func DaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
+func DaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator) []error {
 	klog.V(3).Info("Delete Daemonsets start")
 	defer klog.V(3).Info("Delete Daemonsets end")
+
 	var errors []error
+
+	trees, err := getTreesByNodeGroup(ctx, cli, instance.Spec.NodeGroups)
+	if err != nil {
+		return append(errors, err)
+	}
+
 	var daemonSetList appsv1.DaemonSetList
 	if err := cli.List(ctx, &daemonSetList, &client.ListOptions{Namespace: instance.Namespace}); err != nil {
 		klog.ErrorS(err, "error while getting Daemonset list")
