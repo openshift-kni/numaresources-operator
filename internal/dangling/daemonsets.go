@@ -21,7 +21,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -29,21 +28,15 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 
-func DaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator) []error {
-	klog.V(3).Info("Delete Daemonsets start")
-	defer klog.V(3).Info("Delete Daemonsets end")
-
-	var errors []error
-
+func DaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator) ([]client.ObjectKey, error) {
 	trees, err := getTreesByNodeGroup(ctx, cli, instance.Spec.NodeGroups)
 	if err != nil {
-		return append(errors, err)
+		return nil, err
 	}
 
 	var daemonSetList appsv1.DaemonSetList
 	if err := cli.List(ctx, &daemonSetList, &client.ListOptions{Namespace: instance.Namespace}); err != nil {
-		klog.ErrorS(err, "error while getting Daemonset list")
-		return append(errors, err)
+		return nil, err
 	}
 
 	expectedDaemonSetNames := sets.NewString()
@@ -53,6 +46,7 @@ func DaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMARes
 		}
 	}
 
+	var dangling []client.ObjectKey
 	for _, ds := range daemonSetList.Items {
 		if expectedDaemonSetNames.Has(ds.Name) {
 			continue
@@ -60,12 +54,7 @@ func DaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMARes
 		if !isOwnedBy(ds.GetObjectMeta(), instance) {
 			continue
 		}
-		if err := cli.Delete(ctx, &ds); err != nil {
-			klog.ErrorS(err, "error while deleting daemonset", "DaemonSet", ds.Name)
-			errors = append(errors, err)
-		} else {
-			klog.V(3).InfoS("Daemonset deleted", "name", ds.Name)
-		}
+		dangling = append(dangling, client.ObjectKeyFromObject(&ds))
 	}
-	return errors
+	return dangling, nil
 }
