@@ -17,23 +17,25 @@
 package objects
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
 func TestNewNUMAResourcesOperator(t *testing.T) {
 	name := "test-nrop"
-	labelSelectors := []*metav1.LabelSelector{
-		{
-			MatchLabels: map[string]string{
-				"unit-test-nrop-obj": "foobar",
-			},
+	ng := nropv1.NodeGroup{
+		MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: map[string]string{
+			"unit-test-nrop-obj": "foobar",
+		},
 		},
 	}
 
-	obj := NewNUMAResourcesOperator(name, labelSelectors)
+	obj := NewNUMAResourcesOperator(name, ng)
 
 	if obj == nil {
 		t.Fatalf("null object")
@@ -91,5 +93,44 @@ func TestNewNamespace(t *testing.T) {
 		if gotValue != value {
 			t.Errorf("unexpected value for %q: got %q expectdd %q", key, gotValue, value)
 		}
+	}
+}
+
+func TestGetDaemonSetListFromNodeGroupStatuses(t *testing.T) {
+	ngs := []nropv1.NodeGroupStatus{
+		{
+			PoolName: "pool1",
+			DaemonSet: nropv1.NamespacedName{
+				Name: "daemonset-1",
+			},
+		},
+		{
+			PoolName: "pool2",
+			DaemonSet: nropv1.NamespacedName{
+				Name: "daemonset-2",
+			},
+		},
+		{
+			PoolName: "pool3",
+			DaemonSet: nropv1.NamespacedName{
+				Name: "daemonset-1", // duplicates should not exist, if they do it's a bug and we don't want to ignore it by eliminate the duplicates
+			},
+		},
+	}
+	expectedOutput := []nropv1.NamespacedName{
+		{
+			Name: "daemonset-1",
+		},
+		{
+			Name: "daemonset-2",
+		},
+		{
+			Name: "daemonset-1",
+		},
+	}
+
+	got := GetDaemonSetListFromNodeGroupStatuses(ngs)
+	if !reflect.DeepEqual(got, expectedOutput) {
+		t.Errorf("unexpected daemonsets list:\n\t%v\n\tgot:\n\t%v", expectedOutput, got)
 	}
 }

@@ -23,6 +23,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -185,6 +186,47 @@ func TestFindTrees(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "node group with PoolName and MachineConfigPoolSelector in another node group",
+			mcps: &mcpList,
+			ngs: []nropv1.NodeGroup{
+				{
+					PoolName: &mcpList.Items[0].Name,
+				},
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"mcp-label-3": "test3",
+						},
+					},
+				},
+			},
+			expected: []Tree{
+				{
+					MachineConfigPools: []*mcov1.MachineConfigPool{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "mcp1",
+							},
+						},
+					},
+				},
+				{
+					MachineConfigPools: []*mcov1.MachineConfigPool{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "mcp3",
+							},
+						},
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "mcp5",
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
@@ -203,9 +245,10 @@ func TestFindTrees(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error checking backward compat: %v", err)
 			}
-			compatNames := mcpNamesFromList(gotMcps)
-			if !reflect.DeepEqual(gotNames, compatNames) {
-				t.Errorf("Trees mismatch (non backward compatible): got=%v compat=%v", gotNames, compatNames)
+			compatibleNames := mcpNamesFromList(gotMcps)
+			gotSet := sets.New[string](gotNames...)
+			if !gotSet.HasAll(compatibleNames...) {
+				t.Errorf("Trees mismatch (non backward compatible): got=%v compat=%v", gotNames, compatibleNames)
 			}
 		})
 	}

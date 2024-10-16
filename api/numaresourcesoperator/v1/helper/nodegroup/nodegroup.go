@@ -59,31 +59,42 @@ func (ttr Tree) Clone() Tree {
 // One of the key design assumptions in NROP is the 1:1 mapping between NodeGroups and MCPs.
 // This historical accident should be fixed in future versions.
 func FindTrees(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup) ([]Tree, error) {
+	// node groups are validated by the controller before getting to this phase, so for sure all node groups will be valid at this point.
+	// a valid node group has either PoolName OR MachineConfigPoolSelector, not both. Getting here means operator is deployed on Openshift thus processing MCPs
 	var result []Tree
 	for idx := range nodeGroups {
 		nodeGroup := &nodeGroups[idx] // shortcut
-
-		if nodeGroup.MachineConfigPoolSelector == nil {
-			continue
-		}
-		selector, err := metav1.LabelSelectorAsSelector(nodeGroup.MachineConfigPoolSelector)
-		if err != nil {
-			klog.Errorf("bad node group machine config pool selector %q", nodeGroup.MachineConfigPoolSelector.String())
-			continue
-		}
-
 		treeMCPs := []*mcov1.MachineConfigPool{}
-		for i := range mcps.Items {
-			mcp := &mcps.Items[i] // shortcut
-			mcpLabels := labels.Set(mcp.Labels)
-			if !selector.Matches(mcpLabels) {
+
+		if nodeGroup.PoolName != nil {
+			for i := range mcps.Items {
+				mcp := &mcps.Items[i]
+				if mcp.Name == *nodeGroup.PoolName {
+					treeMCPs = append(treeMCPs, mcp)
+					// MCO ensures there are no mcp name duplications
+					break
+				}
+			}
+		}
+
+		if nodeGroup.MachineConfigPoolSelector != nil {
+			selector, err := metav1.LabelSelectorAsSelector(nodeGroup.MachineConfigPoolSelector)
+			if err != nil {
+				klog.Errorf("bad node group machine config pool selector %q", nodeGroup.MachineConfigPoolSelector.String())
 				continue
 			}
-			treeMCPs = append(treeMCPs, mcp)
-		}
 
+			for i := range mcps.Items {
+				mcp := &mcps.Items[i] // shortcut
+				mcpLabels := labels.Set(mcp.Labels)
+				if !selector.Matches(mcpLabels) {
+					continue
+				}
+				treeMCPs = append(treeMCPs, mcp)
+			}
+		}
 		if len(treeMCPs) == 0 {
-			return nil, fmt.Errorf("failed to find MachineConfigPool for the node group with the selector %q", nodeGroup.MachineConfigPoolSelector.String())
+			return nil, fmt.Errorf("failed to find MachineConfigPool for the node group %+v", nodeGroup)
 		}
 
 		result = append(result, Tree{

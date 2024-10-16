@@ -25,7 +25,6 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
-
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
@@ -90,12 +89,14 @@ func TestNodeGroupsSanity(t *testing.T) {
 		expectedErrorMessage string
 	}
 
+	poolName := "poolname-test"
 	testCases := []testCase{
 		{
-			name: "nil MCP selector",
+			name: "both source pools are nil",
 			nodeGroups: []nropv1.NodeGroup{
 				{
 					MachineConfigPoolSelector: nil,
+					PoolName:                  nil,
 				},
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
@@ -106,10 +107,25 @@ func TestNodeGroupsSanity(t *testing.T) {
 				},
 			},
 			expectedError:        true,
-			expectedErrorMessage: "one of the node groups does not have machineConfigPoolSelector",
+			expectedErrorMessage: "missing any pool specifier",
 		},
 		{
-			name: "with duplicates",
+			name: "both source pools are set",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "test",
+						},
+					},
+					PoolName: &poolName,
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "must have only a single specifier set",
+		},
+		{
+			name: "with duplicates - mcp selector",
 			nodeGroups: []nropv1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
@@ -124,6 +140,19 @@ func TestNodeGroupsSanity(t *testing.T) {
 							"test": "test",
 						},
 					},
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "has duplicates",
+		},
+		{
+			name: "with duplicates - pool name",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					PoolName: &poolName,
+				},
+				{
+					PoolName: &poolName,
 				},
 			},
 			expectedError:        true,
@@ -164,6 +193,9 @@ func TestNodeGroupsSanity(t *testing.T) {
 							"test1": "test1",
 						},
 					},
+				},
+				{
+					PoolName: &poolName,
 				},
 			},
 		},
