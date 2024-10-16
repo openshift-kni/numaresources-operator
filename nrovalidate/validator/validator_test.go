@@ -55,15 +55,15 @@ func TestRequested(t *testing.T) {
 			expectedValue: available,
 		},
 		{
-			what:          "k8scfg,podst,nrt,schedcache",
+			what:          "k8scfg,objdangling,podst,nrt,schedcache",
 			expectedValue: available,
 		},
 		{
-			what:          "nrt,k8scfg,schedcache,podst",
+			what:          "nrt,k8scfg,schedcache,podst,objdangling",
 			expectedValue: available,
 		},
 		{
-			what:          "     schedcache,nrt,  k8scfg ,   podst ",
+			what:          "     schedcache,nrt,  k8scfg ,   podst , objdangling ",
 			expectedValue: available,
 		},
 	}
@@ -78,7 +78,7 @@ func TestRequested(t *testing.T) {
 			gotValue := strings.Join(sets.List(got), ",")
 
 			if !reflect.DeepEqual(gotValue, tc.expectedValue) {
-				t.Errorf("Requested(%s): got %v expected %v", tc.what, got, tc.expectedValue)
+				t.Errorf("Requested(%s): got %v expected %v", tc.what, gotValue, tc.expectedValue)
 			}
 		})
 	}
