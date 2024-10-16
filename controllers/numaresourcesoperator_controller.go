@@ -177,11 +177,11 @@ func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, inst
 
 func updateStatus(ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
 	conditions, ok := status.GetUpdatedConditions(instance.Status.Conditions, condition, reason, message)
-	if !ok {
-		return false, nil
+	if ok {
+		instance.Status.Conditions = conditions
 	}
-	instance.Status.Conditions = conditions
 
+	// in case of a 2 similar successive conditions happen we still want to update the status to get latest status updates
 	if err := cli.Status().Update(ctx, instance); err != nil {
 		return false, fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(instance), err)
 	}
