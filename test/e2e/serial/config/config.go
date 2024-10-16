@@ -30,8 +30,9 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	nrtv1alpha2attr "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 
+	"github.com/openshift-kni/numaresources-operator/nrovalidate/validator"
+
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
-	"github.com/openshift-kni/numaresources-operator/pkg/validator"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
 )

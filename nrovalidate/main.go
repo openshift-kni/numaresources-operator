@@ -39,7 +39,7 @@ import (
 
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 
-	nrovalidator "github.com/openshift-kni/numaresources-operator/pkg/validator"
+	nrovalidator "github.com/openshift-kni/numaresources-operator/nrovalidate/validator"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 )
 
