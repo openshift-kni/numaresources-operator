@@ -27,14 +27,20 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 
-func MachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
+func MachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator) []error {
 	klog.V(3).Info("Delete Machineconfigs start")
 	defer klog.V(3).Info("Delete Machineconfigs end")
+
 	var errors []error
+
+	trees, err := getTreesByNodeGroup(ctx, r.Client, instance.Spec.NodeGroups)
+	if err != nil {
+		return append(errors, err)
+	}
+
 	var machineConfigList machineconfigv1.MachineConfigList
 	if err := cli.List(ctx, &machineConfigList); err != nil {
 		klog.ErrorS(err, "error while getting MachineConfig list")
