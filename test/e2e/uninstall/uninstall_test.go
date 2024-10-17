@@ -18,24 +18,29 @@ package uninstall
 
 import (
 	"context"
-
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"fmt"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/klog/v2"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 
-	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	"github.com/openshift-kni/numaresources-operator/internal/dangling"
+	"github.com/openshift-kni/numaresources-operator/internal/render"
+	"github.com/openshift-kni/numaresources-operator/pkg/images"
+	"github.com/openshift-kni/numaresources-operator/pkg/version"
 
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	"github.com/openshift-kni/numaresources-operator/test/utils/deploy"
+	e2eimages "github.com/openshift-kni/numaresources-operator/test/utils/images"
 	e2epause "github.com/openshift-kni/numaresources-operator/test/utils/objects/pause"
 )
 
@@ -53,70 +58,121 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 	})
 
 	Context("with a running cluster with all the components", func() {
-		It("should delete all components after NRO deletion", func() {
-			By("deleting the NRO object")
-			// since we are getting an existing object, we don't need the real labels here
-			nroObj := objects.TestNRO(objects.EmptyMatchLabels())
-			By("deleting the KC object")
-			kcObj, err := objects.TestKC(objects.EmptyMatchLabels())
-			Expect(err).To(Not(HaveOccurred()))
+		var (
+			deployOnce      bool
+			deployedObj     deploy.NroDeployment
+			clusterPlatform platform.Platform
+			clusterVersion  platform.Version
+		)
 
-			// failed to get the NRO object, nothing else we can do
-			if err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj); err != nil {
-				if !errors.IsNotFound(err) {
-					klog.Warningf("failed to get the NUMA resource operator %q: %v", nroObj.Name, err)
-				}
-
-				return
+		BeforeEach(func() {
+			if !deployOnce {
+				deployedObj = deploy.OverallDeployment()
+				nname := client.ObjectKeyFromObject(deployedObj.NroObj)
+				Expect(nname.Name).ToNot(BeEmpty())
 			}
+			deployOnce = true
+
+			var err error
+			clusterPlatform, clusterVersion, err = version.DiscoverCluster(context.Background(), "", "")
+			Expect(err).ToNot(HaveOccurred(), "cannot autodetect cluster version")
+			klog.InfoS("detected cluster", "platform", clusterPlatform, "version", clusterVersion)
+		})
+
+		It("should delete all components after NRO deletion", func(ctx context.Context) {
+			By("cloning the NRO object")
+			nroObj := deployedObj.NroObj.DeepCopy()
+
+			By(fmt.Sprintf("loading the RTE manifests for %v %v", clusterPlatform, clusterVersion))
+			// we don't care much about the manifests content, so the tunables are arbitrary
+			rteManifests, err := rtemanifests.GetManifests(clusterPlatform, clusterVersion, nroObj.Namespace, false, false)
+			Expect(err).ToNot(HaveOccurred(), "cannot get RTE manifests")
+
+			// we don't care much about the manifests content, so fake images is fine
+			renderedRTEManifests, err := render.RTEManifests(rteManifests, nroObj.Namespace, images.Data{
+				Self:    e2eimages.PauseImage,
+				Builtin: e2eimages.PauseImage,
+			})
+			Expect(err).ToNot(HaveOccurred(), "cannot render RTE manifests")
+
+			By("cloning the KC object")
+			kcObj := deployedObj.KcObj.DeepCopy()
 
 			unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups)
 			Expect(err).NotTo(HaveOccurred())
 
-			if err := e2eclient.Client.Delete(context.TODO(), nroObj); err != nil {
-				klog.Warningf("failed to delete the numaresourcesoperators %q", nroObj.Name)
-				return
-			}
-
-			if err := e2eclient.Client.Delete(context.TODO(), kcObj); err != nil && !errors.IsNotFound(err) {
-				klog.Warningf("failed to delete the kubeletconfigs %q", kcObj.Name)
-			}
+			By("deleting the NRO object")
+			Expect(e2eclient.Client.Delete(ctx, nroObj)).To(Succeed(), "failed to delete the numaresourcesoperators %q", nroObj.Name)
+			By("deleting the KC object")
+			Expect(e2eclient.Client.Delete(ctx, kcObj)).To(Succeed(), "failed to delete the kubeletconfigs %q", kcObj.Name)
 
 			err = unpause()
 			Expect(err).NotTo(HaveOccurred())
 
 			if configuration.Plat == platform.Kubernetes {
-				mcpObj := objects.TestMCP()
-				if err := e2eclient.Client.Delete(context.TODO(), mcpObj); err != nil {
-					klog.Warningf("failed to delete the machine config pool %q", mcpObj.Name)
+				By("cloning the MCP object")
+				mcpObj := deployedObj.McpObj.DeepCopy()
+				Expect(e2eclient.Client.Delete(ctx, mcpObj)).To(Succeed(), "failed to delete the machine config pool %q", mcpObj.Name)
+			}
+
+			By("checking that owned objects are deleted")
+			objs := renderedRTEManifests.ToObjects()
+
+			// TODO: parallelize wait
+			Eventually(func() error {
+				for _, obj := range objs {
+					objKey := client.ObjectKeyFromObject(obj)
+					var tmpObj client.Object
+					err := e2eclient.Client.Get(ctx, objKey, tmpObj)
+					if err == nil {
+						return fmt.Errorf("object %v still present", objKey.String())
+					}
+					if !apierrors.IsNotFound(err) {
+						return err
+					}
 				}
-			}
+				return nil
+			}).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(Succeed())
 
-			if configuration.Plat == platform.OpenShift {
-				Eventually(func() bool {
-					mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
+			By("checking there are not dangling objects")
+			// uses the same code of explicit deletion loops we had up until 4.17, serves as non-regression
+			// Note that the intention, and the very reason we removed the explicit deletion, is that is redundant since 4.16 at least.
+			Eventually(func() error {
+				// sort by less likely to break (or expected so)
+				dsKeys, err := dangling.DaemonSetKeys(e2eclient.Client, ctx, nroObj)
+				if err != nil {
+					return err
+				}
+				if len(dsKeys) > 0 {
+					return fmt.Errorf("found dangling DaemonSets: %s", stringifyObjectKeys(dsKeys))
+				}
+
+				if configuration.Plat == platform.OpenShift {
+					mcKeys, err := dangling.MachineConfigKeys(e2eclient.Client, ctx, nroObj)
 					if err != nil {
-						klog.Warningf("failed to get machine config pools: %v", err)
-						return false
+						return err
 					}
-
-					for _, mcp := range mcps {
-						mcName := objectnames.GetMachineConfigName(nroObj.Name, mcp.Name)
-						for _, s := range mcp.Status.Configuration.Source {
-							// the config is still existing under the machine config pool
-							if s.Name == mcName {
-								return false
-							}
-						}
-
-						if machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
-							return false
-						}
+					if len(mcKeys) > 0 {
+						return fmt.Errorf("found dangling MachineConfigs: %s", stringifyObjectKeys(mcKeys))
 					}
-
-					return true
-				}).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(BeTrue())
-			}
+				}
+				return nil
+			}).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(Succeed())
 		})
 	})
 })
+
+func stringifyObjectKeys(keys []client.ObjectKey) string {
+	if len(keys) == 0 {
+		return ""
+	}
+	if len(keys) == 1 {
+		return keys[0].String()
+	}
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "%s", keys[0].String())
+	for _, key := range keys[1:] {
+		fmt.Fprintf(&sb, ",%s", key.String())
+	}
+	return sb.String()
+}
