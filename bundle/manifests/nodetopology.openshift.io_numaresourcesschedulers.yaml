@@ -223,7 +223,8 @@ spec:
     storage: true
     subresources:
       status: {}
-  - name: v1alpha1
+  - deprecated: true
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
