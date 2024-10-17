@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -47,21 +46,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/options"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	"github.com/openshift-kni/numaresources-operator/internal/api/features"
-	"github.com/openshift-kni/numaresources-operator/pkg/hash"
+	"github.com/openshift-kni/numaresources-operator/internal/render"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/controlplane"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
-	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
-	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
 )
@@ -97,12 +92,6 @@ type ImageParams struct {
 	Scheduler string
 }
 
-type RenderParams struct {
-	NRTCRD    bool
-	Namespace string
-	Image     ImageParams
-}
-
 type Params struct {
 	webhookPort           int
 	metricsAddr           string
@@ -114,7 +103,7 @@ type Params struct {
 	showVersion           bool
 	enableScheduler       bool
 	renderMode            bool
-	render                RenderParams
+	render                render.Params
 	enableWebhooks        bool
 	enableMetrics         bool
 	enableHTTP2           bool
@@ -142,8 +131,8 @@ func (pa *Params) FromFlags() {
 	flag.BoolVar(&pa.renderMode, "render", pa.renderMode, "outputs the rendered manifests, then exits")
 	flag.BoolVar(&pa.render.NRTCRD, "render-nrt-crd", pa.render.NRTCRD, "outputs only the rendered NodeResourceTopology CRD manifest, then exits")
 	flag.StringVar(&pa.render.Namespace, "render-namespace", pa.render.Namespace, "outputs the manifests rendered using the given namespace")
-	flag.StringVar(&pa.render.Image.Exporter, "render-image", pa.render.Image.Exporter, "outputs the manifests rendered using the given image")
-	flag.StringVar(&pa.render.Image.Scheduler, "render-image-scheduler", pa.render.Image.Scheduler, "outputs the manifests rendered using the given image for the scheduler")
+	flag.StringVar(&pa.render.ExporterImage, "render-image", pa.render.ExporterImage, "outputs the manifests rendered using the given image")
+	flag.StringVar(&pa.render.SchedulerImage, "render-image-scheduler", pa.render.SchedulerImage, "outputs the manifests rendered using the given image for the scheduler")
 	flag.BoolVar(&pa.showVersion, "version", pa.showVersion, "outputs the version and exit")
 	flag.BoolVar(&pa.enableScheduler, "enable-scheduler", pa.enableScheduler, "enable support for the NUMAResourcesScheduler object")
 	flag.BoolVar(&pa.enableWebhooks, "enable-webhooks", pa.enableWebhooks, "enable conversion webhooks")
@@ -247,7 +236,7 @@ func main() {
 
 	imgs, pullPolicy := images.Discover(context.Background(), params.image.Exporter)
 
-	rteManifestsRendered, err := renderRTEManifests(rteManifests, namespace, imgs)
+	rteManifestsRendered, err := render.RTEManifests(rteManifests, namespace, imgs)
 	if err != nil {
 		klog.ErrorS(err, "unable to render RTE manifests", "controller", "NUMAResourcesOperator")
 		os.Exit(1)
@@ -339,9 +328,9 @@ func manageIntrospection() int {
 	return 0
 }
 
-func manageRendering(render RenderParams, clusterPlatform platform.Platform, apiMf apimanifests.Manifests, rteMf rtemanifests.Manifests, namespace string, enableScheduler bool) int {
-	if render.NRTCRD {
-		if err := renderObjects(apiMf.ToObjects()); err != nil {
+func manageRendering(params render.Params, clusterPlatform platform.Platform, apiMf apimanifests.Manifests, rteMf rtemanifests.Manifests, namespace string, enableScheduler bool) int {
+	if params.NRTCRD {
+		if err := render.Objects(apiMf.ToObjects()); err != nil {
 			klog.ErrorS(err, "unable to render manifests")
 			return 1
 		}
@@ -350,7 +339,7 @@ func manageRendering(render RenderParams, clusterPlatform platform.Platform, api
 
 	var objs []client.Object
 	if enableScheduler {
-		if render.Image.Scheduler == "" {
+		if params.SchedulerImage == "" {
 			klog.Errorf("missing scheduler image")
 			return 1
 		}
@@ -362,7 +351,7 @@ func manageRendering(render RenderParams, clusterPlatform platform.Platform, api
 		}
 		klog.InfoS("manifests loaded", "component", "Scheduler")
 
-		mf, err := renderSchedulerManifests(schedMf, render.Image.Scheduler)
+		mf, err := render.SchedulerManifests(schedMf, params.SchedulerImage)
 		if err != nil {
 			klog.ErrorS(err, "unable to render scheduler manifests")
 			return 1
@@ -371,74 +360,22 @@ func manageRendering(render RenderParams, clusterPlatform platform.Platform, api
 	}
 
 	imgs := images.Data{
-		User:    render.Image.Exporter,
+		User:    params.ExporterImage,
 		Builtin: images.SpecPath(),
 	}
-	mf, err := renderRTEManifests(rteMf, render.Namespace, imgs)
+	mf, err := render.RTEManifests(rteMf, params.Namespace, imgs)
 	if err != nil {
 		klog.ErrorS(err, "unable to render RTE manifests")
 		return 1
 	}
 	objs = append(objs, mf.ToObjects()...)
 
-	if err := renderObjects(objs); err != nil {
+	if err := render.Objects(objs); err != nil {
 		klog.ErrorS(err, "unable to render manifests")
 		return 1
 	}
 
 	return 0
-}
-
-func renderObjects(objs []client.Object) error {
-	for _, obj := range objs {
-		fmt.Printf("---\n")
-		if err := manifests.SerializeObject(obj, os.Stdout); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// renderRTEManifests renders the reconciler manifests so they can be deployed on the cluster.
-func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, imgs images.Data) (rtemanifests.Manifests, error) {
-	klog.InfoS("Updating RTE manifests")
-	mf, err := rteManifests.Render(options.UpdaterDaemon{
-		Namespace: namespace,
-		DaemonSet: options.DaemonSet{
-			Verbose:            2,
-			NotificationEnable: true,
-			UpdateInterval:     10 * time.Second,
-		},
-	})
-	if err != nil {
-		return mf, err
-	}
-
-	err = rteupdate.DaemonSetUserImageSettings(mf.DaemonSet, imgs.Discovered(), imgs.Builtin, images.NullPolicy)
-	if err != nil {
-		return mf, err
-	}
-
-	err = rteupdate.DaemonSetPauseContainerSettings(mf.DaemonSet)
-	if err != nil {
-		return mf, err
-	}
-	if mf.ConfigMap != nil {
-		rteupdate.DaemonSetHashAnnotation(mf.DaemonSet, hash.ConfigMapData(mf.ConfigMap))
-	}
-	return mf, err
-}
-
-func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec string) (schedmanifests.Manifests, error) {
-	klog.InfoS("Updating scheduler manifests")
-	mf := schedManifests.Clone()
-	schedupdate.DeploymentImageSettings(mf.Deployment, imageSpec)
-	// empty string is fine. Will be handled as "disabled".
-	// We only care about setting the environ variable to declare it exists,
-	// the best setting is "present, but disabled" vs "missing, thus implicitly disabled"
-	schedupdate.DeploymentConfigMapSettings(mf.Deployment, schedManifests.ConfigMap.Name, hash.ConfigMapData(schedManifests.ConfigMap))
-	return mf, nil
 }
 
 // SetupWebhookWithManager enables Webhooks - needed for version conversion
