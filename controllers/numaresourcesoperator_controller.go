@@ -57,6 +57,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	"github.com/openshift-kni/numaresources-operator/internal/dangling"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
@@ -214,6 +215,12 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Conte
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
+	err := r.syncDanglingMachineConfigs(ctx, instance, trees)
+	if err != nil {
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCCleanup", "Failed to remove dangling machine configs: %v", err)
+		return true, ctrl.Result{}, status.ConditionDegraded, fmt.Errorf("failed to remove dangling machine configs: %w", err)
+	}
+
 	// we need to sync machine configs first and wait for the MachineConfigPool updates
 	// before checking additional components for updates
 	mcpUpdatedFunc, err := r.syncMachineConfigs(ctx, instance, trees)
@@ -238,6 +245,12 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (map[string]nropv1.NamespacedName, bool, ctrl.Result, string, error) {
+	err := r.syncDanglingDaemonSets(ctx, instance, trees)
+	if err != nil {
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECleanup", "Failed to remove dangling daemonsets: %v", err)
+		return nil, true, ctrl.Result{}, status.ConditionDegraded, fmt.Errorf("failed to remove dangling daemonsets: %w", err)
+	}
+
 	daemonSetsInfoPerMCP, err := r.syncNUMAResourcesOperatorResources(ctx, instance, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECreate", "Failed to create Resource-Topology-Exporter DaemonSets: %v", err)
@@ -340,6 +353,65 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx contex
 		updatedCount++
 	}
 	return (updatedCount == len(objStates)), err
+}
+
+// If we edit nodegroups in such a way that a set of nodes previously managed is no longer managed, the related MachineConfig is left lingering.
+// We need to explicit cleanup objects with are 1:1 with NodeGroups because NodeGroups are not a separate object, and the main NRO object is set as
+// the owner of all the generated object. But in this scenario (NodeGroup no longer managed), the main NRO object is NOT deleted, so the dependant
+// objects are left unnecessarily lingering. In hindsight, we should probably have set a NUMAResourcesOperator own NodeGroups, or just allow more than
+// a NUMAResourcesOperator object, but that ship as sailed and now a NUMAResourcesOperator object is 1:N to NodeGroups (and the latter are not K8S objects).
+
+func (r *NUMAResourcesOperatorReconciler) syncDanglingMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) error {
+	klog.V(4).InfoS("Dangling Machine Config Sync start", "trees", len(trees))
+	defer klog.V(4).Info("Dangling Machine Config Sync stop")
+
+	mcObjs, err := dangling.MachineConfigs(r.Client, ctx, instance, trees)
+	if err != nil {
+		return err
+	}
+	if len(mcObjs) == 0 {
+		return nil // nothing to do!
+	}
+
+	// we expect to hit this flow rarely, so we intentionally log at low (regular) verbosity levels
+	klog.V(2).InfoS("found dangling MachineConfigs", "count", len(mcObjs))
+	for _, mcObj := range mcObjs {
+		mcObj2 := mcObj
+		err = r.Client.Delete(ctx, &mcObj2)
+		if err != nil {
+			klog.ErrorS(err, "failed to delete dangling MachineConfig", "key", client.ObjectKeyFromObject(&mcObj2))
+			return err
+		}
+		klog.V(2).InfoS("deleted dangling MachineConfig", "key", client.ObjectKeyFromObject(&mcObj2))
+		// TODO: should we wait for the MC to be updated?
+	}
+	return nil
+}
+
+func (r *NUMAResourcesOperatorReconciler) syncDanglingDaemonSets(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) error {
+	klog.V(4).InfoS("Dangling DaemonSet Sync start", "trees", len(trees))
+	defer klog.V(4).Info("Dangling DaemonSet Sync stop")
+
+	dsObjs, err := dangling.DaemonSets(r.Client, ctx, instance, trees)
+	if err != nil {
+		return err
+	}
+	if len(dsObjs) == 0 {
+		return nil // nothing to do!
+	}
+
+	// we expect to hit this flow rarely, so we intentionally log at low (regular) verbosity levels
+	klog.V(2).InfoS("found dangling DaemonSets", "count", len(dsObjs))
+	for _, dsObj := range dsObjs {
+		dsObj2 := dsObj
+		err = r.Client.Delete(ctx, &dsObj2)
+		if err != nil {
+			klog.ErrorS(err, "failed to delete dangling DaemonSet", "key", client.ObjectKeyFromObject(&dsObj2))
+			return err
+		}
+		klog.V(2).InfoS("deleted dangling DaemonSet", "key", client.ObjectKeyFromObject(&dsObj2))
+	}
+	return nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (rtestate.MCPWaitForUpdatedFunc, error) {
