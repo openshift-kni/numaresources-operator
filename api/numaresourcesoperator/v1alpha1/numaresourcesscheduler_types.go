@@ -59,6 +59,7 @@ type NUMAResourcesSchedulerStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:shortName=numaressched,path=numaresourcesschedulers,scope=Cluster
+//+kubebuilder:deprecatedversion
 
 // NUMAResourcesScheduler is the Schema for the numaresourcesschedulers API
 // +operator-sdk:csv:customresourcedefinitions:displayName="NUMA Aware Scheduler",resources={{Deployment,v1,secondary-scheduler-deployment}}
