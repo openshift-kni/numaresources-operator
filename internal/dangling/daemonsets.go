@@ -25,15 +25,28 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 
-func DaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator) ([]client.ObjectKey, error) {
+func DaemonSetKeys(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator) ([]client.ObjectKey, error) {
 	trees, err := getTreesByNodeGroup(ctx, cli, instance.Spec.NodeGroups)
 	if err != nil {
 		return nil, err
 	}
+	objs, err := DaemonSets(cli, ctx, instance, trees)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]client.ObjectKey, 0, len(objs))
+	for _, obj := range objs {
+		obj2 := obj
+		keys = append(keys, client.ObjectKeyFromObject(&obj2))
+	}
+	return keys, nil
+}
 
+func DaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]appsv1.DaemonSet, error) {
 	var daemonSetList appsv1.DaemonSetList
 	if err := cli.List(ctx, &daemonSetList, &client.ListOptions{Namespace: instance.Namespace}); err != nil {
 		return nil, err
@@ -46,7 +59,7 @@ func DaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMARes
 		}
 	}
 
-	var dangling []client.ObjectKey
+	var dangling []appsv1.DaemonSet
 	for _, ds := range daemonSetList.Items {
 		if expectedDaemonSetNames.Has(ds.Name) {
 			continue
@@ -54,7 +67,7 @@ func DaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMARes
 		if !isOwnedBy(ds.GetObjectMeta(), instance) {
 			continue
 		}
-		dangling = append(dangling, client.ObjectKeyFromObject(&ds))
+		dangling = append(dangling, ds)
 	}
 	return dangling, nil
 }
