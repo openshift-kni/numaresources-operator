@@ -26,15 +26,28 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 
-func MachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator) ([]client.ObjectKey, error) {
+func MachineConfigKeys(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator) ([]client.ObjectKey, error) {
 	trees, err := getTreesByNodeGroup(ctx, cli, instance.Spec.NodeGroups)
 	if err != nil {
 		return nil, err
 	}
+	objs, err := MachineConfigs(cli, ctx, instance, trees)
+	if err != nil {
+		return nil, err
+	}
+	keys := make([]client.ObjectKey, 0, len(objs))
+	for _, obj := range objs {
+		obj2 := obj
+		keys = append(keys, client.ObjectKeyFromObject(&obj2))
+	}
+	return keys, nil
+}
 
+func MachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]machineconfigv1.MachineConfig, error) {
 	var machineConfigList machineconfigv1.MachineConfigList
 	if err := cli.List(ctx, &machineConfigList); err != nil {
 		return nil, err
@@ -47,7 +60,7 @@ func MachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUM
 		}
 	}
 
-	var dangling []client.ObjectKey
+	var dangling []machineconfigv1.MachineConfig
 	for _, mc := range machineConfigList.Items {
 		if expectedMachineConfigNames.Has(mc.Name) {
 			continue
@@ -55,7 +68,7 @@ func MachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUM
 		if !isOwnedBy(mc.GetObjectMeta(), instance) {
 			continue
 		}
-		dangling = append(dangling, client.ObjectKeyFromObject(&mc))
+		dangling = append(dangling, mc)
 	}
 	return dangling, nil
 }
