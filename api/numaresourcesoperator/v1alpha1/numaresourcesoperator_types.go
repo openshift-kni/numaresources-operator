@@ -133,6 +133,7 @@ type MachineConfigPool struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:shortName=numaresop,path=numaresourcesoperators,scope=Cluster
+//+kubebuilder:deprecatedversion
 
 // NUMAResourcesOperator is the Schema for the numaresourcesoperators API
 // +operator-sdk:csv:customresourcedefinitions:displayName="NUMA Resources Operator",resources={{DaemonSet,v1,rte-daemonset,ConfigMap,v1,rte-configmap}}
