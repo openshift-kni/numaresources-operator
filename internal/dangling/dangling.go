@@ -57,15 +57,17 @@ func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nr
 	}
 
 	for _, ds := range daemonSetList.Items {
-		if !expectedDaemonSetNames.Has(ds.Name) {
-			if isOwnedBy(ds.GetObjectMeta(), instance) {
-				if err := cli.Delete(ctx, &ds); err != nil {
-					klog.ErrorS(err, "error while deleting daemonset", "DaemonSet", ds.Name)
-					errors = append(errors, err)
-				} else {
-					klog.V(3).InfoS("Daemonset deleted", "name", ds.Name)
-				}
-			}
+		if expectedDaemonSetNames.Has(ds.Name) {
+			continue
+		}
+		if !isOwnedBy(ds.GetObjectMeta(), instance) {
+			continue
+		}
+		if err := cli.Delete(ctx, &ds); err != nil {
+			klog.ErrorS(err, "error while deleting daemonset", "DaemonSet", ds.Name)
+			errors = append(errors, err)
+		} else {
+			klog.V(3).InfoS("Daemonset deleted", "name", ds.Name)
 		}
 	}
 	return errors
@@ -89,15 +91,17 @@ func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance
 	}
 
 	for _, mc := range machineConfigList.Items {
-		if !expectedMachineConfigNames.Has(mc.Name) {
-			if isOwnedBy(mc.GetObjectMeta(), instance) {
-				if err := cli.Delete(ctx, &mc); err != nil {
-					klog.ErrorS(err, "error while deleting machineconfig", "MachineConfig", mc.Name)
-					errors = append(errors, err)
-				} else {
-					klog.V(3).InfoS("Machineconfig deleted", "name", mc.Name)
-				}
-			}
+		if expectedMachineConfigNames.Has(mc.Name) {
+			continue
+		}
+		if !isOwnedBy(mc.GetObjectMeta(), instance) {
+			continue
+		}
+		if err := cli.Delete(ctx, &mc); err != nil {
+			klog.ErrorS(err, "error while deleting machineconfig", "MachineConfig", mc.Name)
+			errors = append(errors, err)
+		} else {
+			klog.V(3).InfoS("Machineconfig deleted", "name", mc.Name)
 		}
 	}
 	return errors
