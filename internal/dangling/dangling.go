@@ -57,10 +57,10 @@ func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nr
 	}
 
 	for _, ds := range daemonSetList.Items {
-		if expectedDaemonSetNames.Has(ds.Name) {
+		if !isOwnedBy(ds.GetObjectMeta(), instance) {
 			continue
 		}
-		if !isOwnedBy(ds.GetObjectMeta(), instance) {
+		if expectedDaemonSetNames.Has(ds.Name) {
 			continue
 		}
 		if err := cli.Delete(ctx, &ds); err != nil {
@@ -91,10 +91,10 @@ func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance
 	}
 
 	for _, mc := range machineConfigList.Items {
-		if expectedMachineConfigNames.Has(mc.Name) {
+		if !isOwnedBy(mc.GetObjectMeta(), instance) {
 			continue
 		}
-		if !isOwnedBy(mc.GetObjectMeta(), instance) {
+		if expectedMachineConfigNames.Has(mc.Name) {
 			continue
 		}
 		if err := cli.Delete(ctx, &mc); err != nil {
