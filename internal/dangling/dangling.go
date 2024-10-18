@@ -40,8 +40,8 @@ import (
 )
 
 func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
-	klog.V(3).Info("Delete Daemonsets start")
-	defer klog.V(3).Info("Delete Daemonsets end")
+	klog.V(3).Info("Delete dangling Daemonsets start")
+	defer klog.V(3).Info("Delete dangling Daemonsets end")
 	var errors []error
 	var daemonSetList appsv1.DaemonSetList
 	if err := cli.List(ctx, &daemonSetList, &client.ListOptions{Namespace: instance.Namespace}); err != nil {
@@ -64,18 +64,18 @@ func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nr
 			continue
 		}
 		if err := cli.Delete(ctx, &ds); err != nil {
-			klog.ErrorS(err, "error while deleting daemonset", "DaemonSet", ds.Name)
+			klog.ErrorS(err, "error while deleting dangling daemonset", "DaemonSet", ds.Namespace+"/"+ds.Name)
 			errors = append(errors, err)
-		} else {
-			klog.V(3).InfoS("Daemonset deleted", "name", ds.Name)
+			continue
 		}
+		klog.V(3).InfoS("dangling Daemonset deleted", "name", ds.Name)
 	}
 	return errors
 }
 
 func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
-	klog.V(3).Info("Delete Machineconfigs start")
-	defer klog.V(3).Info("Delete Machineconfigs end")
+	klog.V(3).Info("Delete dangling Machineconfigs start")
+	defer klog.V(3).Info("Delete dangling Machineconfigs end")
 	var errors []error
 	var machineConfigList machineconfigv1.MachineConfigList
 	if err := cli.List(ctx, &machineConfigList); err != nil {
@@ -98,11 +98,11 @@ func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance
 			continue
 		}
 		if err := cli.Delete(ctx, &mc); err != nil {
-			klog.ErrorS(err, "error while deleting machineconfig", "MachineConfig", mc.Name)
+			klog.ErrorS(err, "error while deleting dangling machineconfig", "MachineConfig", mc.Name)
 			errors = append(errors, err)
-		} else {
-			klog.V(3).InfoS("Machineconfig deleted", "name", mc.Name)
+			continue
 		}
+		klog.V(3).InfoS("dangling Machineconfig deleted", "name", mc.Name)
 	}
 	return errors
 }
