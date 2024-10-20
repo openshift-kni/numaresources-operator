@@ -8,7 +8,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
+	topologyclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
+
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/kubeconf"
+	metricssrv "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/metrics/server"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/notification"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podreadiness"
@@ -18,26 +21,53 @@ import (
 )
 
 type Args struct {
-	Debug                  bool
-	ReferenceContainer     *sharedcpuspool.ContainerIdent
-	TopologyManagerPolicy  string
-	TopologyManagerScope   string
-	KubeletConfigFile      string
-	PodResourcesSocketPath string
-	SleepInterval          time.Duration
-	PodReadinessEnable     bool
-	NotifyFilePath         string
-	MaxEventsPerTimeUnit   int64
-	TimeUnitToLimitEvents  time.Duration
-	AddNRTOwnerEnable      bool
-	MetricsMode            string
+	ReferenceContainer     *sharedcpuspool.ContainerIdent `json:"referenceContainer,omitempty"`
+	TopologyManagerPolicy  string                         `json:"topologyManagerPolicy,omitempty"`
+	TopologyManagerScope   string                         `json:"topologyManagerScope,omitempty"`
+	KubeletConfigFile      string                         `json:"kubeletConfigFile,omitempty"`
+	PodResourcesSocketPath string                         `json:"podResourcesSocketPath,omitempty"`
+	SleepInterval          time.Duration                  `json:"sleepInterval,omitempty"`
+	PodReadinessEnable     bool                           `json:"podReadinessEnable,omitempty"`
+	NotifyFilePath         string                         `json:"notifyFilePath,omitempty"`
+	MaxEventsPerTimeUnit   int64                          `json:"maxEventPerTimeUnit,omitempty"`
+	TimeUnitToLimitEvents  time.Duration                  `json:"timeUnitToLimitEvents,omitempty"`
+	AddNRTOwnerEnable      bool                           `json:"addNRTOwnerEnable,omitempty"`
+	MetricsMode            string                         `json:"metricsMode,omitempty"`
+	MetricsPort            int                            `json:"metricsPort,omitempty"`
+	MetricsAddress         string                         `json:"metricsAddress,omitempty"`
+	MetricsTLSCfg          metricssrv.TLSConfig           `json:"metricsTLS,omitempty"`
+}
+
+func (args Args) Clone() Args {
+	return Args{
+		ReferenceContainer:     args.ReferenceContainer.Clone(),
+		TopologyManagerPolicy:  args.TopologyManagerPolicy,
+		TopologyManagerScope:   args.TopologyManagerScope,
+		KubeletConfigFile:      args.KubeletConfigFile,
+		PodResourcesSocketPath: args.PodResourcesSocketPath,
+		SleepInterval:          args.SleepInterval,
+		PodReadinessEnable:     args.PodReadinessEnable,
+		NotifyFilePath:         args.NotifyFilePath,
+		MaxEventsPerTimeUnit:   args.MaxEventsPerTimeUnit,
+		TimeUnitToLimitEvents:  args.TimeUnitToLimitEvents,
+		AddNRTOwnerEnable:      args.AddNRTOwnerEnable,
+		MetricsMode:            args.MetricsMode,
+		MetricsPort:            args.MetricsPort,
+		MetricsAddress:         args.MetricsAddress,
+		MetricsTLSCfg:          args.MetricsTLSCfg.Clone(),
+	}
 }
 
 type tmSettings struct {
 	config nrtupdater.TMConfig
 }
 
-func Execute(hnd resourcemonitor.Handle, nrtupdaterArgs nrtupdater.Args, resourcemonitorArgs resourcemonitor.Args, rteArgs Args) error {
+type Handle struct {
+	ResMon resourcemonitor.Handle
+	NRTCli topologyclientset.Interface
+}
+
+func Execute(hnd Handle, nrtupdaterArgs nrtupdater.Args, resourcemonitorArgs resourcemonitor.Args, rteArgs Args) error {
 	tmConf, err := getTopologyManagerSettings(rteArgs)
 	if err != nil {
 		return err
@@ -45,7 +75,7 @@ func Execute(hnd resourcemonitor.Handle, nrtupdaterArgs nrtupdater.Args, resourc
 
 	var nodeGetter nrtupdater.NodeGetter
 	if rteArgs.AddNRTOwnerEnable {
-		nodeGetter, err = nrtupdater.NewCachedNodeGetter(hnd.K8SCli, context.Background())
+		nodeGetter, err = nrtupdater.NewCachedNodeGetter(hnd.ResMon.K8SCli, context.Background())
 		if err != nil {
 			klog.V(2).Info("Cannot enable 'add-nrt-owner'. Unable to get node info")
 			return fmt.Errorf("Cannot enable 'add-nrt-owner'. %w", err)
@@ -57,7 +87,7 @@ func Execute(hnd resourcemonitor.Handle, nrtupdaterArgs nrtupdater.Args, resourc
 	var condChan chan v1.PodCondition
 	if rteArgs.PodReadinessEnable {
 		condChan = make(chan v1.PodCondition)
-		condIn, err := podreadiness.NewConditionInjector(hnd.K8SCli)
+		condIn, err := podreadiness.NewConditionInjector(hnd.ResMon.K8SCli)
 		if err != nil {
 			return err
 		}
@@ -69,13 +99,16 @@ func Execute(hnd resourcemonitor.Handle, nrtupdaterArgs nrtupdater.Args, resourc
 		return err
 	}
 
-	resObs, err := NewResourceObserver(hnd, resourcemonitorArgs)
+	resObs, err := NewResourceObserver(hnd.ResMon, resourcemonitorArgs)
 	if err != nil {
 		return err
 	}
 	go resObs.Run(eventSource.Events(), condChan)
 
-	upd := nrtupdater.NewNRTUpdater(nodeGetter, nrtupdaterArgs, tmConf.config)
+	upd, err := nrtupdater.NewNRTUpdater(nodeGetter, hnd.NRTCli, nrtupdaterArgs, tmConf.config)
+	if err != nil {
+		return err
+	}
 	go upd.Run(resObs.Infos, condChan)
 
 	go eventSource.Run()
