@@ -23,7 +23,7 @@ replacing the main entry point.
 Logically, the operator manages three operands (API, RTE, scheduler) but it depends on just a single artifact for the operand (the scheduler),
 while the other two operands (API, RTE) are bundled in the same operator image.
 
-## bundled operand
+## bundled operand (`./rte/...`)
 
 Instead of consuming a separate image like we do for the secondary scheduler, we bundle the RTE operand adding the binary in the operator image,
 which has multiple entry points.
@@ -34,7 +34,7 @@ We foresee RTE as the first operand to be replaced, and in general is the easies
 and a supported component. On the other hand, the secondary scheduler is likely to stick around for a while more - and that's also easier to
 support because secondary schedulers are not uncommon in the kubernetes ecosystem.
 
-## controllers
+## controllers (`./controllers/...`)
 
 The operator has three controllers and three control loop. Likewise well-formed controllers, they are independent from each other and will
 reconcile the cluster state towards a functional NUMA-aware scheduler installation.
@@ -50,3 +50,63 @@ reconcile the cluster state towards a functional NUMA-aware scheduler installati
    configuration). This approach was taken because it is a good compromise between security, practicality, maintainability, but being
    the least critical controller this can perhaps replaced in the future. This functionality should be subsumed by the operator
    managing the RTE replacement.
+
+## packages and tree breakdown
+
+### API (`./api`)
+
+The api package holds the definition of the public API types, from which the API schema
+is derived by the controller-gen/operator-sdk/kubebuilder tooling.
+
+The master source is the set of annotated go types.
+
+The main content is `api/numaresourcesoperator` whose subfolders hold the versioned api:
+`v1alpha1`, `v1`...
+
+The top-level api packages (`api/numaresourcesoperator/v1`) should have minimal deps: they
+should depend only on
+1. stdlib
+2. other API packages (e.g. k8s, ocp)
+
+We add helper packages which build on top of api packages and provide utilities: they sit in
+`api/numaresources/$VERSION/helper/$HELPER/...` and these packages *can* have more dependencies.
+
+NOTE: helper packages can depend on top-level api packages, but top-level api packages **must not**
+depend on helpers. Keep the top-level dependencies minimal and controlled!
+
+#### `./api/...` vs `./internal/api/...`
+
+Similarly to `pkg vs internal` (see below), `api` are public APIs we are committed to support and we provide
+stability guarantees about. `internal/api` holds api between internal tooling (e.g. operator vs e2e tests)
+which we best-effort promise to keep stable and usable, but which have much less guarantees and that
+*noone outside the operator* must be using. If they do, they're on their own, and they probably should stop ASAP.
+
+#### stability guarantees: `./api/...` vs `./pkg/...`
+
+The kubernetes/openshift stability guarantees is about API endpoints and types. golang packages (`pkg/...`) are
+NOT covered by the same guarantee. Nevertheless, the intention is to keep the same stability promises.
+The takeaway is that packages in `pkg/...` must be updated carefully and they must be backward compatible.
+
+### `pkg/...` vs `internal/...`
+
+TL:DR: if unsure, put your package in `./internal/`
+
+The `internal` tree holds packages which are shared across the operator and its support tools (nrovalidate...) and/or
+the e2e serial suite. These packages are usable freely in this context, but these packages are not mature enough
+or supportable for external project to consume.
+
+The `pkg` tree holds packages we are confident and ready to support for external projects, for which we provide
+stability and backward compatibility guarantees.
+
+Code in the `internal` tree is guaranteed compatible *only within the same Z-stream*.
+
+### `./tools/...`: internal tooling
+
+We have ere tools we have to support the project sit in `tools/...`. This includes build process helpers and general utilities.
+These tools are not covered by support/stability guarantees, but we best-effort try to keep them stable (and working of course)
+
+### `./nrovalidate/...`: validation tool
+
+A special tool is `nrovalidate` which is shaping up to be promoted a top-level, supported tool like the operator proper
+and the operand exporter, **but is not there yet**. It is meant to scan the cluster on which the operator is deployed
+and report for misconfiguration and help troubleshoot issues. It's a client-only utility (think like `kubectl`)
