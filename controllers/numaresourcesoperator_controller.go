@@ -73,6 +73,12 @@ import (
 
 const numaResourcesRetryPeriod = 1 * time.Minute
 
+// poolDaemonSet a struct to hold the target MCP of a configured node group and its created respective RTE daemonset
+type poolDaemonSet struct {
+	PoolName  string
+	DaemonSet nropv1.NamespacedName
+}
+
 // NUMAResourcesOperatorReconciler reconciles a NUMAResourcesOperator object
 type NUMAResourcesOperatorReconciler struct {
 	client.Client
@@ -238,7 +244,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 	return false, ctrl.Result{}, "", nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (map[string]nropv1.NamespacedName, bool, ctrl.Result, string, error) {
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]poolDaemonSet, bool, ctrl.Result, string, error) {
 	daemonSetsInfoPerMCP, err := r.syncNUMAResourcesOperatorResources(ctx, instance, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECreate", "Failed to create Resource-Topology-Exporter DaemonSets: %v", err)
@@ -286,13 +292,13 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	return ctrl.Result{}, status.ConditionAvailable, nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, daemonSetsInfo map[string]nropv1.NamespacedName) ([]nropv1.NamespacedName, bool, error) {
+func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, daemonSetsInfo []poolDaemonSet) ([]nropv1.NamespacedName, bool, error) {
 	dssWithReadyStatus := []nropv1.NamespacedName{}
-	for _, nname := range daemonSetsInfo {
+	for _, dsInfo := range daemonSetsInfo {
 		ds := appsv1.DaemonSet{}
 		dsKey := client.ObjectKey{
-			Namespace: nname.Namespace,
-			Name:      nname.Name,
+			Namespace: dsInfo.DaemonSet.Namespace,
+			Name:      dsInfo.DaemonSet.Name,
 		}
 		err := rd.Get(ctx, dsKey, &ds)
 		if err != nil {
@@ -302,20 +308,26 @@ func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Con
 		if !isDaemonSetReady(&ds) {
 			return dssWithReadyStatus, false, nil
 		}
-		dssWithReadyStatus = append(dssWithReadyStatus, nname)
+		dssWithReadyStatus = append(dssWithReadyStatus, dsInfo.DaemonSet)
 	}
 	return dssWithReadyStatus, true, nil
 }
 
-func syncNodeGroupsStatus(instance *nropv1.NUMAResourcesOperator, dsPerMCP map[string]nropv1.NamespacedName) []nropv1.NodeGroupStatus {
+func syncNodeGroupsStatus(instance *nropv1.NUMAResourcesOperator, dsPerMCP []poolDaemonSet) []nropv1.NodeGroupStatus {
 	ngStatuses := []nropv1.NodeGroupStatus{}
 	for _, mcp := range instance.Status.MachineConfigPools {
-		status := nropv1.NodeGroupStatus{
-			PoolName:  mcp.Name,
-			Config:    *mcp.Config,
-			DaemonSet: dsPerMCP[mcp.Name],
+		for _, info := range dsPerMCP {
+			if mcp.Name != info.PoolName {
+				continue
+			}
+
+			status := nropv1.NodeGroupStatus{
+				PoolName:  mcp.Name,
+				Config:    *mcp.Config,
+				DaemonSet: info.DaemonSet,
+			}
+			ngStatuses = append(ngStatuses, status)
 		}
-		ngStatuses = append(ngStatuses, status)
 	}
 	return ngStatuses
 }
@@ -447,7 +459,7 @@ func getMachineConfigPoolStatusByName(mcpStatuses []nropv1.MachineConfigPool, na
 	return nropv1.MachineConfigPool{Name: name}
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (map[string]nropv1.NamespacedName, error) {
+func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]poolDaemonSet, error) {
 	klog.V(4).InfoS("RTESync start", "trees", len(trees))
 	defer klog.V(4).Info("RTESync stop")
 
@@ -462,28 +474,28 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	}
 
 	var err error
-	dssByMCP := make(map[string]nropv1.NamespacedName)
-
+	// using a slice of poolDaemonSet instead of a map because Go maps assignment order is not consistent and non-deterministic
+	dsMCPPairs := []poolDaemonSet{}
 	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
 	if err != nil {
-		return dssByMCP, err
+		return dsMCPPairs, err
 	}
 
 	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.DaemonSet)
 	if err != nil {
-		return dssByMCP, err
+		return dsMCPPairs, err
 	}
 
 	err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
 	if err != nil {
-		return dssByMCP, err
+		return dsMCPPairs, err
 	}
 
 	// ConfigMap should be provided by the kubeletconfig reconciliation loop
 	if r.RTEManifests.ConfigMap != nil {
 		cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.RTEManifests.ConfigMap)
 		if err != nil {
-			return dssByMCP, err
+			return dsMCPPairs, err
 		}
 		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
 	}
@@ -494,10 +506,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		if err != nil {
 			return err
 		}
-		dssByMCP[mcpName] = nropv1.NamespacedName{
-			Namespace: gdm.DaemonSet.GetNamespace(),
-			Name:      gdm.DaemonSet.GetName(),
-		}
+		dsMCPPairs = append(dsMCPPairs, poolDaemonSet{mcpName, nropv1.NamespacedNameFromObject(gdm.DaemonSet)})
 		return nil
 	}
 
@@ -521,7 +530,10 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 			return nil, fmt.Errorf("failed to apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 	}
-	return dssByMCP, nil
+	if len(dsMCPPairs) < len(trees) {
+		klog.Warningf("daemonset and tree size mismatch: expected %d got in daemonsets %d", len(trees), len(dsMCPPairs))
+	}
+	return dsMCPPairs, nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
