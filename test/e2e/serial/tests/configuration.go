@@ -1125,10 +1125,7 @@ func createTAEDeployment(fxt *e2efixture.Fixture, ctx context.Context, name, sch
 func daemonSetListToNamespacedNameList(dss []*appsv1.DaemonSet) []nropv1.NamespacedName {
 	ret := make([]nropv1.NamespacedName, 0, len(dss))
 	for _, ds := range dss {
-		ret = append(ret, nropv1.NamespacedName{
-			Namespace: ds.Namespace,
-			Name:      ds.Name,
-		})
+		ret = append(ret, (nropv1.NamespacedNameFromObject(ds)))
 	}
 	return ret
 }
