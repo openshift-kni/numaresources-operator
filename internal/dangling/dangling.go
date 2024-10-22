@@ -56,6 +56,7 @@ func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nr
 		}
 	}
 
+	deleted := 0
 	for _, ds := range daemonSetList.Items {
 		if !isOwnedBy(ds.GetObjectMeta(), instance) {
 			continue
@@ -69,6 +70,10 @@ func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nr
 			continue
 		}
 		klog.V(3).InfoS("dangling Daemonset deleted", "name", ds.Name)
+		deleted += 1
+	}
+	if deleted > 0 {
+		klog.V(2).InfoS("Delete dangling Daemonsets", "deletedCount", deleted)
 	}
 	return errors
 }
@@ -90,6 +95,7 @@ func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance
 		}
 	}
 
+	deleted := 0
 	for _, mc := range machineConfigList.Items {
 		if !isOwnedBy(mc.GetObjectMeta(), instance) {
 			continue
@@ -103,6 +109,10 @@ func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance
 			continue
 		}
 		klog.V(3).InfoS("dangling Machineconfig deleted", "name", mc.Name)
+		deleted += 1
+	}
+	if deleted > 0 {
+		klog.V(2).InfoS("Delete dangling Machineconfigs", "deletedCount", deleted)
 	}
 	return errors
 }
