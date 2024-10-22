@@ -210,9 +210,16 @@ func init() {
 }
 
 func (ngc *NodeGroupConfig) ToString() string {
-	if ngc != nil {
-		ngc.SetDefaults()
-		return fmt.Sprintf("PodsFingerprinting mode: %s InfoRefreshMode: %s InfoRefreshPeriod: %s InfoRefreshPause: %s", *ngc.PodsFingerprinting, *ngc.InfoRefreshMode, *ngc.InfoRefreshPeriod, *ngc.InfoRefreshPause)
+	if ngc == nil {
+		return ""
 	}
-	return ""
+	ngc.SetDefaults()
+	return fmt.Sprintf("PodsFingerprinting mode: %s InfoRefreshMode: %s InfoRefreshPeriod: %s InfoRefreshPause: %s Tolerations: %+v", *ngc.PodsFingerprinting, *ngc.InfoRefreshMode, *ngc.InfoRefreshPeriod, *ngc.InfoRefreshPause, ngc.Tolerations)
+}
+
+func (ng *NodeGroup) ToString() string {
+	if ng == nil {
+		return ""
+	}
+	return fmt.Sprintf("PoolName: %s MachineConfigPoolSelector: %s Config: %s", *ng.PoolName, ng.MachineConfigPoolSelector.String(), ng.Config.ToString())
 }

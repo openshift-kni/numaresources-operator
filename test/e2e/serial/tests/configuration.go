@@ -1218,7 +1218,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					PoolName: &mcp.Name,
 					Config:   &conf, // intentionally set the shorter config to ensure the status was normalized when published
 				}
-				klog.InfoS("the new node group:", "pool name", *ng.PoolName, "config", ng.Config.ToString(), "MCPselector", ng.MachineConfigPoolSelector.String())
+				klog.InfoS("the new node group to add", "node group", ng.ToString())
 				newNodeGroups := append(initialOperObj.Spec.NodeGroups, ng)
 				var updatedNRO nropv1.NUMAResourcesOperator
 				Eventually(func(g Gomega) {
@@ -1266,7 +1266,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					PoolName: &mcp.Name,
 					Config:   &conf,
 				}
-				klog.InfoS("the updated node group:", "pool name", *ng.PoolName, "config", ng.Config.ToString(), "MCPselector", ng.MachineConfigPoolSelector.String())
+				klog.InfoS("the updated node group to apply", "node group", ng.ToString())
 				newNodeGroups = append(initialOperObj.Spec.NodeGroups, ng)
 
 				Eventually(func(g Gomega) {
