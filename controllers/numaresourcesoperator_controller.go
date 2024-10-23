@@ -462,12 +462,22 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	klog.V(4).InfoS("RTESync start", "trees", len(trees))
 	defer klog.V(4).Info("RTESync stop")
 
+	wantsCustomPolicy := annotations.IsCustomPolicyEnabled(instance.Annotations)
+
 	errorList := dangling.DeleteUnusedDaemonSets(r.Client, ctx, instance, trees)
 	if len(errorList) > 0 {
 		klog.ErrorS(fmt.Errorf("failed to delete unused daemonsets"), "errors", errorList)
 	}
 
-	errorList = dangling.DeleteUnusedMachineConfigs(r.Client, ctx, instance, trees)
+	errorList = dangling.DeleteUnusedMachineConfigs(r.Client, ctx, instance, trees, func(expected bool, _ client.Object) (bool, string) {
+		if !expected {
+			return false, "unexpected object"
+		}
+		if !wantsCustomPolicy {
+			return false, "removing custom SELinuxPolicy, using builtin"
+		}
+		return true, ""
+	})
 	if len(errorList) > 0 {
 		klog.ErrorS(fmt.Errorf("failed to delete unused machineconfigs"), "errors", errorList)
 	}
@@ -498,7 +508,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		}
 		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
 	}
-	rteupdate.SecurityContextConstraint(r.RTEManifests.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
+	rteupdate.SecurityContextConstraint(r.RTEManifests.SecurityContextConstraint, wantsCustomPolicy)
 
 	processor := func(mcpName string, gdm *rtestate.GeneratedDesiredManifest) error {
 		err := daemonsetUpdater(mcpName, gdm)
@@ -510,7 +520,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	}
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
-	for _, objState := range existing.State(r.RTEManifests, processor, annotations.IsCustomPolicyEnabled(instance.Annotations)) {
+	for _, objState := range existing.State(r.RTEManifests, processor, wantsCustomPolicy) {
 		if objState.Error != nil {
 			// We are likely in the bootstrap scenario. In this case, which is expected once, everything is fine.
 			// If it happens past bootstrap, still carry on. We know what to do, and we do want to enforce the desired state.

@@ -39,6 +39,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 
+type KeepDanglingObjectFunc func(expected bool, obj client.Object) (bool, string)
+
 func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
 	klog.V(3).Info("Delete dangling Daemonsets start")
 	defer klog.V(3).Info("Delete dangling Daemonsets end")
@@ -78,7 +80,7 @@ func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nr
 	return errors
 }
 
-func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
+func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, filterObjects ...KeepDanglingObjectFunc) []error {
 	klog.V(3).Info("Delete dangling Machineconfigs start")
 	defer klog.V(3).Info("Delete dangling Machineconfigs end")
 	var errors []error
@@ -100,7 +102,7 @@ func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance
 		if !isOwnedBy(mc.GetObjectMeta(), instance) {
 			continue
 		}
-		if expectedMachineConfigNames.Has(mc.Name) {
+		if keepMachineConfig(expectedMachineConfigNames.Has(mc.Name), mc, filterObjects...) {
 			continue
 		}
 		if err := cli.Delete(ctx, &mc); err != nil {
@@ -115,6 +117,21 @@ func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance
 		klog.V(2).InfoS("Delete dangling Machineconfigs", "deletedCount", deleted)
 	}
 	return errors
+}
+
+func keepMachineConfig(expected bool, mc machineconfigv1.MachineConfig, filterObjects ...KeepDanglingObjectFunc) bool {
+	if len(filterObjects) == 0 {
+		return expected
+	}
+	for _, filterObject := range filterObjects {
+		keep, reason := filterObject(expected, &mc)
+		if keep {
+			klog.V(5).InfoS("keeping dangling object", "MachineConfig", mc.Name, "reason", reason)
+			return true
+		}
+	}
+	klog.V(2).InfoS("deleting dangling object", "MachineConfig", mc.Name)
+	return false
 }
 
 func isOwnedBy(element metav1.Object, owner metav1.Object) bool {
