@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,6 +60,8 @@ import (
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
+	"github.com/openshift-kni/numaresources-operator/pkg/status"
+	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
@@ -678,13 +681,25 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						len(nroOperObj.Status.MachineConfigPools), len(nroOperObj.Spec.NodeGroups),
 					)
 				}
+				if len(nroOperObj.Status.NodeGroups) != len(nroOperObj.Spec.NodeGroups) {
+					return false, fmt.Errorf("NodeGroupStatus mismatch: found %d, expected %d",
+						len(nroOperObj.Status.NodeGroups), len(nroOperObj.Spec.NodeGroups),
+					)
+				}
 				klog.Infof("fetched NRO Object %q", nroKey.String())
 
-				statusConf := nroOperObj.Status.MachineConfigPools[0].Config // shortcut
-				if statusConf == nil {
+				// the assumption here is that the configured node group selector will be targeting one mcp
+				Expect(nroOperObj.Status.MachineConfigPools[0].Name).To(Equal(nroOperObj.Status.NodeGroups[0].PoolName))
+				Expect(len(nroOperObj.Status.DaemonSets)).To(Equal(1)) // always one daemonset per MCP
+				Expect(nroOperObj.Status.DaemonSets[0]).To(Equal(nroOperObj.Status.NodeGroups[0].DaemonSet))
+
+				statusConfFromMCP := nroOperObj.Status.MachineConfigPools[0].Config // shortcut
+				if statusConfFromMCP == nil {
 					// is this a transient error or does the cluster not support the Config reporting?
 					return false, nil
 				}
+
+				statusConfFromGroupStatus := nroOperObj.Status.NodeGroups[0].Config // shortcut
 
 				seenStatusConf = true
 
@@ -699,9 +714,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				// This is wrapped in a Eventually because even in functional, well-behaving clusters,
 				// the operator may take nonzero time to populate the status, and this is still fine.\
 				// NOTE HERE: we need to match the types as well (ptr and ptr)
-				match := cmp.Equal(statusConf, &specConf)
-				klog.Infof("NRO Object %q status %v spec %v match %v", nroKey.String(), toJSON(statusConf), toJSON(specConf), match)
-				return match, nil
+				matchFromMCP := cmp.Equal(statusConfFromMCP, &specConf)
+				klog.InfoS("result of checking the status from MachineConfigPools", "NRO Object", nroKey.String(), "status", toJSON(statusConfFromMCP), "spec", toJSON(specConf), "match", matchFromMCP)
+				matchFromGroupStatus := cmp.Equal(statusConfFromGroupStatus, specConf)
+				klog.InfoS("result of checking the status from NodeGroupStatus", "NRO Object", nroKey.String(), "status", toJSON(statusConfFromGroupStatus), "spec", toJSON(specConf), "match", matchFromGroupStatus)
+
+				return matchFromMCP && matchFromGroupStatus, nil
 			})
 			if !seenStatusConf {
 				e2efixture.Skipf(fxt, "NodeGroupConfig never reported in status, assuming not supported")
@@ -1097,9 +1115,266 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pendingPod.Namespace, pendingPod.Name, schedulerName)
 		})
+
+		Context("[ngpoolname] node group with PoolName support", Label("ngpoolname"), Label("feature:ngpoolname"), func() {
+			initialOperObj := &nropv1.NUMAResourcesOperator{}
+			nroKey := objects.NROObjectKey()
+
+			It("[tier2] should not allow configuring PoolName and MCP selector on same node group", Label("tier2"), func(ctx context.Context) {
+				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
+
+				labelSel := &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"test2": "test2",
+					},
+				}
+				pn := "test2"
+				ng := nropv1.NodeGroup{
+					MachineConfigPoolSelector: labelSel,
+					PoolName:                  &pn,
+				}
+
+				By(fmt.Sprintf("modifying the NUMAResourcesOperator by appending a node group with several pool specifiers: %+v", ng))
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Eventually(func(g Gomega) {
+					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+					updatedNRO.Spec.NodeGroups = append(updatedNRO.Spec.NodeGroups, ng)
+					g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
+				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
+
+				defer func() {
+					By(fmt.Sprintf("revert initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name))
+					var updatedNRO nropv1.NUMAResourcesOperator
+					Eventually(func(g Gomega) {
+						g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+						updatedNRO.Spec.NodeGroups = initialOperObj.Spec.NodeGroups
+						g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
+					}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+					By("verify the operator is in Available condition")
+					Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+					cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
+					Expect(cond).ToNot(BeNil(), "condition Available was not found: %+v", updatedNRO.Status.Conditions)
+					Expect(cond.Status).To(Equal(metav1.ConditionTrue), "expected operators condition to be Available but was found something else: %+v", updatedNRO.Status.Conditions)
+				}()
+
+				By("verify degraded condition is found due to node group with multiple selectors")
+				Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+				cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionDegraded)
+				Expect(cond).NotTo(BeNil(), "condition Degraded was not found: %+v", updatedNRO.Status.Conditions)
+				Expect(cond.Reason).To(Equal(validation.NodeGroupsError), "reason of the conditions is different from expected: expected %q found %q", validation.NodeGroupsError, cond.Reason)
+				expectedCondMsg := "must have only a single specifier set"
+				Expect(strings.Contains(cond.Message, expectedCondMsg)).To(BeTrue(), "different degrade message was found: expected to contains %q but found %q", "must have only a single specifier set", expectedCondMsg, cond.Message)
+			})
+
+			It("[tier1] should report the NodeGroupConfig in the NodeGroupStatus with NodePool set and allow updates", func(ctx context.Context) {
+				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
+
+				mcp := objects.TestMCP()
+				By(fmt.Sprintf("create new MCP %q", mcp.Name))
+				// we rely on the fact that RTE DS will be created for a valid MCP even with machine count 0, that will
+				// save the reboot, so create a temporary MCP just to test this
+
+				mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": roleMCPTest}
+				mcp.Spec.MachineConfigSelector = &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "machineconfiguration.openshift.io/role",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{roleMCPTest, depnodes.RoleWorker},
+						},
+					},
+				}
+				mcp.Spec.NodeSelector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{getLabelRoleMCPTest(): ""},
+				}
+				Expect(fxt.Client.Create(ctx, mcp)).To(Succeed())
+
+				defer func() {
+					By(fmt.Sprintf("CLEANUP: deleting mcp: %q", mcp.Name))
+					Expect(fxt.Client.Delete(ctx, mcp)).To(Succeed())
+
+					err := wait.With(fxt.Client).
+						Interval(configuration.MachineConfigPoolUpdateInterval).
+						Timeout(configuration.MachineConfigPoolUpdateTimeout).
+						ForMachineConfigPoolDeleted(ctx, mcp)
+					Expect(err).ToNot(HaveOccurred())
+				}()
+
+				By("modifying the NUMAResourcesOperator by appending a node group with PoolName set")
+				pfpMode := nropv1.PodsFingerprintingEnabled
+				refMode := nropv1.InfoRefreshPeriodic
+				rteMode := nropv1.InfoRefreshPauseEnabled
+				conf := nropv1.NodeGroupConfig{
+					PodsFingerprinting: &pfpMode,
+					InfoRefreshMode:    &refMode,
+					InfoRefreshPause:   &rteMode,
+				}
+				specConf := nropv1.DefaultNodeGroupConfig() // to normalize with it
+				// normalize config to handle unspecified defaults
+				specConf = specConf.Merge(conf)
+
+				ng := nropv1.NodeGroup{
+					PoolName: &mcp.Name,
+					Config:   &conf, // intentionally set the shorter config to ensure the status was normalized when published
+				}
+				klog.InfoS("the new node group to add", "node group", ng.ToString())
+				newNodeGroups := append(initialOperObj.Spec.NodeGroups, ng)
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Eventually(func(g Gomega) {
+					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+					updatedNRO.Spec.NodeGroups = newNodeGroups
+					g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
+				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
+
+				defer func() {
+					By(fmt.Sprintf("revert initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name))
+					var updatedNRO nropv1.NUMAResourcesOperator
+					Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+					if !reflect.DeepEqual(updatedNRO.Spec.NodeGroups, initialOperObj.Spec.NodeGroups) {
+						Eventually(func(g Gomega) {
+							g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+							updatedNRO.Spec.NodeGroups = initialOperObj.Spec.NodeGroups
+							g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
+						}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+					}
+
+					By("verify the operator is in Available condition")
+					Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+					cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
+					Expect(cond).ToNot(BeNil(), "expected operators conditions to be Available but was found something else: %+v", updatedNRO.Status.Conditions)
+				}()
+
+				By("wait for NodeGroupStatus to reflect changes")
+				Eventually(func(g Gomega) {
+					g.Expect(ng.PoolName).ToNot(BeNil())
+					verifyStatusUpdate(fxt.Client, ctx, nroKey, updatedNRO, *ng.PoolName, specConf)
+				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+
+				By("update the same node group config and ensure it's updated in the operator status")
+				pfpMode = nropv1.PodsFingerprintingDisabled
+				refMode = nropv1.InfoRefreshEvents
+				conf = nropv1.NodeGroupConfig{
+					PodsFingerprinting: &pfpMode,
+					InfoRefreshMode:    &refMode,
+				}
+				newSpecConf := nropv1.DefaultNodeGroupConfig() // to normalize with it
+				// normalize config to handle unspecified defaults
+				newSpecConf = newSpecConf.Merge(conf)
+
+				ng = nropv1.NodeGroup{
+					PoolName: &mcp.Name,
+					Config:   &conf,
+				}
+				klog.InfoS("the updated node group to apply", "node group", ng.ToString())
+				newNodeGroups = append(initialOperObj.Spec.NodeGroups, ng)
+
+				Eventually(func(g Gomega) {
+					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+					updatedNRO.Spec.NodeGroups = newNodeGroups
+					g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
+				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
+
+				By("wait for NodeGroupStatus to reflect config changes")
+				Eventually(func(g Gomega) {
+					g.Expect(ng.PoolName).ToNot(BeNil())
+					verifyStatusUpdate(fxt.Client, ctx, nroKey, updatedNRO, *ng.PoolName, newSpecConf)
+				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+
+				Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+				var ds nropv1.NamespacedName // to use it later to verify ds termination
+				for _, ngStatus := range updatedNRO.Status.NodeGroups {
+					if ngStatus.PoolName == *ng.PoolName {
+						ds = ngStatus.DaemonSet
+						break
+					}
+				}
+
+				By("delete the node group")
+				Eventually(func(g Gomega) {
+					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+					updatedNRO.Spec.NodeGroups = initialOperObj.Spec.NodeGroups
+					g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
+				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+				klog.Info("verify respective daemonset is deleted")
+				err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetDeleted(ctx, wait.ObjectKey{
+					Namespace: ds.Namespace,
+					Name:      ds.Name,
+				})
+				Expect(err).ToNot(HaveOccurred())
+
+				klog.Info("verify the operator status no longer reference to the deleted node group")
+				Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+
+				for _, dsStatus := range updatedNRO.Status.DaemonSets {
+					Expect(reflect.DeepEqual(dsStatus, ds)).To(BeFalse(), "daemonset %+v is still reported in the daemonsets slice in status: %+v", ds, updatedNRO.Status.DaemonSets)
+				}
+				for _, ngStatus := range updatedNRO.Status.NodeGroups {
+					Expect(ngStatus.PoolName).ToNot(Equal(ng.PoolName), "node group status %+v still exists undet the operator status", ngStatus)
+					Expect(reflect.DeepEqual(ngStatus.DaemonSet, ds)).To(BeFalse(), "daemonset %+v is still reported in one of the NodeGroupStatuses: %+v", ds, ngStatus)
+				}
+				for _, mcp := range updatedNRO.Status.MachineConfigPools {
+					Expect(mcp.Name).ToNot(Equal(ng.PoolName), "status MCPs still contain deleted node group: %+v", mcp)
+				}
+			})
+		})
 	})
 })
 
+func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.ObjectKey, appliedObj nropv1.NUMAResourcesOperator, expectedPoolName string, expectedConf nropv1.NodeGroupConfig) {
+	klog.InfoS("fetch NRO object", "key", key.String())
+	var updatedNRO nropv1.NUMAResourcesOperator
+	Expect(cli.Get(ctx, key, &updatedNRO)).To(Succeed())
+	Expect(len(updatedNRO.Status.NodeGroups)).To(Equal(len(appliedObj.Spec.NodeGroups)), "NodeGroups Status mismatch: found %d, expected %d", len(updatedNRO.Status.NodeGroups), len(appliedObj.Spec.NodeGroups))
+
+	klog.InfoS("successfully fetched NRO object", "key", key.String())
+
+	statusIdxInNodeGroups := -1
+	for idx, ngStatus := range updatedNRO.Status.NodeGroups {
+		if cmp.Equal(ngStatus.PoolName, expectedPoolName) {
+			statusIdxInNodeGroups = idx
+			break
+		}
+	}
+	Expect(statusIdxInNodeGroups).To(BeNumerically(">", -1), "no NodeGroupStatus found for pool name %q yet", expectedPoolName)
+	// all NodeGroupStatus fields are required, if not set in the CR spec they should turn back to defaults
+	statusFromNodeGroups := updatedNRO.Status.NodeGroups[statusIdxInNodeGroups]
+
+	statusIdxInMCPs := -1
+	for idx, mcp := range updatedNRO.Status.MachineConfigPools {
+		if mcp.Name == expectedPoolName {
+			statusIdxInMCPs = idx
+			break
+		}
+	}
+	Expect(statusIdxInMCPs).To(BeNumerically(">", -1), "node group with pool name %q set is still not reflected in the operator status", expectedPoolName)
+	statusConfFromMCP := updatedNRO.Status.MachineConfigPools[statusIdxInMCPs].Config // shortcut
+	Expect(statusConfFromMCP).ToNot(BeNil(), "the config of the node group with pool name %q set is still not reflected in the operator status", expectedPoolName)
+
+	// no need to re-check the pool names because this is already tested in the loops, getting here means both statuses reflect the node group with the PoolName
+	klog.Info("verify daemonset is recorded in all relevant places")
+	found := false
+	for _, ds := range updatedNRO.Status.DaemonSets {
+		if reflect.DeepEqual(ds, statusFromNodeGroups.DaemonSet) {
+			klog.Info("daemonset was found")
+			found = true
+			break
+		}
+	}
+	Expect(found).To(BeTrue(), "the corresponding daemonset for node group with PoolName set still not reflected in the operator status: expected %+v to be among %+v", statusFromNodeGroups.DaemonSet, updatedNRO.Status.DaemonSets)
+
+	// the status must be always populated by the operator.
+	// If the user-provided spec is missing, the status must reflect the compiled-in defaults.
+	// This is wrapped in an Eventually because even in functional, well-behaving clusters,
+	// the operator may take nonzero time to populate the status, and this is still fine.\
+	// NOTE HERE: we need to match the types as well (ptr and ptr)
+	matchFromMCP := cmp.Equal(statusConfFromMCP, &expectedConf)
+	klog.InfoS("result of checking the status from MachineConfigPools", "NRO Object", key.String(), "status", toJSON(statusConfFromMCP), "spec", toJSON(expectedConf), "match", matchFromMCP)
+	matchFromGroupStatus := cmp.Equal(statusFromNodeGroups.Config, expectedConf)
+	klog.InfoS("result of checking the status from NodeGroupStatus", "NRO Object", key.String(), "status", toJSON(statusFromNodeGroups), "spec", toJSON(expectedConf), "match", matchFromGroupStatus)
+	Expect(matchFromMCP && matchFromGroupStatus).To(BeTrue(), "config status mismatch")
+}
 func createTAEDeployment(fxt *e2efixture.Fixture, ctx context.Context, name, schedulerName, cpus string) *appsv1.Deployment {
 	var err error
 	var replicas int32 = 1
