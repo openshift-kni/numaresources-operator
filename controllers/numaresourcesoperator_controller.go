@@ -32,7 +32,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 
@@ -54,10 +53,10 @@ import (
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	"github.com/openshift-kni/numaresources-operator/internal/dangling"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
@@ -463,12 +462,12 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	klog.V(4).InfoS("RTESync start", "trees", len(trees))
 	defer klog.V(4).Info("RTESync stop")
 
-	errorList := r.deleteUnusedDaemonSets(ctx, instance, trees)
+	errorList := dangling.DeleteUnusedDaemonSets(r.Client, ctx, instance, trees)
 	if len(errorList) > 0 {
 		klog.ErrorS(fmt.Errorf("failed to delete unused daemonsets"), "errors", errorList)
 	}
 
-	errorList = r.deleteUnusedMachineConfigs(ctx, instance, trees)
+	errorList = dangling.DeleteUnusedMachineConfigs(r.Client, ctx, instance, trees)
 	if len(errorList) > 0 {
 		klog.ErrorS(fmt.Errorf("failed to delete unused machineconfigs"), "errors", errorList)
 	}
@@ -534,79 +533,6 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		klog.Warningf("daemonset and tree size mismatch: expected %d got in daemonsets %d", len(trees), len(dsMCPPairs))
 	}
 	return dsMCPPairs, nil
-}
-
-func (r *NUMAResourcesOperatorReconciler) deleteUnusedDaemonSets(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
-	klog.V(3).Info("Delete Daemonsets start")
-	defer klog.V(3).Info("Delete Daemonsets end")
-	var errors []error
-	var daemonSetList appsv1.DaemonSetList
-	if err := r.List(ctx, &daemonSetList, &client.ListOptions{Namespace: instance.Namespace}); err != nil {
-		klog.ErrorS(err, "error while getting Daemonset list")
-		return append(errors, err)
-	}
-
-	expectedDaemonSetNames := sets.NewString()
-	for _, tree := range trees {
-		for _, mcp := range tree.MachineConfigPools {
-			expectedDaemonSetNames = expectedDaemonSetNames.Insert(objectnames.GetComponentName(instance.Name, mcp.Name))
-		}
-	}
-
-	for _, ds := range daemonSetList.Items {
-		if !expectedDaemonSetNames.Has(ds.Name) {
-			if isOwnedBy(ds.GetObjectMeta(), instance) {
-				if err := r.Client.Delete(ctx, &ds); err != nil {
-					klog.ErrorS(err, "error while deleting daemonset", "DaemonSet", ds.Name)
-					errors = append(errors, err)
-				} else {
-					klog.V(3).InfoS("Daemonset deleted", "name", ds.Name)
-				}
-			}
-		}
-	}
-	return errors
-}
-
-func (r *NUMAResourcesOperatorReconciler) deleteUnusedMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) []error {
-	klog.V(3).Info("Delete Machineconfigs start")
-	defer klog.V(3).Info("Delete Machineconfigs end")
-	var errors []error
-	var machineConfigList machineconfigv1.MachineConfigList
-	if err := r.List(ctx, &machineConfigList); err != nil {
-		klog.ErrorS(err, "error while getting MachineConfig list")
-		return append(errors, err)
-	}
-
-	expectedMachineConfigNames := sets.NewString()
-	for _, tree := range trees {
-		for _, mcp := range tree.MachineConfigPools {
-			expectedMachineConfigNames = expectedMachineConfigNames.Insert(objectnames.GetMachineConfigName(instance.Name, mcp.Name))
-		}
-	}
-
-	for _, mc := range machineConfigList.Items {
-		if !expectedMachineConfigNames.Has(mc.Name) {
-			if isOwnedBy(mc.GetObjectMeta(), instance) {
-				if err := r.Client.Delete(ctx, &mc); err != nil {
-					klog.ErrorS(err, "error while deleting machineconfig", "MachineConfig", mc.Name)
-					errors = append(errors, err)
-				} else {
-					klog.V(3).InfoS("Machineconfig deleted", "name", mc.Name)
-				}
-			}
-		}
-	}
-	return errors
-}
-
-func isOwnedBy(element metav1.Object, owner metav1.Object) bool {
-	for _, ref := range element.GetOwnerReferences() {
-		if ref.UID == owner.GetUID() {
-			return true
-		}
-	}
-	return false
 }
 
 // SetupWithManager sets up the controller with the Manager.
