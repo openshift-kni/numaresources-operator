@@ -85,7 +85,7 @@ func OverallDeployment() NroDeployment {
 	kcObj, err := objects.TestKC(matchLabels)
 	Expect(err).To(Not(HaveOccurred()))
 
-	unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups)
+	unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups, nroObj.Annotations)
 	Expect(err).NotTo(HaveOccurred())
 
 	var createKubelet bool
@@ -112,7 +112,7 @@ func OverallDeployment() NroDeployment {
 
 	if createKubelet || annotations.IsCustomPolicyEnabled(nroObj.Annotations) {
 		By("waiting for MCP to get updated")
-		mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
+		mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups, nroObj.Annotations)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(WaitForMCPsCondition(e2eclient.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)).To(Succeed())
 		Expect(WaitForMCPsCondition(e2eclient.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
@@ -212,7 +212,7 @@ func WaitForMCPUpdatedAfterNRODeleted(nroObj *nropv1.NUMAResourcesOperator) {
 // isMachineConfigPoolsUpdatedAfterDeletion checks if all related to NUMAResourceOperator CR machines config pools have updated status
 // after MachineConfig deletion
 func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1.NUMAResourcesOperator) (bool, error) {
-	mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups)
+	mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nro.Spec.NodeGroups, nro.Annotations)
 	if err != nil {
 		return false, err
 	}

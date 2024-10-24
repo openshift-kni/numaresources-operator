@@ -48,7 +48,7 @@ import (
 )
 
 func SetupInfra(fxt *e2efixture.Fixture, nroOperObj *nropv1.NUMAResourcesOperator, nrtList nrtv1alpha2.NodeResourceTopologyList) {
-	setupNUMACell(fxt, nroOperObj.Spec.NodeGroups, nrtList, 3*time.Minute)
+	setupNUMACell(fxt, nroOperObj.Spec.NodeGroups, nrtList, 3*time.Minute, nroOperObj.Annotations)
 	LabelNodes(fxt.Client, nrtList)
 }
 
@@ -56,12 +56,12 @@ func TeardownInfra(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopo
 	UnlabelNodes(fxt.Client, nrtList)
 }
 
-func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, nrtList nrtv1alpha2.NodeResourceTopologyList, timeout time.Duration) {
+func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, nrtList nrtv1alpha2.NodeResourceTopologyList, timeout time.Duration, annot map[string]string) {
 	klog.Infof("e2e infra setup begin")
 
 	Expect(nodeGroups).ToNot(BeEmpty(), "cannot autodetect the TAS node groups from the cluster")
 
-	mcps, err := machineconfigpools.GetListByNodeGroupsV1(context.TODO(), fxt.Client, nodeGroups)
+	mcps, err := machineconfigpools.GetListByNodeGroupsV1(context.TODO(), fxt.Client, nodeGroups, annot)
 	Expect(err).ToNot(HaveOccurred())
 
 	klog.Infof("setting e2e infra for %d MCPs", len(mcps))

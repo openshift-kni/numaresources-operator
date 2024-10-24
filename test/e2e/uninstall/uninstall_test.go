@@ -70,7 +70,7 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 				return
 			}
 
-			unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups)
+			unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups, nroObj.Annotations)
 			Expect(err).NotTo(HaveOccurred())
 
 			if err := e2eclient.Client.Delete(context.TODO(), nroObj); err != nil {
@@ -94,7 +94,7 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 
 			if configuration.Plat == platform.OpenShift {
 				Eventually(func() bool {
-					mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
+					mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups, nroObj.Annotations)
 					if err != nil {
 						klog.Warningf("failed to get machine config pools: %v", err)
 						return false

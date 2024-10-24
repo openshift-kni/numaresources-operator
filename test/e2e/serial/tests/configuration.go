@@ -153,7 +153,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			initialMcpSampleNode := workers[len(workers)-targetIdx-1]
 
 			// save the initial nrop mcp to use it later while waiting for mcp to get updated
-			initialMcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
+			initialMcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups, nroOperObj.Annotations)
 			Expect(err).ToNot(HaveOccurred())
 
 			if len(initialMcps) > 1 {
@@ -439,7 +439,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mcpsInfo).ToNot(BeEmpty())
 
-			mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), fxt.Client, nroOperObj.Spec.NodeGroups)
+			mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), fxt.Client, nroOperObj.Spec.NodeGroups, nroOperObj.Annotations)
 			Expect(err).ToNot(HaveOccurred(), "cannot get MCPs associated with NUMAResourcesOperator %q", nroOperObj.Name)
 
 			kcList := &machineconfigv1.KubeletConfigList{}
@@ -848,7 +848,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mcpsInfo).ToNot(BeEmpty())
 
-			mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, fxt.Client, nroOperObj.Spec.NodeGroups)
+			mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, fxt.Client, nroOperObj.Spec.NodeGroups, nroOperObj.Annotations)
 			Expect(err).ToNot(HaveOccurred(), "cannot get MCPs associated with NUMAResourcesOperator %q", nroOperObj.Name)
 
 			kcList := &machineconfigv1.KubeletConfigList{}

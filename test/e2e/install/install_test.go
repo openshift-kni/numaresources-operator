@@ -330,7 +330,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			if annotations.IsCustomPolicyEnabled(nroObj.Annotations) {
-				mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
+				mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups, nroObj.Annotations)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(deploy.WaitForMCPsCondition(e2eclient.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)).To(Succeed())
 				Expect(deploy.WaitForMCPsCondition(e2eclient.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())

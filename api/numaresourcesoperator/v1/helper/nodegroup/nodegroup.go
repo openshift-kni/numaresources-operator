@@ -26,6 +26,7 @@ import (
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 )
 
 // Tree maps a NodeGroup to the MachineConfigPool identified by the NodeGroup's MCPSelector.
@@ -57,14 +58,17 @@ func (ttr Tree) Clone() Tree {
 // / NOTE: because of historical accident we have a 1:N mapping between NodeGroup and MCPs (MachineConfigPool*s* is a slice!)
 // Unfortunately this is with very, very high probability a refactoring mistake which slipped in unchecked.
 // One of the key design assumptions in NROP is the 1:1 mapping between NodeGroups and MCPs.
-// This historical accident should be fixed in future versions.
-func FindTrees(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup) ([]Tree, error) {
+func FindTrees(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup, annot map[string]string) ([]Tree, error) {
 	// node groups are validated by the controller before getting to this phase, so for sure all node groups will be valid at this point.
 	// a valid node group has either PoolName OR MachineConfigPoolSelector, not both. Getting here means operator is deployed on Openshift thus processing MCPs
+	multiMCPsPerTree := annotations.IsMultiplePoolsPerTree(annot)
+	if multiMCPsPerTree {
+		klog.Warningf("support for multiple pools match per node group will soon be disabled")
+	}
 	var result []Tree
 	for idx := range nodeGroups {
 		nodeGroup := &nodeGroups[idx] // shortcut
-		treeMCPs := []*mcov1.MachineConfigPool{}
+		var treeMCPs []*mcov1.MachineConfigPool
 
 		if nodeGroup.PoolName != nil {
 			for i := range mcps.Items {
@@ -90,6 +94,9 @@ func FindTrees(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup)
 				if !selector.Matches(mcpLabels) {
 					continue
 				}
+				if len(treeMCPs) != 0 && !multiMCPsPerTree {
+					return nil, fmt.Errorf("found more than one MCP matching to the node group with MCP selector %q", nodeGroup.MachineConfigPoolSelector.String())
+				}
 				treeMCPs = append(treeMCPs, mcp)
 			}
 		}
@@ -107,8 +114,8 @@ func FindTrees(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup)
 }
 
 // FindMachineConfigPools returns a slice of all the MachineConfigPool matching the configured node groups
-func FindMachineConfigPools(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
-	trees, err := FindTrees(mcps, nodeGroups)
+func FindMachineConfigPools(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup, annot map[string]string) ([]*mcov1.MachineConfigPool, error) {
+	trees, err := FindTrees(mcps, nodeGroups, annot)
 	if err != nil {
 		return nil, err
 	}

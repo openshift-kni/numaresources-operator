@@ -147,7 +147,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
 	}
 
-	trees, err := getTreesByNodeGroup(ctx, r.Client, instance.Spec.NodeGroups)
+	trees, err := getTreesByNodeGroup(ctx, r.Client, instance.Spec.NodeGroups, instance.Annotations)
 	if err != nil {
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
 	}
@@ -704,10 +704,10 @@ func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
 	return ds.Status.DesiredNumberScheduled > 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
 }
 
-func getTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nropv1.NodeGroup) ([]nodegroupv1.Tree, error) {
+func getTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nropv1.NodeGroup, annot map[string]string) ([]nodegroupv1.Tree, error) {
 	mcps := &machineconfigv1.MachineConfigPoolList{}
 	if err := cli.List(ctx, mcps); err != nil {
 		return nil, err
 	}
-	return nodegroupv1.FindTrees(mcps, nodeGroups)
+	return nodegroupv1.FindTrees(mcps, nodeGroups, annot)
 }

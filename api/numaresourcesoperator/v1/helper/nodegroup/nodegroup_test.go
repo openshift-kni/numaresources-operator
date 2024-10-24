@@ -17,18 +17,16 @@
 package nodegroup
 
 import (
-	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 )
 
 func TestFindTrees(t *testing.T) {
@@ -79,10 +77,12 @@ func TestFindTrees(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name     string
-		mcps     *mcov1.MachineConfigPoolList
-		ngs      []nropv1.NodeGroup
-		expected []Tree
+		name        string
+		mcps        *mcov1.MachineConfigPoolList
+		ngs         []nropv1.NodeGroup
+		annotations map[string]string
+		expected    []Tree
+		errText     string
 	}{
 		{
 			name: "no-node-groups",
@@ -113,7 +113,7 @@ func TestFindTrees(t *testing.T) {
 			},
 		},
 		{
-			name: "ng1-mcp2",
+			name: "ng1 with more than one matching MCP with default configuration",
 			mcps: &mcpList,
 			ngs: []nropv1.NodeGroup{
 				{
@@ -123,6 +123,23 @@ func TestFindTrees(t *testing.T) {
 						},
 					},
 				},
+			},
+			errText: "found more than one MCP matching",
+		},
+		{
+			name: "ng1 with more than one matching MCP and enabled annotation",
+			mcps: &mcpList,
+			ngs: []nropv1.NodeGroup{
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"mcp-label-3": "test3",
+						},
+					},
+				},
+			},
+			annotations: map[string]string{
+				annotations.MultiplePoolsPerTreeAnnotation: annotations.MultiplePoolsPerTreeEnabled,
 			},
 			expected: []Tree{
 				{
@@ -142,7 +159,7 @@ func TestFindTrees(t *testing.T) {
 			},
 		},
 		{
-			name: "ng2-mcpX",
+			name: "ng2-mcp not found",
 			mcps: &mcpList,
 			ngs: []nropv1.NodeGroup{
 				{
@@ -155,36 +172,12 @@ func TestFindTrees(t *testing.T) {
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"mcp-label-3": "test3",
+							"mcp-label": "notFound",
 						},
 					},
 				},
 			},
-			expected: []Tree{
-				{
-					MachineConfigPools: []*mcov1.MachineConfigPool{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "mcp2",
-							},
-						},
-					},
-				},
-				{
-					MachineConfigPools: []*mcov1.MachineConfigPool{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "mcp3",
-							},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "mcp5",
-							},
-						},
-					},
-				},
-			},
+			errText: "failed to find MachineConfigPool",
 		},
 		{
 			name: "node group with PoolName and MachineConfigPoolSelector in another node group",
@@ -196,7 +189,7 @@ func TestFindTrees(t *testing.T) {
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"mcp-label-3": "test3",
+							"mcp-label-2a": "test2a",
 						},
 					},
 				},
@@ -215,12 +208,7 @@ func TestFindTrees(t *testing.T) {
 					MachineConfigPools: []*mcov1.MachineConfigPool{
 						{
 							ObjectMeta: metav1.ObjectMeta{
-								Name: "mcp3",
-							},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "mcp5",
+								Name: "mcp2",
 							},
 						},
 					},
@@ -230,25 +218,23 @@ func TestFindTrees(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := FindTrees(tt.mcps, tt.ngs)
+			got, err := FindTrees(tt.mcps, tt.ngs, tt.annotations)
 			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+				if len(got) != 0 || tt.errText == "" {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if !strings.Contains(err.Error(), tt.errText) {
+					t.Errorf("expected error %q to contain %q", err.Error(), tt.errText)
+				}
 			}
+			if err == nil && tt.errText != "" {
+				t.Errorf("test passed but expected error; looking for %q", tt.errText)
+			}
+
 			gotNames := mcpNamesFromTrees(got)
 			expectedNames := mcpNamesFromTrees(tt.expected)
 			if !reflect.DeepEqual(gotNames, expectedNames) {
 				t.Errorf("Trees mismatch: got=%v expected=%v", gotNames, expectedNames)
-			}
-
-			// backward compat
-			gotMcps, err := findListByNodeGroups(tt.mcps, tt.ngs)
-			if err != nil {
-				t.Errorf("unexpected error checking backward compat: %v", err)
-			}
-			compatibleNames := mcpNamesFromList(gotMcps)
-			gotSet := sets.New[string](gotNames...)
-			if !gotSet.HasAll(compatibleNames...) {
-				t.Errorf("Trees mismatch (non backward compatible): got=%v compat=%v", gotNames, compatibleNames)
 			}
 		})
 	}
@@ -302,10 +288,11 @@ func TestFindMachineConfigPools(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name     string
-		mcps     *mcov1.MachineConfigPoolList
-		ngs      []nropv1.NodeGroup
-		expected []*mcov1.MachineConfigPool
+		name        string
+		mcps        *mcov1.MachineConfigPoolList
+		ngs         []nropv1.NodeGroup
+		annotations map[string]string
+		expected    []*mcov1.MachineConfigPool
 	}{
 		{
 			name: "no-node-groups",
@@ -332,7 +319,7 @@ func TestFindMachineConfigPools(t *testing.T) {
 			},
 		},
 		{
-			name: "ng1-mcp2",
+			name: "ng1-multiple mcps found",
 			mcps: &mcpList,
 			ngs: []nropv1.NodeGroup{
 				{
@@ -342,6 +329,22 @@ func TestFindMachineConfigPools(t *testing.T) {
 						},
 					},
 				},
+			},
+		},
+		{
+			name: "ng1-multiple mcps found with enabled annotation",
+			mcps: &mcpList,
+			ngs: []nropv1.NodeGroup{
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"mcp-label-3": "test3",
+						},
+					},
+				},
+			},
+			annotations: map[string]string{
+				annotations.MultiplePoolsPerTreeAnnotation: annotations.MultiplePoolsPerTreeEnabled,
 			},
 			expected: []*mcov1.MachineConfigPool{
 				{
@@ -357,7 +360,7 @@ func TestFindMachineConfigPools(t *testing.T) {
 			},
 		},
 		{
-			name: "ng2-mcpX",
+			name: "ng2-mcp not found",
 			mcps: &mcpList,
 			ngs: []nropv1.NodeGroup{
 				{
@@ -370,25 +373,8 @@ func TestFindMachineConfigPools(t *testing.T) {
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
-							"mcp-label-3": "test3",
+							"mcp-label": "notFound",
 						},
-					},
-				},
-			},
-			expected: []*mcov1.MachineConfigPool{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "mcp2",
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "mcp3",
-					},
-				},
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "mcp5",
 					},
 				},
 			},
@@ -396,8 +382,8 @@ func TestFindMachineConfigPools(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := FindMachineConfigPools(tt.mcps, tt.ngs)
-			if err != nil {
+			got, err := FindMachineConfigPools(tt.mcps, tt.ngs, tt.annotations)
+			if err != nil && len(tt.expected) != 0 {
 				t.Errorf("unexpected error: %v", err)
 			}
 			gotNames := mcpNamesFromList(got)
@@ -425,41 +411,4 @@ func mcpNamesFromList(mcps []*mcov1.MachineConfigPool) []string {
 		result = append(result, mcp.Name)
 	}
 	return result
-}
-
-// old implementation acting as reference for comparisons
-func findListByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
-	var result []*mcov1.MachineConfigPool
-	for idx := range nodeGroups {
-		nodeGroup := &nodeGroups[idx]
-		found := false
-
-		// handled by validation
-		if nodeGroup.MachineConfigPoolSelector == nil {
-			continue
-		}
-
-		for i := range mcps.Items {
-			mcp := &mcps.Items[i]
-
-			selector, err := metav1.LabelSelectorAsSelector(nodeGroup.MachineConfigPoolSelector)
-			// handled by validation
-			if err != nil {
-				klog.Errorf("bad node group machine config pool selector %q", nodeGroup.MachineConfigPoolSelector.String())
-				continue
-			}
-
-			mcpLabels := labels.Set(mcp.Labels)
-			if selector.Matches(mcpLabels) {
-				found = true
-				result = append(result, mcp)
-			}
-		}
-
-		if !found {
-			return nil, fmt.Errorf("failed to find MachineConfigPool for the node group with the selector %q", nodeGroup.MachineConfigPoolSelector.String())
-		}
-	}
-
-	return result, nil
 }

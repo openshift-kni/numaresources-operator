@@ -25,8 +25,8 @@ import (
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 )
 
-func MachineConfigPoolsByNodeGroups(nodeGroups []nropv1.NodeGroup) (func() error, error) {
-	mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nodeGroups)
+func MachineConfigPoolsByNodeGroups(nodeGroups []nropv1.NodeGroup, annot map[string]string) (func() error, error) {
+	mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nodeGroups, annot)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func MachineConfigPoolsByNodeGroups(nodeGroups []nropv1.NodeGroup) (func() error
 	}
 
 	unpause := func() error {
-		mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nodeGroups)
+		mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nodeGroups, annot)
 		if err != nil {
 			return err
 		}

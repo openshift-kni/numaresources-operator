@@ -736,7 +736,7 @@ func buildMCPsInfo(cli client.Client, ctx context.Context, nroObj nropv1.NUMARes
 	if err != nil {
 		return mcpsInfo, err
 	}
-	mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, cli, updatedNroObj.Spec.NodeGroups)
+	mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, cli, updatedNroObj.Spec.NodeGroups, updatedNroObj.Annotations)
 	if err != nil {
 		return mcpsInfo, err
 	}
