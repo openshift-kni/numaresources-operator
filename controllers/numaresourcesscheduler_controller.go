@@ -111,9 +111,7 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	}
 
 	result, condition, err := r.reconcileResource(ctx, instance)
-
-	reason := condition // TODO: use proper reason
-	if err := r.updateStatus(ctx, instance, condition, reason, messageFromError(err)); err != nil {
+	if err := r.updateStatus(ctx, instance, condition, reasonFromError(err), messageFromError(err)); err != nil {
 		klog.InfoS("Failed to update numaresourcesscheduler status", "Desired condition", condition, "error", err)
 	}
 
@@ -251,7 +249,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 }
 
 func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
-	sched.Status.Conditions, _ = status.GetUpdatedConditions(sched.Status.Conditions, condition, reason, message)
+	sched.Status.Conditions, _ = status.UpdateConditions(sched.Status.Conditions, condition, reason, message)
 	if err := r.Client.Status().Update(ctx, sched); err != nil {
 		return fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(sched), err)
 	}

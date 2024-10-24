@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -140,21 +139,21 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	if req.Name != objectnames.DefaultNUMAResourcesOperatorCrName {
-		message := fmt.Sprintf("incorrect NUMAResourcesOperator resource name: %s", instance.Name)
-		return r.updateStatus(ctx, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, message)
+		err := fmt.Errorf("incorrect NUMAResourcesOperator resource name: %s", instance.Name)
+		return r.updateStatus(ctx, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, err)
 	}
 
 	if err := validation.NodeGroups(instance.Spec.NodeGroups); err != nil {
-		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
+		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
 	}
 
 	trees, err := getTreesByNodeGroup(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
-		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
+		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
 	}
 
 	if err := validation.MachineConfigPoolDuplicates(trees); err != nil {
-		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err.Error())
+		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
 	}
 
 	for idx := range trees {
@@ -164,47 +163,35 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
 	if condition != "" {
-		// TODO: use proper reason
-		reason, message := condition, messageFromError(err)
-		_, _ = r.updateStatus(ctx, instance, condition, reason, message)
+		_, _ = r.updateStatus(ctx, instance, condition, reasonFromError(err), err)
 	}
 	return result, err
 }
 
-func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (ctrl.Result, error) {
+// updateStatusConditionsIfNeeded returns true if conditions were updated.
+func updateStatusConditionsIfNeeded(instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) bool {
 	klog.InfoS("updateStatus", "condition", condition, "reason", reason, "message", message)
-
-	if _, err := updateStatus(ctx, r.Client, instance, condition, reason, message); err != nil {
-		klog.InfoS("Failed to update numaresourcesoperator status", "Desired condition", status.ConditionDegraded, "error", err)
-		return ctrl.Result{}, err
-	}
-	// we do not return an error here because to pass the validation error a user will need to update NRO CR
-	// that will anyway initiate to reconcile loop
-	return ctrl.Result{}, nil
-}
-
-func updateStatus(ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
-	conditions, ok := status.GetUpdatedConditions(instance.Status.Conditions, condition, reason, message)
+	conditions, ok := status.UpdateConditions(instance.Status.Conditions, condition, reason, message)
 	if ok {
 		instance.Status.Conditions = conditions
 	}
-
-	// in case of a 2 similar successive conditions happen we still want to update the status to get latest status updates
-	if err := cli.Status().Update(ctx, instance); err != nil {
-		return false, fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(instance), err)
-	}
-	return true, nil
+	return ok
 }
 
-func messageFromError(err error) string {
-	if err == nil {
-		return ""
+func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, instance *nropv1.NUMAResourcesOperator, condition string, reason string, stErr error) (ctrl.Result, error) {
+	message := messageFromError(stErr)
+
+	_ = updateStatusConditionsIfNeeded(instance, condition, reason, message)
+
+	err := r.Client.Status().Update(ctx, instance)
+	if err != nil {
+		klog.InfoS("Failed to update numaresourcesoperator status", "error", err)
+		return ctrl.Result{}, fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(instance), err)
 	}
-	unwErr := errors.Unwrap(err)
-	if unwErr == nil {
-		return ""
-	}
-	return unwErr.Error()
+
+	// we do not return an error here because to pass the validation error a user will need to update NRO CR
+	// that will anyway initiate to reconcile loop
+	return ctrl.Result{}, nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
