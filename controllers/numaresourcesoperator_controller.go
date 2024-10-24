@@ -163,10 +163,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
 
-	ok := updateStatusConditionsIfNeeded(instance, condition, reasonFromError(err), messageFromError(err))
-	if !ok {
-		return result, err
-	}
+	_ = updateStatusConditionsIfNeeded(instance, condition, reasonFromError(err), messageFromError(err))
 
 	updErr := r.Client.Status().Update(ctx, instance)
 	if updErr != nil {
