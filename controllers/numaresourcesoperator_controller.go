@@ -490,7 +490,15 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		}
 		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
 	}
-	rteupdate.SecurityContextConstraint(r.RTEManifests.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
+
+	customPolicyEnabled := annotations.IsCustomPolicyEnabled(instance.Annotations)
+
+	delete(r.RTEManifests.DaemonSet.Annotations, annotations.SELinuxPolicyConfigAnnotation)
+	if customPolicyEnabled {
+		rteupdate.DaemonSetAnnotation(r.RTEManifests.DaemonSet, annotations.SELinuxPolicyConfigAnnotation, instance.Annotations[annotations.SELinuxPolicyConfigAnnotation])
+	}
+
+	rteupdate.SecurityContextConstraint(r.RTEManifests.SecurityContextConstraint, customPolicyEnabled)
 
 	processor := func(mcpName string, gdm *rtestate.GeneratedDesiredManifest) error {
 		err := daemonsetUpdater(mcpName, gdm)
@@ -502,7 +510,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	}
 
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
-	for _, objState := range existing.State(r.RTEManifests, processor, annotations.IsCustomPolicyEnabled(instance.Annotations)) {
+	for _, objState := range existing.State(r.RTEManifests, processor, customPolicyEnabled) {
 		if objState.Error != nil {
 			// We are likely in the bootstrap scenario. In this case, which is expected once, everything is fine.
 			// If it happens past bootstrap, still carry on. We know what to do, and we do want to enforce the desired state.

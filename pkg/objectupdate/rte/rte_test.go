@@ -280,6 +280,67 @@ func TestUpdateDaemonSetTolerations(t *testing.T) {
 	}
 }
 
+func TestDaemonSetAnnotation(t *testing.T) {
+	testCases := []struct {
+		name                string
+		ds                  *appsv1.DaemonSet
+		key                 string
+		value               string
+		expectedAnnotations map[string]string
+	}{
+		{
+			name:  "add new annotation to nil map",
+			ds:    &appsv1.DaemonSet{},
+			key:   "foo",
+			value: "bar",
+			expectedAnnotations: map[string]string{
+				"foo": "bar",
+			},
+		},
+		{
+			name: "add new annotation to non-empty map",
+			ds: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			key:   "test",
+			value: "",
+			expectedAnnotations: map[string]string{
+				"foo":  "bar",
+				"test": "",
+			},
+		},
+		{
+			name: "update annotation",
+			ds: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			key:   "foo",
+			value: "bar2",
+			expectedAnnotations: map[string]string{
+				"foo": "bar2",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			DaemonSetAnnotation(tc.ds, tc.key, tc.value)
+			res := tc.ds.Annotations
+			if !reflect.DeepEqual(res, tc.expectedAnnotations) {
+				t.Fatalf("update failed: expected=%v got=%v", tc.expectedAnnotations, res)
+			}
+		})
+	}
+}
+
 func expectCommandLine(t *testing.T, ds, origDs *appsv1.DaemonSet, testName string, expectedArgs []string) {
 	expectedArgs = append(expectedArgs, commonArgs...)
 	actualArgsSet := getSetFromStringList(ds.Spec.Template.Spec.Containers[0].Args)

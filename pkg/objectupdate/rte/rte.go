@@ -129,6 +129,13 @@ func DaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
 }
 
+func DaemonSetAnnotation(ds *appsv1.DaemonSet, annotKey string, annotValue string) {
+	if ds.Annotations == nil {
+		ds.Annotations = map[string]string{}
+	}
+	ds.Annotations[annotKey] = annotValue
+}
+
 const _MiB = 1024 * 1024
 
 func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
