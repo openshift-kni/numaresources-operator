@@ -18,13 +18,14 @@ package padder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
@@ -235,7 +236,7 @@ func (p *Padder) Clean() error {
 			client.MatchingLabels{PadderLabel: ""},
 			client.GracePeriodSeconds(5),
 		}...); err != nil {
-		if !errors.IsNotFound(err) {
+		if !k8serrors.IsNotFound(err) {
 			return err
 		}
 	}
@@ -252,7 +253,7 @@ func (p *Padder) Clean() error {
 	}
 
 	var errLock sync.Mutex
-	var deletionErrors []string
+	var deletionErrors error
 
 	var wg sync.WaitGroup
 	for _, padPod := range podList.Items {
@@ -263,18 +264,15 @@ func (p *Padder) Clean() error {
 			klog.Infof("waiting for pod %q to get deleted", pod.Name)
 			if err := wait.With(p.Client).Timeout(time.Minute).ForPodDeleted(context.TODO(), p.namespace, pod.Name); err != nil {
 				errLock.Lock()
-				deletionErrors = append(deletionErrors, err.Error())
+				deletionErrors = errors.Join(deletionErrors, err)
 				errLock.Unlock()
 			}
 		}(padPod)
 	}
 	wg.Wait()
-	if deletionErrors != nil {
-		return fmt.Errorf("failed to wait for pad pods deletion. errors: %s", strings.Join(deletionErrors, ", "))
-	}
 
 	p.paddedNodes = []string{}
-	return nil
+	return deletionErrors
 }
 
 func (p *Padder) GetPaddedNodes() []string {

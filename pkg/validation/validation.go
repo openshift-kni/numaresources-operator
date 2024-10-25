@@ -19,7 +19,6 @@ package validation
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -41,18 +40,14 @@ func MachineConfigPoolDuplicates(trees []nodegroupv1.Tree) error {
 		}
 	}
 
-	var duplicateErrors []string
+	var duplicateErrors error
 	for mcpName, count := range duplicates {
 		if count > 1 {
-			duplicateErrors = append(duplicateErrors, fmt.Sprintf("the MachineConfigPool %q selected by at least two node groups", mcpName))
+			duplicateErrors = errors.Join(duplicateErrors, fmt.Errorf("the MachineConfigPool %q selected by at least two node groups", mcpName))
 		}
 	}
 
-	if len(duplicateErrors) > 0 {
-		return errors.New(strings.Join(duplicateErrors, "; "))
-	}
-
-	return nil
+	return duplicateErrors
 }
 
 // NodeGroups validates the node groups for nil values and duplicates.
@@ -103,18 +98,14 @@ func nodeGroupsDuplicatesByMCPSelector(nodeGroups []nropv1.NodeGroup) error {
 		duplicates[key] += 1
 	}
 
-	var duplicateErrors []string
+	var duplicateErrors error
 	for selector, count := range duplicates {
 		if count > 1 {
-			duplicateErrors = append(duplicateErrors, fmt.Sprintf("the node group with the machineConfigPoolSelector %q has duplicates", selector))
+			duplicateErrors = errors.Join(duplicateErrors, fmt.Errorf("the node group with the machineConfigPoolSelector %q has duplicates", selector))
 		}
 	}
 
-	if len(duplicateErrors) > 0 {
-		return errors.New(strings.Join(duplicateErrors, "; "))
-	}
-
-	return nil
+	return duplicateErrors
 }
 
 func nodeGroupsDuplicatesByPoolName(nodeGroups []nropv1.NodeGroup) error {
@@ -131,35 +122,27 @@ func nodeGroupsDuplicatesByPoolName(nodeGroups []nropv1.NodeGroup) error {
 		duplicates[key] += 1
 	}
 
-	var duplicateErrors []string
+	var duplicateErrors error
 	for name, count := range duplicates {
 		if count > 1 {
-			duplicateErrors = append(duplicateErrors, fmt.Sprintf("the pool name %q has duplicates", name))
+			duplicateErrors = errors.Join(duplicateErrors, fmt.Errorf("the pool name %q has duplicates", name))
 		}
 	}
 
-	if len(duplicateErrors) > 0 {
-		return errors.New(strings.Join(duplicateErrors, "; "))
-	}
-
-	return nil
+	return duplicateErrors
 }
 
 func nodeGroupMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
-	var selectorsErrors []string
+	var selectorsErrors error
 	for _, nodeGroup := range nodeGroups {
 		if nodeGroup.MachineConfigPoolSelector == nil {
 			continue
 		}
 
 		if _, err := metav1.LabelSelectorAsSelector(nodeGroup.MachineConfigPoolSelector); err != nil {
-			selectorsErrors = append(selectorsErrors, err.Error())
+			selectorsErrors = errors.Join(selectorsErrors, err)
 		}
 	}
 
-	if len(selectorsErrors) > 0 {
-		return errors.New(strings.Join(selectorsErrors, "; "))
-	}
-
-	return nil
+	return selectorsErrors
 }

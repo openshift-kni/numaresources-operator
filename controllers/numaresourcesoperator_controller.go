@@ -449,17 +449,16 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	klog.V(4).InfoS("RTESync start", "trees", len(trees))
 	defer klog.V(4).Info("RTESync stop")
 
-	errorList := dangling.DeleteUnusedDaemonSets(r.Client, ctx, instance, trees)
-	if len(errorList) > 0 {
-		klog.ErrorS(fmt.Errorf("failed to delete unused daemonsets"), "errors", errorList)
+	err := dangling.DeleteUnusedDaemonSets(r.Client, ctx, instance, trees)
+	if err != nil {
+		klog.ErrorS(err, "failed to deleted unused daemonsets")
 	}
 
-	errorList = dangling.DeleteUnusedMachineConfigs(r.Client, ctx, instance, trees)
-	if len(errorList) > 0 {
-		klog.ErrorS(fmt.Errorf("failed to delete unused machineconfigs"), "errors", errorList)
+	err = dangling.DeleteUnusedMachineConfigs(r.Client, ctx, instance, trees)
+	if err != nil {
+		klog.ErrorS(err, "failed to deleted unused machineconfigs")
 	}
 
-	var err error
 	// using a slice of poolDaemonSet instead of a map because Go maps assignment order is not consistent and non-deterministic
 	dsMCPPairs := []poolDaemonSet{}
 	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
