@@ -185,22 +185,21 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 }
 
 // updateStatusConditionsIfNeeded returns true if conditions were updated.
-func updateStatusConditionsIfNeeded(instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) bool {
-	if condition == "" {
-		return false
+func updateStatusConditionsIfNeeded(instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) {
+	if condition == "" { // backward (=legacy) compatibility
+		return
 	}
 	klog.InfoS("updateStatus", "condition", condition, "reason", reason, "message", message)
 	conditions, ok := status.UpdateConditions(instance.Status.Conditions, condition, reason, message)
 	if ok {
 		instance.Status.Conditions = conditions
 	}
-	return ok
 }
 
 func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, instance *nropv1.NUMAResourcesOperator, reason string, stErr error) (ctrl.Result, error) {
 	message := messageFromError(stErr)
 
-	_ = updateStatusConditionsIfNeeded(instance, status.ConditionDegraded, reason, message)
+	updateStatusConditionsIfNeeded(instance, status.ConditionDegraded, reason, message)
 	// TODO: if we keep being degraded, we likely (= if we don't, it's too implicit) keep sending possibly redundant updates to the apiserver
 
 	err := r.Client.Status().Update(ctx, instance)
@@ -277,20 +276,20 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, error) {
 	if done, res, cond, err := r.reconcileResourceAPI(ctx, instance, trees); done {
-		_ = updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
+		updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
 		return res, err
 	}
 
 	if r.Platform == platform.OpenShift {
 		if done, res, cond, err := r.reconcileResourceMachineConfig(ctx, instance, trees); done {
-			_ = updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
+			updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
 			return res, err
 		}
 	}
 
 	dsPerMCP, done, res, cond, err := r.reconcileResourceDaemonSet(ctx, instance, trees)
 	if done {
-		_ = updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
+		updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
 		return res, err
 	}
 
@@ -298,7 +297,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	// is a certain thing if we got to this point otherwise the function would have returned already
 	instance.Status.NodeGroups = syncNodeGroupsStatus(instance, dsPerMCP)
 
-	_ = updateStatusConditionsIfNeeded(instance, status.ConditionAvailable, reasonFromError(nil), messageFromError(nil))
+	updateStatusConditionsIfNeeded(instance, status.ConditionAvailable, reasonFromError(nil), messageFromError(nil))
 	return ctrl.Result{}, nil
 }
 
