@@ -16,7 +16,64 @@
 
 package controllers
 
-import "errors"
+import (
+	"errors"
+
+	"github.com/openshift-kni/numaresources-operator/pkg/status"
+)
+
+type conditionInfo struct {
+	Type    string // like metav1.Condition.Type
+	Reason  string
+	Message string
+}
+
+func (ci conditionInfo) WithReason(reason string) conditionInfo {
+	ret := ci
+	if ret.Reason == "" {
+		ret.Reason = reason
+	}
+	return ret
+}
+
+func (ci conditionInfo) WithMessage(message string) conditionInfo {
+	ret := ci
+	if ret.Message == "" {
+		ret.Message = message
+	}
+	return ret
+}
+
+func availableConditionInfo() conditionInfo {
+	return conditionInfo{
+		Type:   status.ConditionAvailable,
+		Reason: "AsExpected",
+	}
+}
+
+func progressingConditionInfo() conditionInfo {
+	return conditionInfo{
+		Type: status.ConditionProgressing,
+	}
+}
+
+func degradedConditionInfoFromError(err error) conditionInfo {
+	return conditionInfo{
+		Type:    status.ConditionDegraded,
+		Message: messageFromError(err),
+		Reason:  reasonFromError(err),
+	}
+}
+
+func fillConditionInfoFromError(cond conditionInfo, err error) conditionInfo {
+	if cond.Message == "" {
+		cond.Message = messageFromError(err)
+	}
+	if cond.Reason == "" {
+		cond.Reason = reasonFromError(err)
+	}
+	return cond
+}
 
 func reasonFromError(err error) string {
 	if err == nil {

@@ -185,21 +185,24 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 }
 
 // updateStatusConditionsIfNeeded returns true if conditions were updated.
-func updateStatusConditionsIfNeeded(instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) {
-	if condition == "" { // backward (=legacy) compatibility
+func updateStatusConditionsIfNeeded(instance *nropv1.NUMAResourcesOperator, cond conditionInfo) {
+	if cond.Type == "" { // backward (=legacy) compatibility
 		return
 	}
-	klog.InfoS("updateStatus", "condition", condition, "reason", reason, "message", message)
-	conditions, ok := status.UpdateConditions(instance.Status.Conditions, condition, reason, message)
+	klog.InfoS("updateStatus", "condition", cond.Type, "reason", cond.Reason, "message", cond.Message)
+	conditions, ok := status.UpdateConditions(instance.Status.Conditions, cond.Type, cond.Reason, cond.Message)
 	if ok {
 		instance.Status.Conditions = conditions
 	}
 }
 
 func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, instance *nropv1.NUMAResourcesOperator, reason string, stErr error) (ctrl.Result, error) {
-	message := messageFromError(stErr)
+	info := degradedConditionInfoFromError(stErr)
+	if reason != "" { // intentionally overwrite
+		info.Reason = reason
+	}
 
-	updateStatusConditionsIfNeeded(instance, status.ConditionDegraded, reason, message)
+	updateStatusConditionsIfNeeded(instance, info)
 	// TODO: if we keep being degraded, we likely (= if we don't, it's too implicit) keep sending possibly redundant updates to the apiserver
 
 	err := r.Client.Status().Update(ctx, instance)
@@ -213,25 +216,27 @@ func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, ins
 	return ctrl.Result{}, nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, conditionInfo, error) {
 	applied, err := r.syncNodeResourceTopologyAPI(ctx)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedCRDInstall", "Failed to install Node Resource Topology CRD: %v", err)
-		return true, ctrl.Result{}, status.ConditionDegraded, fmt.Errorf("FailedAPISync: %w", err)
+		err = fmt.Errorf("FailedAPISync: %w", err)
+		return true, ctrl.Result{}, degradedConditionInfoFromError(err), err
 	}
 	if applied {
 		r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulCRDInstall", "Node Resource Topology CRD installed")
 	}
-	return false, ctrl.Result{}, "", nil
+	return false, ctrl.Result{}, availableConditionInfo(), nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, string, error) {
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, conditionInfo, error) {
 	// we need to sync machine configs first and wait for the MachineConfigPool updates
 	// before checking additional components for updates
 	mcpUpdatedFunc, err := r.syncMachineConfigs(ctx, instance, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
-		return true, ctrl.Result{}, status.ConditionDegraded, fmt.Errorf("failed to sync machine configs: %w", err)
+		err = fmt.Errorf("failed to sync machine configs: %w", err)
+		return true, ctrl.Result{}, degradedConditionInfoFromError(err), err
 	}
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulMCSync", "Enabled machine configuration for worker nodes")
 
@@ -242,21 +247,22 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 
 	if !allMCPsUpdated {
 		// the Machine Config Pool still did not apply the machine config, wait for one minute
-		return true, ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, status.ConditionProgressing, nil
+		return true, ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, progressingConditionInfo(), nil
 	}
 	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
 
-	return false, ctrl.Result{}, "", nil
+	return false, ctrl.Result{}, availableConditionInfo(), nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]poolDaemonSet, bool, ctrl.Result, string, error) {
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]poolDaemonSet, bool, ctrl.Result, conditionInfo, error) {
 	daemonSetsInfoPerMCP, err := r.syncNUMAResourcesOperatorResources(ctx, instance, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECreate", "Failed to create Resource-Topology-Exporter DaemonSets: %v", err)
-		return nil, true, ctrl.Result{}, status.ConditionDegraded, fmt.Errorf("FailedRTESync: %w", err)
+		err = fmt.Errorf("FailedRTESync: %w", err)
+		return nil, true, ctrl.Result{}, degradedConditionInfoFromError(err), err
 	}
 	if len(daemonSetsInfoPerMCP) == 0 {
-		return nil, false, ctrl.Result{}, "", nil
+		return nil, false, ctrl.Result{}, availableConditionInfo(), nil
 	}
 
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
@@ -265,31 +271,31 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 	instance.Status.DaemonSets = dssWithReadyStatus
 	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dssWithReadyStatus)
 	if err != nil {
-		return nil, true, ctrl.Result{}, status.ConditionDegraded, err
+		return nil, true, ctrl.Result{}, degradedConditionInfoFromError(err), err
 	}
 	if !allDSsUpdated {
-		return nil, true, ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
+		return nil, true, ctrl.Result{RequeueAfter: 5 * time.Second}, progressingConditionInfo(), nil
 	}
 
-	return daemonSetsInfoPerMCP, false, ctrl.Result{}, "", nil
+	return daemonSetsInfoPerMCP, false, ctrl.Result{}, availableConditionInfo(), nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, error) {
 	if done, res, cond, err := r.reconcileResourceAPI(ctx, instance, trees); done {
-		updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
+		updateStatusConditionsIfNeeded(instance, fillConditionInfoFromError(cond, err))
 		return res, err
 	}
 
 	if r.Platform == platform.OpenShift {
 		if done, res, cond, err := r.reconcileResourceMachineConfig(ctx, instance, trees); done {
-			updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
+			updateStatusConditionsIfNeeded(instance, fillConditionInfoFromError(cond, err))
 			return res, err
 		}
 	}
 
 	dsPerMCP, done, res, cond, err := r.reconcileResourceDaemonSet(ctx, instance, trees)
 	if done {
-		updateStatusConditionsIfNeeded(instance, cond, reasonFromError(err), messageFromError(err))
+		updateStatusConditionsIfNeeded(instance, fillConditionInfoFromError(cond, err))
 		return res, err
 	}
 
@@ -297,7 +303,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	// is a certain thing if we got to this point otherwise the function would have returned already
 	instance.Status.NodeGroups = syncNodeGroupsStatus(instance, dsPerMCP)
 
-	updateStatusConditionsIfNeeded(instance, status.ConditionAvailable, reasonFromError(nil), messageFromError(nil))
+	updateStatusConditionsIfNeeded(instance, availableConditionInfo())
 	return ctrl.Result{}, nil
 }
 
