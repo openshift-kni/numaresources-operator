@@ -152,6 +152,8 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
 	}
 
+	multiMCPsErr := validation.MultipleMCPsPerTree(instance.Annotations, trees)
+
 	if err := validation.MachineConfigPoolDuplicates(trees); err != nil {
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
 	}
@@ -163,7 +165,11 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	result, condition, err := r.reconcileResource(ctx, instance, trees)
 	if condition != "" {
-		_, _ = r.updateStatus(ctx, instance, condition, reasonFromError(err), err)
+		if condition == status.ConditionAvailable && multiMCPsErr != nil {
+			_, _ = r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, multiMCPsErr)
+		} else {
+			_, _ = r.updateStatus(ctx, instance, condition, reasonFromError(err), err)
+		}
 	}
 	return result, err
 }

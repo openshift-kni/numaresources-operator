@@ -24,6 +24,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 )
 
 const (
@@ -145,4 +146,19 @@ func nodeGroupMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
 	}
 
 	return selectorsErrors
+}
+
+func MultipleMCPsPerTree(annot map[string]string, trees []nodegroupv1.Tree) error {
+	multiMCPsPerTree := annotations.IsMultiplePoolsPerTreeEnabled(annot)
+	if multiMCPsPerTree {
+		return nil
+	}
+
+	var err error
+	for _, tree := range trees {
+		if len(tree.MachineConfigPools) > 1 {
+			err = errors.Join(err, fmt.Errorf("found multiple pools matches for node group %v but expected one. Pools found %+v", &tree.NodeGroup, tree.MachineConfigPools))
+		}
+	}
+	return err
 }

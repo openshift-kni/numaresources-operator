@@ -25,6 +25,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
@@ -214,6 +215,95 @@ func TestNodeGroupsSanity(t *testing.T) {
 				if !strings.Contains(err.Error(), tc.expectedErrorMessage) {
 					t.Errorf("unexpected error: %v (expected %q)", err, tc.expectedErrorMessage)
 				}
+			}
+		})
+	}
+}
+
+func TestMultipleMCPsPerTree(t *testing.T) {
+	testCases := []struct {
+		name          string
+		trees         []nodegroupv1.Tree
+		annotations   map[string]string
+		expectedError bool
+	}{
+		{
+			name: "single MCP per tree, annotation is not set",
+			trees: []nodegroupv1.Tree{
+				{
+					MachineConfigPools: []*machineconfigv1.MachineConfigPool{
+						testobjs.NewMachineConfigPool("foo", nil, nil, nil),
+					},
+				},
+				{
+					MachineConfigPools: []*machineconfigv1.MachineConfigPool{
+						testobjs.NewMachineConfigPool("bar", nil, nil, nil),
+					},
+				},
+			},
+			expectedError: false,
+		},
+		{
+			name: "single MCP per tree, annotation is enabled",
+			trees: []nodegroupv1.Tree{
+				{
+					MachineConfigPools: []*machineconfigv1.MachineConfigPool{
+						testobjs.NewMachineConfigPool("foo", nil, nil, nil),
+					},
+				},
+			},
+			annotations: map[string]string{
+				annotations.MultiplePoolsPerTreeAnnotation: annotations.MultiplePoolsPerTreeEnabled,
+			},
+			expectedError: false,
+		},
+		{
+			name: "multiple MCPs per tree, annotation is enabled",
+			trees: []nodegroupv1.Tree{
+				{
+					MachineConfigPools: []*machineconfigv1.MachineConfigPool{
+						testobjs.NewMachineConfigPool("foo", nil, nil, nil),
+					},
+				},
+				{
+					MachineConfigPools: []*machineconfigv1.MachineConfigPool{
+						testobjs.NewMachineConfigPool("bar1", nil, nil, nil),
+						testobjs.NewMachineConfigPool("bar2", nil, nil, nil),
+					},
+				},
+			},
+			annotations: map[string]string{
+				annotations.MultiplePoolsPerTreeAnnotation: annotations.MultiplePoolsPerTreeEnabled,
+			},
+			expectedError: false,
+		},
+		{
+			name: "multiple MCPs per tree, annotation is not enabled",
+			trees: []nodegroupv1.Tree{
+				{
+					MachineConfigPools: []*machineconfigv1.MachineConfigPool{
+						testobjs.NewMachineConfigPool("foo", nil, nil, nil),
+					},
+				},
+				{
+					MachineConfigPools: []*machineconfigv1.MachineConfigPool{
+						testobjs.NewMachineConfigPool("bar1", nil, nil, nil),
+						testobjs.NewMachineConfigPool("bar2", nil, nil, nil),
+					},
+				},
+			},
+			expectedError: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := MultipleMCPsPerTree(tc.annotations, tc.trees)
+			if err == nil && tc.expectedError {
+				t.Errorf("expected error, but succeeded instead")
+			}
+			if err != nil && !tc.expectedError {
+				t.Errorf("expected success, but failed instead: %v", err)
 			}
 		})
 	}
