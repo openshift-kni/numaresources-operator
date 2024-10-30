@@ -396,8 +396,6 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tre
 	pendingMCPs := []string{}
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
-			mcpStatuses = append(mcpStatuses, extractMCPStatus(mcp, forwardMCPConds))
-
 			isUpdated := updatedFunc(instanceName, mcp)
 			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instanceName, "updated", isUpdated)
 
@@ -405,6 +403,7 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tre
 				pendingMCPs = append(pendingMCPs, mcp.Name)
 				continue
 			}
+			mcpStatuses = append(mcpStatuses, extractMCPStatus(mcp, forwardMCPConds))
 		}
 	}
 	return mcpStatuses, pendingMCPs

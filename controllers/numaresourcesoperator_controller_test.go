@@ -870,9 +870,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 						key := client.ObjectKeyFromObject(nro)
 						Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
-						Expect(len(nro.Status.MachineConfigPools)).To(Equal(2)) // TODO: status should not reflect not updated items
-						Expect(nro.Status.MachineConfigPools[0].Name).To(Equal("test1"))
-						Expect(nro.Status.MachineConfigPools[0].Name).To(Equal("test2"))
+						Expect(nro.Status.MachineConfigPools).To(BeEmpty())
 					})
 				})
 
