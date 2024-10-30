@@ -52,13 +52,20 @@ func (ttr Tree) Clone() Tree {
 	return ret
 }
 
-// FindTrees binds the provided mcps from their list to the given nodegroups.
+// FindTrees [DEPRECATED] an alias of FindTreesOpenshift, it finds the MCPs per node group and returns []Tree
+// As the operator advances, it is being supported on different platforms in which []Tree is calculated differently
+// This function is deprecated please use platform-specific functions instead
+func FindTrees(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup) ([]Tree, error) {
+	return FindTreesOpenshift(mcps, nodeGroups)
+}
+
+// FindTreesOpenshift binds the provided mcps from their list to the given nodegroups.
 // Note that if no nodegroup match, the result slice may be empty.
 // / NOTE: because of historical accident we have a 1:N mapping between NodeGroup and MCPs (MachineConfigPool*s* is a slice!)
 // Unfortunately this is with very, very high probability a refactoring mistake which slipped in unchecked.
 // One of the key design assumptions in NROP is the 1:1 mapping between NodeGroups and MCPs.
 // This historical accident should be fixed in future versions.
-func FindTrees(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup) ([]Tree, error) {
+func FindTreesOpenshift(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup) ([]Tree, error) {
 	// node groups are validated by the controller before getting to this phase, so for sure all node groups will be valid at this point.
 	// a valid node group has either PoolName OR MachineConfigPoolSelector, not both. Getting here means operator is deployed on Openshift thus processing MCPs
 	var result []Tree
@@ -106,9 +113,19 @@ func FindTrees(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup)
 	return result, nil
 }
 
+func FindTreesHypershift(nodeGroups []nropv1.NodeGroup) []Tree {
+	// node groups are validated by the controller before getting to this phase, so for sure all node groups will be valid at this point.
+	// a valid node group has either PoolName OR MachineConfigPoolSelector, not both, and since this is called in a HCP platform environment we know we are working only with PoolNames
+	result := make([]Tree, len(nodeGroups))
+	for i := range nodeGroups {
+		result[i] = Tree{NodeGroup: &nodeGroups[i]}
+	}
+	return result
+}
+
 // FindMachineConfigPools returns a slice of all the MachineConfigPool matching the configured node groups
 func FindMachineConfigPools(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
-	trees, err := FindTrees(mcps, nodeGroups)
+	trees, err := FindTreesOpenshift(mcps, nodeGroups)
 	if err != nil {
 		return nil, err
 	}

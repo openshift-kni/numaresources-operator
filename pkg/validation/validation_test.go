@@ -20,8 +20,10 @@ import (
 	"strings"
 	"testing"
 
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
@@ -88,10 +90,13 @@ func TestNodeGroupsSanity(t *testing.T) {
 		nodeGroups           []nropv1.NodeGroup
 		expectedError        bool
 		expectedErrorMessage string
+		platf                platform.Platform
 	}
 
 	emptyString := ""
 	poolName := "poolname-test"
+	config := nropv1.DefaultNodeGroupConfig()
+
 	testCases := []testCase{
 		{
 			name: "both source pools are nil",
@@ -110,6 +115,7 @@ func TestNodeGroupsSanity(t *testing.T) {
 			},
 			expectedError:        true,
 			expectedErrorMessage: "missing any pool specifier",
+			platf:                platform.OpenShift,
 		},
 		{
 			name: "both source pools are set",
@@ -125,6 +131,7 @@ func TestNodeGroupsSanity(t *testing.T) {
 			},
 			expectedError:        true,
 			expectedErrorMessage: "must have only a single specifier set",
+			platf:                platform.OpenShift,
 		},
 		{
 			name: "with duplicates - mcp selector",
@@ -146,6 +153,7 @@ func TestNodeGroupsSanity(t *testing.T) {
 			},
 			expectedError:        true,
 			expectedErrorMessage: "has duplicates",
+			platf:                platform.OpenShift,
 		},
 		{
 			name: "with duplicates - pool name",
@@ -159,6 +167,7 @@ func TestNodeGroupsSanity(t *testing.T) {
 			},
 			expectedError:        true,
 			expectedErrorMessage: "has duplicates",
+			platf:                platform.OpenShift,
 		},
 		{
 			name: "bad MCP selector",
@@ -175,9 +184,9 @@ func TestNodeGroupsSanity(t *testing.T) {
 					},
 				},
 			},
-
 			expectedError:        true,
 			expectedErrorMessage: "not a valid label selector operator",
+			platf:                platform.OpenShift,
 		},
 		{
 			name: "correct values",
@@ -200,6 +209,34 @@ func TestNodeGroupsSanity(t *testing.T) {
 					PoolName: &poolName,
 				},
 			},
+			platf: platform.OpenShift,
+		},
+		{
+			name: "MCP selector set on Hypershift platform",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"test": "test",
+						},
+					},
+					PoolName: &poolName,
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "MachineConfigPoolSelector on Hypershift platform",
+			platf:                platform.HyperShift,
+		},
+		{
+			name: "empty PoolName on Hypershift platform",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					Config: &config,
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "must specify PoolName on Hypershift platform",
+			platf:                platform.HyperShift,
 		},
 		{
 			name: "empty pool name",
@@ -215,7 +252,7 @@ func TestNodeGroupsSanity(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := NodeGroups(tc.nodeGroups)
+			err := NodeGroups(tc.nodeGroups, tc.platf)
 			if err == nil && tc.expectedError {
 				t.Errorf("expected error, succeeded")
 			}
