@@ -383,6 +383,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 	Context("with correct NRO and more than one NodeGroup", func() {
 		var nro *nropv1.NUMAResourcesOperator
+		var nroKey client.ObjectKey
 		var mcp1 *machineconfigv1.MachineConfigPool
 		var mcp2 *machineconfigv1.MachineConfigPool
 
@@ -418,9 +419,9 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
 			Expect(err).ToNot(HaveOccurred())
 
-			key := client.ObjectKeyFromObject(nro)
+			nroKey = client.ObjectKeyFromObject(nro)
 			// on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC, thus RTE daemonsets and complete status update is not going to be achieved at this point
-			firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
 
@@ -455,7 +456,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(reconciler.Client.Update(context.TODO(), mcp2)).To(Succeed())
 
 			// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
-			secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(secondLoopResult).To(Equal(reconcile.Result{}))
 
@@ -466,12 +467,14 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			}
 			ds := &appsv1.DaemonSet{}
 			Expect(reconciler.Client.Get(context.TODO(), mcp1DSKey, ds)).ToNot(HaveOccurred())
+			Expect(ds.Annotations[annotations.SELinuxPolicyConfigAnnotation]).To(Equal(annotations.SELinuxPolicyCustom))
 
 			mcp2DSKey := client.ObjectKey{
 				Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
 				Namespace: testNamespace,
 			}
 			Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).To(Succeed())
+			Expect(ds.Annotations[annotations.SELinuxPolicyConfigAnnotation]).To(Equal(annotations.SELinuxPolicyCustom))
 		})
 		When("NRO updated to remove the custom policy annotation", func() {
 			BeforeEach(func() {
@@ -507,6 +510,52 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				}
 				err = reconciler.Client.Get(context.TODO(), mc2Key, mc)
 				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s is expected to not be found", mc2Key.String())
+			})
+			It("should update DaemonSets annotations", func() {
+				// Ensure mcp1 is ready
+				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).ToNot(HaveOccurred())
+				mcp1.Status.Configuration.Source = []corev1.ObjectReference{}
+				mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+					{
+						Type:   machineconfigv1.MachineConfigPoolUpdated,
+						Status: corev1.ConditionTrue,
+					},
+				}
+				Expect(reconciler.Client.Update(context.TODO(), mcp1))
+
+				// ensure mcp2 is ready
+				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).ToNot(HaveOccurred())
+				mcp2.Status.Configuration.Source = []corev1.ObjectReference{}
+				mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+					{
+						Type:   machineconfigv1.MachineConfigPoolUpdated,
+						Status: corev1.ConditionTrue,
+					},
+				}
+				Expect(reconciler.Client.Update(context.TODO(), mcp2))
+
+				//after removing the annotation the MCs are detached from the MCPs and are marked as ready as well as the rest of the objects like DSs, thus no need for another reconciliation loop
+				postAnnotationDeleteResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(postAnnotationDeleteResult).To(Equal(reconcile.Result{}))
+
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, nro)).NotTo(HaveOccurred())
+
+				By("Check DaemonSets are updated")
+				mcpDSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+					Namespace: testNamespace,
+				}
+				ds := &appsv1.DaemonSet{}
+				Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+				val, ok := ds.Annotations[annotations.SELinuxPolicyConfigAnnotation]
+				Expect(ok).To(BeFalse(), "expected annotation %q to be deleted from RTE ds %s/%s but it was found with values %q", ds.Namespace, ds.Name, annotations.SELinuxPolicyConfigAnnotation, val)
+
+				mcpDSKey.Name = objectnames.GetComponentName(nro.Name, mcp2.Name)
+				Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
+				val, ok = ds.Annotations[annotations.SELinuxPolicyConfigAnnotation]
+				Expect(ok).To(BeFalse(), "expected annotation %q to be deleted from RTE ds %s/%s but it was found with values %q", ds.Namespace, ds.Name, annotations.SELinuxPolicyConfigAnnotation, val)
+
 			})
 		})
 		When("a NodeGroup is deleted", func() {
@@ -811,7 +860,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		})
 
 		Context("with machine config pool with SIMPLE machine config selector", func() {
-
 			BeforeEach(func() {
 				var err error
 
@@ -851,7 +899,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}
 					Expect(reconciler.Client.Get(context.TODO(), mc2Key, mc)).ToNot(HaveOccurred())
 				})
-
 			})
 			Context("on the second iteration", func() {
 				var result reconcile.Result
