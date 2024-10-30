@@ -55,44 +55,5 @@ func MetadataForUpdate(current, updated client.Object) (client.Object, error) {
 	updated.SetManagedFields(current.GetManagedFields())
 	updated.SetFinalizers(current.GetFinalizers())
 
-	_ = Annotations(current, updated)
-	_ = Labels(current, updated)
-
 	return updated, nil
-}
-
-func Annotations(current, updated client.Object) client.Object {
-	updatedAnnotations := updated.GetAnnotations()
-	curAnnotations := current.GetAnnotations()
-
-	if curAnnotations == nil {
-		curAnnotations = map[string]string{}
-	}
-
-	for k, v := range updatedAnnotations {
-		curAnnotations[k] = v
-	}
-
-	if len(curAnnotations) != 0 {
-		updated.SetAnnotations(curAnnotations)
-	}
-	return updated
-}
-
-func Labels(current, updated client.Object) client.Object {
-	updatedLabels := updated.GetLabels()
-	curLabels := current.GetLabels()
-
-	if curLabels == nil {
-		curLabels = map[string]string{}
-	}
-
-	for k, v := range updatedLabels {
-		curLabels[k] = v
-	}
-
-	if len(curLabels) != 0 {
-		updated.SetLabels(curLabels)
-	}
-	return updated
 }
