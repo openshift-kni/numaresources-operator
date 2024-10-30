@@ -40,8 +40,11 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 )
 
-// MachineConfigLabelKey contains the key of generated label for machine config
-const MachineConfigLabelKey = "machineconfiguration.openshift.io/role"
+const (
+	// MachineConfigLabelKey contains the key of generated label for machine config
+	MachineConfigLabelKey   = "machineconfiguration.openshift.io/role"
+	HyperShiftNodePoolLabel = "hypershift.openshift.io/nodePool"
+)
 
 type daemonSetManifest struct {
 	daemonSet      *appsv1.DaemonSet
@@ -257,11 +260,64 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 	}
 
 	for _, tree := range em.trees {
-		for _, mcp := range tree.MachineConfigPools {
+		if em.plat == platform.OpenShift {
+			for _, mcp := range tree.MachineConfigPools {
+				var existingDs client.Object
+				var loadError error
+
+				generatedName := objectnames.GetComponentName(em.instance.Name, mcp.Name)
+				existingDaemonSet, ok := em.daemonSets[generatedName]
+				if ok {
+					existingDs = existingDaemonSet.daemonSet
+					loadError = existingDaemonSet.daemonSetError
+				} else {
+					loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.DaemonSet.Namespace, mf.DaemonSet.Name)
+				}
+
+				desiredDaemonSet := mf.DaemonSet.DeepCopy()
+				desiredDaemonSet.Name = generatedName
+
+				var updateError error
+				if mcp.Spec.NodeSelector != nil {
+					desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
+				} else {
+					updateError = fmt.Errorf("the machine config pool %q does not have node selector", mcp.Name)
+				}
+
+				if updater != nil {
+					gdm := GeneratedDesiredManifest{
+						ClusterPlatform:       em.plat,
+						MachineConfigPool:     mcp.DeepCopy(),
+						NodeGroup:             tree.NodeGroup.DeepCopy(),
+						DaemonSet:             desiredDaemonSet,
+						IsCustomPolicyEnabled: isCustomPolicyEnabled,
+					}
+
+					err := updater(mcp.Name, &gdm)
+					if err != nil {
+						updateError = fmt.Errorf("daemonset for MCP %q: update failed: %w", mcp.Name, err)
+					}
+				}
+
+				ret = append(ret,
+					objectstate.ObjectState{
+						Existing:    existingDs,
+						Error:       loadError,
+						UpdateError: updateError,
+						Desired:     desiredDaemonSet,
+						Compare:     compare.Object,
+						Merge:       merge.ObjectForUpdate,
+					},
+				)
+			}
+		}
+		if em.plat == platform.HyperShift {
 			var existingDs client.Object
 			var loadError error
 
-			generatedName := objectnames.GetComponentName(em.instance.Name, mcp.Name)
+			poolName := *tree.NodeGroup.PoolName
+
+			generatedName := objectnames.GetComponentName(em.instance.Name, poolName)
 			existingDaemonSet, ok := em.daemonSets[generatedName]
 			if ok {
 				existingDs = existingDaemonSet.daemonSet
@@ -274,24 +330,22 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 			desiredDaemonSet.Name = generatedName
 
 			var updateError error
-			if mcp.Spec.NodeSelector != nil {
-				desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
-			} else {
-				updateError = fmt.Errorf("the machine config pool %q does not have node selector", mcp.Name)
+			desiredDaemonSet.Spec.Template.Spec.NodeSelector = map[string]string{
+				HyperShiftNodePoolLabel: poolName,
 			}
 
 			if updater != nil {
 				gdm := GeneratedDesiredManifest{
 					ClusterPlatform:       em.plat,
-					MachineConfigPool:     mcp.DeepCopy(),
+					MachineConfigPool:     nil,
 					NodeGroup:             tree.NodeGroup.DeepCopy(),
 					DaemonSet:             desiredDaemonSet,
 					IsCustomPolicyEnabled: isCustomPolicyEnabled,
 				}
 
-				err := updater(mcp.Name, &gdm)
+				err := updater(poolName, &gdm)
 				if err != nil {
-					updateError = fmt.Errorf("daemonset for MCP %q: update failed: %w", mcp.Name, err)
+					updateError = fmt.Errorf("daemonset for pool %q: update failed: %w", poolName, err)
 				}
 			}
 
@@ -358,8 +412,37 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 
 	// should have the amount of resources equals to the amount of node groups
 	for _, tree := range trees {
-		for _, mcp := range tree.MachineConfigPools {
-			generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
+		if plat == platform.OpenShift {
+			for _, mcp := range tree.MachineConfigPools {
+				generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
+				key := client.ObjectKey{
+					Name:      generatedName,
+					Namespace: namespace,
+				}
+				ds := &appsv1.DaemonSet{}
+				dsm := daemonSetManifest{}
+				if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
+					dsm.daemonSet = ds
+				}
+				ret.daemonSets[generatedName] = dsm
+
+				if plat == platform.OpenShift {
+					mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
+					key := client.ObjectKey{
+						Name: mcName,
+					}
+					mc := &machineconfigv1.MachineConfig{}
+					mcm := machineConfigManifest{}
+					if mcm.machineConfigError = cli.Get(ctx, key, mc); mcm.machineConfigError == nil {
+						mcm.machineConfig = mc
+					}
+					ret.machineConfigs[mcName] = mcm
+				}
+			}
+		}
+
+		if plat == platform.HyperShift {
+			generatedName := objectnames.GetComponentName(instance.Name, *tree.NodeGroup.PoolName)
 			key := client.ObjectKey{
 				Name:      generatedName,
 				Namespace: namespace,
@@ -370,19 +453,6 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 				dsm.daemonSet = ds
 			}
 			ret.daemonSets[generatedName] = dsm
-
-			if plat == platform.OpenShift {
-				mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
-				key := client.ObjectKey{
-					Name: mcName,
-				}
-				mc := &machineconfigv1.MachineConfig{}
-				mcm := machineConfigManifest{}
-				if mcm.machineConfigError = cli.Get(ctx, key, mc); mcm.machineConfigError == nil {
-					mcm.machineConfig = mc
-				}
-				ret.machineConfigs[mcName] = mcm
-			}
 		}
 	}
 

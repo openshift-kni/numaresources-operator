@@ -143,19 +143,22 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, err)
 	}
 
-	if err := validation.NodeGroups(instance.Spec.NodeGroups); err != nil {
+	if err := validation.NodeGroups(instance.Spec.NodeGroups, r.Platform); err != nil {
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
 	}
 
-	trees, err := getTreesByNodeGroup(ctx, r.Client, instance.Spec.NodeGroups)
+	trees, err := getTreesByNodeGroup(ctx, r.Client, instance.Spec.NodeGroups, r.Platform)
 	if err != nil {
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
 	}
 
-	multiMCPsErr := validation.MultipleMCPsPerTree(instance.Annotations, trees)
+	var multiMCPsErr error
+	if r.Platform == platform.OpenShift {
+		multiMCPsErr = validation.MultipleMCPsPerTree(instance.Annotations, trees)
 
-	if err := validation.MachineConfigPoolDuplicates(trees); err != nil {
-		return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
+		if err := validation.MachineConfigPoolDuplicates(trees); err != nil {
+			return r.updateStatus(ctx, instance, status.ConditionDegraded, validation.NodeGroupsError, err)
+		}
 	}
 
 	for idx := range trees {
@@ -237,18 +240,18 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]poolDaemonSet, bool, ctrl.Result, string, error) {
-	daemonSetsInfoPerMCP, err := r.syncNUMAResourcesOperatorResources(ctx, instance, trees)
+	daemonSetsInfoPerPool, err := r.syncNUMAResourcesOperatorResources(ctx, instance, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECreate", "Failed to create Resource-Topology-Exporter DaemonSets: %v", err)
 		return nil, true, ctrl.Result{}, status.ConditionDegraded, fmt.Errorf("FailedRTESync: %w", err)
 	}
-	if len(daemonSetsInfoPerMCP) == 0 {
+	if len(daemonSetsInfoPerPool) == 0 {
 		return nil, false, ctrl.Result{}, "", nil
 	}
 
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
 
-	dssWithReadyStatus, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, daemonSetsInfoPerMCP)
+	dssWithReadyStatus, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, daemonSetsInfoPerPool)
 	instance.Status.DaemonSets = dssWithReadyStatus
 	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dssWithReadyStatus)
 	if err != nil {
@@ -258,7 +261,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 		return nil, true, ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
 	}
 
-	return daemonSetsInfoPerMCP, false, ctrl.Result{}, "", nil
+	return daemonSetsInfoPerPool, false, ctrl.Result{}, "", nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, string, error) {
@@ -272,14 +275,14 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 		}
 	}
 
-	dsPerMCP, done, res, cond, err := r.reconcileResourceDaemonSet(ctx, instance, trees)
+	dsPerPool, done, res, cond, err := r.reconcileResourceDaemonSet(ctx, instance, trees)
 	if done {
 		return res, cond, err
 	}
 
 	// all fields of NodeGroupStatus are required so publish the status only when all daemonset and MCPs are updated which
 	// is a certain thing if we got to this point otherwise the function would have returned already
-	instance.Status.NodeGroups = syncNodeGroupsStatus(instance, dsPerMCP)
+	instance.Status.NodeGroups = syncNodeGroupsStatus(instance, dsPerPool)
 
 	return ctrl.Result{}, status.ConditionAvailable, nil
 }
@@ -460,44 +463,46 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		klog.ErrorS(err, "failed to deleted unused daemonsets")
 	}
 
-	err = dangling.DeleteUnusedMachineConfigs(r.Client, ctx, instance, trees)
-	if err != nil {
-		klog.ErrorS(err, "failed to deleted unused machineconfigs")
+	if r.Platform == platform.OpenShift {
+		err = dangling.DeleteUnusedMachineConfigs(r.Client, ctx, instance, trees)
+		if err != nil {
+			klog.ErrorS(err, "failed to deleted unused machineconfigs")
+		}
 	}
 
 	// using a slice of poolDaemonSet instead of a map because Go maps assignment order is not consistent and non-deterministic
-	dsMCPPairs := []poolDaemonSet{}
+	dsPoolPairs := []poolDaemonSet{}
 	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
 	if err != nil {
-		return dsMCPPairs, err
+		return dsPoolPairs, err
 	}
 
 	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.DaemonSet)
 	if err != nil {
-		return dsMCPPairs, err
+		return dsPoolPairs, err
 	}
 
 	err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
 	if err != nil {
-		return dsMCPPairs, err
+		return dsPoolPairs, err
 	}
 
 	// ConfigMap should be provided by the kubeletconfig reconciliation loop
 	if r.RTEManifests.ConfigMap != nil {
 		cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.RTEManifests.ConfigMap)
 		if err != nil {
-			return dsMCPPairs, err
+			return dsPoolPairs, err
 		}
 		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
 	}
 	rteupdate.SecurityContextConstraint(r.RTEManifests.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
 
-	processor := func(mcpName string, gdm *rtestate.GeneratedDesiredManifest) error {
-		err := daemonsetUpdater(mcpName, gdm)
+	processor := func(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
+		err := daemonsetUpdater(poolName, gdm)
 		if err != nil {
 			return err
 		}
-		dsMCPPairs = append(dsMCPPairs, poolDaemonSet{mcpName, nropv1.NamespacedNameFromObject(gdm.DaemonSet)})
+		dsPoolPairs = append(dsPoolPairs, poolDaemonSet{poolName, nropv1.NamespacedNameFromObject(gdm.DaemonSet)})
 		return nil
 	}
 
@@ -521,10 +526,10 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 			return nil, fmt.Errorf("failed to apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 	}
-	if len(dsMCPPairs) < len(trees) {
-		klog.Warningf("daemonset and tree size mismatch: expected %d got in daemonsets %d", len(trees), len(dsMCPPairs))
+	if len(dsPoolPairs) < len(trees) {
+		klog.Warningf("daemonset and tree size mismatch: expected %d got in daemonsets %d", len(trees), len(dsPoolPairs))
 	}
-	return dsMCPPairs, nil
+	return dsPoolPairs, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -664,12 +669,12 @@ func validateMachineConfigLabels(mc client.Object, trees []nodegroupv1.Tree) err
 	return nil
 }
 
-func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) error {
+func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
 	rteupdate.DaemonSetTolerations(gdm.DaemonSet, gdm.NodeGroup.Config.Tolerations)
 
 	err := rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config)
 	if err != nil {
-		klog.V(5).InfoS("DaemonSet update: cannot update arguments", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
+		klog.V(5).InfoS("DaemonSet update: cannot update arguments", "pool name", poolName, "daemonset", gdm.DaemonSet.Name, "error", err)
 		return err
 	}
 
@@ -678,15 +683,15 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 	// We cannot do this at GetManifests time because we need to mount
 	// a specific configmap for each daemonset, whose name we know only
 	// when we instantiate the daemonset from the MCP.
-	if gdm.ClusterPlatform != platform.OpenShift {
-		klog.V(5).InfoS("DaemonSet update: unsupported platform", "mcp", mcpName, "platform", gdm.ClusterPlatform)
+	if gdm.ClusterPlatform != platform.OpenShift && gdm.ClusterPlatform != platform.HyperShift {
+		klog.V(5).InfoS("DaemonSet update: unsupported platform", "pool name", poolName, "platform", gdm.ClusterPlatform)
 		// nothing to do!
 		return nil
 	}
 	err = rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
 	if err != nil {
 		// intentionally info because we want to keep going
-		klog.V(5).InfoS("DaemonSet update: cannot update config", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
+		klog.V(5).InfoS("DaemonSet update: cannot update config", "pool name", poolName, "daemonset", gdm.DaemonSet.Name, "error", err)
 		return err
 	}
 	if gdm.ClusterPlatform != platform.Kubernetes {
@@ -709,10 +714,17 @@ func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
 	return ds.Status.DesiredNumberScheduled > 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
 }
 
-func getTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nropv1.NodeGroup) ([]nodegroupv1.Tree, error) {
-	mcps := &machineconfigv1.MachineConfigPoolList{}
-	if err := cli.List(ctx, mcps); err != nil {
-		return nil, err
+func getTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nropv1.NodeGroup, platf platform.Platform) ([]nodegroupv1.Tree, error) {
+	switch platf {
+	case platform.OpenShift:
+		mcps := &machineconfigv1.MachineConfigPoolList{}
+		if err := cli.List(ctx, mcps); err != nil {
+			return nil, err
+		}
+		return nodegroupv1.FindTreesOpenshift(mcps, nodeGroups)
+	case platform.HyperShift:
+		return nodegroupv1.FindTreesHypershift(nodeGroups), nil
+	default:
+		return nil, fmt.Errorf("unsupported platform")
 	}
-	return nodegroupv1.FindTrees(mcps, nodeGroups)
 }
