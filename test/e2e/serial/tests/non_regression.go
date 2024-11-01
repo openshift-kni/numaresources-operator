@@ -116,14 +116,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			numOfNodeToBePadded := len(nrts) - 1
 
 			rl := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("8G"),
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("4G"),
 			}
 			By("padding the nodes before test start")
 			labSel, err := labels.Parse(serialconfig.MultiNUMALabel + "=2")
 			Expect(err).ToNot(HaveOccurred())
 
-			err = padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceList(rl).Pad(timeout, e2epadder.PaddingOptions{
+			err = padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceListPerZone(rl).Pad(timeout, e2epadder.PaddingOptions{
 				LabelSelector: labSel,
 			})
 			Expect(err).ToNot(HaveOccurred())
@@ -161,7 +161,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			cnt := &testPod.Spec.Containers[0]
 			requiredRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceCPU:    resource.MustParse("4"),
 				corev1.ResourceMemory: resource.MustParse("100Mi"),
 			}
 			cnt.Resources.Requests = requiredRes
