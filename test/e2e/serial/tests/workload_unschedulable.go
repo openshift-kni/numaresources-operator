@@ -633,13 +633,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 
 			padUntilRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("3"),
-				corev1.ResourceMemory: resource.MustParse("8Gi"),
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
 			}
 
 			labSel, err := labels.Parse(serialconfig.MultiNUMALabel + "=2")
 			Expect(err).ToNot(HaveOccurred())
-			err = padder.Nodes(len(nrts)).UntilAvailableIsResourceList(padUntilRes).Pad(time.Minute*2, e2epadder.PaddingOptions{
+			err = padder.Nodes(len(nrts)).UntilAvailableIsResourceListPerZone(padUntilRes).Pad(time.Minute*2, e2epadder.PaddingOptions{
 				LabelSelector: labSel,
 			})
 			Expect(err).ToNot(HaveOccurred())

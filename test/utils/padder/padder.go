@@ -98,14 +98,14 @@ func (p *Padder) Nodes(n int) *Padder {
 }
 
 // UntilAvailableIsResource will pad pods into nodes until reach the desired available allocationTarget
-func (p *Padder) UntilAvailableIsResource(resName corev1.ResourceName, quantity string) *Padder {
+func (p *Padder) UntilAvailableIsResourcePerZone(resName corev1.ResourceName, quantity string) *Padder {
 	quan := resource.MustParse(quantity)
 	p.allocationTarget[resName] = quan
 	return p
 }
 
 // UntilAvailableIsResourceList is like UntilAvailableIsResource but with a complete ResourceList as a parameter
-func (p *Padder) UntilAvailableIsResourceList(resources corev1.ResourceList) *Padder {
+func (p *Padder) UntilAvailableIsResourceListPerZone(resources corev1.ResourceList) *Padder {
 	p.allocationTarget = resources
 	return p
 }
