@@ -13,7 +13,7 @@ defaults:
 
 jobs:
   e2e:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     env:
       built_image: "numaresources-operator:ci" # Arbitrary name
       E2E_NAMESPACE_NAME: numaresources

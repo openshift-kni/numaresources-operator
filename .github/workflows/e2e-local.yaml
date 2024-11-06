@@ -16,7 +16,7 @@ defaults:
 
 jobs:
   e2e-local:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     env:
       LOG_DIR: /tmp/test_e2e_logs
     steps:
