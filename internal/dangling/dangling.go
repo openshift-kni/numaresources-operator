@@ -50,12 +50,7 @@ func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nr
 		return err
 	}
 
-	expectedDaemonSetNames := sets.NewString()
-	for _, tree := range trees {
-		for _, mcp := range tree.MachineConfigPools {
-			expectedDaemonSetNames = expectedDaemonSetNames.Insert(objectnames.GetComponentName(instance.Name, mcp.Name))
-		}
-	}
+	expectedDaemonSetNames := buildDaemonSetNames(instance, trees)
 
 	var errs error
 	deleted := 0
@@ -126,4 +121,19 @@ func isOwnedBy(element metav1.Object, owner metav1.Object) bool {
 		}
 	}
 	return false
+}
+
+func buildDaemonSetNames(instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) sets.Set[string] {
+	expectedDaemonSetNames := sets.New[string]()
+	for _, tree := range trees {
+		poolName := tree.NodeGroup.PoolName
+		if poolName != nil && *poolName != "" {
+			expectedDaemonSetNames.Insert(objectnames.GetComponentName(instance.Name, *poolName))
+			continue
+		}
+		for _, mcp := range tree.MachineConfigPools {
+			expectedDaemonSetNames = expectedDaemonSetNames.Insert(objectnames.GetComponentName(instance.Name, mcp.Name))
+		}
+	}
+	return expectedDaemonSetNames
 }
