@@ -565,7 +565,11 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 
 	b := ctrl.NewControllerManagedBy(mgr).For(&nropv1.NUMAResourcesOperator{})
 	if r.Platform == platform.OpenShift {
-		b = b.Owns(&securityv1.SecurityContextConstraints{}).
+		b.Watches(
+			&machineconfigv1.MachineConfigPool{},
+			handler.EnqueueRequestsFromMapFunc(r.mcpToNUMAResourceOperator),
+			builder.WithPredicates(mcpPredicates)).
+			Owns(&securityv1.SecurityContextConstraints{}).
 			Owns(&machineconfigv1.MachineConfig{}, builder.WithPredicates(p))
 	}
 	return b.Owns(&apiextensionv1.CustomResourceDefinition{}).
@@ -573,10 +577,6 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 		Owns(&rbacv1.RoleBinding{}, builder.WithPredicates(p)).
 		Owns(&rbacv1.Role{}, builder.WithPredicates(p)).
 		Owns(&appsv1.DaemonSet{}, builder.WithPredicates(p)).
-		Watches(
-			&machineconfigv1.MachineConfigPool{},
-			handler.EnqueueRequestsFromMapFunc(r.mcpToNUMAResourceOperator),
-			builder.WithPredicates(mcpPredicates)).
 		Complete(r)
 }
 
