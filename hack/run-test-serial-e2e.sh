@@ -200,9 +200,13 @@ function runtests() {
 trap 'teardown' EXIT SIGINT SIGTERM SIGSTOP
 
 setupreport
-setup
-if [ $? -ne 0 ]; then
+
+if ! setup; then
     echo "Failed to install NRO"
     exit 1
 fi
-runtests
+
+if ! runtests; then
+  echo "Failed to run tests"
+  exit 2
+fi
