@@ -14,5 +14,10 @@ if ${REPO_DIR}/bin/lsplatform -is-platform openshift; then
 	exit 0
 fi
 
+if ${REPO_DIR}/bin/lsplatform -is-platform HyperShift; then
+	echo "detected HyperShift platform - nothing to do"
+	exit 0
+fi
+
 runcmd kubectl apply -f ${CRD_MACHINE_CONFIG_POOL_URL}
 runcmd kubectl apply -f ${CRD_KUBELET_CONFIG_URL}
