@@ -197,7 +197,7 @@ function runtests() {
 }
 
 # Make sure that we always properly clean the environment
-trap 'teardown' EXIT SIGINT SIGTERM SIGSTOP
+trap 'teardown' EXIT SIGINT SIGTERM
 
 setupreport
 
