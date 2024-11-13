@@ -48,10 +48,13 @@ import (
 	e2epause "github.com/openshift-kni/numaresources-operator/test/utils/objects/pause"
 )
 
-type NroDeployment struct {
-	McpObj *machineconfigv1.MachineConfigPool
-	KcObj  *machineconfigv1.KubeletConfig
-	NroObj *nropv1.NUMAResourcesOperator
+type Deployer interface {
+	// Deploy deploys NUMAResourcesOperator object create other dependencies
+	// per the platform that implements it
+	Deploy() *nropv1.NUMAResourcesOperator
+	// Teardown Teardowns NUMAResourcesOperator object delete other dependencies
+	// per the platform that implements it
+	Teardown(timeout time.Duration)
 }
 
 type NroDeploymentWithSched struct {
