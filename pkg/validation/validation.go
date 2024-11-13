@@ -61,6 +61,10 @@ func NodeGroups(nodeGroups []nropv1.NodeGroup) error {
 		return err
 	}
 
+	if err := nodeGroupsValidPoolName(nodeGroups); err != nil {
+		return err
+	}
+
 	if err := nodeGroupsDuplicatesByPoolName(nodeGroups); err != nil {
 		return err
 	}
@@ -83,6 +87,20 @@ func nodeGroupPools(nodeGroups []nropv1.NodeGroup) error {
 	}
 
 	return nil
+}
+
+func nodeGroupsValidPoolName(nodeGroups []nropv1.NodeGroup) error {
+	var err error
+	for idx, nodeGroup := range nodeGroups {
+		if nodeGroup.PoolName == nil {
+			continue
+		}
+		if *nodeGroup.PoolName != "" {
+			continue
+		}
+		err = errors.Join(err, fmt.Errorf("pool name for pool #%d cannot be empty", idx))
+	}
+	return err
 }
 
 func nodeGroupsDuplicatesByMCPSelector(nodeGroups []nropv1.NodeGroup) error {

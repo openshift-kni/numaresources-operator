@@ -90,6 +90,7 @@ func TestNodeGroupsSanity(t *testing.T) {
 		expectedErrorMessage string
 	}
 
+	emptyString := ""
 	poolName := "poolname-test"
 	testCases := []testCase{
 		{
@@ -199,6 +200,16 @@ func TestNodeGroupsSanity(t *testing.T) {
 					PoolName: &poolName,
 				},
 			},
+		},
+		{
+			name: "empty pool name",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					PoolName: &emptyString,
+				},
+			},
+			expectedError:        true,
+			expectedErrorMessage: "cannot be empty",
 		},
 	}
 

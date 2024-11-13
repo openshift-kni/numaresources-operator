@@ -126,8 +126,9 @@ func isOwnedBy(element metav1.Object, owner metav1.Object) bool {
 func buildDaemonSetNames(instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) sets.Set[string] {
 	expectedDaemonSetNames := sets.New[string]()
 	for _, tree := range trees {
-		poolName := tree.NodeGroup.PoolName
-		if poolName != nil && *poolName != "" {
+		// the earlier validation step ensures that if poolName is not nil, then it's not empty either
+		poolName := tree.NodeGroup.PoolName // shortcut
+		if poolName != nil {
 			expectedDaemonSetNames.Insert(objectnames.GetComponentName(instance.Name, *poolName))
 			continue
 		}
