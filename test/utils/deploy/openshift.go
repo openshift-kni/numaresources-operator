@@ -38,7 +38,6 @@ type OpenShiftNRO struct {
 func (o *OpenShiftNRO) Deploy(ctx context.Context) *nropv1.NUMAResourcesOperator {
 	GinkgoHelper()
 
-	// TODO: should this be configurable?
 	return o.deployWithLabels(ctx, objects.OpenshiftMatchLabels())
 }
 
@@ -67,7 +66,7 @@ func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, matchLabels map[str
 	Expect(err).NotTo(HaveOccurred())
 	o.NroObj = nroObj
 
-	Eventually(unpause).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).ShouldNot(HaveOccurred())
+	Eventually(unpause).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(Succeed())
 
 	err = e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(nroObj), nroObj)
 	Expect(err).NotTo(HaveOccurred())
@@ -83,7 +82,6 @@ func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, matchLabels map[str
 	return nroObj
 }
 
-// TODO: what if timeout < period?
 func (o *OpenShiftNRO) Teardown(ctx context.Context, timeout time.Duration) {
 	GinkgoHelper()
 

@@ -98,15 +98,15 @@ var _ = Describe("[Install] continuousIntegration", func() {
 			if err != nil {
 				logRTEPodsLogs(e2eclient.Client, e2eclient.K8sClient, context.TODO(), updatedNROObj, "NRO never reported available")
 			}
-			Expect(err).NotTo(HaveOccurred(), "NRO never reported available")
+			Expect(err).ToNot(HaveOccurred(), "NRO never reported available")
 
 			By("checking the NRT CRD is deployed")
 			_, err = crds.GetByName(e2eclient.Client, crds.CrdNRTName)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the NRO CRD is deployed")
 			_, err = crds.GetByName(e2eclient.Client, crds.CrdNROName)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("checking Daemonset is up&running")
 			Eventually(func() bool {
@@ -140,7 +140,7 @@ var _ = Describe("[Install] continuousIntegration", func() {
 
 			By("checking DaemonSet pods are running with correct SELinux context")
 			ds, err := getDaemonSetByOwnerReference(updatedNROObj.UID)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			rteContainer, err := findContainerByName(*ds, containerNameRTE)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(rteContainer.SecurityContext.SELinuxOptions.Type).To(Equal(selinux.RTEContextType), "container %s is running with wrong selinux context", rteContainer.Name)
