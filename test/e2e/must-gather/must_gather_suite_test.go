@@ -17,6 +17,7 @@
 package mustgather
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -65,12 +66,12 @@ var _ = ginkgo.BeforeSuite(func() {
 		ginkgo.By("Fetching up cluster data")
 
 		var err error
-		deployment, err = deploy.GetDeploymentWithSched()
+		deployment, err = deploy.GetDeploymentWithSched(context.TODO())
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		return
 	}
 	ginkgo.By("Setting up the cluster")
-	deployment.Deploy()
+	deployment.Deploy(context.TODO())
 	deployment.NroSchedObj = deploy.DeployNROScheduler()
 })
 
@@ -81,7 +82,7 @@ var _ = ginkgo.AfterSuite(func() {
 	}
 	ginkgo.By("tearing down the cluster")
 	deploy.TeardownNROScheduler(deployment.NroSchedObj, 5*time.Minute)
-	deployment.Teardown(5 * time.Minute)
+	deployment.Teardown(context.TODO(), 5*time.Minute)
 })
 
 func getStringValueFromEnv(envVar, fallback string) string {

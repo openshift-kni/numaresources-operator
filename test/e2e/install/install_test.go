@@ -72,7 +72,7 @@ var _ = Describe("[Install] continuousIntegration", func() {
 	Context("with a running cluster with all the components", func() {
 		It("[test_id:47574][tier0] should perform overall deployment and verify the condition is reported as available", func() {
 			deployer := deploy.NewForPlatform(configuration.Plat)
-			nroObj := deployer.Deploy()
+			nroObj := deployer.Deploy(context.TODO())
 			nname := client.ObjectKeyFromObject(nroObj)
 			Expect(nname.Name).ToNot(BeEmpty())
 
@@ -196,11 +196,11 @@ var _ = Describe("[Install] durability", Serial, func() {
 
 		BeforeEach(func() {
 			deployer = deploy.NewForPlatform(configuration.Plat)
-			nroObj = deployer.Deploy()
+			nroObj = deployer.Deploy(context.TODO())
 		})
 
 		AfterEach(func() {
-			deployer.Teardown(5 * time.Minute)
+			deployer.Teardown(context.TODO(), 5*time.Minute)
 		})
 
 		It("[test_id:47587][tier1] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", func() {
