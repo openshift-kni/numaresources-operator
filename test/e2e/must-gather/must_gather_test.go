@@ -25,8 +25,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
@@ -38,21 +38,21 @@ import (
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
-var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
-	ginkgo.Context("with a freshly executed must-gather command", func() {
+var _ = Describe("[must-gather] NRO data collected", func() {
+	Context("with a freshly executed must-gather command", func() {
 		var destDir string
 
-		ginkgo.BeforeEach(func() {
+		BeforeEach(func() {
 			var err error
 			destDir, err = os.MkdirTemp("", "*-e2e-data")
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			ginkgo.By(fmt.Sprintf("using destination data directory: %q", destDir))
+			Expect(err).ToNot(HaveOccurred())
+			By(fmt.Sprintf("using destination data directory: %q", destDir))
 
-			ginkgo.By("Looking for oc tool")
+			By("Looking for oc tool")
 			ocExec, err := exec.LookPath("oc")
 			if err != nil {
-				fmt.Fprintf(ginkgo.GinkgoWriter, "Unable to find oc executable: %v\n", err)
-				ginkgo.Skip(fmt.Sprintf("unable to find 'oc' executable %v\n", err))
+				fmt.Fprintf(GinkgoWriter, "Unable to find oc executable: %v\n", err)
+				Skip(fmt.Sprintf("unable to find 'oc' executable %v\n", err))
 			}
 
 			mgImageParam := fmt.Sprintf("--image=%s:%s", mustGatherImage, mustGatherTag)
@@ -65,23 +65,23 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 				mgImageParam,
 				mgDestDirParam,
 			}
-			ginkgo.By(fmt.Sprintf("running: %v\n", cmdline))
+			By(fmt.Sprintf("running: %v\n", cmdline))
 
 			cmd := exec.Command(cmdline[0], cmdline[1:]...)
-			cmd.Stderr = ginkgo.GinkgoWriter
+			cmd.Stderr = GinkgoWriter
 
 			_, err = cmd.Output()
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 		})
 
-		ginkgo.AfterEach(func() {
+		AfterEach(func() {
 			if _, ok := os.LookupEnv("E2E_NROP_MUSTGATHER_CLEANUP_SKIP"); ok {
 				return
 			}
 			os.RemoveAll(destDir)
 		})
 
-		ginkgo.It("check NRO data files have been collected", func(ctx context.Context) {
+		It("check NRO data files have been collected", func(ctx context.Context) {
 			crdDefinitions := []string{
 				"cluster-scoped-resources/apiextensions.k8s.io/customresourcedefinitions/noderesourcetopologies.topology.node.k8s.io.yaml",
 				"cluster-scoped-resources/apiextensions.k8s.io/customresourcedefinitions/numaresourcesoperators.nodetopology.openshift.io.yaml",
@@ -89,7 +89,7 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 			}
 
 			destDirContent, err := os.ReadDir(destDir)
-			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "unable to read contents from destDir:%s. error: %w", destDir, err)
+			Expect(err).NotTo(HaveOccurred(), "unable to read contents from destDir:%s. error: %w", destDir, err)
 
 			for _, content := range destDirContent {
 				if !content.IsDir() {
@@ -97,49 +97,49 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 				}
 				mgContentFolder := filepath.Join(destDir, content.Name())
 
-				ginkgo.By(fmt.Sprintf("Checking Folder: %q", mgContentFolder))
-				ginkgo.By("Looking for CRD definitions")
+				By(fmt.Sprintf("Checking Folder: %q", mgContentFolder))
+				By("Looking for CRD definitions")
 				err = checkfilesExist(crdDefinitions, mgContentFolder)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
-				ginkgo.By("Looking for resources instances")
+				By("Looking for resources instances")
 				nropInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesoperators", deployment.NroObj.Name))
 				nroschedInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesschedulers", deployment.NroSchedObj.Name))
 
 				collectedMCPs, err := getMachineConfigPools(filepath.Join(mgContentFolder, "cluster-scoped-resources/machineconfiguration.openshift.io/machineconfigpools"))
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				ngMCPs, err := nodegroupv1.FindMachineConfigPools(&collectedMCPs, deployment.NroObj.Spec.NodeGroups)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				nglabels := collectMachineConfigPoolsNodeSelector(ngMCPs)
 				workerNodesNames, err := getWorkerNodesNames(filepath.Join(mgContentFolder, "cluster-scoped-resources/core/nodes"), nglabels)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				crdInstances := []string{nropInstanceFileName, nroschedInstanceFileName}
 				for _, value := range workerNodesNames {
 					crdInstances = append(crdInstances, fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/topology.node.k8s.io/noderesourcetopologies", value)))
 				}
 				err = checkfilesExist(crdInstances, mgContentFolder)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
-				ginkgo.By("Looking for namespace in NUMAResourcesOperator")
+				By("Looking for namespace in NUMAResourcesOperator")
 				updatedNRO, err := wait.With(e2eclient.Client).Interval(5*time.Second).Timeout(2*time.Minute).ForDaemonsetInNUMAResourcesOperatorStatus(ctx, deployment.NroObj)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 				namespace := updatedNRO.Status.DaemonSets[0].Namespace
 
-				ginkgo.By(fmt.Sprintf("Checking: %q namespace\n", namespace))
+				By(fmt.Sprintf("Checking: %q namespace\n", namespace))
 				namespaceFolder := filepath.Join(mgContentFolder, "namespaces/", namespace)
 				items := []string{
 					"core/pods.yaml",
 					"pods",
 				}
 				err = checkfilesExist(items, namespaceFolder)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				podsFolder := filepath.Join(namespaceFolder, "pods")
 				podsFolders, err := os.ReadDir(podsFolder)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				podFolderNames := []string{}
 				for _, podFolder := range podsFolders {
@@ -148,8 +148,8 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 					}
 					podFolderNames = append(podFolderNames, podFolder.Name())
 				}
-				gomega.Expect(podFolderNames).To(gomega.ContainElement(gomega.MatchRegexp("^numaresources-controller-manager*")))
-				gomega.Expect(podFolderNames).To(gomega.ContainElement(gomega.MatchRegexp("^secondary-scheduler*")))
+				Expect(podFolderNames).To(ContainElement(MatchRegexp("^numaresources-controller-manager*")))
+				Expect(podFolderNames).To(ContainElement(MatchRegexp("^secondary-scheduler*")))
 			}
 		})
 	})
