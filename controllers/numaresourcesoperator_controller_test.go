@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"os"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -59,6 +61,26 @@ const (
 	defaultOCPVersion = "v4.14"
 )
 
+var testPlatform platform.Platform
+
+func init() {
+	var ok bool
+	val, ok := os.LookupEnv("TEST_PLATFORM")
+	if !ok {
+		// work with default
+		klog.InfoS("TEST_PLATFORM not set", "default", platform.OpenShift)
+		testPlatform = platform.OpenShift
+		return
+	}
+	switch val {
+	case "openshift":
+		testPlatform = platform.OpenShift
+	case "hypershift":
+		testPlatform = platform.HyperShift
+	default:
+		klog.Fatalf("unsupported platform: %s", val)
+	}
+}
 func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion platform.Version, initObjects ...runtime.Object) (*NUMAResourcesOperatorReconciler, error) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithStatusSubresource(&nropv1.NUMAResourcesOperator{}).WithRuntimeObjects(initObjects...).Build()
 	apiManifests, err := apimanifests.GetManifests(plat)
@@ -91,7 +113,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 	verifyDegradedCondition := func(nro *nropv1.NUMAResourcesOperator, reason string) {
 		GinkgoHelper()
 
-		reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro)
+		reconciler, err := NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro)
 		Expect(err).ToNot(HaveOccurred())
 
 		key := client.ObjectKeyFromObject(nro)
@@ -172,7 +194,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			mcp1 := testobjs.NewMachineConfigPool(mcpName, label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
 
 			var err error
-			reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1)
+			reconciler, err := NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp1)
 			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKeyFromObject(nro)
@@ -212,7 +234,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			mcp2 := testobjs.NewMachineConfigPool(mcpName2, label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
 
 			var err error
-			reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+			reconciler, err := NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp1, mcp2)
 			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKeyFromObject(nro)
@@ -273,7 +295,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			mcp2 := testobjs.NewMachineConfigPool(mcpName2, label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
 
 			var err error
-			reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+			reconciler, err := NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp1, mcp2)
 			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKeyFromObject(nro)
@@ -353,7 +375,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			mcp := testobjs.NewMachineConfigPool(mcpName, label, &metav1.LabelSelector{MatchLabels: label}, &metav1.LabelSelector{MatchLabels: label})
 
 			var err error
-			reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
+			reconciler, err := NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp)
 			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKeyFromObject(nro)
@@ -415,7 +437,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
 
 			var err error
-			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp1, mcp2)
 			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKeyFromObject(nro)
@@ -695,7 +717,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
 				nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 
-				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp1, mcp2)
 				Expect(err).ToNot(HaveOccurred())
 
 				key := client.ObjectKeyFromObject(nro)
@@ -815,7 +837,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			BeforeEach(func() {
 				var err error
 
-				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp1, mcp2)
 				Expect(err).ToNot(HaveOccurred())
 			})
 			Context("on the first iteration", func() {
@@ -1063,7 +1085,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}
 					var err error
 
-					reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcpWithComplexMachineConfigSelector)
+					reconciler, err = NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcpWithComplexMachineConfigSelector)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -1095,7 +1117,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}
 
 					var err error
-					reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcpWithComplexMachineConfigSelector)
+					reconciler, err = NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcpWithComplexMachineConfigSelector)
 					Expect(err).ToNot(HaveOccurred())
 				})
 
@@ -1670,7 +1692,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
 
 			var err error
-			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp1, mcp2)
 			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKeyFromObject(nro)
@@ -1769,7 +1791,7 @@ func getConditionByType(conditions []metav1.Condition, conditionType string) *me
 func reconcileObjects(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.MachineConfigPool) *NUMAResourcesOperatorReconciler {
 	GinkgoHelper()
 
-	reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
+	reconciler, err := NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp)
 	Expect(err).ToNot(HaveOccurred())
 
 	key := client.ObjectKeyFromObject(nro)
