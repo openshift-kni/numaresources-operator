@@ -124,7 +124,7 @@ test-unit-pkgs:
 	go test ./api/... ./pkg/... ./rte/pkg/... ./internal/... ./nrovalidate/validator/...
 
 test-controllers: envtest
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/...
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" hack/run-test-controllers.sh
 
 test-e2e: build-e2e-all
 	ENABLE_SCHED_TESTS=true hack/run-test-e2e.sh

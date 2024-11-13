@@ -63,7 +63,7 @@ const (
 
 var testPlatform platform.Platform
 
-func init() {
+func initTestPlatform() {
 	var ok bool
 	val, ok := os.LookupEnv("TEST_PLATFORM")
 	if !ok {
@@ -80,7 +80,9 @@ func init() {
 	default:
 		klog.Fatalf("unsupported platform: %s", val)
 	}
+	klog.InfoS("TEST_PLATFORM set", "value", testPlatform)
 }
+
 func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion platform.Version, initObjects ...runtime.Object) (*NUMAResourcesOperatorReconciler, error) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithStatusSubresource(&nropv1.NUMAResourcesOperator{}).WithRuntimeObjects(initObjects...).Build()
 	apiManifests, err := apimanifests.GetManifests(plat)
@@ -110,6 +112,8 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 }
 
 var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
+	initTestPlatform()
+
 	verifyDegradedCondition := func(nro *nropv1.NUMAResourcesOperator, reason string) {
 		GinkgoHelper()
 
