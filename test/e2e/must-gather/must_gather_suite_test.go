@@ -70,7 +70,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		return
 	}
 	ginkgo.By("Setting up the cluster")
-	deployment.NroDeployment = deploy.OverallDeployment()
+	deployment.Deploy()
 	deployment.NroSchedObj = deploy.DeployNROScheduler()
 })
 
@@ -81,7 +81,7 @@ var _ = ginkgo.AfterSuite(func() {
 	}
 	ginkgo.By("tearing down the cluster")
 	deploy.TeardownNROScheduler(deployment.NroSchedObj, 5*time.Minute)
-	deploy.TeardownDeployment(deployment.NroDeployment, 5*time.Minute)
+	deployment.Teardown(5 * time.Minute)
 })
 
 func getStringValueFromEnv(envVar, fallback string) string {

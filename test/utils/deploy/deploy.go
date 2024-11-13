@@ -72,17 +72,9 @@ func NewForPlatform(plat platform.Platform) Deployer {
 
 func GetDeploymentWithSched() (NroDeploymentWithSched, error) {
 	sd := NroDeploymentWithSched{}
-
-	nroKey := objects.NROObjectKey()
-	nroObj := nropv1.NUMAResourcesOperator{}
-	err := e2eclient.Client.Get(context.TODO(), nroKey, &nroObj)
-	if err != nil {
-		return sd, err
-	}
-
 	nroSchedKey := objects.NROSchedObjectKey()
 	nroSchedObj := nropv1.NUMAResourcesScheduler{}
-	err = e2eclient.Client.Get(context.TODO(), nroSchedKey, &nroSchedObj)
+	err := e2eclient.Client.Get(context.TODO(), nroSchedKey, &nroSchedObj)
 	if err != nil {
 		return sd, err
 	}
