@@ -71,8 +71,9 @@ var _ = Describe("[Install] continuousIntegration", func() {
 
 	Context("with a running cluster with all the components", func() {
 		It("[test_id:47574][tier0] should perform overall deployment and verify the condition is reported as available", func() {
-			deployedObj := deploy.OverallDeployment()
-			nname := client.ObjectKeyFromObject(deployedObj.NroObj)
+			deployer := deploy.NewForPlatform(configuration.Plat)
+			nroObj := deployer.Deploy()
+			nname := client.ObjectKeyFromObject(nroObj)
 			Expect(nname.Name).ToNot(BeEmpty())
 
 			By("checking that the condition Available=true")
@@ -190,22 +191,22 @@ var _ = Describe("[Install] durability", Serial, func() {
 	})
 
 	Context("with a running cluster with all the components and overall deployment", func() {
-		var deployedObj deploy.NroDeployment
+		var deployer deploy.Deployer
+		var nroObj *nropv1.NUMAResourcesOperator
 
 		BeforeEach(func() {
-			deployedObj = deploy.OverallDeployment()
+			deployer = deploy.NewForPlatform(configuration.Plat)
+			nroObj = deployer.Deploy()
 		})
 
 		AfterEach(func() {
-			deploy.TeardownDeployment(deployedObj, 5*time.Minute)
+			deployer.Teardown(5 * time.Minute)
 		})
 
 		It("[test_id:47587][tier1] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", func() {
 			By("getting up-to-date NRO object")
-			nroKey := client.ObjectKeyFromObject(deployedObj.NroObj)
-			Expect(nroKey.Name).NotTo(BeEmpty())
+			nroKey := objects.NROObjectKey()
 
-			nroObj := &nropv1.NUMAResourcesOperator{}
 			immediate := true
 			err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 10*time.Minute, immediate, func(ctx context.Context) (bool, error) {
 				err := e2eclient.Client.Get(ctx, nroKey, nroObj)
@@ -278,11 +279,10 @@ var _ = Describe("[Install] durability", Serial, func() {
 		})
 
 		It("should be able to delete NUMAResourceOperator CR and redeploy without polluting cluster state", func() {
-			nname := client.ObjectKeyFromObject(deployedObj.NroObj)
+			nname := client.ObjectKeyFromObject(nroObj)
 			Expect(nname.Name).NotTo(BeEmpty())
 
-			nroObj := &nropv1.NUMAResourcesOperator{}
-			err := e2eclient.Client.Get(context.TODO(), nname, nroObj)
+			err := e2eclient.Client.Get(context.TODO(), objects.NROObjectKey(), nroObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for the DaemonSet to be created..")
@@ -322,7 +322,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 
 			By("redeploy with other parameters")
 			nroObjRedep := objects.TestNRO(objects.EmptyMatchLabels())
-			nroObjRedep.Spec = *deployedObj.NroObj.Spec.DeepCopy()
+			nroObjRedep.Spec = *nroObj.Spec.DeepCopy()
 			// TODO change to an image which is test dedicated
 			nroObjRedep.Spec.ExporterImage = e2eimages.RTETestImageCI
 
