@@ -31,9 +31,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
+	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
-
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
+
+	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
@@ -79,7 +81,7 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 			os.RemoveAll(destDir)
 		})
 
-		ginkgo.It("check NRO data files have been collected", func() {
+		ginkgo.It("check NRO data files have been collected", func(ctx context.Context) {
 			crdDefinitions := []string{
 				"cluster-scoped-resources/apiextensions.k8s.io/customresourcedefinitions/noderesourcetopologies.topology.node.k8s.io.yaml",
 				"cluster-scoped-resources/apiextensions.k8s.io/customresourcedefinitions/numaresourcesoperators.nodetopology.openshift.io.yaml",
@@ -95,15 +97,23 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 				}
 				mgContentFolder := filepath.Join(destDir, content.Name())
 
-				ginkgo.By(fmt.Sprintf("Checking Folder: %q\n", mgContentFolder))
-				ginkgo.By("\tLooking for CRD definitions")
+				ginkgo.By(fmt.Sprintf("Checking Folder: %q", mgContentFolder))
+				ginkgo.By("Looking for CRD definitions")
 				err = checkfilesExist(crdDefinitions, mgContentFolder)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
+				ginkgo.By("Looking for resources instances")
 				nropInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesoperators", deployment.NroObj.Name))
 				nroschedInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesschedulers", deployment.NroSchedObj.Name))
 
-				workerNodesNames, err := getWorkerNodesNames(filepath.Join(mgContentFolder, "cluster-scoped-resources/core/nodes"))
+				collectedMCPs, err := getMachineConfigPools(filepath.Join(mgContentFolder, "cluster-scoped-resources/machineconfiguration.openshift.io/machineconfigpools"))
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				ngMCPs, err := nodegroupv1.FindMachineConfigPools(&collectedMCPs, deployment.NroObj.Spec.NodeGroups)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				nglabels := collectMachineConfigPoolsNodeSelector(ngMCPs)
+				workerNodesNames, err := getWorkerNodesNames(filepath.Join(mgContentFolder, "cluster-scoped-resources/core/nodes"), nglabels)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				crdInstances := []string{nropInstanceFileName, nroschedInstanceFileName}
@@ -114,7 +124,7 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				ginkgo.By("Looking for namespace in NUMAResourcesOperator")
-				updatedNRO, err := wait.With(e2eclient.Client).Interval(5*time.Second).Timeout(2*time.Minute).ForDaemonsetInNUMAResourcesOperatorStatus(context.TODO(), deployment.NroObj)
+				updatedNRO, err := wait.With(e2eclient.Client).Interval(5*time.Second).Timeout(2*time.Minute).ForDaemonsetInNUMAResourcesOperatorStatus(ctx, deployment.NroObj)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				namespace := updatedNRO.Status.DaemonSets[0].Namespace
 
@@ -145,6 +155,15 @@ var _ = ginkgo.Describe("[must-gather] NRO data collected", func() {
 	})
 })
 
+func collectMachineConfigPoolsNodeSelector(mcps []*mcov1.MachineConfigPool) []map[string]string {
+	labelsGroup := []map[string]string{}
+	for _, mcp := range mcps {
+		labels := mcp.Spec.NodeSelector.MatchLabels
+		labelsGroup = append(labelsGroup, labels)
+	}
+	return labelsGroup
+}
+
 func checkfilesExist(listOfFiles []string, path string) error {
 	for _, f := range listOfFiles {
 		file := filepath.Join(path, f)
@@ -157,8 +176,8 @@ func checkfilesExist(listOfFiles []string, path string) error {
 
 // Look for node yaml manifest in `folder` and return
 // all the names of all the nodes with
-// label "node-role.kubernetes.io/worker"
-func getWorkerNodesNames(folder string) ([]string, error) {
+// any set of labels
+func getWorkerNodesNames(folder string, labelsGroups []map[string]string) ([]string, error) {
 	retval := []string{}
 	items, err := os.ReadDir(folder)
 	if err != nil {
@@ -181,9 +200,56 @@ func getWorkerNodesNames(folder string) ([]string, error) {
 			return retval, err
 		}
 
-		if _, ok := node.ObjectMeta.Labels["node-role.kubernetes.io/worker"]; ok {
-			retval = append(retval, node.Name)
+		for _, labels := range labelsGroups {
+			if isMapSubsetOf(node.ObjectMeta.Labels, labels) {
+				retval = append(retval, node.Name)
+				break
+			}
 		}
 	}
 	return retval, nil
+}
+
+func getMachineConfigPools(folder string) (mcov1.MachineConfigPoolList, error) {
+	retval := mcov1.MachineConfigPoolList{}
+	items, err := os.ReadDir(folder)
+	if err != nil {
+		return retval, err
+	}
+
+	for _, item := range items {
+		if item.IsDir() {
+			continue
+		}
+
+		data, err := os.ReadFile(filepath.Join(folder, item.Name()))
+		if err != nil {
+			return retval, err
+		}
+
+		mcp := &mcov1.MachineConfigPool{}
+		err = yaml.Unmarshal(data, mcp)
+		if err != nil {
+			return retval, err
+		}
+
+		retval.Items = append(retval.Items, *mcp)
+	}
+	return retval, nil
+}
+
+// return true if B keys and values respectively are part of A, otherwise false
+func isMapSubsetOf(A map[string]string, B map[string]string) bool {
+	if len(A) < len(B) || len(A) == 0 {
+		return false
+	}
+
+	for k, bv := range B {
+		av, ok := A[k]
+
+		if !ok || av != bv {
+			return false
+		}
+	}
+	return true
 }
