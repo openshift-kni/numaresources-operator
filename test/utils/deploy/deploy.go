@@ -46,10 +46,10 @@ import (
 type Deployer interface {
 	// Deploy deploys NUMAResourcesOperator object create other dependencies
 	// per the platform that implements it
-	Deploy() *nropv1.NUMAResourcesOperator
+	Deploy(ctx context.Context) *nropv1.NUMAResourcesOperator
 	// Teardown Teardowns NUMAResourcesOperator object delete other dependencies
 	// per the platform that implements it
-	Teardown(timeout time.Duration)
+	Teardown(ctx context.Context, timeout time.Duration)
 }
 
 type NroDeploymentWithSched struct {
@@ -70,11 +70,11 @@ func NewForPlatform(plat platform.Platform) Deployer {
 	}
 }
 
-func GetDeploymentWithSched() (NroDeploymentWithSched, error) {
+func GetDeploymentWithSched(ctx context.Context) (NroDeploymentWithSched, error) {
 	sd := NroDeploymentWithSched{}
 	nroSchedKey := objects.NROSchedObjectKey()
 	nroSchedObj := nropv1.NUMAResourcesScheduler{}
-	err := e2eclient.Client.Get(context.TODO(), nroSchedKey, &nroSchedObj)
+	err := e2eclient.Client.Get(ctx, nroSchedKey, &nroSchedObj)
 	if err != nil {
 		return sd, err
 	}

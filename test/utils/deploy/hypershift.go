@@ -1,8 +1,10 @@
 package deploy
 
 import (
-	corev1 "k8s.io/api/core/v1"
+	"context"
 	"time"
+
+	corev1 "k8s.io/api/core/v1"
 
 	. "github.com/onsi/ginkgo/v2"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
@@ -15,13 +17,13 @@ type HyperShiftNRO struct {
 	KcConfigMapObj *corev1.ConfigMap
 }
 
-func (h HyperShiftNRO) Deploy() *nropv1.NUMAResourcesOperator {
+func (h HyperShiftNRO) Deploy(ctx context.Context) *nropv1.NUMAResourcesOperator {
 	GinkgoHelper()
 	By("deploying NRO for HyperShift platform not supported just yet")
 	return h.NroObj
 }
 
-func (h HyperShiftNRO) Teardown(timeout time.Duration) {
+func (h HyperShiftNRO) Teardown(ctx context.Context, timeout time.Duration) {
 	GinkgoHelper()
 	By("Teardown NRO for HyperShift not supported just yet")
 }

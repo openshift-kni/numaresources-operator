@@ -21,19 +21,19 @@ type KubernetesNRO struct {
 
 // Deploy returns a struct containing all the deployed objects,
 // so it will be easier to introspect and delete them later.
-func (k *KubernetesNRO) Deploy() *v1.NUMAResourcesOperator {
+func (k *KubernetesNRO) Deploy(ctx context.Context) *v1.NUMAResourcesOperator {
 	GinkgoHelper()
 
 	mcpObj := objects.TestMCP()
 	By(fmt.Sprintf("creating the machine config pool object: %s", mcpObj.Name))
-	err := e2eclient.Client.Create(context.TODO(), mcpObj)
+	err := e2eclient.Client.Create(ctx, mcpObj)
 	Expect(err).NotTo(HaveOccurred())
 	k.McpObj = mcpObj
 	matchLabels := map[string]string{"test": "test"}
 
-	return k.OpenShiftNRO.deployWithLabels(matchLabels)
+	return k.OpenShiftNRO.deployWithLabels(ctx, matchLabels)
 }
 
-func (k *KubernetesNRO) Teardown(timeout time.Duration) {
-	k.OpenShiftNRO.Teardown(timeout)
+func (k *KubernetesNRO) Teardown(ctx context.Context, timeout time.Duration) {
+	k.OpenShiftNRO.Teardown(ctx, timeout)
 }
