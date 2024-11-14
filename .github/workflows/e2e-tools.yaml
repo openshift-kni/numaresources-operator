@@ -28,7 +28,7 @@ jobs:
     - name: Set up golang
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.8
+        go-version: 1.23.3
 
     - name: Verify modules
       run: go mod verify

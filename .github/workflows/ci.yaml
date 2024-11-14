@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  GOLANG_VERSION: 1.23.3
+
 defaults:
   run:
     shell: bash
@@ -20,7 +23,7 @@ jobs:
     - name: Set up golang
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.8
+        go-version: ${{ env.GOLANG_VERSION }}
 
     - name: format
       run: ./hack/check-format.sh
@@ -36,7 +39,10 @@ jobs:
       - name: Set up golang
         uses: actions/setup-go@v5
         with:
-          go-version: 1.22.8
+          go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: Debug feedback
+        run: go version
 
       - name: Get branch name (pull request)
         shell: bash
@@ -57,7 +63,7 @@ jobs:
     - name: Set up golang
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.8
+        go-version: ${{ env.GOLANG_VERSION }}
 
     - name: Verify modules
       run: go mod verify
@@ -86,7 +92,7 @@ jobs:
     - name: Set up golang
       uses: actions/setup-go@v5
       with:
-        go-version: 1.22.8
+        go-version: ${{ env.GOLANG_VERSION }}
 
     - name: Run Linter
       run: make golangci-lint
