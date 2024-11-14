@@ -147,6 +147,3 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.30.6
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.30.6
 )
-
-// local pinning
-replace github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
