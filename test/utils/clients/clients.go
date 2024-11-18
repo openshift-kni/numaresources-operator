@@ -30,6 +30,7 @@ import (
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/test/utils/hypershift"
 )
 
 var (
@@ -37,6 +38,9 @@ var (
 	Client client.Client
 	// K8sClient defines k8s client to run subresource operations, for example you should use it to get pod logs
 	K8sClient *kubernetes.Clientset
+	// MNGClient defines the API client to run CRUD operations on HyperShift management cluster,
+	// that will be used for testing
+	MNGClient client.Client
 	// ClientsEnabled tells if the client from the package can be used
 	ClientsEnabled bool
 )
@@ -74,6 +78,13 @@ func init() {
 		klog.Info("Failed to initialize k8s client, check the KUBECONFIG env variable", err.Error())
 		ClientsEnabled = false
 		return
+	}
+	if hypershift.IsHypershiftCluster() {
+		MNGClient, err = hypershift.BuildControlPlaneClient()
+		if err != nil {
+			ClientsEnabled = false
+			return
+		}
 	}
 	ClientsEnabled = true
 }
