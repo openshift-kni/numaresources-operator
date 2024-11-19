@@ -338,10 +338,27 @@ func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Con
 	return dssWithReadyStatus, true, nil
 }
 
-func syncNodeGroupsStatus(instance *nropv1.NUMAResourcesOperator, dsPerMCP []poolDaemonSet) []nropv1.NodeGroupStatus {
+func syncNodeGroupsStatus(instance *nropv1.NUMAResourcesOperator, dsPerPool []poolDaemonSet) []nropv1.NodeGroupStatus {
 	ngStatuses := []nropv1.NodeGroupStatus{}
+
+	if len(instance.Status.MachineConfigPools) == 0 {
+		for _, group := range instance.Spec.NodeGroups {
+			for _, info := range dsPerPool {
+				if *group.PoolName != info.PoolName {
+					continue
+				}
+				status := nropv1.NodeGroupStatus{
+					PoolName:  info.PoolName,
+					Config:    *group.Config,
+					DaemonSet: info.DaemonSet,
+				}
+				ngStatuses = append(ngStatuses, status)
+			}
+		}
+	}
+
 	for _, mcp := range instance.Status.MachineConfigPools {
-		for _, info := range dsPerMCP {
+		for _, info := range dsPerPool {
 			if mcp.Name != info.PoolName {
 				continue
 			}
