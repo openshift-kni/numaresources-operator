@@ -195,8 +195,11 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, kubeletConf
 	for _, objState := range existing.State(cfgManifests) {
 		// the owner should be the KubeletConfig object and not the NUMAResourcesOperator CR
 		// this means that when KubeletConfig will get deleted, the ConfigMap gets deleted as well
-		if err := controllerutil.SetControllerReference(kcHandler.ownerObject, objState.Desired, r.Scheme); err != nil {
-			return nil, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+		// TODO on HyperShift there's a cross-namespaced owner references that need to be fixed.
+		if r.Platform != platform.HyperShift {
+			if err := controllerutil.SetControllerReference(kcHandler.ownerObject, objState.Desired, r.Scheme); err != nil {
+				return nil, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+			}
 		}
 		if _, _, err := apply.ApplyObject(ctx, r.Client, objState); err != nil {
 			return nil, fmt.Errorf("could not create %s: %w", objState.Desired.GetObjectKind().GroupVersionKind().String(), err)
