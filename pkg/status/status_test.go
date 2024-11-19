@@ -18,6 +18,8 @@ package status
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -155,6 +157,46 @@ func TestIsUpdatedNUMAResourcesOperator(t *testing.T) {
 			got := IsUpdatedNUMAResourcesOperator(oldStatus, newStatus)
 			if got != tc.expectedUpdated {
 				t.Errorf("isUpdated %v expected %v", got, tc.expectedUpdated)
+			}
+		})
+	}
+}
+
+func TestMessageFromError(t *testing.T) {
+	type testCase struct {
+		name     string
+		err      error
+		expected string
+	}
+
+	testCases := []testCase{
+		{
+			name:     "nil error",
+			expected: "",
+		},
+		{
+			name:     "simple error",
+			err:      errors.New("testing error with simple message"),
+			expected: "testing error with simple message",
+		},
+		{
+			name:     "simple formatted error",
+			err:      fmt.Errorf("testing error message=%s val=%d", "complex", 42),
+			expected: "testing error message=complex val=42",
+		},
+
+		{
+			name:     "wrapped error",
+			err:      fmt.Errorf("outer error: %w", errors.New("inner error")),
+			expected: "inner error",
+		},
+	}
+
+	for _, tcase := range testCases {
+		t.Run(tcase.name, func(t *testing.T) {
+			got := MessageFromError(tcase.err)
+			if got != tcase.expected {
+				t.Errorf("failure getting message from error: got=%q expected=%q", got, tcase.expected)
 			}
 		})
 	}
