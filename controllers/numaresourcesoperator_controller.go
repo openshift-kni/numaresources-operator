@@ -165,14 +165,14 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	curStatus := instance.Status.DeepCopy()
 
-	result, err := r.reconcileResource(ctx, instance, trees)
+	step := r.reconcileResource(ctx, instance, trees)
 
-	if condition == status.ConditionAvailable && multiMCPsErr != nil {
-		_, _ = r.degradeStatus(ctx, instance, validation.NodeGroupsError, multiMCPsErr)
+	if step.Done() && multiMCPsErr != nil {
+		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, multiMCPsErr)
 	}
 
 	if !status.IsUpdatedNUMAResourcesOperator(curStatus, &instance.Status) {
-		return result, err
+		return step.Result, step.Error
 	}
 
 	updErr := r.Client.Status().Update(ctx, instance)
@@ -181,7 +181,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(instance), updErr)
 	}
 
-	return result, err
+	return step.Result, step.Error
 }
 
 // updateStatusConditionsIfNeeded returns true if conditions were updated.
@@ -216,27 +216,27 @@ func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, ins
 	return ctrl.Result{}, nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, conditionInfo, error) {
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) reconcileStep {
 	applied, err := r.syncNodeResourceTopologyAPI(ctx)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedCRDInstall", "Failed to install Node Resource Topology CRD: %v", err)
 		err = fmt.Errorf("FailedAPISync: %w", err)
-		return true, ctrl.Result{}, degradedConditionInfoFromError(err), err
+		return reconcileStepFailed(err)
 	}
 	if applied {
 		r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulCRDInstall", "Node Resource Topology CRD installed")
 	}
-	return false, ctrl.Result{}, availableConditionInfo(), nil
+	return reconcileStepSuccess()
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (bool, ctrl.Result, conditionInfo, error) {
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) reconcileStep {
 	// we need to sync machine configs first and wait for the MachineConfigPool updates
 	// before checking additional components for updates
 	mcpUpdatedFunc, err := r.syncMachineConfigs(ctx, instance, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
 		err = fmt.Errorf("failed to sync machine configs: %w", err)
-		return true, ctrl.Result{}, degradedConditionInfoFromError(err), err
+		return reconcileStepFailed(err)
 	}
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulMCSync", "Enabled machine configuration for worker nodes")
 
@@ -247,22 +247,22 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 
 	if !allMCPsUpdated {
 		// the Machine Config Pool still did not apply the machine config, wait for one minute
-		return true, ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, progressingConditionInfo(), nil
+		return reconcileStepOngoing(numaResourcesRetryPeriod)
 	}
 	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
 
-	return false, ctrl.Result{}, availableConditionInfo(), nil
+	return reconcileStepSuccess()
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]poolDaemonSet, bool, ctrl.Result, conditionInfo, error) {
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]poolDaemonSet, reconcileStep) {
 	daemonSetsInfoPerMCP, err := r.syncNUMAResourcesOperatorResources(ctx, instance, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECreate", "Failed to create Resource-Topology-Exporter DaemonSets: %v", err)
 		err = fmt.Errorf("FailedRTESync: %w", err)
-		return nil, true, ctrl.Result{}, degradedConditionInfoFromError(err), err
+		return nil, reconcileStepFailed(err)
 	}
 	if len(daemonSetsInfoPerMCP) == 0 {
-		return nil, false, ctrl.Result{}, availableConditionInfo(), nil
+		return nil, reconcileStepSuccess()
 	}
 
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
@@ -271,32 +271,32 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 	instance.Status.DaemonSets = dssWithReadyStatus
 	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dssWithReadyStatus)
 	if err != nil {
-		return nil, true, ctrl.Result{}, degradedConditionInfoFromError(err), err
+		return nil, reconcileStepFailed(err)
 	}
 	if !allDSsUpdated {
-		return nil, true, ctrl.Result{RequeueAfter: 5 * time.Second}, progressingConditionInfo(), nil
+		return nil, reconcileStepOngoing(5 * time.Second)
 	}
 
-	return daemonSetsInfoPerMCP, false, ctrl.Result{}, availableConditionInfo(), nil
+	return daemonSetsInfoPerMCP, reconcileStepSuccess()
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (ctrl.Result, error) {
-	if done, res, cond, err := r.reconcileResourceAPI(ctx, instance, trees); done {
-		updateStatusConditionsIfNeeded(instance, fillConditionInfoFromError(cond, err))
-		return res, err
+func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) reconcileStep {
+	if step := r.reconcileResourceAPI(ctx, instance, trees); step.EarlyStop() {
+		updateStatusConditionsIfNeeded(instance, step.ConditionInfo)
+		return step
 	}
 
 	if r.Platform == platform.OpenShift {
-		if done, res, cond, err := r.reconcileResourceMachineConfig(ctx, instance, trees); done {
-			updateStatusConditionsIfNeeded(instance, fillConditionInfoFromError(cond, err))
-			return res, err
+		if step := r.reconcileResourceMachineConfig(ctx, instance, trees); step.EarlyStop() {
+			updateStatusConditionsIfNeeded(instance, step.ConditionInfo)
+			return step
 		}
 	}
 
-	dsPerMCP, done, res, cond, err := r.reconcileResourceDaemonSet(ctx, instance, trees)
-	if done {
-		updateStatusConditionsIfNeeded(instance, fillConditionInfoFromError(cond, err))
-		return res, err
+	dsPerMCP, step := r.reconcileResourceDaemonSet(ctx, instance, trees)
+	if step.EarlyStop() {
+		updateStatusConditionsIfNeeded(instance, step.ConditionInfo)
+		return step
 	}
 
 	// all fields of NodeGroupStatus are required so publish the status only when all daemonset and MCPs are updated which
@@ -304,7 +304,10 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	instance.Status.NodeGroups = syncNodeGroupsStatus(instance, dsPerMCP)
 
 	updateStatusConditionsIfNeeded(instance, availableConditionInfo())
-	return ctrl.Result{}, nil
+	return reconcileStep{
+		Result:        ctrl.Result{},
+		ConditionInfo: availableConditionInfo(),
+	}
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, daemonSetsInfo []poolDaemonSet) ([]nropv1.NamespacedName, bool, error) {

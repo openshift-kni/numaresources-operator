@@ -188,7 +188,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 	})
 
 	Context("with node group with MCP selector that matches more than one MCP", func() {
-		It("should update the CR condition to degraded when annotation is not enabled but still creat all needed objects", func() {
+		It("should update the CR condition to degraded when annotation is not enabled but still create all needed objects", func() {
 			mcpName1 := "test1"
 			label1 := map[string]string{
 				"test1": "test1",
@@ -336,6 +336,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
 		})
 	})
+
 	Context("with correct NRO and SELinuxPolicyConfigAnnotation not set", func() {
 		It("should create all objects, RTE daemonsets and MCPs will get updated from the first reconcile iteration", func() {
 			mcpName := "test1"
