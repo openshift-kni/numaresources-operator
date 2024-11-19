@@ -126,7 +126,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 		Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
 		degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
-		Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+		Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue), "conditions: %+v", nro.Status.Conditions)
 		Expect(degradedCondition.Reason).To(Equal(reason))
 	}
 
@@ -201,6 +201,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			ng2 := nropv1.NodeGroup{
 				PoolName: &mcpName,
 			}
+
 			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
 
 			mcp1 := testobjs.NewMachineConfigPool(mcpName, label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
@@ -445,7 +446,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 	})
 
 	Context("with correct NRO and SELinuxPolicyConfigAnnotation not set", func() {
-		It("[openshift] should create all objects, RTE daemonsets and MCPs will get updated from the first reconcile iteration", func() {
+		It("[openshift] should create all objects, RTE daemonsets and MCPs will get updated from the first reconcile iteration - MachineConfigPoolSelector", func() {
 			if testPlatform == platform.HyperShift {
 				Skip("MCP is not a supported CRD in hypershift")
 			}
@@ -491,16 +492,22 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			availableCondition := getConditionByType(nro.Status.Conditions, status.ConditionAvailable)
 			Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
 		})
-		It("should create all objects including RTE daemonsets and update the status from the first reconcile iteration", func() {
+		It("should create all objects including RTE daemonsets and update the status from the first reconcile iteration - PoolName ", func() {
 			poolName := "test"
-
 			ng1 := nropv1.NodeGroup{
 				PoolName: &poolName,
 			}
 			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1)
 
-			var err error
 			reconciler, err := NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro)
+			if testPlatform != platform.HyperShift {
+				label := map[string]string{
+					"test": "test",
+				}
+				mcp := testobjs.NewMachineConfigPool(poolName, label, &metav1.LabelSelector{MatchLabels: label}, &metav1.LabelSelector{MatchLabels: label})
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp)
+			}
+
 			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKeyFromObject(nro)
@@ -538,12 +545,15 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		var label1, label2 map[string]string
 		var ng1, ng2 nropv1.NodeGroup
 
+		pn1 := "test1"
+		pn2 := "test2"
+
 		BeforeEach(func() {
 			label1 = map[string]string{
-				"test1": "test1",
+				pn1: pn1,
 			}
 			label2 = map[string]string{
-				"test2": "test2",
+				pn2: pn2,
 			}
 
 			ng1 = nropv1.NodeGroup{
@@ -558,8 +568,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			}
 
 			if testPlatform == platform.HyperShift {
-				pn1 := "test1"
-				pn2 := "test2"
 				ng1 = nropv1.NodeGroup{
 					PoolName: &pn1,
 				}
@@ -573,21 +581,27 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro)
 
 			if testPlatform != platform.HyperShift {
-				mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
-				mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
+				mcp1 = testobjs.NewMachineConfigPool(pn1, label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
+				mcp2 = testobjs.NewMachineConfigPool(pn2, label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
 				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp1, mcp2)
 			}
+
 			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKeyFromObject(nro)
-			// on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC, thus RTE daemonsets and complete status update is not going to be achieved at this point
 			firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+			// OCP: on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC,
+			// thus RTE daemonsets and complete status update is not going to be achieved at this point
+			expectedResult := reconcile.Result{RequeueAfter: time.Minute}
+			if testPlatform == platform.HyperShift {
+				// even though the legacy SELinux policy is used, on hypershift no need to wait for MC updates
+				expectedResult = reconcile.Result{}
+			}
+			Expect(firstLoopResult).To(Equal(expectedResult))
 
-			var secondLoopResult reconcile.Result
+			var secondLoopResult reconcile.Result // won't affect Hypershift
 			if testPlatform != platform.HyperShift {
-
 				// Ensure mcp1 is ready
 				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
 				mcp1.Status.Configuration.Source = []corev1.ObjectReference{
@@ -625,18 +639,18 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(secondLoopResult).To(Equal(reconcile.Result{}))
 
 			By("Check DaemonSets are created")
-			mcp1DSKey := client.ObjectKey{
-				Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+			dsKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, pn1),
 				Namespace: testNamespace,
 			}
 			ds := &appsv1.DaemonSet{}
-			Expect(reconciler.Client.Get(context.TODO(), mcp1DSKey, ds)).ToNot(HaveOccurred())
+			Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
-			mcp2DSKey := client.ObjectKey{
-				Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+			dsKey = client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, pn2),
 				Namespace: testNamespace,
 			}
-			Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).To(Succeed())
+			Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
 		})
 		When("NRO updated to remove the custom policy annotation", func() {
 			BeforeEach(func() {
@@ -651,24 +665,31 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				nro.Annotations = map[string]string{}
 				Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
 
-				// removing the annotation will trigger reboot which requires resync after 1 min
 				thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+				expectedResult := reconcile.Result{}
+				if testPlatform != platform.HyperShift {
+					// removing the annotation will trigger reboot which requires resync after 1 min
+					expectedResult = reconcile.Result{RequeueAfter: time.Minute}
+				}
+				Expect(thirdLoopResult).To(Equal(expectedResult))
 			})
 			It("should not create a machine config", func() {
+				if testPlatform == platform.HyperShift {
+					Skip("MCP is not a supported CRD in hypershift")
+				}
 				mc := &machineconfigv1.MachineConfig{}
 
 				// Check mc1 not created
 				mc1Key := client.ObjectKey{
-					Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
+					Name: objectnames.GetMachineConfigName(nro.Name, pn1),
 				}
 				err := reconciler.Client.Get(context.TODO(), mc1Key, mc)
 				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s is expected to not be found", mc1Key.String())
 
 				// Check mc1 not created
 				mc2Key := client.ObjectKey{
-					Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
+					Name: objectnames.GetMachineConfigName(nro.Name, pn2),
 				}
 				err = reconciler.Client.Get(context.TODO(), mc2Key, mc)
 				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s is expected to not be found", mc2Key.String())
@@ -681,12 +702,16 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 				By("Update NRO to have just one NodeGroup")
 				key := client.ObjectKeyFromObject(nro)
-				nro := &nropv1.NUMAResourcesOperator{}
 				Expect(reconciler.Client.Get(context.TODO(), key, nro)).NotTo(HaveOccurred())
 
 				nro.Spec.NodeGroups = []nropv1.NodeGroup{{
 					MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: label1},
 				}}
+				if testPlatform == platform.HyperShift {
+					nro.Spec.NodeGroups = []nropv1.NodeGroup{{
+						PoolName: &pn1,
+					}}
+				}
 				nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 				Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
 
@@ -696,36 +721,38 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(thirdLoopResult).To(Equal(reconcile.Result{}))
 			})
 			It("should delete also the corresponding DaemonSet", func() {
-
 				ds := &appsv1.DaemonSet{}
 
 				// Check ds1 still exist
 				ds1Key := client.ObjectKey{
-					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+					Name:      objectnames.GetComponentName(nro.Name, pn1),
 					Namespace: testNamespace,
 				}
 				Expect(reconciler.Client.Get(context.TODO(), ds1Key, ds)).NotTo(HaveOccurred())
 
 				// check ds2 has been deleted
 				ds2Key := client.ObjectKey{
-					Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+					Name:      objectnames.GetComponentName(nro.Name, pn2),
 					Namespace: testNamespace,
 				}
 				Expect(reconciler.Client.Get(context.TODO(), ds2Key, ds)).To(HaveOccurred(), "error: Daemonset %v should have been deleted", ds2Key)
 			})
 			It("should delete also the corresponding Machineconfig", func() {
+				if testPlatform == platform.HyperShift {
+					Skip("MCP is not a supported CRD in hypershift")
+				}
 
 				mc := &machineconfigv1.MachineConfig{}
 
-				// Check ds1 still exist
+				// Check mc for ds1 still exist
 				mc1Key := client.ObjectKey{
-					Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
+					Name: objectnames.GetMachineConfigName(nro.Name, pn1),
 				}
 				Expect(reconciler.Client.Get(context.TODO(), mc1Key, mc)).NotTo(HaveOccurred())
 
-				// check ds2 has been deleted
+				// check mc for ds2 has been deleted
 				mc2Key := client.ObjectKey{
-					Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
+					Name: objectnames.GetMachineConfigName(nro.Name, pn2),
 				}
 				Expect(reconciler.Client.Get(context.TODO(), mc2Key, mc)).To(HaveOccurred(), "error: Machineconfig %v should have been deleted", mc2Key)
 			})
@@ -734,7 +761,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					By("Create a new Daemonset with correct name but not owner reference")
 
 					ds := reconciler.RTEManifests.DaemonSet.DeepCopy()
-					ds.Name = objectnames.GetComponentName(nro.Name, mcp2.Name)
+					ds.Name = objectnames.GetComponentName(nro.Name, pn2)
 					ds.Namespace = testNamespace
 
 					Expect(reconciler.Client.Create(context.TODO(), ds)).ToNot(HaveOccurred())
@@ -750,14 +777,14 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					// Check ds1 still exist
 					ds1Key := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+						Name:      objectnames.GetComponentName(nro.Name, pn1),
 						Namespace: testNamespace,
 					}
 					Expect(reconciler.Client.Get(context.TODO(), ds1Key, ds)).NotTo(HaveOccurred())
 
 					// Check not owned DS is NOT deleted even if the name corresponds to mcp2
 					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+						Name:      objectnames.GetComponentName(nro.Name, pn2),
 						Namespace: testNamespace,
 					}
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).NotTo(HaveOccurred(), "error: Daemonset %v should NOT have been deleted", dsKey)
@@ -766,58 +793,69 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		})
 		When("add PoolName on existing node group with another specifier already exist", func() {
 			It("should update the CR condition to degraded", func(ctx context.Context) {
-				pn := "pool-1"
-				ng1WithNodeSelector := ng1.DeepCopy()
-				ng1WithNodeSelector.PoolName = &pn
+				newGroup := ng1.DeepCopy()
+				if testPlatform == platform.HyperShift {
+					newGroup.MachineConfigPoolSelector = &metav1.LabelSelector{
+						MatchLabels: label2,
+					}
+				} else {
+					pn := "pool-1"
+					newGroup.PoolName = &pn
+				}
+
 				key := client.ObjectKeyFromObject(nro)
+				nroUpdated := &nropv1.NUMAResourcesOperator{}
 				Eventually(func() error {
-					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(ctx, key, nroUpdated))
-					nroUpdated.Spec.NodeGroups[0] = *ng1WithNodeSelector
+					nroUpdated.Spec.NodeGroups[0] = *newGroup
 					return reconciler.Client.Update(context.TODO(), nroUpdated)
 				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
-				verifyDegradedCondition(nro, validation.NodeGroupsError)
+				verifyDegradedCondition(nroUpdated, validation.NodeGroupsError)
 			})
 		})
 	})
 
 	Context("with correct NRO and PoolName set", func() {
+
 		It("should create RTE daemonset and report the status", func(ctx context.Context) {
-			mcpName := "test1"
+			poolName := "test1"
 			label := map[string]string{
 				"test1": "test1",
 			}
 			ng := nropv1.NodeGroup{
-				PoolName: &mcpName,
+				PoolName: &poolName,
 			}
 
-			mcp := testobjs.NewMachineConfigPool(mcpName, label, &metav1.LabelSelector{MatchLabels: label}, &metav1.LabelSelector{MatchLabels: label})
+			mcp := testobjs.NewMachineConfigPool(poolName, label, &metav1.LabelSelector{MatchLabels: label}, &metav1.LabelSelector{MatchLabels: label})
 			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
 			nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 
 			reconciler := reconcileObjects(nro, mcp)
 
-			mcpDSKey := client.ObjectKey{
-				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+			dsKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, poolName),
 				Namespace: testNamespace,
 			}
 			ds := &appsv1.DaemonSet{}
-			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+			Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 			nroUpdated := &nropv1.NUMAResourcesOperator{}
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
 
-			Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(1))
-			Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(mcp.Name))
-
+			if testPlatform != platform.HyperShift {
+				Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(1))
+				Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(mcp.Name))
+			}
 			conf := nropv1.DefaultNodeGroupConfig()
 			Expect(nroUpdated.Status.NodeGroups[0].Config).To(Equal(conf), "node group config was not updated in the operator status")
 		})
 
 		When("multiple node groups are configured with different config", func() {
 			It("should create all RTE daemonsets and report the status respectively per node group", func(ctx context.Context) {
-				mcp1Name := "test1"
-				mcp2Name := "test2"
+				var mcp1, mcp2 *machineconfigv1.MachineConfigPool
+
+				poolName1 := "test1"
+				poolName2 := "test2"
 				label1 := map[string]string{
 					"test1": "test1",
 				}
@@ -847,102 +885,114 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				}
 
 				ng1 := nropv1.NodeGroup{
-					PoolName: &mcp1Name,
+					PoolName: &poolName1,
 					Config:   conf1,
 				}
 				ng2 := nropv1.NodeGroup{
-					PoolName: &mcp2Name,
+					PoolName: &poolName2,
 					Config:   conf2,
 				}
 
-				mcp1 := testobjs.NewMachineConfigPool(mcp1Name, label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
-				mcp2 := testobjs.NewMachineConfigPool(mcp2Name, label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
 				nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 
-				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp1, mcp2)
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro)
+				if testPlatform != platform.HyperShift {
+					mcp1 = testobjs.NewMachineConfigPool(poolName1, label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
+					mcp2 = testobjs.NewMachineConfigPool(poolName2, label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
+					reconciler, err = NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp1, mcp2)
+				}
 				Expect(err).ToNot(HaveOccurred())
 
 				key := client.ObjectKeyFromObject(nro)
 				// on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC, thus RTE daemonsets and complete status update is not going to be achieved at this point
 				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(result).To(Equal(reconcile.Result{RequeueAfter: 1 * time.Minute}))
-
-				By("ensure MachineConfigPools are ready")
-				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).ToNot(HaveOccurred())
-				mcp1.Status.Configuration.Source = []corev1.ObjectReference{
-					{
-						Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
-					},
+				var expectedResult reconcile.Result
+				if testPlatform != platform.HyperShift {
+					expectedResult = reconcile.Result{RequeueAfter: 1 * time.Minute}
 				}
-				mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-					{
-						Type:   machineconfigv1.MachineConfigPoolUpdated,
-						Status: corev1.ConditionTrue,
-					},
-				}
-				Expect(reconciler.Client.Update(context.TODO(), mcp1)).Should(Succeed())
-				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).ToNot(HaveOccurred())
+				Expect(result).To(Equal(expectedResult))
 
-				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).ToNot(HaveOccurred())
-				mcp2.Status.Configuration.Source = []corev1.ObjectReference{
-					{
-						Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
-					},
-				}
-				mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-					{
-						Type:   machineconfigv1.MachineConfigPoolUpdated,
-						Status: corev1.ConditionTrue,
-					},
-				}
-				Expect(reconciler.Client.Update(context.TODO(), mcp2)).Should(Succeed())
-				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).ToNot(HaveOccurred())
+				if testPlatform != platform.HyperShift {
+					By("ensure MachineConfigPools are ready")
+					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).ToNot(HaveOccurred())
+					mcp1.Status.Configuration.Source = []corev1.ObjectReference{
+						{
+							Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
+						},
+					}
+					mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+						{
+							Type:   machineconfigv1.MachineConfigPoolUpdated,
+							Status: corev1.ConditionTrue,
+						},
+					}
+					Expect(reconciler.Client.Update(context.TODO(), mcp1)).Should(Succeed())
+					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).ToNot(HaveOccurred())
 
-				// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
-				var secondLoopResult reconcile.Result
-				secondLoopResult, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(secondLoopResult).To(Equal(reconcile.Result{}))
+					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).ToNot(HaveOccurred())
+					mcp2.Status.Configuration.Source = []corev1.ObjectReference{
+						{
+							Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
+						},
+					}
+					mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+						{
+							Type:   machineconfigv1.MachineConfigPoolUpdated,
+							Status: corev1.ConditionTrue,
+						},
+					}
+					Expect(reconciler.Client.Update(context.TODO(), mcp2)).Should(Succeed())
+					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).ToNot(HaveOccurred())
 
+					// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
+					var secondLoopResult reconcile.Result
+					secondLoopResult, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+					Expect(err).ToNot(HaveOccurred())
+					Expect(secondLoopResult).To(Equal(reconcile.Result{}))
+				}
+
+				By("ensure RTE Daemonsets are created")
 				ds := &appsv1.DaemonSet{}
-				mcpDSKey1 := client.ObjectKey{
-					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+				dsKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, poolName1),
 					Namespace: testNamespace,
 				}
-				Expect(reconciler.Client.Get(context.TODO(), mcpDSKey1, ds)).ToNot(HaveOccurred())
+				Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
-				mcpDSKey2 := client.ObjectKey{
-					Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+				dsKey = client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, poolName2),
 					Namespace: testNamespace,
 				}
-				Expect(reconciler.Client.Get(context.TODO(), mcpDSKey2, ds)).ToNot(HaveOccurred())
+				Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
+				By("ensure status is updated")
 				nroUpdated := &nropv1.NUMAResourcesOperator{}
 				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
 
-				Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(2))
 				Expect(len(nroUpdated.Status.DaemonSets)).To(Equal(2))
-
-				// the order of the NodeGroups also preserved under the operator status
-				Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(mcp1.Name))
-				Expect(nroUpdated.Status.NodeGroups[0].PoolName).To(Equal(mcp1.Name))
-				Expect(nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(conf1))
+				Expect(len(nroUpdated.Status.NodeGroups)).To(Equal(2))
 				Expect(nroUpdated.Status.NodeGroups[0].Config).To(Equal(*conf1))
+				// the order of the NodeGroups also preserved under the operator status
 				Expect(nroUpdated.Status.NodeGroups[0].DaemonSet).To(Equal(nroUpdated.Status.DaemonSets[0]))
-
-				Expect(nroUpdated.Status.MachineConfigPools[1].Name).To(Equal(mcp2.Name))
-				Expect(nroUpdated.Status.NodeGroups[1].PoolName).To(Equal(mcp2.Name))
-				Expect(nroUpdated.Status.MachineConfigPools[1].Config).To(Equal(conf2))
+				Expect(nroUpdated.Status.NodeGroups[0].PoolName).To(Equal(poolName1))
+				Expect(nroUpdated.Status.NodeGroups[1].PoolName).To(Equal(poolName2))
 				Expect(nroUpdated.Status.NodeGroups[1].Config).To(Equal(*conf2))
 				Expect(nroUpdated.Status.NodeGroups[1].DaemonSet).To(Equal(nroUpdated.Status.DaemonSets[1]))
 
+				if testPlatform != platform.HyperShift {
+					Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(2))
+					Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(mcp1.Name))
+					Expect(nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(conf1))
+					Expect(nroUpdated.Status.MachineConfigPools[1].Name).To(Equal(mcp2.Name))
+					Expect(nroUpdated.Status.MachineConfigPools[1].Config).To(Equal(conf2))
+				}
 			})
 		})
 	})
 
-	Context("with correct NRO CR", func() {
+	Context("with correct NRO CR - test MCP selector labels", func() {
 		var nro *nropv1.NUMAResourcesOperator
 		var mcp1 *machineconfigv1.MachineConfigPool
 		var mcp2 *machineconfigv1.MachineConfigPool
@@ -951,6 +1001,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		var label1 map[string]string
 
 		BeforeEach(func() {
+			if testPlatform == platform.HyperShift {
+				Skip("MCP is not a supported CRD in hypershift")
+			}
+
 			label1 = map[string]string{
 				"test1": "test1",
 			}
@@ -1289,32 +1343,32 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 	Context("with NodeGroupConfig", func() {
 		var labels map[string]string
-		var labSel metav1.LabelSelector
 		var mcp *machineconfigv1.MachineConfigPool
+		pn := "test"
 
 		BeforeEach(func() {
 			labels = map[string]string{
-				"test": "test",
+				pn: pn,
 			}
 
-			labSel = metav1.LabelSelector{
+			labSel := metav1.LabelSelector{
 				MatchLabels: labels,
 			}
 
-			mcp = testobjs.NewMachineConfigPool("test", labels, &metav1.LabelSelector{MatchLabels: labels}, &metav1.LabelSelector{MatchLabels: labels})
+			mcp = testobjs.NewMachineConfigPool(pn, labels, &labSel, &labSel)
 		})
 
 		It("should set defaults in the DS objects", func() {
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, nil)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, nil, testPlatform)
 
 			reconciler := reconcileObjects(nro, mcp)
 
-			mcpDSKey := client.ObjectKey{
-				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+			dsKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, pn),
 				Namespace: testNamespace,
 			}
 			ds := &appsv1.DaemonSet{}
-			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+			Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 			args := ds.Spec.Template.Spec.Containers[0].Args
 			Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
@@ -1338,18 +1392,20 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				InfoRefreshPause:   &rteMode,
 			}
 
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf, testPlatform)
 
 			reconciler := reconcileObjects(nro, mcp)
 
 			nroUpdated := &nropv1.NUMAResourcesOperator{}
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
 
-			Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(1))
-			Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(mcp.Name))
-			Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(conf), "operator status was not updated")
 			Expect(nroUpdated.Status.NodeGroups[0].Config).To(Equal(conf), "operator status was not updated under NodeGroupStatus field")
 
+			if testPlatform != platform.HyperShift {
+				Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(1))
+				Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(mcp.Name))
+				Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(conf), "operator status was not updated")
+			}
 		})
 
 		It("should allow to alter all the settings of the DS objects", func() {
@@ -1369,16 +1425,16 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				InfoRefreshPause:   &rteMode,
 			}
 
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf, testPlatform)
 
 			reconciler := reconcileObjects(nro, mcp)
 
-			mcpDSKey := client.ObjectKey{
-				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+			dsKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, pn),
 				Namespace: testNamespace,
 			}
 			ds := &appsv1.DaemonSet{}
-			Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+			Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 			args := ds.Spec.Template.Spec.Containers[0].Args
 			Expect(args).To(ContainElement("--sleep-interval=33s"), "malformed args: %v", args)
@@ -1392,7 +1448,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			conf := nropv1.NodeGroupConfig{
 				PodsFingerprinting: &pfpMode,
 			}
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf, testPlatform)
 
 			reconciler := reconcileObjects(nro, mcp)
 
@@ -1408,8 +1464,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			nroUpdated := &nropv1.NUMAResourcesOperator{}
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-			Expect(*nroUpdated.Status.MachineConfigPools[0].Config.PodsFingerprinting).To(Equal(pfpMode), "node group config was not updated in the operator status")
 			Expect(*nroUpdated.Status.NodeGroups[0].Config.PodsFingerprinting).To(Equal(pfpMode), "node group config was not updated under NodeGroupStatus field")
+			if testPlatform != platform.HyperShift {
+				Expect(*nroUpdated.Status.MachineConfigPools[0].Config.PodsFingerprinting).To(Equal(pfpMode), "node group config was not updated in the operator status")
+			}
 		})
 
 		It("should allow to tune the update period", func() {
@@ -1422,7 +1480,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			conf := nropv1.NodeGroupConfig{
 				InfoRefreshPeriod: &period,
 			}
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf, testPlatform)
 
 			reconciler := reconcileObjects(nro, mcp)
 
@@ -1438,8 +1496,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			nroUpdated := &nropv1.NUMAResourcesOperator{}
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-			Expect(*nroUpdated.Status.MachineConfigPools[0].Config.InfoRefreshPeriod).To(Equal(period), "node group config was not updated in the operator status")
 			Expect(*nroUpdated.Status.NodeGroups[0].Config.InfoRefreshPeriod).To(Equal(period), "node group config was not updated under NodeGroupStatus field")
+			if testPlatform != platform.HyperShift {
+				Expect(*nroUpdated.Status.MachineConfigPools[0].Config.InfoRefreshPeriod).To(Equal(period), "node group config was not updated in the operator status")
+			}
 		})
 
 		It("should allow to tune the update mechanism", func() {
@@ -1448,7 +1508,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				InfoRefreshMode: &refMode,
 			}
 
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf, testPlatform)
 
 			reconciler := reconcileObjects(nro, mcp)
 
@@ -1464,14 +1524,16 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			nroUpdated := &nropv1.NUMAResourcesOperator{}
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-			Expect(*nroUpdated.Status.MachineConfigPools[0].Config.InfoRefreshMode).To(Equal(refMode), "node group config was not updated in the operator status")
 			Expect(*nroUpdated.Status.NodeGroups[0].Config.InfoRefreshMode).To(Equal(refMode), "node group config was not updated under NodeGroupStatus field")
+			if testPlatform != platform.HyperShift {
+				Expect(*nroUpdated.Status.MachineConfigPools[0].Config.InfoRefreshMode).To(Equal(refMode), "node group config was not updated in the operator status")
+			}
 		})
 
 		It("should find default behavior to update NRT data", func() {
 			conf := nropv1.DefaultNodeGroupConfig()
 
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf, testPlatform)
 
 			reconciler := reconcileObjects(nro, mcp)
 
@@ -1497,7 +1559,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			conf := nropv1.NodeGroupConfig{
 				InfoRefreshPause: &rteMode,
 			}
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf, testPlatform)
 
 			// first and second reconcile loops are done inside
 			reconciler := reconcileObjects(nro, mcp)
@@ -1506,8 +1568,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			nroCurrent := &nropv1.NUMAResourcesOperator{}
 			Expect(reconciler.Client.Get(context.TODO(), key, nroCurrent)).NotTo(HaveOccurred())
-			Expect(*nroCurrent.Status.MachineConfigPools[0].Config.InfoRefreshPause).To(Equal(rteMode), "node group config was not updated in the operator status")
 			Expect(*nroCurrent.Status.NodeGroups[0].Config.InfoRefreshPause).To(Equal(rteMode), "node group config was not updated under NodeGroupStatus field")
+			if testPlatform != platform.HyperShift {
+				Expect(*nroCurrent.Status.MachineConfigPools[0].Config.InfoRefreshPause).To(Equal(rteMode), "node group config was not updated in the operator status")
+			}
 
 			mcpDSKey := client.ObjectKey{
 				Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
@@ -1531,7 +1595,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				return reconciler.Client.Update(context.TODO(), nroUpdated)
 			}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
 
-			// immediate update reflection with no reboot needed -> no need to reconcile after this
+			// immediate update reflection with no reboot needed -> no need to reconcile after this for all platforms
 			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(Equal(reconcile.Result{}))
@@ -1544,13 +1608,15 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			nroUpdated := &nropv1.NUMAResourcesOperator{}
 			Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).ToNot(HaveOccurred())
-			Expect(*nroUpdated.Status.MachineConfigPools[0].Config.InfoRefreshPause).To(Equal(rteModeOpp), "node group config was not updated in the operator status")
 			Expect(*nroUpdated.Status.NodeGroups[0].Config.InfoRefreshPause).To(Equal(rteModeOpp), "node group config was not updated under NodeGroupStatus field")
+			if testPlatform != platform.HyperShift {
+				Expect(*nroUpdated.Status.MachineConfigPools[0].Config.InfoRefreshPause).To(Equal(rteModeOpp), "node group config was not updated in the operator status")
+			}
 		})
 
 		It("should allow to update all the settings of the DS objects", func() {
 			conf := nropv1.DefaultNodeGroupConfig()
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf, testPlatform)
 
 			// first and second reconcile loops are done inside
 			reconciler := reconcileObjects(nro, mcp)
@@ -1608,8 +1674,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			nroUpdated := &nropv1.NUMAResourcesOperator{}
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-			Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(confUpdated), "node group config was not updated in the operator status")
 			Expect(nroUpdated.Status.NodeGroups[0].Config).To(Equal(confUpdated), "node group config was not updated under NodeGroupStatus field")
+			if testPlatform != platform.HyperShift {
+				Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(confUpdated), "node group config was not updated in the operator status")
+			}
 		})
 
 		It("should allow to change the PFP method dynamically", func() {
@@ -1618,7 +1686,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				PodsFingerprinting: &pfpMode,
 			}
 
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf, testPlatform)
 
 			reconciler := reconcileObjects(nro, mcp)
 
@@ -1635,7 +1703,9 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			key := client.ObjectKeyFromObject(nro)
 			nroUpdated := &nropv1.NUMAResourcesOperator{}
 			Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).ToNot(HaveOccurred())
-			Expect(*nroUpdated.Status.MachineConfigPools[0].Config.PodsFingerprinting).To(Equal(pfpMode), "node group config was not updated in the operator status")
+			if testPlatform != platform.HyperShift {
+				Expect(*nroUpdated.Status.MachineConfigPools[0].Config.PodsFingerprinting).To(Equal(pfpMode), "node group config was not updated in the operator status")
+			}
 			Expect(*nroUpdated.Status.NodeGroups[0].Config.PodsFingerprinting).To(Equal(pfpMode), "node group config was not updated under NodeGroupStatus field")
 
 			updatedPFPMode := nropv1.PodsFingerprintingEnabled
@@ -1656,14 +1726,17 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(args).To(ContainElement("--pods-fingerprint-method=all"), "malformed args: %v", args)
 
 			Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).ToNot(HaveOccurred())
-			Expect(*nroUpdated.Status.MachineConfigPools[0].Config.PodsFingerprinting).To(Equal(updatedPFPMode), "node group config was not updated in the operator status")
 			Expect(*nroUpdated.Status.NodeGroups[0].Config.PodsFingerprinting).To(Equal(updatedPFPMode), "node group config was not updated under NodeGroupStatus field")
+			if testPlatform != platform.HyperShift {
+				Expect(*nroUpdated.Status.MachineConfigPools[0].Config.PodsFingerprinting).To(Equal(updatedPFPMode), "node group config was not updated in the operator status")
+			}
+
 		})
 
 		It("should keep the manifest tolerations if not set", func() {
 			conf := nropv1.DefaultNodeGroupConfig()
 			Expect(conf.Tolerations).To(BeEmpty())
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf, testPlatform)
 
 			reconciler := reconcileObjects(nro, mcp)
 
@@ -1686,7 +1759,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Effect: corev1.TaintEffectNoSchedule,
 				},
 			}
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf, testPlatform)
 
 			reconciler := reconcileObjects(nro, mcp)
 
@@ -1701,8 +1774,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			nroUpdated := &nropv1.NUMAResourcesOperator{}
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-			Expect(nroUpdated.Status.MachineConfigPools[0].Config.Tolerations).To(Equal(conf.Tolerations), "node group config was not updated in the operator status")
 			Expect(nroUpdated.Status.NodeGroups[0].Config.Tolerations).To(Equal(conf.Tolerations), "node group config was not updated under NodeGroupStatus field")
+			if testPlatform != platform.HyperShift {
+				Expect(nroUpdated.Status.MachineConfigPools[0].Config.Tolerations).To(Equal(conf.Tolerations), "node group config was not updated in the operator status")
+			}
 		})
 
 		It("should replace the extra tolerations in the DS objects", func() {
@@ -1714,7 +1789,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Effect: corev1.TaintEffectNoSchedule,
 				},
 			}
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf, testPlatform)
 
 			reconciler := reconcileObjects(nro, mcp)
 
@@ -1755,8 +1830,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(nroUpdated.Spec.NodeGroups[0].Config.Tolerations), "mismatched DS tolerations (round 2)")
 
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-			Expect(nroUpdated.Status.MachineConfigPools[0].Config.Tolerations).To(Equal(newTols), "node group config was not updated in the operator status")
 			Expect(nroUpdated.Status.NodeGroups[0].Config.Tolerations).To(Equal(newTols), "node group config was not updated under NodeGroupStatus field")
+			if testPlatform != platform.HyperShift {
+				Expect(nroUpdated.Status.MachineConfigPools[0].Config.Tolerations).To(Equal(newTols), "node group config was not updated in the operator status")
+			}
 		})
 
 		It("should remove the extra tolerations in the DS objects", func() {
@@ -1768,7 +1845,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Effect: corev1.TaintEffectNoSchedule,
 				},
 			}
-			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+			nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf, testPlatform)
 
 			reconciler := reconcileObjects(nro, mcp)
 
@@ -1798,9 +1875,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			nroUpdated := &nropv1.NUMAResourcesOperator{}
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-			Expect(nroUpdated.Status.MachineConfigPools[0].Config.Tolerations).To(BeNil(), "node group config was not updated in the operator status")
 			Expect(nroUpdated.Status.NodeGroups[0].Config.Tolerations).To(BeNil(), "node group config was not updated under NodeGroupStatus field")
+			if testPlatform != platform.HyperShift {
+				Expect(nroUpdated.Status.MachineConfigPools[0].Config.Tolerations).To(BeNil(), "node group config was not updated in the operator status")
+			}
 		})
+
 	})
 
 	Context("emulating upgrade from 4.1X to 4.18 which has a built-in selinux policy for RTE pods", func() {
@@ -1810,86 +1890,106 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 		var reconciler *NUMAResourcesOperatorReconciler
 
+		pn1 := "test1"
+		pn2 := "test2"
+
 		BeforeEach(func() {
 			label1 := map[string]string{
-				"test1": "test1",
+				pn1: pn1,
 			}
 			label2 := map[string]string{
-				"test2": "test2",
+				pn2: pn2,
 			}
 
 			ng1 := nropv1.NodeGroup{
-				MachineConfigPoolSelector: &metav1.LabelSelector{
-					MatchLabels: label1,
-				},
+				PoolName: &pn1,
 			}
 			ng2 := nropv1.NodeGroup{
-				MachineConfigPoolSelector: &metav1.LabelSelector{
-					MatchLabels: label2,
-				},
+				PoolName: &pn2,
+			}
+			if testPlatform != platform.HyperShift {
+				ng1 = nropv1.NodeGroup{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: label1,
+					},
+				}
+				ng2 = nropv1.NodeGroup{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: label2,
+					},
+				}
 			}
 			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
 			// reconciling NRO object with custom policy, emulates the old behavior version
 			nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 
-			mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
-			mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
+			mcp1 = testobjs.NewMachineConfigPool(pn1, label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
+			mcp2 = testobjs.NewMachineConfigPool(pn2, label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
 
 			var err error
-			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp1, mcp2)
+			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro)
+			if testPlatform != platform.HyperShift {
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp1, mcp2)
+			}
 			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKeyFromObject(nro)
 			// on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC, thus RTE daemonsets and complete status update is not going to be achieved at this point
 			firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+			expectedResult := reconcile.Result{}
+			if testPlatform != platform.HyperShift {
+				expectedResult = reconcile.Result{RequeueAfter: 1 * time.Minute}
+			}
+			Expect(firstLoopResult).To(Equal(expectedResult))
 
-			// Ensure mcp1 is ready
-			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
-			mcp1.Status.Configuration.Source = []corev1.ObjectReference{
-				{
-					Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
-				},
-			}
-			mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-				{
-					Type:   machineconfigv1.MachineConfigPoolUpdated,
-					Status: corev1.ConditionTrue,
-				},
-			}
-			Expect(reconciler.Client.Update(context.TODO(), mcp1)).To(Succeed())
+			if testPlatform != platform.HyperShift {
+				// Ensure mcp1 is ready
+				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
+				mcp1.Status.Configuration.Source = []corev1.ObjectReference{
+					{
+						Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
+					},
+				}
+				mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+					{
+						Type:   machineconfigv1.MachineConfigPoolUpdated,
+						Status: corev1.ConditionTrue,
+					},
+				}
+				Expect(reconciler.Client.Update(context.TODO(), mcp1)).To(Succeed())
 
-			// ensure mcp2 is ready
-			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
-			mcp2.Status.Configuration.Source = []corev1.ObjectReference{
-				{
-					Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
-				},
-			}
-			mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-				{
-					Type:   machineconfigv1.MachineConfigPoolUpdated,
-					Status: corev1.ConditionTrue,
-				},
-			}
-			Expect(reconciler.Client.Update(context.TODO(), mcp2)).To(Succeed())
+				// ensure mcp2 is ready
+				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
+				mcp2.Status.Configuration.Source = []corev1.ObjectReference{
+					{
+						Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
+					},
+				}
+				mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+					{
+						Type:   machineconfigv1.MachineConfigPoolUpdated,
+						Status: corev1.ConditionTrue,
+					},
+				}
+				Expect(reconciler.Client.Update(context.TODO(), mcp2)).To(Succeed())
 
-			// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
-			secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-			Expect(err).ToNot(HaveOccurred())
-			Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 0}))
+				// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
+				secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 0}))
+			}
 
 			By("Check DaemonSets are created")
 			mcp1DSKey := client.ObjectKey{
-				Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+				Name:      objectnames.GetComponentName(nro.Name, pn1),
 				Namespace: testNamespace,
 			}
 			ds := &appsv1.DaemonSet{}
 			Expect(reconciler.Client.Get(context.TODO(), mcp1DSKey, ds)).ToNot(HaveOccurred())
 
 			mcp2DSKey := client.ObjectKey{
-				Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+				Name:      objectnames.GetComponentName(nro.Name, pn2),
 				Namespace: testNamespace,
 			}
 			Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).To(Succeed())
@@ -1902,9 +2002,14 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			// removing the annotation will trigger reboot which requires resync after 1 min
 			thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+			expectedResult = reconcile.Result{}
+			if testPlatform != platform.HyperShift {
+				expectedResult = reconcile.Result{RequeueAfter: 1 * time.Minute}
+			}
+			Expect(thirdLoopResult).To(Equal(expectedResult))
 		})
 		It("should delete existing mc", func() {
+			//no harm to check on hypershift, MCP is not supported anyway
 			mc1Key := client.ObjectKey{
 				Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
 			}
@@ -1934,8 +2039,11 @@ func getConditionByType(conditions []metav1.Condition, conditionType string) *me
 
 func reconcileObjects(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.MachineConfigPool) *NUMAResourcesOperatorReconciler {
 	GinkgoHelper()
+	reconciler, err := NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro)
 
-	reconciler, err := NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp)
+	if testPlatform != platform.HyperShift {
+		reconciler, err = NewFakeNUMAResourcesOperatorReconciler(testPlatform, defaultOCPVersion, nro, mcp)
+	}
 	Expect(err).ToNot(HaveOccurred())
 
 	key := client.ObjectKeyFromObject(nro)
@@ -1943,34 +2051,39 @@ func reconcileObjects(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.Ma
 	// we need to do the first iteration here because the DS object is created in the second
 	firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 	Expect(err).ToNot(HaveOccurred())
-	Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: 1 * time.Minute}))
-
-	By("Ensure MachineConfigPools is ready")
-	Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp), mcp)).ToNot(HaveOccurred())
-	mcp.Status.Configuration.Source = []corev1.ObjectReference{
-		{
-			Name: objectnames.GetMachineConfigName(nro.Name, mcp.Name),
-		},
+	expectedResult := reconcile.Result{}
+	if testPlatform != platform.HyperShift {
+		expectedResult = reconcile.Result{RequeueAfter: 1 * time.Minute}
 	}
-	mcp.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-		{
-			Type:   machineconfigv1.MachineConfigPoolUpdated,
-			Status: corev1.ConditionTrue,
-		},
+	Expect(firstLoopResult).To(Equal(expectedResult))
+
+	if testPlatform != platform.HyperShift {
+		By("Ensure MachineConfigPools is ready")
+		Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp), mcp)).ToNot(HaveOccurred())
+		mcp.Status.Configuration.Source = []corev1.ObjectReference{
+			{
+				Name: objectnames.GetMachineConfigName(nro.Name, mcp.Name),
+			},
+		}
+		mcp.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+			{
+				Type:   machineconfigv1.MachineConfigPoolUpdated,
+				Status: corev1.ConditionTrue,
+			},
+		}
+		mcName := objectnames.GetMachineConfigName(nro.Name, mcp.Name)
+		mcp.Status.Configuration.Source[0].Name = mcName
+
+		Expect(reconciler.Client.Update(context.TODO(), mcp)).Should(Succeed())
+		Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp), mcp)).ToNot(HaveOccurred())
+		Expect(mcp.Status.Conditions[0].Type).To(Equal(machineconfigv1.MachineConfigPoolUpdated))
+		Expect(mcp.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
+		Expect(mcp.Status.Configuration.Source[0].Name).To(Equal(mcName))
+		// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
+		secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(secondLoopResult).To(Equal(reconcile.Result{}))
 	}
-	mcName := objectnames.GetMachineConfigName(nro.Name, mcp.Name)
-	mcp.Status.Configuration.Source[0].Name = mcName
-
-	Expect(reconciler.Client.Update(context.TODO(), mcp)).Should(Succeed())
-	Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp), mcp)).ToNot(HaveOccurred())
-	Expect(mcp.Status.Conditions[0].Type).To(Equal(machineconfigv1.MachineConfigPoolUpdated))
-	Expect(mcp.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
-	Expect(mcp.Status.Configuration.Source[0].Name).To(Equal(mcName))
-
-	// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
-	secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-	Expect(err).ToNot(HaveOccurred())
-	Expect(secondLoopResult).To(Equal(reconcile.Result{}))
 
 	return reconciler
 }

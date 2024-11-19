@@ -22,13 +22,15 @@ import (
 	"fmt"
 	"time"
 
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
@@ -49,7 +51,22 @@ func NewNUMAResourcesOperator(name string, nodeGroups ...nropv1.NodeGroup) *nrop
 	}
 }
 
-func NewNUMAResourcesOperatorWithNodeGroupConfig(name string, selector *metav1.LabelSelector, conf *nropv1.NodeGroupConfig) *nropv1.NUMAResourcesOperator {
+func NewNUMAResourcesOperatorWithNodeGroupConfig(name string, poolName string, conf *nropv1.NodeGroupConfig, platf platform.Platform) *nropv1.NUMAResourcesOperator {
+	ngs := []nropv1.NodeGroup{
+		{
+			MachineConfigPoolSelector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					poolName: poolName,
+				},
+			},
+			Config: conf,
+		},
+	}
+	if platf == platform.HyperShift {
+		ngs[0].MachineConfigPoolSelector = nil
+		ngs[0].PoolName = &poolName
+	}
+
 	return &nropv1.NUMAResourcesOperator{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NUMAResourcesOperator",
@@ -63,12 +80,7 @@ func NewNUMAResourcesOperatorWithNodeGroupConfig(name string, selector *metav1.L
 			},
 		},
 		Spec: nropv1.NUMAResourcesOperatorSpec{
-			NodeGroups: []nropv1.NodeGroup{
-				{
-					MachineConfigPoolSelector: selector,
-					Config:                    conf,
-				},
-			},
+			NodeGroups: ngs,
 		},
 	}
 }
