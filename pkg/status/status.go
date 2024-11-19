@@ -17,6 +17,7 @@ limitations under the License.
 package status
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -33,6 +34,12 @@ const (
 	ConditionProgressing = "Progressing"
 	ConditionDegraded    = "Degraded"
 	ConditionUpgradeable = "Upgradeable"
+)
+
+// TODO: are we duping these?
+const (
+	ReasonAsExpected    = "AsExpected"
+	ReasonInternalError = "InternalError"
 )
 
 const (
@@ -129,4 +136,22 @@ type ErrResourcesNotReady struct {
 
 func (e ErrResourcesNotReady) Error() string {
 	return e.Message
+}
+
+func ReasonFromError(err error) string {
+	if err == nil {
+		return ReasonAsExpected
+	}
+	return ReasonInternalError
+}
+
+func MessageFromError(err error) string {
+	if err == nil {
+		return ""
+	}
+	unwErr := errors.Unwrap(err)
+	if unwErr == nil {
+		return ""
+	}
+	return unwErr.Error()
 }
