@@ -8,7 +8,7 @@ data:
     apiVersion: kubescheduler.config.k8s.io/v1
     kind: KubeSchedulerConfiguration
     leaderElection:
-      leaderElect: true
+      leaderElect: false
     profiles:
       - schedulerName: topo-aware-scheduler
         plugins:
