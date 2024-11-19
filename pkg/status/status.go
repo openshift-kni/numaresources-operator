@@ -151,7 +151,7 @@ func MessageFromError(err error) string {
 	}
 	unwErr := errors.Unwrap(err)
 	if unwErr == nil {
-		return ""
+		return err.Error()
 	}
 	return unwErr.Error()
 }
