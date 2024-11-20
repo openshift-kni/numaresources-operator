@@ -71,8 +71,9 @@ var _ = Describe("[Install] continuousIntegration", func() {
 
 	Context("with a running cluster with all the components", func() {
 		It("[test_id:47574][tier0] should perform overall deployment and verify the condition is reported as available", func() {
-			deployedObj := deploy.OverallDeployment()
-			nname := client.ObjectKeyFromObject(deployedObj.NroObj)
+			deployer := deploy.NewForPlatform(configuration.Plat)
+			nroObj := deployer.Deploy(context.TODO())
+			nname := client.ObjectKeyFromObject(nroObj)
 			Expect(nname.Name).ToNot(BeEmpty())
 
 			By("checking that the condition Available=true")
@@ -97,15 +98,15 @@ var _ = Describe("[Install] continuousIntegration", func() {
 			if err != nil {
 				logRTEPodsLogs(e2eclient.Client, e2eclient.K8sClient, context.TODO(), updatedNROObj, "NRO never reported available")
 			}
-			Expect(err).NotTo(HaveOccurred(), "NRO never reported available")
+			Expect(err).ToNot(HaveOccurred(), "NRO never reported available")
 
 			By("checking the NRT CRD is deployed")
 			_, err = crds.GetByName(e2eclient.Client, crds.CrdNRTName)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the NRO CRD is deployed")
 			_, err = crds.GetByName(e2eclient.Client, crds.CrdNROName)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			By("checking Daemonset is up&running")
 			Eventually(func() bool {
@@ -139,7 +140,7 @@ var _ = Describe("[Install] continuousIntegration", func() {
 
 			By("checking DaemonSet pods are running with correct SELinux context")
 			ds, err := getDaemonSetByOwnerReference(updatedNROObj.UID)
-			Expect(err).NotTo(HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			rteContainer, err := findContainerByName(*ds, containerNameRTE)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(rteContainer.SecurityContext.SELinuxOptions.Type).To(Equal(selinux.RTEContextType), "container %s is running with wrong selinux context", rteContainer.Name)
@@ -159,7 +160,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 
 	Context("with deploying NUMAResourcesOperator with wrong name", func() {
 		It("should do nothing", func() {
-			nroObj := objects.TestNRO(objects.EmptyMatchLabels())
+			nroObj := objects.TestNRO(objects.NROWithMCPSelector(objects.EmptyMatchLabels()))
 			nroObj.Name = "wrong-name"
 
 			err := e2eclient.Client.Create(context.TODO(), nroObj)
@@ -190,22 +191,22 @@ var _ = Describe("[Install] durability", Serial, func() {
 	})
 
 	Context("with a running cluster with all the components and overall deployment", func() {
-		var deployedObj deploy.NroDeployment
+		var deployer deploy.Deployer
+		var nroObj *nropv1.NUMAResourcesOperator
 
 		BeforeEach(func() {
-			deployedObj = deploy.OverallDeployment()
+			deployer = deploy.NewForPlatform(configuration.Plat)
+			nroObj = deployer.Deploy(context.TODO())
 		})
 
 		AfterEach(func() {
-			deploy.TeardownDeployment(deployedObj, 5*time.Minute)
+			deployer.Teardown(context.TODO(), 5*time.Minute)
 		})
 
 		It("[test_id:47587][tier1] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", func() {
 			By("getting up-to-date NRO object")
-			nroKey := client.ObjectKeyFromObject(deployedObj.NroObj)
-			Expect(nroKey.Name).NotTo(BeEmpty())
+			nroKey := objects.NROObjectKey()
 
-			nroObj := &nropv1.NUMAResourcesOperator{}
 			immediate := true
 			err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 10*time.Minute, immediate, func(ctx context.Context) (bool, error) {
 				err := e2eclient.Client.Get(ctx, nroKey, nroObj)
@@ -278,11 +279,10 @@ var _ = Describe("[Install] durability", Serial, func() {
 		})
 
 		It("should be able to delete NUMAResourceOperator CR and redeploy without polluting cluster state", func() {
-			nname := client.ObjectKeyFromObject(deployedObj.NroObj)
+			nname := client.ObjectKeyFromObject(nroObj)
 			Expect(nname.Name).NotTo(BeEmpty())
 
-			nroObj := &nropv1.NUMAResourcesOperator{}
-			err := e2eclient.Client.Get(context.TODO(), nname, nroObj)
+			err := e2eclient.Client.Get(context.TODO(), objects.NROObjectKey(), nroObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for the DaemonSet to be created..")
@@ -301,7 +301,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 			By("checking there are no leftovers")
 			// by taking the ns from the ds we're avoiding the need to figure out in advanced
 			// at which ns we should look for the resources
-			mf, err := rte.GetManifests(configuration.Plat, configuration.PlatVersion, ds.Namespace, true, true)
+			mf, err := rte.GetManifests(configuration.Plat, configuration.PlatVersion, ds.Namespace, true, annotations.IsCustomPolicyEnabled(nroObj.Annotations))
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() bool {
@@ -321,8 +321,8 @@ var _ = Describe("[Install] durability", Serial, func() {
 			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
 
 			By("redeploy with other parameters")
-			nroObjRedep := objects.TestNRO(objects.EmptyMatchLabels())
-			nroObjRedep.Spec = *deployedObj.NroObj.Spec.DeepCopy()
+			nroObjRedep := objects.TestNRO(objects.NROWithMCPSelector(objects.EmptyMatchLabels()))
+			nroObjRedep.Spec = *nroObj.Spec.DeepCopy()
 			// TODO change to an image which is test dedicated
 			nroObjRedep.Spec.ExporterImage = e2eimages.RTETestImageCI
 

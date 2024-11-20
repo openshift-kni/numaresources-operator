@@ -8,12 +8,15 @@ import (
 	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 )
 
 var isHypershiftCluster bool
 
 func init() {
-	if v, ok := os.LookupEnv("CLUSTER_TYPE"); ok && v == "hypershift" {
+	if configuration.Plat == platform.HyperShift {
 		klog.Infof("hypershift cluster detected")
 		isHypershiftCluster = true
 	}

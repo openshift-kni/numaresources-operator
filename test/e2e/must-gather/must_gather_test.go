@@ -31,9 +31,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/yaml"
 
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
+	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
@@ -103,13 +105,15 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				By("Looking for resources instances")
-				nropInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesoperators", deployment.NroObj.Name))
+				nropInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesoperators", objects.NROObjectKey().Name))
 				nroschedInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesschedulers", deployment.NroSchedObj.Name))
 
 				collectedMCPs, err := getMachineConfigPools(filepath.Join(mgContentFolder, "cluster-scoped-resources/machineconfiguration.openshift.io/machineconfigpools"))
 				Expect(err).ToNot(HaveOccurred())
 
-				ngMCPs, err := nodegroupv1.FindMachineConfigPools(&collectedMCPs, deployment.NroObj.Spec.NodeGroups)
+				nro := &nropv1.NUMAResourcesOperator{}
+				Expect(e2eclient.Client.Get(context.TODO(), objects.NROObjectKey(), nro)).To(Succeed())
+				ngMCPs, err := nodegroupv1.FindMachineConfigPools(&collectedMCPs, nro.Spec.NodeGroups)
 				Expect(err).ToNot(HaveOccurred())
 
 				nglabels := collectMachineConfigPoolsNodeSelector(ngMCPs)
@@ -124,7 +128,7 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				By("Looking for namespace in NUMAResourcesOperator")
-				updatedNRO, err := wait.With(e2eclient.Client).Interval(5*time.Second).Timeout(2*time.Minute).ForDaemonsetInNUMAResourcesOperatorStatus(ctx, deployment.NroObj)
+				updatedNRO, err := wait.With(e2eclient.Client).Interval(5*time.Second).Timeout(2*time.Minute).ForDaemonsetInNUMAResourcesOperatorStatus(ctx, nro)
 				Expect(err).ToNot(HaveOccurred())
 				namespace := updatedNRO.Status.DaemonSets[0].Namespace
 

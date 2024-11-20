@@ -17,6 +17,7 @@
 package clients
 
 import (
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
@@ -26,8 +27,8 @@ import (
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	perfprof "github.com/openshift/cluster-node-tuning-operator/pkg/apis/performanceprofile/v2"
+	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/test/utils/hypershift"
@@ -63,6 +64,9 @@ func init() {
 		klog.Exit(err.Error())
 	}
 	if err := perfprof.AddToScheme(scheme.Scheme); err != nil {
+		klog.Exit(err.Error())
+	}
+	if err := hypershiftv1beta1.AddToScheme(scheme.Scheme); err != nil {
 		klog.Exit(err.Error())
 	}
 
