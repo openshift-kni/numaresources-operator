@@ -123,10 +123,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 		Context("with NRO mutiple pool specifiers set on same node group", func() {
 			It("should update the CR condition to degraded", func() {
-				pn := "pn-1"
+				pn := "test"
 				ng := nropv1.NodeGroup{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{"test": "test"},
+						MatchLabels: map[string]string{pn: pn},
 					},
 					PoolName: &pn,
 				}
@@ -168,35 +168,40 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				var nro *nropv1.NUMAResourcesOperator
 				var mcp1 *machineconfigv1.MachineConfigPool
 				var mcp2 *machineconfigv1.MachineConfigPool
+				var mcp1Selector, mcp2Selector *metav1.LabelSelector
 				var nroKey client.ObjectKey
 
 				var reconciler *NUMAResourcesOperatorReconciler
-				var label1, label2 map[string]string
 				var ng1, ng2 nropv1.NodeGroup
 
+				pn1 := "test1"
+				pn2 := "test2"
+
 				BeforeEach(func() {
-					label1 = map[string]string{
-						"test1": "test1",
+					mcp1Selector = &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							pn1: pn1,
+						},
 					}
-					label2 = map[string]string{
-						"test2": "test2",
+					mcp2Selector = &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							pn2: pn2,
+						},
 					}
 
 					ng1 = nropv1.NodeGroup{
-						MachineConfigPoolSelector: &metav1.LabelSelector{
-							MatchLabels: label1,
-						},
+						PoolName: &pn1,
 					}
 					ng2 = nropv1.NodeGroup{
-						MachineConfigPoolSelector: &metav1.LabelSelector{
-							MatchLabels: label2,
-						},
+						PoolName: &pn2,
 					}
+
 					nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
 					nroKey = client.ObjectKeyFromObject(nro)
 
-					mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
-					mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
+					// would be used only if the platform supports MCP
+					mcp1 = testobjs.NewMachineConfigPool(pn1, mcp1Selector.MatchLabels, mcp1Selector, mcp1Selector)
+					mcp2 = testobjs.NewMachineConfigPool(pn2, mcp2Selector.MatchLabels, mcp2Selector, mcp2Selector)
 
 					var err error
 					reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
@@ -210,18 +215,18 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 				It("should create all CRDs and objects and operator status are updated from the first reconcile iteration", func() {
 					By("Check DaemonSets are created")
-					mcp1DSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn1),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcp1DSKey, ds)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
-					mcp2DSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+					dsKey = client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn2),
 						Namespace: testNamespace,
 					}
-					Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).To(Succeed())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
 
 					By("Check status is updated")
 					Expect(reconciler.Client.Get(context.TODO(), nroKey, nro)).ToNot(HaveOccurred())
@@ -229,8 +234,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
 
 					Expect(len(nro.Status.MachineConfigPools)).To(Equal(2))
-					Expect(nro.Status.MachineConfigPools[0].Name).To(Equal(mcp1.Name))
-					Expect(nro.Status.MachineConfigPools[1].Name).To(Equal(mcp2.Name))
+					Expect(nro.Status.MachineConfigPools[0].Name).To(Equal(pn1))
+					Expect(nro.Status.MachineConfigPools[1].Name).To(Equal(pn2))
 
 					conf := nropv1.DefaultNodeGroupConfig()
 					Expect(nro.Status.NodeGroups[0].Config).To(Equal(conf), "default node group config for %q was not updated in the operator status", nro.Status.NodeGroups[0].PoolName)
@@ -279,14 +284,14 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(len(nroUpdated.Status.DaemonSets)).To(Equal(2))
 
 					// the order of the NodeGroups also preserved under the operator status
-					Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(mcp1.Name))
-					Expect(nroUpdated.Status.NodeGroups[0].PoolName).To(Equal(mcp1.Name))
+					Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(pn1))
+					Expect(nroUpdated.Status.NodeGroups[0].PoolName).To(Equal(pn1))
 					Expect(nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(conf1))
 					Expect(nroUpdated.Status.NodeGroups[0].Config).To(Equal(*conf1))
 					Expect(nroUpdated.Status.NodeGroups[0].DaemonSet).To(Equal(nroUpdated.Status.DaemonSets[0]))
 
-					Expect(nroUpdated.Status.MachineConfigPools[1].Name).To(Equal(mcp2.Name))
-					Expect(nroUpdated.Status.NodeGroups[1].PoolName).To(Equal(mcp2.Name))
+					Expect(nroUpdated.Status.MachineConfigPools[1].Name).To(Equal(pn2))
+					Expect(nroUpdated.Status.NodeGroups[1].PoolName).To(Equal(pn2))
 					Expect(nroUpdated.Status.MachineConfigPools[1].Config).To(Equal(conf2))
 					Expect(nroUpdated.Status.NodeGroups[1].Config).To(Equal(*conf2))
 					Expect(nroUpdated.Status.NodeGroups[1].DaemonSet).To(Equal(nroUpdated.Status.DaemonSets[1]))
@@ -302,7 +307,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						Expect(reconciler.Client.Get(context.TODO(), nroKey, nro)).NotTo(HaveOccurred())
 
 						nro.Spec.NodeGroups = []nropv1.NodeGroup{{
-							MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: label1},
+							PoolName: &pn1,
 						}}
 						Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
 
@@ -315,18 +320,18 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						ds := &appsv1.DaemonSet{}
 
 						// Check ds1 still exist
-						ds1Key := client.ObjectKey{
-							Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+						dsKey := client.ObjectKey{
+							Name:      objectnames.GetComponentName(nro.Name, pn1),
 							Namespace: testNamespace,
 						}
-						Expect(reconciler.Client.Get(context.TODO(), ds1Key, ds)).NotTo(HaveOccurred())
+						Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).NotTo(HaveOccurred())
 
 						// check ds2 has been deleted
-						ds2Key := client.ObjectKey{
-							Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+						dsKey = client.ObjectKey{
+							Name:      objectnames.GetComponentName(nro.Name, pn2),
 							Namespace: testNamespace,
 						}
-						Expect(reconciler.Client.Get(context.TODO(), ds2Key, ds)).To(HaveOccurred(), "error: Daemonset %v should have been deleted", ds2Key)
+						Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(HaveOccurred(), "error: Daemonset %v should have been deleted", dsKey)
 					})
 
 					When("a NOT owned Daemonset exists", func() {
@@ -334,7 +339,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							By("Create a new Daemonset with correct name but not owner reference")
 
 							ds := reconciler.RTEManifests.DaemonSet.DeepCopy()
-							ds.Name = objectnames.GetComponentName(nro.Name, mcp2.Name)
+							ds.Name = objectnames.GetComponentName(nro.Name, pn2)
 							ds.Namespace = testNamespace
 
 							Expect(reconciler.Client.Create(context.TODO(), ds)).ToNot(HaveOccurred())
@@ -348,15 +353,15 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							ds := &appsv1.DaemonSet{}
 
 							// Check ds1 still exist
-							ds1Key := client.ObjectKey{
-								Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+							dsKey := client.ObjectKey{
+								Name:      objectnames.GetComponentName(nro.Name, pn1),
 								Namespace: testNamespace,
 							}
-							Expect(reconciler.Client.Get(context.TODO(), ds1Key, ds)).NotTo(HaveOccurred())
+							Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).NotTo(HaveOccurred())
 
 							// Check not owned DS is NOT deleted even if the name corresponds to mcp2
-							dsKey := client.ObjectKey{
-								Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+							dsKey = client.ObjectKey{
+								Name:      objectnames.GetComponentName(nro.Name, pn2),
 								Namespace: testNamespace,
 							}
 							Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).NotTo(HaveOccurred(), "error: Daemonset %v should NOT have been deleted", dsKey)
@@ -366,17 +371,17 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 				When("add a second pool specifier on existing node group", func() {
 					It("should update the CR condition to degraded", func(ctx context.Context) {
-						pn := "pool-1"
+						pnNew := "pool-1"
 						ng1WithNodeSelector := ng1.DeepCopy()
 						if ng1.MachineConfigPoolSelector != nil {
-							ng1WithNodeSelector.PoolName = &pn
+							ng1WithNodeSelector.PoolName = &pnNew
 						} else {
 							//must be PoolName that's set, so set the MCP selector
 							ng1WithNodeSelector.MachineConfigPoolSelector = &metav1.LabelSelector{
-								MatchLabels: map[string]string{pn: pn},
+								MatchLabels: map[string]string{pnNew: pnNew},
 							}
 						}
-						ng1WithNodeSelector.PoolName = &pn
+						ng1WithNodeSelector.PoolName = &pnNew
 						Eventually(func() error {
 							nroUpdated := &nropv1.NUMAResourcesOperator{}
 							Expect(reconciler.Client.Get(ctx, nroKey, nroUpdated))
@@ -389,40 +394,38 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			})
 
 			Context("with NodeGroupConfig", func() {
-				var labels map[string]string
 				var labSel metav1.LabelSelector
 				var mcp *machineconfigv1.MachineConfigPool
+				pn := "test"
 
 				BeforeEach(func() {
-					labels = map[string]string{
-						"test": "test",
-					}
-
 					labSel = metav1.LabelSelector{
-						MatchLabels: labels,
+						MatchLabels: map[string]string{
+							pn: pn,
+						},
 					}
 
-					mcp = testobjs.NewMachineConfigPool("test", labels, &metav1.LabelSelector{MatchLabels: labels}, &metav1.LabelSelector{MatchLabels: labels})
+					mcp = testobjs.NewMachineConfigPool(pn, labSel.MatchLabels, &labSel, &labSel)
 				})
 
 				It("should set defaults in the DS objects", func() {
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, nil)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, nil)
 
 					reconciler := reconcileObjects(nro, mcp)
 
-					mcpDSKey := client.ObjectKey{
+					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 					args := ds.Spec.Template.Spec.Containers[0].Args
 					Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
 					Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
 				})
 
-				It("should report the observed values per-MCP in status", func() {
+				It("should report the observed values per Node Group in status", func() {
 					d, err := time.ParseDuration("33s")
 					Expect(err).ToNot(HaveOccurred())
 
@@ -439,7 +442,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						InfoRefreshPause:   &rteMode,
 					}
 
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
 					reconciler := reconcileObjects(nro, mcp)
 
@@ -447,7 +450,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
 
 					Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(1))
-					Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(mcp.Name))
+					Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(pn))
 					Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(conf), "operator status was not updated")
 					Expect(nroUpdated.Status.NodeGroups[0].Config).To(Equal(conf), "operator status was not updated under NodeGroupStatus field")
 
@@ -470,16 +473,16 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						InfoRefreshPause:   &rteMode,
 					}
 
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
 					reconciler := reconcileObjects(nro, mcp)
 
-					mcpDSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 					args := ds.Spec.Template.Spec.Containers[0].Args
 					Expect(args).To(ContainElement("--sleep-interval=33s"), "malformed args: %v", args)
@@ -493,16 +496,16 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					conf := nropv1.NodeGroupConfig{
 						PodsFingerprinting: &pfpMode,
 					}
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
 					reconciler := reconcileObjects(nro, mcp)
 
-					mcpDSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 					args := ds.Spec.Template.Spec.Containers[0].Args
 					Expect(args).ToNot(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
@@ -523,16 +526,16 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					conf := nropv1.NodeGroupConfig{
 						InfoRefreshPeriod: &period,
 					}
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
 					reconciler := reconcileObjects(nro, mcp)
 
-					mcpDSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 					args := ds.Spec.Template.Spec.Containers[0].Args
 					Expect(args).To(ContainElement("--sleep-interval=42s"), "malformed args: %v", args)
@@ -549,16 +552,16 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						InfoRefreshMode: &refMode,
 					}
 
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
 					reconciler := reconcileObjects(nro, mcp)
 
-					mcpDSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 					args := ds.Spec.Template.Spec.Containers[0].Args
 					Expect(args).ToNot(ContainElement(ContainSubstring("--notify-file")), "malformed args: %v", args)
@@ -572,7 +575,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				It("should find default behavior to update NRT data", func() {
 					conf := nropv1.DefaultNodeGroupConfig()
 
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
 					reconciler := reconcileObjects(nro, mcp)
 
@@ -582,12 +585,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(reconciler.Client.Get(context.TODO(), key, nroCurrent)).NotTo(HaveOccurred())
 					Expect(nroCurrent.Spec.NodeGroups[0].Config.InfoRefreshPause).To(Equal(conf.InfoRefreshPause))
 
-					mcpDSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 					args := ds.Spec.Template.Spec.Containers[0].Args
 					Expect(args).ToNot(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
@@ -598,7 +601,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					conf := nropv1.NodeGroupConfig{
 						InfoRefreshPause: &rteMode,
 					}
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
 					// first and second reconcile loops are done inside
 					reconciler := reconcileObjects(nro, mcp)
@@ -610,12 +613,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(*nroCurrent.Status.MachineConfigPools[0].Config.InfoRefreshPause).To(Equal(rteMode), "node group config was not updated in the operator status")
 					Expect(*nroCurrent.Status.NodeGroups[0].Config.InfoRefreshPause).To(Equal(rteMode), "node group config was not updated under NodeGroupStatus field")
 
-					mcpDSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 					args := ds.Spec.Template.Spec.Containers[0].Args
 					Expect(args).To(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
@@ -638,7 +641,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(result).To(Equal(reconcile.Result{}))
 
 					dsUpdated := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, dsUpdated)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, dsUpdated)).ToNot(HaveOccurred())
 
 					argsUpdated := dsUpdated.Spec.Template.Spec.Containers[0].Args
 					Expect(argsUpdated).ToNot(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", argsUpdated)
@@ -651,17 +654,17 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 				It("should allow to update all the settings of the DS objects", func() {
 					conf := nropv1.DefaultNodeGroupConfig()
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
 					// first and second reconcile loops are done inside
 					reconciler := reconcileObjects(nro, mcp)
 
-					mcpDSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 					args := ds.Spec.Template.Spec.Containers[0].Args
 					Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
@@ -699,7 +702,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(thirdLoopResult).To(Equal(reconcile.Result{}))
 
 					dsUpdated := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, dsUpdated)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, dsUpdated)).ToNot(HaveOccurred())
 
 					argsUpdated := dsUpdated.Spec.Template.Spec.Containers[0].Args
 					Expect(argsUpdated).To(ContainElement("--sleep-interval=12s"), "malformed updated args: %v", argsUpdated)
@@ -719,16 +722,16 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						PodsFingerprinting: &pfpMode,
 					}
 
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
 					reconciler := reconcileObjects(nro, mcp)
 
-					mcpDSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 					args := ds.Spec.Template.Spec.Containers[0].Args
 					Expect(args).To(ContainElement("--pods-fingerprint-method=with-exclusive-resources"), "malformed args: %v", args)
@@ -751,7 +754,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 					Expect(err).ToNot(HaveOccurred())
 
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).ToNot(HaveOccurred())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 					args = ds.Spec.Template.Spec.Containers[0].Args
 					Expect(args).To(ContainElement("--pods-fingerprint-method=all"), "malformed args: %v", args)
@@ -764,16 +767,16 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				It("should keep the manifest tolerations if not set", func() {
 					conf := nropv1.DefaultNodeGroupConfig()
 					Expect(conf.Tolerations).To(BeEmpty())
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
 					reconciler := reconcileObjects(nro, mcp)
 
-					mcpDSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
 
 					Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(reconciler.RTEManifests.DaemonSet.Spec.Template.Spec.Tolerations), "mismatched DS default tolerations")
 				})
@@ -787,16 +790,16 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							Effect: corev1.TaintEffectNoSchedule,
 						},
 					}
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
 					reconciler := reconcileObjects(nro, mcp)
 
-					mcpDSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
 
 					Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(conf.Tolerations), "mismatched DS tolerations")
 
@@ -815,16 +818,16 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							Effect: corev1.TaintEffectNoSchedule,
 						},
 					}
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
 					reconciler := reconcileObjects(nro, mcp)
 
-					mcpDSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
 
 					Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(conf.Tolerations), "mismatched DS tolerations (round 1)")
 
@@ -852,7 +855,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 					Expect(err).ToNot(HaveOccurred())
 
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
 					Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(nroUpdated.Spec.NodeGroups[0].Config.Tolerations), "mismatched DS tolerations (round 2)")
 
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
@@ -869,16 +872,16 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							Effect: corev1.TaintEffectNoSchedule,
 						},
 					}
-					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, &labSel, &conf)
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
 					reconciler := reconcileObjects(nro, mcp)
 
-					mcpDSKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
 
 					Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(conf.Tolerations), "mismatched DS tolerations")
 
@@ -894,7 +897,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 					Expect(err).ToNot(HaveOccurred())
 
-					Expect(reconciler.Client.Get(context.TODO(), mcpDSKey, ds)).To(Succeed())
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
 					Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(reconciler.RTEManifests.DaemonSet.Spec.Template.Spec.Tolerations), "DS tolerations not restored to defaults")
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
