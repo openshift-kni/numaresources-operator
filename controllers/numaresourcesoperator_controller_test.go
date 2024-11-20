@@ -87,10 +87,10 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 }
 
 var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
-	verifyDegradedCondition := func(nro *nropv1.NUMAResourcesOperator, reason string) {
+	verifyDegradedCondition := func(nro *nropv1.NUMAResourcesOperator, reason string, platf platform.Platform) {
 		GinkgoHelper()
 
-		reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro)
+		reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platf, defaultOCPVersion, nro)
 		Expect(err).ToNot(HaveOccurred())
 
 		key := client.ObjectKeyFromObject(nro)
@@ -104,12 +104,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		Expect(degradedCondition.Reason).To(Equal(reason))
 	}
 
-	Describe("Running on different platforms", func() {
+	DescribeTableSubtree("Running on different platforms", func(platf platform.Platform) {
 
 		Context("with unexpected NRO CR name", func() {
 			It("should updated the CR condition to degraded", func() {
 				nro := testobjs.NewNUMAResourcesOperator("test")
-				verifyDegradedCondition(nro, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName)
+				verifyDegradedCondition(nro, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, platf)
 			})
 		})
 
@@ -117,7 +117,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			It("should update the CR condition to degraded", func() {
 				ng := nropv1.NodeGroup{}
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
-				verifyDegradedCondition(nro, validation.NodeGroupsError)
+				verifyDegradedCondition(nro, validation.NodeGroupsError, platf)
 			})
 		})
 
@@ -131,7 +131,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					PoolName: &pn,
 				}
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
-				verifyDegradedCondition(nro, validation.NodeGroupsError)
+				verifyDegradedCondition(nro, validation.NodeGroupsError, platf)
 			})
 		})
 
@@ -148,7 +148,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
 
 				var err error
-				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro)
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platf, defaultOCPVersion, nro)
 				Expect(err).ToNot(HaveOccurred())
 
 				key := client.ObjectKeyFromObject(nro)
@@ -388,7 +388,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							nroUpdated.Spec.NodeGroups[0] = *ng1WithNodeSelector
 							return reconciler.Client.Update(context.TODO(), nroUpdated)
 						}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
-						verifyDegradedCondition(nro, validation.NodeGroupsError)
+						verifyDegradedCondition(nro, validation.NodeGroupsError, platf)
 					})
 				})
 			})
@@ -411,7 +411,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				It("should set defaults in the DS objects", func() {
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, nil)
 
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
@@ -444,16 +449,24 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
 
-					Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(1))
-					Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(pn))
-					Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(conf), "operator status was not updated")
+					Expect(len(nroUpdated.Status.NodeGroups)).To(Equal(1))
 					Expect(nroUpdated.Status.NodeGroups[0].Config).To(Equal(conf), "operator status was not updated under NodeGroupStatus field")
 
+					if platf != platform.HyperShift {
+						Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(1))
+						Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(pn))
+						Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(conf), "operator status was not updated")
+					}
 				})
 
 				It("should allow to alter all the settings of the DS objects", func() {
@@ -475,7 +488,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn),
@@ -498,7 +516,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn),
@@ -512,8 +535,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-					Expect(*nroUpdated.Status.MachineConfigPools[0].Config.PodsFingerprinting).To(Equal(pfpMode), "node group config was not updated in the operator status")
 					Expect(*nroUpdated.Status.NodeGroups[0].Config.PodsFingerprinting).To(Equal(pfpMode), "node group config was not updated under NodeGroupStatus field")
+					if platf != platform.HyperShift {
+						Expect(*nroUpdated.Status.MachineConfigPools[0].Config.PodsFingerprinting).To(Equal(pfpMode), "node group config was not updated in the operator status")
+					}
 				})
 
 				It("should allow to tune the update period", func() {
@@ -528,7 +553,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn),
@@ -542,8 +572,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-					Expect(*nroUpdated.Status.MachineConfigPools[0].Config.InfoRefreshPeriod).To(Equal(period), "node group config was not updated in the operator status")
 					Expect(*nroUpdated.Status.NodeGroups[0].Config.InfoRefreshPeriod).To(Equal(period), "node group config was not updated under NodeGroupStatus field")
+					if platf != platform.HyperShift {
+						Expect(*nroUpdated.Status.MachineConfigPools[0].Config.InfoRefreshPeriod).To(Equal(period), "node group config was not updated in the operator status")
+					}
 				})
 
 				It("should allow to tune the update mechanism", func() {
@@ -554,7 +586,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn),
@@ -568,8 +605,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-					Expect(*nroUpdated.Status.MachineConfigPools[0].Config.InfoRefreshMode).To(Equal(refMode), "node group config was not updated in the operator status")
 					Expect(*nroUpdated.Status.NodeGroups[0].Config.InfoRefreshMode).To(Equal(refMode), "node group config was not updated under NodeGroupStatus field")
+					if platf != platform.HyperShift {
+						Expect(*nroUpdated.Status.MachineConfigPools[0].Config.InfoRefreshMode).To(Equal(refMode), "node group config was not updated in the operator status")
+					}
 				})
 
 				It("should find default behavior to update NRT data", func() {
@@ -577,7 +616,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					key := client.ObjectKeyFromObject(nro)
 
@@ -603,15 +647,21 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
-					// first and second reconcile loops are done inside
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					key := client.ObjectKeyFromObject(nro)
 
 					nroCurrent := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), key, nroCurrent)).NotTo(HaveOccurred())
-					Expect(*nroCurrent.Status.MachineConfigPools[0].Config.InfoRefreshPause).To(Equal(rteMode), "node group config was not updated in the operator status")
 					Expect(*nroCurrent.Status.NodeGroups[0].Config.InfoRefreshPause).To(Equal(rteMode), "node group config was not updated under NodeGroupStatus field")
+					if platf != platform.HyperShift {
+						Expect(*nroCurrent.Status.MachineConfigPools[0].Config.InfoRefreshPause).To(Equal(rteMode), "node group config was not updated in the operator status")
+					}
 
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn),
@@ -648,16 +698,22 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).ToNot(HaveOccurred())
-					Expect(*nroUpdated.Status.MachineConfigPools[0].Config.InfoRefreshPause).To(Equal(rteModeOpp), "node group config was not updated in the operator status")
 					Expect(*nroUpdated.Status.NodeGroups[0].Config.InfoRefreshPause).To(Equal(rteModeOpp), "node group config was not updated under NodeGroupStatus field")
+					if platf != platform.HyperShift {
+						Expect(*nroUpdated.Status.MachineConfigPools[0].Config.InfoRefreshPause).To(Equal(rteModeOpp), "node group config was not updated in the operator status")
+					}
 				})
 
 				It("should allow to update all the settings of the DS objects", func() {
 					conf := nropv1.DefaultNodeGroupConfig()
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
-					// first and second reconcile loops are done inside
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn),
@@ -712,8 +768,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-					Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(confUpdated), "node group config was not updated in the operator status")
 					Expect(nroUpdated.Status.NodeGroups[0].Config).To(Equal(confUpdated), "node group config was not updated under NodeGroupStatus field")
+					if platf != platform.HyperShift {
+						Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(confUpdated), "node group config was not updated in the operator status")
+					}
 				})
 
 				It("should allow to change the PFP method dynamically", func() {
@@ -724,7 +782,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn),
@@ -739,8 +802,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					key := client.ObjectKeyFromObject(nro)
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).ToNot(HaveOccurred())
-					Expect(*nroUpdated.Status.MachineConfigPools[0].Config.PodsFingerprinting).To(Equal(pfpMode), "node group config was not updated in the operator status")
 					Expect(*nroUpdated.Status.NodeGroups[0].Config.PodsFingerprinting).To(Equal(pfpMode), "node group config was not updated under NodeGroupStatus field")
+					if platf != platform.HyperShift {
+						Expect(*nroUpdated.Status.MachineConfigPools[0].Config.PodsFingerprinting).To(Equal(pfpMode), "node group config was not updated in the operator status")
+					}
 
 					updatedPFPMode := nropv1.PodsFingerprintingEnabled
 					Eventually(func() error {
@@ -760,8 +825,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(args).To(ContainElement("--pods-fingerprint-method=all"), "malformed args: %v", args)
 
 					Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).ToNot(HaveOccurred())
-					Expect(*nroUpdated.Status.MachineConfigPools[0].Config.PodsFingerprinting).To(Equal(updatedPFPMode), "node group config was not updated in the operator status")
 					Expect(*nroUpdated.Status.NodeGroups[0].Config.PodsFingerprinting).To(Equal(updatedPFPMode), "node group config was not updated under NodeGroupStatus field")
+					if platf != platform.HyperShift {
+						Expect(*nroUpdated.Status.MachineConfigPools[0].Config.PodsFingerprinting).To(Equal(updatedPFPMode), "node group config was not updated in the operator status")
+					}
 				})
 
 				It("should keep the manifest tolerations if not set", func() {
@@ -769,7 +836,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(conf.Tolerations).To(BeEmpty())
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn),
@@ -792,7 +864,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn),
@@ -805,8 +882,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-					Expect(nroUpdated.Status.MachineConfigPools[0].Config.Tolerations).To(Equal(conf.Tolerations), "node group config was not updated in the operator status")
 					Expect(nroUpdated.Status.NodeGroups[0].Config.Tolerations).To(Equal(conf.Tolerations), "node group config was not updated under NodeGroupStatus field")
+					if platf != platform.HyperShift {
+						Expect(nroUpdated.Status.MachineConfigPools[0].Config.Tolerations).To(Equal(conf.Tolerations), "node group config was not updated in the operator status")
+					}
 				})
 
 				It("should replace the extra tolerations in the DS objects", func() {
@@ -820,7 +899,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn),
@@ -859,8 +943,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(nroUpdated.Spec.NodeGroups[0].Config.Tolerations), "mismatched DS tolerations (round 2)")
 
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-					Expect(nroUpdated.Status.MachineConfigPools[0].Config.Tolerations).To(Equal(newTols), "node group config was not updated in the operator status")
 					Expect(nroUpdated.Status.NodeGroups[0].Config.Tolerations).To(Equal(newTols), "node group config was not updated under NodeGroupStatus field")
+					if platf != platform.HyperShift {
+						Expect(nroUpdated.Status.MachineConfigPools[0].Config.Tolerations).To(Equal(newTols), "node group config was not updated in the operator status")
+					}
 				})
 
 				It("should remove the extra tolerations in the DS objects", func() {
@@ -874,7 +960,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
 
-					reconciler := reconcileObjects(nro, mcp)
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjects(nro, mcp)
+					}
 
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn),
@@ -902,12 +993,17 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-					Expect(nroUpdated.Status.MachineConfigPools[0].Config.Tolerations).To(BeNil(), "node group config was not updated in the operator status")
 					Expect(nroUpdated.Status.NodeGroups[0].Config.Tolerations).To(BeNil(), "node group config was not updated under NodeGroupStatus field")
+					if platf != platform.HyperShift {
+						Expect(nroUpdated.Status.MachineConfigPools[0].Config.Tolerations).To(BeNil(), "node group config was not updated in the operator status")
+					}
 				})
 			})
 		})
-	})
+	},
+		Entry("Openshift Platform", platform.OpenShift),
+		Entry("Hypershift Platform", platform.HyperShift),
+	)
 
 	Describe("Openshift only", func() {
 		Context("[openshift] without available machine config pools", func() {
@@ -916,7 +1012,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"test": "test"}},
 				}
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
-				verifyDegradedCondition(nro, validation.NodeGroupsError)
+				verifyDegradedCondition(nro, validation.NodeGroupsError, platform.OpenShift)
 			})
 			It("should update the CR condition to degraded when PoolName set", func() {
 				pn := "pn-1"
@@ -924,7 +1020,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					PoolName: &pn,
 				}
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
-				verifyDegradedCondition(nro, validation.NodeGroupsError)
+				verifyDegradedCondition(nro, validation.NodeGroupsError, platform.OpenShift)
 			})
 		})
 
@@ -1843,6 +1939,22 @@ func reconcileObjects(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.Ma
 		Expect(err).ToNot(HaveOccurred())
 		Expect(secondLoopResult).To(Equal(reconcile.Result{}))
 	}
+
+	return reconciler
+}
+
+func reconcileObjectsHypershift(nro *nropv1.NUMAResourcesOperator) *NUMAResourcesOperatorReconciler {
+	GinkgoHelper()
+
+	reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.HyperShift, defaultOCPVersion, nro)
+	Expect(err).ToNot(HaveOccurred())
+
+	key := client.ObjectKeyFromObject(nro)
+
+	// immediate update
+	firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+	Expect(err).ToNot(HaveOccurred())
+	Expect(firstLoopResult).To(Equal(reconcile.Result{}))
 
 	return reconciler
 }
