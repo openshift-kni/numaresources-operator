@@ -48,6 +48,7 @@ import (
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 
+	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/schedcache"
 )
@@ -83,7 +84,13 @@ func main() {
 		os.Exit(0)
 	}
 
-	logCfg := textlogger.NewConfig(textlogger.Verbosity(getKlogLevel()))
+	lev, err := intkloglevel.Get()
+	if err != nil {
+		klog.V(1).ErrorS(err, "setting up the logger")
+		os.Exit(1)
+	}
+
+	logCfg := textlogger.NewConfig(textlogger.Verbosity(int(lev)))
 
 	cli, err := NewClientWithScheme(scheme)
 	if err != nil {
@@ -253,16 +260,4 @@ func NewClientWithScheme(scheme *k8sruntime.Scheme) (client.Client, error) {
 		return nil, err
 	}
 	return client.New(cfg, client.Options{Scheme: scheme})
-}
-
-// getKlogLevel reconstructs the klog verb level, because
-// the klog package doesn't give a clean easy way to access
-// the setting, so we have to jumps through some hoops.
-func getKlogLevel() int {
-	for j := 1; j < 15; j++ {
-		if !klog.V(klog.Level(j)).Enabled() {
-			return j - 1
-		}
-	}
-	return 0
 }
