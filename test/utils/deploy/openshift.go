@@ -43,7 +43,7 @@ func (o *OpenShiftNRO) Deploy(ctx context.Context) *nropv1.NUMAResourcesOperator
 
 func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, matchLabels map[string]string) *nropv1.NUMAResourcesOperator {
 	GinkgoHelper()
-	nroObj := objects.TestNRO(matchLabels)
+	nroObj := objects.TestNRO(objects.NROWithMCPSelector(matchLabels))
 	kcObj, err := objects.TestKC(matchLabels)
 	Expect(err).To(Not(HaveOccurred()))
 

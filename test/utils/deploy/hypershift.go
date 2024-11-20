@@ -65,8 +65,8 @@ func (h *HyperShiftNRO) Deploy(ctx context.Context) *nropv1.NUMAResourcesOperato
 		Expect(wait.ForConfigToBeReady(ctx, e2eclient.MNGClient, np.Name, np.Namespace)).To(Succeed())
 	}
 
-	nroObj := objects.TestNRO(objects.EmptyMatchLabels())
-	nroObj.Spec.NodeGroups[0].PoolName = &np.Name
+	nroObj := objects.TestNRO()
+	nroObj.Spec.NodeGroups = append(nroObj.Spec.NodeGroups, nropv1.NodeGroup{PoolName: &np.Name})
 	By(fmt.Sprintf("creating the NRO object: %s", nroObj.Name))
 	err = e2eclient.Client.Create(ctx, nroObj)
 	Expect(err).NotTo(HaveOccurred())

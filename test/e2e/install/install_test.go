@@ -160,7 +160,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 
 	Context("with deploying NUMAResourcesOperator with wrong name", func() {
 		It("should do nothing", func() {
-			nroObj := objects.TestNRO(objects.EmptyMatchLabels())
+			nroObj := objects.TestNRO(objects.NROWithMCPSelector(objects.EmptyMatchLabels()))
 			nroObj.Name = "wrong-name"
 
 			err := e2eclient.Client.Create(context.TODO(), nroObj)
@@ -321,7 +321,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
 
 			By("redeploy with other parameters")
-			nroObjRedep := objects.TestNRO(objects.EmptyMatchLabels())
+			nroObjRedep := objects.TestNRO(objects.NROWithMCPSelector(objects.EmptyMatchLabels()))
 			nroObjRedep.Spec = *nroObj.Spec.DeepCopy()
 			// TODO change to an image which is test dedicated
 			nroObjRedep.Spec.ExporterImage = e2eimages.RTETestImageCI

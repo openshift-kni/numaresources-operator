@@ -56,7 +56,7 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 		It("should delete all components after NRO deletion", func() {
 			By("deleting the NRO object")
 			// since we are getting an existing object, we don't need the real labels here
-			nroObj := objects.TestNRO(objects.EmptyMatchLabels())
+			nroObj := objects.TestNRO(objects.NROWithMCPSelector(objects.EmptyMatchLabels()))
 			By("deleting the KC object")
 			kcObj, err := objects.TestKC(objects.EmptyMatchLabels())
 			Expect(err).To(Not(HaveOccurred()))

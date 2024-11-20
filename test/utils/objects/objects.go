@@ -67,8 +67,8 @@ func NROSchedObjectKey() client.ObjectKey {
 	return client.ObjectKey{Name: objectnames.DefaultNUMAResourcesSchedulerCrName}
 }
 
-func TestNRO(matchLabels map[string]string) *nropv1.NUMAResourcesOperator {
-	return &nropv1.NUMAResourcesOperator{
+func TestNRO(options ...func(*nropv1.NUMAResourcesOperator)) *nropv1.NUMAResourcesOperator {
+	nrop := &nropv1.NUMAResourcesOperator{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NUMAResourcesOperator",
 			APIVersion: nropv1.GroupVersion.String(),
@@ -77,15 +77,25 @@ func TestNRO(matchLabels map[string]string) *nropv1.NUMAResourcesOperator {
 			Name: objectnames.DefaultNUMAResourcesOperatorCrName,
 		},
 		Spec: nropv1.NUMAResourcesOperatorSpec{
-			NodeGroups: []nropv1.NodeGroup{
-				{
-					MachineConfigPoolSelector: &metav1.LabelSelector{
-						MatchLabels: matchLabels,
-					},
+			NodeGroups: []nropv1.NodeGroup{},
+			LogLevel:   operatorv1.Debug,
+		},
+	}
+	for _, option := range options {
+		option(nrop)
+	}
+	return nrop
+}
+
+func NROWithMCPSelector(labels map[string]string) func(*nropv1.NUMAResourcesOperator) {
+	return func(nrop *nropv1.NUMAResourcesOperator) {
+		nrop.Spec.NodeGroups = []nropv1.NodeGroup{
+			{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: labels,
 				},
 			},
-			LogLevel: operatorv1.Debug,
-		},
+		}
 	}
 }
 
