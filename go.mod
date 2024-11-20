@@ -19,12 +19,13 @@ require (
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo/v2 v2.19.1
 	github.com/onsi/gomega v1.34.0
-	github.com/openshift/api v0.0.0-20240422085825-2624175e9673
+	github.com/openshift/api v0.0.0-20240524162738-d899f8877d22
 	github.com/openshift/cluster-node-tuning-operator v0.0.0-20240611064827-2bd8891ead93
+	github.com/openshift/hypershift/api v0.0.0-20241115183703-d41904871380
 	github.com/openshift/machine-config-operator v0.0.1-0.20230724174830-7b54f1dcce4e
 	github.com/sergi/go-diff v1.1.0
 	github.com/stretchr/testify v1.9.0
-	golang.org/x/sync v0.7.0
+	golang.org/x/sync v0.8.0
 	k8s.io/api v0.31.2
 	k8s.io/apiextensions-apiserver v0.31.2
 	k8s.io/apimachinery v0.31.2
@@ -97,11 +98,11 @@ require (
 	go.uber.org/ratelimit v0.2.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
 	golang.org/x/mod v0.17.0 // indirect
-	golang.org/x/net v0.26.0 // indirect
+	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
-	golang.org/x/sys v0.21.0 // indirect
-	golang.org/x/term v0.21.0 // indirect
-	golang.org/x/text v0.16.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/term v0.25.0 // indirect
+	golang.org/x/text v0.19.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
