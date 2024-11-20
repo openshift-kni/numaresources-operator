@@ -415,7 +415,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					dsKey := client.ObjectKey{
@@ -453,7 +453,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
@@ -492,7 +492,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					dsKey := client.ObjectKey{
@@ -520,7 +520,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					dsKey := client.ObjectKey{
@@ -557,7 +557,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					dsKey := client.ObjectKey{
@@ -590,7 +590,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					dsKey := client.ObjectKey{
@@ -620,7 +620,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					key := client.ObjectKeyFromObject(nro)
@@ -651,7 +651,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					key := client.ObjectKeyFromObject(nro)
@@ -712,7 +712,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					dsKey := client.ObjectKey{
@@ -786,7 +786,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					dsKey := client.ObjectKey{
@@ -840,7 +840,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					dsKey := client.ObjectKey{
@@ -868,7 +868,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					dsKey := client.ObjectKey{
@@ -903,7 +903,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					dsKey := client.ObjectKey{
@@ -964,7 +964,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					if platf == platform.HyperShift {
 						reconciler = reconcileObjectsHypershift(nro)
 					} else {
-						reconciler = reconcileObjects(nro, mcp)
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
 					dsKey := client.ObjectKey{
@@ -1888,7 +1888,7 @@ func getConditionByType(conditions []metav1.Condition, conditionType string) *me
 	return nil
 }
 
-func reconcileObjects(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.MachineConfigPool) *NUMAResourcesOperatorReconciler {
+func reconcileObjectsOpenshift(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.MachineConfigPool) *NUMAResourcesOperatorReconciler {
 	GinkgoHelper()
 
 	reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
