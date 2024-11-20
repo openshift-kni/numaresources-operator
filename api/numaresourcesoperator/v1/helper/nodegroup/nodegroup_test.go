@@ -31,7 +31,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
-func TestFindTrees(t *testing.T) {
+func TestFindTreesOpenshift(t *testing.T) {
 	mcpList := mcov1.MachineConfigPoolList{
 		Items: []mcov1.MachineConfigPool{
 			{
@@ -230,7 +230,7 @@ func TestFindTrees(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := FindTrees(tt.mcps, tt.ngs)
+			got, err := FindTreesOpenshift(tt.mcps, tt.ngs)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -249,6 +249,45 @@ func TestFindTrees(t *testing.T) {
 			gotSet := sets.New[string](gotNames...)
 			if !gotSet.HasAll(compatibleNames...) {
 				t.Errorf("Trees mismatch (non backward compatible): got=%v compat=%v", gotNames, compatibleNames)
+			}
+		})
+	}
+}
+
+func TestFindTreesHypershift(t *testing.T) {
+	pn1 := "test1"
+	pn2 := "test2"
+	pn3 := "test3"
+
+	testCases := []struct {
+		name string
+		ngs  []nropv1.NodeGroup
+	}{
+		{
+			name: "no-node-groups",
+		},
+		{
+			name: "ng1-mcp1",
+			ngs: []nropv1.NodeGroup{
+				{
+					PoolName: &pn1,
+				},
+				{
+					PoolName: &pn3,
+				},
+				{
+					PoolName: &pn2,
+				},
+			},
+		},
+	}
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FindTreesHypershift(tt.ngs)
+			gotNodeGroups := nodeGroupsFromTrees(got)
+
+			if !reflect.DeepEqual(tt.ngs, gotNodeGroups) {
+				t.Errorf("Trees mismatch: got=%+v expected=%+v", gotNodeGroups, tt.ngs)
 			}
 		})
 	}
@@ -425,6 +464,15 @@ func mcpNamesFromList(mcps []*mcov1.MachineConfigPool) []string {
 		result = append(result, mcp.Name)
 	}
 	return result
+}
+
+func nodeGroupsFromTrees(trees []Tree) []nropv1.NodeGroup {
+	var ngs []nropv1.NodeGroup
+	for _, tree := range trees {
+		ng := *tree.NodeGroup
+		ngs = append(ngs, ng)
+	}
+	return ngs
 }
 
 // old implementation acting as reference for comparisons

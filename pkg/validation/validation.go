@@ -22,6 +22,8 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
@@ -52,7 +54,13 @@ func MachineConfigPoolDuplicates(trees []nodegroupv1.Tree) error {
 }
 
 // NodeGroups validates the node groups for nil values and duplicates.
-func NodeGroups(nodeGroups []nropv1.NodeGroup) error {
+func NodeGroups(nodeGroups []nropv1.NodeGroup, platf platform.Platform) error {
+	if platf == platform.HyperShift {
+		if err := nodeGroupForHypershift(nodeGroups); err != nil {
+			return err
+		}
+	}
+
 	if err := nodeGroupPools(nodeGroups); err != nil {
 		return err
 	}
@@ -73,6 +81,18 @@ func NodeGroups(nodeGroups []nropv1.NodeGroup) error {
 		return err
 	}
 
+	return nil
+}
+
+func nodeGroupForHypershift(nodeGroups []nropv1.NodeGroup) error {
+	for idx, nodeGroup := range nodeGroups {
+		if nodeGroup.MachineConfigPoolSelector != nil {
+			return fmt.Errorf("node group %d specifies MachineConfigPoolSelector on Hypershift platform; Should specify PoolName only", idx)
+		}
+		if nodeGroup.PoolName == nil {
+			return fmt.Errorf("node group %d must specify PoolName on Hypershift platform", idx)
+		}
+	}
 	return nil
 }
 
