@@ -111,7 +111,7 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	}
 
 	result, condition, err := r.reconcileResource(ctx, instance)
-	if err := r.updateStatus(ctx, instance, condition, reasonFromError(err), messageFromError(err)); err != nil {
+	if err := r.updateStatus(ctx, instance, condition, status.ReasonFromError(err), status.MessageFromError(err)); err != nil {
 		klog.InfoS("Failed to update numaresourcesscheduler status", "Desired condition", condition, "error", err)
 	}
 

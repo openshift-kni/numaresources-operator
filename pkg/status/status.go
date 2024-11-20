@@ -17,12 +17,15 @@ limitations under the License.
 package status
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
 // TODO: are we duping these?
@@ -33,9 +36,24 @@ const (
 	ConditionUpgradeable = "Upgradeable"
 )
 
+// TODO: are we duping these?
+const (
+	ReasonAsExpected    = "AsExpected"
+	ReasonInternalError = "InternalError"
+)
+
 const (
 	ConditionTypeIncorrectNUMAResourcesOperatorResourceName = "IncorrectNUMAResourcesOperatorResourceName"
 )
+
+func IsUpdatedNUMAResourcesOperator(oldStatus, newStatus *nropv1.NUMAResourcesOperatorStatus) bool {
+	options := []cmp.Option{
+		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime"),
+		cmpopts.IgnoreFields(metav1.Condition{}, "ObservedGeneration"),
+	}
+
+	return !cmp.Equal(newStatus, oldStatus, options...)
+}
 
 // UpdateConditions compute new conditions based on arguments, and then compare with given current conditions.
 // Returns the conditions to use, either current or newly computed, and a boolean flag which is `true` if conditions need
@@ -118,4 +136,22 @@ type ErrResourcesNotReady struct {
 
 func (e ErrResourcesNotReady) Error() string {
 	return e.Message
+}
+
+func ReasonFromError(err error) string {
+	if err == nil {
+		return ReasonAsExpected
+	}
+	return ReasonInternalError
+}
+
+func MessageFromError(err error) string {
+	if err == nil {
+		return ""
+	}
+	unwErr := errors.Unwrap(err)
+	if unwErr == nil {
+		return err.Error()
+	}
+	return unwErr.Error()
 }

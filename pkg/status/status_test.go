@@ -18,7 +18,10 @@ package status
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"testing"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -76,5 +79,125 @@ func TestUpdateIfNeeded(t *testing.T) {
 	_, ok = UpdateConditions(nro.Status.Conditions, ConditionAvailable, "", "")
 	if ok {
 		t.Errorf("Update did change status, but it should not")
+	}
+}
+
+func TestIsUpdatedNUMAResourcesOperator(t *testing.T) {
+	type testCase struct {
+		name            string
+		oldStatus       *nropv1.NUMAResourcesOperatorStatus
+		updaterFunc     func(*nropv1.NUMAResourcesOperatorStatus)
+		expectedUpdated bool
+	}
+	testCases := []testCase{
+		{
+			name:            "zero status, no change",
+			oldStatus:       &nropv1.NUMAResourcesOperatorStatus{},
+			updaterFunc:     func(st *nropv1.NUMAResourcesOperatorStatus) {},
+			expectedUpdated: false,
+		},
+		{
+			name: "status, conditions, updated only time",
+			oldStatus: &nropv1.NUMAResourcesOperatorStatus{
+				Conditions: NewConditions(ConditionAvailable, "test all good", "testing info"),
+			},
+			updaterFunc: func(st *nropv1.NUMAResourcesOperatorStatus) {
+				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
+				st.Conditions = NewConditions(ConditionAvailable, "test all good", "testing info")
+			},
+			expectedUpdated: false,
+		},
+		{
+			name: "status, conditions, updated only time, other fields changed",
+			oldStatus: &nropv1.NUMAResourcesOperatorStatus{
+				Conditions: NewConditions(ConditionAvailable, "test all good", "testing info"),
+			},
+			updaterFunc: func(st *nropv1.NUMAResourcesOperatorStatus) {
+				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
+				st.Conditions = NewConditions(ConditionAvailable, "test all good", "testing info")
+				st.DaemonSets = []nropv1.NamespacedName{
+					{
+						Namespace: "foo",
+						Name:      "bar",
+					},
+				}
+			},
+			expectedUpdated: true,
+		},
+		{
+			name: "status, conditions, updated only time, other fields mutated",
+			oldStatus: &nropv1.NUMAResourcesOperatorStatus{
+				Conditions: NewConditions(ConditionAvailable, "test all good", "testing info"),
+				DaemonSets: []nropv1.NamespacedName{
+					{
+						Namespace: "foo",
+						Name:      "bar",
+					},
+				},
+			},
+			updaterFunc: func(st *nropv1.NUMAResourcesOperatorStatus) {
+				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
+				st.Conditions = NewConditions(ConditionAvailable, "test all good", "testing info")
+				st.DaemonSets = []nropv1.NamespacedName{
+					{
+						Namespace: "foo",
+						Name:      "zap",
+					},
+				}
+			},
+			expectedUpdated: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			oldStatus := tc.oldStatus.DeepCopy()
+			newStatus := tc.oldStatus.DeepCopy()
+			tc.updaterFunc(newStatus)
+			got := IsUpdatedNUMAResourcesOperator(oldStatus, newStatus)
+			if got != tc.expectedUpdated {
+				t.Errorf("isUpdated %v expected %v", got, tc.expectedUpdated)
+			}
+		})
+	}
+}
+
+func TestMessageFromError(t *testing.T) {
+	type testCase struct {
+		name     string
+		err      error
+		expected string
+	}
+
+	testCases := []testCase{
+		{
+			name:     "nil error",
+			expected: "",
+		},
+		{
+			name:     "simple error",
+			err:      errors.New("testing error with simple message"),
+			expected: "testing error with simple message",
+		},
+		{
+			name:     "simple formatted error",
+			err:      fmt.Errorf("testing error message=%s val=%d", "complex", 42),
+			expected: "testing error message=complex val=42",
+		},
+
+		{
+			name:     "wrapped error",
+			err:      fmt.Errorf("outer error: %w", errors.New("inner error")),
+			expected: "inner error",
+		},
+	}
+
+	for _, tcase := range testCases {
+		t.Run(tcase.name, func(t *testing.T) {
+			got := MessageFromError(tcase.err)
+			if got != tcase.expected {
+				t.Errorf("failure getting message from error: got=%q expected=%q", got, tcase.expected)
+			}
+		})
 	}
 }
