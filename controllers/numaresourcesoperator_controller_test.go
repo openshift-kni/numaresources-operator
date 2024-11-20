@@ -383,10 +383,9 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						}
 						ng1WithNodeSelector.PoolName = &pnNew
 						Eventually(func() error {
-							nroUpdated := &nropv1.NUMAResourcesOperator{}
-							Expect(reconciler.Client.Get(ctx, nroKey, nroUpdated))
-							nroUpdated.Spec.NodeGroups[0] = *ng1WithNodeSelector
-							return reconciler.Client.Update(context.TODO(), nroUpdated)
+							Expect(reconciler.Client.Get(ctx, nroKey, nro))
+							nro.Spec.NodeGroups[0] = *ng1WithNodeSelector
+							return reconciler.Client.Update(context.TODO(), nro)
 						}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
 						verifyDegradedCondition(nro, validation.NodeGroupsError, platf)
 					})
