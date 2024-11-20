@@ -301,7 +301,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 			By("checking there are no leftovers")
 			// by taking the ns from the ds we're avoiding the need to figure out in advanced
 			// at which ns we should look for the resources
-			mf, err := rte.GetManifests(configuration.Plat, configuration.PlatVersion, ds.Namespace, true, true)
+			mf, err := rte.GetManifests(configuration.Plat, configuration.PlatVersion, ds.Namespace, true, annotations.IsCustomPolicyEnabled(nroObj.Annotations))
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() bool {
