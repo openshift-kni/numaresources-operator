@@ -31,7 +31,6 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 )
 
 func NewNUMAResourcesOperator(name string, nodeGroups ...nropv1.NodeGroup) *nropv1.NUMAResourcesOperator {
@@ -57,10 +56,6 @@ func NewNUMAResourcesOperatorWithNodeGroupConfig(name string, selector *metav1.L
 		},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
-			// add the custom policy to keep the existing test's behavior consistent
-			Annotations: map[string]string{
-				annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
-			},
 		},
 		Spec: nropv1.NUMAResourcesOperatorSpec{
 			NodeGroups: []nropv1.NodeGroup{
