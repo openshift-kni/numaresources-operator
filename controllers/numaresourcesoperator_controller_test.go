@@ -133,7 +133,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		})
 	})
 
-	Context("without available machine config pools", func() {
+	Context("[openshift] without available machine config pools", func() {
 		It("should update the CR condition to degraded when MachineConfigPoolSelector is set", func() {
 			ng := nropv1.NodeGroup{
 				MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"test": "test"}},
@@ -151,7 +151,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		})
 	})
 
-	Context("with two node groups each with different pool specifier type and both point to same MCP", func() {
+	Context("[openshift] with two node groups each with different pool specifier type and both point to same MCP", func() {
 		It("should update the CR condition to degraded", func() {
 			mcpName := "test1"
 			label1 := map[string]string{
@@ -213,7 +213,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(degradedCondition.Reason).To(Equal(validation.NodeGroupsError))
 		})
 
-		It("should update the CR condition to degraded - MachineConfigSelector", func() {
+		It("[openshift] should update the CR condition to degraded - MachineConfigSelector", func() {
 			mcpName := "test1"
 			label := map[string]string{
 				"test1": "test1",
@@ -250,7 +250,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		})
 	})
 
-	Context("with node group with MCP selector that matches more than one MCP", func() {
+	Context("[openshift] with node group with MCP selector that matches more than one MCP", func() {
 		It("should update the CR condition to degraded when annotation is not enabled but still create all needed objects", func() {
 			mcpName1 := "test1"
 			label1 := map[string]string{
@@ -401,7 +401,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 	})
 
 	Context("with correct NRO and SELinuxPolicyConfigAnnotation not set", func() {
-		It("should create all objects, RTE daemonsets and MCPs will get updated from the first reconcile iteration - MachineConfigPoolSelector", func() {
+		It("[openshift] should create all objects, RTE daemonsets and MCPs will get updated from the first reconcile iteration - MachineConfigPoolSelector", func() {
 			mcpName := "test1"
 			label := map[string]string{
 				"test": "test",
@@ -575,7 +575,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			}
 			Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).To(Succeed())
 		})
-		When("NRO updated to remove the custom policy annotation", func() {
+		When("[openshift] NRO updated to remove the custom policy annotation", func() {
 			BeforeEach(func() {
 				// check we have at least two NodeGroups
 				Expect(len(nro.Spec.NodeGroups)).To(BeNumerically(">", 1))
@@ -650,7 +650,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				}
 				Expect(reconciler.Client.Get(context.TODO(), ds2Key, ds)).To(HaveOccurred(), "error: Daemonset %v should have been deleted", ds2Key)
 			})
-			It("should delete also the corresponding Machineconfig", func() {
+			It("[openshift] should delete also the corresponding Machineconfig", func() {
 
 				mc := &machineconfigv1.MachineConfig{}
 
@@ -879,7 +879,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		})
 	})
 
-	Context("with correct NRO CR", func() {
+	Context("[openshift] with correct NRO CR- test MCP selector labels", func() {
 		var nro *nropv1.NUMAResourcesOperator
 		var mcp1 *machineconfigv1.MachineConfigPool
 		var mcp2 *machineconfigv1.MachineConfigPool
@@ -1739,7 +1739,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(nroUpdated.Status.NodeGroups[0].Config.Tolerations).To(BeNil(), "node group config was not updated under NodeGroupStatus field")
 		})
 	})
-	Context("emulating upgrade from 4.1X to 4.18 which has a built-in selinux policy for RTE pods", func() {
+	Context("[openshift] emulating upgrade from 4.1X to 4.18 which has a built-in selinux policy for RTE pods", func() {
 		var nro *nropv1.NUMAResourcesOperator
 		var mcp1 *machineconfigv1.MachineConfigPool
 		var mcp2 *machineconfigv1.MachineConfigPool
