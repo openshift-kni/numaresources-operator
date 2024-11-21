@@ -162,6 +162,46 @@ func TestIsUpdatedNUMAResourcesOperator(t *testing.T) {
 	}
 }
 
+func TestReasonFromError(t *testing.T) {
+	type testCase struct {
+		name     string
+		err      error
+		expected string
+	}
+
+	testCases := []testCase{
+		{
+			name:     "nil error",
+			expected: ReasonAsExpected,
+		},
+		{
+			name:     "simple error",
+			err:      errors.New("testing error with simple message"),
+			expected: ReasonInternalError,
+		},
+		{
+			name:     "simple formatted error",
+			err:      fmt.Errorf("testing error message=%s val=%d", "complex", 42),
+			expected: ReasonInternalError,
+		},
+
+		{
+			name:     "wrapped error",
+			err:      fmt.Errorf("outer error: %w", errors.New("inner error")),
+			expected: ReasonInternalError,
+		},
+	}
+
+	for _, tcase := range testCases {
+		t.Run(tcase.name, func(t *testing.T) {
+			got := ReasonFromError(tcase.err)
+			if got != tcase.expected {
+				t.Errorf("failure getting reason from error: got=%q expected=%q", got, tcase.expected)
+			}
+		})
+	}
+}
+
 func TestMessageFromError(t *testing.T) {
 	type testCase struct {
 		name     string
