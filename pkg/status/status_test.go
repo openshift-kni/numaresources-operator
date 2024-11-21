@@ -33,6 +33,45 @@ import (
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
+func TestFindCondition(t *testing.T) {
+	type testCase struct {
+		name          string
+		desired       string
+		conds         []metav1.Condition
+		expectedFound bool
+	}
+
+	testCases := []testCase{
+		{
+			name:          "nil conditions",
+			desired:       ConditionAvailable,
+			expectedFound: false,
+		},
+		{
+			name:          "missing condition",
+			desired:       "foobar",
+			conds:         newBaseConditions(),
+			expectedFound: false,
+		},
+		{
+			name:          "found condition",
+			desired:       ConditionProgressing,
+			conds:         newBaseConditions(),
+			expectedFound: true,
+		},
+	}
+
+	for _, tcase := range testCases {
+		t.Run(tcase.name, func(t *testing.T) {
+			cond := FindCondition(tcase.conds, tcase.desired)
+			found := (cond != nil)
+			if found != tcase.expectedFound {
+				t.Errorf("failure looking for condition %q: got=%v expected=%v", tcase.desired, found, tcase.expectedFound)
+			}
+		})
+	}
+}
+
 func TestUpdate(t *testing.T) {
 	err := nropv1.AddToScheme(scheme.Scheme)
 	if err != nil {
