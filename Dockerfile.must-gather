@@ -1,16 +1,4 @@
-FROM quay.io/openshift/origin-must-gather:4.18.0 AS builder
-
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
-RUN microdnf install -y procps-ng tar rsync
-RUN microdnf clean all
-
-# Copy must-gather required binaries
-COPY --from=builder /usr/bin/openshift-must-gather /usr/bin/openshift-must-gather
-COPY --from=builder /usr/bin/oc /usr/bin/oc
-
-# Save original gather script
-COPY --from=builder /usr/bin/gather* /usr/bin/
-RUN mv /usr/bin/gather /usr/bin/gather_original
+FROM quay.io/openshift/origin-cli:4.18
 
 COPY must-gather/collection-scripts/* /usr/bin/
 
