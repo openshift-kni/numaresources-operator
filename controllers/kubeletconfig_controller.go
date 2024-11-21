@@ -20,10 +20,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
@@ -66,6 +68,9 @@ type KubeletConfigReconciler struct {
 	Recorder  record.EventRecorder
 	Namespace string
 	Platform  platform.Platform
+	// garbageCollectionFor is a list of objects
+	// that their dependent needs to be removed from the cluster.
+	garbageCollectionFor []*corev1.ConfigMap
 }
 
 type kubeletConfigHandler struct {
@@ -140,6 +145,15 @@ func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager, clusterPlat
 			_, ok := kubelet.Labels[HypershiftKubeletConfigConfigMapLabel]
 			return ok
 		})
+		p.DeleteFunc = func(e event.DeleteEvent) bool {
+			kubelet := e.Object.(*corev1.ConfigMap)
+			if _, ok := kubelet.Labels[HypershiftKubeletConfigConfigMapLabel]; !ok {
+				return false
+			}
+			klog.InfoS("KubeletConfig ConfigMap object got deleted", "KubeletConfig", kubelet.Name)
+			r.garbageCollectionFor = append(r.garbageCollectionFor, kubelet)
+			return true
+		}
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(o, builder.WithPredicates(p)).
@@ -161,6 +175,13 @@ func (e *InvalidKubeletConfig) Unwrap() error {
 }
 
 func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*corev1.ConfigMap, error) {
+	// first check if the ConfigMap should be deleted
+	// to save all the additional work related for create/update
+	cm, deleted, err := r.deleteConfigMap(ctx, instance, kcKey)
+	if deleted {
+		return cm, err
+	}
+
 	kcHandler, err := r.makeKCHandlerForPlatform(ctx, instance, kcKey)
 	if err != nil {
 		return nil, err
@@ -273,6 +294,50 @@ func (r *KubeletConfigReconciler) makeKCHandlerForPlatform(ctx context.Context, 
 		}, nil
 	}
 	return nil, fmt.Errorf("unsupported platform: %s", r.Platform)
+}
+
+func (r *KubeletConfigReconciler) deleteConfigMap(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*corev1.ConfigMap, bool, error) {
+	cm := getDeletedOwner(kcKey, r.garbageCollectionFor)
+	if cm == nil {
+		return nil, false, nil
+	}
+	// we'll get to this flow only on hypershift
+	// on openshift the deletion is done automatically by setting the owner reference on the dependent ConfigMap
+	nodePoolName := cm.Labels[HyperShiftNodePoolLabel]
+	generatedName := objectnames.GetComponentName(instance.Name, nodePoolName)
+	dependentCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      generatedName,
+			Namespace: r.Namespace,
+		},
+	}
+	if err := r.Delete(ctx, dependentCM); err != nil {
+		if !apierrors.IsNotFound(err) {
+			return cm, true, err
+		}
+		klog.V(2).InfoS("could not delete ConfigMap since it was not found", "configmapName", dependentCM.Name)
+	}
+	r.garbageCollectionFor = removeDeletedOwner(kcKey, r.garbageCollectionFor)
+	return cm, true, nil
+}
+
+func getDeletedOwner(kcKey client.ObjectKey, ownerConfigMaps []*corev1.ConfigMap) *corev1.ConfigMap {
+	for i := range ownerConfigMaps {
+		cm := ownerConfigMaps[i]
+		if client.ObjectKeyFromObject(cm).String() == kcKey.String() {
+			return cm
+		}
+	}
+	return nil
+}
+
+func removeDeletedOwner(kcKey client.ObjectKey, ownerConfigMaps []*corev1.ConfigMap) []*corev1.ConfigMap {
+	for i := range ownerConfigMaps {
+		if client.ObjectKeyFromObject(ownerConfigMaps[i]) == kcKey {
+			return slices.Delete(ownerConfigMaps, i, i+1)
+		}
+	}
+	return ownerConfigMaps
 }
 
 func podExcludesListToMap(podExcludes []nropv1.NamespacedName) map[string]string {
