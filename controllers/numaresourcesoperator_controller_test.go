@@ -121,6 +121,17 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			})
 		})
 
+		Context("with PoolName set to empty string", func() {
+			It("should update the CR condition to degraded", func() {
+				pn := ""
+				ng := nropv1.NodeGroup{
+					PoolName: &pn,
+				}
+				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
+				verifyDegradedCondition(nro, validation.NodeGroupsError, platf)
+			})
+		})
+
 		Context("with NRO mutiple pool specifiers set on same node group", func() {
 			It("should update the CR condition to degraded", func() {
 				pn := "test"
