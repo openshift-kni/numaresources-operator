@@ -186,6 +186,70 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		})
 	})
 
+	Context("with two node groups while both point to same pool using same pool specifier", func() {
+		It("should update the CR condition to degraded - PoolName", func() {
+			poolName := "test"
+
+			ng1 := nropv1.NodeGroup{
+				PoolName: &poolName,
+			}
+			ng2 := nropv1.NodeGroup{
+				PoolName: &poolName,
+			}
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
+
+			var err error
+			reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro)
+			Expect(err).ToNot(HaveOccurred())
+
+			key := client.ObjectKeyFromObject(nro)
+			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(reconcile.Result{}))
+
+			Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
+			degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
+			Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+			Expect(degradedCondition.Reason).To(Equal(validation.NodeGroupsError))
+		})
+
+		It("should update the CR condition to degraded - MachineConfigSelector", func() {
+			mcpName := "test1"
+			label := map[string]string{
+				"test1": "test1",
+				"test2": "test2",
+			}
+
+			ng1 := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"test1": "test1"},
+				},
+			}
+			ng2 := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{"test2": "test2"},
+				},
+			}
+
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
+			mcp := testobjs.NewMachineConfigPool(mcpName, label, &metav1.LabelSelector{MatchLabels: label}, &metav1.LabelSelector{MatchLabels: label})
+
+			var err error
+			reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
+			Expect(err).ToNot(HaveOccurred())
+
+			key := client.ObjectKeyFromObject(nro)
+			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(reconcile.Result{}))
+
+			Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
+			degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
+			Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+			Expect(degradedCondition.Reason).To(Equal(validation.NodeGroupsError))
+		})
+	})
+
 	Context("with node group with MCP selector that matches more than one MCP", func() {
 		It("should update the CR condition to degraded when annotation is not enabled but still create all needed objects", func() {
 			mcpName1 := "test1"
@@ -337,7 +401,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 	})
 
 	Context("with correct NRO and SELinuxPolicyConfigAnnotation not set", func() {
-		It("should create all objects, RTE daemonsets and MCPs will get updated from the first reconcile iteration", func() {
+		It("should create all objects, RTE daemonsets and MCPs will get updated from the first reconcile iteration - MachineConfigPoolSelector", func() {
 			mcpName := "test1"
 			label := map[string]string{
 				"test": "test",
@@ -374,6 +438,44 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			}
 			ds := &appsv1.DaemonSet{}
 			Expect(reconciler.Client.Get(context.TODO(), mcp1DSKey, ds)).ToNot(HaveOccurred())
+
+			Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
+			availableCondition := getConditionByType(nro.Status.Conditions, status.ConditionAvailable)
+			Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
+		})
+		It("should create all objects including RTE daemonsets and update the status from the first reconcile iteration - PoolName ", func() {
+			poolName := "test"
+			ng1 := nropv1.NodeGroup{
+				PoolName: &poolName,
+			}
+			nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1)
+
+			label := map[string]string{
+				"test": "test",
+			}
+			mcp := testobjs.NewMachineConfigPool(poolName, label, &metav1.LabelSelector{MatchLabels: label}, &metav1.LabelSelector{MatchLabels: label})
+			reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
+
+			Expect(err).ToNot(HaveOccurred())
+
+			key := client.ObjectKeyFromObject(nro)
+			// when the SELinux custom annotation is not set by default on hypershift, the controller will not wait for
+			// the selinux update on the nodes hence no need to reconcile again.
+			firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(firstLoopResult).To(Equal(reconcile.Result{}))
+
+			// all objects should be created from the first reconciliation
+			// TODO add CRDs check
+			// TODO add OCP check oc MCP status
+
+			By("Check DaemonSet is created")
+			dsKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, poolName),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
 			Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
 			availableCondition := getConditionByType(nro.Status.Conditions, status.ConditionAvailable)
