@@ -1005,7 +1005,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 	)
 
 	Describe("Openshift only", func() {
-		Context("[openshift] without available machine config pools", func() {
+		Context("[openshift] without available machine config pools", Label("platform:openshift"), func() {
 			It("should update the CR condition to degraded when MachineConfigPoolSelector is set", func() {
 				ng := nropv1.NodeGroup{
 					MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"test": "test"}},
@@ -1023,7 +1023,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			})
 		})
 
-		Context("[openshift] with two node groups each with different pool specifier type and both point to same MCP", func() {
+		Context("[openshift] with two node groups each with different pool specifier type and both point to same MCP", Label("platform:openshift"), func() {
 			It("should update the CR condition to degraded", func() {
 				mcpName := "test1"
 				label1 := map[string]string{
@@ -1058,7 +1058,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			})
 		})
 
-		Context("[openshift] with node group with MCP selector that matches more than one MCP", func() {
+		Context("[openshift] with node group with MCP selector that matches more than one MCP", Label("platform:openshift"), func() {
 			It("should update the CR condition to degraded when annotation is not enabled but still create all needed objects", func() {
 				mcpName1 := "test1"
 				label1 := map[string]string{
@@ -1208,7 +1208,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			})
 		})
 
-		Context("[openshift] with two node groups while both point to same pool using same pool specifier", func() {
+		Context("[openshift] with two node groups while both point to same pool using same pool specifier", Label("platform:openshift"), func() {
 			It("should update the CR condition to degraded - MachineConfigSelector", func() {
 				mcpName := "test1"
 				label := map[string]string{
@@ -1246,7 +1246,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			})
 		})
 
-		Context("[openshift] with correct NRO CR", func() {
+		Context("[openshift] with correct NRO CR", Label("platform:openshift"), func() {
 			var nro *nropv1.NUMAResourcesOperator
 			var mcp1 *machineconfigv1.MachineConfigPool
 			var mcp2 *machineconfigv1.MachineConfigPool
@@ -1756,7 +1756,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 		})
 
-		Context("[openshift] emulating upgrade from 4.1X to 4.18 which has a built-in selinux policy for RTE pods", func() {
+		Context("[openshift] emulating upgrade from 4.1X to 4.18 which has a built-in selinux policy for RTE pods", Label("platform:openshift"), func() {
 			var nro *nropv1.NUMAResourcesOperator
 			var mcp1 *machineconfigv1.MachineConfigPool
 			var mcp2 *machineconfigv1.MachineConfigPool
