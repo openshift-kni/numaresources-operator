@@ -222,6 +222,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})
 					Expect(err).ToNot(HaveOccurred())
 					Expect(result).To(Equal(reconcile.Result{}))
+
+					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nro)).ToNot(HaveOccurred())
+
+					availableCondition := getConditionByType(nro.Status.Conditions, status.ConditionAvailable)
+					Expect(availableCondition).ToNot(BeNil())
+					Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
 				})
 
 				It("should create all CRDs and objects and operator status are updated from the first reconcile iteration", func() {
