@@ -17,40 +17,73 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
-	"net/http"
 	"os"
 	"strconv"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/klog/v2"
+	ctrlmetricssrv "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 const (
-	prometheusDefaultPort      = 2112
-	prometheusDefaultIPAddress = "0.0.0.0"
+	PortDefault    = 2112
+	AddressDefault = "0.0.0.0"
+
+	TLSRootDir = "/etc/secrets/rte"
+
+	TLSCert = "tls.crt"
+	TLSKey  = "tls.key"
 )
 
-type Config struct {
-	IPAddress  string
-	Port       int
-	Registerer prometheus.Registerer
-	Gatherer   prometheus.Gatherer
-}
+const (
+	ServingDefault  = ServingDisabled
+	ServingDisabled = "disabled"
+	ServingHTTP     = "http" // plaintext
+	ServingHTTPTLS  = "httptls"
+)
 
-func NewDefaultConfig() Config {
-	return Config{
-		IPAddress:  prometheusDefaultIPAddress,
-		Port:       prometheusDefaultPort,
-		Registerer: prometheus.DefaultRegisterer,
-		Gatherer:   prometheus.DefaultGatherer,
+func NewDefaultTLSConfig() TLSConfig {
+	return TLSConfig{
+		CertsDir: TLSRootDir,
+		CertFile: TLSCert,
+		KeyFile:  TLSKey,
 	}
 }
 
-func (conf Config) Address() string {
-	return fmt.Sprintf("%s:%d", conf.IPAddress, conf.Port)
+type TLSConfig struct {
+	CertsDir    string `json:"certsDir,omitempty"`
+	CertFile    string `json:"certFile,omitempty"`
+	KeyFile     string `json:"keyFile,omitempty"`
+	WantCliAuth bool   `json:"wantCliAuth,omitempty"`
+}
+
+type Config struct {
+	IP   string
+	Port int
+	TLS  TLSConfig
+}
+
+func NewConfig(ip string, port int, tlsConf TLSConfig) Config {
+	return Config{
+		IP:   ip,
+		Port: port,
+		TLS:  tlsConf,
+	}
+}
+
+func NewDefaultConfig() Config {
+	return NewConfig(AddressDefault, PortDefault, NewDefaultTLSConfig())
+}
+
+func (conf TLSConfig) Clone() TLSConfig {
+	return TLSConfig{
+		CertsDir: conf.CertsDir,
+		CertFile: conf.CertFile,
+		KeyFile:  conf.KeyFile,
+	}
 }
 
 func (conf Config) Validate() error {
@@ -60,10 +93,9 @@ func (conf Config) Validate() error {
 	return nil
 }
 
-const (
-	ServingDisabled = "disabled"
-	ServingHTTP     = "http" // plaintext
-)
+func (conf Config) BindAddress() string {
+	return fmt.Sprintf("%s:%d", conf.IP, conf.Port)
+}
 
 func ServingModeIsSupported(value string) (string, error) {
 	val := strings.ToLower(value)
@@ -71,6 +103,8 @@ func ServingModeIsSupported(value string) (string, error) {
 	case ServingDisabled:
 		return val, nil
 	case ServingHTTP:
+		return val, nil
+	case ServingHTTPTLS:
 		return val, nil
 	default:
 		return val, fmt.Errorf("unsupported method  %q", value)
@@ -81,8 +115,30 @@ func ServingModeSupported() string {
 	modes := []string{
 		ServingDisabled,
 		ServingHTTP,
+		ServingHTTPTLS,
 	}
 	return strings.Join(modes, ",")
+}
+
+func PortFromEnv() int {
+	envValue, ok := os.LookupEnv("METRICS_PORT")
+	if !ok {
+		return 0
+	}
+	port, err := strconv.Atoi(envValue)
+	if err != nil {
+		klog.Warningf("the env variable METRICS_PORT has inccorrect value %q: %v", envValue, err)
+		return 0
+	}
+	return port
+}
+
+func AddressFromEnv() string {
+	ip, ok := os.LookupEnv("METRICS_ADDRESS")
+	if !ok {
+		return ""
+	}
+	return ip
 }
 
 func Setup(mode string, conf Config) error {
@@ -91,46 +147,55 @@ func Setup(mode string, conf Config) error {
 		return nil
 	}
 
-	if envValue, ok := os.LookupEnv("METRICS_PORT"); ok {
-		if _, err := strconv.Atoi(envValue); err != nil {
-			return fmt.Errorf("the env variable PROMETHEUS_PORT has inccorrect value %q: %w", envValue, err)
-		}
-		port, err := strconv.Atoi(envValue)
-		if err != nil {
-			return err
-		}
-
-		klog.V(2).InfoS("overriding metrics port", "from", conf.Port, "to", port)
-		conf.Port = port
-	}
-
-	if ip, ok := os.LookupEnv("METRICS_ADDRESS"); ok {
-		klog.V(2).InfoS("overriding metrics address", "from", conf.IPAddress, "to", ip)
-		conf.IPAddress = ip
-	}
-
 	if err := conf.Validate(); err != nil {
 		return err
 	}
 
-	if mode == ServingHTTP {
-		return SetupHTTP(conf)
+	var secureServing bool
+	switch mode {
+	case ServingHTTP:
+		secureServing = false
+	case ServingHTTPTLS:
+		secureServing = true
+	default:
+		return fmt.Errorf("unknown mode: %v", mode)
 	}
 
-	return fmt.Errorf("unknown mode: %v", mode)
-}
+	opts := ctrlmetricssrv.Options{
+		SecureServing: secureServing,
+		BindAddress:   conf.BindAddress(),
+		CertDir:       conf.TLS.CertsDir,
+		CertName:      conf.TLS.CertFile,
+		KeyName:       conf.TLS.KeyFile,
+		TLSOpts: []func(*tls.Config){
+			WithClientAuth(conf.TLS.WantCliAuth),
+		},
+	}
+	srv, err := ctrlmetricssrv.NewServer(opts, nil, nil)
+	if err != nil {
+		return fmt.Errorf("failed to build server with port %d: %w", conf.Port, err)
+	}
 
-func SetupHTTP(conf Config) error {
-	http.Handle("/metrics", promhttp.InstrumentMetricHandler(
-		conf.Registerer, promhttp.HandlerFor(conf.Gatherer, promhttp.HandlerOpts{}),
-	))
+	ctx := context.Background()
 
 	go func() {
-		err := http.ListenAndServe(conf.Address(), nil)
+		err := srv.Start(ctx)
 		if err != nil {
-			klog.Fatalf("failed to run prometheus server; %v", err)
+			klog.ErrorS(err, "error starting the controller-runtime metrics server", "config", conf, "options", opts)
 		}
 	}()
 
 	return nil
+}
+
+func WithClientAuth(cliAuth bool) func(tlscfg *tls.Config) {
+	return func(tlscfg *tls.Config) {
+		if !cliAuth {
+			tlscfg.ClientAuth = tls.NoClientCert
+			klog.InfoS("metrics server configuration", "client authentication", "disabled")
+			return
+		}
+		tlscfg.ClientAuth = tls.RequireAndVerifyClientCert
+		klog.InfoS("metrics server configuration", "client authentication", "enabled")
+	}
 }
