@@ -11,13 +11,17 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
+	"k8s.io/klog/v2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/nodepools"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/hypershift"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
@@ -91,6 +95,26 @@ func (h *HyperShiftNRO) Teardown(ctx context.Context, timeout time.Duration) {
 		Expect(wait.ForConfigToBeReady(ctx, e2eclient.MNGClient, np.Name, np.Namespace)).To(Succeed())
 
 		Expect(e2eclient.MNGClient.Delete(ctx, h.KcConfigMapObj)).To(Succeed())
+
+		By("checking that generated configmap has been deleted")
+		Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(h.NroObj), h.NroObj))
+		Expect(h.NroObj.Status.DaemonSets).ToNot(BeEmpty())
+		cm := &corev1.ConfigMap{}
+		key := client.ObjectKey{
+			Name:      objectnames.GetComponentName(h.NroObj.Name, np.Name),
+			Namespace: h.NroObj.Status.DaemonSets[0].Namespace,
+		}
+		Eventually(func() bool {
+			if err := e2eclient.Client.Get(context.TODO(), key, cm); !errors.IsNotFound(err) {
+				if err == nil {
+					klog.Warningf("configmap %s still exists", key.String())
+				} else {
+					klog.Warningf("configmap %s return with error: %v", key.String(), err)
+				}
+				return false
+			}
+			return true
+		}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
 	}
 	Expect(e2eclient.Client.Delete(ctx, h.NroObj)).To(Succeed())
 }
