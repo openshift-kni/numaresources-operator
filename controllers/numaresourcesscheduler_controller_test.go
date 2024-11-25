@@ -41,6 +41,7 @@ import (
 	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
+	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
@@ -85,7 +86,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 	ginkgo.Context("with unexpected NRS CR name", func() {
 		ginkgo.It("should updated the CR condition to degraded", func() {
 			nrs := testobjs.NewNUMAResourcesScheduler("test", "some/url:latest", testSchedulerName, 9*time.Second)
-			verifyDegradedCondition(nrs, conditionTypeIncorrectNUMAResourcesSchedulerResourceName)
+			verifyDegradedCondition(nrs, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName)
 		})
 	})
 
@@ -221,7 +222,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			dp := &appsv1.Deployment{}
 			gomega.Expect(reconciler.Client.Get(context.TODO(), key, dp)).ToNot(gomega.HaveOccurred())
 
-			gomega.Expect(dp.Spec.Template.Spec.PriorityClassName).To(gomega.BeEquivalentTo(schedulerPriorityClassName))
+			gomega.Expect(dp.Spec.Template.Spec.PriorityClassName).To(gomega.BeEquivalentTo(nrosched.SchedulerPriorityClassName))
 		})
 
 		ginkgo.It("should have a config hash annotation under deployment", func() {
@@ -434,7 +435,6 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, depmanifests.CacheInformerDedicated)
-
 		})
 
 		ginkgo.It("should allow to change the informerMode to Shared", func() {
@@ -454,7 +454,6 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, depmanifests.CacheInformerShared)
-
 		})
 
 		ginkgo.It("should allow to change the informerMode to Dedicated", func() {
@@ -474,7 +473,6 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, depmanifests.CacheInformerDedicated)
-
 		})
 
 		ginkgo.It("should configure by default the ScoringStrategy to be LeastAllocated", func() {
@@ -504,7 +502,6 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			resources := []depmanifests.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
 			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyLeastAllocated, resources)
-
 		})
 
 		ginkgo.It("should allow to change the ScoringStrategy to BalancedAllocation", func() {
@@ -524,7 +521,6 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			var resources []depmanifests.ResourceSpecParams
 			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyBalancedAllocation, resources)
-
 		})
 
 		ginkgo.It("should allow to change the ScoringStrategy to MostAllocated", func() {
@@ -544,7 +540,6 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			var resources []depmanifests.ResourceSpecParams
 			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyMostAllocated, resources)
-
 		})
 
 		ginkgo.It("should allow to change the ScoringStrategy to BalancedAllocation with resources", func() {
@@ -566,7 +561,6 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			resources := []depmanifests.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
 			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyBalancedAllocation, resources)
-
 		})
 
 		ginkgo.It("should allow to change the ScoringStrategy to MostAllocated with resources", func() {
@@ -588,8 +582,29 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			resources := []depmanifests.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
 			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyMostAllocated, resources)
-
 		})
+
+		ginkgo.It("should set the leader election resource parameters by default", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			expectLeaderElectParams(reconciler.Client, false, testNamespace, nrosched.LeaderElectionResourceName)
+		})
+
+		ginkgo.DescribeTable("should set the leader election resource parameters depending on replica count", func(replicas int32, expectedEnabled bool) {
+			nrs := nrs.DeepCopy()
+			nrs.Spec.Replicas = &replicas
+			gomega.Eventually(reconciler.Client.Update(context.TODO(), nrs)).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(gomega.Succeed())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			expectLeaderElectParams(reconciler.Client, expectedEnabled, testNamespace, nrosched.LeaderElectionResourceName)
+		},
+			ginkgo.Entry("replicas=0", int32(0), false),
+			ginkgo.Entry("replicas=1", int32(1), false),
+			ginkgo.Entry("replicas=3", int32(3), true),
+		)
 	})
 })
 
@@ -657,4 +672,26 @@ func expectScoringStrategyParams(cli client.Client, ScoringStrategyType string, 
 
 	gomega.Expect(cfg.ScoringStrategy.Type).To(gomega.Equal(ScoringStrategyType))
 	gomega.Expect(cfg.ScoringStrategy.Resources).To(gomega.Equal(resources))
+}
+
+func expectLeaderElectParams(cli client.Client, enabled bool, resourceNamespace, resourceName string) {
+	ginkgo.GinkgoHelper()
+
+	key := client.ObjectKey{
+		Name:      "topo-aware-scheduler-config",
+		Namespace: testNamespace,
+	}
+
+	cm := corev1.ConfigMap{}
+	gomega.Expect(cli.Get(context.TODO(), key, &cm)).To(gomega.Succeed())
+
+	confRaw := cm.Data[sched.SchedulerConfigFileName]
+	cfgs, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(confRaw))
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+	gomega.Expect(cfgs).To(gomega.HaveLen(1), "unexpected config params count: %d", len(cfgs))
+	cfg := cfgs[0]
+
+	gomega.Expect(cfg.LeaderElection.LeaderElect).To(gomega.Equal(enabled))
+	gomega.Expect(cfg.LeaderElection.ResourceNamespace).To(gomega.Equal(resourceNamespace))
+	gomega.Expect(cfg.LeaderElection.ResourceName).To(gomega.Equal(resourceName))
 }

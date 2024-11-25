@@ -47,20 +47,12 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
+	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
-)
-
-const (
-	leaderElectionResourceName = "numa-scheduler-leader"
-	schedulerPriorityClassName = "system-node-critical"
-)
-
-const (
-	conditionTypeIncorrectNUMAResourcesSchedulerResourceName = "IncorrectNUMAResourcesSchedulerResourceName"
 )
 
 // NUMAResourcesSchedulerReconciler reconciles a NUMAResourcesScheduler object
@@ -109,7 +101,7 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 
 	if req.Name != objectnames.DefaultNUMAResourcesSchedulerCrName {
 		message := fmt.Sprintf("incorrect NUMAResourcesScheduler resource name: %s", instance.Name)
-		return ctrl.Result{}, r.updateStatus(ctx, instance, status.ConditionDegraded, conditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
+		return ctrl.Result{}, r.updateStatus(ctx, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
 	}
 
 	result, condition, err := r.reconcileResource(ctx, instance)
@@ -219,7 +211,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	// should set a degraded state
 
 	// node-critical so the pod won't be preempted by pods having the most critical priority class
-	r.SchedulerManifests.Deployment.Spec.Template.Spec.PriorityClassName = schedulerPriorityClassName
+	r.SchedulerManifests.Deployment.Spec.Template.Spec.PriorityClassName = nrosched.SchedulerPriorityClassName
 
 	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, schedSpec.SchedulerImage)
 	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
@@ -230,7 +222,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 
 	schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec)
 
-	k8swgrbacupdate.RoleForLeaderElection(r.SchedulerManifests.Role, r.Namespace, leaderElectionResourceName)
+	k8swgrbacupdate.RoleForLeaderElection(r.SchedulerManifests.Role, r.Namespace, nrosched.LeaderElectionResourceName)
 
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
 	for _, objState := range existing.State(r.SchedulerManifests) {
@@ -268,6 +260,10 @@ func unpackAPIResyncPeriod(reconcilePeriod *metav1.Duration) time.Duration {
 
 func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cacheResyncPeriod time.Duration, namespace string) k8swgmanifests.ConfigParams {
 	resyncPeriod := int64(cacheResyncPeriod.Seconds())
+	// if no actual replicas are required, leader election is unnecessary, so
+	// we force it to off to reduce the background noise.
+	// note: the api validation/normalization layer must ensure this value is != nil
+	leaderElect := (*schedSpec.Replicas > 1)
 
 	params := k8swgmanifests.ConfigParams{
 		ProfileName: schedSpec.SchedulerName,
@@ -275,15 +271,17 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 			ResyncPeriodSeconds: &resyncPeriod,
 		},
 		ScoringStrategy: &k8swgmanifests.ScoringStrategyParams{},
+		LeaderElection: &k8swgmanifests.LeaderElectionParams{
+			// Make sure to always set explicitly the value and override the configmap defaults.
+			LeaderElect: leaderElect,
+			// unconditionally set those to make sure
+			// to play nice with the cluster and the main scheduler
+			ResourceNamespace: namespace,
+			ResourceName:      nrosched.LeaderElectionResourceName,
+		},
 	}
 
-	if schedSpec.Replicas != nil && *schedSpec.Replicas > 1 {
-		params.LeaderElection = &k8swgmanifests.LeaderElectionParams{
-			LeaderElect:       true,
-			ResourceNamespace: namespace,
-			ResourceName:      leaderElectionResourceName,
-		}
-	}
+	klog.V(2).InfoS("setting leader election parameters", dumpLeaderElectionParams(params.LeaderElection)...)
 
 	var foreignPodsDetect string
 	var resyncMethod string = k8swgmanifests.CacheResyncAutodetect
@@ -321,7 +319,7 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 	params.Cache.ResyncMethod = &resyncMethod
 	params.Cache.ForeignPodsDetectMode = &foreignPodsDetect
 	params.Cache.InformerMode = &informerMode
-	klog.InfoS("setting cache parameters", dumpConfigCacheParams(params.Cache)...)
+	klog.V(2).InfoS("setting cache parameters", dumpConfigCacheParams(params.Cache)...)
 
 	return params
 }
@@ -332,6 +330,14 @@ func dumpConfigCacheParams(ccp *k8swgmanifests.ConfigCacheParams) []interface{} 
 		"resyncMethod", strStringPtr(ccp.ResyncMethod),
 		"foreignPodsDetectMode", strStringPtr(ccp.ForeignPodsDetectMode),
 		"informerMode", strStringPtr(ccp.InformerMode),
+	}
+}
+
+func dumpLeaderElectionParams(lep *k8swgmanifests.LeaderElectionParams) []interface{} {
+	return []interface{}{
+		"leaderElect", lep.LeaderElect,
+		"resourceNamespace", lep.ResourceNamespace,
+		"resourceName", lep.ResourceName,
 	}
 }
 

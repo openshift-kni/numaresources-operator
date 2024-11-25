@@ -37,6 +37,10 @@ const (
 	ConditionTypeIncorrectNUMAResourcesOperatorResourceName = "IncorrectNUMAResourcesOperatorResourceName"
 )
 
+const (
+	ConditionTypeIncorrectNUMAResourcesSchedulerResourceName = "IncorrectNUMAResourcesSchedulerResourceName"
+)
+
 func GetUpdatedConditions(currentConditions []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
 	conditions := NewConditions(condition, reason, message)
 
