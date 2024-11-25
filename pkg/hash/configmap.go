@@ -34,7 +34,7 @@ import (
 
 const ConfigMapAnnotation = "configmap.hash"
 
-func ComputeCurrentConfigMap(ctx context.Context, cli client.Client, cm *corev1.ConfigMap) (string, error) {
+func ComputeCurrentConfigMap(ctx context.Context, cli client.Reader, cm *corev1.ConfigMap) (string, error) {
 	updatedConfigMap := &corev1.ConfigMap{}
 	key := client.ObjectKeyFromObject(cm)
 
