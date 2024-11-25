@@ -6,7 +6,6 @@ toolchain go1.22.8
 
 require (
 	github.com/aquasecurity/go-version v0.0.0-20210121072130-637058cfe492
-	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 	github.com/drone/envsubst v1.0.3
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0

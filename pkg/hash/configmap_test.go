@@ -18,6 +18,7 @@ package hash
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -28,8 +29,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openshift-kni/numaresources-operator/internal/objects"
-
-	"github.com/asaskevich/govalidator"
 )
 
 func TestComputeCurrentConfigMap(t *testing.T) {
@@ -100,7 +99,7 @@ func TestConfigMapData(t *testing.T) {
 			t.Errorf("test: %q hash string cannot be empty", tc.testName)
 		}
 
-		if !govalidator.IsHash(strings.TrimLeft(hash, "SHA256:"), "sha256") {
+		if !looksLikeSHA256Sum(hash) {
 			t.Errorf("test: %q ilegal hash string %q", tc.testName, hash)
 		}
 	}
@@ -218,4 +217,13 @@ func TestConfigMapDataConsistency(t *testing.T) {
 			}
 		}
 	}
+}
+
+func looksLikeSHA256Sum(hs string) bool {
+	if !strings.HasPrefix(hs, "SHA256:") {
+		return false
+	}
+	val := strings.TrimLeft(hs, "SHA256:")
+	ok, _ := regexp.MatchString("^[a-f0-9]{64}$", val)
+	return ok
 }
