@@ -134,14 +134,6 @@ func newBaseConditions() []metav1.Condition {
 	}
 }
 
-type ErrResourcesNotReady struct {
-	Message string
-}
-
-func (e ErrResourcesNotReady) Error() string {
-	return e.Message
-}
-
 func ReasonFromError(err error) string {
 	if err == nil {
 		return ReasonAsExpected

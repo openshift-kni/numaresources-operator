@@ -33,6 +33,45 @@ import (
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
+func TestFindCondition(t *testing.T) {
+	type testCase struct {
+		name          string
+		desired       string
+		conds         []metav1.Condition
+		expectedFound bool
+	}
+
+	testCases := []testCase{
+		{
+			name:          "nil conditions",
+			desired:       ConditionAvailable,
+			expectedFound: false,
+		},
+		{
+			name:          "missing condition",
+			desired:       "foobar",
+			conds:         newBaseConditions(),
+			expectedFound: false,
+		},
+		{
+			name:          "found condition",
+			desired:       ConditionProgressing,
+			conds:         newBaseConditions(),
+			expectedFound: true,
+		},
+	}
+
+	for _, tcase := range testCases {
+		t.Run(tcase.name, func(t *testing.T) {
+			cond := FindCondition(tcase.conds, tcase.desired)
+			found := (cond != nil)
+			if found != tcase.expectedFound {
+				t.Errorf("failure looking for condition %q: got=%v expected=%v", tcase.desired, found, tcase.expectedFound)
+			}
+		})
+	}
+}
+
 func TestUpdate(t *testing.T) {
 	err := nropv1.AddToScheme(scheme.Scheme)
 	if err != nil {
@@ -157,6 +196,46 @@ func TestIsUpdatedNUMAResourcesOperator(t *testing.T) {
 			got := IsUpdatedNUMAResourcesOperator(oldStatus, newStatus)
 			if got != tc.expectedUpdated {
 				t.Errorf("isUpdated %v expected %v", got, tc.expectedUpdated)
+			}
+		})
+	}
+}
+
+func TestReasonFromError(t *testing.T) {
+	type testCase struct {
+		name     string
+		err      error
+		expected string
+	}
+
+	testCases := []testCase{
+		{
+			name:     "nil error",
+			expected: ReasonAsExpected,
+		},
+		{
+			name:     "simple error",
+			err:      errors.New("testing error with simple message"),
+			expected: ReasonInternalError,
+		},
+		{
+			name:     "simple formatted error",
+			err:      fmt.Errorf("testing error message=%s val=%d", "complex", 42),
+			expected: ReasonInternalError,
+		},
+
+		{
+			name:     "wrapped error",
+			err:      fmt.Errorf("outer error: %w", errors.New("inner error")),
+			expected: ReasonInternalError,
+		},
+	}
+
+	for _, tcase := range testCases {
+		t.Run(tcase.name, func(t *testing.T) {
+			got := ReasonFromError(tcase.err)
+			if got != tcase.expected {
+				t.Errorf("failure getting reason from error: got=%q expected=%q", got, tcase.expected)
 			}
 		})
 	}

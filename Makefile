@@ -123,6 +123,9 @@ test-unit: test-unit-pkgs test-controllers
 test-unit-pkgs:
 	go test ./api/... ./pkg/... ./rte/pkg/... ./internal/... ./nrovalidate/validator/...
 
+test-unit-pkgs-cover:
+	go test -coverprofile=coverage.out ./api/numaresourcesoperator/v1/helper/... ./api/numaresourcesoperator/v1alpha1/helper/... ./pkg/... ./rte/pkg/... ./internal/... ./nrovalidate/validator/...
+
 test-controllers: envtest
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/...
 
@@ -134,6 +137,12 @@ test-install-e2e: build-e2e-all
 
 test-must-gather-e2e: build-must-gather-e2e
 	hack/run-test-must-gather-e2e.sh
+
+cover-view:
+	go tool cover -html=coverage.out
+
+cover-summary:
+	go tool cover -func=coverage.out
 
 ##@ Build
 
