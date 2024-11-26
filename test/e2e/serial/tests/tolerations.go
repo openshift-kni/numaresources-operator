@@ -536,7 +536,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					By("delete current NROP CR from the cluster")
 					mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, nroOperObj)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(len(mcpsInfo)).To(BeNumerically(">", 0))
+					Expect(mcpsInfo).ToNot(BeEmpty())
 
 					err = fxt.Client.Delete(ctx, &nroOperObj)
 					Expect(err).ToNot(HaveOccurred())
@@ -578,7 +578,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 						mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
 						Expect(err).ToNot(HaveOccurred())
-						Expect(len(mcpsInfo)).To(BeNumerically(">", 0))
+						Expect(mcpsInfo).ToNot(BeEmpty())
 
 						waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineCount)
 					} else {
@@ -610,7 +610,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 					mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(len(mcpsInfo)).To(BeNumerically(">", 0))
+					Expect(mcpsInfo).ToNot(BeEmpty())
 
 					waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineCount)
 
@@ -654,7 +654,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 					mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(len(mcpsInfo)).To(BeNumerically(">", 0))
+					Expect(mcpsInfo).ToNot(BeEmpty())
 
 					waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineCount)
 
