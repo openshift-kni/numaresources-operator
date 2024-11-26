@@ -44,6 +44,7 @@ const (
 
 const (
 	ConditionTypeIncorrectNUMAResourcesOperatorResourceName = "IncorrectNUMAResourcesOperatorResourceName"
+	ConditionTypeInternalError                              = "Internal Error"
 )
 
 const (
