@@ -52,6 +52,11 @@ func (wt Waiter) ForMachineConfigPoolCondition(ctx context.Context, mcp *machine
 		if err != nil {
 			return false, err
 		}
+		klog.Infof("mcp: updated resourceversion %q (reference: %q)", updatedMcp.ResourceVersion, mcp.ResourceVersion)
+		if updatedMcp.ResourceVersion == mcp.ResourceVersion {
+			// nothing yet changed, need to recheck later
+			return false, nil
+		}
 		for _, cond := range updatedMcp.Status.Conditions {
 			if cond.Type == condType {
 				if cond.Status == corev1.ConditionTrue {

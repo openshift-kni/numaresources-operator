@@ -832,27 +832,16 @@ func sriovToleration() corev1.Toleration {
 }
 
 func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo, updateType MCPUpdateType) {
+	GinkgoHelper()
+
+	mcps := make([]*machineconfigv1.MachineConfigPool, 0, len(mcpsInfo))
 	for _, info := range mcpsInfo {
-		/*
-				For every mcp check the following:
-				1. soft requirement: loop over until condition Updating==true
-			    2. loop over until condition Updated==true, is a must
-				3. check the sample node is updated with new config in its annotations, both for desired and current, is a must
-		*/
+		mcps = append(mcps, info.mcpObj)
+	}
+	Expect(deploy.WaitForMCPsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
 
-		By(fmt.Sprintf("verify updates for mcp %q", info.obj.Name))
-		klog.Info("waiting for mcp to start updating")
-		err := deploy.WaitForMCPsCondition(cli, ctx, []*machineconfigv1.MachineConfigPool{info.obj}, machineconfigv1.MachineConfigPoolUpdating)
-		if err != nil {
-			// just warn here because the switch between the mcp conditions: updated->updating->updated can be faster
-			// and may be missed while the condition was actually met at some point
-			klog.Warningf("failed to find mcps while in updating status")
-		}
-
-		klog.Info("wait for mcp to get updated")
-		//here we must fail on errors
-		Expect(deploy.WaitForMCPsCondition(cli, ctx, []*machineconfigv1.MachineConfigPool{info.obj}, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
-
+	for _, info := range mcpsInfo {
+		// check the sample node is updated with new config in its annotations, both for desired and current, is a must
 		var updatedMcp machineconfigv1.MachineConfigPool
 		Expect(cli.Get(ctx, client.ObjectKeyFromObject(info.mcpObj), &updatedMcp)).To(Succeed())
 		// Note: when update type is MachineCount, don't check for difference between initial config and current config
