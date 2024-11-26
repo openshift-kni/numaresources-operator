@@ -755,7 +755,7 @@ func buildMCPsInfo(cli client.Client, ctx context.Context, nroObj nropv1.NUMARes
 		// TODO: support correlated labels on nodes for different MCPs
 
 		mcpInfo := mcpInfo{
-			obj:           mcp,
+			mcpObj:        mcp,
 			initialConfig: mcp.Status.Configuration.Name,
 			sampleNode:    nodes.Items[0],
 		}
@@ -854,7 +854,7 @@ func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo
 		Expect(deploy.WaitForMCPsCondition(cli, ctx, []*machineconfigv1.MachineConfigPool{info.obj}, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
 
 		var updatedMcp machineconfigv1.MachineConfigPool
-		Expect(cli.Get(ctx, client.ObjectKeyFromObject(info.obj), &updatedMcp)).To(Succeed())
+		Expect(cli.Get(ctx, client.ObjectKeyFromObject(info.mcpObj), &updatedMcp)).To(Succeed())
 		// Note: when update type is MachineCount, don't check for difference between initial config and current config
 		// on the updated mcp because mcp going into an update doesn't always it goes into a configuration update and
 		// thus associated to different MC, it could be because new nodes are joining the pool so the MC update is
