@@ -24,6 +24,8 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/stretchr/testify/assert"
+
+	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"
 )
 
 func TestToKlog(t *testing.T) {
@@ -103,6 +105,55 @@ func TestUpdatePodSpec(t *testing.T) {
 		}
 		cnt := podSpec.Containers[0]
 		assert.ElementsMatch(t, cnt.Args, tc.expectedArgs, "container %s args %v, not equal to %v", cnt.Name, cnt.Args, tc.expectedArgs)
+	}
+}
+
+func TestUpdateArgs(t *testing.T) {
+	tests := []struct {
+		name       string
+		cntName    string
+		level      operatorv1.LogLevel
+		expectVerb int
+	}{
+		{
+			name:       "Debug level",
+			cntName:    "test-container-debug",
+			level:      operatorv1.Debug,
+			expectVerb: 4,
+		},
+		{
+			name:       "Trace level",
+			cntName:    "test-container-trace",
+			level:      operatorv1.Trace,
+			expectVerb: 6,
+		},
+		{
+			name:       "Default verbosity",
+			cntName:    "test-container-default",
+			level:      operatorv1.Normal,
+			expectVerb: 2,
+		},
+		{
+			name:       "Default in case of invalid",
+			cntName:    "test-container-invalid",
+			level:      "InvalidLevel",
+			expectVerb: 2, // Should set the default
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			args := &rteconfiguration.ProgArgs{}
+			err := UpdateArgs(args, tt.cntName, tt.level)
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if args.Global.Verbose != tt.expectVerb {
+				t.Errorf("Expected Verbosity %v, got %v", tt.expectVerb, args.Global.Verbose)
+			}
+		})
 	}
 }
 

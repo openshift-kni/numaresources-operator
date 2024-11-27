@@ -18,12 +18,14 @@ package loglevel
 
 import (
 	"fmt"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
+	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"
 	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
@@ -63,5 +65,16 @@ func UpdatePodSpec(podSpec *corev1.PodSpec, cntName string, level operatorv1.Log
 	flags.SetOption("-v", kLog.String())
 	klog.InfoS("container klog level", "container", cnt.Name, "-v", kLog.String())
 	cnt.Args = flags.Argv()
+	return nil
+}
+
+func UpdateArgs(args *rteconfiguration.ProgArgs, cntName string, level operatorv1.LogLevel) error {
+	var err error
+	kLog := ToKlog(level)
+	args.Global.Verbose, err = strconv.Atoi(kLog.String())
+	if err != nil {
+		return fmt.Errorf("cannot parse verbosity argument %q: %v", kLog.String(), err)
+	}
+	klog.InfoS("container klog level", "container", cntName, "-v", kLog.String())
 	return nil
 }
