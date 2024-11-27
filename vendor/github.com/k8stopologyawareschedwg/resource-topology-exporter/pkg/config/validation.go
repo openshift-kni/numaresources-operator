@@ -19,7 +19,7 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log"
+	"io/fs"
 	"path/filepath"
 	"strings"
 
@@ -65,11 +65,17 @@ func validateConfigRootPath(configRoot string) (string, error) {
 
 	cfgRoot, err := filepath.EvalSymlinks(configRoot)
 	if err != nil {
-		return "", fmt.Errorf("failed to validate configRoot path: %w", err)
+		if errors.Is(err, fs.ErrNotExist) {
+			// reset to original value, it somehow passed the symlink check
+			cfgRoot = configRoot
+		} else {
+			return "", fmt.Errorf("failed to validate configRoot path: %w", err)
+		}
 	}
+	// else either success or checking a non-existing path. Which can be still OK.
 
 	// Resolve and clean the input path
-	cfgRoot, err := filepath.Abs(filepath.Clean(cfgRoot))
+	cfgRoot, err = filepath.Abs(filepath.Clean(cfgRoot))
 	if err != nil {
 		return "", fmt.Errorf("failed to validate configRoot path: %w", err)
 	}
@@ -81,17 +87,15 @@ func validateConfigRootPath(configRoot string) (string, error) {
 		"/usr/local/etc/rte",
 	}
 	var userDir string
-	userDir, err = UserRunDir()
-	if err != nil {
-		return "", err
+	for _, addDirFn := range []func() (string, error){
+		UserRunDir, UserHomeDir,
+	} {
+		userDir, err = addDirFn()
+		if err != nil {
+			return "", err
+		}
+		allowedPatterns = append(allowedPatterns, userDir)
 	}
-	allowedPatterns = append(allowedPatterns, userDir)
-
-	userDir, err = UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	allowedPatterns = append(allowedPatterns, userDir)
 
 	ok, pattern, err := matchAny(cfgRoot, allowedPatterns)
 	if err != nil {
@@ -109,7 +113,6 @@ func validateConfigRootPath(configRoot string) (string, error) {
 func matchAny(cfgPath string, patterns []string) (bool, string, error) {
 	for _, pattern := range patterns {
 		ok := strings.HasPrefix(cfgPath, pattern)
-		log.Printf("path=%q pattern=%q ok=%v", cfgPath, pattern, ok)
 		if ok {
 			return true, pattern, nil
 		}
