@@ -44,18 +44,14 @@ func Validate(pArgs *ProgArgs) error {
 }
 
 func validateConfigLetPath(configletDir, configletName string) (string, error) {
-	configletPath, err := filepath.EvalSymlinks(filepath.Join(configletDir, configletName))
+	configletPath, err := filepath.EvalSymlinks(filepath.Clean(filepath.Join(configletDir, configletName)))
 	if err != nil {
 		return "", err
 	}
-	fullPath, err := filepath.Abs(filepath.Clean(configletPath))
-	if err != nil {
-		return "", err
-	}
-	if filepath.Dir(fullPath) != configletDir {
+	if filepath.Dir(configletPath) != configletDir {
 		return "", fmt.Errorf("configlet %q is not within %q", configletName, configletDir)
 	}
-	return fullPath, nil
+	return configletPath, nil
 }
 
 func validateConfigRootPath(configRoot string) (string, error) {
@@ -63,6 +59,7 @@ func validateConfigRootPath(configRoot string) (string, error) {
 		return "", fmt.Errorf("configRoot is not allowed to be an empty string")
 	}
 
+	configRoot = filepath.Clean(configRoot)
 	cfgRoot, err := filepath.EvalSymlinks(configRoot)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -74,34 +71,11 @@ func validateConfigRootPath(configRoot string) (string, error) {
 	}
 	// else either success or checking a non-existing path. Which can be still OK.
 
-	// Resolve and clean the input path
-	cfgRoot, err = filepath.Abs(filepath.Clean(cfgRoot))
-	if err != nil {
-		return "", fmt.Errorf("failed to validate configRoot path: %w", err)
-	}
-
-	allowedPatterns := []string{
-		"/etc/rte",
-		"/run/rte",
-		"/var/rte",
-		"/usr/local/etc/rte",
-	}
-	var userDir string
-	for _, addDirFn := range []func() (string, error){
-		UserRunDir, UserHomeDir,
-	} {
-		userDir, err = addDirFn()
-		if err != nil {
-			return "", err
-		}
-		allowedPatterns = append(allowedPatterns, userDir)
-	}
-
-	ok, pattern, err := matchAny(cfgRoot, allowedPatterns)
+	pattern, err := IsConfigRootAllowed(cfgRoot, UserRunDir, UserHomeDir)
 	if err != nil {
 		return "", err
 	}
-	if !ok {
+	if pattern == "" {
 		return "", errors.New("failed to validate configRoot path: not matches any allowed pattern")
 	}
 
@@ -110,12 +84,25 @@ func validateConfigRootPath(configRoot string) (string, error) {
 	return filepath.Abs(filepath.Clean(filepath.Join(pattern, relPath)))
 }
 
-func matchAny(cfgPath string, patterns []string) (bool, string, error) {
-	for _, pattern := range patterns {
-		ok := strings.HasPrefix(cfgPath, pattern)
-		if ok {
-			return true, pattern, nil
+func IsConfigRootAllowed(cfgPath string, addDirFns ...func() (string, error)) (string, error) {
+	allowedPatterns := []string{
+		"/etc/rte",
+		"/run/rte",
+		"/var/rte",
+		"/usr/local/etc/rte",
+	}
+	for _, addDirFn := range addDirFns {
+		userDir, err := addDirFn()
+		if err != nil {
+			return "", err
+		}
+		allowedPatterns = append(allowedPatterns, userDir)
+	}
+
+	for _, pattern := range allowedPatterns {
+		if strings.HasPrefix(cfgPath, pattern) {
+			return pattern, nil
 		}
 	}
-	return false, "", nil
+	return "", nil
 }
