@@ -56,10 +56,7 @@ func main() {
 		} else if parsedArgs.DumpConfig == ".log" {
 			klog.Infof("current configuration:\n%s", conf)
 		} else {
-			err = os.WriteFile(parsedArgs.DumpConfig, []byte(conf), 0644)
-			if err != nil {
-				klog.Fatalf("failed to write the config to %q: %v", parsedArgs.DumpConfig, err)
-			}
+			klog.Fatalf("unsupported option: %q", parsedArgs.DumpConfig)
 		}
 	}
 
