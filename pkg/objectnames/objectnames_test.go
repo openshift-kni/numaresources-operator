@@ -37,3 +37,10 @@ func TestGetComponentName(t *testing.T) {
 		t.Errorf("generated empty ComponentName")
 	}
 }
+
+func TestGetDaemonSetConfigName(t *testing.T) {
+	got := GetDaemonSetConfigName("foo")
+	if len(got) == 0 {
+		t.Errorf("generated empty DaemonSetConfigName")
+	}
+}
