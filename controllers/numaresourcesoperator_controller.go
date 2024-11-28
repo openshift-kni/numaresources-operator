@@ -248,12 +248,12 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 
 	// MCO needs to update the SELinux context removal and other stuff, and need to trigger a reboot.
 	// It can take a while.
-	mcpStatuses, allMCPsUpdated := syncMachineConfigPoolsStatuses(instance.Name, trees, r.ForwardMCPConds, mcpUpdatedFunc)
+	mcpStatuses, mcpNamePending := syncMachineConfigPoolsStatuses(instance.Name, trees, r.ForwardMCPConds, mcpUpdatedFunc)
 	instance.Status.MachineConfigPools = mcpStatuses
 
-	if !allMCPsUpdated {
+	if mcpNamePending != "" {
 		// the Machine Config Pool still did not apply the machine config, wait for one minute
-		return intreconcile.StepOngoing(numaResourcesRetryPeriod)
+		return intreconcile.StepOngoing(numaResourcesRetryPeriod).WithReason("MachineConfigPoolIsUpdating").WithMessage(mcpNamePending + " is updating")
 	}
 	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
 
@@ -274,14 +274,14 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 
 	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
 
-	dssWithReadyStatus, allDSsUpdated, err := r.syncDaemonSetsStatuses(ctx, r.Client, daemonSetsInfoPerPool)
+	dssWithReadyStatus, dsNamePending, err := r.syncDaemonSetsStatuses(ctx, r.Client, daemonSetsInfoPerPool)
 	instance.Status.DaemonSets = dssWithReadyStatus
 	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dssWithReadyStatus)
 	if err != nil {
 		return nil, intreconcile.StepFailed(err)
 	}
-	if !allDSsUpdated {
-		return nil, intreconcile.StepOngoing(5 * time.Second)
+	if dsNamePending != "" {
+		return nil, intreconcile.StepOngoing(5 * time.Second).WithReason("DaemonSetIsUpdating").WithMessage(dsNamePending + " is updating")
 	}
 
 	return daemonSetsInfoPerPool, intreconcile.StepSuccess()
@@ -317,7 +317,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	}
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, daemonSetsInfo []poolDaemonSet) ([]nropv1.NamespacedName, bool, error) {
+func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, daemonSetsInfo []poolDaemonSet) ([]nropv1.NamespacedName, string, error) {
 	dssWithReadyStatus := []nropv1.NamespacedName{}
 	for _, dsInfo := range daemonSetsInfo {
 		ds := appsv1.DaemonSet{}
@@ -327,15 +327,15 @@ func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Con
 		}
 		err := rd.Get(ctx, dsKey, &ds)
 		if err != nil {
-			return dssWithReadyStatus, false, err
+			return dssWithReadyStatus, dsKey.String(), err
 		}
 
 		if !isDaemonSetReady(&ds) {
-			return dssWithReadyStatus, false, nil
+			return dssWithReadyStatus, dsKey.String(), nil
 		}
 		dssWithReadyStatus = append(dssWithReadyStatus, dsInfo.DaemonSet)
 	}
-	return dssWithReadyStatus, true, nil
+	return dssWithReadyStatus, "", nil
 }
 
 func syncNodeGroupsStatus(instance *nropv1.NUMAResourcesOperator, dsPerPool []poolDaemonSet) []nropv1.NodeGroupStatus {
@@ -432,7 +432,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	return waitFunc, err
 }
 
-func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree, forwardMCPConds bool, updatedFunc rtestate.MCPWaitForUpdatedFunc) ([]nropv1.MachineConfigPool, bool) {
+func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree, forwardMCPConds bool, updatedFunc rtestate.MCPWaitForUpdatedFunc) ([]nropv1.MachineConfigPool, string) {
 	klog.V(4).InfoS("Machine Config Status Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Status Sync stop")
 
@@ -445,11 +445,11 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tre
 			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instanceName, "updated", isUpdated)
 
 			if !isUpdated {
-				return mcpStatuses, false
+				return mcpStatuses, mcp.Name
 			}
 		}
 	}
-	return mcpStatuses, true
+	return mcpStatuses, ""
 }
 
 func extractMCPStatus(mcp *machineconfigv1.MachineConfigPool, forwardMCPConds bool) nropv1.MachineConfigPool {

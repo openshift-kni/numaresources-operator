@@ -27,8 +27,8 @@ type ConditionInfo struct {
 	Message string
 }
 
-// WithReason override the ConditionInfo reason with the given value,
-// and returns a new updated ConditionInfo
+// WithReason override the ConditionInfo reason with the given value
+// if not set already and returns a new updated ConditionInfo
 func (ci ConditionInfo) WithReason(reason string) ConditionInfo {
 	ret := ci
 	if ret.Reason == "" {
@@ -37,8 +37,8 @@ func (ci ConditionInfo) WithReason(reason string) ConditionInfo {
 	return ret
 }
 
-// WithMessage override the ConditionInfo message with the given value,
-// and returns a new updated ConditionInfo
+// WithMessage override the ConditionInfo message with the given value
+// if not set already and returns a new updated ConditionInfo
 func (ci ConditionInfo) WithMessage(message string) ConditionInfo {
 	ret := ci
 	if ret.Message == "" {
