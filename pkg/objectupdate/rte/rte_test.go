@@ -18,13 +18,19 @@ package rte
 
 import (
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/google/go-cmp/cmp"
+
+	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
@@ -63,11 +69,12 @@ var testDs = &appsv1.DaemonSet{
 	},
 }
 
-func TestUpdateDaemonSetArgs(t *testing.T) {
+func TestDaemonSetArgs(t *testing.T) {
 	type testCase struct {
 		name         string
+		dsArgs       *rteconfiguration.ProgArgs
 		conf         nropv1.NodeGroupConfig
-		expectedArgs []string
+		expectedArgs *rteconfiguration.ProgArgs
 	}
 
 	pfpEnabled := nropv1.PodsFingerprintingEnabled
@@ -83,8 +90,17 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 		{
 			name: "defaults",
 			conf: nropv1.DefaultNodeGroupConfig(),
-			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
+			expectedArgs: &rteconfiguration.ProgArgs{
+				Resourcemonitor: resourcemonitor.Args{
+					PodSetFingerprint:           true,
+					PodSetFingerprintStatusFile: "/run/pfpstatus/dump.json",
+					PodSetFingerprintMethod:     "with-exclusive-resources",
+					RefreshNodeResources:        true,
+				},
+				RTE: resourcetopologyexporter.Args{
+					AddNRTOwnerEnable: false,
+					SleepInterval:     time.Second * 10,
+				},
 			},
 		},
 		{
@@ -94,8 +110,17 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 					Duration: 32 * time.Second,
 				},
 			},
-			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=32s",
+			expectedArgs: &rteconfiguration.ProgArgs{
+				Resourcemonitor: resourcemonitor.Args{
+					PodSetFingerprint:           true,
+					PodSetFingerprintStatusFile: "/run/pfpstatus/dump.json",
+					PodSetFingerprintMethod:     "with-exclusive-resources",
+					RefreshNodeResources:        true,
+				},
+				RTE: resourcetopologyexporter.Args{
+					AddNRTOwnerEnable: false,
+					SleepInterval:     time.Second * 32,
+				},
 			},
 		},
 		{
@@ -103,8 +128,17 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			conf: nropv1.NodeGroupConfig{
 				PodsFingerprinting: &pfpEnabled,
 			},
-			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=all", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
+			expectedArgs: &rteconfiguration.ProgArgs{
+				Resourcemonitor: resourcemonitor.Args{
+					PodSetFingerprint:           true,
+					PodSetFingerprintStatusFile: "/run/pfpstatus/dump.json",
+					PodSetFingerprintMethod:     "all",
+					RefreshNodeResources:        true,
+				},
+				RTE: resourcetopologyexporter.Args{
+					AddNRTOwnerEnable: false,
+					SleepInterval:     time.Second * 10,
+				},
 			},
 		},
 		{
@@ -112,8 +146,15 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			conf: nropv1.NodeGroupConfig{
 				PodsFingerprinting: &pfpDisabled,
 			},
-			expectedArgs: []string{
-				"--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
+			expectedArgs: &rteconfiguration.ProgArgs{
+				Resourcemonitor: resourcemonitor.Args{
+					PodSetFingerprint:    false,
+					RefreshNodeResources: true,
+				},
+				RTE: resourcetopologyexporter.Args{
+					AddNRTOwnerEnable: false,
+					SleepInterval:     time.Second * 10,
+				},
 			},
 		},
 		{
@@ -121,8 +162,18 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			conf: nropv1.NodeGroupConfig{
 				InfoRefreshMode: &refreshEvents,
 			},
-			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--notify-file=/run/rte/notify",
+			expectedArgs: &rteconfiguration.ProgArgs{
+				Resourcemonitor: resourcemonitor.Args{
+					PodSetFingerprint:           true,
+					PodSetFingerprintStatusFile: "/run/pfpstatus/dump.json",
+					PodSetFingerprintMethod:     "with-exclusive-resources",
+					RefreshNodeResources:        true,
+				},
+				RTE: resourcetopologyexporter.Args{
+					AddNRTOwnerEnable: false,
+					SleepInterval:     0,
+					NotifyFilePath:    "/run/rte/notify",
+				},
 			},
 		},
 		{
@@ -130,8 +181,17 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			conf: nropv1.NodeGroupConfig{
 				InfoRefreshMode: &refreshPeriodic,
 			},
-			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
+			expectedArgs: &rteconfiguration.ProgArgs{
+				Resourcemonitor: resourcemonitor.Args{
+					PodSetFingerprint:           true,
+					PodSetFingerprintStatusFile: "/run/pfpstatus/dump.json",
+					PodSetFingerprintMethod:     "with-exclusive-resources",
+					RefreshNodeResources:        true,
+				},
+				RTE: resourcetopologyexporter.Args{
+					AddNRTOwnerEnable: false,
+					SleepInterval:     time.Second * 10,
+				},
 			},
 		},
 		{
@@ -139,32 +199,54 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			conf: nropv1.NodeGroupConfig{
 				InfoRefreshPause: &infoRefreshPauseEnabled,
 			},
-			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=with-exclusive-resources", "--no-publish", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
+			expectedArgs: &rteconfiguration.ProgArgs{
+				Resourcemonitor: resourcemonitor.Args{
+					PodSetFingerprint:           true,
+					PodSetFingerprintStatusFile: "/run/pfpstatus/dump.json",
+					PodSetFingerprintMethod:     "with-exclusive-resources",
+					RefreshNodeResources:        true,
+				},
+				RTE: resourcetopologyexporter.Args{
+					AddNRTOwnerEnable: false,
+					SleepInterval:     time.Second * 10,
+				},
+				NRTupdater: nrtupdater.Args{
+					NoPublish: true,
+				},
 			},
 		},
 		{
-			name: "precisely enable publishing NRT data",
+			name: "explicitly enable publishing NRT data",
 			conf: nropv1.NodeGroupConfig{
 				InfoRefreshPause: &infoRefreshPauseDisabled,
 			},
-			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s",
+			expectedArgs: &rteconfiguration.ProgArgs{
+				Resourcemonitor: resourcemonitor.Args{
+					PodSetFingerprint:           true,
+					PodSetFingerprintStatusFile: "/run/pfpstatus/dump.json",
+					PodSetFingerprintMethod:     "with-exclusive-resources",
+					RefreshNodeResources:        true,
+				},
+				RTE: resourcetopologyexporter.Args{
+					AddNRTOwnerEnable: false,
+					SleepInterval:     time.Second * 10,
+				},
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			origDs := testDs.DeepCopy()
+			tc.dsArgs = &rteconfiguration.ProgArgs{}
 			ds := testDs.DeepCopy()
 
-			err := DaemonSetArgs(ds, tc.conf)
+			err := DaemonSetArgs(ds, tc.conf, tc.dsArgs)
 			if err != nil {
 				t.Fatalf("update failed: %v", err)
 			}
-
-			expectCommandLine(t, ds, origDs, tc.name, tc.expectedArgs)
+			if diff := cmp.Diff(tc.dsArgs, tc.expectedArgs); diff != "" {
+				t.Errorf("args mismatch (-want +got):\n%s", diff)
+			}
 		})
 	}
 }
@@ -280,52 +362,50 @@ func TestUpdateDaemonSetTolerations(t *testing.T) {
 	}
 }
 
-func expectCommandLine(t *testing.T, ds, origDs *appsv1.DaemonSet, testName string, expectedArgs []string) {
-	expectedArgs = append(expectedArgs, commonArgs...)
-	actualArgsSet := getSetFromStringList(ds.Spec.Template.Spec.Containers[0].Args)
-
-	if len(actualArgsSet) != len(ds.Spec.Template.Spec.Containers[0].Args) {
-		t.Errorf("ds RTE container arguments has duplicates; ds args \"%v\"", ds.Spec.Template.Spec.Containers[0].Args)
+func TestProgArgsFromDaemonSet(t *testing.T) {
+	testCases := []struct {
+		name         string
+		ds           *appsv1.DaemonSet
+		dsArgs       []string
+		expectedArgs *rteconfiguration.ProgArgs
+	}{
+		{
+			name:   "common args",
+			ds:     testDs.DeepCopy(),
+			dsArgs: commonArgs,
+			expectedArgs: &rteconfiguration.ProgArgs{
+				Resourcemonitor: resourcemonitor.Args{
+					SysfsRoot: "/host-sys",
+				},
+				RTE: resourcetopologyexporter.Args{
+					PodResourcesSocketPath: "unix:///host-var/lib/kubelet/pod-resources/kubelet.sock",
+					TopologyManagerScope:   "pod",
+					TopologyManagerPolicy:  "restricted",
+				},
+			},
+		},
+		{
+			name:   "enable pod fingerprint",
+			ds:     testDs.DeepCopy(),
+			dsArgs: []string{"--pods-fingerprint"},
+			expectedArgs: &rteconfiguration.ProgArgs{
+				Resourcemonitor: resourcemonitor.Args{
+					PodSetFingerprint: true,
+				},
+			},
+		},
 	}
 
-	if len(expectedArgs) != len(ds.Spec.Template.Spec.Containers[0].Args) {
-		t.Errorf("ds RTE container arguments does not match the expected; ds args \"%v\" vs expected args \"%v\"", ds.Spec.Template.Spec.Containers[0].Args, expectedArgs)
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.ds.Spec.Template.Spec.Containers[0].Args = tc.dsArgs
+			args, err := ProgArgsFromDaemonSet(tc.ds)
+			if err != nil {
+				t.Fatalf("ProgArgsFromDaemonSet failed: %v", err)
+			}
+			if diff := cmp.Diff(tc.expectedArgs, args); diff != "" {
+				t.Errorf("args mismatch (-want +got):\n%s", diff)
+			}
+		})
 	}
-	for _, arg := range expectedArgs {
-		if idx := sliceIndex(ds.Spec.Template.Spec.Containers[0].Args, arg); idx == -1 {
-			t.Errorf("%s: %s option missing from %v", testName, arg, ds.Spec.Template.Spec.Containers[0].Args)
-		}
-	}
-
-	if !reflect.DeepEqual(origDs.Spec.Template.Spec.Containers[0].Command, ds.Spec.Template.Spec.Containers[0].Command) {
-		t.Errorf("%s: unexpected change on command: %v", testName, ds.Spec.Template.Spec.Containers[0].Command)
-	}
-
-	if !reflect.DeepEqual(origDs.Spec.Template.Spec.Containers[1].Args, ds.Spec.Template.Spec.Containers[1].Args) {
-		t.Errorf("%s: unexpected change on command: %v", testName, ds.Spec.Template.Spec.Containers[1].Args)
-	}
-	if !reflect.DeepEqual(origDs.Spec.Template.Spec.Containers[1].Command, ds.Spec.Template.Spec.Containers[1].Command) {
-		t.Errorf("%s: unexpected change on command: %v", testName, ds.Spec.Template.Spec.Containers[1].Command)
-	}
-}
-
-func sliceIndex(sl []string, s string) int {
-	for idx, it := range sl {
-		if it == s {
-			return idx
-		}
-	}
-	return -1
-}
-func getSetFromStringList(args []string) map[string]struct{} {
-	argsSet := map[string]struct{}{}
-	for _, arg := range args {
-		keyVal := strings.Split(arg, "=")
-		if len(keyVal) == 1 {
-			argsSet[keyVal[0]] = struct{}{}
-			continue
-		}
-		argsSet[keyVal[0]] = struct{}{}
-	}
-	return argsSet
 }

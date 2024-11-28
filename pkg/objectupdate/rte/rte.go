@@ -19,21 +19,25 @@ package rte
 import (
 	"fmt"
 	"path/filepath"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+	"sigs.k8s.io/yaml"
 
 	securityv1 "github.com/openshift/api/security/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
+	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 )
@@ -131,57 +135,47 @@ func DaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
 
 const _MiB = 1024 * 1024
 
-func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
+func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig, dsArgs *rteconfiguration.ProgArgs) error {
 	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
 	if cnt == nil {
 		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
-	flags := flagcodec.ParseArgvKeyValue(cnt.Args, flagcodec.WithFlagNormalization)
-	if flags == nil {
-		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
-	}
 
 	infoRefreshPauseEnabled := isInfoRefreshPauseEnabled(&conf)
 	klog.V(2).InfoS("DaemonSet update: InfoRefreshPause status", "daemonset", ds.Name, "enabled", infoRefreshPauseEnabled)
-	if infoRefreshPauseEnabled {
-		flags.SetToggle("--no-publish")
-	} else {
-		flags.Delete("--no-publish")
-	}
-
-	flags.SetToggle("--refresh-node-resources")
+	dsArgs.NRTupdater.NoPublish = infoRefreshPauseEnabled
+	dsArgs.Resourcemonitor.RefreshNodeResources = true
 
 	notifEnabled := isNotifyFileEnabled(&conf)
 	klog.V(2).InfoS("DaemonSet update: event notification", "daemonset", ds.Name, "enabled", notifEnabled)
 	if notifEnabled {
-		flags.SetOption("--notify-file", "/run/rte/notify")
-	} else {
-		flags.Delete("--notify-file")
+		dsArgs.RTE.NotifyFilePath = "/run/rte/notify"
 	}
 
 	needsPeriodic := isPeriodicUpdateRequired(&conf)
 	refreshPeriod := findRefreshPeriod(&conf)
-	klog.V(2).InfoS("DaemonSet update: periodic update", "daemonset", ds.Name, "enabled", needsPeriodic, "period", refreshPeriod)
+	klog.V(2).InfoS("DaemonSet update: periodic update", "daemonset", ds.Name, "enabled", needsPeriodic, "period", refreshPeriod.String())
 	if needsPeriodic {
-		flags.SetOption("--sleep-interval", refreshPeriod)
+		dsArgs.RTE.SleepInterval = refreshPeriod
+	} else {
+		dsArgs.RTE.SleepInterval = time.Duration(0)
 	}
 
 	pfpEnabled, pfpMethod := isPodFingerprintEnabled(&conf)
 	klog.V(2).InfoS("DaemonSet update: pod fingerprinting status", "daemonset", ds.Name, "enabled", pfpEnabled)
 	if pfpEnabled {
-		flags.SetToggle("--pods-fingerprint")
-		flags.SetOption("--pods-fingerprint-status-file", filepath.Join(pfpStatusDir, "dump.json"))
-		flags.SetOption("--pods-fingerprint-method", pfpMethod)
+		dsArgs.Resourcemonitor.PodSetFingerprint = true
+		dsArgs.Resourcemonitor.PodSetFingerprintStatusFile = filepath.Join(pfpStatusDir, "dump.json")
+		dsArgs.Resourcemonitor.PodSetFingerprintMethod = pfpMethod
 
 		podSpec := &ds.Spec.Template.Spec
 		// TODO: this doesn't really belong here, but OTOH adding the status file without having set
 		// the volume doesn't work either. We need a deeper refactoring in this area.
 		AddVolumeMountMemory(podSpec, cnt, pfpStatusMountName, pfpStatusDir, 8*_MiB)
+	} else {
+		dsArgs.Resourcemonitor.PodSetFingerprint = false
 	}
-
-	flags.SetOption("--add-nrt-owner", "false")
-
-	cnt.Args = flags.Argv()
+	dsArgs.RTE.AddNRTOwnerEnable = false
 	return nil
 }
 
@@ -263,7 +257,7 @@ func isPeriodicUpdateRequired(conf *nropv1.NodeGroupConfig) bool {
 	return *conf.InfoRefreshMode != nropv1.InfoRefreshEvents
 }
 
-func findRefreshPeriod(conf *nropv1.NodeGroupConfig) string {
+func findRefreshPeriod(conf *nropv1.NodeGroupConfig) time.Duration {
 	cfg := nropv1.DefaultNodeGroupConfig()
 	if conf == nil || conf.InfoRefreshPeriod == nil {
 		// not specified -> use defaults
@@ -271,7 +265,7 @@ func findRefreshPeriod(conf *nropv1.NodeGroupConfig) string {
 	}
 	// TODO ensure we overwrite - and possibly find a less ugly stringification code
 	// TODO: what if sleep-interval is set and is 0 ?
-	return conf.InfoRefreshPeriod.Duration.String()
+	return conf.InfoRefreshPeriod.Duration
 }
 
 func isInfoRefreshPauseEnabled(conf *nropv1.NodeGroupConfig) bool {
@@ -281,4 +275,33 @@ func isInfoRefreshPauseEnabled(conf *nropv1.NodeGroupConfig) bool {
 		conf = &cfg
 	}
 	return *conf.InfoRefreshPause == nropv1.InfoRefreshPauseEnabled
+}
+
+func ProgArgsFromDaemonSet(ds *appsv1.DaemonSet) (*rteconfiguration.ProgArgs, error) {
+	progArgs := &rteconfiguration.ProgArgs{}
+	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
+	if cnt == nil {
+		return progArgs, fmt.Errorf("cannot find container data for %q", MainContainerName)
+	}
+	_, _, err := rteconfiguration.FromFlags(progArgs, cnt.Args...)
+	if err != nil {
+		return progArgs, err
+	}
+	return progArgs, nil
+}
+
+func DaemonSetArgsToConfigMap(ds *appsv1.DaemonSet, dsArgs *rteconfiguration.ProgArgs) (*corev1.ConfigMap, error) {
+	b, err := yaml.Marshal(dsArgs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal DaemonSet %s args: %w", ds.Name, err)
+	}
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ds.GetNamespace(),
+			Name:      objectnames.GetDaemonSetConfigName(ds.GetName()),
+		},
+		Data: map[string]string{
+			"config.yaml": string(b),
+		},
+	}, nil
 }
