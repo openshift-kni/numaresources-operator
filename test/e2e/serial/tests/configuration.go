@@ -91,7 +91,7 @@ const (
 )
 
 type mcpInfo struct {
-	obj           *machineconfigv1.MachineConfigPool
+	mcpObj        *machineconfigv1.MachineConfigPool
 	initialConfig string
 	sampleNode    corev1.Node
 }
@@ -195,12 +195,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}()
 			//so far 0 machine count for mcp-test -> no nodes -> no updates status
 			newMcpInfo := mcpInfo{
-				obj:           mcp,
+				mcpObj:        mcp,
 				initialConfig: mcp.Status.Configuration.Name,
 				sampleNode:    targetedNode,
 			}
 			initialMcpInfo := mcpInfo{
-				obj:           initialMcp,
+				mcpObj:        initialMcp,
 				initialConfig: initialMcp.Status.Configuration.Name,
 				sampleNode:    initialMcpSampleNode,
 			}
@@ -212,7 +212,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			defer func() {
 				By(fmt.Sprintf("CLEANUP: restore initial labels of node %q with %q", targetedNode.Name, getLabelRoleWorker()))
 				var updatedMcp machineconfigv1.MachineConfigPool
-				Expect(fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialMcpInfo.obj), &updatedMcp)).To(Succeed())
+				Expect(fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialMcpInfo.mcpObj), &updatedMcp)).To(Succeed())
 				initialMcpInfo.initialConfig = updatedMcp.Status.Configuration.Name
 				initialMcpInfo.sampleNode = targetedNode
 
@@ -241,7 +241,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			defer func() {
 				By("CLEANUP: reverting the changes under the NUMAResourcesOperator object")
 				var updatedMcp machineconfigv1.MachineConfigPool
-				Expect(fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialMcpInfo.obj), &updatedMcp)).To(Succeed())
+				Expect(fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialMcpInfo.mcpObj), &updatedMcp)).To(Succeed())
 				initialMcpInfo.initialConfig = updatedMcp.Status.Configuration.Name
 
 				// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3

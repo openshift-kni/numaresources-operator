@@ -326,13 +326,17 @@ var _ = Describe("[Install] durability", Serial, func() {
 			// TODO change to an image which is test dedicated
 			nroObjRedep.Spec.ExporterImage = e2eimages.RTETestImageCI
 
+			var mcps []*machineconfigv1.MachineConfigPool
+			if annotations.IsCustomPolicyEnabled(nroObj.Annotations) {
+				// need to get MCPs before the mutation
+				mcps, err = nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
+				Expect(err).NotTo(HaveOccurred())
+			}
+
 			err = e2eclient.Client.Create(context.TODO(), nroObjRedep)
 			Expect(err).ToNot(HaveOccurred())
 
 			if annotations.IsCustomPolicyEnabled(nroObj.Annotations) {
-				mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(deploy.WaitForMCPsCondition(e2eclient.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdating)).To(Succeed())
 				Expect(deploy.WaitForMCPsCondition(e2eclient.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
 			}
 

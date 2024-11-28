@@ -536,7 +536,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					By("delete current NROP CR from the cluster")
 					mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, nroOperObj)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(len(mcpsInfo)).To(BeNumerically(">", 0))
+					Expect(mcpsInfo).ToNot(BeEmpty())
 
 					err = fxt.Client.Delete(ctx, &nroOperObj)
 					Expect(err).ToNot(HaveOccurred())
@@ -578,7 +578,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 						mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
 						Expect(err).ToNot(HaveOccurred())
-						Expect(len(mcpsInfo)).To(BeNumerically(">", 0))
+						Expect(mcpsInfo).ToNot(BeEmpty())
 
 						waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineCount)
 					} else {
@@ -610,7 +610,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 					mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(len(mcpsInfo)).To(BeNumerically(">", 0))
+					Expect(mcpsInfo).ToNot(BeEmpty())
 
 					waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineCount)
 
@@ -654,7 +654,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 					mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
 					Expect(err).ToNot(HaveOccurred())
-					Expect(len(mcpsInfo)).To(BeNumerically(">", 0))
+					Expect(mcpsInfo).ToNot(BeEmpty())
 
 					waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineCount)
 
@@ -755,7 +755,7 @@ func buildMCPsInfo(cli client.Client, ctx context.Context, nroObj nropv1.NUMARes
 		// TODO: support correlated labels on nodes for different MCPs
 
 		mcpInfo := mcpInfo{
-			obj:           mcp,
+			mcpObj:        mcp,
 			initialConfig: mcp.Status.Configuration.Name,
 			sampleNode:    nodes.Items[0],
 		}
@@ -832,29 +832,18 @@ func sriovToleration() corev1.Toleration {
 }
 
 func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo, updateType MCPUpdateType) {
+	GinkgoHelper()
+
+	mcps := make([]*machineconfigv1.MachineConfigPool, 0, len(mcpsInfo))
 	for _, info := range mcpsInfo {
-		/*
-				For every mcp check the following:
-				1. soft requirement: loop over until condition Updating==true
-			    2. loop over until condition Updated==true, is a must
-				3. check the sample node is updated with new config in its annotations, both for desired and current, is a must
-		*/
+		mcps = append(mcps, info.mcpObj)
+	}
+	Expect(deploy.WaitForMCPsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
 
-		By(fmt.Sprintf("verify updates for mcp %q", info.obj.Name))
-		klog.Info("waiting for mcp to start updating")
-		err := deploy.WaitForMCPsCondition(cli, ctx, []*machineconfigv1.MachineConfigPool{info.obj}, machineconfigv1.MachineConfigPoolUpdating)
-		if err != nil {
-			// just warn here because the switch between the mcp conditions: updated->updating->updated can be faster
-			// and may be missed while the condition was actually met at some point
-			klog.Warningf("failed to find mcps while in updating status")
-		}
-
-		klog.Info("wait for mcp to get updated")
-		//here we must fail on errors
-		Expect(deploy.WaitForMCPsCondition(cli, ctx, []*machineconfigv1.MachineConfigPool{info.obj}, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
-
+	for _, info := range mcpsInfo {
+		// check the sample node is updated with new config in its annotations, both for desired and current, is a must
 		var updatedMcp machineconfigv1.MachineConfigPool
-		Expect(cli.Get(ctx, client.ObjectKeyFromObject(info.obj), &updatedMcp)).To(Succeed())
+		Expect(cli.Get(ctx, client.ObjectKeyFromObject(info.mcpObj), &updatedMcp)).To(Succeed())
 		// Note: when update type is MachineCount, don't check for difference between initial config and current config
 		// on the updated mcp because mcp going into an update doesn't always it goes into a configuration update and
 		// thus associated to different MC, it could be because new nodes are joining the pool so the MC update is

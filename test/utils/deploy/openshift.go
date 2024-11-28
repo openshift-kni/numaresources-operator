@@ -47,6 +47,10 @@ func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, matchLabels map[str
 	kcObj, err := objects.TestKC(matchLabels)
 	Expect(err).To(Not(HaveOccurred()))
 
+	// need to get reference values before any mutations
+	mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, nroObj.Spec.NodeGroups)
+	Expect(err).NotTo(HaveOccurred())
+
 	unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -55,28 +59,22 @@ func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, matchLabels map[str
 		By("using cluster kubeletconfig (if any)")
 	} else {
 		By(fmt.Sprintf("creating the KC object: %s", kcObj.Name))
-		err = e2eclient.Client.Create(ctx, kcObj)
-		Expect(err).NotTo(HaveOccurred())
+		Expect(e2eclient.Client.Create(ctx, kcObj)).To(Succeed())
 		o.KcObj = kcObj
 		createKubelet = true
 	}
 
 	By(fmt.Sprintf("creating the NRO object: %s", nroObj.Name))
-	err = e2eclient.Client.Create(ctx, nroObj)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(e2eclient.Client.Create(ctx, nroObj)).To(Succeed())
 	o.NroObj = nroObj
 
 	Eventually(unpause).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(Succeed())
 
-	err = e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(nroObj), nroObj)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(nroObj), nroObj)).To(Succeed())
 	o.NroObj = nroObj
 
 	if createKubelet || annotations.IsCustomPolicyEnabled(nroObj.Annotations) {
 		By("waiting for MCP to get updated")
-		mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, nroObj.Spec.NodeGroups)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(WaitForMCPsCondition(e2eclient.Client, ctx, mcps, machineconfigv1.MachineConfigPoolUpdating)).To(Succeed())
 		Expect(WaitForMCPsCondition(e2eclient.Client, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
 	}
 	return nroObj

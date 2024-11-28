@@ -82,8 +82,9 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 				klog.Warningf("failed to delete the kubeletconfigs %q", kcObj.Name)
 			}
 
-			err = unpause()
-			Expect(err).NotTo(HaveOccurred())
+			timeout := configuration.MachineConfigPoolUpdateTimeout   // shortcut
+			interval := configuration.MachineConfigPoolUpdateInterval // shortcut
+			Eventually(unpause).WithTimeout(timeout).WithPolling(interval).Should(Succeed())
 
 			if configuration.Plat == platform.Kubernetes {
 				mcpObj := objects.TestMCP()
