@@ -43,6 +43,26 @@ func (rs Step) EarlyStop() bool {
 	return rs.ConditionInfo.Type != status.ConditionAvailable
 }
 
+// WithReason set the existing reason with the given value,
+// if not set already and returns a new updated Step
+func (rs Step) WithReason(reason string) Step {
+	return Step{
+		Result:        rs.Result,
+		ConditionInfo: rs.ConditionInfo.WithReason(reason),
+		Error:         rs.Error,
+	}
+}
+
+// WithMessage override the existing message with the given value,
+// if not set already, and returns a new updated ConditionInfo
+func (rs Step) WithMessage(message string) Step {
+	return Step{
+		Result:        rs.Result,
+		ConditionInfo: rs.ConditionInfo.WithMessage(message),
+		Error:         rs.Error,
+	}
+}
+
 // StepSuccess returns a Step which tells the caller
 // the reconciliation attempt was completed successfully
 func StepSuccess() Step {
