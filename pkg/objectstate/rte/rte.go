@@ -46,9 +46,15 @@ const (
 	HyperShiftNodePoolLabel = "hypershift.openshift.io/nodePool"
 )
 
+type configManifest struct {
+	config      *corev1.ConfigMap
+	configError error
+}
+
 type daemonSetManifest struct {
-	daemonSet      *appsv1.DaemonSet
-	daemonSetError error
+	daemonSet       *appsv1.DaemonSet
+	daemonSetError  error
+	daemonSetConfig configManifest
 }
 
 type machineConfigManifest struct {
@@ -196,6 +202,7 @@ type GeneratedDesiredManifest struct {
 	NodeGroup         *nropv1.NodeGroup
 	// generated manifests
 	DaemonSet             *appsv1.DaemonSet
+	DaemonSetConfig       *corev1.ConfigMap
 	IsCustomPolicyEnabled bool
 }
 
@@ -262,16 +269,19 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 	for _, tree := range em.trees {
 		if em.plat == platform.OpenShift {
 			for _, mcp := range tree.MachineConfigPools {
-				var existingDs client.Object
-				var loadError error
+				var existingDs, existingDsCm client.Object
+				var loadError, cmLoadError error
 
 				generatedName := objectnames.GetComponentName(em.instance.Name, mcp.Name)
 				existingDaemonSet, ok := em.daemonSets[generatedName]
 				if ok {
 					existingDs = existingDaemonSet.daemonSet
 					loadError = existingDaemonSet.daemonSetError
+					cmLoadError = existingDaemonSet.daemonSetConfig.configError
+					existingDsCm = existingDaemonSet.daemonSetConfig.config
 				} else {
 					loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.DaemonSet.Namespace, mf.DaemonSet.Name)
+					cmLoadError = fmt.Errorf("failed to find daemon set %s/%s config", mf.DaemonSet.Namespace, mf.DaemonSet.Name)
 				}
 
 				desiredDaemonSet := mf.DaemonSet.DeepCopy()
@@ -297,6 +307,16 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 					if err != nil {
 						updateError = fmt.Errorf("daemonset for MCP %q: update failed: %w", mcp.Name, err)
 					}
+					// only if updater is running and updating the DaemonSet arguments,
+					// we should create a configfile for it
+					ret = append(ret, objectstate.ObjectState{
+						Existing:    existingDsCm,
+						Error:       cmLoadError,
+						UpdateError: updateError,
+						Desired:     gdm.DaemonSetConfig.DeepCopy(),
+						Compare:     compare.Object,
+						Merge:       merge.ObjectForUpdate,
+					})
 				}
 
 				ret = append(ret,
@@ -312,8 +332,8 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 			}
 		}
 		if em.plat == platform.HyperShift {
-			var existingDs client.Object
-			var loadError error
+			var existingDs, existingDsCm client.Object
+			var loadError, cmLoadError error
 
 			poolName := *tree.NodeGroup.PoolName
 
@@ -322,8 +342,11 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 			if ok {
 				existingDs = existingDaemonSet.daemonSet
 				loadError = existingDaemonSet.daemonSetError
+				existingDsCm = existingDaemonSet.daemonSetConfig.config
+				cmLoadError = existingDaemonSet.daemonSetConfig.configError
 			} else {
 				loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.DaemonSet.Namespace, mf.DaemonSet.Name)
+				cmLoadError = fmt.Errorf("failed to find daemon set %s/%s config", mf.DaemonSet.Namespace, mf.DaemonSet.Name)
 			}
 
 			desiredDaemonSet := mf.DaemonSet.DeepCopy()
@@ -347,6 +370,17 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 				if err != nil {
 					updateError = fmt.Errorf("daemonset for pool %q: update failed: %w", poolName, err)
 				}
+				// TODO refactor to cleanup code duplication
+				// only if updater is running and updating the DaemonSet arguments,
+				// we should create a configfile for it
+				ret = append(ret, objectstate.ObjectState{
+					Existing:    existingDsCm,
+					Error:       cmLoadError,
+					UpdateError: updateError,
+					Desired:     gdm.DaemonSetConfig.DeepCopy(),
+					Compare:     compare.Object,
+					Merge:       merge.ObjectForUpdate,
+				})
 			}
 
 			ret = append(ret,
@@ -424,6 +458,11 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 				if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
 					dsm.daemonSet = ds
 				}
+
+				dsConfig := &corev1.ConfigMap{}
+				if dsm.daemonSetConfig.configError = cli.Get(ctx, client.ObjectKey{Name: objectnames.GetDaemonSetConfigName(generatedName), Namespace: namespace}, dsConfig); dsm.daemonSetConfig.configError == nil {
+					dsm.daemonSetConfig.config = dsConfig
+				}
 				ret.daemonSets[generatedName] = dsm
 
 				mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
@@ -449,6 +488,11 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 			dsm := daemonSetManifest{}
 			if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
 				dsm.daemonSet = ds
+			}
+			// TODO fix this code duplication requires refactoring of the whole function
+			dsConfig := &corev1.ConfigMap{}
+			if dsm.daemonSetConfig.configError = cli.Get(ctx, client.ObjectKey{Name: objectnames.GetDaemonSetConfigName(generatedName), Namespace: namespace}, dsConfig); dsm.daemonSetConfig.configError == nil {
+				dsm.daemonSetConfig.config = dsConfig
 			}
 			ret.daemonSets[generatedName] = dsm
 		}

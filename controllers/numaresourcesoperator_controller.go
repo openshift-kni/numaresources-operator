@@ -716,14 +716,22 @@ func validateMachineConfigLabels(mc client.Object, trees []nodegroupv1.Tree) err
 	return nil
 }
 
-func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
+func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest, dsArgs *rteconfiguration.ProgArgs) error {
 	rteupdate.DaemonSetTolerations(gdm.DaemonSet, gdm.NodeGroup.Config.Tolerations)
 
-	err := rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config)
+	// set specific configuration per DaemonSet based on their given
+	// NodeGroup configuration
+	err := rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config, dsArgs)
 	if err != nil {
 		klog.V(5).InfoS("DaemonSet update: cannot update arguments", "pool name", poolName, "daemonset", gdm.DaemonSet.Name, "error", err)
 		return err
 	}
+	cm, err := rteupdate.DaemonSetArgsToConfigMap(gdm.DaemonSet, dsArgs)
+	if err != nil {
+		klog.V(5).InfoS("DaemonSet update: cannot create a config for DaemonSet from arguments", "pool name", poolName, "daemonset", gdm.DaemonSet.Name, "error", err)
+		return err
+	}
+	gdm.DaemonSetConfig = cm
 
 	// on kubernetes we can just mount the kubeletconfig (no SCC/Selinux),
 	// so handling the kubeletconfig configmap is not needed at all.

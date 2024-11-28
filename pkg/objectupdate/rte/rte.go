@@ -296,6 +296,10 @@ func DaemonSetArgsToConfigMap(ds *appsv1.DaemonSet, dsArgs *rteconfiguration.Pro
 		return nil, fmt.Errorf("failed to marshal DaemonSet %s args: %w", ds.Name, err)
 	}
 	return &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "ConfigMap",
+		},
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: ds.GetNamespace(),
 			Name:      objectnames.GetDaemonSetConfigName(ds.GetName()),
