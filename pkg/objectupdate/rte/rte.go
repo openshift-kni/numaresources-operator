@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/yaml"
 
 	securityv1 "github.com/openshift/api/security/v1"
@@ -49,6 +50,8 @@ const (
 
 	pfpStatusMountName = "run-pfpstatus"
 	pfpStatusDir       = "/run/pfpstatus"
+
+	rteDaemonSetMountName = "rte-daemonset-config-volume"
 )
 
 func DaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImageSpec string, builtinPullPolicy corev1.PullPolicy) error {
@@ -193,6 +196,27 @@ func ContainerConfig(ds *appsv1.DaemonSet, name string) error {
 		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
 	k8swgrteupdate.ContainerConfig(&ds.Spec.Template.Spec, cnt, name)
+	//shortcut
+	podSpec := &ds.Spec.Template.Spec
+	cnt.VolumeMounts = append(cnt.VolumeMounts,
+		corev1.VolumeMount{
+			Name:      rteDaemonSetMountName,
+			MountPath: "/etc/rte/daemon",
+		},
+	)
+	podSpec.Volumes = append(podSpec.Volumes,
+		corev1.Volume{
+			Name: rteDaemonSetMountName,
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: objectnames.GetDaemonSetConfigName(ds.Name),
+					},
+					Optional: ptr.To(true),
+				},
+			},
+		},
+	)
 	return nil
 }
 
