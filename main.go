@@ -24,8 +24,6 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"time"
-
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 
@@ -412,11 +410,6 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 	klog.InfoS("Updating RTE manifests")
 	mf, err := rteManifests.Render(options.UpdaterDaemon{
 		Namespace: namespace,
-		DaemonSet: options.DaemonSet{
-			Verbose:            2,
-			NotificationEnable: true,
-			UpdateInterval:     10 * time.Second,
-		},
 	})
 	if err != nil {
 		return mf, err
