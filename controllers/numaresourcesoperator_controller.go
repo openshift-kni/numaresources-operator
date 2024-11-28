@@ -52,6 +52,7 @@ import (
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
+	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
@@ -529,7 +530,14 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		return dsPoolPairs, err
 	}
 
-	err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
+	// setting args which are common to all DaemonSet regardless of their
+	// associated NodeGroup configuration
+	dsArgs, err := rteupdate.ProgArgsFromDaemonSet(r.RTEManifests.DaemonSet)
+	if err != nil {
+		return dsPoolPairs, err
+	}
+
+	err = loglevel.UpdateArgs(dsArgs, manifests.ContainerNameRTE, instance.Spec.LogLevel)
 	if err != nil {
 		return dsPoolPairs, err
 	}
@@ -545,7 +553,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	rteupdate.SecurityContextConstraint(r.RTEManifests.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
 
 	processor := func(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
-		err := daemonsetUpdater(poolName, gdm)
+		err := daemonsetUpdater(poolName, gdm, dsArgs)
 		if err != nil {
 			return err
 		}
