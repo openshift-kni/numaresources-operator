@@ -47,6 +47,7 @@ import (
 const (
 	MainContainerName   = "resource-topology-exporter"
 	HelperContainerName = "shared-pool-container"
+	ConfigKey           = "config.yaml"
 
 	pfpStatusMountName = "run-pfpstatus"
 	pfpStatusDir       = "/run/pfpstatus"
@@ -329,7 +330,7 @@ func DaemonSetArgsToConfigMap(ds *appsv1.DaemonSet, dsArgs *rteconfiguration.Pro
 			Name:      objectnames.GetDaemonSetConfigName(ds.GetName()),
 		},
 		Data: map[string]string{
-			"config.yaml": string(b),
+			ConfigKey: string(b),
 		},
 	}, nil
 }

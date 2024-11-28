@@ -30,6 +30,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,6 +40,7 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"
 
 	configv1 "github.com/openshift/api/config/v1"
 	securityv1 "github.com/openshift/api/security/v1"
@@ -50,6 +52,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
+	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 )
@@ -439,11 +442,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
-
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
-					Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
+					args := getArgsForDaemonSet(reconciler.Client, ds)
+					Expect(args.RTE.SleepInterval).To(Equal(time.Second*10), "malformed args: %+v", args)
+					Expect(args.Resourcemonitor.PodSetFingerprint).To(BeTrue(), "malformed args: %+v", args)
 				})
 
 				It("should report the observed values per Node Group in status", func() {
@@ -517,12 +519,11 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}
 					ds := &appsv1.DaemonSet{}
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
-
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement("--sleep-interval=33s"), "malformed args: %v", args)
-					Expect(args).ToNot(ContainElement(ContainSubstring("--notify-file=")), "malformed args: %v", args)
-					Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
-					Expect(args).To(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
+					args := getArgsForDaemonSet(reconciler.Client, ds)
+					Expect(args.RTE.SleepInterval).To(Equal(time.Second*33), "malformed args: %+v", args)
+					Expect(args.RTE.NotifyFilePath).To(BeEmpty(), "malformed args: %+v", args)
+					Expect(args.Resourcemonitor.PodSetFingerprint).To(BeTrue(), "malformed args: %+v", args)
+					Expect(args.NRTupdater.NoPublish).To(BeTrue(), "malformed args: %+v", args)
 				})
 
 				It("should allow to disable pods fingerprinting", func() {
@@ -583,8 +584,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					ds := &appsv1.DaemonSet{}
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement("--sleep-interval=42s"), "malformed args: %v", args)
+					args := getArgsForDaemonSet(reconciler.Client, ds)
+					Expect(args.RTE.SleepInterval).To(Equal(time.Second*42), "malformed args: %+v", args)
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
@@ -686,8 +687,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					ds := &appsv1.DaemonSet{}
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
+					args := getArgsForDaemonSet(reconciler.Client, ds)
+					Expect(args.NRTupdater.NoPublish).To(BeTrue(), "malformed args: %+v", args)
 
 					rteModeOpp := nropv1.InfoRefreshPauseDisabled
 					confUpdated := nropv1.NodeGroupConfig{
@@ -738,10 +739,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					ds := &appsv1.DaemonSet{}
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
-					Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
-					Expect(args).ToNot(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
+					args := getArgsForDaemonSet(reconciler.Client, ds)
+					Expect(args.RTE.SleepInterval).To(Equal(time.Second*10), "malformed args: %+v", args)
+					Expect(args.Resourcemonitor.PodSetFingerprint).To(BeTrue(), "malformed args: %+v", args)
+					Expect(args.NRTupdater.NoPublish).To(BeFalse(), "malformed args: %+v", args)
 
 					d, err := time.ParseDuration("12s")
 					Expect(err).ToNot(HaveOccurred())
@@ -776,11 +777,11 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					dsUpdated := &appsv1.DaemonSet{}
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, dsUpdated)).ToNot(HaveOccurred())
 
-					argsUpdated := dsUpdated.Spec.Template.Spec.Containers[0].Args
-					Expect(argsUpdated).To(ContainElement("--sleep-interval=12s"), "malformed updated args: %v", argsUpdated)
-					Expect(argsUpdated).ToNot(ContainElement(ContainSubstring("--notify-file=")), "malformed updated args: %v", argsUpdated)
-					Expect(argsUpdated).To(ContainElement("--pods-fingerprint"), "malformed updated args: %v", argsUpdated)
-					Expect(argsUpdated).To(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", argsUpdated)
+					argsUpdated := getArgsForDaemonSet(reconciler.Client, ds)
+					Expect(argsUpdated.RTE.SleepInterval).To(Equal(time.Second*12), "malformed args: %+v", argsUpdated)
+					Expect(argsUpdated.RTE.NotifyFilePath).To(BeEmpty(), "malformed args: %+v", argsUpdated)
+					Expect(argsUpdated.Resourcemonitor.PodSetFingerprint).To(BeTrue(), "malformed args: %+v", argsUpdated)
+					Expect(argsUpdated.NRTupdater.NoPublish).To(BeTrue(), "malformed args: %+v", argsUpdated)
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
@@ -812,8 +813,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					ds := &appsv1.DaemonSet{}
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement("--pods-fingerprint-method=with-exclusive-resources"), "malformed args: %v", args)
+					args := getArgsForDaemonSet(reconciler.Client, ds)
+					Expect(args.Resourcemonitor.PodSetFingerprintMethod).To(Equal("with-exclusive-resources"), "malformed args: %+v", args)
 
 					key := client.ObjectKeyFromObject(nro)
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
@@ -837,8 +838,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
 
-					args = ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement("--pods-fingerprint-method=all"), "malformed args: %v", args)
+					args = getArgsForDaemonSet(reconciler.Client, ds)
+					Expect(args.Resourcemonitor.PodSetFingerprintMethod).To(Equal("all"), "malformed args: %+v", args)
 
 					Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).ToNot(HaveOccurred())
 					Expect(*nroUpdated.Status.NodeGroups[0].Config.PodsFingerprinting).To(Equal(updatedPFPMode), "node group config was not updated under NodeGroupStatus field")
@@ -1973,4 +1974,20 @@ func reconcileObjectsHypershift(nro *nropv1.NUMAResourcesOperator) *NUMAResource
 	Expect(firstLoopResult).To(Equal(reconcile.Result{}))
 
 	return reconciler
+}
+
+func getArgsForDaemonSet(cli client.Client, ds *appsv1.DaemonSet) *rteconfiguration.ProgArgs {
+	GinkgoHelper()
+	cmKey := client.ObjectKey{
+		Name:      objectnames.GetDaemonSetConfigName(ds.Name),
+		Namespace: testNamespace,
+	}
+	dsCm := &corev1.ConfigMap{}
+	Expect(cli.Get(context.TODO(), cmKey, dsCm)).To(Succeed())
+
+	data := dsCm.Data[rteupdate.ConfigKey]
+	args := &rteconfiguration.ProgArgs{}
+	Expect(yaml.Unmarshal([]byte(data), args)).To(Succeed())
+
+	return args
 }
