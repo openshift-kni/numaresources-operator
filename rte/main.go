@@ -15,9 +15,11 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -28,6 +30,7 @@ import (
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/sharedcpuspool"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/terminalpods"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter"
 
@@ -58,39 +61,57 @@ func main() {
 		_ = dump(&parsedArgs)
 	}
 
-	k8scli, err := k8shelpers.GetK8sClient("")
+	k8scli, err := k8shelpers.GetK8sClient(parsedArgs.Global.KubeConfig)
 	if err != nil {
-		klog.Fatalf("failed to get k8s client: %v", err)
+		klog.Fatalf("failed to get a kubernetes core client: %v", err)
 	}
 
-	cli, cleanup, err := podres.GetClient(parsedArgs.RTE.PodResourcesSocketPath)
+	nrtcli, err := k8shelpers.GetTopologyClient(parsedArgs.Global.KubeConfig)
 	if err != nil {
-		klog.Fatalf("failed to start prometheus server: %v", err)
+		klog.Fatalf("failed to get a noderesourcetopology client: %v", err)
+	}
+
+	cli, cleanup, err := podres.WaitForReady(podres.GetClient(parsedArgs.RTE.PodResourcesSocketPath))
+	if err != nil {
+		klog.Fatalf("failed to get podresources client: %v", err)
 	}
 	//nolint: errcheck
 	defer cleanup()
 
 	cli = sharedcpuspool.NewFromLister(cli, parsedArgs.Global.Debug, parsedArgs.RTE.ReferenceContainer)
 
+	if len(parsedArgs.Resourcemonitor.PodExclude) > 0 {
+		cli = podexclude.NewFromLister(cli, parsedArgs.Global.Debug, parsedArgs.Resourcemonitor.PodExclude)
+	}
+
+	if parsedArgs.Resourcemonitor.ExcludeTerminalPods {
+		klog.Infof("terminal pods are filtered from the PodResourcesLister client")
+		cli, err = terminalpods.NewFromLister(context.TODO(), cli, k8scli, time.Minute, parsedArgs.Global.Debug)
+		if err != nil {
+			klog.Fatalf("failed to get PodResourceAPI client: %v", err)
+		}
+	}
+
 	err = metrics.Setup("")
 	if err != nil {
 		klog.Fatalf("failed to setup metrics: %v", err)
 	}
-	err = metricssrv.Setup(parsedArgs.RTE.MetricsMode, metricssrv.NewDefaultConfig())
+	err = metricssrv.Setup(parsedArgs.RTE.MetricsMode, metricssrv.NewConfig(parsedArgs.RTE.MetricsAddress, parsedArgs.RTE.MetricsPort, parsedArgs.RTE.MetricsTLSCfg))
 	if err != nil {
 		klog.Fatalf("failed to setup metrics server: %v", err)
 	}
 
-	cli = podexclude.NewFromLister(cli, parsedArgs.Global.Debug, parsedArgs.Resourcemonitor.PodExclude)
 	hnd := resourcetopologyexporter.Handle{
 		ResMon: resourcemonitor.Handle{
 			PodResCli: cli,
 			K8SCli:    k8scli,
 		},
+		NRTCli: nrtcli,
 	}
 	err = resourcetopologyexporter.Execute(hnd, parsedArgs.NRTupdater, parsedArgs.Resourcemonitor, parsedArgs.RTE)
-	// must never execute; if it does, we want to know
-	klog.Fatalf("failed to execute: %v", err)
+	if err != nil {
+		klog.Fatalf("failed to execute: %v", err)
+	}
 }
 
 func parseArgs(args ...string) (rteconfiguration.ProgArgs, error) {

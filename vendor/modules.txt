@@ -228,6 +228,7 @@ github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/filter
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/filter/numalocality
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/sharedcpuspool
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/terminalpods
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/ratelimiter
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter

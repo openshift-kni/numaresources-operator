@@ -26,7 +26,7 @@ func TestReadNonExistent(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if cfg.ExcludeList != nil || cfg.TopologyManagerPolicy != "" {
+	if cfg.PodExclude != nil || cfg.Kubelet.TopologyManagerPolicy != "" {
 		t.Errorf("unexpected data: %#v", cfg)
 	}
 }
@@ -56,13 +56,13 @@ func TestReadValidData(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error reading back the config: %v", err)
 	}
-	if cfg.TopologyManagerPolicy != "restricted" {
+	if cfg.Kubelet.TopologyManagerPolicy != "restricted" {
 		t.Errorf("unexpected values: %#v", cfg)
 	}
-	if cfg.TopologyManagerScope != "pod" {
+	if cfg.Kubelet.TopologyManagerScope != "pod" {
 		t.Errorf("unexpected values: %#v", cfg)
 	}
-	if cfg.ExcludeList["masternode"][0] != "memory" {
+	if cfg.ResourceExclude["masternode"][0] != "memory" {
 		t.Errorf("unexpected values: %#v", cfg)
 	}
 }
@@ -71,9 +71,10 @@ const testData string = `resources:
   reservedcpus: "0"
   resourcemapping:
     "8086:1520": "intel_sriov_netdevice"
-topologymanagerpolicy: "restricted"
-topologymanagerscope: "pod"
-excludelist:
+kubelet:
+  topologymanagerpolicy: "restricted"
+  topologymanagerscope: "pod"
+resourceExclude:
   masternode: [memory, device/exampleA]
   workernode1: [memory, device/exampleB]
   workernode2: [cpu]`
