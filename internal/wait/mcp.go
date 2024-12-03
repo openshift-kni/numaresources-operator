@@ -45,14 +45,13 @@ func (wt Waiter) ForMachineConfigPoolDeleted(ctx context.Context, mcp *machineco
 
 func (wt Waiter) ForMachineConfigPoolCondition(ctx context.Context, mcp *machineconfigv1.MachineConfigPool, condType machineconfigv1.MachineConfigPoolConditionType) error {
 	immediate := false
+	key := ObjectKeyFromObject(mcp)
+	updatedMcp := machineconfigv1.MachineConfigPool{}
 	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(ctx context.Context) (bool, error) {
-		updatedMcp := machineconfigv1.MachineConfigPool{}
-		key := ObjectKeyFromObject(mcp)
 		err := wt.Cli.Get(ctx, key.AsKey(), &updatedMcp)
 		if err != nil {
 			return false, err
 		}
-		klog.Infof("mcp: updated resourceversion %q (reference: %q)", updatedMcp.ResourceVersion, mcp.ResourceVersion)
 		if updatedMcp.ResourceVersion == mcp.ResourceVersion {
 			// nothing yet changed, need to recheck later
 			return false, nil
@@ -62,7 +61,7 @@ func (wt Waiter) ForMachineConfigPoolCondition(ctx context.Context, mcp *machine
 				if cond.Status == corev1.ConditionTrue {
 					return true, nil
 				} else {
-					klog.Infof("mcp: %q condition type: %q status is: %q expected status: %q", updatedMcp.Name, cond.Type, cond.Status, corev1.ConditionTrue)
+					klog.Infof("mcp: %q conditionType: %q status is: %q resourceversion: updated %q reference %q", updatedMcp.Name, cond.Type, cond.Status, updatedMcp.ResourceVersion, mcp.ResourceVersion)
 					return false, nil
 				}
 			}
@@ -70,5 +69,8 @@ func (wt Waiter) ForMachineConfigPoolCondition(ctx context.Context, mcp *machine
 		klog.Infof("mcp: %q condition type: %q was not found", updatedMcp.Name, condType)
 		return false, nil
 	})
+	if err != nil {
+		klog.Infof("mcp: %q final status: %+v", updatedMcp.Name, updatedMcp.Status)
+	}
 	return err
 }
