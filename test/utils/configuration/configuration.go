@@ -34,7 +34,7 @@ const (
 )
 
 const (
-	defaultMCPUpdateTimeout  = 30 * time.Minute
+	defaultMCPUpdateTimeout  = 60 * time.Minute
 	defaultMCPUpdateInterval = 30 * time.Second
 )
 

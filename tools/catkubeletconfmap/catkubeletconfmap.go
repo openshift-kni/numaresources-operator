@@ -90,6 +90,6 @@ func main() {
 		log.Fatalf("error unrendering ConfigMap %s/%s: %v", cmNamespace, cmName, err)
 	}
 
-	fmt.Printf("%sTOPOLOGY_MANAGER_POLICY=%s\n", prefix, conf.TopologyManagerPolicy)
-	fmt.Printf("%sTOPOLOGY_MANAGER_SCOPE=%s\n", prefix, conf.TopologyManagerScope)
+	fmt.Printf("%sTOPOLOGY_MANAGER_POLICY=%s\n", prefix, conf.Kubelet.TopologyManagerPolicy)
+	fmt.Printf("%sTOPOLOGY_MANAGER_SCOPE=%s\n", prefix, conf.Kubelet.TopologyManagerScope)
 }

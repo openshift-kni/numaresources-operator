@@ -47,10 +47,13 @@ func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, matchLabels map[str
 	kcObj, err := objects.TestKC(matchLabels)
 	Expect(err).To(Not(HaveOccurred()))
 
+	By("getting reference values for target MCPs")
 	// need to get reference values before any mutations
 	mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, nroObj.Spec.NodeGroups)
 	Expect(err).NotTo(HaveOccurred())
+	klog.Infof("Found %d target MCPs", len(mcps))
 
+	By("pausing the target MCPs")
 	unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -68,8 +71,10 @@ func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, matchLabels map[str
 	Expect(e2eclient.Client.Create(ctx, nroObj)).To(Succeed())
 	o.NroObj = nroObj
 
+	By("unpausing the target MCPs")
 	Eventually(unpause).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(Succeed())
 
+	By("updating the target NRO object")
 	Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(nroObj), nroObj)).To(Succeed())
 	o.NroObj = nroObj
 

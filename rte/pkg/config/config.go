@@ -27,6 +27,11 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	"sigs.k8s.io/yaml"
+
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
+
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
 const (
@@ -38,11 +43,15 @@ const (
 	LabelNodeGroupKindMachineConfigPool string = "machineconfigpool"
 )
 
+type KubeletParams struct {
+	TopologyManagerPolicy string `json:"topologyManagerPolicy,omitempty"`
+	TopologyManagerScope  string `json:"topologyManagerScope,omitempty"`
+}
+
 type Config struct {
-	ExcludeList           map[string][]string `json:"excludeList,omitempty"`
-	TopologyManagerPolicy string              `json:"topologyManagerPolicy,omitempty"`
-	TopologyManagerScope  string              `json:"topologyManagerScope,omitempty"`
-	PodExcludes           map[string]string   `json:"podExcludes"`
+	Kubelet         KubeletParams                   `json:"kubelet,omitempty"`
+	ResourceExclude resourcemonitor.ResourceExclude `json:"resourceExclude,omitempty"`
+	PodExclude      podexclude.List                 `json:"podExclude,omitempty"`
 }
 
 func ReadFile(configPath string) (Config, error) {
@@ -61,13 +70,21 @@ func ReadFile(configPath string) (Config, error) {
 	return conf, err
 }
 
-func Render(klConfig *kubeletconfigv1beta1.KubeletConfiguration, podExcludes map[string]string) (string, error) {
+func Render(klConfig *kubeletconfigv1beta1.KubeletConfiguration, podExcludes []nropv1.NamespacedName) (string, error) {
 	conf := Config{
-		TopologyManagerPolicy: klConfig.TopologyManagerPolicy,
-		TopologyManagerScope:  klConfig.TopologyManagerScope,
+		Kubelet: KubeletParams{
+			TopologyManagerPolicy: klConfig.TopologyManagerPolicy,
+			TopologyManagerScope:  klConfig.TopologyManagerScope,
+		},
 	}
 	if len(podExcludes) > 0 {
-		conf.PodExcludes = podExcludes
+		conf.PodExclude = make(podexclude.List, 0, len(podExcludes))
+		for _, pex := range podExcludes {
+			conf.PodExclude = append(conf.PodExclude, podexclude.Item{
+				NamespacePattern: pex.Namespace,
+				NamePattern:      pex.Name,
+			})
+		}
 	}
 	data, err := yaml.Marshal(conf)
 	return string(data), err

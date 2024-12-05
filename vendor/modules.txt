@@ -166,6 +166,9 @@ github.com/jaypipes/ghw/pkg/util
 # github.com/jaypipes/pcidb v1.0.0
 ## explicit; go 1.17
 github.com/jaypipes/pcidb
+# github.com/jeremywohl/flatten/v2 v2.0.0-20211013061545-07e4a09fb8e4
+## explicit
+github.com/jeremywohl/flatten/v2
 # github.com/josharian/intern v1.0.0
 ## explicit; go 1.5
 github.com/josharian/intern
@@ -208,12 +211,12 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/client
 # github.com/k8stopologyawareschedwg/podfingerprint v0.2.2
 ## explicit; go 1.17
 github.com/k8stopologyawareschedwg/podfingerprint
-# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.16.1
-## explicit; go 1.20
+# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.20.3
+## explicit; go 1.22.0
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/dump
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8sannotations
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8shelpers
-github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8simported/cpuset
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/kubeconf
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/metrics
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/metrics/server
@@ -225,10 +228,12 @@ github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/filter
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/filter/numalocality
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/sharedcpuspool
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/terminalpods
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/ratelimiter
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/sysinfo
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/version
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater
 github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/fixture

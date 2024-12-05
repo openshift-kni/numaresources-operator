@@ -17,7 +17,6 @@
 package local
 
 import (
-	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -25,18 +24,11 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater"
-	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
-	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter"
+	"sigs.k8s.io/yaml"
 
+	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/test/utils/runtime"
 )
-
-type ProgArgs struct {
-	NRTupdater      nrtupdater.Args
-	Resourcemonitor resourcemonitor.Args
-	RTE             resourcetopologyexporter.Args
-}
 
 var binaryPath string
 
@@ -93,12 +85,12 @@ var _ = Describe("[rte][local][config] RTE configuration", func() {
 	})
 })
 
-func runConfig(argv []string, env map[string]string) ProgArgs {
+func runConfig(argv []string, env map[string]string) rteconfiguration.ProgArgs {
 	GinkgoHelper()
 
 	cmdline := []string{
 		binaryPath,
-		"--dump-config",
+		"--dump-config=.andexit",
 	}
 	cmdline = append(cmdline, argv...)
 
@@ -113,11 +105,13 @@ func runConfig(argv []string, env map[string]string) ProgArgs {
 	}
 
 	out, err := cmd.Output()
+	fmt.Fprintf(GinkgoWriter, "out: %v\n", string(out))
 	Expect(err).ToNot(HaveOccurred())
 
-	var args ProgArgs
-	err = json.Unmarshal(out, &args)
+	var args rteconfiguration.ProgArgs
+	err = yaml.Unmarshal(out, &args)
 	Expect(err).ToNot(HaveOccurred())
+	fmt.Fprintf(GinkgoWriter, "out: %+v\n", args)
 
 	return args
 }
