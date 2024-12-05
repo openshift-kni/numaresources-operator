@@ -16,5 +16,6 @@ exclude:
     - "vendor/github.com/onsi/gomega**"
     - "vendor/github.com/onsi/ginkgo/**"
     - "vendor/golang.org/**"
+    - "vendor/github.com/spf13/cobra/**"
     - "vendor/github.com/stretchr/testify/**"
     - "vendor/github.com/stretchr/objx/**"
