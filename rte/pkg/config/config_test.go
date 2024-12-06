@@ -17,12 +17,16 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"testing"
+
+	"k8s.io/klog"
+	"sigs.k8s.io/yaml"
 )
 
 func TestReadNonExistent(t *testing.T) {
-	cfg, err := ReadFile("/does/not/exist")
+	cfg, err := readFile("/does/not/exist")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -32,7 +36,7 @@ func TestReadNonExistent(t *testing.T) {
 }
 
 func TestReadMalformed(t *testing.T) {
-	_, err := ReadFile("/etc/services")
+	_, err := readFile("/etc/services")
 	if err == nil {
 		t.Errorf("unexpected success reading unrelated data")
 	}
@@ -52,7 +56,7 @@ func TestReadValidData(t *testing.T) {
 	if err := tmpfile.Close(); err != nil {
 		t.Errorf("closing the tempfile: %v", err)
 	}
-	cfg, err := ReadFile(tmpfile.Name())
+	cfg, err := readFile(tmpfile.Name())
 	if err != nil {
 		t.Errorf("unexpected error reading back the config: %v", err)
 	}
@@ -65,6 +69,21 @@ func TestReadValidData(t *testing.T) {
 	if cfg.ResourceExclude["masternode"][0] != "memory" {
 		t.Errorf("unexpected values: %#v", cfg)
 	}
+}
+
+func readFile(configPath string) (Config, error) {
+	conf := Config{}
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		// config is optional
+		if errors.Is(err, os.ErrNotExist) {
+			klog.Warningf("Info: couldn't find configuration in %q", configPath)
+			return conf, nil
+		}
+		return conf, err
+	}
+	err = yaml.Unmarshal(data, &conf)
+	return conf, err
 }
 
 const testData string = `resources:
