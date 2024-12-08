@@ -16,9 +16,3 @@ if ! "${BIN_DIR}"/e2e-nrop-install.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=
   echo "Failed to run NRO install test suite"
   exit 1
 fi
-
-echo "Running NRO uninstall test suite";
-if ! "${BIN_DIR}"/e2e-nrop-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.junit-report=${REPORT_DIR}/uninstall.xml; then
-  echo "Failed to run NRO install test suite"
-  exit 2
-fi

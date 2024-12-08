@@ -135,6 +135,9 @@ test-e2e: build-e2e-all
 test-install-e2e: build-e2e-all
 	hack/run-test-install-e2e.sh
 
+test-uninstall-e2e: build-e2e-all
+	hack/run-test-uninstall-e2e.sh
+
 test-must-gather-e2e: build-must-gather-e2e
 	hack/run-test-must-gather-e2e.sh
 
