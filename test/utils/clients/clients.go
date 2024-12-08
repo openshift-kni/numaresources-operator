@@ -32,6 +32,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/test/utils/hypershift"
+	operatorsv1alpha1 "github.com/operator-framework/api/pkg/operators/v1alpha1"
 )
 
 var (
@@ -69,7 +70,9 @@ func init() {
 	if err := hypershiftv1beta1.AddToScheme(scheme.Scheme); err != nil {
 		klog.Exit(err.Error())
 	}
-
+	if err := operatorsv1alpha1.AddToScheme(scheme.Scheme); err != nil {
+		klog.Exit(err.Error())
+	}
 	var err error
 	Client, err = New()
 	if err != nil {
