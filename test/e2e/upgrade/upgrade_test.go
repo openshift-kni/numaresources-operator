@@ -14,6 +14,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	"github.com/openshift-kni/numaresources-operator/test/utils/version"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
@@ -25,6 +26,11 @@ var _ = Describe("Upgrade", Label("upgrade"), func() {
 			Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
 		}
 		initialized = true
+		operatorVersion, err := version.OfOperator(context.TODO(), e2eclient.Client)
+		Expect(err).NotTo(HaveOccurred())
+		if operatorVersion.String() < "4.18" {
+			Skip("Upgrade suite is only supported on operator versions 4.18 or newer")
+		}
 	})
 
 	Context("after operator upgrade", func() {

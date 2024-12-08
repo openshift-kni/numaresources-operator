@@ -22,6 +22,7 @@ require (
 	github.com/openshift/cluster-node-tuning-operator v0.0.0-20240611064827-2bd8891ead93
 	github.com/openshift/hypershift/api v0.0.0-20241115183703-d41904871380
 	github.com/openshift/machine-config-operator v0.0.1-0.20230724174830-7b54f1dcce4e
+	github.com/operator-framework/api v0.27.0
 	github.com/sergi/go-diff v1.1.0
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/sync v0.8.0
@@ -90,13 +91,14 @@ require (
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/vincent-petithory/dataurl v1.0.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.uber.org/ratelimit v0.2.0 // indirect
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
+	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a // indirect
 	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.30.0 // indirect
 	golang.org/x/oauth2 v0.21.0 // indirect
