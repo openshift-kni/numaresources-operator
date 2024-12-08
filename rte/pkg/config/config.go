@@ -17,13 +17,10 @@
 package config
 
 import (
-	"errors"
 	"fmt"
-	"os"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	"sigs.k8s.io/yaml"
@@ -52,22 +49,6 @@ type Config struct {
 	Kubelet         KubeletParams                   `json:"kubelet,omitempty"`
 	ResourceExclude resourcemonitor.ResourceExclude `json:"resourceExclude,omitempty"`
 	PodExclude      podexclude.List                 `json:"podExclude,omitempty"`
-}
-
-func ReadFile(configPath string) (Config, error) {
-	conf := Config{}
-	// TODO modernize using os.ReadFile
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		// config is optional
-		if errors.Is(err, os.ErrNotExist) {
-			klog.Warningf("Info: couldn't find configuration in %q", configPath)
-			return conf, nil
-		}
-		return conf, err
-	}
-	err = yaml.Unmarshal(data, &conf)
-	return conf, err
 }
 
 func Render(klConfig *kubeletconfigv1beta1.KubeletConfiguration, podExcludes []nropv1.NamespacedName) (string, error) {

@@ -161,11 +161,11 @@ func yamlCompare(t *testing.T, testName, got, expected string) {
 	}
 	if diffCount > 0 {
 		var err error
-		err = os.WriteFile(testName+"-got.yaml", []byte(got), 0644)
+		err = os.WriteFile(testName+"-got.yaml", []byte(got), 0600)
 		if err != nil {
 			t.Fatalf("cannot write got.yaml")
 		}
-		err = os.WriteFile(testName+"-exp.yaml", []byte(expected), 0644)
+		err = os.WriteFile(testName+"-exp.yaml", []byte(expected), 0600)
 		if err != nil {
 			t.Fatalf("cannot write exp.yaml")
 		}
