@@ -24,25 +24,35 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	semver "github.com/blang/semver/v4"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	"github.com/openshift-kni/numaresources-operator/test/utils/version"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	ver "github.com/operator-framework/api/pkg/lib/version"
 )
 
 var _ = Describe("Upgrade", Label("upgrade"), func() {
 	var namespace = "numaresources-operator"
 	var err error
 	var initialized bool
-
+	var operatorVersion *ver.OperatorVersion
 	BeforeEach(func() {
 		if !initialized {
 			Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
 		}
 		initialized = true
+		operatorVersion, err = version.OfOperator(context.TODO(), e2eclient.Client, namespace)
+		Expect(err).NotTo(HaveOccurred())
+		minVersion, err := semver.New("4.18.0")
+		Expect(err).NotTo(HaveOccurred())
+		if minVersion.Compare(operatorVersion.Version) > 0 {
+			Skip("Upgrade suite is only supported on operator versions 4.18 or newer")
+		}
 	})
 
 	Context("after operator upgrade", func() {
