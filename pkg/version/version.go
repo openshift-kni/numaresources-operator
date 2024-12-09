@@ -55,3 +55,11 @@ func ProgramName() string {
 	}
 	return filepath.Base(os.Args[0])
 }
+
+func OperatorProgramName() string {
+	return "numaresources-operator"
+}
+
+func ExporterProgramName() string {
+	return "resource-topology-exporter"
+}

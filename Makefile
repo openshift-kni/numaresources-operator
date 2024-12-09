@@ -221,8 +221,13 @@ runner-e2e-serial: bin/envsubst
 	hack/render-e2e-runner.sh
 	hack/test-e2e-runner.sh
 
+introspect-data: build-topics build-buildinfo
+
 build-topics:
 	mkdir -p bin && go run tools/lstopics/lstopics.go > bin/topics.json
+
+build-buildinfo: bin/buildhelper
+	bin/buildhelper inspect > bin/buildinfo.json
 
 build: generate fmt vet binary
 
@@ -240,7 +245,7 @@ build-e2e-install: fmt vet binary-e2e-install
 
 build-e2e-uninstall: fmt vet binary-e2e-uninstall
 
-build-e2e-all: fmt vet binary-e2e-all
+build-e2e-all: fmt vet introspect-data binary-e2e-all
 
 build-e2e-must-gather: fmt vet binary-e2e-must-gather
 

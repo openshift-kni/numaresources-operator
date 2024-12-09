@@ -4,5 +4,6 @@ COPY run-e2e-nrop-*.sh /usr/local/bin
 COPY numacell /bin
 COPY pause /
 COPY topics.json /usr/local/share
+COPY buildinfo.json /usr/local/share
 WORKDIR /usr/local/bin
 CMD ["./run-e2e-nrop-serial.sh"]
