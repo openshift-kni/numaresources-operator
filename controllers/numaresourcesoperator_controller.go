@@ -146,6 +146,11 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.degradeStatus(ctx, instance, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, err)
 	}
 
+	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
+		klog.V(2).InfoS("Pause reconciliation enabled", "object", req.NamespacedName)
+		return ctrl.Result{}, nil
+	}
+
 	if err := validation.NodeGroups(instance.Spec.NodeGroups, r.Platform); err != nil {
 		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
 	}

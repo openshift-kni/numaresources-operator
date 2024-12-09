@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -406,6 +407,36 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
 						verifyDegradedCondition(nro, validation.NodeGroupsError, platf)
 					})
+				})
+				When("pause annotation enabled", func() {
+					BeforeEach(func() {
+						if nro.Annotations == nil {
+							nro.Annotations = map[string]string{}
+						}
+						nro.Annotations[annotations.PauseReconciliationAnnotation] = annotations.PauseReconciliationAnnotationEnabled
+						Expect(reconciler.Client.Update(context.TODO(), nro)).To(Succeed())
+					})
+					It("should be able to tamper the DaemonSet", func() {
+						dsKey := client.ObjectKey{
+							Name:      objectnames.GetComponentName(nro.Name, pn1),
+							Namespace: testNamespace,
+						}
+						ds := &appsv1.DaemonSet{}
+						Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
+
+						cnt := &ds.Spec.Template.Spec.Containers[0]
+						cnt.Image = "madeup-image:1"
+						Expect(reconciler.Client.Update(context.TODO(), ds)).To(Succeed())
+
+						_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})
+						Expect(err).ToNot(HaveOccurred())
+
+						Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
+						cnt = &ds.Spec.Template.Spec.Containers[0]
+						By(fmt.Sprintf("Check that container %s image did not change", cnt.Name))
+						Expect(cnt.Image).To(Equal("madeup-image:1"))
+					})
+
 				})
 			})
 
