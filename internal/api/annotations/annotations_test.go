@@ -87,3 +87,38 @@ func TestIsMultiplePoolsPerTreeEnabled(t *testing.T) {
 		})
 	}
 }
+
+func TestIsPauseReconciliationEnabled(t *testing.T) {
+	testcases := []struct {
+		description string
+		annotations map[string]string
+		expected    bool
+	}{
+		{
+			description: "empty map",
+			annotations: map[string]string{},
+			expected:    false,
+		},
+		{
+			description: "annotation set to anything but not \"enabled\" means it's disabled",
+			annotations: map[string]string{
+				PauseReconciliationAnnotation: "true",
+			},
+			expected: false,
+		},
+		{
+			description: "enabled multiple pools per tree",
+			annotations: map[string]string{
+				PauseReconciliationAnnotation: PauseReconciliationAnnotationEnabled,
+			},
+			expected: true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			if got := IsPauseReconciliationEnabled(tc.annotations); got != tc.expected {
+				t.Errorf("expected %v got %v", tc.expected, got)
+			}
+		})
+	}
+}
