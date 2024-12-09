@@ -23,6 +23,9 @@ const (
 	// the annotation is on when it's set to "enabled", every other value is equivalent to disabled
 	MultiplePoolsPerTreeAnnotation = "config.node.openshift-kni.io/multiple-pools-per-tree"
 	MultiplePoolsPerTreeEnabled    = "enabled"
+
+	PauseReconciliationAnnotation        = "config.numa-operator.openshift.io/pause-reconciliation"
+	PauseReconciliationAnnotationEnabled = "enabled"
 )
 
 func IsCustomPolicyEnabled(annot map[string]string) bool {
@@ -34,6 +37,13 @@ func IsCustomPolicyEnabled(annot map[string]string) bool {
 
 func IsMultiplePoolsPerTreeEnabled(annot map[string]string) bool {
 	if v, ok := annot[MultiplePoolsPerTreeAnnotation]; ok && v == MultiplePoolsPerTreeEnabled {
+		return true
+	}
+	return false
+}
+
+func IsPauseReconciliationEnabled(annot map[string]string) bool {
+	if v, ok := annot[PauseReconciliationAnnotation]; ok && v == PauseReconciliationAnnotationEnabled {
 		return true
 	}
 	return false
