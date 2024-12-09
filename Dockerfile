@@ -10,6 +10,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/manager /bin/numaresources-operator
 # bundle the operand, and use a backward compatible name for RTE
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter /bin/resource-topology-exporter
+COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/buildinfo.json /usr/local/share
 RUN mkdir /etc/resource-topology-exporter/ && \
     touch /etc/resource-topology-exporter/config.yaml
 RUN microdnf install -y hwdata && \

@@ -175,7 +175,11 @@ binary-numacell: build-tools
 	LDFLAGS="-s -w" \
 	CGO_ENABLED=0 go build -mod=vendor -o bin/numacell -ldflags "$$LDFLAGS" test/deviceplugin/cmd/numacell/main.go
 
-binary-all: binary binary-rte binary-nrovalidate
+binary-all: goversion \
+	binary \
+	binary-rte \
+	binary-nrovalidate \
+	introspect-data
 
 binary-e2e-rte-local:
 	go test -c -v -o bin/e2e-nrop-rte-local.test ./test/e2e/rte/local
@@ -215,14 +219,20 @@ binary-e2e-all: goversion \
 	binary-e2e-tools \
 	binary-e2e-must-gather \
 	runner-e2e-serial \
-	build-pause
+	build-pause \
+	introspect-data
 
 runner-e2e-serial: bin/envsubst
 	hack/render-e2e-runner.sh
 	hack/test-e2e-runner.sh
 
+introspect-data: build-topics build-buildinfo
+
 build-topics:
 	mkdir -p bin && go run tools/lstopics/lstopics.go > bin/topics.json
+
+build-buildinfo: bin/buildhelper
+	bin/buildhelper inspect > bin/buildinfo.json
 
 build: generate fmt vet binary
 
