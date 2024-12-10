@@ -250,8 +250,9 @@ func main() {
 		Cache:  cache.Options{}, // TODO: restrict namespace here?
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
-			// TODO: secureServing?
-			BindAddress: params.metricsAddr,
+			BindAddress:   params.metricsAddr,
+			SecureServing: true,
+			CertDir:       "/certs",
 		},
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port:    params.webhookPort,
