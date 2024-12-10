@@ -9,6 +9,7 @@ rules:
   resources:
   - configmaps
   - serviceaccounts
+  - services
   verbs:
   - '*'
 - apiGroups:
@@ -26,18 +27,6 @@ rules:
   - get
   - list
   - watch
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccounts
-  verbs:
-  - '*'
-- apiGroups:
-  - ""
-  resources:
-  - services
-  verbs:
-  - '*'
 - apiGroups:
   - apiextensions.k8s.io
   resources:
