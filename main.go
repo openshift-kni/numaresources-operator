@@ -59,6 +59,7 @@ import (
 	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
+	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/controlplane"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
@@ -262,18 +263,24 @@ func main() {
 		klog.ErrorS(err, "unable to render RTE manifests", "controller", "NUMAResourcesOperator")
 		os.Exit(1)
 	}
+	rteMetricsManifests, err := rtemetricsmanifests.GetManifests(namespace)
+	if err != nil {
+		klog.ErrorS(err, "unable to load the RTE metrics manifests")
+		os.Exit(1)
+	}
 
 	if err = (&controllers.NUMAResourcesOperatorReconciler{
-		Client:          mgr.GetClient(),
-		Scheme:          mgr.GetScheme(),
-		Recorder:        mgr.GetEventRecorderFor("numaresources-controller"),
-		APIManifests:    apiManifests,
-		RTEManifests:    rteManifestsRendered,
-		Platform:        clusterPlatform,
-		Images:          imgs,
-		ImagePullPolicy: pullPolicy,
-		Namespace:       namespace,
-		ForwardMCPConds: params.enableMCPCondsForward,
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		Recorder:            mgr.GetEventRecorderFor("numaresources-controller"),
+		APIManifests:        apiManifests,
+		RTEManifests:        rteManifestsRendered,
+		RTEMetricsManifests: rteMetricsManifests,
+		Platform:            clusterPlatform,
+		Images:              imgs,
+		ImagePullPolicy:     pullPolicy,
+		Namespace:           namespace,
+		ForwardMCPConds:     params.enableMCPCondsForward,
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesOperator")
 		os.Exit(1)
