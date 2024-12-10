@@ -16,6 +16,9 @@ const (
 	ocpVersion413 = "v4.13"
 	ocpVersion414 = "v4.14"
 	ocpVersion415 = "v4.15"
+	ocpVersion416 = "v4.16"
+	ocpVersion417 = "v4.17"
+	ocpVersion418 = "v4.18"
 )
 
 //go:embed selinuxinstall.service.template
@@ -43,6 +46,9 @@ func GetPolicy(ver platform.Version) ([]byte, error) {
 
 func knownVersions() []string {
 	return []string{
+		ocpVersion418,
+		ocpVersion417,
+		ocpVersion416,
 		ocpVersion415,
 		ocpVersion414,
 		ocpVersion413,
