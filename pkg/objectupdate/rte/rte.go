@@ -140,6 +140,7 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 	if flags == nil {
 		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
 	}
+	flags.SetOption("--metrics-mode", "httptls")
 
 	infoRefreshPauseEnabled := isInfoRefreshPauseEnabled(&conf)
 	klog.V(2).InfoS("DaemonSet update: InfoRefreshPause status", "daemonset", ds.Name, "enabled", infoRefreshPauseEnabled)
@@ -208,6 +209,11 @@ func AddVolumeMountMemory(podSpec *corev1.PodSpec, cnt *corev1.Container, mountN
 			Name:      mountName,
 			MountPath: dirName,
 		},
+		corev1.VolumeMount{
+			MountPath: "/etc/secrets/rte/",
+			Name:      "rte-metrics-service-cert",
+			ReadOnly:  true,
+		},
 	)
 	podSpec.Volumes = append(podSpec.Volumes,
 		corev1.Volume{
@@ -216,6 +222,14 @@ func AddVolumeMountMemory(podSpec *corev1.PodSpec, cnt *corev1.Container, mountN
 				EmptyDir: &corev1.EmptyDirVolumeSource{
 					Medium:    corev1.StorageMediumMemory,
 					SizeLimit: resource.NewQuantity(sizeMiB, resource.BinarySI),
+				},
+			},
+		},
+		corev1.Volume{
+			Name: "rte-metrics-service-cert",
+			VolumeSource: corev1.VolumeSource{
+				Secret: &corev1.SecretVolumeSource{
+					SecretName: "rte-metrics-service-cert",
 				},
 			},
 		},
