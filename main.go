@@ -182,7 +182,7 @@ func main() {
 
 	klogV, err := intkloglevel.Get()
 	if err != nil {
-		klog.V(1).ErrorS(err, "setting up the logger")
+		klog.ErrorS(err, "setting up the logger")
 		os.Exit(1)
 	}
 
@@ -259,6 +259,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// the only way this can change from the command line is to restart, so fetching once is the best option
 	if err = (&controllers.NUMAResourcesOperatorReconciler{
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
@@ -270,6 +271,7 @@ func main() {
 		ImagePullPolicy: pullPolicy,
 		Namespace:       namespace,
 		ForwardMCPConds: params.enableMCPCondsForward,
+		Verbose:         int(klogV),
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesOperator")
 		os.Exit(1)
