@@ -62,6 +62,29 @@ func RenderConfig(data []byte, schedulerName string, params *manifests.ConfigPar
 
 	updated := false
 
+	if params.LeaderElection != nil {
+		lead, ok, err := unstructured.NestedMap(r.Object, "leaderElection")
+		if !ok || err != nil {
+			klog.ErrorS(err, "failed to process unstructured data", "leaderElection", ok)
+			return data, false, err
+		}
+
+		leadUpdated, err := updateLeaderElection(lead, params)
+		if err != nil {
+			klog.ErrorS(err, "failed to update unstructured data", "leaderElection", lead, "params", params)
+			return data, false, err
+		}
+		if leadUpdated {
+			updated = true
+		}
+
+		if err := unstructured.SetNestedMap(r.Object, lead, "leaderElection"); err != nil {
+			klog.ErrorS(err, "failed to override unstructured data", "data", "leaderElection")
+			return data, false, err
+		}
+
+	}
+
 	profiles, ok, err := unstructured.NestedSlice(r.Object, "profiles")
 	if !ok || err != nil {
 		klog.ErrorS(err, "failed to process unstructured data", "profiles", ok)
@@ -151,6 +174,32 @@ func RenderConfig(data []byte, schedulerName string, params *manifests.ConfigPar
 		return data, false, nil
 	}
 	return newData, updated, nil
+}
+
+func updateLeaderElection(lead map[string]interface{}, params *manifests.ConfigParams) (bool, error) {
+	var updated int
+	var err error
+
+	err = unstructured.SetNestedField(lead, params.LeaderElection.LeaderElect, "leaderElect")
+	if err != nil {
+		return updated > 0, err
+	}
+	updated++
+
+	err = unstructured.SetNestedField(lead, params.LeaderElection.ResourceName, "resourceName")
+	if err != nil {
+		return updated > 0, err
+	}
+	updated++
+
+	err = unstructured.SetNestedField(lead, params.LeaderElection.ResourceNamespace, "resourceNamespace")
+	if err != nil {
+		return updated > 0, err
+	}
+	updated++
+
+	return updated > 0, nil
+
 }
 
 func updateArgs(args map[string]interface{}, params *manifests.ConfigParams) (bool, error) {
