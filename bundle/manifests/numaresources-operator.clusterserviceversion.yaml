@@ -62,7 +62,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-11-14T15:38:47Z"
+    createdAt: "2024-12-10T19:30:57Z"
     olm.skipRange: '>=4.17.0 <4.18.0'
     operators.operatorframework.io/builder: operator-sdk-v1.36.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
@@ -544,6 +544,10 @@ spec:
                     memory: 20Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+                volumeMounts:
+                - mountPath: /certs
+                  name: metrics-tls
+                  readOnly: true
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: numaresources-controller-manager
@@ -553,6 +557,10 @@ spec:
                 key: node-role.kubernetes.io/control-plane
               - effect: NoSchedule
                 key: node-role.kubernetes.io/master
+              volumes:
+              - name: metrics-tls
+                secret:
+                  secretName: metrics-service-cert
       permissions:
       - rules:
         - apiGroups:

@@ -43,6 +43,10 @@ spec:
                 matchExpressions:
                   - key: node-role.kubernetes.io/control-plane
                     operator: Exists
+      volumes: 
+      - name : metrics-tls
+        secret:
+          secretName: metrics-service-cert
       containers:
       - command:
         - /bin/numaresources-operator
@@ -52,6 +56,10 @@ spec:
         - --enable-scheduler
         image: controller:latest
         name: manager
+        volumeMounts:
+        - name: metrics-tls
+          mountPath: /certs
+          readOnly: true
         securityContext:
           allowPrivilegeEscalation: false
         env:
