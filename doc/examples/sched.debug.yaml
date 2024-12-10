@@ -3,7 +3,7 @@ kind: NUMAResourcesScheduler
 metadata:
   name: numaresourcesscheduler
 spec:
-  imageSpec: "quay.io/openshift-kni/scheduler-plugins:4.18-snapshot"
+  imageSpec: "quay.io/openshift-kni/scheduler-plugins:4.19-snapshot"
   logLevel: "Trace"
   schedulerName: "topo-aware-scheduler"
   cacheResyncDebug: "DumpJSONFile"

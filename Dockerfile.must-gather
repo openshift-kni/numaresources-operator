@@ -1,4 +1,4 @@
-FROM quay.io/openshift/origin-cli:4.18
+FROM quay.io/openshift/origin-cli:4.19
 
 COPY must-gather/collection-scripts/* /usr/bin/
 
