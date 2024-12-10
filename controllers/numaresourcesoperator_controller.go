@@ -61,6 +61,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
+	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
@@ -83,15 +84,16 @@ type poolDaemonSet struct {
 // NUMAResourcesOperatorReconciler reconciles a NUMAResourcesOperator object
 type NUMAResourcesOperatorReconciler struct {
 	client.Client
-	Scheme          *runtime.Scheme
-	Platform        platform.Platform
-	APIManifests    apimanifests.Manifests
-	RTEManifests    rtemanifests.Manifests
-	Namespace       string
-	Images          images.Data
-	ImagePullPolicy corev1.PullPolicy
-	Recorder        record.EventRecorder
-	ForwardMCPConds bool
+	Scheme              *runtime.Scheme
+	Platform            platform.Platform
+	APIManifests        apimanifests.Manifests
+	RTEManifests        rtemanifests.Manifests
+	RTEMetricsManifests rtemetricsmanifests.Manifests
+	Namespace           string
+	Images              images.Data
+	ImagePullPolicy     corev1.PullPolicy
+	Recorder            record.EventRecorder
+	ForwardMCPConds     bool
 }
 
 // TODO: narrow down
