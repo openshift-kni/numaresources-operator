@@ -45,14 +45,15 @@ const (
 )
 
 func main() {
-	klog.Infof("starting %s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
+	klog.Infof("starting %s %s %s %s\n", version.ExporterProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
+
 	parsedArgs, err := parseArgs(os.Args[1:]...)
 	if err != nil {
 		klog.Fatalf("failed to parse args: %v", err)
 	}
 
 	if parsedArgs.Version {
-		fmt.Printf("%s %s %s %s\n", version.ProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
+		fmt.Printf("%s %s %s %s\n", version.ExporterProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
 		os.Exit(0)
 	}
 
