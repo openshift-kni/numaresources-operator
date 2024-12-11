@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
@@ -536,97 +538,132 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							Expect(nroUpdated.Status.RelatedObjects).To(ContainElements(expected))
 						})
 					})
+					When("pause annotation enabled", func() {
+						var nroKey client.ObjectKey
+						BeforeEach(func() {
+							nroKey = client.ObjectKeyFromObject(nro)
+							Expect(reconciler.Client.Get(context.TODO(), nroKey, nro)).To(Succeed())
+							if nro.Annotations == nil {
+								nro.Annotations = map[string]string{}
+							}
+							nro.Annotations[annotations.PauseReconciliationAnnotation] = annotations.PauseReconciliationAnnotationEnabled
+							Expect(reconciler.Client.Update(context.TODO(), nro)).To(Succeed())
+						})
+						It("should be able to tamper the DaemonSet", func() {
+							dsKey := client.ObjectKey{
+								Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+								Namespace: testNamespace,
+							}
+							ds := &appsv1.DaemonSet{}
+							dsList := &appsv1.DaemonSetList{}
+							Expect(reconciler.Client.List(context.TODO(), dsList))
+							Expect(dsList.Items).ToNot(BeEmpty())
+							Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
+
+							cnt := &ds.Spec.Template.Spec.Containers[0]
+							cnt.Image = "madeup-image:1"
+							Expect(reconciler.Client.Update(context.TODO(), ds)).To(Succeed())
+
+							_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})
+							Expect(err).ToNot(HaveOccurred())
+
+							Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
+							cnt = &ds.Spec.Template.Spec.Containers[0]
+							By(fmt.Sprintf("Check that container %s image did not change", cnt.Name))
+							Expect(cnt.Image).To(Equal("madeup-image:1"))
+						})
+					})
 				})
 			})
-		})
+			Context("with machine config pool with complex machine config selector", func() {
+				var mcpWithComplexMachineConfigSelector *machineconfigv1.MachineConfigPool
 
-		Context("with machine config pool with complex machine config selector", func() {
-			var mcpWithComplexMachineConfigSelector *machineconfigv1.MachineConfigPool
-
-			BeforeEach(func() {
-				label3 := map[string]string{"test3": "test3"}
-				mcpWithComplexMachineConfigSelector = testobjs.NewMachineConfigPool(
-					"complex-machine-config-selector",
-					label3,
-					&metav1.LabelSelector{MatchLabels: label3},
-					&metav1.LabelSelector{MatchLabels: label3},
-				)
-				nro.Spec.NodeGroups = []nropv1.NodeGroup{
-					{
-						MachineConfigPoolSelector: &metav1.LabelSelector{
-							MatchLabels: label3,
-						},
-					},
-				}
-			})
-
-			When("machine config selector matches machine config labels", func() {
 				BeforeEach(func() {
-					mcpWithComplexMachineConfigSelector.Spec.MachineConfigSelector = &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      rte.MachineConfigLabelKey,
-								Operator: metav1.LabelSelectorOpIn,
-								Values:   []string{mcpWithComplexMachineConfigSelector.Name, "worker"},
+					label3 := map[string]string{"test3": "test3"}
+					mcpWithComplexMachineConfigSelector = testobjs.NewMachineConfigPool(
+						"complex-machine-config-selector",
+						label3,
+						&metav1.LabelSelector{MatchLabels: label3},
+						&metav1.LabelSelector{MatchLabels: label3},
+					)
+					nro.Spec.NodeGroups = []nropv1.NodeGroup{
+						{
+							MachineConfigPoolSelector: &metav1.LabelSelector{
+								MatchLabels: label3,
 							},
 						},
 					}
-					var err error
-
-					reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcpWithComplexMachineConfigSelector)
-					Expect(err).ToNot(HaveOccurred())
 				})
 
-				It("should create the machine config", func() {
-					key := client.ObjectKeyFromObject(nro)
-					firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-					Expect(err).ToNot(HaveOccurred())
-					Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
-
-					mc := &machineconfigv1.MachineConfig{}
-					key = client.ObjectKey{
-						Name: objectnames.GetMachineConfigName(nro.Name, mcpWithComplexMachineConfigSelector.Name),
-					}
-					Expect(reconciler.Client.Get(context.TODO(), key, mc)).ToNot(HaveOccurred())
-				})
-			})
-
-			When("machine config selector does not match machine config labels", func() {
-				BeforeEach(func() {
-					mcpWithComplexMachineConfigSelector.Spec.MachineConfigSelector = &metav1.LabelSelector{
-						MatchExpressions: []metav1.LabelSelectorRequirement{
-							{
-								Key:      rte.MachineConfigLabelKey,
-								Operator: metav1.LabelSelectorOpIn,
-								Values:   []string{"worker", "worker-cnf"},
+				When("machine config selector matches machine config labels", func() {
+					BeforeEach(func() {
+						mcpWithComplexMachineConfigSelector.Spec.MachineConfigSelector = &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      rte.MachineConfigLabelKey,
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{mcpWithComplexMachineConfigSelector.Name, "worker"},
+								},
 							},
-						},
-					}
+						}
+						var err error
 
-					var err error
-					reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcpWithComplexMachineConfigSelector)
-					Expect(err).ToNot(HaveOccurred())
+						reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcpWithComplexMachineConfigSelector)
+						Expect(err).ToNot(HaveOccurred())
+					})
+
+					It("should create the machine config", func() {
+						key := client.ObjectKeyFromObject(nro)
+						firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+						Expect(err).ToNot(HaveOccurred())
+						Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+
+						mc := &machineconfigv1.MachineConfig{}
+						key = client.ObjectKey{
+							Name: objectnames.GetMachineConfigName(nro.Name, mcpWithComplexMachineConfigSelector.Name),
+						}
+						Expect(reconciler.Client.Get(context.TODO(), key, mc)).ToNot(HaveOccurred())
+					})
 				})
 
-				It("should not create the machine config and set the degraded condition", func() {
-					key := client.ObjectKeyFromObject(nro)
-					firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-					Expect(err).To(HaveOccurred())
-					Expect(firstLoopResult).To(Equal(reconcile.Result{}))
+				When("machine config selector does not match machine config labels", func() {
+					BeforeEach(func() {
+						mcpWithComplexMachineConfigSelector.Spec.MachineConfigSelector = &metav1.LabelSelector{
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      rte.MachineConfigLabelKey,
+									Operator: metav1.LabelSelectorOpIn,
+									Values:   []string{"worker", "worker-cnf"},
+								},
+							},
+						}
 
-					mc := &machineconfigv1.MachineConfig{}
-					mcKey := client.ObjectKey{
-						Name: objectnames.GetMachineConfigName(nro.Name, mcpWithComplexMachineConfigSelector.Name),
-					}
-					err = reconciler.Client.Get(context.TODO(), mcKey, mc)
-					Expect(apierrors.IsNotFound(err)).To(BeTrue())
+						var err error
+						reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcpWithComplexMachineConfigSelector)
+						Expect(err).ToNot(HaveOccurred())
+					})
 
-					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nro)).ToNot(HaveOccurred())
-					degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
-					Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
-					Expect(degradedCondition.Message).To(ContainSubstring("labels does not match the machine config pool"))
+					It("should not create the machine config and set the degraded condition", func() {
+						key := client.ObjectKeyFromObject(nro)
+						firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+						Expect(err).To(HaveOccurred())
+						Expect(firstLoopResult).To(Equal(reconcile.Result{}))
+
+						mc := &machineconfigv1.MachineConfig{}
+						mcKey := client.ObjectKey{
+							Name: objectnames.GetMachineConfigName(nro.Name, mcpWithComplexMachineConfigSelector.Name),
+						}
+						err = reconciler.Client.Get(context.TODO(), mcKey, mc)
+						Expect(apierrors.IsNotFound(err)).To(BeTrue())
+
+						Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nro)).ToNot(HaveOccurred())
+						degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
+						Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+						Expect(degradedCondition.Message).To(ContainSubstring("labels does not match the machine config pool"))
+					})
 				})
 			})
+
 		})
 	})
 

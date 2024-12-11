@@ -52,6 +52,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
@@ -130,6 +131,11 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	if req.Name != objectnames.DefaultNUMAResourcesOperatorCrName {
 		message := fmt.Sprintf("incorrect NUMAResourcesOperator resource name: %s", instance.Name)
 		return r.updateStatus(ctx, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, message)
+	}
+
+	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
+		klog.V(2).InfoS("Pause reconciliation enabled", "object", req.NamespacedName)
+		return ctrl.Result{}, nil
 	}
 
 	if err := validation.NodeGroups(instance.Spec.NodeGroups); err != nil {
