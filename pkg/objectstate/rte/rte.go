@@ -385,6 +385,8 @@ func (em *ExistingManifests) State(mf Manifests, updater GenerateDesiredManifest
 	return ret
 }
 
+type UpdateFromClientTreeFunc func(ret *ExistingManifests, ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, tree nodegroupv1.Tree, namespace string)
+
 func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf Manifests, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, namespace string) ExistingManifests {
 	ret := ExistingManifests{
 		existing: Manifests{
@@ -426,57 +428,27 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		ret.existing.Core.ServiceAccount = sa
 	}
 
+	method := "nodeGroups"
+	var updateFromClientTree UpdateFromClientTreeFunc = updateFromClientTreeNodeGroup
+
+	if plat == platform.OpenShift {
+		method = "machineConfigPools"
+		updateFromClientTree = updateFromClientTreeMachineConfigPool // backward compatibility
+	}
+
+	klog.V(4).InfoS("RTE manifests processing trees", "method", method)
+
 	if plat != platform.Kubernetes {
 		scc := &securityv1.SecurityContextConstraints{}
 		if ok := getObject(ctx, cli, keyFor(mf.Core.SecurityContextConstraint), scc, &ret.errs.Core.SCC); ok {
 			ret.existing.Core.SecurityContextConstraint = scc
 		}
-
 		ret.machineConfigs = make(map[string]machineConfigManifest)
 	}
 
 	// should have the amount of resources equals to the amount of node groups
 	for _, tree := range trees {
-		if plat == platform.OpenShift {
-			for _, mcp := range tree.MachineConfigPools {
-				generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
-				key := client.ObjectKey{
-					Name:      generatedName,
-					Namespace: namespace,
-				}
-				ds := &appsv1.DaemonSet{}
-				dsm := daemonSetManifest{}
-				if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
-					dsm.daemonSet = ds
-				}
-				ret.daemonSets[generatedName] = dsm
-
-				mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
-				mckey := client.ObjectKey{
-					Name: mcName,
-				}
-				mc := &machineconfigv1.MachineConfig{}
-				mcm := machineConfigManifest{}
-				if mcm.machineConfigError = cli.Get(ctx, mckey, mc); mcm.machineConfigError == nil {
-					mcm.machineConfig = mc
-				}
-				ret.machineConfigs[mcName] = mcm
-			}
-		}
-
-		if plat == platform.HyperShift {
-			generatedName := objectnames.GetComponentName(instance.Name, *tree.NodeGroup.PoolName)
-			key := client.ObjectKey{
-				Name:      generatedName,
-				Namespace: namespace,
-			}
-			ds := &appsv1.DaemonSet{}
-			dsm := daemonSetManifest{}
-			if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
-				dsm.daemonSet = ds
-			}
-			ret.daemonSets[generatedName] = dsm
-		}
+		updateFromClientTree(&ret, ctx, cli, instance, tree, namespace)
 	}
 
 	// extra: metrics
@@ -486,6 +458,47 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 	}
 
 	return ret
+}
+
+func updateFromClientTreeMachineConfigPool(ret *ExistingManifests, ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, tree nodegroupv1.Tree, namespace string) {
+	for _, mcp := range tree.MachineConfigPools {
+		generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
+		key := client.ObjectKey{
+			Name:      generatedName,
+			Namespace: namespace,
+		}
+		ds := &appsv1.DaemonSet{}
+		dsm := daemonSetManifest{}
+		if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
+			dsm.daemonSet = ds
+		}
+		ret.daemonSets[generatedName] = dsm
+
+		mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
+		mckey := client.ObjectKey{
+			Name: mcName,
+		}
+		mc := &machineconfigv1.MachineConfig{}
+		mcm := machineConfigManifest{}
+		if mcm.machineConfigError = cli.Get(ctx, mckey, mc); mcm.machineConfigError == nil {
+			mcm.machineConfig = mc
+		}
+		ret.machineConfigs[mcName] = mcm
+	}
+}
+
+func updateFromClientTreeNodeGroup(ret *ExistingManifests, ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, tree nodegroupv1.Tree, namespace string) {
+	generatedName := objectnames.GetComponentName(instance.Name, *tree.NodeGroup.PoolName)
+	key := client.ObjectKey{
+		Name:      generatedName,
+		Namespace: namespace,
+	}
+	ds := &appsv1.DaemonSet{}
+	dsm := daemonSetManifest{}
+	if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
+		dsm.daemonSet = ds
+	}
+	ret.daemonSets[generatedName] = dsm
 }
 
 func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName, bool) {
