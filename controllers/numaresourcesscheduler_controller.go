@@ -42,6 +42,7 @@ import (
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
@@ -104,6 +105,11 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	if req.Name != objectnames.DefaultNUMAResourcesSchedulerCrName {
 		message := fmt.Sprintf("incorrect NUMAResourcesScheduler resource name: %s", instance.Name)
 		return ctrl.Result{}, r.updateStatus(ctx, instance, status.ConditionDegraded, conditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
+	}
+
+	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
+		klog.InfoS("Pause reconciliation enabled", "object", req.NamespacedName)
+		return ctrl.Result{}, nil
 	}
 
 	result, condition, err := r.reconcileResource(ctx, instance)
