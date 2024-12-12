@@ -103,16 +103,20 @@ help: ## Display this help.
 
 ##@ Development
 
-manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+manifests: controller-gen
 	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
-generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
-fmt: ## Run go fmt against code.
+generate-source: pkg/version/_buildinfo.json
+
+fmt: 
 	go fmt ./...
 
-vet: ## Run go vet against code.
+# needed otherwise vet complains about trying to embed a missing file.
+# note: this would be missing only at time of vetting, which happens before the build process even starts
+vet: generate-source
 	go vet ./...
 
 gosec:
@@ -123,13 +127,13 @@ test: manifests generate fmt vet envtest ## Run tests.
 
 test-unit: test-unit-pkgs test-controllers
 
-test-unit-pkgs:
+test-unit-pkgs: generate-source pkg/
 	go test ./api/... ./pkg/... ./rte/pkg/... ./internal/... ./nrovalidate/validator/...
 
-test-unit-pkgs-cover:
+test-unit-pkgs-cover: generate-source
 	go test -coverprofile=coverage.out ./api/numaresourcesoperator/v1/helper/... ./api/numaresourcesoperator/v1alpha1/helper/... ./pkg/... ./rte/pkg/... ./internal/... ./nrovalidate/validator/...
 
-test-controllers: envtest
+test-controllers: envtest generate-source
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/...
 
 test-e2e: build-e2e-all
@@ -154,21 +158,15 @@ cover-summary:
 
 binary: build-tools
 	LDFLAGS="-s -w"; \
-	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)"; \
-	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version)"; \
 	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/images.tag=$(VERSION)"; \
 	go build -mod=vendor -o bin/manager -ldflags "$$LDFLAGS" -tags "$$GOTAGS" main.go
 
 binary-rte: build-tools
 	LDFLAGS="-s -w"; \
-	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)"; \
-	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version)"; \
-	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/images.tag=$(VERSION)"; \
 	go build -mod=vendor -o bin/exporter -ldflags "$$LDFLAGS" -tags "$$GOTAGS" rte/main.go
 
 binary-nrovalidate: build-tools
 	LDFLAGS="-s -w"; \
-	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version)"; \
 	go build -mod=vendor -o bin/nrovalidate -ldflags "$$LDFLAGS" -tags "$$GOTAGS" nrovalidate/main.go
 
 binary-numacell: build-tools
@@ -181,30 +179,28 @@ binary-all: goversion \
 	binary-nrovalidate \
 	introspect-data
 
-binary-e2e-rte-local:
+binary-e2e-rte-local: generate-source
 	go test -c -v -o bin/e2e-nrop-rte-local.test ./test/e2e/rte/local
 
-binary-e2e-rte: binary-e2e-rte-local
+binary-e2e-rte: binary-e2e-rte-local generate-source
 	go test -c -v -o bin/e2e-nrop-rte.test ./test/e2e/rte
 
-binary-e2e-install:
+binary-e2e-install: generate-source
 	go test -v -c -o bin/e2e-nrop-install.test ./test/e2e/install && go test -v -c -o bin/e2e-nrop-sched-install.test ./test/e2e/sched/install
 
-binary-e2e-uninstall:
+binary-e2e-uninstall: generate-source
 	go test -v -c -o bin/e2e-nrop-uninstall.test ./test/e2e/uninstall && go test -v -c -o bin/e2e-nrop-sched-uninstall.test ./test/e2e/sched/uninstall
 
-binary-e2e-sched:
+binary-e2e-sched: generate-source
 	go test -c -v -o bin/e2e-nrop-sched.test ./test/e2e/sched
 
-binary-e2e-serial:
-	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version) "; \
-	LDFLAGS+="-X github.com/openshift-kni/numaresources-operator/pkg/version.gitcommit=$(shell bin/buildhelper commit)"; \
+binary-e2e-serial: generate-source
 	CGO_ENABLED=0 go test -c -v -o bin/e2e-nrop-serial.test -ldflags "$$LDFLAGS" ./test/e2e/serial
 
-binary-e2e-tools:
+binary-e2e-tools: generate-source
 	go test -c -v -o bin/e2e-nrop-tools.test ./test/e2e/tools
 
-binary-e2e-must-gather:
+binary-e2e-must-gather: generate-source
 	go test -c -v -o bin/e2e-nrop-must-gather.test ./test/e2e/must-gather
 
 # backward compatibility
@@ -234,23 +230,23 @@ build-topics:
 build-buildinfo: bin/buildhelper
 	bin/buildhelper inspect > bin/buildinfo.json
 
-build: generate fmt vet binary
+build: generate generate-source fmt vet binary
 
-build-rte: fmt vet binary-rte
+build-rte: generate-source fmt vet binary-rte
 
 build-numacell: fmt vet binary-numacell
 
-build-nrovalidate: fmt vet binary-nrovalidate
+build-nrovalidate: generate-source fmt vet binary-nrovalidate
 
-build-all: generate fmt vet binary binary-rte binary-numacell binary-nrovalidate
+build-all: generate generate-source fmt vet binary binary-rte binary-numacell binary-nrovalidate
 
-build-e2e-rte: fmt vet binary-e2e-rte
+build-e2e-rte: generate-source fmt vet binary-e2e-rte
 
 build-e2e-install: fmt vet binary-e2e-install
 
 build-e2e-uninstall: fmt vet binary-e2e-uninstall
 
-build-e2e-all: fmt vet binary-e2e-all
+build-e2e-all: generate-source fmt vet binary-e2e-all
 
 build-e2e-must-gather: fmt vet binary-e2e-must-gather
 
@@ -266,7 +262,7 @@ build-pause-gcc: bin-dir
 bin-dir:
 	@mkdir -p bin || :
 
-run: manifests generate fmt vet ## Run a controller from your host.
+run: manifests generate generate-source fmt vet ## Run a controller from your host.
 	go run ./main.go
 
 # backward compatibility
@@ -405,10 +401,15 @@ goversion:
 	@go version
 
 .PHONY: build-tools
-build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform
+build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform update-buildinfo
 
 .PHONY: build-tools-all
-build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap bin/watchnrtattr bin/mkginkgolabelfilter bin/nrtcacheck
+build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap bin/watchnrtattr bin/mkginkgolabelfilter bin/nrtcacheck update-buildinfo
+
+pkg/version/_buildinfo.json: bin/buildhelper
+	@bin/buildhelper inspect > pkg/version/_buildinfo.json
+
+update-buildinfo: pkg/version/_buildinfo.json
 
 bin/buildhelper:
 	@go build -o bin/buildhelper tools/buildhelper/buildhelper.go
@@ -432,7 +433,6 @@ bin/mkginkgolabelfilter:
 
 bin/nrtcacheck: build-tools
 	LDFLAGS="-s -w" \
-	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/version.version=$(shell bin/buildhelper version)"; \
 	go build -mod=vendor -o bin/nrtcacheck -ldflags "$$LDFLAGS" -tags "$$GOTAGS" tools/nrtcacheck/nrtcacheck.go
 
 verify-generated: bundle generate
@@ -445,7 +445,7 @@ install-git-hooks:
 
 GOLANGCI_LINT_LOCAL_VERSION := $(shell command ${GOLANGCI_LINT} --version 2> /dev/null | awk '{print $$4}')
 .PHONY: golangci-lint
-golangci-lint:
+golangci-lint: pkg/version/_buildinfo.json
 	@if [ ! -x "$(GOLANGCI_LINT)" ]; then\
 		echo "Downloading golangci-lint from https://github.com/golangci/golangci-lint/releases/download/v$(GOLANGCI_LINT_VERSION)/$(GOLANGCI_LINT_ARTIFACT_FILE)";\
 		mkdir -p $(BIN_DIR);\

@@ -17,36 +17,32 @@
 package version
 
 import (
+	_ "embed"
+	"encoding/json"
 	"os"
 	"path/filepath"
+
+	"github.com/openshift-kni/numaresources-operator/internal/api/buildinfo"
 )
 
-const (
-	undefined string = "undefined"
-)
+//go:embed _buildinfo.json
+var buildInfo string
 
-// version Must not be const, supposed to be set using ldflags at build time
-var version = undefined
-
-// gitcommit Must not be const, supposed to be set using ldflags at build time
-var gitcommit = undefined
+func GetBuildInfo() buildinfo.BuildInfo {
+	var bi buildinfo.BuildInfo
+	_ = json.Unmarshal([]byte(buildInfo), &bi)
+	return bi
+}
 
 // Get returns the version as a string
 func Get() string {
-	return version
-}
-
-// Undefined returns if version is at it's default value
-func Undefined() bool {
-	return version == undefined
+	bi := GetBuildInfo()
+	return bi.Version
 }
 
 func GetGitCommit() string {
-	return gitcommit
-}
-
-func UndefinedGitCommit() bool {
-	return gitcommit == undefined
+	bi := GetBuildInfo()
+	return bi.Commit
 }
 
 func ProgramName() string {

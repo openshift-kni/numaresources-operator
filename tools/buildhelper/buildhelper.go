@@ -25,18 +25,14 @@ import (
 	"strings"
 
 	"github.com/mdomke/git-semver/version"
+
+	"github.com/openshift-kni/numaresources-operator/internal/api/buildinfo"
 )
 
 const (
 	develBranchName     = "devel"
 	releaseBranchPrefix = "release-"
 )
-
-type buildInfo struct {
-	Branch  string `json:"branch"`
-	Version string `json:"version"`
-	Commit  string `json:"commit"`
-}
 
 func getVersion() (string, error) {
 	if ver, ok := os.LookupEnv("NRO_BUILD_VERSION"); ok {
@@ -108,7 +104,7 @@ func showBranch() int {
 }
 
 func inspect() int {
-	var bi buildInfo
+	var bi buildinfo.BuildInfo
 	var err error
 
 	bi.Version, err = getVersion()

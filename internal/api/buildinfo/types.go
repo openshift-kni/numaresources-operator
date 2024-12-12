@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 Red Hat, Inc.
+ * Copyright 2024 Red Hat, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,24 +14,14 @@
  * limitations under the License.
  */
 
-package version
+package buildinfo
 
-import "testing"
-
-func TestGet(t *testing.T) {
-	if Get() == "" {
-		t.Errorf("empty version")
-	}
+type BuildInfo struct {
+	Branch  string `json:"branch"`
+	Version string `json:"version"`
+	Commit  string `json:"commit"`
 }
 
-func TestGetGitCommit(t *testing.T) {
-	if GetGitCommit() == "" {
-		t.Errorf("empty gitcommit")
-	}
-}
-
-func TestProgramName(t *testing.T) {
-	if ProgramName() == "undefined" {
-		t.Errorf("program name should always be defined")
-	}
+func (bi BuildInfo) String() string {
+	return bi.Version + " " + bi.Commit + " (" + bi.Branch + ")"
 }
