@@ -46,6 +46,13 @@ const (
 	HyperShiftNodePoolLabel = "hypershift.openshift.io/nodePool"
 )
 
+// TODO: ugly name. At least it's only internal
+type rteHelper interface {
+	Name() string
+	UpdateFromClient(ctx context.Context, cli client.Client, tree nodegroupv1.Tree)
+	FindState(mf Manifests, tree nodegroupv1.Tree) []objectstate.ObjectState
+}
+
 type daemonSetManifest struct {
 	daemonSet      *appsv1.DaemonSet
 	daemonSetError error
@@ -87,6 +94,7 @@ type ExistingManifests struct {
 	namespace           string
 	customPolicyEnabled bool
 	updater             GenerateDesiredManifestUpdater
+	helper              rteHelper
 }
 
 func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName, bool) {
@@ -229,8 +237,6 @@ func SkipManifestUpdate(mcpName string, gdm *GeneratedDesiredManifest) error {
 	return nil
 }
 
-type stateHelperFunc func(em *ExistingManifests, mf Manifests, tree nodegroupv1.Tree) []objectstate.ObjectState
-
 func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 	ret := []objectstate.ObjectState{
 		{
@@ -280,18 +286,10 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 		})
 	}
 
-	method := "nodeGroup"
-	var stateHelper stateHelperFunc = stateFromNodeGroup
-
-	if em.plat == platform.OpenShift {
-		method = "machineConfigPools"
-		stateHelper = stateFromMachineConfigPools // backward compatibility
-	}
-
-	klog.V(4).InfoS("RTE manifests processing trees", "method", method)
+	klog.V(4).InfoS("RTE manifests processing trees", "method", em.helper.Name())
 
 	for _, tree := range em.trees {
-		ret = append(ret, stateHelper(em, mf, tree)...)
+		ret = append(ret, em.helper.FindState(mf, tree)...)
 	}
 
 	// extra: metrics
@@ -306,8 +304,6 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 
 	return ret
 }
-
-type updateFromClientTreeFunc func(ret *ExistingManifests, ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, tree nodegroupv1.Tree, namespace string)
 
 func (em *ExistingManifests) WithManifestsUpdater(updater GenerateDesiredManifestUpdater) *ExistingManifests {
 	em.updater = updater
@@ -329,6 +325,20 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 	}
 
 	keyFor := client.ObjectKeyFromObject // shortcut
+
+	if plat == platform.OpenShift {
+		ret.helper = machineConfigPoolFinder{
+			em:        &ret,
+			instance:  instance,
+			namespace: namespace,
+		}
+	} else {
+		ret.helper = nodeGroupFinder{
+			em:        &ret,
+			instance:  instance,
+			namespace: namespace,
+		}
+	}
 
 	// objects that should present in the single replica
 	ro := &rbacv1.Role{}
@@ -356,15 +366,7 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		ret.existing.Core.ServiceAccount = sa
 	}
 
-	method := "nodeGroups"
-	var updateFromClientTree updateFromClientTreeFunc = updateFromClientTreeNodeGroup
-
-	if plat == platform.OpenShift {
-		method = "machineConfigPools"
-		updateFromClientTree = updateFromClientTreeMachineConfigPool // backward compatibility
-	}
-
-	klog.V(4).InfoS("RTE manifests processing trees", "method", method)
+	klog.V(4).InfoS("RTE manifests processing trees", "method", ret.helper.Name())
 
 	if plat != platform.Kubernetes {
 		scc := &securityv1.SecurityContextConstraints{}
@@ -376,7 +378,7 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 
 	// should have the amount of resources equals to the amount of node groups
 	for _, tree := range trees {
-		updateFromClientTree(&ret, ctx, cli, instance, tree, namespace)
+		ret.helper.UpdateFromClient(ctx, cli, tree)
 	}
 
 	// extra: metrics

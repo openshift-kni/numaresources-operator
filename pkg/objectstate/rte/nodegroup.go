@@ -31,29 +31,39 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 )
 
-func updateFromClientTreeNodeGroup(ret *ExistingManifests, ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, tree nodegroupv1.Tree, namespace string) {
-	generatedName := objectnames.GetComponentName(instance.Name, *tree.NodeGroup.PoolName)
+type nodeGroupFinder struct {
+	em        *ExistingManifests
+	instance  *nropv1.NUMAResourcesOperator
+	namespace string
+}
+
+func (obj nodeGroupFinder) Name() string {
+	return "nodeGroup"
+}
+
+func (obj nodeGroupFinder) UpdateFromClient(ctx context.Context, cli client.Client, tree nodegroupv1.Tree) {
+	generatedName := objectnames.GetComponentName(obj.instance.Name, *tree.NodeGroup.PoolName)
 	key := client.ObjectKey{
 		Name:      generatedName,
-		Namespace: namespace,
+		Namespace: obj.namespace,
 	}
 	ds := &appsv1.DaemonSet{}
 	dsm := daemonSetManifest{}
 	if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
 		dsm.daemonSet = ds
 	}
-	ret.daemonSets[generatedName] = dsm
+	obj.em.daemonSets[generatedName] = dsm
 }
 
-func stateFromNodeGroup(em *ExistingManifests, mf Manifests, tree nodegroupv1.Tree) []objectstate.ObjectState {
+func (obj nodeGroupFinder) FindState(mf Manifests, tree nodegroupv1.Tree) []objectstate.ObjectState {
 	var ret []objectstate.ObjectState
 	var existingDs client.Object
 	var loadError error
 
 	poolName := *tree.NodeGroup.PoolName
 
-	generatedName := objectnames.GetComponentName(em.instance.Name, poolName)
-	existingDaemonSet, ok := em.daemonSets[generatedName]
+	generatedName := objectnames.GetComponentName(obj.instance.Name, poolName)
+	existingDaemonSet, ok := obj.em.daemonSets[generatedName]
 	if ok {
 		existingDs = existingDaemonSet.daemonSet
 		loadError = existingDaemonSet.daemonSetError
@@ -70,14 +80,14 @@ func stateFromNodeGroup(em *ExistingManifests, mf Manifests, tree nodegroupv1.Tr
 	}
 
 	gdm := GeneratedDesiredManifest{
-		ClusterPlatform:       em.plat,
+		ClusterPlatform:       obj.em.plat,
 		MachineConfigPool:     nil,
 		NodeGroup:             tree.NodeGroup.DeepCopy(),
 		DaemonSet:             desiredDaemonSet,
-		IsCustomPolicyEnabled: em.customPolicyEnabled,
+		IsCustomPolicyEnabled: obj.em.customPolicyEnabled,
 	}
 
-	err := em.updater(poolName, &gdm)
+	err := obj.em.updater(poolName, &gdm)
 	if err != nil {
 		updateError = fmt.Errorf("daemonset for pool %q: update failed: %w", poolName, err)
 	}

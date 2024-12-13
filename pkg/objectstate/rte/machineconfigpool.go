@@ -33,21 +33,31 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 )
 
-func updateFromClientTreeMachineConfigPool(ret *ExistingManifests, ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, tree nodegroupv1.Tree, namespace string) {
+type machineConfigPoolFinder struct {
+	em        *ExistingManifests
+	instance  *nropv1.NUMAResourcesOperator
+	namespace string
+}
+
+func (obj machineConfigPoolFinder) Name() string {
+	return "machineConfigPool"
+}
+
+func (obj machineConfigPoolFinder) UpdateFromClient(ctx context.Context, cli client.Client, tree nodegroupv1.Tree) {
 	for _, mcp := range tree.MachineConfigPools {
-		generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
+		generatedName := objectnames.GetComponentName(obj.instance.Name, mcp.Name)
 		key := client.ObjectKey{
 			Name:      generatedName,
-			Namespace: namespace,
+			Namespace: obj.namespace,
 		}
 		ds := &appsv1.DaemonSet{}
 		dsm := daemonSetManifest{}
 		if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
 			dsm.daemonSet = ds
 		}
-		ret.daemonSets[generatedName] = dsm
+		obj.em.daemonSets[generatedName] = dsm
 
-		mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
+		mcName := objectnames.GetMachineConfigName(obj.instance.Name, mcp.Name)
 		mckey := client.ObjectKey{
 			Name: mcName,
 		}
@@ -56,18 +66,18 @@ func updateFromClientTreeMachineConfigPool(ret *ExistingManifests, ctx context.C
 		if mcm.machineConfigError = cli.Get(ctx, mckey, mc); mcm.machineConfigError == nil {
 			mcm.machineConfig = mc
 		}
-		ret.machineConfigs[mcName] = mcm
+		obj.em.machineConfigs[mcName] = mcm
 	}
 }
 
-func stateFromMachineConfigPools(em *ExistingManifests, mf Manifests, tree nodegroupv1.Tree) []objectstate.ObjectState {
+func (obj machineConfigPoolFinder) FindState(mf Manifests, tree nodegroupv1.Tree) []objectstate.ObjectState {
 	var ret []objectstate.ObjectState
 	for _, mcp := range tree.MachineConfigPools {
 		var existingDs client.Object
 		var loadError error
 
-		generatedName := objectnames.GetComponentName(em.instance.Name, mcp.Name)
-		existingDaemonSet, ok := em.daemonSets[generatedName]
+		generatedName := objectnames.GetComponentName(obj.instance.Name, mcp.Name)
+		existingDaemonSet, ok := obj.em.daemonSets[generatedName]
 		if ok {
 			existingDs = existingDaemonSet.daemonSet
 			loadError = existingDaemonSet.daemonSetError
@@ -86,14 +96,14 @@ func stateFromMachineConfigPools(em *ExistingManifests, mf Manifests, tree nodeg
 		}
 
 		gdm := GeneratedDesiredManifest{
-			ClusterPlatform:       em.plat,
+			ClusterPlatform:       obj.em.plat,
 			MachineConfigPool:     mcp.DeepCopy(),
 			NodeGroup:             tree.NodeGroup.DeepCopy(),
 			DaemonSet:             desiredDaemonSet,
-			IsCustomPolicyEnabled: em.customPolicyEnabled,
+			IsCustomPolicyEnabled: obj.em.customPolicyEnabled,
 		}
 
-		err := em.updater(mcp.Name, &gdm)
+		err := obj.em.updater(mcp.Name, &gdm)
 		if err != nil {
 			updateError = fmt.Errorf("daemonset for MCP %q: update failed: %w", mcp.Name, err)
 		}
