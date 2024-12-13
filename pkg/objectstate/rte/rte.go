@@ -18,7 +18,6 @@ package rte
 
 import (
 	"context"
-	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -88,6 +87,15 @@ type ExistingManifests struct {
 	namespace           string
 	customPolicyEnabled bool
 	updater             GenerateDesiredManifestUpdater
+}
+
+func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName, bool) {
+	res := nropv1.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}
+	_, ok := obj.(*appsv1.DaemonSet)
+	return res, ok
 }
 
 type MCPWaitForUpdatedFunc func(string, *machineconfigv1.MachineConfigPool) bool
@@ -221,6 +229,8 @@ func SkipManifestUpdate(mcpName string, gdm *GeneratedDesiredManifest) error {
 	return nil
 }
 
+type stateHelperFunc func(em *ExistingManifests, mf Manifests, tree nodegroupv1.Tree) []objectstate.ObjectState
+
 func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 	ret := []objectstate.ObjectState{
 		{
@@ -270,103 +280,18 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 		})
 	}
 
+	method := "nodeGroup"
+	var stateHelper stateHelperFunc = stateFromNodeGroup
+
+	if em.plat == platform.OpenShift {
+		method = "machineConfigPools"
+		stateHelper = stateFromMachineConfigPools // backward compatibility
+	}
+
+	klog.V(4).InfoS("RTE manifests processing trees", "method", method)
+
 	for _, tree := range em.trees {
-		if em.plat == platform.OpenShift {
-			for _, mcp := range tree.MachineConfigPools {
-				var existingDs client.Object
-				var loadError error
-
-				generatedName := objectnames.GetComponentName(em.instance.Name, mcp.Name)
-				existingDaemonSet, ok := em.daemonSets[generatedName]
-				if ok {
-					existingDs = existingDaemonSet.daemonSet
-					loadError = existingDaemonSet.daemonSetError
-				} else {
-					loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.Core.DaemonSet.Namespace, mf.Core.DaemonSet.Name)
-				}
-
-				desiredDaemonSet := mf.Core.DaemonSet.DeepCopy()
-				desiredDaemonSet.Name = generatedName
-
-				var updateError error
-				if mcp.Spec.NodeSelector != nil {
-					desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
-				} else {
-					updateError = fmt.Errorf("the machine config pool %q does not have node selector", mcp.Name)
-				}
-
-				gdm := GeneratedDesiredManifest{
-					ClusterPlatform:       em.plat,
-					MachineConfigPool:     mcp.DeepCopy(),
-					NodeGroup:             tree.NodeGroup.DeepCopy(),
-					DaemonSet:             desiredDaemonSet,
-					IsCustomPolicyEnabled: em.customPolicyEnabled,
-				}
-
-				err := em.updater(mcp.Name, &gdm)
-				if err != nil {
-					updateError = fmt.Errorf("daemonset for MCP %q: update failed: %w", mcp.Name, err)
-				}
-
-				ret = append(ret,
-					objectstate.ObjectState{
-						Existing:    existingDs,
-						Error:       loadError,
-						UpdateError: updateError,
-						Desired:     desiredDaemonSet,
-						Compare:     compare.Object,
-						Merge:       merge.ObjectForUpdate,
-					},
-				)
-			}
-		}
-		if em.plat == platform.HyperShift {
-			var existingDs client.Object
-			var loadError error
-
-			poolName := *tree.NodeGroup.PoolName
-
-			generatedName := objectnames.GetComponentName(em.instance.Name, poolName)
-			existingDaemonSet, ok := em.daemonSets[generatedName]
-			if ok {
-				existingDs = existingDaemonSet.daemonSet
-				loadError = existingDaemonSet.daemonSetError
-			} else {
-				loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.Core.DaemonSet.Namespace, mf.Core.DaemonSet.Name)
-			}
-
-			desiredDaemonSet := mf.Core.DaemonSet.DeepCopy()
-			desiredDaemonSet.Name = generatedName
-
-			var updateError error
-			desiredDaemonSet.Spec.Template.Spec.NodeSelector = map[string]string{
-				HyperShiftNodePoolLabel: poolName,
-			}
-
-			gdm := GeneratedDesiredManifest{
-				ClusterPlatform:       em.plat,
-				MachineConfigPool:     nil,
-				NodeGroup:             tree.NodeGroup.DeepCopy(),
-				DaemonSet:             desiredDaemonSet,
-				IsCustomPolicyEnabled: em.customPolicyEnabled,
-			}
-
-			err := em.updater(poolName, &gdm)
-			if err != nil {
-				updateError = fmt.Errorf("daemonset for pool %q: update failed: %w", poolName, err)
-			}
-
-			ret = append(ret,
-				objectstate.ObjectState{
-					Existing:    existingDs,
-					Error:       loadError,
-					UpdateError: updateError,
-					Desired:     desiredDaemonSet,
-					Compare:     compare.Object,
-					Merge:       merge.ObjectForUpdate,
-				},
-			)
-		}
+		ret = append(ret, stateHelper(em, mf, tree)...)
 	}
 
 	// extra: metrics
@@ -382,7 +307,7 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 	return ret
 }
 
-type UpdateFromClientTreeFunc func(ret *ExistingManifests, ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, tree nodegroupv1.Tree, namespace string)
+type updateFromClientTreeFunc func(ret *ExistingManifests, ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, tree nodegroupv1.Tree, namespace string)
 
 func (em *ExistingManifests) WithManifestsUpdater(updater GenerateDesiredManifestUpdater) *ExistingManifests {
 	em.updater = updater
@@ -432,7 +357,7 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 	}
 
 	method := "nodeGroups"
-	var updateFromClientTree UpdateFromClientTreeFunc = updateFromClientTreeNodeGroup
+	var updateFromClientTree updateFromClientTreeFunc = updateFromClientTreeNodeGroup
 
 	if plat == platform.OpenShift {
 		method = "machineConfigPools"
@@ -461,56 +386,6 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 	}
 
 	return &ret
-}
-
-func updateFromClientTreeMachineConfigPool(ret *ExistingManifests, ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, tree nodegroupv1.Tree, namespace string) {
-	for _, mcp := range tree.MachineConfigPools {
-		generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
-		key := client.ObjectKey{
-			Name:      generatedName,
-			Namespace: namespace,
-		}
-		ds := &appsv1.DaemonSet{}
-		dsm := daemonSetManifest{}
-		if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
-			dsm.daemonSet = ds
-		}
-		ret.daemonSets[generatedName] = dsm
-
-		mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
-		mckey := client.ObjectKey{
-			Name: mcName,
-		}
-		mc := &machineconfigv1.MachineConfig{}
-		mcm := machineConfigManifest{}
-		if mcm.machineConfigError = cli.Get(ctx, mckey, mc); mcm.machineConfigError == nil {
-			mcm.machineConfig = mc
-		}
-		ret.machineConfigs[mcName] = mcm
-	}
-}
-
-func updateFromClientTreeNodeGroup(ret *ExistingManifests, ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, tree nodegroupv1.Tree, namespace string) {
-	generatedName := objectnames.GetComponentName(instance.Name, *tree.NodeGroup.PoolName)
-	key := client.ObjectKey{
-		Name:      generatedName,
-		Namespace: namespace,
-	}
-	ds := &appsv1.DaemonSet{}
-	dsm := daemonSetManifest{}
-	if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
-		dsm.daemonSet = ds
-	}
-	ret.daemonSets[generatedName] = dsm
-}
-
-func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName, bool) {
-	res := nropv1.NamespacedName{
-		Namespace: obj.GetNamespace(),
-		Name:      obj.GetName(),
-	}
-	_, ok := obj.(*appsv1.DaemonSet)
-	return res, ok
 }
 
 // getObject is a shortcut to don't type the error twice
