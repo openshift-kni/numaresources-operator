@@ -86,7 +86,8 @@ type ExistingManifests struct {
 	instance            *nropv1.NUMAResourcesOperator
 	trees               []nodegroupv1.Tree
 	namespace           string
-	enableMachineConfig bool
+	customPolicyEnabled bool
+	updater             GenerateDesiredManifestUpdater
 }
 
 type MCPWaitForUpdatedFunc func(string, *machineconfigv1.MachineConfigPool) bool
@@ -110,7 +111,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 				continue
 			}
 
-			if !em.enableMachineConfig {
+			if !em.customPolicyEnabled {
 				// caution here: we want a *nil interface value*, not an *interface which points to nil*.
 				// the latter would lead to apparently correct code leading to runtime panics. See:
 				// https://trstringer.com/go-nil-interface-and-interface-with-nil-concrete-value/
@@ -146,7 +147,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 }
 
 func (em *ExistingManifests) getWaitMCPUpdatedFunc() MCPWaitForUpdatedFunc {
-	if em.enableMachineConfig {
+	if em.customPolicyEnabled {
 		return IsMachineConfigPoolUpdated
 	}
 	return IsMachineConfigPoolUpdatedAfterDeletion
@@ -216,11 +217,11 @@ type GeneratedDesiredManifest struct {
 
 type GenerateDesiredManifestUpdater func(mcpName string, gdm *GeneratedDesiredManifest) error
 
-func SkipManifestUpdate(gdm *GeneratedDesiredManifest) error {
+func SkipManifestUpdate(mcpName string, gdm *GeneratedDesiredManifest) error {
 	return nil
 }
 
-func (em *ExistingManifests) State(mf Manifests, updater GenerateDesiredManifestUpdater, isCustomPolicyEnabled bool) []objectstate.ObjectState {
+func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 	ret := []objectstate.ObjectState{
 		{
 			Existing: em.existing.Core.ServiceAccount,
@@ -294,19 +295,17 @@ func (em *ExistingManifests) State(mf Manifests, updater GenerateDesiredManifest
 					updateError = fmt.Errorf("the machine config pool %q does not have node selector", mcp.Name)
 				}
 
-				if updater != nil {
-					gdm := GeneratedDesiredManifest{
-						ClusterPlatform:       em.plat,
-						MachineConfigPool:     mcp.DeepCopy(),
-						NodeGroup:             tree.NodeGroup.DeepCopy(),
-						DaemonSet:             desiredDaemonSet,
-						IsCustomPolicyEnabled: isCustomPolicyEnabled,
-					}
+				gdm := GeneratedDesiredManifest{
+					ClusterPlatform:       em.plat,
+					MachineConfigPool:     mcp.DeepCopy(),
+					NodeGroup:             tree.NodeGroup.DeepCopy(),
+					DaemonSet:             desiredDaemonSet,
+					IsCustomPolicyEnabled: em.customPolicyEnabled,
+				}
 
-					err := updater(mcp.Name, &gdm)
-					if err != nil {
-						updateError = fmt.Errorf("daemonset for MCP %q: update failed: %w", mcp.Name, err)
-					}
+				err := em.updater(mcp.Name, &gdm)
+				if err != nil {
+					updateError = fmt.Errorf("daemonset for MCP %q: update failed: %w", mcp.Name, err)
 				}
 
 				ret = append(ret,
@@ -344,19 +343,17 @@ func (em *ExistingManifests) State(mf Manifests, updater GenerateDesiredManifest
 				HyperShiftNodePoolLabel: poolName,
 			}
 
-			if updater != nil {
-				gdm := GeneratedDesiredManifest{
-					ClusterPlatform:       em.plat,
-					MachineConfigPool:     nil,
-					NodeGroup:             tree.NodeGroup.DeepCopy(),
-					DaemonSet:             desiredDaemonSet,
-					IsCustomPolicyEnabled: isCustomPolicyEnabled,
-				}
+			gdm := GeneratedDesiredManifest{
+				ClusterPlatform:       em.plat,
+				MachineConfigPool:     nil,
+				NodeGroup:             tree.NodeGroup.DeepCopy(),
+				DaemonSet:             desiredDaemonSet,
+				IsCustomPolicyEnabled: em.customPolicyEnabled,
+			}
 
-				err := updater(poolName, &gdm)
-				if err != nil {
-					updateError = fmt.Errorf("daemonset for pool %q: update failed: %w", poolName, err)
-				}
+			err := em.updater(poolName, &gdm)
+			if err != nil {
+				updateError = fmt.Errorf("daemonset for pool %q: update failed: %w", poolName, err)
 			}
 
 			ret = append(ret,
@@ -387,7 +384,12 @@ func (em *ExistingManifests) State(mf Manifests, updater GenerateDesiredManifest
 
 type UpdateFromClientTreeFunc func(ret *ExistingManifests, ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, tree nodegroupv1.Tree, namespace string)
 
-func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf Manifests, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, namespace string) ExistingManifests {
+func (em *ExistingManifests) WithManifestsUpdater(updater GenerateDesiredManifestUpdater) *ExistingManifests {
+	em.updater = updater
+	return em
+}
+
+func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf Manifests, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, namespace string) *ExistingManifests {
 	ret := ExistingManifests{
 		existing: Manifests{
 			Core: rtemanifests.New(plat),
@@ -397,7 +399,8 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		instance:            instance,
 		trees:               trees,
 		namespace:           namespace,
-		enableMachineConfig: annotations.IsCustomPolicyEnabled(instance.Annotations),
+		updater:             SkipManifestUpdate,
+		customPolicyEnabled: annotations.IsCustomPolicyEnabled(instance.Annotations),
 	}
 
 	keyFor := client.ObjectKeyFromObject // shortcut
@@ -457,7 +460,7 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		ret.existing.Metrics.Service = ser
 	}
 
-	return ret
+	return &ret
 }
 
 func updateFromClientTreeMachineConfigPool(ret *ExistingManifests, ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, tree nodegroupv1.Tree, namespace string) {

@@ -300,13 +300,13 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
 
 	if r.Platform == platform.OpenShift {
-		if step := r.reconcileResourceMachineConfig(ctx, instance, &existing, trees); step.EarlyStop() {
+		if step := r.reconcileResourceMachineConfig(ctx, instance, existing, trees); step.EarlyStop() {
 			updateStatusConditionsIfNeeded(instance, step.ConditionInfo)
 			return step
 		}
 	}
 
-	dsPerPool, step := r.reconcileResourceDaemonSet(ctx, instance, &existing, trees)
+	dsPerPool, step := r.reconcileResourceDaemonSet(ctx, instance, existing, trees)
 	if step.EarlyStop() {
 		updateStatusConditionsIfNeeded(instance, step.ConditionInfo)
 		return step
@@ -548,16 +548,16 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	}
 	rteupdate.SecurityContextConstraint(r.RTEManifests.Core.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
 
-	processor := func(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
+	existing = existing.WithManifestsUpdater(func(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
 		err := daemonsetUpdater(poolName, gdm)
 		if err != nil {
 			return err
 		}
 		dsPoolPairs = append(dsPoolPairs, poolDaemonSet{poolName, nropv1.NamespacedNameFromObject(gdm.DaemonSet)})
 		return nil
-	}
+	})
 
-	for _, objState := range existing.State(r.RTEManifests, processor, annotations.IsCustomPolicyEnabled(instance.Annotations)) {
+	for _, objState := range existing.State(r.RTEManifests) {
 		if objState.Error != nil {
 			// We are likely in the bootstrap scenario. In this case, which is expected once, everything is fine.
 			// If it happens past bootstrap, still carry on. We know what to do, and we do want to enforce the desired state.
