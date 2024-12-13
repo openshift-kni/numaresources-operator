@@ -557,8 +557,8 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		return nil
 	}
 
-	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
-	for _, objState := range existing.State(r.RTEManifests, processor, annotations.IsCustomPolicyEnabled(instance.Annotations)) {
+	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace).WithManifestsUpdater(processor)
+	for _, objState := range existing.State(r.RTEManifests) {
 		if objState.Error != nil {
 			// We are likely in the bootstrap scenario. In this case, which is expected once, everything is fine.
 			// If it happens past bootstrap, still carry on. We know what to do, and we do want to enforce the desired state.
