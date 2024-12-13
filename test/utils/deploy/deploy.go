@@ -71,7 +71,10 @@ func NewForPlatform(plat platform.Platform) Deployer {
 }
 
 func GetDeploymentWithSched(ctx context.Context) (NroDeploymentWithSched, error) {
-	sd := NroDeploymentWithSched{}
+	sd := NroDeploymentWithSched{
+		Deployer: NewForPlatform(configuration.Plat),
+	}
+
 	nroSchedKey := objects.NROSchedObjectKey()
 	nroSchedObj := nropv1.NUMAResourcesScheduler{}
 	err := e2eclient.Client.Get(ctx, nroSchedKey, &nroSchedObj)

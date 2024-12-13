@@ -62,12 +62,13 @@ var _ = ginkgo.BeforeSuite(func() {
 	mustGatherTag = getStringValueFromEnv(envVarMustGatherTag, defaultMustGatherTag)
 	ginkgo.By(fmt.Sprintf("Using must-gather image %q tag %q", mustGatherImage, mustGatherTag))
 
+	ginkgo.By("Fetching up cluster data")
+	var err error
+	// the error might be not nil we'll decide if that's fine or not depending on E2E_NROP_INFRA_SETUP_SKIP
+	deployment, err = deploy.GetDeploymentWithSched(context.TODO())
 	if _, ok := os.LookupEnv("E2E_NROP_INFRA_SETUP_SKIP"); ok {
-		ginkgo.By("Fetching up cluster data")
-
-		var err error
-		deployment, err = deploy.GetDeploymentWithSched(context.TODO())
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		gomega.Expect(err).ToNot(gomega.HaveOccurred(), "infra setup skip but Scheduler instance not found")
+		ginkgo.By("skip setting up the cluster")
 		return
 	}
 	ginkgo.By("Setting up the cluster")
