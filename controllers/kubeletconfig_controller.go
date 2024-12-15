@@ -77,7 +77,8 @@ type kubeletConfigHandler struct {
 	ownerObject client.Object
 	mcoKc       *mcov1.KubeletConfig
 	// mcp or nodePool name
-	poolName string
+	poolName   string
+	setCtrlRef func(owner, controlled metav1.Object, scheme *runtime.Scheme, opts ...controllerutil.OwnerReferenceOption) error
 }
 
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
@@ -124,10 +125,10 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return ctrl.Result{}, nil
 }
 
-func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager, clusterPlatform platform.Platform) error {
+func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	var o client.Object
 	var p predicate.Funcs
-	if clusterPlatform == platform.OpenShift {
+	if r.Platform == platform.OpenShift {
 		o = &mcov1.KubeletConfig{}
 		// we have nothing to do in case of deletion
 		p = predicate.Funcs{
@@ -138,7 +139,7 @@ func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager, clusterPlat
 			},
 		}
 	}
-	if clusterPlatform == platform.HyperShift {
+	if r.Platform == platform.HyperShift {
 		o = &corev1.ConfigMap{}
 		p = predicate.NewPredicateFuncs(func(o client.Object) bool {
 			kubelet := o.(*corev1.ConfigMap)
@@ -211,13 +212,8 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, kubeletConf
 	}
 	existing := cfgstate.FromClient(ctx, r.Client, r.Namespace, generatedName)
 	for _, objState := range existing.State(cfgManifests) {
-		// the owner should be the KubeletConfig object and not the NUMAResourcesOperator CR
-		// this means that when KubeletConfig will get deleted, the ConfigMap gets deleted as well
-		// TODO on HyperShift there's a cross-namespaced owner references that need to be fixed.
-		if r.Platform != platform.HyperShift {
-			if err := controllerutil.SetControllerReference(kcHandler.ownerObject, objState.Desired, r.Scheme); err != nil {
-				return nil, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
-			}
+		if err := kcHandler.setCtrlRef(kcHandler.ownerObject, objState.Desired, r.Scheme); err != nil {
+			return nil, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 		if _, _, err := apply.ApplyObject(ctx, r.Client, objState); err != nil {
 			return nil, fmt.Errorf("could not create %s: %w", objState.Desired.GetObjectKind().GroupVersionKind().String(), err)
@@ -263,6 +259,7 @@ func (r *KubeletConfigReconciler) makeKCHandlerForPlatform(ctx context.Context, 
 			ownerObject: mcoKc,
 			mcoKc:       mcoKc,
 			poolName:    mcp.Name,
+			setCtrlRef:  controllerutil.SetControllerReference,
 		}, nil
 
 	case platform.HyperShift:
@@ -288,6 +285,12 @@ func (r *KubeletConfigReconciler) makeKCHandlerForPlatform(ctx context.Context, 
 			ownerObject: cmKc,
 			mcoKc:       mcoKc,
 			poolName:    nodePoolName,
+			// the owner should be the KubeletConfig object and not the NUMAResourcesOperator CR
+			// this means that when KubeletConfig will get deleted, the ConfigMap gets deleted as well
+			// TODO on HyperShift there's a cross-namespaced owner references that need to be fixed.
+			setCtrlRef: func(owner, controlled metav1.Object, scheme *runtime.Scheme, opts ...controllerutil.OwnerReferenceOption) error {
+				return nil
+			},
 		}, nil
 	}
 	return nil, fmt.Errorf("unsupported platform: %s", r.Platform)
