@@ -41,6 +41,8 @@ const (
 
 	defaultMustGatherImage = "quay.io/openshift-kni/numaresources-must-gather"
 	defaultMustGatherTag   = "4.19.999-snapshot"
+
+	nroSchedTimeout = 5 * time.Minute
 )
 
 var (
@@ -82,8 +84,8 @@ var _ = ginkgo.BeforeSuite(func() {
 	ginkgo.By("Setting up the cluster")
 
 	deployment = deploy.NewForPlatform(configuration.Plat)
-	_ = deployment.Deploy(ctx) // we don't care about the nrop instance
-	nroSchedObj = deploy.DeployNROScheduler()
+	_ = deployment.Deploy(ctx, configuration.MachineConfigPoolUpdateTimeout) // we don't care about the nrop instance
+	nroSchedObj = deploy.DeployNROScheduler(ctx, nroSchedTimeout)
 })
 
 var _ = ginkgo.AfterSuite(func() {
@@ -93,7 +95,7 @@ var _ = ginkgo.AfterSuite(func() {
 	}
 	ginkgo.By("tearing down the cluster")
 	ctx := context.Background()
-	deploy.TeardownNROScheduler(nroSchedObj, 5*time.Minute)
+	deploy.TeardownNROScheduler(ctx, nroSchedObj, nroSchedTimeout)
 	deployment.Teardown(ctx, 5*time.Minute)
 })
 

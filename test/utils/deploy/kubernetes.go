@@ -21,7 +21,7 @@ type KubernetesNRO struct {
 
 // Deploy returns a struct containing all the deployed objects,
 // so it will be easier to introspect and delete them later.
-func (k *KubernetesNRO) Deploy(ctx context.Context) *v1.NUMAResourcesOperator {
+func (k *KubernetesNRO) Deploy(ctx context.Context, timeout time.Duration) *v1.NUMAResourcesOperator {
 	GinkgoHelper()
 
 	mcpObj := objects.TestMCP()
@@ -31,7 +31,7 @@ func (k *KubernetesNRO) Deploy(ctx context.Context) *v1.NUMAResourcesOperator {
 	k.McpObj = mcpObj
 	matchLabels := map[string]string{"test": "test"}
 
-	return k.OpenShiftNRO.deployWithLabels(ctx, matchLabels)
+	return k.OpenShiftNRO.deployWithLabels(ctx, timeout, matchLabels)
 }
 
 func (k *KubernetesNRO) Teardown(ctx context.Context, timeout time.Duration) {
