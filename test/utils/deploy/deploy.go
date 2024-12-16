@@ -52,11 +52,6 @@ type Deployer interface {
 	Teardown(ctx context.Context, timeout time.Duration)
 }
 
-type NroDeploymentWithSched struct {
-	Deployer
-	NroSchedObj *nropv1.NUMAResourcesScheduler
-}
-
 func NewForPlatform(plat platform.Platform) Deployer {
 	switch plat {
 	case platform.OpenShift:
@@ -68,19 +63,6 @@ func NewForPlatform(plat platform.Platform) Deployer {
 	default:
 		return nil
 	}
-}
-
-func GetDeploymentWithSched(ctx context.Context) (NroDeploymentWithSched, error) {
-	sd := NroDeploymentWithSched{}
-	nroSchedKey := objects.NROSchedObjectKey()
-	nroSchedObj := nropv1.NUMAResourcesScheduler{}
-	err := e2eclient.Client.Get(ctx, nroSchedKey, &nroSchedObj)
-	if err != nil {
-		return sd, err
-	}
-	sd.NroSchedObj = &nroSchedObj
-
-	return sd, nil
 }
 
 func WaitForMCPUpdatedAfterNRODeleted(nroObj *nropv1.NUMAResourcesOperator) {
