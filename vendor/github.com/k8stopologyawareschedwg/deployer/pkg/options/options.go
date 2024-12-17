@@ -24,6 +24,17 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 )
 
+type SCCVersion string
+
+const (
+	SCCV1 SCCVersion = "v1"
+	SCCV2 SCCVersion = "v2"
+)
+
+func IsValidSCCVersion(ver string) bool {
+	return ver == string(SCCV1) || ver == string(SCCV2)
+}
+
 type Options struct {
 	UserPlatform                platform.Platform
 	UserPlatformVersion         platform.Version
@@ -35,6 +46,7 @@ type Options struct {
 	UpdaterNotifEnable          bool
 	UpdaterCRIHooksEnable       bool
 	UpdaterCustomSELinuxPolicy  bool
+	UpdaterSCCVersion           SCCVersion
 	UpdaterSyncPeriod           time.Duration
 	UpdaterVerbose              int
 	SchedProfileName            string
@@ -78,6 +90,7 @@ type DaemonSet struct {
 	NotificationEnable bool
 	NodeSelector       *metav1.LabelSelector
 	UpdateInterval     time.Duration
+	SCCVersion         SCCVersion
 }
 
 type UpdaterDaemon struct {
@@ -104,6 +117,7 @@ func ForDaemonSet(commonOpts *Options) DaemonSet {
 		PFPEnable:          commonOpts.UpdaterPFPEnable,
 		NotificationEnable: commonOpts.UpdaterNotifEnable,
 		UpdateInterval:     commonOpts.UpdaterSyncPeriod,
+		SCCVersion:         commonOpts.UpdaterSCCVersion,
 		Verbose:            commonOpts.UpdaterVerbose,
 	}
 }

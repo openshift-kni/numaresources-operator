@@ -465,6 +465,24 @@ func SecurityContextConstraint(component string, withCustomSELinuxPolicy bool) (
 	return scc, nil
 }
 
+func SecurityContextConstraintV2(component string) (*securityv1.SecurityContextConstraints, error) {
+	if component != ComponentResourceTopologyExporter {
+		return nil, fmt.Errorf("component %q is not an %q component", component, ComponentResourceTopologyExporter)
+	}
+
+	obj, err := loadObject(filepath.Join("yaml", component, "securitycontextconstraintv2.yaml"))
+	if err != nil {
+		return nil, err
+	}
+
+	scc, ok := obj.(*securityv1.SecurityContextConstraints)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type, got %t", obj)
+	}
+
+	return scc, nil
+}
+
 func validateComponent(component string) error {
 	if component == ComponentAPI || component == ComponentResourceTopologyExporter || component == ComponentNodeFeatureDiscovery || component == ComponentSchedulerPlugin {
 		return nil
