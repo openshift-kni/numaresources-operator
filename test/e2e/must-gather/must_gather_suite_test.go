@@ -25,8 +25,11 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/deploy"
+	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
@@ -38,10 +41,14 @@ const (
 
 	defaultMustGatherImage = "quay.io/openshift-kni/numaresources-must-gather"
 	defaultMustGatherTag   = "4.18.999-snapshot"
+
+	nroSchedTimeout = 5 * time.Minute
 )
 
 var (
-	deployment deploy.NroDeploymentWithSched
+	deployment deploy.Deployer
+
+	nroSchedObj *nropv1.NUMAResourcesScheduler
 
 	mustGatherImage string
 	mustGatherTag   string
@@ -62,17 +69,23 @@ var _ = ginkgo.BeforeSuite(func() {
 	mustGatherTag = getStringValueFromEnv(envVarMustGatherTag, defaultMustGatherTag)
 	ginkgo.By(fmt.Sprintf("Using must-gather image %q tag %q", mustGatherImage, mustGatherTag))
 
+	ctx := context.Background()
+
 	if _, ok := os.LookupEnv("E2E_NROP_INFRA_SETUP_SKIP"); ok {
 		ginkgo.By("Fetching up cluster data")
 
-		var err error
-		deployment, err = deploy.GetDeploymentWithSched(context.TODO())
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		// assume cluster is set up correctly, so just fetch what we have already;
+		// fail loudly if we can't get, this means the assumption was wrong
+		nroSchedObj = &nropv1.NUMAResourcesScheduler{}
+		gomega.Expect(e2eclient.Client.Get(ctx, objects.NROSchedObjectKey(), nroSchedObj)).To(gomega.Succeed())
 		return
 	}
+
 	ginkgo.By("Setting up the cluster")
-	deployment.Deploy(context.TODO())
-	deployment.NroSchedObj = deploy.DeployNROScheduler()
+
+	deployment = deploy.NewForPlatform(configuration.Plat)
+	_ = deployment.Deploy(ctx, configuration.MachineConfigPoolUpdateTimeout) // we don't care about the nrop instance
+	nroSchedObj = deploy.DeployNROScheduler(ctx, nroSchedTimeout)
 })
 
 var _ = ginkgo.AfterSuite(func() {
@@ -81,8 +94,9 @@ var _ = ginkgo.AfterSuite(func() {
 		return
 	}
 	ginkgo.By("tearing down the cluster")
-	deploy.TeardownNROScheduler(deployment.NroSchedObj, 5*time.Minute)
-	deployment.Teardown(context.TODO(), 5*time.Minute)
+	ctx := context.Background()
+	deploy.TeardownNROScheduler(ctx, nroSchedObj, nroSchedTimeout)
+	deployment.Teardown(ctx, 5*time.Minute)
 })
 
 func getStringValueFromEnv(envVar, fallback string) string {

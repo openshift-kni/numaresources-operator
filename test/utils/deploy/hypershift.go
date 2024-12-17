@@ -39,7 +39,7 @@ const (
 	ConfigDataKey               = "config"
 )
 
-func (h *HyperShiftNRO) Deploy(ctx context.Context) *nropv1.NUMAResourcesOperator {
+func (h *HyperShiftNRO) Deploy(ctx context.Context, _ time.Duration) *nropv1.NUMAResourcesOperator {
 	GinkgoHelper()
 
 	hostedClusterName, err := hypershift.GetHostedClusterName()
@@ -105,7 +105,7 @@ func (h *HyperShiftNRO) Teardown(ctx context.Context, timeout time.Duration) {
 			Namespace: h.NroObj.Status.DaemonSets[0].Namespace,
 		}
 		Eventually(func() bool {
-			if err := e2eclient.Client.Get(context.TODO(), key, cm); !errors.IsNotFound(err) {
+			if err := e2eclient.Client.Get(ctx, key, cm); !errors.IsNotFound(err) {
 				if err == nil {
 					klog.Warningf("configmap %s still exists", key.String())
 				} else {
@@ -114,7 +114,7 @@ func (h *HyperShiftNRO) Teardown(ctx context.Context, timeout time.Duration) {
 				return false
 			}
 			return true
-		}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
+		}).WithTimeout(timeout).WithPolling(10 * time.Second).Should(BeTrue())
 	}
 	Expect(e2eclient.Client.Delete(ctx, h.NroObj)).To(Succeed())
 }

@@ -45,6 +45,8 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 		var destDir string
 
 		BeforeEach(func() {
+			Expect(nroSchedObj).ToNot(BeNil(), "missing scheduler object reference")
+
 			var err error
 			destDir, err = os.MkdirTemp("", "*-e2e-data")
 			Expect(err).ToNot(HaveOccurred())
@@ -106,7 +108,7 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 
 				By("Looking for resources instances")
 				nropInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesoperators", objects.NROObjectKey().Name))
-				nroschedInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesschedulers", deployment.NroSchedObj.Name))
+				nroschedInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesschedulers", nroSchedObj.Name))
 
 				collectedMCPs, err := getMachineConfigPools(filepath.Join(mgContentFolder, "cluster-scoped-resources/machineconfiguration.openshift.io/machineconfigpools"))
 				Expect(err).ToNot(HaveOccurred())
