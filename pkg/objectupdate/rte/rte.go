@@ -228,6 +228,14 @@ func SecurityContextConstraint(scc *securityv1.SecurityContextConstraints, legac
 		return
 	}
 	scc.SELinuxContext.SELinuxOptions.Type = selinux.RTEContextType
+	scc.Volumes = []securityv1.FSType{
+		securityv1.FSTypeHostPath,
+		securityv1.FSTypeEmptyDir,
+		securityv1.FSTypeSecret,
+		securityv1.FSTypeDownwardAPI,
+		securityv1.FSTypeConfigMap,
+		securityv1.FSProjected,
+	}
 }
 
 func isPodFingerprintEnabled(conf *nropv1.NodeGroupConfig) (bool, string) {
