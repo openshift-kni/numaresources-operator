@@ -77,7 +77,7 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 	Context("with a running cluster with all the components", func() {
 		It("[test_id:47574][tier0] should perform overall deployment and verify the condition is reported as available", func() {
 			deployer := deploy.NewForPlatform(configuration.Plat)
-			nroObj := deployer.Deploy(context.TODO())
+			nroObj := deployer.Deploy(context.TODO(), configuration.MachineConfigPoolUpdateTimeout)
 			nname := client.ObjectKeyFromObject(nroObj)
 			Expect(nname.Name).ToNot(BeEmpty())
 
@@ -205,7 +205,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 
 		BeforeEach(func() {
 			deployer = deploy.NewForPlatform(configuration.Plat)
-			nroObj = deployer.Deploy(context.TODO())
+			nroObj = deployer.Deploy(context.TODO(), configuration.MachineConfigPoolUpdateTimeout)
 		})
 
 		AfterEach(func() {

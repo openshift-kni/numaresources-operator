@@ -43,18 +43,17 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
+const (
+	NROSchedulerPollingInterval = 10 * time.Second
+)
+
 type Deployer interface {
 	// Deploy deploys NUMAResourcesOperator object create other dependencies
 	// per the platform that implements it
-	Deploy(ctx context.Context) *nropv1.NUMAResourcesOperator
+	Deploy(ctx context.Context, timeout time.Duration) *nropv1.NUMAResourcesOperator
 	// Teardown Teardowns NUMAResourcesOperator object delete other dependencies
 	// per the platform that implements it
 	Teardown(ctx context.Context, timeout time.Duration)
-}
-
-type NroDeploymentWithSched struct {
-	Deployer
-	NroSchedObj *nropv1.NUMAResourcesScheduler
 }
 
 func NewForPlatform(plat platform.Platform) Deployer {
@@ -68,19 +67,6 @@ func NewForPlatform(plat platform.Platform) Deployer {
 	default:
 		return nil
 	}
-}
-
-func GetDeploymentWithSched(ctx context.Context) (NroDeploymentWithSched, error) {
-	sd := NroDeploymentWithSched{}
-	nroSchedKey := objects.NROSchedObjectKey()
-	nroSchedObj := nropv1.NUMAResourcesScheduler{}
-	err := e2eclient.Client.Get(ctx, nroSchedKey, &nroSchedObj)
-	if err != nil {
-		return sd, err
-	}
-	sd.NroSchedObj = &nroSchedObj
-
-	return sd, nil
 }
 
 func WaitForMCPUpdatedAfterNRODeleted(nroObj *nropv1.NUMAResourcesOperator) {
@@ -122,20 +108,16 @@ func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1.NUMAResourcesOperator)
 // or a timeout happens (5 min right now).
 //
 // see: `TestNROScheduler` to see the specific object characteristics.
-func DeployNROScheduler() *nropv1.NUMAResourcesScheduler {
+func DeployNROScheduler(ctx context.Context, timeout time.Duration) *nropv1.NUMAResourcesScheduler {
 	GinkgoHelper()
 
 	nroSchedObj := objects.TestNROScheduler()
 
-	err := e2eclient.Client.Create(context.TODO(), nroSchedObj)
-	Expect(err).NotTo(HaveOccurred())
-
-	err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
-	Expect(err).NotTo(HaveOccurred())
-
+	Expect(e2eclient.Client.Create(ctx, nroSchedObj)).To(Succeed())
+	Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)).To(Succeed())
 	Eventually(func() bool {
 		updatedNROObj := &nropv1.NUMAResourcesScheduler{}
-		err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), updatedNROObj)
+		err := e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(nroSchedObj), updatedNROObj)
 		if err != nil {
 			klog.Warningf("failed to get the NRO Scheduler resource: %v", err)
 			return false
@@ -151,20 +133,15 @@ func DeployNROScheduler() *nropv1.NUMAResourcesScheduler {
 		klog.Infof("condition: %v", cond)
 
 		return cond.Status == metav1.ConditionTrue
-	}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "NRO Scheduler condition did not become available")
+	}).WithTimeout(timeout).WithPolling(NROSchedulerPollingInterval).Should(BeTrue(), "NRO Scheduler condition did not become available")
 	return nroSchedObj
 }
 
-func TeardownNROScheduler(nroSched *nropv1.NUMAResourcesScheduler, timeout time.Duration) {
+func TeardownNROScheduler(ctx context.Context, nroSched *nropv1.NUMAResourcesScheduler, timeout time.Duration) {
 	GinkgoHelper()
-
-	if nroSched != nil {
-		err := e2eclient.Client.Delete(context.TODO(), nroSched)
-		Expect(err).ToNot(HaveOccurred())
-
-		err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(timeout).ForNUMAResourcesSchedulerDeleted(context.TODO(), nroSched)
-		Expect(err).ToNot(HaveOccurred(), "NROScheduler %q failed to be deleted", nroSched.Name)
-	}
+	Expect(nroSched).ToNot(BeNil())
+	Expect(e2eclient.Client.Delete(ctx, nroSched)).To(Succeed())
+	Expect(wait.With(e2eclient.Client).Interval(NROSchedulerPollingInterval).Timeout(timeout).ForNUMAResourcesSchedulerDeleted(ctx, nroSched)).To(Succeed(), "NROScheduler %q failed to be deleted", nroSched.Name)
 }
 
 func WaitForMCPsCondition(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool, condition machineconfigv1.MachineConfigPoolConditionType) error {

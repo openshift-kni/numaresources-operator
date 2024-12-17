@@ -35,13 +35,13 @@ type OpenShiftNRO struct {
 // Deploy deploys NUMAResourcesOperator object and
 // other dependencies, so the controller will be able to install TAS
 // stack properly
-func (o *OpenShiftNRO) Deploy(ctx context.Context) *nropv1.NUMAResourcesOperator {
+func (o *OpenShiftNRO) Deploy(ctx context.Context, timeout time.Duration) *nropv1.NUMAResourcesOperator {
 	GinkgoHelper()
 
-	return o.deployWithLabels(ctx, objects.OpenshiftMatchLabels())
+	return o.deployWithLabels(ctx, timeout, objects.OpenshiftMatchLabels())
 }
 
-func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, matchLabels map[string]string) *nropv1.NUMAResourcesOperator {
+func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, timeout time.Duration, matchLabels map[string]string) *nropv1.NUMAResourcesOperator {
 	GinkgoHelper()
 	nroObj := objects.TestNRO(objects.NROWithMCPSelector(matchLabels))
 	kcObj, err := objects.TestKC(matchLabels)
@@ -72,7 +72,7 @@ func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, matchLabels map[str
 	o.NroObj = nroObj
 
 	By("unpausing the target MCPs")
-	Eventually(unpause).WithTimeout(configuration.MachineConfigPoolUpdateTimeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(Succeed())
+	Eventually(unpause).WithTimeout(timeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(Succeed())
 
 	By("updating the target NRO object")
 	Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(nroObj), nroObj)).To(Succeed())
