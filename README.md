@@ -14,6 +14,8 @@ Assuming you can push container images to a container registry and you are in th
 1. build and upload the manifest bundle container image: `make bundle bundle-build bundle-push`
 1. leverage `operator-sdk` to deploy the container: `operator-sdk run bundle ${REPO}/numaresources-operator-bundle:${VERSION}`. Note the build procedure typically downloads a local copy of `operator-sdk` in `bin/` which you can reuse
 
+Note that installing the operator using this method requires adding the openshift.io/cluster-monitoring: "true" label to the operator namespace to enable Prometheus cluster monitoring.
+
 For further details, please refer to the [operator-sdk documentation](https://sdk.operatorframework.io/docs/olm-integration/tutorial-bundle/)
 
 ## roadmap

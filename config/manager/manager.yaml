@@ -4,6 +4,7 @@ metadata:
   annotations:
     workload.openshift.io/allowed: management
   labels:
+    openshift.io/cluster-monitoring: "true"
     control-plane: controller-manager
   name: system
 ---
