@@ -26,16 +26,32 @@ import (
 
 	"github.com/mdomke/git-semver/version"
 
-	"github.com/openshift-kni/numaresources-operator/internal/api/buildinfo"
+	apibuildinfo "github.com/openshift-kni/numaresources-operator/internal/api/buildinfo"
+	"github.com/openshift-kni/numaresources-operator/internal/buildinfo"
 )
 
 const (
 	develBranchName     = "devel"
 	releaseBranchPrefix = "release-"
+
+	versionFileName = "Makefile"
 )
+
+func parseVersion() string {
+	srcFile := versionFileName
+	// enable override the master version file, which is Makefile by default
+	if fileName, ok := os.LookupEnv("NRO_BUILD_VERSION_FILE"); ok {
+		srcFile = fileName
+	}
+	return buildinfo.ParseVersionFromFile(srcFile)
+}
 
 func getVersion() (string, error) {
 	if ver, ok := os.LookupEnv("NRO_BUILD_VERSION"); ok {
+		return ver, nil
+	}
+
+	if ver := parseVersion(); ver != "" {
 		return ver, nil
 	}
 
@@ -56,7 +72,7 @@ func getCommit() (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-func getBranch() (string, error) {
+func getRawBranch() (string, error) {
 	if cm, ok := os.LookupEnv("NRO_BUILD_BRANCH"); ok {
 		return cm, nil
 	}
@@ -66,11 +82,22 @@ func getBranch() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	branchName := strings.TrimSpace(string(out))
+	return strings.TrimSpace(string(out)), nil
+}
+
+func parseBranch(branchName string) string {
 	if !strings.HasPrefix(branchName, releaseBranchPrefix) {
-		return develBranchName, nil
+		return develBranchName
 	}
-	return strings.TrimPrefix(branchName, releaseBranchPrefix), nil
+	return strings.TrimPrefix(branchName, releaseBranchPrefix)
+}
+
+func getBranch() (string, error) {
+	branchName, err := getRawBranch()
+	if err != nil {
+		return "", err
+	}
+	return parseBranch(branchName), nil
 }
 
 func showVersion() int {
@@ -104,7 +131,8 @@ func showBranch() int {
 }
 
 func inspect() int {
-	var bi buildinfo.BuildInfo
+	var bi apibuildinfo.BuildInfo
+	var branchName string
 	var err error
 
 	bi.Version, err = getVersion()
@@ -113,14 +141,22 @@ func inspect() int {
 		return 1
 	}
 
-	bi.Branch, err = getBranch()
+	branchName, err = getRawBranch()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		return 1
 	}
 
+	bi.GitBranch = branchName
+	bi.Branch = parseBranch(branchName)
+
 	bi.Commit, err = getCommit()
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
+		return 1
+	}
+
+	if err := validate(bi); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		return 1
 	}
@@ -130,6 +166,18 @@ func inspect() int {
 		return 1
 	}
 	return 0
+}
+
+func validate(bi apibuildinfo.BuildInfo) error {
+	// TODO: for devel branch,
+	// validate the current version is greater than the version encoded
+	// in the highest numbered release branch
+	if bi.Branch != develBranchName { // release branch
+		if bi.Branch != bi.Version {
+			return fmt.Errorf("branch name %q must match version %q", bi.Branch, bi.Version)
+		}
+	}
+	return nil
 }
 
 func help() {

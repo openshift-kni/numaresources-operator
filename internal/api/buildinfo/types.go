@@ -17,9 +17,14 @@
 package buildinfo
 
 type BuildInfo struct {
-	Branch  string `json:"branch"`
+	// GitBranch is the raw git branch from which the artifacts are built
+	GitBranch string `json:"gitbranch"`
+	// Branch is the parsed git branch from which the artifacts are built
+	Branch string `json:"branch"`
+	// Version is the MAJOR.MINOR version of the artifacts being built
 	Version string `json:"version"`
-	Commit  string `json:"commit"`
+	// Commit is the parsed git commit from which the artifacts are built
+	Commit string `json:"commit"`
 }
 
 func (bi BuildInfo) String() string {
