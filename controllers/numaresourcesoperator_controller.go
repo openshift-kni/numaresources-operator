@@ -546,7 +546,9 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		}
 		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.Core.DaemonSet, cmHash)
 	}
-	rteupdate.SecurityContextConstraint(r.RTEManifests.Core.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
+
+	rteupdate.SecurityContextConstraint(r.RTEManifests.Core.SecurityContextConstraint, true) // force to legacy context
+	// SCC v2 needs no updates
 
 	existing = existing.WithManifestsUpdater(func(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
 		err := daemonsetUpdater(poolName, gdm)

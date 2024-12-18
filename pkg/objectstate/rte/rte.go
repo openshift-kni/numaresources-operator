@@ -114,6 +114,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 	if mf.Core.MachineConfig == nil {
 		return ret, nullMachineConfigPoolUpdated
 	}
+	enabledMCCount := 0
 	for _, tree := range em.trees {
 		for _, mcp := range tree.MachineConfigPools {
 			mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
@@ -128,7 +129,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 				continue
 			}
 
-			if !em.customPolicyEnabled {
+			if !em.customPolicyEnabled && !annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations) {
 				// caution here: we want a *nil interface value*, not an *interface which points to nil*.
 				// the latter would lead to apparently correct code leading to runtime panics. See:
 				// https://trstringer.com/go-nil-interface-and-interface-with-nil-concrete-value/
@@ -157,17 +158,14 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 					Merge:    merge.ObjectForUpdate,
 				},
 			)
+			enabledMCCount++
 		}
 	}
 
-	return ret, em.getWaitMCPUpdatedFunc()
-}
-
-func (em *ExistingManifests) getWaitMCPUpdatedFunc() MCPWaitForUpdatedFunc {
-	if em.customPolicyEnabled {
-		return IsMachineConfigPoolUpdated
+	if enabledMCCount > 0 {
+		return ret, IsMachineConfigPoolUpdated
 	}
-	return IsMachineConfigPoolUpdatedAfterDeletion
+	return ret, IsMachineConfigPoolUpdatedAfterDeletion
 }
 
 func nullMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
