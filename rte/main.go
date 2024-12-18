@@ -45,7 +45,8 @@ const (
 )
 
 func main() {
-	klog.Infof("starting %s %s %s %s\n", version.ExporterProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
+	bi := version.GetBuildInfo()
+	klog.Infof("starting %s %s %s\n", version.ExporterProgramName(), bi.String(), runtime.Version())
 
 	parsedArgs, err := parseArgs(os.Args[1:]...)
 	if err != nil {
@@ -53,7 +54,7 @@ func main() {
 	}
 
 	if parsedArgs.Version {
-		fmt.Printf("%s %s %s %s\n", version.ExporterProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
+		fmt.Printf("%s %s %s\n", version.ExporterProgramName(), bi.String(), runtime.Version())
 		os.Exit(0)
 	}
 

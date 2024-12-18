@@ -171,8 +171,9 @@ func main() {
 	params.SetDefaults()
 	params.FromFlags()
 
+	bi := version.GetBuildInfo()
 	if params.showVersion {
-		fmt.Printf("%s %s %s %s\n", version.OperatorProgramName(), version.Get(), version.GetGitCommit(), runtime.Version())
+		fmt.Printf("%s %s %s\n", version.OperatorProgramName(), bi.String(), runtime.Version())
 		os.Exit(0)
 	}
 
@@ -189,7 +190,7 @@ func main() {
 	config := textlogger.NewConfig(textlogger.Verbosity(int(klogV)))
 	ctrl.SetLogger(textlogger.NewLogger(config))
 
-	klog.InfoS("starting", "program", version.OperatorProgramName(), "version", version.Get(), "gitcommit", version.GetGitCommit(), "golang", runtime.Version(), "vl", klogV, "auxv", config.Verbosity().String())
+	klog.InfoS("starting", "program", version.OperatorProgramName(), "version", bi.Version, "branch", bi.Branch, "gitcommit", bi.Commit, "golang", runtime.Version(), "vl", klogV, "auxv", config.Verbosity().String())
 
 	ctx := context.Background()
 
