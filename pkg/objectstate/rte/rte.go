@@ -82,6 +82,7 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) ([]o
 	if mf.MachineConfig == nil {
 		return ret, nullMachineConfigPoolUpdated
 	}
+	enabledMCCount := 0
 	for _, tree := range em.trees {
 		for _, mcp := range tree.MachineConfigPools {
 			mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
@@ -96,7 +97,7 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) ([]o
 				continue
 			}
 
-			if !em.enableMachineConfig {
+			if !em.enableMachineConfig && !annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations) {
 				// caution here: we want a *nil interface value*, not an *interface which points to nil*.
 				// the latter would lead to apparently correct code leading to runtime panics. See:
 				// https://trstringer.com/go-nil-interface-and-interface-with-nil-concrete-value/
@@ -125,17 +126,14 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) ([]o
 					Merge:    merge.ObjectForUpdate,
 				},
 			)
+			enabledMCCount++
 		}
 	}
 
-	return ret, em.getWaitMCPUpdatedFunc()
-}
-
-func (em *ExistingManifests) getWaitMCPUpdatedFunc() MCPWaitForUpdatedFunc {
-	if em.enableMachineConfig {
-		return IsMachineConfigPoolUpdated
+	if enabledMCCount > 0 {
+		return ret, IsMachineConfigPoolUpdated
 	}
-	return IsMachineConfigPoolUpdatedAfterDeletion
+	return ret, IsMachineConfigPoolUpdatedAfterDeletion
 }
 
 func nullMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
@@ -295,12 +293,13 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 				}
 
 				if updater != nil {
+					cpEnabled := isCustomPolicyEnabled || annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
 					gdm := GeneratedDesiredManifest{
 						ClusterPlatform:       em.plat,
 						MachineConfigPool:     mcp.DeepCopy(),
 						NodeGroup:             tree.NodeGroup.DeepCopy(),
 						DaemonSet:             desiredDaemonSet,
-						IsCustomPolicyEnabled: isCustomPolicyEnabled,
+						IsCustomPolicyEnabled: cpEnabled,
 					}
 
 					err := updater(mcp.Name, &gdm)
@@ -343,14 +342,14 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 			desiredDaemonSet.Spec.Template.Spec.NodeSelector = map[string]string{
 				HyperShiftNodePoolLabel: poolName,
 			}
-
 			if updater != nil {
+				cpEnabled := isCustomPolicyEnabled || annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
 				gdm := GeneratedDesiredManifest{
 					ClusterPlatform:       em.plat,
 					MachineConfigPool:     nil,
 					NodeGroup:             tree.NodeGroup.DeepCopy(),
 					DaemonSet:             desiredDaemonSet,
-					IsCustomPolicyEnabled: isCustomPolicyEnabled,
+					IsCustomPolicyEnabled: cpEnabled,
 				}
 
 				err := updater(poolName, &gdm)
