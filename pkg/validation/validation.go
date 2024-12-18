@@ -81,6 +81,10 @@ func NodeGroups(nodeGroups []nropv1.NodeGroup, platf platform.Platform) error {
 		return err
 	}
 
+	if err := nodeGroupsAnnotations(nodeGroups); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -184,6 +188,17 @@ func nodeGroupMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
 	}
 
 	return selectorsErrors
+}
+
+func nodeGroupsAnnotations(nodeGroups []nropv1.NodeGroup) error {
+	var err error
+	for idx, nodeGroup := range nodeGroups {
+		if len(nodeGroup.Annotations) <= nropv1.NodeGroupMaxAnnotations {
+			continue
+		}
+		err = errors.Join(err, fmt.Errorf("pool #%d has too many annotations %d max %d", idx, len(nodeGroup.Annotations), nropv1.NodeGroupMaxAnnotations))
+	}
+	return err
 }
 
 func MultipleMCPsPerTree(annot map[string]string, trees []nodegroupv1.Tree) error {
