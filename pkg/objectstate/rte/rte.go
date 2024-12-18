@@ -61,6 +61,7 @@ type ExistingManifests struct {
 	daemonSets              map[string]daemonSetManifest
 	machineConfigs          map[string]machineConfigManifest
 	sccError                error
+	sccV2Error              error
 	serviceAccountError     error
 	roleError               error
 	roleBindingError        error
@@ -258,6 +259,15 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 			Merge:    merge.ObjectForUpdate,
 		})
 	}
+	if mf.SecurityContextConstraintV2 != nil {
+		ret = append(ret, objectstate.ObjectState{
+			Existing: em.existing.SecurityContextConstraintV2,
+			Error:    em.sccV2Error,
+			Desired:  mf.SecurityContextConstraintV2.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.ObjectForUpdate,
+		})
+	}
 
 	for _, tree := range em.trees {
 		if em.plat == platform.OpenShift {
@@ -405,6 +415,10 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		scc := &securityv1.SecurityContextConstraints{}
 		if ret.sccError = cli.Get(ctx, client.ObjectKeyFromObject(mf.SecurityContextConstraint), scc); ret.sccError == nil {
 			ret.existing.SecurityContextConstraint = scc
+		}
+		sccv2 := &securityv1.SecurityContextConstraints{}
+		if ret.sccV2Error = cli.Get(ctx, client.ObjectKeyFromObject(mf.SecurityContextConstraintV2), sccv2); ret.sccV2Error == nil {
+			ret.existing.SecurityContextConstraintV2 = sccv2
 		}
 
 		ret.machineConfigs = make(map[string]machineConfigManifest)
