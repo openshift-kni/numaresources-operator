@@ -111,6 +111,10 @@ type NodeGroupConfig struct {
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }
 
+const (
+	NodeGroupMaxAnnotations = 8
+)
+
 // NodeGroup defines group of nodes that will run resource topology exporter daemon set
 // You can choose the group of node by MachineConfigPoolSelector or by PoolName
 type NodeGroup struct {
@@ -123,6 +127,11 @@ type NodeGroup struct {
 	// PoolName defines the pool name to which the nodes belong that the config of this node group will be applied to
 	// +optional
 	PoolName *string `json:"poolName,omitempty"`
+	// Annotations is the per-nodegroup equivalent of the per-object annotations.
+	// Unlike the regular annotations, there is a hard limit of supported annotations, dependent on the operator version.
+	// In general, prefer to use per-object standard annotations.
+	// +optional
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // NodeGroupStatus reports the status of a NodeGroup once matches an actual set of nodes and it is correctly processed

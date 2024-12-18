@@ -61,6 +61,7 @@ type ExistingManifests struct {
 	daemonSets              map[string]daemonSetManifest
 	machineConfigs          map[string]machineConfigManifest
 	sccError                error
+	sccV2Error              error
 	serviceAccountError     error
 	roleError               error
 	roleBindingError        error
@@ -81,6 +82,7 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) ([]o
 	if mf.MachineConfig == nil {
 		return ret, nullMachineConfigPoolUpdated
 	}
+	enabledMCCount := 0
 	for _, tree := range em.trees {
 		for _, mcp := range tree.MachineConfigPools {
 			mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
@@ -95,7 +97,7 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) ([]o
 				continue
 			}
 
-			if !em.enableMachineConfig {
+			if !em.enableMachineConfig && !annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations) {
 				// caution here: we want a *nil interface value*, not an *interface which points to nil*.
 				// the latter would lead to apparently correct code leading to runtime panics. See:
 				// https://trstringer.com/go-nil-interface-and-interface-with-nil-concrete-value/
@@ -124,17 +126,14 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) ([]o
 					Merge:    merge.ObjectForUpdate,
 				},
 			)
+			enabledMCCount++
 		}
 	}
 
-	return ret, em.getWaitMCPUpdatedFunc()
-}
-
-func (em *ExistingManifests) getWaitMCPUpdatedFunc() MCPWaitForUpdatedFunc {
-	if em.enableMachineConfig {
-		return IsMachineConfigPoolUpdated
+	if enabledMCCount > 0 {
+		return ret, IsMachineConfigPoolUpdated
 	}
-	return IsMachineConfigPoolUpdatedAfterDeletion
+	return ret, IsMachineConfigPoolUpdatedAfterDeletion
 }
 
 func nullMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
@@ -258,6 +257,15 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 			Merge:    merge.ObjectForUpdate,
 		})
 	}
+	if mf.SecurityContextConstraintV2 != nil {
+		ret = append(ret, objectstate.ObjectState{
+			Existing: em.existing.SecurityContextConstraintV2,
+			Error:    em.sccV2Error,
+			Desired:  mf.SecurityContextConstraintV2.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.ObjectForUpdate,
+		})
+	}
 
 	for _, tree := range em.trees {
 		if em.plat == platform.OpenShift {
@@ -285,12 +293,13 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 				}
 
 				if updater != nil {
+					cpEnabled := isCustomPolicyEnabled || annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
 					gdm := GeneratedDesiredManifest{
 						ClusterPlatform:       em.plat,
 						MachineConfigPool:     mcp.DeepCopy(),
 						NodeGroup:             tree.NodeGroup.DeepCopy(),
 						DaemonSet:             desiredDaemonSet,
-						IsCustomPolicyEnabled: isCustomPolicyEnabled,
+						IsCustomPolicyEnabled: cpEnabled,
 					}
 
 					err := updater(mcp.Name, &gdm)
@@ -333,14 +342,14 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 			desiredDaemonSet.Spec.Template.Spec.NodeSelector = map[string]string{
 				HyperShiftNodePoolLabel: poolName,
 			}
-
 			if updater != nil {
+				cpEnabled := isCustomPolicyEnabled || annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
 				gdm := GeneratedDesiredManifest{
 					ClusterPlatform:       em.plat,
 					MachineConfigPool:     nil,
 					NodeGroup:             tree.NodeGroup.DeepCopy(),
 					DaemonSet:             desiredDaemonSet,
-					IsCustomPolicyEnabled: isCustomPolicyEnabled,
+					IsCustomPolicyEnabled: cpEnabled,
 				}
 
 				err := updater(poolName, &gdm)
@@ -405,6 +414,10 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		scc := &securityv1.SecurityContextConstraints{}
 		if ret.sccError = cli.Get(ctx, client.ObjectKeyFromObject(mf.SecurityContextConstraint), scc); ret.sccError == nil {
 			ret.existing.SecurityContextConstraint = scc
+		}
+		sccv2 := &securityv1.SecurityContextConstraints{}
+		if ret.sccV2Error = cli.Get(ctx, client.ObjectKeyFromObject(mf.SecurityContextConstraintV2), sccv2); ret.sccV2Error == nil {
+			ret.existing.SecurityContextConstraintV2 = sccv2
 		}
 
 		ret.machineConfigs = make(map[string]machineConfigManifest)
