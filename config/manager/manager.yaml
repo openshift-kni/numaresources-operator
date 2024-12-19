@@ -4,6 +4,7 @@ metadata:
   annotations:
     workload.openshift.io/allowed: management
   labels:
+    openshift.io/cluster-monitoring: "true"
     control-plane: controller-manager
   name: system
 ---
@@ -43,6 +44,10 @@ spec:
                 matchExpressions:
                   - key: node-role.kubernetes.io/control-plane
                     operator: Exists
+      volumes: 
+      - name : metrics-tls
+        secret:
+          secretName: metrics-service-cert
       containers:
       - command:
         - /bin/numaresources-operator
@@ -50,8 +55,16 @@ spec:
         - -v=4
         - --leader-elect
         - --enable-scheduler
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+          name: https
         image: controller:latest
         name: manager
+        volumeMounts:
+        - name: metrics-tls
+          mountPath: /certs
+          readOnly: true
         securityContext:
           allowPrivilegeEscalation: false
         env:

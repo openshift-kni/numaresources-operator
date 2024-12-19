@@ -72,10 +72,11 @@ const (
 )
 
 const (
-	defaultWebhookPort = 9443
-	defaultMetricsAddr = ":8080"
-	defaultProbeAddr   = ":8081"
-	defaultNamespace   = "numaresources-operator"
+	defaultWebhookPort    = 9443
+	defaultMetricsAddr    = ":8080"
+	defaultMetricsSupport = true
+	defaultProbeAddr      = ":8081"
+	defaultNamespace      = "numaresources-operator"
 )
 
 var (
@@ -130,6 +131,7 @@ func (pa *Params) SetDefaults() {
 	pa.probeAddr = defaultProbeAddr
 	pa.render.Namespace = defaultNamespace
 	pa.enableReplicasDetect = true
+	pa.enableMetrics = defaultMetricsSupport
 }
 
 func (pa *Params) FromFlags() {
@@ -235,8 +237,9 @@ func main() {
 		Cache:  cache.Options{}, // TODO: restrict namespace here?
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
-			// TODO: secureServing?
-			BindAddress: params.metricsAddr,
+			BindAddress:   params.metricsAddr,
+			SecureServing: true,
+			CertDir:       "/certs",
 		},
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port:    params.webhookPort,
