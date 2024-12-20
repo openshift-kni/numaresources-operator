@@ -36,7 +36,7 @@ type ExistingManifests struct {
 	CrdError error
 }
 
-func (em ExistingManifests) State(mf apimanifests.Manifests) []objectstate.ObjectState {
+func (em *ExistingManifests) State(mf apimanifests.Manifests) []objectstate.ObjectState {
 	return []objectstate.ObjectState{
 		{
 			Existing: em.Existing.Crd,
@@ -48,7 +48,7 @@ func (em ExistingManifests) State(mf apimanifests.Manifests) []objectstate.Objec
 	}
 }
 
-func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf apimanifests.Manifests) ExistingManifests {
+func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf apimanifests.Manifests) *ExistingManifests {
 	ret := ExistingManifests{
 		Existing: apimanifests.New(plat),
 	}
@@ -56,5 +56,5 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 	if ret.CrdError = cli.Get(ctx, client.ObjectKeyFromObject(mf.Crd), &crd); ret.CrdError == nil {
 		ret.Existing.Crd = &crd
 	}
-	return ret
+	return &ret
 }
