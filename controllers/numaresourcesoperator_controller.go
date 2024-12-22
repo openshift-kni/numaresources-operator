@@ -61,8 +61,11 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
+	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -83,15 +86,16 @@ type poolDaemonSet struct {
 // NUMAResourcesOperatorReconciler reconciles a NUMAResourcesOperator object
 type NUMAResourcesOperatorReconciler struct {
 	client.Client
-	Scheme          *runtime.Scheme
-	Platform        platform.Platform
-	APIManifests    apimanifests.Manifests
-	RTEManifests    rtemanifests.Manifests
-	Namespace       string
-	Images          images.Data
-	ImagePullPolicy corev1.PullPolicy
-	Recorder        record.EventRecorder
-	ForwardMCPConds bool
+	Scheme              *runtime.Scheme
+	Platform            platform.Platform
+	APIManifests        apimanifests.Manifests
+	RTEManifests        rtemanifests.Manifests
+	RTEMetricsManifests rtemetricsmanifests.Manifests
+	Namespace           string
+	Images              images.Data
+	ImagePullPolicy     corev1.PullPolicy
+	Recorder            record.EventRecorder
+	ForwardMCPConds     bool
 }
 
 // TODO: narrow down
@@ -118,6 +122,7 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=*
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=services,verbs=*
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -578,6 +583,30 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 			return nil, fmt.Errorf("failed to apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 	}
+
+	for _, obj := range r.RTEMetricsManifests.ToObjects() {
+		// Check if the object already exists
+		existingObj := obj.DeepCopyObject().(client.Object)
+		err := r.Client.Get(ctx, client.ObjectKeyFromObject(obj), existingObj)
+		if err != nil && !apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("failed to get %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+		}
+		if apierrors.IsNotFound(err) {
+			err := controllerutil.SetControllerReference(instance, obj, r.Scheme)
+			if err != nil {
+				return nil, fmt.Errorf("failed to set controller reference to %s %s: %w", obj.GetNamespace(), obj.GetName(), err)
+			}
+			err = r.Client.Create(ctx, obj)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
+			}
+		} else {
+			if err := updateIfNeeded(ctx, existingObj, obj, r.Client); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	if len(dsPoolPairs) < len(trees) {
 		klog.Warningf("daemonset and tree size mismatch: expected %d got in daemonsets %d", len(trees), len(dsPoolPairs))
 	}
@@ -779,4 +808,22 @@ func getTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nr
 	default:
 		return nil, fmt.Errorf("unsupported platform")
 	}
+}
+
+func updateIfNeeded(ctx context.Context, existingObj, desiredObj client.Object, cli client.Client) error {
+	merged, err := merge.MetadataForUpdate(existingObj, desiredObj)
+	if err != nil {
+		return fmt.Errorf("could not merge object %s with existing: %w", desiredObj.GetName(), err)
+	}
+	isEqual, err := compare.Object(existingObj, merged)
+	if err != nil {
+		return fmt.Errorf("could not compare object %s with existing: %w", desiredObj.GetName(), err)
+	}
+	if !isEqual {
+		err = cli.Update(ctx, desiredObj)
+		if err != nil {
+			return fmt.Errorf("failed to update %s/%s: %w", desiredObj.GetNamespace(), desiredObj.GetName(), err)
+		}
+	}
+	return nil
 }

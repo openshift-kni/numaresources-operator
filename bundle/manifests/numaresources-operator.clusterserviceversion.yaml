@@ -62,7 +62,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-12-18T20:58:55Z"
+    createdAt: "2024-12-19T08:31:49Z"
     olm.skipRange: '>=4.18.0 <4.19.0'
     operatorframework.io/cluster-monitoring: "true"
     operators.operatorframework.io/builder: operator-sdk-v1.36.1
@@ -359,6 +359,7 @@ spec:
           resources:
           - configmaps
           - serviceaccounts
+          - services
           verbs:
           - '*'
         - apiGroups:
