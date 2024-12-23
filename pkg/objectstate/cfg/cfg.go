@@ -37,7 +37,7 @@ type ExistingManifests struct {
 	ConfigError error
 }
 
-func (em ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
+func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 	return []objectstate.ObjectState{
 		{
 			Existing: em.Existing.Config,
@@ -49,7 +49,7 @@ func (em ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 	}
 }
 
-func FromClient(ctx context.Context, cli client.Client, namespace, name string) ExistingManifests {
+func FromClient(ctx context.Context, cli client.Client, namespace, name string) *ExistingManifests {
 	ret := ExistingManifests{}
 	key := client.ObjectKey{
 		Name:      name,
@@ -59,5 +59,5 @@ func FromClient(ctx context.Context, cli client.Client, namespace, name string) 
 	if ret.ConfigError = cli.Get(ctx, key, &config); ret.ConfigError == nil {
 		ret.Existing.Config = &config
 	}
-	return ret
+	return &ret
 }
