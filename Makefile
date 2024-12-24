@@ -145,6 +145,9 @@ test-install-e2e: build-e2e-all
 test-uninstall-e2e: build-e2e-all
 	hack/run-test-uninstall-e2e.sh
 
+test-upgrade-e2e: build-e2e-all
+	hack/run-test-upgrade-e2e.sh
+
 test-must-gather-e2e: build-must-gather-e2e
 	hack/run-test-must-gather-e2e.sh
 
@@ -188,6 +191,9 @@ binary-e2e-rte: binary-e2e-rte-local generate-source
 binary-e2e-install: generate-source
 	go test -v -c -o bin/e2e-nrop-install.test ./test/e2e/install && go test -v -c -o bin/e2e-nrop-sched-install.test ./test/e2e/sched/install
 
+binary-e2e-upgrade: generate-source
+	go test -v -c -o bin/e2e-nrop-upgrade.test ./test/e2e/upgrade
+
 binary-e2e-uninstall: generate-source
 	go test -v -c -o bin/e2e-nrop-uninstall.test ./test/e2e/uninstall && go test -v -c -o bin/e2e-nrop-sched-uninstall.test ./test/e2e/sched/uninstall
 
@@ -208,6 +214,7 @@ binary-must-gather-e2e: binary-e2e-must-gather
 
 binary-e2e-all: goversion \
 	binary-e2e-install \
+	binary-e2e-upgrade \
 	binary-e2e-rte \
 	binary-e2e-sched \
 	binary-e2e-uninstall \
@@ -243,6 +250,8 @@ build-all: generate generate-source fmt vet binary binary-rte binary-numacell bi
 build-e2e-rte: generate-source fmt vet binary-e2e-rte
 
 build-e2e-install: fmt vet binary-e2e-install
+
+build-e2e-upgrade: fmt vet binary-e2e-upgrade
 
 build-e2e-uninstall: fmt vet binary-e2e-uninstall
 
