@@ -34,6 +34,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	rtemetrics "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -57,7 +58,8 @@ type machineConfigManifest struct {
 }
 
 type Manifests struct {
-	Core rtemanifests.Manifests
+	Core    rtemanifests.Manifests
+	Metrics rtemetrics.Manifests
 }
 
 type Errors struct {
@@ -68,6 +70,9 @@ type Errors struct {
 		RoleBinding        error
 		ClusterRole        error
 		ClusterRoleBinding error
+	}
+	Metrics struct {
+		Service error
 	}
 }
 
@@ -366,6 +371,17 @@ func (em *ExistingManifests) State(mf Manifests, updater GenerateDesiredManifest
 			)
 		}
 	}
+
+	// extra: metrics
+
+	ret = append(ret, objectstate.ObjectState{
+		Existing: em.existing.Metrics.Service,
+		Error:    em.errs.Metrics.Service,
+		Desired:  mf.Metrics.Service.DeepCopy(),
+		Compare:  compare.Object,
+		Merge:    merge.MetadataForUpdate,
+	})
+
 	return ret
 }
 
@@ -459,6 +475,12 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 			}
 			ret.daemonSets[generatedName] = dsm
 		}
+	}
+
+	// extra: metrics
+	ser := &corev1.Service{}
+	if ret.errs.Metrics.Service = cli.Get(ctx, client.ObjectKeyFromObject(mf.Metrics.Service), ser); ret.errs.Metrics.Service == nil {
+		ret.existing.Metrics.Service = ser
 	}
 
 	return ret

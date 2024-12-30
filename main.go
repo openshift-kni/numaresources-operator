@@ -276,14 +276,14 @@ func main() {
 		Recorder:     mgr.GetEventRecorderFor("numaresources-controller"),
 		APIManifests: apiManifests,
 		RTEManifests: rtestate.Manifests{
-			Core: rteManifestsRendered,
+			Core:    rteManifestsRendered,
+			Metrics: rteMetricsManifests,
 		},
-		RTEMetricsManifests: rteMetricsManifests,
-		Platform:            clusterPlatform,
-		Images:              imgs,
-		ImagePullPolicy:     pullPolicy,
-		Namespace:           namespace,
-		ForwardMCPConds:     params.enableMCPCondsForward,
+		Platform:        clusterPlatform,
+		Images:          imgs,
+		ImagePullPolicy: pullPolicy,
+		Namespace:       namespace,
+		ForwardMCPConds: params.enableMCPCondsForward,
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesOperator")
 		os.Exit(1)
