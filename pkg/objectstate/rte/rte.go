@@ -398,35 +398,37 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		enableMachineConfig: annotations.IsCustomPolicyEnabled(instance.Annotations),
 	}
 
+	keyFor := client.ObjectKeyFromObject // shortcut
+
 	// objects that should present in the single replica
 	ro := &rbacv1.Role{}
-	if ret.errs.Core.Role = cli.Get(ctx, client.ObjectKeyFromObject(mf.Core.Role), ro); ret.errs.Core.Role == nil {
+	if ok := getObject(ctx, cli, keyFor(mf.Core.Role), ro, &ret.errs.Core.Role); ok {
 		ret.existing.Core.Role = ro
 	}
 
 	rb := &rbacv1.RoleBinding{}
-	if ret.errs.Core.RoleBinding = cli.Get(ctx, client.ObjectKeyFromObject(mf.Core.RoleBinding), rb); ret.errs.Core.RoleBinding == nil {
+	if ok := getObject(ctx, cli, keyFor(mf.Core.RoleBinding), rb, &ret.errs.Core.RoleBinding); ok {
 		ret.existing.Core.RoleBinding = rb
 	}
 
 	cro := &rbacv1.ClusterRole{}
-	if ret.errs.Core.ClusterRole = cli.Get(ctx, client.ObjectKeyFromObject(mf.Core.ClusterRole), cro); ret.errs.Core.ClusterRole == nil {
+	if ok := getObject(ctx, cli, keyFor(mf.Core.ClusterRole), cro, &ret.errs.Core.ClusterRole); ok {
 		ret.existing.Core.ClusterRole = cro
 	}
 
 	crb := &rbacv1.ClusterRoleBinding{}
-	if ret.errs.Core.ClusterRoleBinding = cli.Get(ctx, client.ObjectKeyFromObject(mf.Core.ClusterRoleBinding), crb); ret.errs.Core.ClusterRoleBinding == nil {
+	if ok := getObject(ctx, cli, keyFor(mf.Core.ClusterRoleBinding), crb, &ret.errs.Core.ClusterRoleBinding); ok {
 		ret.existing.Core.ClusterRoleBinding = crb
 	}
 
 	sa := &corev1.ServiceAccount{}
-	if ret.errs.Core.ServiceAccount = cli.Get(ctx, client.ObjectKeyFromObject(mf.Core.ServiceAccount), sa); ret.errs.Core.ServiceAccount == nil {
+	if ok := getObject(ctx, cli, keyFor(mf.Core.ServiceAccount), sa, &ret.errs.Core.ServiceAccount); ok {
 		ret.existing.Core.ServiceAccount = sa
 	}
 
 	if plat != platform.Kubernetes {
 		scc := &securityv1.SecurityContextConstraints{}
-		if ret.errs.Core.SCC = cli.Get(ctx, client.ObjectKeyFromObject(mf.Core.SecurityContextConstraint), scc); ret.errs.Core.SCC == nil {
+		if ok := getObject(ctx, cli, keyFor(mf.Core.SecurityContextConstraint), scc, &ret.errs.Core.SCC); ok {
 			ret.existing.Core.SecurityContextConstraint = scc
 		}
 
@@ -479,7 +481,7 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 
 	// extra: metrics
 	ser := &corev1.Service{}
-	if ret.errs.Metrics.Service = cli.Get(ctx, client.ObjectKeyFromObject(mf.Metrics.Service), ser); ret.errs.Metrics.Service == nil {
+	if ok := getObject(ctx, cli, keyFor(mf.Metrics.Service), ser, &ret.errs.Metrics.Service); ok {
 		ret.existing.Metrics.Service = ser
 	}
 
@@ -493,4 +495,10 @@ func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName
 	}
 	_, ok := obj.(*appsv1.DaemonSet)
 	return res, ok
+}
+
+// getObject is a shortcut to don't type the error twice
+func getObject(ctx context.Context, cli client.Client, key client.ObjectKey, obj client.Object, err *error) bool {
+	*err = cli.Get(ctx, key, obj)
+	return *err == nil
 }
