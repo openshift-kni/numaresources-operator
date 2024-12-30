@@ -83,10 +83,10 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 		Platform:     plat,
 		APIManifests: apiManifests,
 		RTEManifests: rte.Manifests{
-			Core: rteManifests,
+			Core:    rteManifests,
+			Metrics: rtemetricsmanifests,
 		},
-		RTEMetricsManifests: rtemetricsmanifests,
-		Namespace:           testNamespace,
+		Namespace: testNamespace,
 		Images: images.Data{
 			Builtin: testImageSpec,
 		},
@@ -1483,16 +1483,13 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								}
 								Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).ToNot(HaveOccurred())
 
-								By("Check All RTE metrics components are created")
-								for _, obj := range reconciler.RTEMetricsManifests.ToObjects() {
-									objectKey := client.ObjectKeyFromObject(obj)
-									switch obj.(type) {
-									case *corev1.Service:
-										service := &corev1.Service{}
-										Expect(reconciler.Client.Get(context.TODO(), objectKey, service)).ToNot(HaveOccurred())
-									default:
-									}
+								serKey := client.ObjectKey{
+									Name:      "numaresources-rte-metrics-service", // TODO: staticize
+									Namespace: testNamespace,
 								}
+								ser := &corev1.Service{}
+								By("Check All RTE metrics components are created")
+								Expect(reconciler.Client.Get(context.TODO(), serKey, ser)).ToNot(HaveOccurred())
 							})
 							When("daemonsets are ready", func() {
 								var dsDesiredNumberScheduled int32
