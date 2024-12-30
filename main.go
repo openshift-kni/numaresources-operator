@@ -227,8 +227,19 @@ func main() {
 	}
 	klog.InfoS("manifests loaded", "component", "RTE")
 
+	rteMetricsManifests, err := rtemetricsmanifests.GetManifests(namespace)
+	if err != nil {
+		klog.ErrorS(err, "unable to load the RTE metrics manifests")
+		os.Exit(1)
+	}
+	klog.InfoS("manifests loaded", "component", "RTEMetrics")
+
 	if params.renderMode {
-		os.Exit(manageRendering(params.render, clusterPlatform, apiManifests, rteManifests, namespace, params.enableScheduler))
+		rteMf := rtestate.Manifests{
+			Core:    rteManifests,
+			Metrics: rteMetricsManifests,
+		}
+		os.Exit(manageRendering(params.render, clusterPlatform, apiManifests, rteMf, namespace, params.enableScheduler))
 	}
 
 	klog.InfoS("metrics server", "enabled", params.enableMetrics, "addr", params.metricsAddr)
@@ -259,11 +270,6 @@ func main() {
 	rteManifestsRendered, err := renderRTEManifests(rteManifests, namespace, imgs)
 	if err != nil {
 		klog.ErrorS(err, "unable to render RTE manifests", "controller", "NUMAResourcesOperator")
-		os.Exit(1)
-	}
-	rteMetricsManifests, err := rtemetricsmanifests.GetManifests(namespace)
-	if err != nil {
-		klog.ErrorS(err, "unable to load the RTE metrics manifests")
 		os.Exit(1)
 	}
 
@@ -357,7 +363,7 @@ func manageIntrospection() int {
 	return 0
 }
 
-func manageRendering(render RenderParams, clusterPlatform platform.Platform, apiMf apimanifests.Manifests, rteMf rtemanifests.Manifests, namespace string, enableScheduler bool) int {
+func manageRendering(render RenderParams, clusterPlatform platform.Platform, apiMf apimanifests.Manifests, rteMf rtestate.Manifests, namespace string, enableScheduler bool) int {
 	if render.NRTCRD {
 		if err := renderObjects(apiMf.ToObjects()); err != nil {
 			klog.ErrorS(err, "unable to render manifests")
@@ -392,12 +398,13 @@ func manageRendering(render RenderParams, clusterPlatform platform.Platform, api
 		User:    render.Image.Exporter,
 		Builtin: images.SpecPath(),
 	}
-	mf, err := renderRTEManifests(rteMf, render.Namespace, imgs)
+	mf, err := renderRTEManifests(rteMf.Core, render.Namespace, imgs)
 	if err != nil {
 		klog.ErrorS(err, "unable to render RTE manifests")
 		return 1
 	}
 	objs = append(objs, mf.ToObjects()...)
+	objs = append(objs, rteMf.Metrics.ToObjects()...) // no rendering needed
 
 	if err := renderObjects(objs); err != nil {
 		klog.ErrorS(err, "unable to render manifests")
