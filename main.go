@@ -62,6 +62,7 @@ import (
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/controlplane"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
+	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
@@ -270,11 +271,13 @@ func main() {
 	}
 
 	if err = (&controllers.NUMAResourcesOperatorReconciler{
-		Client:              mgr.GetClient(),
-		Scheme:              mgr.GetScheme(),
-		Recorder:            mgr.GetEventRecorderFor("numaresources-controller"),
-		APIManifests:        apiManifests,
-		RTEManifests:        rteManifestsRendered,
+		Client:       mgr.GetClient(),
+		Scheme:       mgr.GetScheme(),
+		Recorder:     mgr.GetEventRecorderFor("numaresources-controller"),
+		APIManifests: apiManifests,
+		RTEManifests: rtestate.Manifests{
+			Core: rteManifestsRendered,
+		},
 		RTEMetricsManifests: rteMetricsManifests,
 		Platform:            clusterPlatform,
 		Images:              imgs,
