@@ -50,7 +50,6 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
@@ -89,7 +88,7 @@ type NUMAResourcesOperatorReconciler struct {
 	Scheme              *runtime.Scheme
 	Platform            platform.Platform
 	APIManifests        apimanifests.Manifests
-	RTEManifests        rtemanifests.Manifests
+	RTEManifests        rtestate.Manifests
 	RTEMetricsManifests rtemetricsmanifests.Manifests
 	Namespace           string
 	Images              images.Data
@@ -529,30 +528,30 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 
 	// using a slice of poolDaemonSet instead of a map because Go maps assignment order is not consistent and non-deterministic
 	dsPoolPairs := []poolDaemonSet{}
-	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
+	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.Core.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
 	if err != nil {
 		return dsPoolPairs, err
 	}
 
-	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.DaemonSet)
+	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.Core.DaemonSet)
 	if err != nil {
 		return dsPoolPairs, err
 	}
 
-	err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
+	err = loglevel.UpdatePodSpec(&r.RTEManifests.Core.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
 	if err != nil {
 		return dsPoolPairs, err
 	}
 
 	// ConfigMap should be provided by the kubeletconfig reconciliation loop
-	if r.RTEManifests.ConfigMap != nil {
-		cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.RTEManifests.ConfigMap)
+	if r.RTEManifests.Core.ConfigMap != nil {
+		cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.RTEManifests.Core.ConfigMap)
 		if err != nil {
 			return dsPoolPairs, err
 		}
-		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
+		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.Core.DaemonSet, cmHash)
 	}
-	rteupdate.SecurityContextConstraint(r.RTEManifests.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
+	rteupdate.SecurityContextConstraint(r.RTEManifests.Core.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
 
 	processor := func(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
 		err := daemonsetUpdater(poolName, gdm)
