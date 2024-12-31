@@ -64,13 +64,18 @@ func Platform(ctx context.Context) (platform.Platform, error) {
 	if err != nil {
 		return platform.Unknown, err
 	}
-	return PlatformFromLister(ctx, ocpCli.ConfigV1.ClusterVersions())
+	return PlatformFromClients(ctx, ocpCli.ConfigV1.ClusterVersions(), ocpCli.ConfigV1.Infrastructures())
 }
 
 type ClusterVersionsLister interface {
 	List(ctx context.Context, opts metav1.ListOptions) (*ocpconfigv1.ClusterVersionList, error)
 }
 
+type InfrastructuresGetter interface {
+	Get(ctx context.Context, name string, options metav1.GetOptions) (*ocpconfigv1.Infrastructure, error)
+}
+
+// PlatformFromLister is deprecated, use PlatformFromClients instead
 func PlatformFromLister(ctx context.Context, cvLister ClusterVersionsLister) (platform.Platform, error) {
 	vers, err := cvLister.List(ctx, metav1.ListOptions{})
 	if err != nil {
@@ -80,6 +85,27 @@ func PlatformFromLister(ctx context.Context, cvLister ClusterVersionsLister) (pl
 		return platform.Unknown, err
 	}
 	if len(vers.Items) > 0 {
+		return platform.OpenShift, nil
+	}
+	return platform.Kubernetes, nil
+}
+
+func PlatformFromClients(ctx context.Context, cvLister ClusterVersionsLister, infraGetter InfrastructuresGetter) (platform.Platform, error) {
+	vers, err := cvLister.List(ctx, metav1.ListOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return platform.Kubernetes, nil
+		}
+		return platform.Unknown, err
+	}
+	if len(vers.Items) > 0 {
+		infra, err := infraGetter.Get(ctx, "cluster", metav1.GetOptions{})
+		if err != nil {
+			return platform.Unknown, err
+		}
+		if infra.Status.ControlPlaneTopology == ocpconfigv1.ExternalTopologyMode {
+			return platform.HyperShift, nil
+		}
 		return platform.OpenShift, nil
 	}
 	return platform.Kubernetes, nil
