@@ -600,6 +600,12 @@ spec:
           verbs:
           - create
           - patch
+        - apiGroups:
+          - ""
+          resources:
+          - services
+          verbs:
+          - '*'
         serviceAccountName: numaresources-controller-manager
     strategy: deployment
   installModes:
