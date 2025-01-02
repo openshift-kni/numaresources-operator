@@ -78,13 +78,15 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 	recorder := record.NewFakeRecorder(bufferSize)
 
 	return &NUMAResourcesOperatorReconciler{
-		Client:              fakeClient,
-		Scheme:              scheme.Scheme,
-		Platform:            plat,
-		APIManifests:        apiManifests,
-		RTEManifests:        rteManifests,
-		RTEMetricsManifests: rtemetricsmanifests,
-		Namespace:           testNamespace,
+		Client:       fakeClient,
+		Scheme:       scheme.Scheme,
+		Platform:     plat,
+		APIManifests: apiManifests,
+		RTEManifests: rte.Manifests{
+			Core:    rteManifests,
+			Metrics: rtemetricsmanifests,
+		},
+		Namespace: testNamespace,
 		Images: images.Data{
 			Builtin: testImageSpec,
 		},
@@ -361,7 +363,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						BeforeEach(func() {
 							By("Create a new Daemonset with correct name but not owner reference")
 
-							ds := reconciler.RTEManifests.DaemonSet.DeepCopy()
+							ds := reconciler.RTEManifests.Core.DaemonSet.DeepCopy()
 							ds.Name = objectnames.GetComponentName(nro.Name, pn2)
 							ds.Namespace = testNamespace
 
@@ -902,7 +904,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					ds := &appsv1.DaemonSet{}
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
 
-					Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(reconciler.RTEManifests.DaemonSet.Spec.Template.Spec.Tolerations), "mismatched DS default tolerations")
+					Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(reconciler.RTEManifests.Core.DaemonSet.Spec.Template.Spec.Tolerations), "mismatched DS default tolerations")
 				})
 
 				It("should add the extra tolerations in the DS objects", func() {
@@ -1041,7 +1043,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(err).ToNot(HaveOccurred())
 
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
-					Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(reconciler.RTEManifests.DaemonSet.Spec.Template.Spec.Tolerations), "DS tolerations not restored to defaults")
+					Expect(ds.Spec.Template.Spec.Tolerations).To(Equal(reconciler.RTEManifests.Core.DaemonSet.Spec.Template.Spec.Tolerations), "DS tolerations not restored to defaults")
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
@@ -1481,33 +1483,30 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								}
 								Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).ToNot(HaveOccurred())
 
-								By("Check All RTE metrics components are created")
-								for _, obj := range reconciler.RTEMetricsManifests.ToObjects() {
-									objectKey := client.ObjectKeyFromObject(obj)
-									switch obj.(type) {
-									case *corev1.Service:
-										service := &corev1.Service{}
-										Expect(reconciler.Client.Get(context.TODO(), objectKey, service)).ToNot(HaveOccurred())
-									default:
-									}
+								serKey := client.ObjectKey{
+									Name:      "numaresources-rte-metrics-service", // TODO: staticize
+									Namespace: testNamespace,
 								}
+								ser := &corev1.Service{}
+								By("Check All RTE metrics components are created")
+								Expect(reconciler.Client.Get(context.TODO(), serKey, ser)).ToNot(HaveOccurred())
 							})
 							When("daemonsets are ready", func() {
 								var dsDesiredNumberScheduled int32
 								var dsNumReady int32
 								BeforeEach(func() {
-									dsDesiredNumberScheduled = reconciler.RTEManifests.DaemonSet.Status.DesiredNumberScheduled
-									dsNumReady = reconciler.RTEManifests.DaemonSet.Status.NumberReady
+									dsDesiredNumberScheduled = reconciler.RTEManifests.Core.DaemonSet.Status.DesiredNumberScheduled
+									dsNumReady = reconciler.RTEManifests.Core.DaemonSet.Status.NumberReady
 
-									reconciler.RTEManifests.DaemonSet.Status.DesiredNumberScheduled = int32(len(nro.Spec.NodeGroups))
-									reconciler.RTEManifests.DaemonSet.Status.NumberReady = reconciler.RTEManifests.DaemonSet.Status.DesiredNumberScheduled
+									reconciler.RTEManifests.Core.DaemonSet.Status.DesiredNumberScheduled = int32(len(nro.Spec.NodeGroups))
+									reconciler.RTEManifests.Core.DaemonSet.Status.NumberReady = reconciler.RTEManifests.Core.DaemonSet.Status.DesiredNumberScheduled
 
 									_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 									Expect(err).ToNot(HaveOccurred())
 								})
 								AfterEach(func() {
-									reconciler.RTEManifests.DaemonSet.Status.DesiredNumberScheduled = dsDesiredNumberScheduled
-									reconciler.RTEManifests.DaemonSet.Status.NumberReady = dsNumReady
+									reconciler.RTEManifests.Core.DaemonSet.Status.DesiredNumberScheduled = dsDesiredNumberScheduled
+									reconciler.RTEManifests.Core.DaemonSet.Status.NumberReady = dsNumReady
 
 									_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 									Expect(err).ToNot(HaveOccurred())

@@ -34,6 +34,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	rtemetrics "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -56,16 +57,30 @@ type machineConfigManifest struct {
 	machineConfigError error
 }
 
+type Manifests struct {
+	Core    rtemanifests.Manifests
+	Metrics rtemetrics.Manifests
+}
+
+type Errors struct {
+	Core struct {
+		SCC                error
+		ServiceAccount     error
+		Role               error
+		RoleBinding        error
+		ClusterRole        error
+		ClusterRoleBinding error
+	}
+	Metrics struct {
+		Service error
+	}
+}
+
 type ExistingManifests struct {
-	existing                rtemanifests.Manifests
-	daemonSets              map[string]daemonSetManifest
-	machineConfigs          map[string]machineConfigManifest
-	sccError                error
-	serviceAccountError     error
-	roleError               error
-	roleBindingError        error
-	clusterRoleError        error
-	clusterRoleBindingError error
+	existing       Manifests
+	errs           Errors
+	daemonSets     map[string]daemonSetManifest
+	machineConfigs map[string]machineConfigManifest
 	// internal helpers
 	plat                platform.Platform
 	instance            *nropv1.NUMAResourcesOperator
@@ -76,9 +91,9 @@ type ExistingManifests struct {
 
 type MCPWaitForUpdatedFunc func(string, *machineconfigv1.MachineConfigPool) bool
 
-func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) ([]objectstate.ObjectState, MCPWaitForUpdatedFunc) {
+func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.ObjectState, MCPWaitForUpdatedFunc) {
 	var ret []objectstate.ObjectState
-	if mf.MachineConfig == nil {
+	if mf.Core.MachineConfig == nil {
 		return ret, nullMachineConfigPoolUpdated
 	}
 	for _, tree := range em.trees {
@@ -110,7 +125,7 @@ func (em *ExistingManifests) MachineConfigsState(mf rtemanifests.Manifests) ([]o
 				continue
 			}
 
-			desiredMachineConfig := mf.MachineConfig.DeepCopy()
+			desiredMachineConfig := mf.Core.MachineConfig.DeepCopy()
 			// prefix machine config name to guarantee that we will have an option to override it
 			desiredMachineConfig.Name = mcName
 			desiredMachineConfig.Labels = GetMachineConfigLabel(mcp)
@@ -205,55 +220,50 @@ func SkipManifestUpdate(gdm *GeneratedDesiredManifest) error {
 	return nil
 }
 
-func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDesiredManifestUpdater, isCustomPolicyEnabled bool) []objectstate.ObjectState {
+func (em *ExistingManifests) State(mf Manifests, updater GenerateDesiredManifestUpdater, isCustomPolicyEnabled bool) []objectstate.ObjectState {
 	ret := []objectstate.ObjectState{
-		// service account
 		{
-			Existing: em.existing.ServiceAccount,
-			Error:    em.serviceAccountError,
-			Desired:  mf.ServiceAccount.DeepCopy(),
+			Existing: em.existing.Core.ServiceAccount,
+			Error:    em.errs.Core.ServiceAccount,
+			Desired:  mf.Core.ServiceAccount.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ServiceAccountForUpdate,
 		},
-		// role
 		{
-			Existing: em.existing.Role,
-			Error:    em.roleError,
-			Desired:  mf.Role.DeepCopy(),
+			Existing: em.existing.Core.Role,
+			Error:    em.errs.Core.Role,
+			Desired:  mf.Core.Role.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
 		},
-		// role binding
 		{
-			Existing: em.existing.RoleBinding,
-			Error:    em.roleBindingError,
-			Desired:  mf.RoleBinding.DeepCopy(),
+			Existing: em.existing.Core.RoleBinding,
+			Error:    em.errs.Core.RoleBinding,
+			Desired:  mf.Core.RoleBinding.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
 		},
-		// cluster role
 		{
-			Existing: em.existing.ClusterRole,
-			Error:    em.clusterRoleError,
-			Desired:  mf.ClusterRole.DeepCopy(),
+			Existing: em.existing.Core.ClusterRole,
+			Error:    em.errs.Core.ClusterRole,
+			Desired:  mf.Core.ClusterRole.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
 		},
-		// cluster role binding
 		{
-			Existing: em.existing.ClusterRoleBinding,
-			Error:    em.clusterRoleBindingError,
-			Desired:  mf.ClusterRoleBinding.DeepCopy(),
+			Existing: em.existing.Core.ClusterRoleBinding,
+			Error:    em.errs.Core.ClusterRoleBinding,
+			Desired:  mf.Core.ClusterRoleBinding.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
 		},
 	}
 
-	if mf.SecurityContextConstraint != nil {
+	if mf.Core.SecurityContextConstraint != nil {
 		ret = append(ret, objectstate.ObjectState{
-			Existing: em.existing.SecurityContextConstraint,
-			Error:    em.sccError,
-			Desired:  mf.SecurityContextConstraint.DeepCopy(),
+			Existing: em.existing.Core.SecurityContextConstraint,
+			Error:    em.errs.Core.SCC,
+			Desired:  mf.Core.SecurityContextConstraint.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
 		})
@@ -271,10 +281,10 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 					existingDs = existingDaemonSet.daemonSet
 					loadError = existingDaemonSet.daemonSetError
 				} else {
-					loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.DaemonSet.Namespace, mf.DaemonSet.Name)
+					loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.Core.DaemonSet.Namespace, mf.Core.DaemonSet.Name)
 				}
 
-				desiredDaemonSet := mf.DaemonSet.DeepCopy()
+				desiredDaemonSet := mf.Core.DaemonSet.DeepCopy()
 				desiredDaemonSet.Name = generatedName
 
 				var updateError error
@@ -323,10 +333,10 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 				existingDs = existingDaemonSet.daemonSet
 				loadError = existingDaemonSet.daemonSetError
 			} else {
-				loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.DaemonSet.Namespace, mf.DaemonSet.Name)
+				loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.Core.DaemonSet.Namespace, mf.Core.DaemonSet.Name)
 			}
 
-			desiredDaemonSet := mf.DaemonSet.DeepCopy()
+			desiredDaemonSet := mf.Core.DaemonSet.DeepCopy()
 			desiredDaemonSet.Name = generatedName
 
 			var updateError error
@@ -361,12 +371,25 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 			)
 		}
 	}
+
+	// extra: metrics
+
+	ret = append(ret, objectstate.ObjectState{
+		Existing: em.existing.Metrics.Service,
+		Error:    em.errs.Metrics.Service,
+		Desired:  mf.Metrics.Service.DeepCopy(),
+		Compare:  compare.Object,
+		Merge:    merge.MetadataForUpdate,
+	})
+
 	return ret
 }
 
-func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf rtemanifests.Manifests, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, namespace string) ExistingManifests {
+func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf Manifests, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, namespace string) ExistingManifests {
 	ret := ExistingManifests{
-		existing:            rtemanifests.New(plat),
+		existing: Manifests{
+			Core: rtemanifests.New(plat),
+		},
 		daemonSets:          make(map[string]daemonSetManifest),
 		plat:                plat,
 		instance:            instance,
@@ -375,36 +398,38 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		enableMachineConfig: annotations.IsCustomPolicyEnabled(instance.Annotations),
 	}
 
+	keyFor := client.ObjectKeyFromObject // shortcut
+
 	// objects that should present in the single replica
 	ro := &rbacv1.Role{}
-	if ret.roleError = cli.Get(ctx, client.ObjectKeyFromObject(mf.Role), ro); ret.roleError == nil {
-		ret.existing.Role = ro
+	if ok := getObject(ctx, cli, keyFor(mf.Core.Role), ro, &ret.errs.Core.Role); ok {
+		ret.existing.Core.Role = ro
 	}
 
 	rb := &rbacv1.RoleBinding{}
-	if ret.roleBindingError = cli.Get(ctx, client.ObjectKeyFromObject(mf.RoleBinding), rb); ret.roleBindingError == nil {
-		ret.existing.RoleBinding = rb
+	if ok := getObject(ctx, cli, keyFor(mf.Core.RoleBinding), rb, &ret.errs.Core.RoleBinding); ok {
+		ret.existing.Core.RoleBinding = rb
 	}
 
 	cro := &rbacv1.ClusterRole{}
-	if ret.clusterRoleError = cli.Get(ctx, client.ObjectKeyFromObject(mf.ClusterRole), cro); ret.clusterRoleError == nil {
-		ret.existing.ClusterRole = cro
+	if ok := getObject(ctx, cli, keyFor(mf.Core.ClusterRole), cro, &ret.errs.Core.ClusterRole); ok {
+		ret.existing.Core.ClusterRole = cro
 	}
 
 	crb := &rbacv1.ClusterRoleBinding{}
-	if ret.clusterRoleBindingError = cli.Get(ctx, client.ObjectKeyFromObject(mf.ClusterRoleBinding), crb); ret.clusterRoleBindingError == nil {
-		ret.existing.ClusterRoleBinding = crb
+	if ok := getObject(ctx, cli, keyFor(mf.Core.ClusterRoleBinding), crb, &ret.errs.Core.ClusterRoleBinding); ok {
+		ret.existing.Core.ClusterRoleBinding = crb
 	}
 
 	sa := &corev1.ServiceAccount{}
-	if ret.serviceAccountError = cli.Get(ctx, client.ObjectKeyFromObject(mf.ServiceAccount), sa); ret.serviceAccountError == nil {
-		ret.existing.ServiceAccount = sa
+	if ok := getObject(ctx, cli, keyFor(mf.Core.ServiceAccount), sa, &ret.errs.Core.ServiceAccount); ok {
+		ret.existing.Core.ServiceAccount = sa
 	}
 
 	if plat != platform.Kubernetes {
 		scc := &securityv1.SecurityContextConstraints{}
-		if ret.sccError = cli.Get(ctx, client.ObjectKeyFromObject(mf.SecurityContextConstraint), scc); ret.sccError == nil {
-			ret.existing.SecurityContextConstraint = scc
+		if ok := getObject(ctx, cli, keyFor(mf.Core.SecurityContextConstraint), scc, &ret.errs.Core.SCC); ok {
+			ret.existing.Core.SecurityContextConstraint = scc
 		}
 
 		ret.machineConfigs = make(map[string]machineConfigManifest)
@@ -454,6 +479,12 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		}
 	}
 
+	// extra: metrics
+	ser := &corev1.Service{}
+	if ok := getObject(ctx, cli, keyFor(mf.Metrics.Service), ser, &ret.errs.Metrics.Service); ok {
+		ret.existing.Metrics.Service = ser
+	}
+
 	return ret
 }
 
@@ -464,4 +495,10 @@ func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName
 	}
 	_, ok := obj.(*appsv1.DaemonSet)
 	return res, ok
+}
+
+// getObject is a shortcut to don't type the error twice
+func getObject(ctx context.Context, cli client.Client, key client.ObjectKey, obj client.Object, err *error) bool {
+	*err = cli.Get(ctx, key, obj)
+	return *err == nil
 }

@@ -50,7 +50,6 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
@@ -61,11 +60,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
-	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -86,16 +82,15 @@ type poolDaemonSet struct {
 // NUMAResourcesOperatorReconciler reconciles a NUMAResourcesOperator object
 type NUMAResourcesOperatorReconciler struct {
 	client.Client
-	Scheme              *runtime.Scheme
-	Platform            platform.Platform
-	APIManifests        apimanifests.Manifests
-	RTEManifests        rtemanifests.Manifests
-	RTEMetricsManifests rtemetricsmanifests.Manifests
-	Namespace           string
-	Images              images.Data
-	ImagePullPolicy     corev1.PullPolicy
-	Recorder            record.EventRecorder
-	ForwardMCPConds     bool
+	Scheme          *runtime.Scheme
+	Platform        platform.Platform
+	APIManifests    apimanifests.Manifests
+	RTEManifests    rtestate.Manifests
+	Namespace       string
+	Images          images.Data
+	ImagePullPolicy corev1.PullPolicy
+	Recorder        record.EventRecorder
+	ForwardMCPConds bool
 }
 
 // TODO: narrow down
@@ -528,30 +523,30 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 
 	// using a slice of poolDaemonSet instead of a map because Go maps assignment order is not consistent and non-deterministic
 	dsPoolPairs := []poolDaemonSet{}
-	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
+	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.Core.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
 	if err != nil {
 		return dsPoolPairs, err
 	}
 
-	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.DaemonSet)
+	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.Core.DaemonSet)
 	if err != nil {
 		return dsPoolPairs, err
 	}
 
-	err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
+	err = loglevel.UpdatePodSpec(&r.RTEManifests.Core.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
 	if err != nil {
 		return dsPoolPairs, err
 	}
 
 	// ConfigMap should be provided by the kubeletconfig reconciliation loop
-	if r.RTEManifests.ConfigMap != nil {
-		cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.RTEManifests.ConfigMap)
+	if r.RTEManifests.Core.ConfigMap != nil {
+		cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.RTEManifests.Core.ConfigMap)
 		if err != nil {
 			return dsPoolPairs, err
 		}
-		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
+		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.Core.DaemonSet, cmHash)
 	}
-	rteupdate.SecurityContextConstraint(r.RTEManifests.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
+	rteupdate.SecurityContextConstraint(r.RTEManifests.Core.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
 
 	processor := func(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
 		err := daemonsetUpdater(poolName, gdm)
@@ -580,29 +575,6 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		_, _, err = apply.ApplyObject(ctx, r.Client, objState)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
-		}
-	}
-
-	for _, obj := range r.RTEMetricsManifests.ToObjects() {
-		// Check if the object already exists
-		existingObj := obj.DeepCopyObject().(client.Object)
-		err := r.Client.Get(ctx, client.ObjectKeyFromObject(obj), existingObj)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return nil, fmt.Errorf("failed to get %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
-		}
-		if apierrors.IsNotFound(err) {
-			err := controllerutil.SetControllerReference(instance, obj, r.Scheme)
-			if err != nil {
-				return nil, fmt.Errorf("failed to set controller reference to %s %s: %w", obj.GetNamespace(), obj.GetName(), err)
-			}
-			err = r.Client.Create(ctx, obj)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create %s/%s: %w", obj.GetNamespace(), obj.GetName(), err)
-			}
-		} else {
-			if err := updateIfNeeded(ctx, existingObj, obj, r.Client); err != nil {
-				return nil, err
-			}
 		}
 	}
 
@@ -807,22 +779,4 @@ func getTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nr
 	default:
 		return nil, fmt.Errorf("unsupported platform")
 	}
-}
-
-func updateIfNeeded(ctx context.Context, existingObj, desiredObj client.Object, cli client.Client) error {
-	merged, err := merge.MetadataForUpdate(existingObj, desiredObj)
-	if err != nil {
-		return fmt.Errorf("could not merge object %s with existing: %w", desiredObj.GetName(), err)
-	}
-	isEqual, err := compare.Object(existingObj, merged)
-	if err != nil {
-		return fmt.Errorf("could not compare object %s with existing: %w", desiredObj.GetName(), err)
-	}
-	if !isEqual {
-		err = cli.Update(ctx, desiredObj)
-		if err != nil {
-			return fmt.Errorf("failed to update %s/%s: %w", desiredObj.GetNamespace(), desiredObj.GetName(), err)
-		}
-	}
-	return nil
 }
