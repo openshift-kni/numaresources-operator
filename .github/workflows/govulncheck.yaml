@@ -1,0 +1,34 @@
+name: CI vulnerability detection with govulncheck
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "release-4.1[8]"
+  push:
+    branches:
+      - main
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up golang
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.23.3
+
+      - name: Show current working directory
+        run: pwd
+
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-package: "./..."
