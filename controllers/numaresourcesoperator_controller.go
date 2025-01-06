@@ -152,11 +152,11 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, nil
 	}
 
-	if err := validation.NodeGroups(instance.Spec.NodeGroups, r.Platform); err != nil {
+	if err := r.NodeGroupsManager.Validate(instance.Spec.NodeGroups); err != nil {
 		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
 	}
 
-	trees, err := getTreesByNodeGroup(ctx, r.Client, instance.Spec.NodeGroups, r.Platform)
+	trees, err := r.NodeGroupsManager.FetchTrees(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
 		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
 	}
@@ -766,19 +766,4 @@ func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
 		return true
 	}
 	return ds.Status.DesiredNumberScheduled > 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
-}
-
-func getTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nropv1.NodeGroup, platf platform.Platform) ([]nodegroupv1.Tree, error) {
-	switch platf {
-	case platform.OpenShift:
-		mcps := &machineconfigv1.MachineConfigPoolList{}
-		if err := cli.List(ctx, mcps); err != nil {
-			return nil, err
-		}
-		return nodegroupv1.FindTreesOpenshift(mcps, nodeGroups)
-	case platform.HyperShift:
-		return nodegroupv1.FindTreesHypershift(nodeGroups), nil
-	default:
-		return nil, fmt.Errorf("unsupported platform")
-	}
 }
