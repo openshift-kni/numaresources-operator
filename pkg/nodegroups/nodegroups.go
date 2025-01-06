@@ -23,6 +23,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 )
@@ -37,6 +38,17 @@ const (
 type Manager interface {
 	Validate(nodeGroups []nropv1.NodeGroup) error
 	FetchTrees(ctx context.Context, cli client.Client, nodeGroups []nropv1.NodeGroup) ([]nodegroupv1.Tree, error)
+}
+
+func NewForPlatform(plat platform.Platform) (Manager, error) {
+	switch plat {
+	case platform.OpenShift:
+		return NewOpenShiftManager(), nil
+	case platform.HyperShift:
+		return NewHyperShiftManager(), nil
+	default:
+		return nil, fmt.Errorf("unsupported platform")
+	}
 }
 
 func validatePoolName(nodeGroups []nropv1.NodeGroup) error {

@@ -76,7 +76,10 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 		return nil, err
 	}
 	recorder := record.NewFakeRecorder(bufferSize)
-
+	manager, err := nodegroups.NewForPlatform(plat)
+	if err != nil {
+		return nil, err
+	}
 	return &NUMAResourcesOperatorReconciler{
 		Client:       fakeClient,
 		Scheme:       scheme.Scheme,
@@ -90,7 +93,8 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 		Images: images.Data{
 			Builtin: testImageSpec,
 		},
-		Recorder: recorder,
+		Recorder:          recorder,
+		NodeGroupsManager: manager,
 	}, nil
 }
 

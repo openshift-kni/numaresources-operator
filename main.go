@@ -61,6 +61,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
+	"github.com/openshift-kni/numaresources-operator/pkg/nodegroups"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/controlplane"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
@@ -282,6 +283,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	nodeGroupsManager, err := nodegroups.NewForPlatform(clusterPlatform)
+	if err != nil {
+		klog.ErrorS(err, "unable to create nodegroups manager")
+		os.Exit(2)
+	}
 	if err = (&controllers.NUMAResourcesOperatorReconciler{
 		Client:       mgr.GetClient(),
 		Scheme:       mgr.GetScheme(),
@@ -291,11 +297,12 @@ func main() {
 			Core:    rteManifestsRendered,
 			Metrics: rteMetricsManifests,
 		},
-		Platform:        clusterPlatform,
-		Images:          imgs,
-		ImagePullPolicy: pullPolicy,
-		Namespace:       namespace,
-		ForwardMCPConds: params.enableMCPCondsForward,
+		Platform:          clusterPlatform,
+		Images:            imgs,
+		ImagePullPolicy:   pullPolicy,
+		Namespace:         namespace,
+		ForwardMCPConds:   params.enableMCPCondsForward,
+		NodeGroupsManager: nodeGroupsManager,
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesOperator")
 		os.Exit(1)
