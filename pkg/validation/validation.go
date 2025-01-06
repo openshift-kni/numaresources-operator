@@ -29,11 +29,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 )
 
-const (
-	// NodeGroupsError specifies the condition reason when node groups failed to pass validation
-	NodeGroupsError = "ValidationErrorUnderNodeGroups"
-)
-
 // MachineConfigPoolDuplicates validates selected MCPs for duplicates
 func MachineConfigPoolDuplicates(trees []nodegroupv1.Tree) error {
 	duplicates := map[string]int{}

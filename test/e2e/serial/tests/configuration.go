@@ -60,8 +60,8 @@ import (
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
+	"github.com/openshift-kni/numaresources-operator/pkg/nodegroups"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
-	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
@@ -1162,7 +1162,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
 				cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionDegraded)
 				Expect(cond).NotTo(BeNil(), "condition Degraded was not found: %+v", updatedNRO.Status.Conditions)
-				Expect(cond.Reason).To(Equal(validation.NodeGroupsError), "reason of the conditions is different from expected: expected %q found %q", validation.NodeGroupsError, cond.Reason)
+				Expect(cond.Reason).To(Equal(nodegroups.ValidationError), "reason of the conditions is different from expected: expected %q found %q", nodegroups.ValidationError, cond.Reason)
 				expectedCondMsg := "must have only a single specifier set"
 				Expect(strings.Contains(cond.Message, expectedCondMsg)).To(BeTrue(), "different degrade message was found: expected to contains %q but found %q", "must have only a single specifier set", expectedCondMsg, cond.Message)
 			})

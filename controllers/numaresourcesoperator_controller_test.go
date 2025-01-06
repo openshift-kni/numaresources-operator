@@ -50,10 +50,10 @@ import (
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
+	"github.com/openshift-kni/numaresources-operator/pkg/nodegroups"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
-	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 )
 
 const (
@@ -129,7 +129,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			It("should update the CR condition to degraded", func() {
 				ng := nropv1.NodeGroup{}
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
-				verifyDegradedCondition(nro, validation.NodeGroupsError, platf)
+				verifyDegradedCondition(nro, nodegroups.ValidationError, platf)
 			})
 		})
 
@@ -140,7 +140,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					PoolName: &pn,
 				}
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
-				verifyDegradedCondition(nro, validation.NodeGroupsError, platf)
+				verifyDegradedCondition(nro, nodegroups.ValidationError, platf)
 			})
 		})
 
@@ -154,7 +154,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					PoolName: &pn,
 				}
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
-				verifyDegradedCondition(nro, validation.NodeGroupsError, platf)
+				verifyDegradedCondition(nro, nodegroups.ValidationError, platf)
 			})
 		})
 
@@ -182,7 +182,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
 				degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
 				Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
-				Expect(degradedCondition.Reason).To(Equal(validation.NodeGroupsError))
+				Expect(degradedCondition.Reason).To(Equal(nodegroups.ValidationError))
 			})
 		})
 
@@ -416,7 +416,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							nro.Spec.NodeGroups[0] = *ng1WithNodeSelector
 							return reconciler.Client.Update(context.TODO(), nro)
 						}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
-						verifyDegradedCondition(nro, validation.NodeGroupsError, platf)
+						verifyDegradedCondition(nro, nodegroups.ValidationError, platf)
 					})
 				})
 				When("pause annotation enabled", func() {
@@ -1070,7 +1070,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: map[string]string{"test": "test"}},
 				}
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
-				verifyDegradedCondition(nro, validation.NodeGroupsError, platform.OpenShift)
+				verifyDegradedCondition(nro, nodegroups.ValidationError, platform.OpenShift)
 			})
 			It("should update the CR condition to degraded when PoolName set", func() {
 				pn := "pn-1"
@@ -1078,7 +1078,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					PoolName: &pn,
 				}
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
-				verifyDegradedCondition(nro, validation.NodeGroupsError, platform.OpenShift)
+				verifyDegradedCondition(nro, nodegroups.ValidationError, platform.OpenShift)
 			})
 		})
 
@@ -1113,7 +1113,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
 				degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
 				Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
-				Expect(degradedCondition.Reason).To(Equal(validation.NodeGroupsError))
+				Expect(degradedCondition.Reason).To(Equal(nodegroups.ValidationError))
 			})
 		})
 
@@ -1174,7 +1174,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
 				degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
 				Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
-				Expect(degradedCondition.Reason).To(Equal(validation.NodeGroupsError))
+				Expect(degradedCondition.Reason).To(Equal(nodegroups.ValidationError))
 			})
 			It("should create objects and CR will be in Available condition when annotation is enabled - legacy", func() {
 				mcpName1 := "test1"
@@ -1301,7 +1301,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
 				degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
 				Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
-				Expect(degradedCondition.Reason).To(Equal(validation.NodeGroupsError))
+				Expect(degradedCondition.Reason).To(Equal(nodegroups.ValidationError))
 			})
 		})
 

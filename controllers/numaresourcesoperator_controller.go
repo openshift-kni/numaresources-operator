@@ -153,12 +153,12 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	if err := r.NodeGroupsManager.Validate(instance.Spec.NodeGroups); err != nil {
-		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
+		return r.degradeStatus(ctx, instance, nodegroups.ValidationError, err)
 	}
 
 	trees, err := r.NodeGroupsManager.FetchTrees(ctx, r.Client, instance.Spec.NodeGroups)
 	if err != nil {
-		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
+		return r.degradeStatus(ctx, instance, nodegroups.ValidationError, err)
 	}
 
 	var multiMCPsErr error
@@ -166,7 +166,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		multiMCPsErr = validation.MultipleMCPsPerTree(instance.Annotations, trees)
 
 		if err := validation.MachineConfigPoolDuplicates(trees); err != nil {
-			return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
+			return r.degradeStatus(ctx, instance, nodegroups.ValidationError, err)
 		}
 	}
 
@@ -180,7 +180,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	step := r.reconcileResource(ctx, instance, trees)
 
 	if step.Done() && multiMCPsErr != nil {
-		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, multiMCPsErr)
+		return r.degradeStatus(ctx, instance, nodegroups.ValidationError, multiMCPsErr)
 	}
 
 	if !status.IsUpdatedNUMAResourcesOperator(curStatus, &instance.Status) {
