@@ -161,13 +161,10 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.degradeStatus(ctx, instance, nodegroups.ValidationError, err)
 	}
 
-	var multiMCPsErr error
-	if r.Platform == platform.OpenShift {
-		multiMCPsErr = validation.MultipleMCPsPerTree(instance.Annotations, trees)
+	multiMCPsErr := validation.MultipleMCPsPerTree(instance.Annotations, trees)
 
-		if err := validation.MachineConfigPoolDuplicates(trees); err != nil {
-			return r.degradeStatus(ctx, instance, nodegroups.ValidationError, err)
-		}
+	if err := validation.MachineConfigPoolDuplicates(trees); err != nil {
+		return r.degradeStatus(ctx, instance, nodegroups.ValidationError, err)
 	}
 
 	for idx := range trees {
