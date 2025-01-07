@@ -96,13 +96,12 @@ func (obj machineConfigPoolFinder) FindState(mf Manifests, tree nodegroupv1.Tree
 			updateError = fmt.Errorf("the machine config pool %q does not have node selector", mcp.Name)
 		}
 
-		cpEnabled := obj.em.customPolicyEnabled || annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
 		gdm := GeneratedDesiredManifest{
 			ClusterPlatform:       obj.em.plat,
 			MachineConfigPool:     mcp.DeepCopy(),
 			NodeGroup:             tree.NodeGroup.DeepCopy(),
 			DaemonSet:             desiredDaemonSet,
-			IsCustomPolicyEnabled: cpEnabled,
+			IsCustomPolicyEnabled: annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations),
 		}
 
 		err := obj.em.updater(mcp.Name, &gdm)

@@ -37,10 +37,10 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
+	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	nrowait "github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/internal/workarounds"
@@ -310,7 +310,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 			By("checking there are no leftovers")
 			// by taking the ns from the ds we're avoiding the need to figure out in advanced
 			// at which ns we should look for the resources
-			mf, err := rte.GetManifests(configuration.Plat, configuration.PlatVersion, ds.Namespace, true, annotations.IsCustomPolicyEnabled(nroObj.Annotations))
+			mf, err := rte.GetManifests(configuration.Plat, configuration.PlatVersion, ds.Namespace, true, inthelper.IsCustomPolicyEnabled(nroObj))
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() bool {
@@ -336,7 +336,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 			nroObjRedep.Spec.ExporterImage = e2eimages.RTETestImageCI
 
 			var mcps []*machineconfigv1.MachineConfigPool
-			if annotations.IsCustomPolicyEnabled(nroObj.Annotations) {
+			if inthelper.IsCustomPolicyEnabled(nroObj) {
 				// need to get MCPs before the mutation
 				mcps, err = nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
 				Expect(err).NotTo(HaveOccurred())
@@ -345,7 +345,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 			err = e2eclient.Client.Create(context.TODO(), nroObjRedep)
 			Expect(err).ToNot(HaveOccurred())
 
-			if annotations.IsCustomPolicyEnabled(nroObj.Annotations) {
+			if inthelper.IsCustomPolicyEnabled(nroObj) {
 				Expect(deploy.WaitForMCPsCondition(e2eclient.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
 			}
 

@@ -80,13 +80,12 @@ func (obj nodeGroupFinder) FindState(mf Manifests, tree nodegroupv1.Tree) []obje
 		HyperShiftNodePoolLabel: poolName,
 	}
 
-	cpEnabled := obj.em.customPolicyEnabled || annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
 	gdm := GeneratedDesiredManifest{
 		ClusterPlatform:       obj.em.plat,
 		MachineConfigPool:     nil,
 		NodeGroup:             tree.NodeGroup.DeepCopy(),
 		DaemonSet:             desiredDaemonSet,
-		IsCustomPolicyEnabled: cpEnabled,
+		IsCustomPolicyEnabled: annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations),
 	}
 
 	err := obj.em.updater(poolName, &gdm)
