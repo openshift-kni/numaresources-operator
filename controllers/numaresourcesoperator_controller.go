@@ -50,7 +50,6 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
@@ -86,7 +85,7 @@ type NUMAResourcesOperatorReconciler struct {
 	Scheme          *runtime.Scheme
 	Platform        platform.Platform
 	APIManifests    apimanifests.Manifests
-	RTEManifests    rtemanifests.Manifests
+	RTEManifests    rtestate.Manifests
 	Namespace       string
 	Images          images.Data
 	ImagePullPolicy corev1.PullPolicy
@@ -118,6 +117,7 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=*
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=services,verbs=*
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -524,30 +524,30 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 
 	// using a slice of poolDaemonSet instead of a map because Go maps assignment order is not consistent and non-deterministic
 	dsPoolPairs := []poolDaemonSet{}
-	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
+	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.Core.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
 	if err != nil {
 		return dsPoolPairs, err
 	}
 
-	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.DaemonSet)
+	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.Core.DaemonSet)
 	if err != nil {
 		return dsPoolPairs, err
 	}
 
-	err = loglevel.UpdatePodSpec(&r.RTEManifests.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
+	err = loglevel.UpdatePodSpec(&r.RTEManifests.Core.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
 	if err != nil {
 		return dsPoolPairs, err
 	}
 
 	// ConfigMap should be provided by the kubeletconfig reconciliation loop
-	if r.RTEManifests.ConfigMap != nil {
-		cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.RTEManifests.ConfigMap)
+	if r.RTEManifests.Core.ConfigMap != nil {
+		cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.RTEManifests.Core.ConfigMap)
 		if err != nil {
 			return dsPoolPairs, err
 		}
-		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
+		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.Core.DaemonSet, cmHash)
 	}
-	rteupdate.SecurityContextConstraint(r.RTEManifests.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
+	rteupdate.SecurityContextConstraint(r.RTEManifests.Core.SecurityContextConstraint, annotations.IsCustomPolicyEnabled(instance.Annotations))
 
 	processor := func(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
 		err := daemonsetUpdater(poolName, gdm)
@@ -578,6 +578,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 			return nil, fmt.Errorf("failed to apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 	}
+
 	if len(dsPoolPairs) < len(trees) {
 		klog.Warningf("daemonset and tree size mismatch: expected %d got in daemonsets %d", len(trees), len(dsPoolPairs))
 	}
