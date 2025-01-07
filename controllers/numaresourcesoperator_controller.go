@@ -240,10 +240,10 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Conte
 	return intreconcile.StepSuccess()
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) intreconcile.Step {
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) intreconcile.Step {
 	// we need to sync machine configs first and wait for the MachineConfigPool updates
 	// before checking additional components for updates
-	mcpUpdatedFunc, err := r.syncMachineConfigs(ctx, instance, trees)
+	mcpUpdatedFunc, err := r.syncMachineConfigs(ctx, instance, existing, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
 		err = fmt.Errorf("failed to sync machine configs: %w", err)
@@ -265,8 +265,8 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 	return intreconcile.StepSuccess()
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]poolDaemonSet, intreconcile.Step) {
-	daemonSetsInfoPerPool, err := r.syncNUMAResourcesOperatorResources(ctx, instance, trees)
+func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) ([]poolDaemonSet, intreconcile.Step) {
+	daemonSetsInfoPerPool, err := r.syncNUMAResourcesOperatorResources(ctx, instance, existing, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECreate", "Failed to create Resource-Topology-Exporter DaemonSets: %v", err)
 		err = fmt.Errorf("FailedRTESync: %w", err)
@@ -298,14 +298,16 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 		return step
 	}
 
+	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
+
 	if r.Platform == platform.OpenShift {
-		if step := r.reconcileResourceMachineConfig(ctx, instance, trees); step.EarlyStop() {
+		if step := r.reconcileResourceMachineConfig(ctx, instance, &existing, trees); step.EarlyStop() {
 			updateStatusConditionsIfNeeded(instance, step.ConditionInfo)
 			return step
 		}
 	}
 
-	dsPerPool, step := r.reconcileResourceDaemonSet(ctx, instance, trees)
+	dsPerPool, step := r.reconcileResourceDaemonSet(ctx, instance, &existing, trees)
 	if step.EarlyStop() {
 		updateStatusConditionsIfNeeded(instance, step.ConditionInfo)
 		return step
@@ -402,11 +404,9 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx contex
 	return (updatedCount == len(objStates)), err
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (rtestate.MCPWaitForUpdatedFunc, error) {
+func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) (rtestate.MCPWaitForUpdatedFunc, error) {
 	klog.V(4).InfoS("Machine Config Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Sync stop")
-
-	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
 
 	var err error
 	// Since 4.18 we're using a built-in SELinux policy,
@@ -506,7 +506,7 @@ func getMachineConfigPoolStatusByName(mcpStatuses []nropv1.MachineConfigPool, na
 	return nropv1.MachineConfigPool{Name: name}
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]poolDaemonSet, error) {
+func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) ([]poolDaemonSet, error) {
 	klog.V(4).InfoS("RTESync start", "trees", len(trees))
 	defer klog.V(4).Info("RTESync stop")
 
@@ -558,7 +558,6 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		return nil
 	}
 
-	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
 	for _, objState := range existing.State(r.RTEManifests, processor, annotations.IsCustomPolicyEnabled(instance.Annotations)) {
 		if objState.Error != nil {
 			// We are likely in the bootstrap scenario. In this case, which is expected once, everything is fine.
