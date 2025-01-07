@@ -13,15 +13,18 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+
+	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 	e2epause "github.com/openshift-kni/numaresources-operator/test/utils/objects/pause"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 var _ Deployer = &OpenShiftNRO{}
@@ -78,7 +81,7 @@ func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, timeout time.Durati
 	Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(nroObj), nroObj)).To(Succeed())
 	o.NroObj = nroObj
 
-	if createKubelet || annotations.IsCustomPolicyEnabled(nroObj.Annotations) {
+	if createKubelet || inthelper.IsCustomPolicyEnabled(nroObj) {
 		By("waiting for MCP to get updated")
 		Expect(WaitForMCPsCondition(e2eclient.Client, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
 	}

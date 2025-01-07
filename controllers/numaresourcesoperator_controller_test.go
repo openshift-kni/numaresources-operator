@@ -49,6 +49,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
@@ -1244,12 +1245,14 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"test": "common"},
 					},
+					Annotations: map[string]string{
+						annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
+					},
 				}
 
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1)
 				nro.Annotations = map[string]string{
 					annotations.MultiplePoolsPerTreeAnnotation: annotations.MultiplePoolsPerTreeEnabled,
-					annotations.SELinuxPolicyConfigAnnotation:  annotations.SELinuxPolicyCustom,
 				}
 				mcp1 := testobjs.NewMachineConfigPool(mcpName1, label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
 				mcp2 := testobjs.NewMachineConfigPool(mcpName2, label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
@@ -1350,15 +1353,20 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: label1,
 					},
+					Annotations: map[string]string{
+						annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
+					},
 				}
 				ng2 := nropv1.NodeGroup{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: label2,
 					},
+					Annotations: map[string]string{
+						annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
+					},
 				}
 				nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
 				key = client.ObjectKeyFromObject(nro)
-				nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 
 				mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
 				mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
@@ -1567,6 +1575,9 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 									nro.Spec.NodeGroups = []nropv1.NodeGroup{{
 										MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: label1},
+										Annotations: map[string]string{
+											annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
+										},
 									}}
 									Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
 
@@ -1577,13 +1588,11 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								It("should delete also the corresponding Machineconfig", func() {
 									mc := &machineconfigv1.MachineConfig{}
 
-									// Check ds1 still exist
 									mc1Key := client.ObjectKey{
 										Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
 									}
 									Expect(reconciler.Client.Get(context.TODO(), mc1Key, mc)).NotTo(HaveOccurred())
 
-									// check ds2 has been deleted
 									mc2Key := client.ObjectKey{
 										Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
 									}
@@ -1609,6 +1618,9 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							{
 								MachineConfigPoolSelector: &metav1.LabelSelector{
 									MatchLabels: label3,
+								},
+								Annotations: map[string]string{
+									annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
 								},
 							},
 						}
@@ -1722,8 +1734,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					By("Update NRO to have both NodeGroups")
 					nro := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), key, nro)).NotTo(HaveOccurred())
-
-					nro.Annotations = map[string]string{}
+					clearSELinuxPolicyCustomAnnotations(nro)
 					Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
 
 					// removing the annotation will trigger reboot which requires resync after 1 min
@@ -1750,7 +1761,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			Context("with correct NRO and SELinuxPolicyConfigAnnotation not set", func() {
 				BeforeEach(func() {
-					nro.Annotations = map[string]string{}
+					clearSELinuxPolicyCustomAnnotations(nro)
 
 					var err error
 					reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
@@ -1827,12 +1838,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
 			})
 
-			It("should keep creating custom policy and use it with per-object annotation", func(ctx context.Context) {
-				nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
-				reconciler = checkSELinuxPolicyProcessing(ctx, nro, mcp1, mcp2)
-				// TODO: check both DSes security context
-			})
-
 			It("should keep creating custom policy and use it with per-nodegroup annotation", func(ctx context.Context) {
 				nro.Spec.NodeGroups[0].Annotations[annotations.SELinuxPolicyConfigAnnotation] = annotations.SELinuxPolicyCustom
 				reconciler = checkSELinuxPolicyProcessing(ctx, nro, mcp1, mcp2)
@@ -1841,13 +1846,13 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			It("should delete existing mc on upgrade", func(ctx context.Context) {
 				// reconciling NRO object with custom policy, emulates the old behavior version
-				nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
+				nro.Spec.NodeGroups[0].Annotations[annotations.SELinuxPolicyConfigAnnotation] = annotations.SELinuxPolicyCustom
 
 				reconciler = checkSELinuxPolicyProcessing(ctx, nro, mcp1, mcp2)
 
 				By("upgrading from 4.1X to 4.18")
 				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nro)).To(Succeed())
-				nro.Annotations = map[string]string{}
+				clearSELinuxPolicyCustomAnnotations(nro)
 				Expect(reconciler.Client.Update(context.TODO(), nro)).To(Succeed())
 			})
 
@@ -1937,7 +1942,7 @@ func reconcileObjectsOpenshift(nro *nropv1.NUMAResourcesOperator, mcp *machineco
 	firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 	Expect(err).ToNot(HaveOccurred())
 	expectedResult := reconcile.Result{}
-	if annotations.IsCustomPolicyEnabled(nro.Annotations) {
+	if inthelper.IsCustomPolicyEnabled(nro) {
 		expectedResult = reconcile.Result{RequeueAfter: time.Minute}
 	}
 	Expect(firstLoopResult).To(Equal(expectedResult))
@@ -1946,7 +1951,7 @@ func reconcileObjectsOpenshift(nro *nropv1.NUMAResourcesOperator, mcp *machineco
 	Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp), mcp)).ToNot(HaveOccurred())
 
 	var mcName string
-	if annotations.IsCustomPolicyEnabled(nro.Annotations) {
+	if inthelper.IsCustomPolicyEnabled(nro) {
 		mcp.Status.Configuration.Source = []corev1.ObjectReference{
 			{
 				Name: objectnames.GetMachineConfigName(nro.Name, mcp.Name),
@@ -1968,7 +1973,7 @@ func reconcileObjectsOpenshift(nro *nropv1.NUMAResourcesOperator, mcp *machineco
 	Expect(mcp.Status.Conditions[0].Type).To(Equal(machineconfigv1.MachineConfigPoolUpdated))
 	Expect(mcp.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
 
-	if annotations.IsCustomPolicyEnabled(nro.Annotations) {
+	if inthelper.IsCustomPolicyEnabled(nro) {
 		Expect(mcp.Status.Configuration.Source[0].Name).To(Equal(mcName))
 
 		// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
@@ -2035,4 +2040,10 @@ func BeDegradedWithReason(reason string) gomegatypes.GomegaMatcher {
 			}
 			return cond.Reason == reason, nil
 		}).WithTemplate("Object must be in Degraded condition with reason={{.Data}}").WithTemplateData(reason)
+}
+
+func clearSELinuxPolicyCustomAnnotations(nro *nropv1.NUMAResourcesOperator) {
+	for idx := 0; idx < len(nro.Spec.NodeGroups); idx++ {
+		delete(nro.Spec.NodeGroups[idx].Annotations, annotations.SELinuxPolicyConfigAnnotation)
+	}
 }

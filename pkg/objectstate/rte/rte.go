@@ -89,13 +89,12 @@ type ExistingManifests struct {
 	daemonSets     map[string]daemonSetManifest
 	machineConfigs map[string]machineConfigManifest
 	// internal helpers
-	plat                platform.Platform
-	instance            *nropv1.NUMAResourcesOperator
-	trees               []nodegroupv1.Tree
-	namespace           string
-	customPolicyEnabled bool
-	updater             GenerateDesiredManifestUpdater
-	helper              rteHelper
+	plat      platform.Platform
+	instance  *nropv1.NUMAResourcesOperator
+	trees     []nodegroupv1.Tree
+	namespace string
+	updater   GenerateDesiredManifestUpdater
+	helper    rteHelper
 }
 
 func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName, bool) {
@@ -129,7 +128,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 				continue
 			}
 
-			if !em.customPolicyEnabled && !annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations) {
+			if !annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations) {
 				// caution here: we want a *nil interface value*, not an *interface which points to nil*.
 				// the latter would lead to apparently correct code leading to runtime panics. See:
 				// https://trstringer.com/go-nil-interface-and-interface-with-nil-concrete-value/
@@ -162,6 +161,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 		}
 	}
 
+	klog.V(4).InfoS("machineConfigsState", "enabledMachineConfigs", enabledMCCount)
 	if enabledMCCount > 0 {
 		return ret, IsMachineConfigPoolUpdated
 	}
@@ -323,13 +323,12 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		existing: Manifests{
 			Core: rtemanifests.New(plat),
 		},
-		daemonSets:          make(map[string]daemonSetManifest),
-		plat:                plat,
-		instance:            instance,
-		trees:               trees,
-		namespace:           namespace,
-		updater:             SkipManifestUpdate,
-		customPolicyEnabled: annotations.IsCustomPolicyEnabled(instance.Annotations),
+		daemonSets: make(map[string]daemonSetManifest),
+		plat:       plat,
+		instance:   instance,
+		trees:      trees,
+		namespace:  namespace,
+		updater:    SkipManifestUpdate,
 	}
 
 	keyFor := client.ObjectKeyFromObject // shortcut
