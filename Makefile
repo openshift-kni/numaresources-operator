@@ -420,29 +420,29 @@ pkg/version/_buildinfo.json: bin/buildhelper
 
 update-buildinfo: pkg/version/_buildinfo.json
 
-bin/buildhelper:
-	@go build -o bin/buildhelper tools/buildhelper/buildhelper.go
+bin/buildhelper: tools/buildhelper/buildhelper.go
+	@go build -o $@ $<
 
-bin/envsubst:
-	@go build -o bin/envsubst tools/envsubst/envsubst.go
+bin/envsubst: tools/envsubst/envsubst.go
+	@go build -o $@ $<
 
-bin/lsplatform:
-	@go build -o bin/lsplatform tools/lsplatform/lsplatform.go
+bin/lsplatform: tools/lsplatform/lsplatform.go
+	@go build -o $@ $<
 
-bin/catkubeletconfmap:
+bin/catkubeletconfmap: tools/catkubeletconfmap/catkubeletconfmap.go
 	LDFLAGS="-static"
-	CGO_ENABLED=0 go build -o bin/catkubeletconfmap -ldflags "$$LDFLAGS" tools/catkubeletconfmap/catkubeletconfmap.go
+	CGO_ENABLED=0 go build -o $@ -ldflags "$$LDFLAGS" $<
 
-bin/watchnrtattr:
-	@go build -o bin/watchnrtattr tools/watchnrtattr/watchnrtattr.go
+bin/watchnrtattr: tools/watchnrtattr/watchnrtattr.go
+	@go build -o $@ $<
 
-bin/mkginkgolabelfilter:
+bin/mkginkgolabelfilter: tools/mkginkgolabelfilter/mkginkgolabelfilter.go
 	LDFLAGS="-static"
-	@go build -o bin/mkginkgolabelfilter -ldflags "$$LDFLAGS" tools/mkginkgolabelfilter/mkginkgolabelfilter.go
+	@go build -o $@ -ldflags "$$LDFLAGS" $<
 
-bin/nrtcacheck: build-tools
+bin/nrtcacheck: build-tools tools/nrtcacheck/nrtcacheck.go
 	LDFLAGS="-s -w" \
-	go build -mod=vendor -o bin/nrtcacheck -ldflags "$$LDFLAGS" -tags "$$GOTAGS" tools/nrtcacheck/nrtcacheck.go
+	go build -mod=vendor -o $@ -ldflags "$$LDFLAGS" -tags "$$GOTAGS" $<
 
 verify-generated: bundle generate
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
