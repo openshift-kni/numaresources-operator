@@ -71,6 +71,7 @@ type Manifests struct {
 type Errors struct {
 	Core struct {
 		SCC                error
+		SCCv2              error
 		ServiceAccount     error
 		Role               error
 		RoleBinding        error
@@ -285,6 +286,15 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 			Merge:    merge.ObjectForUpdate,
 		})
 	}
+	if mf.Core.SecurityContextConstraintV2 != nil {
+		ret = append(ret, objectstate.ObjectState{
+			Existing: em.existing.Core.SecurityContextConstraintV2,
+			Error:    em.errs.Core.SCCv2,
+			Desired:  mf.Core.SecurityContextConstraintV2.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.ObjectForUpdate,
+		})
+	}
 
 	klog.V(4).InfoS("RTE manifests processing trees", "method", em.helper.Name())
 
@@ -373,6 +383,11 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		if ok := getObject(ctx, cli, keyFor(mf.Core.SecurityContextConstraint), scc, &ret.errs.Core.SCC); ok {
 			ret.existing.Core.SecurityContextConstraint = scc
 		}
+		sccv2 := &securityv1.SecurityContextConstraints{}
+		if ok := getObject(ctx, cli, keyFor(mf.Core.SecurityContextConstraintV2), sccv2, &ret.errs.Core.SCCv2); ok {
+			ret.existing.Core.SecurityContextConstraintV2 = sccv2
+		}
+
 		ret.machineConfigs = make(map[string]machineConfigManifest)
 	}
 

@@ -1375,34 +1375,34 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								//	triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
 								Expect(result).To(Equal(reconcile.Result{}))
 
+								ctx := context.Background()
+
 								By("Check All the additional components are created")
 								rteKey := client.ObjectKey{
 									Name:      "rte",
 									Namespace: testNamespace,
 								}
 								role := &rbacv1.Role{}
-								Expect(reconciler.Client.Get(context.TODO(), rteKey, role)).ToNot(HaveOccurred())
+								Expect(reconciler.Client.Get(ctx, rteKey, role)).To(Succeed())
 
 								rb := &rbacv1.RoleBinding{}
-								Expect(reconciler.Client.Get(context.TODO(), rteKey, rb)).ToNot(HaveOccurred())
+								Expect(reconciler.Client.Get(ctx, rteKey, rb)).To(Succeed())
 
 								sa := &corev1.ServiceAccount{}
-								Expect(reconciler.Client.Get(context.TODO(), rteKey, sa)).ToNot(HaveOccurred())
+								Expect(reconciler.Client.Get(ctx, rteKey, sa)).To(Succeed())
 
 								crKey := client.ObjectKey{
 									Name: "rte",
 								}
 								cr := &rbacv1.ClusterRole{}
-								Expect(reconciler.Client.Get(context.TODO(), crKey, cr)).ToNot(HaveOccurred())
+								Expect(reconciler.Client.Get(ctx, crKey, cr)).To(Succeed())
 
 								crb := &rbacv1.ClusterRoleBinding{}
-								Expect(reconciler.Client.Get(context.TODO(), crKey, crb)).ToNot(HaveOccurred())
+								Expect(reconciler.Client.Get(ctx, crKey, crb)).To(Succeed())
 
-								resourceTopologyExporterKey := client.ObjectKey{
-									Name: "resource-topology-exporter",
-								}
 								scc := &securityv1.SecurityContextConstraints{}
-								Expect(reconciler.Client.Get(context.TODO(), resourceTopologyExporterKey, scc)).ToNot(HaveOccurred())
+								Expect(reconciler.Client.Get(ctx, client.ObjectKey{Name: "resource-topology-exporter"}, scc)).To(Succeed())
+								Expect(reconciler.Client.Get(ctx, client.ObjectKey{Name: "resource-topology-exporter-v2"}, scc)).To(Succeed())
 
 								mcp1DSKey := client.ObjectKey{
 									Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
