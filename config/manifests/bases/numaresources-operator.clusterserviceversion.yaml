@@ -5,6 +5,7 @@ metadata:
     alm-examples: '[]'
     capabilities: Basic Install
     olm.skipRange: '>=4.17.0 <4.18.0'
+    operatorframework.io/cluster-monitoring: "true"
   name: numaresources-operator.v0.0.0
   namespace: placeholder
 spec:

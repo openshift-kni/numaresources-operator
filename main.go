@@ -34,6 +34,7 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -74,10 +75,11 @@ const (
 )
 
 const (
-	defaultWebhookPort = 9443
-	defaultMetricsAddr = ":8080"
-	defaultProbeAddr   = ":8081"
-	defaultNamespace   = "numaresources-operator"
+	defaultWebhookPort    = 9443
+	defaultMetricsAddr    = ":8080"
+	defaultMetricsSupport = true
+	defaultProbeAddr      = ":8081"
+	defaultNamespace      = "numaresources-operator"
 )
 
 var (
@@ -132,6 +134,7 @@ func (pa *Params) SetDefaults() {
 	pa.probeAddr = defaultProbeAddr
 	pa.render.Namespace = defaultNamespace
 	pa.enableReplicasDetect = true
+	pa.enableMetrics = defaultMetricsSupport
 }
 
 func (pa *Params) FromFlags() {
@@ -245,11 +248,17 @@ func main() {
 	klog.InfoS("metrics server", "enabled", params.enableMetrics, "addr", params.metricsAddr)
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Cache:  cache.Options{}, // TODO: restrict namespace here?
+		Cache: cache.Options{
+			DefaultNamespaces: map[string]cache.Config{
+				namespace:            {},
+				metav1.NamespaceNone: {},
+			},
+		},
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
-			// TODO: secureServing?
-			BindAddress: params.metricsAddr,
+			BindAddress:   params.metricsAddr,
+			SecureServing: true,
+			CertDir:       "/certs",
 		},
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port:    params.webhookPort,

@@ -64,6 +64,7 @@ metadata:
     capabilities: Basic Install
     createdAt: "2025-01-07T08:34:09Z"
     olm.skipRange: '>=4.17.0 <4.18.0'
+    operatorframework.io/cluster-monitoring: "true"
     operators.operatorframework.io/builder: operator-sdk-v1.36.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
   name: numaresources-operator.v4.18.999-snapshot
@@ -533,6 +534,10 @@ spec:
                   initialDelaySeconds: 15
                   periodSeconds: 20
                 name: manager
+                ports:
+                - containerPort: 8080
+                  name: https
+                  protocol: TCP
                 readinessProbe:
                   httpGet:
                     path: /readyz
@@ -545,6 +550,10 @@ spec:
                     memory: 20Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+                volumeMounts:
+                - mountPath: /certs
+                  name: metrics-tls
+                  readOnly: true
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: numaresources-controller-manager
@@ -554,6 +563,10 @@ spec:
                 key: node-role.kubernetes.io/control-plane
               - effect: NoSchedule
                 key: node-role.kubernetes.io/master
+              volumes:
+              - name: metrics-tls
+                secret:
+                  secretName: metrics-service-cert
       permissions:
       - rules:
         - apiGroups:
@@ -587,6 +600,12 @@ spec:
           verbs:
           - create
           - patch
+        - apiGroups:
+          - ""
+          resources:
+          - services
+          verbs:
+          - '*'
         serviceAccountName: numaresources-controller-manager
     strategy: deployment
   installModes:
