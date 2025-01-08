@@ -65,9 +65,10 @@ func getKLogLevel() *klog.Level {
 	// Second, if the '-v' was not set but is still present in flags defined for the command, attempt to acquire it
 	// by visiting all flags.
 	flag.VisitAll(func(f *flag.Flag) {
-		if level != nil {
+		if level != nil || f.Name != "v" {
 			return
 		}
+
 		if levelFlag, ok := f.Value.(*klog.Level); ok {
 			level = levelFlag
 		}
