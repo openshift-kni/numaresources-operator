@@ -1190,34 +1190,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				// on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC, thus RTE daemonsets and complete status update is not going to be achieved at this point
 				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).To(CauseRequeue())
 
-				// Ensure mcp1 is ready
 				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
-				mcp1.Status.Configuration.Source = []corev1.ObjectReference{
-					{
-						Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
-					},
-				}
-				mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-					{
-						Type:   machineconfigv1.MachineConfigPoolUpdated,
-						Status: corev1.ConditionTrue,
-					},
-				}
+				ensureMCPIsReady(mcp1, nro.Name)
 				Expect(reconciler.Client.Update(context.TODO(), mcp1)).To(Succeed())
 
-				// ensure mcp2 is ready
 				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
-				mcp2.Status.Configuration.Source = []corev1.ObjectReference{
-					{
-						Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
-					},
-				}
-				mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-					{
-						Type:   machineconfigv1.MachineConfigPoolUpdated,
-						Status: corev1.ConditionTrue,
-					},
-				}
+				ensureMCPIsReady(mcp2, nro.Name)
 				Expect(reconciler.Client.Update(context.TODO(), mcp2)).To(Succeed())
 
 				// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
@@ -1381,34 +1359,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								var err error
 
 								By("Ensure both MachineConfigPools are ready")
-								// Ensure mcp1 is ready
 								Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).ToNot(HaveOccurred())
-								mcp1.Status.Configuration.Source = []corev1.ObjectReference{
-									{
-										Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
-									},
-								}
-								mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-									{
-										Type:   machineconfigv1.MachineConfigPoolUpdated,
-										Status: corev1.ConditionTrue,
-									},
-								}
+								ensureMCPIsReady(mcp1, nro.Name)
 								Expect(reconciler.Client.Update(context.TODO(), mcp1))
 
-								// ensure mcp2 is ready
 								Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).ToNot(HaveOccurred())
-								mcp2.Status.Configuration.Source = []corev1.ObjectReference{
-									{
-										Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
-									},
-								}
-								mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-									{
-										Type:   machineconfigv1.MachineConfigPoolUpdated,
-										Status: corev1.ConditionTrue,
-									},
-								}
+								ensureMCPIsReady(mcp2, nro.Name)
 								Expect(reconciler.Client.Update(context.TODO(), mcp2))
 
 								result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
@@ -1664,34 +1620,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					// on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC, thus RTE daemonsets and complete status update is not going to be achieved at this point
 					Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).To(CauseRequeue())
 
-					// Ensure mcp1 is ready
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
-					mcp1.Status.Configuration.Source = []corev1.ObjectReference{
-						{
-							Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
-						},
-					}
-					mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-						{
-							Type:   machineconfigv1.MachineConfigPoolUpdated,
-							Status: corev1.ConditionTrue,
-						},
-					}
+					ensureMCPIsReady(mcp1, nro.Name)
 					Expect(reconciler.Client.Update(context.TODO(), mcp1)).To(Succeed())
 
-					// ensure mcp2 is ready
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
-					mcp2.Status.Configuration.Source = []corev1.ObjectReference{
-						{
-							Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
-						},
-					}
-					mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-						{
-							Type:   machineconfigv1.MachineConfigPoolUpdated,
-							Status: corev1.ConditionTrue,
-						},
-					}
+					ensureMCPIsReady(mcp2, nro.Name)
 					Expect(reconciler.Client.Update(context.TODO(), mcp2)).To(Succeed())
 
 					// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
@@ -1979,6 +1913,20 @@ func reconcileObjectsHypershift(nro *nropv1.NUMAResourcesOperator) *NUMAResource
 	Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
 	return reconciler
+}
+
+func ensureMCPIsReady(mcp *machineconfigv1.MachineConfigPool, nroName string) {
+	mcp.Status.Configuration.Source = []corev1.ObjectReference{
+		{
+			Name: objectnames.GetMachineConfigName(nroName, mcp.Name),
+		},
+	}
+	mcp.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+		{
+			Type:   machineconfigv1.MachineConfigPoolUpdated,
+			Status: corev1.ConditionTrue,
+		},
+	}
 }
 
 func CauseRequeue() gomegatypes.GomegaMatcher {
