@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -42,6 +43,8 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+
+	igntypes "github.com/coreos/ignition/v2/config/v3_2/types"
 
 	configv1 "github.com/openshift/api/config/v1"
 	securityv1 "github.com/openshift/api/security/v1"
@@ -1229,6 +1232,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
 				Expect(degradedCondition.Reason).To(Equal(validation.NodeGroupsError))
 			})
+
 			It("should create objects and CR will be in Available condition when annotation is enabled - legacy", func() {
 				mcpName1 := "test1"
 				label1 := map[string]string{
@@ -1293,6 +1297,79 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
 				availableCondition := getConditionByType(nro.Status.Conditions, status.ConditionAvailable)
 				Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
+			})
+
+			It("should delete the MC object when the legacy annotation was present, then removed", func(ctx context.Context) {
+				mcpName1 := "test1"
+				label1 := map[string]string{
+					mcpName1: mcpName1,
+				}
+
+				ng1 := nropv1.NodeGroup{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: label1,
+					},
+					Annotations: map[string]string{
+						annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
+					},
+				}
+
+				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1)
+				mcp1 := testobjs.NewMachineConfigPool(mcpName1, label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
+
+				var err error
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+				// on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC, thus RTE daemonsets and complete status update is not going to be achieved at this point
+				loopResult, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(loopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+
+				mc1Name := objectnames.GetMachineConfigName(nro.Name, mcp1.Name)
+
+				// Ensure mcp1 is ready
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
+				mcp1.Status.Configuration.Source = []corev1.ObjectReference{
+					{
+						Name: mc1Name,
+					},
+				}
+				mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+					{
+						Type:   machineconfigv1.MachineConfigPoolUpdated,
+						Status: corev1.ConditionTrue,
+					},
+				}
+				Expect(reconciler.Client.Update(ctx, mcp1)).To(Succeed())
+
+				// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
+				loopResult, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(loopResult).To(Equal(reconcile.Result{}))
+
+				By("Check MC is created on target MCP")
+				var mc1 machineconfigv1.MachineConfig
+				Expect(reconciler.Client.Get(ctx, client.ObjectKey{Name: mc1Name}, &mc1)).To(Succeed())
+				ok, err := findFileInIgnition(&mc1, "/etc/selinux/rte.cil")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(ok).To(BeTrue(), "custom SELinux policy found in MachineConfig")
+
+				By("Update NRO to remove the legacy annotation in the target node group")
+				updatedNro := nropv1.NUMAResourcesOperator{}
+				Expect(reconciler.Client.Get(ctx, key, &updatedNro)).To(Succeed())
+				clearSELinuxPolicyCustomAnnotations(&updatedNro)
+				Expect(reconciler.Client.Update(ctx, &updatedNro)).To(Succeed())
+
+				loopResult, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(loopResult).To(Equal(reconcile.Result{RequeueAfter: 1 * time.Minute}))
+
+				By("Check MC is delete on target MCP")
+				var updatedMC1 machineconfigv1.MachineConfig
+				err = reconciler.Client.Get(ctx, client.ObjectKey{Name: mc1Name}, &updatedMC1)
+				Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			})
 		})
 
@@ -2046,4 +2123,19 @@ func clearSELinuxPolicyCustomAnnotations(nro *nropv1.NUMAResourcesOperator) {
 	for idx := 0; idx < len(nro.Spec.NodeGroups); idx++ {
 		delete(nro.Spec.NodeGroups[idx].Annotations, annotations.SELinuxPolicyConfigAnnotation)
 	}
+}
+
+func findFileInIgnition(mc *machineconfigv1.MachineConfig, filePath string) (bool, error) {
+	result := igntypes.Config{}
+	err := json.Unmarshal(mc.Spec.Config.Raw, &result)
+	if err != nil {
+		return false, err
+	}
+
+	for _, ignFile := range result.Storage.Files {
+		if ignFile.Path == filePath {
+			return true, nil
+		}
+	}
+	return false, nil
 }
