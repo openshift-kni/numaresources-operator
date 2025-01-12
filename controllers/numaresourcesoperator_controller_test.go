@@ -23,6 +23,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
+	gomegatypes "github.com/onsi/gomega/types"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -102,9 +104,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		key := client.ObjectKeyFromObject(nro)
-		result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-		Expect(err).ToNot(HaveOccurred())
-		Expect(result).To(Equal(reconcile.Result{}))
+		Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
 		Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
 		degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
@@ -171,9 +171,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				key := client.ObjectKeyFromObject(nro)
-				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(result).To(Equal(reconcile.Result{}))
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
 				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
 				degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
@@ -227,9 +225,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(err).ToNot(HaveOccurred())
 
 					// on the first iteration with the default RTE SELinux policy we expect immediate update, thus the reconciliation result is empty
-					result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})
-					Expect(err).ToNot(HaveOccurred())
-					Expect(result).To(Equal(reconcile.Result{}))
+					Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
 
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nro)).ToNot(HaveOccurred())
 
@@ -298,9 +294,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
 
 					//  immediate update
-					result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})
-					Expect(err).ToNot(HaveOccurred())
-					Expect(result).To(Equal(reconcile.Result{}))
+					Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
 
 					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).ToNot(HaveOccurred())
 					Expect(nroUpdated.Spec.NodeGroups[0].Config).To(Equal(conf1))
@@ -337,9 +331,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
 
 						// immediate update reflection with no reboot needed -> no need to reconcileafter this
-						thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})
-						Expect(err).ToNot(HaveOccurred())
-						Expect(thirdLoopResult).To(Equal(reconcile.Result{}))
+						Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
 					})
 					It("should delete also the corresponding DaemonSet", func() {
 						ds := &appsv1.DaemonSet{}
@@ -740,9 +732,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
 
 					// immediate update reflection with no reboot needed -> no need to reconcile after this
-					result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-					Expect(err).ToNot(HaveOccurred())
-					Expect(result).To(Equal(reconcile.Result{}))
+					Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
 					dsUpdated := &appsv1.DaemonSet{}
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, dsUpdated)).ToNot(HaveOccurred())
@@ -807,9 +797,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
 
 					// immediate update reflection with no reboot needed -> no need to reconcile after this
-					thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-					Expect(err).ToNot(HaveOccurred())
-					Expect(thirdLoopResult).To(Equal(reconcile.Result{}))
+					Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
 					dsUpdated := &appsv1.DaemonSet{}
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, dsUpdated)).ToNot(HaveOccurred())
@@ -1102,9 +1090,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				key := client.ObjectKeyFromObject(nro)
-				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(result).To(Equal(reconcile.Result{}))
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
 				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
 				degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
@@ -1142,9 +1128,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				key := client.ObjectKeyFromObject(nro)
-				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(result).To(Equal(reconcile.Result{}))
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
 				// we still expect that all objects be created as usual without blockers (no hard requirement for now) in addition to the Degraded condition
 				By("Verify all needed objects were created as expected: CRD, MCP, RTE DSs")
@@ -1204,44 +1188,18 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 				key := client.ObjectKeyFromObject(nro)
 				// on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC, thus RTE daemonsets and complete status update is not going to be achieved at this point
-				firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).To(CauseRequeue())
 
-				// Ensure mcp1 is ready
 				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
-				mcp1.Status.Configuration.Source = []corev1.ObjectReference{
-					{
-						Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
-					},
-				}
-				mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-					{
-						Type:   machineconfigv1.MachineConfigPoolUpdated,
-						Status: corev1.ConditionTrue,
-					},
-				}
+				ensureMCPIsReady(mcp1, nro.Name)
 				Expect(reconciler.Client.Update(context.TODO(), mcp1)).To(Succeed())
 
-				// ensure mcp2 is ready
 				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
-				mcp2.Status.Configuration.Source = []corev1.ObjectReference{
-					{
-						Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
-					},
-				}
-				mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-					{
-						Type:   machineconfigv1.MachineConfigPoolUpdated,
-						Status: corev1.ConditionTrue,
-					},
-				}
+				ensureMCPIsReady(mcp2, nro.Name)
 				Expect(reconciler.Client.Update(context.TODO(), mcp2)).To(Succeed())
 
 				// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
-				secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(secondLoopResult).To(Equal(reconcile.Result{}))
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
 				By("Check DaemonSets are created")
 				mcp1DSKey := client.ObjectKey{
@@ -1290,9 +1248,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				key := client.ObjectKeyFromObject(nro)
-				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(result).To(Equal(reconcile.Result{}))
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
 				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
 				degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
@@ -1403,34 +1359,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								var err error
 
 								By("Ensure both MachineConfigPools are ready")
-								// Ensure mcp1 is ready
 								Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).ToNot(HaveOccurred())
-								mcp1.Status.Configuration.Source = []corev1.ObjectReference{
-									{
-										Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
-									},
-								}
-								mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-									{
-										Type:   machineconfigv1.MachineConfigPoolUpdated,
-										Status: corev1.ConditionTrue,
-									},
-								}
+								ensureMCPIsReady(mcp1, nro.Name)
 								Expect(reconciler.Client.Update(context.TODO(), mcp1))
 
-								// ensure mcp2 is ready
 								Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).ToNot(HaveOccurred())
-								mcp2.Status.Configuration.Source = []corev1.ObjectReference{
-									{
-										Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
-									},
-								}
-								mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-									{
-										Type:   machineconfigv1.MachineConfigPoolUpdated,
-										Status: corev1.ConditionTrue,
-									},
-								}
+								ensureMCPIsReady(mcp2, nro.Name)
 								Expect(reconciler.Client.Update(context.TODO(), mcp2))
 
 								result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
@@ -1565,12 +1499,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 									Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
 
 									// immediate update reflection with no reboot needed -> no need to reconcileafter this
-									firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-									Expect(err).ToNot(HaveOccurred())
-									Expect(firstLoopResult).To(Equal(reconcile.Result{}))
+									Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 								})
-								It("should delete also the corresponding Machineconfig", func() {
 
+								It("should delete also the corresponding Machineconfig", func() {
 									mc := &machineconfigv1.MachineConfig{}
 
 									// Check ds1 still exist
@@ -1629,9 +1561,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 						It("should create the machine config", func() {
 							// on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC, thus RTE daemonsets and complete status update is not going to be achieved at this point
-							firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-							Expect(err).ToNot(HaveOccurred())
-							Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+							Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).To(CauseRequeue())
 
 							mc := &machineconfigv1.MachineConfig{}
 							mcKey := client.ObjectKey{
@@ -1688,44 +1618,18 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					key := client.ObjectKeyFromObject(nro)
 					// on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC, thus RTE daemonsets and complete status update is not going to be achieved at this point
-					firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-					Expect(err).ToNot(HaveOccurred())
-					Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+					Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).To(CauseRequeue())
 
-					// Ensure mcp1 is ready
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
-					mcp1.Status.Configuration.Source = []corev1.ObjectReference{
-						{
-							Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
-						},
-					}
-					mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-						{
-							Type:   machineconfigv1.MachineConfigPoolUpdated,
-							Status: corev1.ConditionTrue,
-						},
-					}
+					ensureMCPIsReady(mcp1, nro.Name)
 					Expect(reconciler.Client.Update(context.TODO(), mcp1)).To(Succeed())
 
-					// ensure mcp2 is ready
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
-					mcp2.Status.Configuration.Source = []corev1.ObjectReference{
-						{
-							Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
-						},
-					}
-					mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-						{
-							Type:   machineconfigv1.MachineConfigPoolUpdated,
-							Status: corev1.ConditionTrue,
-						},
-					}
+					ensureMCPIsReady(mcp2, nro.Name)
 					Expect(reconciler.Client.Update(context.TODO(), mcp2)).To(Succeed())
 
 					// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
-					secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-					Expect(err).ToNot(HaveOccurred())
-					Expect(secondLoopResult).To(Equal(reconcile.Result{}))
+					Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
 					By("Check DaemonSets are created")
 					mcp1DSKey := client.ObjectKey{
@@ -1751,9 +1655,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
 
 					// removing the annotation will trigger reboot which requires resync after 1 min
-					thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-					Expect(err).ToNot(HaveOccurred())
-					Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+					Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).To(CauseRequeue())
 				})
 				It("should not create a machine config", func() {
 					mc := &machineconfigv1.MachineConfig{}
@@ -1785,9 +1687,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					key := client.ObjectKeyFromObject(nro)
 					// when the SELinux custom annotation is not set, the controller will not wait for
 					// the selinux update on MC thus no reboot is required hence no need to reconcile again
-					firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-					Expect(err).ToNot(HaveOccurred())
-					Expect(firstLoopResult).To(Equal(reconcile.Result{}))
+					Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 				})
 
 				It("should create RTE daemonsets from the first reconcile iteration - MachineConfigPoolSelector", func() {
@@ -1916,9 +1816,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(reconciler.Client.Update(context.TODO(), nro)).To(Succeed())
 
 				// removing the annotation will trigger reboot which requires resync after 1 min
-				thirdLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(thirdLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).To(CauseRequeue())
 			})
 			It("should delete existing mc", func() {
 				mc1Key := client.ObjectKey{
@@ -1997,9 +1895,7 @@ func reconcileObjectsOpenshift(nro *nropv1.NUMAResourcesOperator, mcp *machineco
 		Expect(mcp.Status.Configuration.Source[0].Name).To(Equal(mcName))
 
 		// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
-		secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-		Expect(err).ToNot(HaveOccurred())
-		Expect(secondLoopResult).To(Equal(reconcile.Result{}))
+		Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 	}
 
 	return reconciler
@@ -2014,9 +1910,27 @@ func reconcileObjectsHypershift(nro *nropv1.NUMAResourcesOperator) *NUMAResource
 	key := client.ObjectKeyFromObject(nro)
 
 	// immediate update
-	firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-	Expect(err).ToNot(HaveOccurred())
-	Expect(firstLoopResult).To(Equal(reconcile.Result{}))
+	Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
 	return reconciler
+}
+
+func ensureMCPIsReady(mcp *machineconfigv1.MachineConfigPool, nroName string) {
+	mcp.Status.Configuration.Source = []corev1.ObjectReference{
+		{
+			Name: objectnames.GetMachineConfigName(nroName, mcp.Name),
+		},
+	}
+	mcp.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+		{
+			Type:   machineconfigv1.MachineConfigPoolUpdated,
+			Status: corev1.ConditionTrue,
+		},
+	}
+}
+
+func CauseRequeue() gomegatypes.GomegaMatcher {
+	return gcustom.MakeMatcher(func(rr reconcile.Result) (bool, error) {
+		return rr.RequeueAfter > 0, nil
+	}).WithTemplate("Reconciliation step should cause requeue")
 }
