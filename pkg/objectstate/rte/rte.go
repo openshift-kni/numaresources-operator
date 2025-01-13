@@ -71,6 +71,7 @@ type Manifests struct {
 type Errors struct {
 	Core struct {
 		SCC                error
+		SCCv2              error
 		ServiceAccount     error
 		Role               error
 		RoleBinding        error
@@ -88,13 +89,12 @@ type ExistingManifests struct {
 	daemonSets     map[string]daemonSetManifest
 	machineConfigs map[string]machineConfigManifest
 	// internal helpers
-	plat                platform.Platform
-	instance            *nropv1.NUMAResourcesOperator
-	trees               []nodegroupv1.Tree
-	namespace           string
-	customPolicyEnabled bool
-	updater             GenerateDesiredManifestUpdater
-	helper              rteHelper
+	plat      platform.Platform
+	instance  *nropv1.NUMAResourcesOperator
+	trees     []nodegroupv1.Tree
+	namespace string
+	updater   GenerateDesiredManifestUpdater
+	helper    rteHelper
 }
 
 func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName, bool) {
@@ -113,6 +113,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 	if mf.Core.MachineConfig == nil {
 		return ret, nullMachineConfigPoolUpdated
 	}
+	enabledMCCount := 0
 	for _, tree := range em.trees {
 		for _, mcp := range tree.MachineConfigPools {
 			mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
@@ -127,7 +128,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 				continue
 			}
 
-			if !em.customPolicyEnabled {
+			if !annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations) {
 				// caution here: we want a *nil interface value*, not an *interface which points to nil*.
 				// the latter would lead to apparently correct code leading to runtime panics. See:
 				// https://trstringer.com/go-nil-interface-and-interface-with-nil-concrete-value/
@@ -156,17 +157,15 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 					Merge:    merge.ObjectForUpdate,
 				},
 			)
+			enabledMCCount++
 		}
 	}
 
-	return ret, em.getWaitMCPUpdatedFunc()
-}
-
-func (em *ExistingManifests) getWaitMCPUpdatedFunc() MCPWaitForUpdatedFunc {
-	if em.customPolicyEnabled {
-		return IsMachineConfigPoolUpdated
+	klog.V(4).InfoS("machineConfigsState", "enabledMachineConfigs", enabledMCCount)
+	if enabledMCCount > 0 {
+		return ret, IsMachineConfigPoolUpdated
 	}
-	return IsMachineConfigPoolUpdatedAfterDeletion
+	return ret, IsMachineConfigPoolUpdatedAfterDeletion
 }
 
 func nullMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
@@ -285,6 +284,15 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 			Merge:    merge.ObjectForUpdate,
 		})
 	}
+	if mf.Core.SecurityContextConstraintV2 != nil {
+		ret = append(ret, objectstate.ObjectState{
+			Existing: em.existing.Core.SecurityContextConstraintV2,
+			Error:    em.errs.Core.SCCv2,
+			Desired:  mf.Core.SecurityContextConstraintV2.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.ObjectForUpdate,
+		})
+	}
 
 	klog.V(4).InfoS("RTE manifests processing trees", "method", em.helper.Name())
 
@@ -315,13 +323,12 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		existing: Manifests{
 			Core: rtemanifests.New(plat),
 		},
-		daemonSets:          make(map[string]daemonSetManifest),
-		plat:                plat,
-		instance:            instance,
-		trees:               trees,
-		namespace:           namespace,
-		updater:             SkipManifestUpdate,
-		customPolicyEnabled: annotations.IsCustomPolicyEnabled(instance.Annotations),
+		daemonSets: make(map[string]daemonSetManifest),
+		plat:       plat,
+		instance:   instance,
+		trees:      trees,
+		namespace:  namespace,
+		updater:    SkipManifestUpdate,
 	}
 
 	keyFor := client.ObjectKeyFromObject // shortcut
@@ -373,6 +380,11 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		if ok := getObject(ctx, cli, keyFor(mf.Core.SecurityContextConstraint), scc, &ret.errs.Core.SCC); ok {
 			ret.existing.Core.SecurityContextConstraint = scc
 		}
+		sccv2 := &securityv1.SecurityContextConstraints{}
+		if ok := getObject(ctx, cli, keyFor(mf.Core.SecurityContextConstraintV2), sccv2, &ret.errs.Core.SCCv2); ok {
+			ret.existing.Core.SecurityContextConstraintV2 = sccv2
+		}
+
 		ret.machineConfigs = make(map[string]machineConfigManifest)
 	}
 

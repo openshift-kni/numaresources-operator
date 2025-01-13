@@ -17,6 +17,7 @@
     "byres",
     "tmpol",
     "schedattrwatch",
-    "ngpoolname"
+    "ngpoolname",
+    "nganns"
   ]
 }

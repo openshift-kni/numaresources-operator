@@ -64,6 +64,14 @@ spec:
                     NodeGroup defines group of nodes that will run resource topology exporter daemon set
                     You can choose the group of node by MachineConfigPoolSelector or by PoolName
                   properties:
+                    annotations:
+                      additionalProperties:
+                        type: string
+                      description: |-
+                        Annotations is the per-nodegroup equivalent of the per-object annotations.
+                        Unlike the regular annotations, there is a hard limit of supported annotations, dependent on the operator version.
+                        In general, prefer to use per-object standard annotations.
+                      type: object
                     config:
                       description: Config defines the RTE behavior for this NodeGroup
                       properties:
