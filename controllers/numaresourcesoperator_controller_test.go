@@ -1042,6 +1042,76 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				})
 			})
 		})
+
+		Context("with per-NodeGroup annotations", Label("feature:nodegroupanns"), func() {
+			It("should accept annotations if less than maximum", func() {
+				poolName := "test"
+				ng := nropv1.NodeGroup{
+					PoolName: &poolName,
+					Annotations: map[string]string{
+						"test-ann0": "some-fake-text",
+						"test-ann1": "some-more-fake-text",
+					},
+				}
+				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
+
+				mcpSelector := &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						poolName: poolName,
+					},
+				}
+
+				// would be used only if the platform supports MCP
+				mcp := testobjs.NewMachineConfigPool(poolName, mcpSelector.MatchLabels, mcpSelector, mcpSelector)
+
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
+				Expect(nro).To(BeInCondition(status.ConditionAvailable))
+			})
+
+			It("should degraded if annotations are more than maximum", func() {
+				anns := make(map[string]string)
+				for idx := 0; idx < nropv1.NodeGroupMaxAnnotations+1; idx++ {
+					key := fmt.Sprintf("test-ann-%02d", idx)
+					val := fmt.Sprintf("fake-value-%d-%d", idx, idx)
+					anns[key] = val
+				}
+
+				poolName := "test"
+				ng := nropv1.NodeGroup{
+					PoolName:    &poolName,
+					Annotations: anns,
+				}
+				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
+
+				mcpSelector := &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						poolName: poolName,
+					},
+				}
+
+				// would be used only if the platform supports MCP
+				mcp := testobjs.NewMachineConfigPool(poolName, mcpSelector.MatchLabels, mcpSelector, mcpSelector)
+
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
+				Expect(nro).To(BeDegradedWithReason(validation.NodeGroupsError))
+			})
+		})
 	},
 		Entry("Openshift Platform", platform.OpenShift),
 		Entry("Hypershift Platform", platform.HyperShift),
@@ -1933,4 +2003,29 @@ func CauseRequeue() gomegatypes.GomegaMatcher {
 	return gcustom.MakeMatcher(func(rr reconcile.Result) (bool, error) {
 		return rr.RequeueAfter > 0, nil
 	}).WithTemplate("Reconciliation step should cause requeue")
+}
+
+func BeInCondition(condType string) gomegatypes.GomegaMatcher {
+	return gcustom.MakeMatcher(
+		func(nropObj *nropv1.NUMAResourcesOperator) (bool, error) {
+			cond := getConditionByType(nropObj.Status.Conditions, condType)
+			if cond == nil {
+				return false, fmt.Errorf("cannot find condition %q", condType)
+			}
+			return cond.Status == metav1.ConditionTrue, nil
+		}).WithTemplate("Object must be in condition {{.Data}}").WithTemplateData(condType)
+}
+
+func BeDegradedWithReason(reason string) gomegatypes.GomegaMatcher {
+	return gcustom.MakeMatcher(
+		func(nropObj *nropv1.NUMAResourcesOperator) (bool, error) {
+			cond := getConditionByType(nropObj.Status.Conditions, status.ConditionDegraded)
+			if cond == nil {
+				return false, fmt.Errorf("cannot find condition %q", status.ConditionDegraded)
+			}
+			if cond.Status != metav1.ConditionTrue {
+				return false, nil
+			}
+			return cond.Reason == reason, nil
+		}).WithTemplate("Object must be in Degraded condition with reason={{.Data}}").WithTemplateData(reason)
 }
