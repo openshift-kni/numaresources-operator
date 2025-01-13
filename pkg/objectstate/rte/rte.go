@@ -18,7 +18,6 @@ package rte
 
 import (
 	"context"
-	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -46,6 +45,13 @@ const (
 	MachineConfigLabelKey   = "machineconfiguration.openshift.io/role"
 	HyperShiftNodePoolLabel = "hypershift.openshift.io/nodePool"
 )
+
+// TODO: ugly name. At least it's only internal
+type rteHelper interface {
+	Name() string
+	UpdateFromClient(ctx context.Context, cli client.Client, tree nodegroupv1.Tree)
+	FindState(mf Manifests, tree nodegroupv1.Tree) []objectstate.ObjectState
+}
 
 type daemonSetManifest struct {
 	daemonSet      *appsv1.DaemonSet
@@ -86,7 +92,18 @@ type ExistingManifests struct {
 	instance            *nropv1.NUMAResourcesOperator
 	trees               []nodegroupv1.Tree
 	namespace           string
-	enableMachineConfig bool
+	customPolicyEnabled bool
+	updater             GenerateDesiredManifestUpdater
+	helper              rteHelper
+}
+
+func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName, bool) {
+	res := nropv1.NamespacedName{
+		Namespace: obj.GetNamespace(),
+		Name:      obj.GetName(),
+	}
+	_, ok := obj.(*appsv1.DaemonSet)
+	return res, ok
 }
 
 type MCPWaitForUpdatedFunc func(string, *machineconfigv1.MachineConfigPool) bool
@@ -110,7 +127,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 				continue
 			}
 
-			if !em.enableMachineConfig {
+			if !em.customPolicyEnabled {
 				// caution here: we want a *nil interface value*, not an *interface which points to nil*.
 				// the latter would lead to apparently correct code leading to runtime panics. See:
 				// https://trstringer.com/go-nil-interface-and-interface-with-nil-concrete-value/
@@ -146,7 +163,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 }
 
 func (em *ExistingManifests) getWaitMCPUpdatedFunc() MCPWaitForUpdatedFunc {
-	if em.enableMachineConfig {
+	if em.customPolicyEnabled {
 		return IsMachineConfigPoolUpdated
 	}
 	return IsMachineConfigPoolUpdatedAfterDeletion
@@ -216,11 +233,11 @@ type GeneratedDesiredManifest struct {
 
 type GenerateDesiredManifestUpdater func(mcpName string, gdm *GeneratedDesiredManifest) error
 
-func SkipManifestUpdate(gdm *GeneratedDesiredManifest) error {
+func SkipManifestUpdate(mcpName string, gdm *GeneratedDesiredManifest) error {
 	return nil
 }
 
-func (em *ExistingManifests) State(mf Manifests, updater GenerateDesiredManifestUpdater, isCustomPolicyEnabled bool) []objectstate.ObjectState {
+func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 	ret := []objectstate.ObjectState{
 		{
 			Existing: em.existing.Core.ServiceAccount,
@@ -269,107 +286,10 @@ func (em *ExistingManifests) State(mf Manifests, updater GenerateDesiredManifest
 		})
 	}
 
+	klog.V(4).InfoS("RTE manifests processing trees", "method", em.helper.Name())
+
 	for _, tree := range em.trees {
-		if em.plat == platform.OpenShift {
-			for _, mcp := range tree.MachineConfigPools {
-				var existingDs client.Object
-				var loadError error
-
-				generatedName := objectnames.GetComponentName(em.instance.Name, mcp.Name)
-				existingDaemonSet, ok := em.daemonSets[generatedName]
-				if ok {
-					existingDs = existingDaemonSet.daemonSet
-					loadError = existingDaemonSet.daemonSetError
-				} else {
-					loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.Core.DaemonSet.Namespace, mf.Core.DaemonSet.Name)
-				}
-
-				desiredDaemonSet := mf.Core.DaemonSet.DeepCopy()
-				desiredDaemonSet.Name = generatedName
-
-				var updateError error
-				if mcp.Spec.NodeSelector != nil {
-					desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
-				} else {
-					updateError = fmt.Errorf("the machine config pool %q does not have node selector", mcp.Name)
-				}
-
-				if updater != nil {
-					gdm := GeneratedDesiredManifest{
-						ClusterPlatform:       em.plat,
-						MachineConfigPool:     mcp.DeepCopy(),
-						NodeGroup:             tree.NodeGroup.DeepCopy(),
-						DaemonSet:             desiredDaemonSet,
-						IsCustomPolicyEnabled: isCustomPolicyEnabled,
-					}
-
-					err := updater(mcp.Name, &gdm)
-					if err != nil {
-						updateError = fmt.Errorf("daemonset for MCP %q: update failed: %w", mcp.Name, err)
-					}
-				}
-
-				ret = append(ret,
-					objectstate.ObjectState{
-						Existing:    existingDs,
-						Error:       loadError,
-						UpdateError: updateError,
-						Desired:     desiredDaemonSet,
-						Compare:     compare.Object,
-						Merge:       merge.ObjectForUpdate,
-					},
-				)
-			}
-		}
-		if em.plat == platform.HyperShift {
-			var existingDs client.Object
-			var loadError error
-
-			poolName := *tree.NodeGroup.PoolName
-
-			generatedName := objectnames.GetComponentName(em.instance.Name, poolName)
-			existingDaemonSet, ok := em.daemonSets[generatedName]
-			if ok {
-				existingDs = existingDaemonSet.daemonSet
-				loadError = existingDaemonSet.daemonSetError
-			} else {
-				loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.Core.DaemonSet.Namespace, mf.Core.DaemonSet.Name)
-			}
-
-			desiredDaemonSet := mf.Core.DaemonSet.DeepCopy()
-			desiredDaemonSet.Name = generatedName
-
-			var updateError error
-			desiredDaemonSet.Spec.Template.Spec.NodeSelector = map[string]string{
-				HyperShiftNodePoolLabel: poolName,
-			}
-
-			if updater != nil {
-				gdm := GeneratedDesiredManifest{
-					ClusterPlatform:       em.plat,
-					MachineConfigPool:     nil,
-					NodeGroup:             tree.NodeGroup.DeepCopy(),
-					DaemonSet:             desiredDaemonSet,
-					IsCustomPolicyEnabled: isCustomPolicyEnabled,
-				}
-
-				err := updater(poolName, &gdm)
-				if err != nil {
-					updateError = fmt.Errorf("daemonset for pool %q: update failed: %w", poolName, err)
-				}
-			}
-
-			ret = append(ret,
-				objectstate.ObjectState{
-					Existing:    existingDs,
-					Error:       loadError,
-					UpdateError: updateError,
-					Desired:     desiredDaemonSet,
-					Compare:     compare.Object,
-					Merge:       merge.ObjectForUpdate,
-				},
-			)
-		}
+		ret = append(ret, em.helper.FindState(mf, tree)...)
 	}
 
 	// extra: metrics
@@ -385,7 +305,12 @@ func (em *ExistingManifests) State(mf Manifests, updater GenerateDesiredManifest
 	return ret
 }
 
-func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf Manifests, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, namespace string) ExistingManifests {
+func (em *ExistingManifests) WithManifestsUpdater(updater GenerateDesiredManifestUpdater) *ExistingManifests {
+	em.updater = updater
+	return em
+}
+
+func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf Manifests, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, namespace string) *ExistingManifests {
 	ret := ExistingManifests{
 		existing: Manifests{
 			Core: rtemanifests.New(plat),
@@ -395,10 +320,25 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		instance:            instance,
 		trees:               trees,
 		namespace:           namespace,
-		enableMachineConfig: annotations.IsCustomPolicyEnabled(instance.Annotations),
+		updater:             SkipManifestUpdate,
+		customPolicyEnabled: annotations.IsCustomPolicyEnabled(instance.Annotations),
 	}
 
 	keyFor := client.ObjectKeyFromObject // shortcut
+
+	if plat == platform.OpenShift {
+		ret.helper = machineConfigPoolFinder{
+			em:        &ret,
+			instance:  instance,
+			namespace: namespace,
+		}
+	} else {
+		ret.helper = nodeGroupFinder{
+			em:        &ret,
+			instance:  instance,
+			namespace: namespace,
+		}
+	}
 
 	// objects that should present in the single replica
 	ro := &rbacv1.Role{}
@@ -426,57 +366,19 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		ret.existing.Core.ServiceAccount = sa
 	}
 
+	klog.V(4).InfoS("RTE manifests processing trees", "method", ret.helper.Name())
+
 	if plat != platform.Kubernetes {
 		scc := &securityv1.SecurityContextConstraints{}
 		if ok := getObject(ctx, cli, keyFor(mf.Core.SecurityContextConstraint), scc, &ret.errs.Core.SCC); ok {
 			ret.existing.Core.SecurityContextConstraint = scc
 		}
-
 		ret.machineConfigs = make(map[string]machineConfigManifest)
 	}
 
 	// should have the amount of resources equals to the amount of node groups
 	for _, tree := range trees {
-		if plat == platform.OpenShift {
-			for _, mcp := range tree.MachineConfigPools {
-				generatedName := objectnames.GetComponentName(instance.Name, mcp.Name)
-				key := client.ObjectKey{
-					Name:      generatedName,
-					Namespace: namespace,
-				}
-				ds := &appsv1.DaemonSet{}
-				dsm := daemonSetManifest{}
-				if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
-					dsm.daemonSet = ds
-				}
-				ret.daemonSets[generatedName] = dsm
-
-				mcName := objectnames.GetMachineConfigName(instance.Name, mcp.Name)
-				mckey := client.ObjectKey{
-					Name: mcName,
-				}
-				mc := &machineconfigv1.MachineConfig{}
-				mcm := machineConfigManifest{}
-				if mcm.machineConfigError = cli.Get(ctx, mckey, mc); mcm.machineConfigError == nil {
-					mcm.machineConfig = mc
-				}
-				ret.machineConfigs[mcName] = mcm
-			}
-		}
-
-		if plat == platform.HyperShift {
-			generatedName := objectnames.GetComponentName(instance.Name, *tree.NodeGroup.PoolName)
-			key := client.ObjectKey{
-				Name:      generatedName,
-				Namespace: namespace,
-			}
-			ds := &appsv1.DaemonSet{}
-			dsm := daemonSetManifest{}
-			if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
-				dsm.daemonSet = ds
-			}
-			ret.daemonSets[generatedName] = dsm
-		}
+		ret.helper.UpdateFromClient(ctx, cli, tree)
 	}
 
 	// extra: metrics
@@ -485,16 +387,7 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		ret.existing.Metrics.Service = ser
 	}
 
-	return ret
-}
-
-func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName, bool) {
-	res := nropv1.NamespacedName{
-		Namespace: obj.GetNamespace(),
-		Name:      obj.GetName(),
-	}
-	_, ok := obj.(*appsv1.DaemonSet)
-	return res, ok
+	return &ret
 }
 
 // getObject is a shortcut to don't type the error twice
