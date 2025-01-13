@@ -66,11 +66,11 @@ func NodeGroups(nodeGroups []nropv1.NodeGroup, platf platform.Platform) error {
 
 	// platform-agnostic validation.
 	validatorFuncs := []nodeGroupsValidatorFunc{
-		nodeGroupPools,
+		nodeGroupsSpecifier,
 		nodeGroupsDuplicatesByMCPSelector,
 		nodeGroupsValidPoolName,
 		nodeGroupsDuplicatesByPoolName,
-		nodeGroupMachineConfigPoolSelector,
+		nodeGroupsValidMachineConfigPoolSelector,
 		nodeGroupsAnnotations,
 	}
 
@@ -94,7 +94,7 @@ func nodeGroupForHypershift(nodeGroups []nropv1.NodeGroup) error {
 	return nil
 }
 
-func nodeGroupPools(nodeGroups []nropv1.NodeGroup) error {
+func nodeGroupsSpecifier(nodeGroups []nropv1.NodeGroup) error {
 	for idx, nodeGroup := range nodeGroups {
 		if nodeGroup.MachineConfigPoolSelector == nil && nodeGroup.PoolName == nil {
 			return fmt.Errorf("node group %d missing any pool specifier", idx)
@@ -169,7 +169,7 @@ func nodeGroupsDuplicatesByPoolName(nodeGroups []nropv1.NodeGroup) error {
 	return duplicateErrors
 }
 
-func nodeGroupMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
+func nodeGroupsValidMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
 	var selectorsErrors error
 	for _, nodeGroup := range nodeGroups {
 		if nodeGroup.MachineConfigPoolSelector == nil {
