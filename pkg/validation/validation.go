@@ -34,6 +34,16 @@ const (
 	NodeGroupsError = "ValidationErrorUnderNodeGroups"
 )
 
+// TolerableError represents an error which should not cause the validation
+// to fail, this is more akin to just an error to pop in the logs or in the
+// object Conditions or Status, perhaps degraded.
+type TolerableError struct {
+	// Error is an error that is worth reporting but still should not cause the validation to fail
+	Error error
+	// Reason is a human-oriented message to provide context for the error
+	Reason string
+}
+
 // MCPsDuplicates validates selected MCPs for duplicates
 func MCPsDuplicates(trees []nodegroupv1.Tree) error {
 	duplicates := map[string]int{}
@@ -62,7 +72,7 @@ func MultipleMCPsPerTree(annot map[string]string, trees []nodegroupv1.Tree) erro
 	var err error
 	for _, tree := range trees {
 		if len(tree.MachineConfigPools) > 1 {
-			err = errors.Join(err, fmt.Errorf("found multiple pools matches for node group %v but expected one. Pools found %+v", &tree.NodeGroup, tree.MachineConfigPools))
+			err = errors.Join(err, fmt.Errorf("found multiple pools matches for node group %v but expected one. Pools found %v", &tree.NodeGroup, tree.MachineConfigPools))
 		}
 	}
 	return err
@@ -94,6 +104,25 @@ func NodeGroups(nodeGroups []nropv1.NodeGroup, platf platform.Platform) error {
 		}
 	}
 	return nil
+}
+
+func NodeGroupsTree(instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, platf platform.Platform) (*TolerableError, error) {
+	if platf == platform.HyperShift {
+		// nothing to do for now
+		return nil, nil
+	}
+
+	var tolErr *TolerableError
+	multiMCPsErr := MultipleMCPsPerTree(instance.Annotations, trees)
+	if multiMCPsErr != nil {
+		tolErr = &TolerableError{
+			Reason: NodeGroupsError,
+			Error:  multiMCPsErr,
+		}
+	}
+
+	err := MCPsDuplicates(trees)
+	return tolErr, err
 }
 
 func nodeGroupForHypershift(nodeGroups []nropv1.NodeGroup) error {
