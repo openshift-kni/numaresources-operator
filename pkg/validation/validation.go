@@ -57,21 +57,20 @@ type nodeGroupsValidatorFunc func(nodeGroups []nropv1.NodeGroup) error
 
 // NodeGroups validates the node groups for nil values and duplicates.
 func NodeGroups(nodeGroups []nropv1.NodeGroup, platf platform.Platform) error {
-	// platform-specific validations
-	if platf == platform.HyperShift {
-		if err := nodeGroupForHypershift(nodeGroups); err != nil {
-			return err
-		}
-	}
-
 	// platform-agnostic validation.
 	validatorFuncs := []nodeGroupsValidatorFunc{
 		nodeGroupsSpecifier,
-		nodeGroupsDuplicatesByMCPSelector,
 		nodeGroupsValidPoolName,
 		nodeGroupsDuplicatesByPoolName,
-		nodeGroupsValidMachineConfigPoolSelector,
 		nodeGroupsAnnotations,
+	}
+
+	// platform-specific validations
+	if platf == platform.HyperShift {
+		validatorFuncs = append(validatorFuncs, nodeGroupForHypershift)
+	}
+	if platf == platform.OpenShift {
+		validatorFuncs = append(validatorFuncs, nodeGroupsDuplicatesByMCPSelector, nodeGroupsValidMachineConfigPoolSelector)
 	}
 
 	for _, validatorFunc := range validatorFuncs {
