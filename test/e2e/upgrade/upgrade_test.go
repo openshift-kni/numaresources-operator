@@ -28,17 +28,19 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+
+	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	"github.com/openshift-kni/numaresources-operator/internal/api/buildinfo"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/deploy"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 var _ = Describe("Upgrade", Label("upgrade"), func() {
@@ -79,7 +81,7 @@ var _ = Describe("Upgrade", Label("upgrade"), func() {
 			err := e2eclient.Client.Get(context.TODO(), objects.NROObjectKey(), updatedNROObj)
 			Expect(err).NotTo(HaveOccurred())
 
-			if annotations.IsCustomPolicyEnabled(updatedNROObj.Annotations) {
+			if inthelper.IsCustomPolicyEnabled(updatedNROObj) {
 				Skip("SElinux policy annotation is present")
 			}
 			mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, updatedNROObj.Spec.NodeGroups)

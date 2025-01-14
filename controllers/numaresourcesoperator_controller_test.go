@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -43,12 +44,15 @@ import (
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 
+	igntypes "github.com/coreos/ignition/v2/config/v3_2/types"
+
 	configv1 "github.com/openshift/api/config/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
@@ -325,9 +329,11 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						By("Update NRO to have just one NodeGroup")
 						Expect(reconciler.Client.Get(context.TODO(), nroKey, nro)).NotTo(HaveOccurred())
 
-						nro.Spec.NodeGroups = []nropv1.NodeGroup{{
-							PoolName: &pn1,
-						}}
+						nro.Spec.NodeGroups = []nropv1.NodeGroup{
+							{
+								PoolName: &pn1,
+							},
+						}
 						Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
 
 						// immediate update reflection with no reboot needed -> no need to reconcileafter this
@@ -1042,6 +1048,76 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				})
 			})
 		})
+
+		Context("with per-NodeGroup annotations", Label("feature:nodegroupanns"), func() {
+			It("should accept annotations if less than maximum", func() {
+				poolName := "test"
+				ng := nropv1.NodeGroup{
+					PoolName: &poolName,
+					Annotations: map[string]string{
+						"test-ann0": "some-fake-text",
+						"test-ann1": "some-more-fake-text",
+					},
+				}
+				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
+
+				mcpSelector := &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						poolName: poolName,
+					},
+				}
+
+				// would be used only if the platform supports MCP
+				mcp := testobjs.NewMachineConfigPool(poolName, mcpSelector.MatchLabels, mcpSelector, mcpSelector)
+
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
+				Expect(nro).To(BeInCondition(status.ConditionAvailable))
+			})
+
+			It("should degraded if annotations are more than maximum", func() {
+				anns := make(map[string]string)
+				for idx := 0; idx < nropv1.NodeGroupMaxAnnotations+1; idx++ {
+					key := fmt.Sprintf("test-ann-%02d", idx)
+					val := fmt.Sprintf("fake-value-%d-%d", idx, idx)
+					anns[key] = val
+				}
+
+				poolName := "test"
+				ng := nropv1.NodeGroup{
+					PoolName:    &poolName,
+					Annotations: anns,
+				}
+				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
+
+				mcpSelector := &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						poolName: poolName,
+					},
+				}
+
+				// would be used only if the platform supports MCP
+				mcp := testobjs.NewMachineConfigPool(poolName, mcpSelector.MatchLabels, mcpSelector, mcpSelector)
+
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
+				Expect(nro).To(BeDegradedWithReason(validation.NodeGroupsError))
+			})
+		})
 	},
 		Entry("Openshift Platform", platform.OpenShift),
 		Entry("Hypershift Platform", platform.HyperShift),
@@ -1156,6 +1232,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
 				Expect(degradedCondition.Reason).To(Equal(validation.NodeGroupsError))
 			})
+
 			It("should create objects and CR will be in Available condition when annotation is enabled - legacy", func() {
 				mcpName1 := "test1"
 				label1 := map[string]string{
@@ -1172,12 +1249,14 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{"test": "common"},
 					},
+					Annotations: map[string]string{
+						annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
+					},
 				}
 
 				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1)
 				nro.Annotations = map[string]string{
 					annotations.MultiplePoolsPerTreeAnnotation: annotations.MultiplePoolsPerTreeEnabled,
-					annotations.SELinuxPolicyConfigAnnotation:  annotations.SELinuxPolicyCustom,
 				}
 				mcp1 := testobjs.NewMachineConfigPool(mcpName1, label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
 				mcp2 := testobjs.NewMachineConfigPool(mcpName2, label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
@@ -1218,6 +1297,79 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
 				availableCondition := getConditionByType(nro.Status.Conditions, status.ConditionAvailable)
 				Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
+			})
+
+			It("should delete the MC object when the legacy annotation was present, then removed", func(ctx context.Context) {
+				mcpName1 := "test1"
+				label1 := map[string]string{
+					mcpName1: mcpName1,
+				}
+
+				ng1 := nropv1.NodeGroup{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: label1,
+					},
+					Annotations: map[string]string{
+						annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
+					},
+				}
+
+				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1)
+				mcp1 := testobjs.NewMachineConfigPool(mcpName1, label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
+
+				var err error
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+				// on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC, thus RTE daemonsets and complete status update is not going to be achieved at this point
+				loopResult, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(loopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+
+				mc1Name := objectnames.GetMachineConfigName(nro.Name, mcp1.Name)
+
+				// Ensure mcp1 is ready
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
+				mcp1.Status.Configuration.Source = []corev1.ObjectReference{
+					{
+						Name: mc1Name,
+					},
+				}
+				mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+					{
+						Type:   machineconfigv1.MachineConfigPoolUpdated,
+						Status: corev1.ConditionTrue,
+					},
+				}
+				Expect(reconciler.Client.Update(ctx, mcp1)).To(Succeed())
+
+				// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
+				loopResult, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(loopResult).To(Equal(reconcile.Result{}))
+
+				By("Check MC is created on target MCP")
+				var mc1 machineconfigv1.MachineConfig
+				Expect(reconciler.Client.Get(ctx, client.ObjectKey{Name: mc1Name}, &mc1)).To(Succeed())
+				ok, err := findFileInIgnition(&mc1, "/etc/selinux/rte.cil")
+				Expect(err).ToNot(HaveOccurred())
+				Expect(ok).To(BeTrue(), "custom SELinux policy found in MachineConfig")
+
+				By("Update NRO to remove the legacy annotation in the target node group")
+				updatedNro := nropv1.NUMAResourcesOperator{}
+				Expect(reconciler.Client.Get(ctx, key, &updatedNro)).To(Succeed())
+				clearSELinuxPolicyCustomAnnotations(&updatedNro)
+				Expect(reconciler.Client.Update(ctx, &updatedNro)).To(Succeed())
+
+				loopResult, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(loopResult).To(Equal(reconcile.Result{RequeueAfter: 1 * time.Minute}))
+
+				By("Check MC is delete on target MCP")
+				var updatedMC1 machineconfigv1.MachineConfig
+				err = reconciler.Client.Get(ctx, client.ObjectKey{Name: mc1Name}, &updatedMC1)
+				Expect(apierrors.IsNotFound(err)).To(BeTrue())
 			})
 		})
 
@@ -1278,15 +1430,20 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: label1,
 					},
+					Annotations: map[string]string{
+						annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
+					},
 				}
 				ng2 := nropv1.NodeGroup{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: label2,
 					},
+					Annotations: map[string]string{
+						annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
+					},
 				}
 				nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
 				key = client.ObjectKeyFromObject(nro)
-				nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 
 				mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
 				mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
@@ -1375,34 +1532,34 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								//	triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
 								Expect(result).To(Equal(reconcile.Result{}))
 
+								ctx := context.Background()
+
 								By("Check All the additional components are created")
 								rteKey := client.ObjectKey{
 									Name:      "rte",
 									Namespace: testNamespace,
 								}
 								role := &rbacv1.Role{}
-								Expect(reconciler.Client.Get(context.TODO(), rteKey, role)).ToNot(HaveOccurred())
+								Expect(reconciler.Client.Get(ctx, rteKey, role)).To(Succeed())
 
 								rb := &rbacv1.RoleBinding{}
-								Expect(reconciler.Client.Get(context.TODO(), rteKey, rb)).ToNot(HaveOccurred())
+								Expect(reconciler.Client.Get(ctx, rteKey, rb)).To(Succeed())
 
 								sa := &corev1.ServiceAccount{}
-								Expect(reconciler.Client.Get(context.TODO(), rteKey, sa)).ToNot(HaveOccurred())
+								Expect(reconciler.Client.Get(ctx, rteKey, sa)).To(Succeed())
 
 								crKey := client.ObjectKey{
 									Name: "rte",
 								}
 								cr := &rbacv1.ClusterRole{}
-								Expect(reconciler.Client.Get(context.TODO(), crKey, cr)).ToNot(HaveOccurred())
+								Expect(reconciler.Client.Get(ctx, crKey, cr)).To(Succeed())
 
 								crb := &rbacv1.ClusterRoleBinding{}
-								Expect(reconciler.Client.Get(context.TODO(), crKey, crb)).ToNot(HaveOccurred())
+								Expect(reconciler.Client.Get(ctx, crKey, crb)).To(Succeed())
 
-								resourceTopologyExporterKey := client.ObjectKey{
-									Name: "resource-topology-exporter",
-								}
 								scc := &securityv1.SecurityContextConstraints{}
-								Expect(reconciler.Client.Get(context.TODO(), resourceTopologyExporterKey, scc)).ToNot(HaveOccurred())
+								Expect(reconciler.Client.Get(ctx, client.ObjectKey{Name: "resource-topology-exporter"}, scc)).To(Succeed())
+								Expect(reconciler.Client.Get(ctx, client.ObjectKey{Name: "resource-topology-exporter-v2"}, scc)).To(Succeed())
 
 								mcp1DSKey := client.ObjectKey{
 									Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
@@ -1495,6 +1652,9 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 									nro.Spec.NodeGroups = []nropv1.NodeGroup{{
 										MachineConfigPoolSelector: &metav1.LabelSelector{MatchLabels: label1},
+										Annotations: map[string]string{
+											annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
+										},
 									}}
 									Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
 
@@ -1505,13 +1665,11 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								It("should delete also the corresponding Machineconfig", func() {
 									mc := &machineconfigv1.MachineConfig{}
 
-									// Check ds1 still exist
 									mc1Key := client.ObjectKey{
 										Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
 									}
 									Expect(reconciler.Client.Get(context.TODO(), mc1Key, mc)).NotTo(HaveOccurred())
 
-									// check ds2 has been deleted
 									mc2Key := client.ObjectKey{
 										Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
 									}
@@ -1537,6 +1695,9 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							{
 								MachineConfigPoolSelector: &metav1.LabelSelector{
 									MatchLabels: label3,
+								},
+								Annotations: map[string]string{
+									annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
 								},
 							},
 						}
@@ -1650,8 +1811,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					By("Update NRO to have both NodeGroups")
 					nro := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), key, nro)).NotTo(HaveOccurred())
-
-					nro.Annotations = map[string]string{}
+					clearSELinuxPolicyCustomAnnotations(nro)
 					Expect(reconciler.Client.Update(context.TODO(), nro)).NotTo(HaveOccurred())
 
 					// removing the annotation will trigger reboot which requires resync after 1 min
@@ -1678,7 +1838,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			Context("with correct NRO and SELinuxPolicyConfigAnnotation not set", func() {
 				BeforeEach(func() {
-					nro.Annotations = map[string]string{}
+					clearSELinuxPolicyCustomAnnotations(nro)
 
 					var err error
 					reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
@@ -1719,8 +1879,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 		})
 
-		Context("[openshift] emulating upgrade from 4.1X to 4.18 which has a built-in selinux policy for RTE pods", Label("platform:openshift"), func() {
+		When("[openshift] we have support for the RHCOS 4.18+ built-in selinux policy for RTE pods", Label("platform:openshift"), func() {
 			var nro *nropv1.NUMAResourcesOperator
+			var ng1 nropv1.NodeGroup
+			var ng2 nropv1.NodeGroup
 			var mcp1 *machineconfigv1.MachineConfigPool
 			var mcp2 *machineconfigv1.MachineConfigPool
 
@@ -1734,91 +1896,48 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					"test2": "test2",
 				}
 
-				ng1 := nropv1.NodeGroup{
+				ng1 = nropv1.NodeGroup{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: label1,
 					},
+					Annotations: map[string]string{},
 				}
-				ng2 := nropv1.NodeGroup{
+				ng2 = nropv1.NodeGroup{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: label2,
 					},
+					Annotations: map[string]string{},
 				}
-				nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
-				// reconciling NRO object with custom policy, emulates the old behavior version
-				nro.Annotations = map[string]string{annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom}
 
 				mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
 				mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
 
-				var err error
-				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
-				Expect(err).ToNot(HaveOccurred())
+				nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
+			})
 
-				key := client.ObjectKeyFromObject(nro)
-				// on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC, thus RTE daemonsets and complete status update is not going to be achieved at this point
-				firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(firstLoopResult).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+			It("should keep creating custom policy and use it with per-nodegroup annotation", func(ctx context.Context) {
+				nro.Spec.NodeGroups[0].Annotations[annotations.SELinuxPolicyConfigAnnotation] = annotations.SELinuxPolicyCustom
+				reconciler = checkSELinuxPolicyProcessing(ctx, nro, mcp1, mcp2)
+				// TODO: check ng1 DS security context
+			})
 
-				// Ensure mcp1 is ready
-				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
-				mcp1.Status.Configuration.Source = []corev1.ObjectReference{
-					{
-						Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
-					},
-				}
-				mcp1.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-					{
-						Type:   machineconfigv1.MachineConfigPoolUpdated,
-						Status: corev1.ConditionTrue,
-					},
-				}
-				Expect(reconciler.Client.Update(context.TODO(), mcp1)).To(Succeed())
+			It("should delete existing mc on upgrade", func(ctx context.Context) {
+				// reconciling NRO object with custom policy, emulates the old behavior version
+				nro.Spec.NodeGroups[0].Annotations[annotations.SELinuxPolicyConfigAnnotation] = annotations.SELinuxPolicyCustom
 
-				// ensure mcp2 is ready
-				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
-				mcp2.Status.Configuration.Source = []corev1.ObjectReference{
-					{
-						Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
-					},
-				}
-				mcp2.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
-					{
-						Type:   machineconfigv1.MachineConfigPoolUpdated,
-						Status: corev1.ConditionTrue,
-					},
-				}
-				Expect(reconciler.Client.Update(context.TODO(), mcp2)).To(Succeed())
-
-				// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
-				secondLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 0}))
-
-				By("Check DaemonSets are created")
-				mcp1DSKey := client.ObjectKey{
-					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
-					Namespace: testNamespace,
-				}
-				ds := &appsv1.DaemonSet{}
-				Expect(reconciler.Client.Get(context.TODO(), mcp1DSKey, ds)).ToNot(HaveOccurred())
-
-				mcp2DSKey := client.ObjectKey{
-					Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
-					Namespace: testNamespace,
-				}
-				Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).To(Succeed())
+				reconciler = checkSELinuxPolicyProcessing(ctx, nro, mcp1, mcp2)
 
 				By("upgrading from 4.1X to 4.18")
 				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nro)).To(Succeed())
-				nro.Annotations = map[string]string{}
+				clearSELinuxPolicyCustomAnnotations(nro)
 				Expect(reconciler.Client.Update(context.TODO(), nro)).To(Succeed())
+			})
 
+			It("should delete existing mc", func() {
+				key := client.ObjectKeyFromObject(nro)
 				// removing the annotation will trigger reboot which requires resync after 1 min
 				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).To(CauseRequeue())
-			})
-			It("should delete existing mc", func() {
+
 				mc1Key := client.ObjectKey{
 					Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
 				}
@@ -1833,9 +1952,49 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s expected to be deleted; err=%v", mc2Key.Name, err)
 			})
 		})
-
 	})
 })
+
+func checkSELinuxPolicyProcessing(ctx context.Context, nro *nropv1.NUMAResourcesOperator, mcp1, mcp2 *machineconfigv1.MachineConfigPool) *NUMAResourcesOperatorReconciler {
+	GinkgoHelper()
+
+	var err error
+	var reconciler *NUMAResourcesOperatorReconciler
+	reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+	Expect(err).ToNot(HaveOccurred())
+
+	key := client.ObjectKeyFromObject(nro)
+	// on the first iteration we expect the CRDs and MCPs to be created, yet, it will wait one minute to update MC, thus RTE daemonsets and complete status update is not going to be achieved at this point
+	Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).To(CauseRequeue())
+
+	// TODO: we should use Eventually, but we're supposed to be the only ones mutating mcp states
+	Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
+	ensureMCPIsReady(mcp1, nro.Name)
+	Expect(reconciler.Client.Update(ctx, mcp1)).To(Succeed())
+
+	Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
+	ensureMCPIsReady(mcp2, nro.Name)
+	Expect(reconciler.Client.Update(ctx, mcp2)).To(Succeed())
+
+	// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
+	Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
+
+	By("Check DaemonSets are created")
+	mcp1DSKey := client.ObjectKey{
+		Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+		Namespace: testNamespace,
+	}
+	ds := &appsv1.DaemonSet{}
+	Expect(reconciler.Client.Get(ctx, mcp1DSKey, ds)).To(Succeed())
+
+	mcp2DSKey := client.ObjectKey{
+		Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+		Namespace: testNamespace,
+	}
+	Expect(reconciler.Client.Get(ctx, mcp2DSKey, ds)).To(Succeed())
+
+	return reconciler
+}
 
 func getConditionByType(conditions []metav1.Condition, conditionType string) *metav1.Condition {
 	for i := range conditions {
@@ -1860,7 +2019,7 @@ func reconcileObjectsOpenshift(nro *nropv1.NUMAResourcesOperator, mcp *machineco
 	firstLoopResult, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 	Expect(err).ToNot(HaveOccurred())
 	expectedResult := reconcile.Result{}
-	if annotations.IsCustomPolicyEnabled(nro.Annotations) {
+	if inthelper.IsCustomPolicyEnabled(nro) {
 		expectedResult = reconcile.Result{RequeueAfter: time.Minute}
 	}
 	Expect(firstLoopResult).To(Equal(expectedResult))
@@ -1869,7 +2028,7 @@ func reconcileObjectsOpenshift(nro *nropv1.NUMAResourcesOperator, mcp *machineco
 	Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp), mcp)).ToNot(HaveOccurred())
 
 	var mcName string
-	if annotations.IsCustomPolicyEnabled(nro.Annotations) {
+	if inthelper.IsCustomPolicyEnabled(nro) {
 		mcp.Status.Configuration.Source = []corev1.ObjectReference{
 			{
 				Name: objectnames.GetMachineConfigName(nro.Name, mcp.Name),
@@ -1891,7 +2050,7 @@ func reconcileObjectsOpenshift(nro *nropv1.NUMAResourcesOperator, mcp *machineco
 	Expect(mcp.Status.Conditions[0].Type).To(Equal(machineconfigv1.MachineConfigPoolUpdated))
 	Expect(mcp.Status.Conditions[0].Status).To(Equal(corev1.ConditionTrue))
 
-	if annotations.IsCustomPolicyEnabled(nro.Annotations) {
+	if inthelper.IsCustomPolicyEnabled(nro) {
 		Expect(mcp.Status.Configuration.Source[0].Name).To(Equal(mcName))
 
 		// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
@@ -1933,4 +2092,50 @@ func CauseRequeue() gomegatypes.GomegaMatcher {
 	return gcustom.MakeMatcher(func(rr reconcile.Result) (bool, error) {
 		return rr.RequeueAfter > 0, nil
 	}).WithTemplate("Reconciliation step should cause requeue")
+}
+
+func BeInCondition(condType string) gomegatypes.GomegaMatcher {
+	return gcustom.MakeMatcher(
+		func(nropObj *nropv1.NUMAResourcesOperator) (bool, error) {
+			cond := getConditionByType(nropObj.Status.Conditions, condType)
+			if cond == nil {
+				return false, fmt.Errorf("cannot find condition %q", condType)
+			}
+			return cond.Status == metav1.ConditionTrue, nil
+		}).WithTemplate("Object must be in condition {{.Data}}").WithTemplateData(condType)
+}
+
+func BeDegradedWithReason(reason string) gomegatypes.GomegaMatcher {
+	return gcustom.MakeMatcher(
+		func(nropObj *nropv1.NUMAResourcesOperator) (bool, error) {
+			cond := getConditionByType(nropObj.Status.Conditions, status.ConditionDegraded)
+			if cond == nil {
+				return false, fmt.Errorf("cannot find condition %q", status.ConditionDegraded)
+			}
+			if cond.Status != metav1.ConditionTrue {
+				return false, nil
+			}
+			return cond.Reason == reason, nil
+		}).WithTemplate("Object must be in Degraded condition with reason={{.Data}}").WithTemplateData(reason)
+}
+
+func clearSELinuxPolicyCustomAnnotations(nro *nropv1.NUMAResourcesOperator) {
+	for idx := 0; idx < len(nro.Spec.NodeGroups); idx++ {
+		delete(nro.Spec.NodeGroups[idx].Annotations, annotations.SELinuxPolicyConfigAnnotation)
+	}
+}
+
+func findFileInIgnition(mc *machineconfigv1.MachineConfig, filePath string) (bool, error) {
+	result := igntypes.Config{}
+	err := json.Unmarshal(mc.Spec.Config.Raw, &result)
+	if err != nil {
+		return false, err
+	}
+
+	for _, ignFile := range result.Storage.Files {
+		if ignFile.Path == filePath {
+			return true, nil
+		}
+	}
+	return false, nil
 }

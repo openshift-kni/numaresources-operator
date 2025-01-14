@@ -53,34 +53,32 @@ func MachineConfigPoolDuplicates(trees []nodegroupv1.Tree) error {
 	return duplicateErrors
 }
 
+type nodeGroupsValidatorFunc func(nodeGroups []nropv1.NodeGroup) error
+
 // NodeGroups validates the node groups for nil values and duplicates.
 func NodeGroups(nodeGroups []nropv1.NodeGroup, platf platform.Platform) error {
+	// platform-specific validations
 	if platf == platform.HyperShift {
 		if err := nodeGroupForHypershift(nodeGroups); err != nil {
 			return err
 		}
 	}
 
-	if err := nodeGroupPools(nodeGroups); err != nil {
-		return err
+	// platform-agnostic validation.
+	validatorFuncs := []nodeGroupsValidatorFunc{
+		nodeGroupsSpecifier,
+		nodeGroupsDuplicatesByMCPSelector,
+		nodeGroupsValidPoolName,
+		nodeGroupsDuplicatesByPoolName,
+		nodeGroupsValidMachineConfigPoolSelector,
+		nodeGroupsAnnotations,
 	}
 
-	if err := nodeGroupsDuplicatesByMCPSelector(nodeGroups); err != nil {
-		return err
+	for _, validatorFunc := range validatorFuncs {
+		if err := validatorFunc(nodeGroups); err != nil {
+			return err
+		}
 	}
-
-	if err := nodeGroupsValidPoolName(nodeGroups); err != nil {
-		return err
-	}
-
-	if err := nodeGroupsDuplicatesByPoolName(nodeGroups); err != nil {
-		return err
-	}
-
-	if err := nodeGroupMachineConfigPoolSelector(nodeGroups); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -96,7 +94,7 @@ func nodeGroupForHypershift(nodeGroups []nropv1.NodeGroup) error {
 	return nil
 }
 
-func nodeGroupPools(nodeGroups []nropv1.NodeGroup) error {
+func nodeGroupsSpecifier(nodeGroups []nropv1.NodeGroup) error {
 	for idx, nodeGroup := range nodeGroups {
 		if nodeGroup.MachineConfigPoolSelector == nil && nodeGroup.PoolName == nil {
 			return fmt.Errorf("node group %d missing any pool specifier", idx)
@@ -171,7 +169,7 @@ func nodeGroupsDuplicatesByPoolName(nodeGroups []nropv1.NodeGroup) error {
 	return duplicateErrors
 }
 
-func nodeGroupMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
+func nodeGroupsValidMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
 	var selectorsErrors error
 	for _, nodeGroup := range nodeGroups {
 		if nodeGroup.MachineConfigPoolSelector == nil {
@@ -184,6 +182,17 @@ func nodeGroupMachineConfigPoolSelector(nodeGroups []nropv1.NodeGroup) error {
 	}
 
 	return selectorsErrors
+}
+
+func nodeGroupsAnnotations(nodeGroups []nropv1.NodeGroup) error {
+	var err error
+	for idx, nodeGroup := range nodeGroups {
+		if len(nodeGroup.Annotations) <= nropv1.NodeGroupMaxAnnotations {
+			continue
+		}
+		err = errors.Join(err, fmt.Errorf("pool #%d has too many annotations %d max %d", idx, len(nodeGroup.Annotations), nropv1.NodeGroupMaxAnnotations))
+	}
+	return err
 }
 
 func MultipleMCPsPerTree(annot map[string]string, trees []nodegroupv1.Tree) error {

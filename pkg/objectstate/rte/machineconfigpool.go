@@ -27,6 +27,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -100,7 +101,7 @@ func (obj machineConfigPoolFinder) FindState(mf Manifests, tree nodegroupv1.Tree
 			MachineConfigPool:     mcp.DeepCopy(),
 			NodeGroup:             tree.NodeGroup.DeepCopy(),
 			DaemonSet:             desiredDaemonSet,
-			IsCustomPolicyEnabled: obj.em.customPolicyEnabled,
+			IsCustomPolicyEnabled: annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations),
 		}
 
 		err := obj.em.updater(mcp.Name, &gdm)
