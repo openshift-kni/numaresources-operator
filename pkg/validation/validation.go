@@ -34,8 +34,8 @@ const (
 	NodeGroupsError = "ValidationErrorUnderNodeGroups"
 )
 
-// MachineConfigPoolDuplicates validates selected MCPs for duplicates
-func MachineConfigPoolDuplicates(trees []nodegroupv1.Tree) error {
+// MCPsDuplicates validates selected MCPs for duplicates
+func MCPsDuplicates(trees []nodegroupv1.Tree) error {
 	duplicates := map[string]int{}
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
@@ -51,6 +51,21 @@ func MachineConfigPoolDuplicates(trees []nodegroupv1.Tree) error {
 	}
 
 	return duplicateErrors
+}
+
+func MultipleMCPsPerTree(annot map[string]string, trees []nodegroupv1.Tree) error {
+	multiMCPsPerTree := annotations.IsMultiplePoolsPerTreeEnabled(annot)
+	if multiMCPsPerTree {
+		return nil
+	}
+
+	var err error
+	for _, tree := range trees {
+		if len(tree.MachineConfigPools) > 1 {
+			err = errors.Join(err, fmt.Errorf("found multiple pools matches for node group %v but expected one. Pools found %+v", &tree.NodeGroup, tree.MachineConfigPools))
+		}
+	}
+	return err
 }
 
 type nodeGroupsValidatorFunc func(nodeGroups []nropv1.NodeGroup) error
@@ -190,21 +205,6 @@ func nodeGroupsAnnotations(nodeGroups []nropv1.NodeGroup) error {
 			continue
 		}
 		err = errors.Join(err, fmt.Errorf("pool #%d has too many annotations %d max %d", idx, len(nodeGroup.Annotations), nropv1.NodeGroupMaxAnnotations))
-	}
-	return err
-}
-
-func MultipleMCPsPerTree(annot map[string]string, trees []nodegroupv1.Tree) error {
-	multiMCPsPerTree := annotations.IsMultiplePoolsPerTreeEnabled(annot)
-	if multiMCPsPerTree {
-		return nil
-	}
-
-	var err error
-	for _, tree := range trees {
-		if len(tree.MachineConfigPools) > 1 {
-			err = errors.Join(err, fmt.Errorf("found multiple pools matches for node group %v but expected one. Pools found %+v", &tree.NodeGroup, tree.MachineConfigPools))
-		}
 	}
 	return err
 }

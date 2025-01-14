@@ -68,7 +68,7 @@ func TestMachineConfigPoolDuplicates(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := MachineConfigPoolDuplicates(tc.trees)
+			err := MCPsDuplicates(tc.trees)
 			if err == nil && tc.expectedError {
 				t.Errorf("expected error, succeeded")
 			}
@@ -220,7 +220,6 @@ func TestNodeGroupsSanity(t *testing.T) {
 							"test": "test",
 						},
 					},
-					PoolName: &poolName,
 				},
 			},
 			expectedError:        true,
@@ -235,7 +234,7 @@ func TestNodeGroupsSanity(t *testing.T) {
 				},
 			},
 			expectedError:        true,
-			expectedErrorMessage: "must specify PoolName on Hypershift platform",
+			expectedErrorMessage: "node group 0 missing any pool specifier",
 			platf:                platform.HyperShift,
 		},
 		{

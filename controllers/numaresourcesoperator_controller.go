@@ -163,7 +163,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	if r.Platform == platform.OpenShift {
 		multiMCPsErr = validation.MultipleMCPsPerTree(instance.Annotations, trees)
 
-		if err := validation.MachineConfigPoolDuplicates(trees); err != nil {
+		if err := validation.MCPsDuplicates(trees); err != nil {
 			return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
 		}
 	}
