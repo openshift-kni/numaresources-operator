@@ -73,19 +73,20 @@ func init() {
 	var err error
 	Client, err = New()
 	if err != nil {
-		klog.Info("Failed to initialize client, check the KUBECONFIG env variable", err.Error())
+		klog.ErrorS(err, "Failed to initialize client, check the KUBECONFIG env variable")
 		ClientsEnabled = false
 		return
 	}
 	K8sClient, err = NewK8s()
 	if err != nil {
-		klog.Info("Failed to initialize k8s client, check the KUBECONFIG env variable", err.Error())
+		klog.ErrorS(err, "Failed to initialize k8s client, check the KUBECONFIG env variable")
 		ClientsEnabled = false
 		return
 	}
 	if hypershift.IsHypershiftCluster() {
 		MNGClient, err = hypershift.BuildControlPlaneClient()
 		if err != nil {
+			klog.ErrorS(err, "Failed to initialize HyperShift management cluster client, check the HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG env variable")
 			ClientsEnabled = false
 			return
 		}
