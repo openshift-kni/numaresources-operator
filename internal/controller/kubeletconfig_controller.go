@@ -27,7 +27,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
@@ -270,8 +269,7 @@ func (r *KubeletConfigReconciler) makeKCHandlerForPlatform(ctx context.Context, 
 
 		nodePoolName := cmKc.Labels[HyperShiftNodePoolLabel]
 		kcData := cmKc.Data[HyperShiftConfigMapConfigKey]
-		mcoKc := &mcov1.KubeletConfig{}
-		err := decodeKCFrom([]byte(kcData), r.Scheme, mcoKc)
+		mcoKc, err := kubeletconfig.DecodeFromData([]byte(kcData), r.Scheme)
 		if err != nil {
 			return nil, err
 		}
@@ -338,13 +336,4 @@ func removeDeletedOwner(kcKey client.ObjectKey, ownerConfigMaps []*corev1.Config
 		}
 	}
 	return ownerConfigMaps
-}
-
-func decodeKCFrom(data []byte, scheme *runtime.Scheme, mcoKc *mcov1.KubeletConfig) error {
-	yamlSerializer := serializer.NewSerializerWithOptions(
-		serializer.DefaultMetaFactory, scheme, scheme,
-		serializer.SerializerOptions{Yaml: true, Pretty: true, Strict: true})
-
-	_, _, err := yamlSerializer.Decode(data, nil, mcoKc)
-	return err
 }
