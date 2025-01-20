@@ -159,13 +159,9 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
 	}
 
-	var multiMCPsErr error
-	if r.Platform == platform.OpenShift {
-		multiMCPsErr = validation.MultipleMCPsPerTree(instance.Annotations, trees)
-
-		if err := validation.MachineConfigPoolDuplicates(trees); err != nil {
-			return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
-		}
+	tolerable, err := validation.NodeGroupsTree(instance, trees, r.Platform)
+	if err != nil {
+		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
 	}
 
 	for idx := range trees {
@@ -177,8 +173,8 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	step := r.reconcileResource(ctx, instance, trees)
 
-	if step.Done() && multiMCPsErr != nil {
-		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, multiMCPsErr)
+	if step.Done() && tolerable != nil {
+		return r.degradeStatus(ctx, instance, tolerable.Reason, tolerable.Error)
 	}
 
 	if !status.IsUpdatedNUMAResourcesOperator(curStatus, &instance.Status) {
