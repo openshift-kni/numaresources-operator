@@ -391,6 +391,12 @@ spec:
           verbs:
           - list
         - apiGroups:
+          - config.openshift.io
+          resources:
+          - infrastructures
+          verbs:
+          - get
+        - apiGroups:
           - machineconfiguration.openshift.io
           resources:
           - kubeletconfigs
