@@ -52,6 +52,7 @@ import (
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/namespacedname"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
@@ -1400,7 +1401,7 @@ func createTAEDeployment(fxt *e2efixture.Fixture, ctx context.Context, name, sch
 func daemonSetListToNamespacedNameList(dss []*appsv1.DaemonSet) []nropv1.NamespacedName {
 	ret := make([]nropv1.NamespacedName, 0, len(dss))
 	for _, ds := range dss {
-		ret = append(ret, (nropv1.NamespacedNameFromObject(ds)))
+		ret = append(ret, namespacedname.FromObject(ds))
 	}
 	return ret
 }

@@ -34,6 +34,7 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/namespacedname"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -133,7 +134,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 				err := fxt.Client.Create(context.TODO(), idleJob) // will be removed by the fixture
 				Expect(err).ToNot(HaveOccurred())
 
-				_, err = wait.With(fxt.Client).Interval(3*time.Second).Timeout(30*time.Second).ForJobCompleted(context.TODO(), idleJob.Namespace, idleJob.Name)
+				_, err = wait.With(fxt.Client).Interval(3*time.Second).Timeout(30*time.Second).ForJobCompleted(context.TODO(), namespacedname.FromObject(idleJob))
 				Expect(err).ToNot(HaveOccurred())
 
 				// ensure foreign pods are reported

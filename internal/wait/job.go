@@ -24,14 +24,12 @@ import (
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	v1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/namespacedname"
 )
 
-func (wt Waiter) ForJobCompleted(ctx context.Context, jobNamespace, jobName string) (*batchv1.Job, error) {
-	jobKey := client.ObjectKey{
-		Namespace: jobNamespace,
-		Name:      jobName,
-	}
+func (wt Waiter) ForJobCompleted(ctx context.Context, nname v1.NamespacedName) (*batchv1.Job, error) {
+	jobKey := namespacedname.AsObjectKey(nname)
 	updatedJob := batchv1.Job{}
 	immediate := true
 	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
@@ -40,10 +38,10 @@ func (wt Waiter) ForJobCompleted(ctx context.Context, jobNamespace, jobName stri
 			return false, err
 		}
 		if !isJobCompleted(updatedJob) {
-			klog.Infof("%s/%s not yet completed (succeeded=%d)", jobNamespace, jobName, updatedJob.Status.Succeeded)
+			klog.Infof("%s not yet completed (succeeded=%d)", nname, updatedJob.Status.Succeeded)
 			return false, nil
 		}
-		klog.Infof("%s/%s completed! (succeeded=%d)", jobNamespace, jobName, updatedJob.Status.Succeeded)
+		klog.Infof("%s completed! (succeeded=%d)", nname, updatedJob.Status.Succeeded)
 		return true, nil
 	})
 	return &updatedJob, err
