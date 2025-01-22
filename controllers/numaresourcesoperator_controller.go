@@ -52,6 +52,7 @@ import (
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/namespacedname"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/internal/dangling"
@@ -551,7 +552,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		if err != nil {
 			return err
 		}
-		dsPoolPairs = append(dsPoolPairs, poolDaemonSet{poolName, nropv1.NamespacedNameFromObject(gdm.DaemonSet)})
+		dsPoolPairs = append(dsPoolPairs, poolDaemonSet{poolName, namespacedname.FromObject(gdm.DaemonSet)})
 		return nil
 	})
 

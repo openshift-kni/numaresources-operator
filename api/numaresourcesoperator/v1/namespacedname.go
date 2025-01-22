@@ -16,10 +16,6 @@
 
 package v1
 
-import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
-
 // This is borrowed from the kubernetes source, because controller-gen
 // complains about the kube native type:
 // encountered struct field "Namespace" without JSON tag in type "NamespacedName"
@@ -39,11 +35,4 @@ const (
 // String returns the general purpose string representation
 func (n NamespacedName) String() string {
 	return n.Namespace + string(Separator) + n.Name
-}
-
-func NamespacedNameFromObject(obj metav1.Object) NamespacedName {
-	return NamespacedName{
-		Namespace: obj.GetNamespace(),
-		Name:      obj.GetName(),
-	}
 }
