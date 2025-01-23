@@ -2,16 +2,40 @@ run:
   concurrency: 4
   timeout: 5m
   tests: true
-  skip-dirs:
+  modules-download-mode: vendor
+issues:
+  exclude-dirs:
     - vendor
     - test/utils/k8simported
-  modules-download-mode: vendor
+    - pkg/version
+  # don't skip warning about doc comments
+  # don't exclude the default set of lint
+  exclude-use-default: false
+  # restore some of the defaults
+  # (fill in the rest as needed)
+  exclude-rules:
+    - path: "api/*"
+      linters:
+        - lll
+    - path: "internal/*"
+      linters:
+        - dupl
+        - lll
+    - path: "test/e2e/serial/*"
+      linters:
+        - dupl
+        - lll
+    - path: "test/utils/*"
+      linters:
+        - dupl
+        - lll
 linters:
   disable-all: true
   enable:
-    - errcheck
+#    - errcheck
     - bodyclose
-    - exportloopref
+#    - copyloopvar
+    - depguard
     - gosimple
     - govet
     - ineffassign
@@ -25,8 +49,10 @@ linters:
     - unused
     - wastedassign
     - whitespace
-    - depguard
 linters-settings:
+  revive:
+    rules:
+      - name: comment-spacings
   misspell:
     locale: US
     ignore-words:

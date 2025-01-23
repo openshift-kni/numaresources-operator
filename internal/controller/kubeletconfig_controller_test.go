@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package controllers
+package controller
 
 import (
 	"context"
@@ -33,7 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 

@@ -25,8 +25,8 @@ import (
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 )
 
 func GetListByNodeGroupsV1(ctx context.Context, cli client.Client, nodeGroups []nropv1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {

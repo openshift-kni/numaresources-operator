@@ -24,8 +24,8 @@ import (
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 
-	v1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	"github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/namespacedname"
+	v1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
 )
 
 func (wt Waiter) ForJobCompleted(ctx context.Context, nname v1.NamespacedName) (*batchv1.Job, error) {

@@ -30,7 +30,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )
 
 func NewNUMAResourcesOperator(name string, nodeGroups ...nropv1.NodeGroup) *nropv1.NUMAResourcesOperator {

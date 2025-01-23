@@ -33,7 +33,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"

@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 )

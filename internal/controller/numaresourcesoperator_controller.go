@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package controllers
+package controller
 
 import (
 	"context"
@@ -51,9 +51,9 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	"github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/namespacedname"
-	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
+	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/internal/dangling"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"

@@ -25,7 +25,7 @@ import (
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )
 
 // Tree maps a NodeGroup to the MachineConfigPool identified by the NodeGroup's MCPSelector.

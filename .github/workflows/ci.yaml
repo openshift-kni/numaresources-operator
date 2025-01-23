@@ -100,4 +100,4 @@ jobs:
         go-version: ${{ env.GOLANG_VERSION }}
 
     - name: Run Linter
-      run: make golangci-lint
+      run: make lint

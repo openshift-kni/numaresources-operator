@@ -23,7 +23,7 @@ import (
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
