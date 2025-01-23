@@ -19,6 +19,7 @@ package machineconfigpools
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -66,4 +67,19 @@ func FindBySelector(mcps []*mcov1.MachineConfigPool, sel *metav1.LabelSelector) 
 		}
 	}
 	return nil, &NotFound{Selector: sel.String()}
+}
+
+func GetNodesFrom(ctx context.Context, cli client.Client, mcp *mcov1.MachineConfigPool) ([]corev1.Node, error) {
+	sel, err := metav1.LabelSelectorAsSelector(mcp.Spec.NodeSelector)
+	if err != nil {
+		return nil, err
+	}
+
+	nodeList := &corev1.NodeList{}
+	err = cli.List(ctx, nodeList, &client.ListOptions{LabelSelector: sel})
+	if err != nil {
+		return nil, err
+	}
+
+	return nodeList.Items, nil
 }
