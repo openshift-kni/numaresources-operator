@@ -73,8 +73,8 @@ jobs:
         mkdir -p ${LOG_DIR}
         for pod in $(kubectl get pods -n $E2E_NAMESPACE_NAME --no-headers=true -o custom-columns=NAME:.metadata.name)
         do
-          oc logs $pod -n $E2E_NAMESPACE_NAME --all-containers=true > ${LOG_DIR}/${pod}.log
-          oc describe pod $pod -n $E2E_NAMESPACE_NAME > ${LOG_DIR}/${pod}.describe.log
+          kubectl logs $pod -n $E2E_NAMESPACE_NAME --all-containers=true > ${LOG_DIR}/${pod}.log
+          kubectl describe pod $pod -n $E2E_NAMESPACE_NAME > ${LOG_DIR}/${pod}.describe.log
         done
 
     - name: Archive E2E Tests logs
