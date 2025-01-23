@@ -60,16 +60,16 @@ is derived by the controller-gen/operator-sdk/kubebuilder tooling.
 
 The master source is the set of annotated go types.
 
-The main content is `api/numaresourcesoperator` whose subfolders hold the versioned api:
+The main content is `api` whose subfolders hold the versioned api:
 `v1alpha1`, `v1`...
 
-The top-level api packages (`api/numaresourcesoperator/v1`) should have minimal deps: they
+The top-level api packages (`api/v1`) should have minimal deps: they
 should depend only on
 1. stdlib
 2. other API packages (e.g. k8s, ocp)
 
 We add helper packages which build on top of api packages and provide utilities: they sit in
-`api/numaresources/$VERSION/helper/$HELPER/...` and these packages *can* have more dependencies.
+`api/$VERSION/helper/$HELPER/...` and these packages *can* have more dependencies.
 
 NOTE: helper packages can depend on top-level api packages, but top-level api packages **must not**
 depend on helpers. Keep the top-level dependencies minimal and controlled!

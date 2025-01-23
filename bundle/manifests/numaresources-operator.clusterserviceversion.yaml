@@ -62,11 +62,11 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-01-07T13:18:55Z"
+    createdAt: "2025-01-24T14:17:15Z"
     olm.skipRange: '>=4.18.0 <4.19.0'
     operatorframework.io/cluster-monitoring: "true"
     operators.operatorframework.io/builder: operator-sdk-v1.36.1
-    operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: numaresources-operator.v4.19.999-snapshot
   namespace: placeholder
 spec:

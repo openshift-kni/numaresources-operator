@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package controllers
+package controller
 
 import (
 	"context"
@@ -50,7 +50,7 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"

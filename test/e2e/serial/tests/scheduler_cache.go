@@ -33,7 +33,7 @@ import (
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	e2enrtint "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -146,8 +146,8 @@ var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, La
 				cpuNum, ok := cpuQty.AsInt64()
 				Expect(ok).To(BeTrue(), "invalid CPU resource in zone %q node %q: %v", referenceZone.Name, referenceNode.Name, cpuQty)
 
-				cpuPerPod := int(float64(cpuNum) * 0.6) // anything that consumes > 50% (because overreserve over 2 NUMA zones) is fine
-				memoryPerPod := 8 * 1024 * 1024 * 1024  // random non-zero amount
+				cpuPerPod := int64(float64(cpuNum) * 0.6)     // anything that consumes > 50% (because overreserve over 2 NUMA zones) is fine
+				memoryPerPod := int64(8 * 1024 * 1024 * 1024) // random non-zero amount
 
 				// so we have now:
 				// - because of CPU request > 51% of available, a NUMA zone can run at most 1 pod.
@@ -155,8 +155,8 @@ var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, La
 				// - hence at most 1 pod per compute node should be running until reconciliation catches up
 
 				podRequiredRes := corev1.ResourceList{
-					corev1.ResourceMemory: *resource.NewQuantity(int64(memoryPerPod), resource.BinarySI),
-					corev1.ResourceCPU:    *resource.NewQuantity(int64(cpuPerPod), resource.DecimalSI),
+					corev1.ResourceMemory: *resource.NewQuantity(memoryPerPod, resource.BinarySI),
+					corev1.ResourceCPU:    *resource.NewQuantity(cpuPerPod, resource.DecimalSI),
 				}
 
 				var zero int64
@@ -383,14 +383,13 @@ var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, La
 				cpuNum, ok := cpuQty.AsInt64()
 				Expect(ok).To(BeTrue(), "invalid CPU resource in zone %q node %q: %v", referenceZone.Name, referenceNode.Name, cpuQty)
 
-				cpuPerPod := int(float64(cpuNum) * 0.7) // anything that consumes > 50% (because overreserve over 2 NUMA zones) is fine
-				memoryPerPod := 8 * 1024 * 1024 * 1024
-				devicePerPod := 1
+				cpuPerPod := int64(float64(cpuNum) * 0.7) // anything that consumes > 50% (because overreserve over 2 NUMA zones) is fine
+				memoryPerPod := int64(8 * 1024 * 1024 * 1024)
 
 				podRequiredRes := corev1.ResourceList{
-					corev1.ResourceMemory:           *resource.NewQuantity(int64(memoryPerPod), resource.BinarySI),
-					corev1.ResourceCPU:              *resource.NewQuantity(int64(cpuPerPod), resource.DecimalSI),
-					corev1.ResourceName(deviceName): *resource.NewQuantity(int64(devicePerPod), resource.DecimalSI),
+					corev1.ResourceMemory:           *resource.NewQuantity(memoryPerPod, resource.BinarySI),
+					corev1.ResourceCPU:              *resource.NewQuantity(cpuPerPod, resource.DecimalSI),
+					corev1.ResourceName(deviceName): *resource.NewQuantity(int64(1), resource.DecimalSI),
 				}
 
 				var zero int64
@@ -504,14 +503,13 @@ var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, La
 				cpuNum, ok := cpuQty.AsInt64()
 				Expect(ok).To(BeTrue(), "invalid CPU resource in zone %q node %q: %v", referenceZone.Name, referenceNode.Name, cpuQty)
 
-				cpuPerPod := int(float64(cpuNum) * 0.6) // anything that consumes > 50% (because overreserve over 2 NUMA zones) is fine
-				memoryPerPod := 8 * 1024 * 1024 * 1024
-				devicePerPod := 1
+				cpuPerPod := int64(float64(cpuNum) * 0.6) // anything that consumes > 50% (because overreserve over 2 NUMA zones) is fine
+				memoryPerPod := int64(8 * 1024 * 1024 * 1024)
 
 				podRequiredRes := corev1.ResourceList{
-					corev1.ResourceMemory:           *resource.NewQuantity(int64(memoryPerPod), resource.BinarySI),
-					corev1.ResourceCPU:              *resource.NewQuantity(int64(cpuPerPod), resource.DecimalSI),
-					corev1.ResourceName(deviceName): *resource.NewQuantity(int64(devicePerPod), resource.DecimalSI),
+					corev1.ResourceMemory:           *resource.NewQuantity(memoryPerPod, resource.BinarySI),
+					corev1.ResourceCPU:              *resource.NewQuantity(cpuPerPod, resource.DecimalSI),
+					corev1.ResourceName(deviceName): *resource.NewQuantity(int64(1), resource.DecimalSI),
 				}
 
 				var zero int64
