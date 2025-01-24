@@ -1,4 +1,4 @@
-name: CI testsuite release flow
+name: CI numacell device plugin release flow
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -25,7 +25,7 @@ jobs:
           image: numacell-device-plugin
           tags: test-ci
           dockerfiles: |
-            ./Dockerfile.tests
+            ./test/deviceplugin/cmd/numacell/Dockerfile
 
       - name: Push to quay
         id: push-to-quay
