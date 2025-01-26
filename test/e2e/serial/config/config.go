@@ -22,6 +22,7 @@ import (
 	"os"
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
@@ -163,6 +164,10 @@ func CheckNodesTopology(ctx context.Context) error {
 		return fmt.Errorf("Following nodes have incoherent info in KubeletConfig/NRT data:\n%#v\n", errText)
 	}
 
+	if err := checkNRTsArePresentForAllNodes(ctx); err != nil {
+		return fmt.Errorf("an NRT object must be associated with each node: %v", err)
+	}
+
 	singleNUMANodeNRTs := e2enrt.FilterByTopologyManagerPolicy(nrtList.Items, intnrt.SingleNUMANode)
 	if len(singleNUMANodeNRTs) < minNumberOfNodesWithSameTopology {
 		return fmt.Errorf("Not enough nodes with %q topology (found:%d). Need at least %d", intnrt.SingleNUMANode, len(singleNUMANodeNRTs), minNumberOfNodesWithSameTopology)
@@ -177,4 +182,21 @@ func errorMapToString(errs map[string]error) string {
 		fmt.Fprintf(&sb, "%s: %v\n", node, err)
 	}
 	return sb.String()
+}
+
+func checkNRTsArePresentForAllNodes(ctx context.Context) error {
+	nodeList := v1.NodeList{}
+	if err := e2eclient.Client.List(ctx, &nodeList); err != nil {
+		return err
+	}
+	nrtList := nrtv1alpha2.NodeResourceTopologyList{}
+	if err := e2eclient.Client.List(ctx, &nrtList); err != nil {
+		return err
+	}
+	for _, node := range nodeList.Items {
+		if _, err := e2enrt.FindFromList(nrtList.Items, node.Name); err != nil {
+			return err
+		}
+	}
+	return nil
 }
