@@ -19,11 +19,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	"github.com/openshift-kni/numaresources-operator/internal/nodepools"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/hypershift"
+	"github.com/openshift-kni/numaresources-operator/test/utils/hypershift/nodepools"
 	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
 )
 
