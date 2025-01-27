@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -168,6 +169,13 @@ func CheckNodesTopology(ctx context.Context) error {
 		return fmt.Errorf("an NRT object must be associated with each node: %v", err)
 	}
 
+	errorMap = validateSMTAlignmentIsOFF(kconfigs)
+	if len(errorMap) != 0 {
+		errText := errorMapToString(errorMap)
+		klog.Infof("SMT alignment is ON in some of the nodes and should be disabled: %v", errText)
+		return fmt.Errorf("Following nodes have SMT alignment enabled:\n%#v\n", errText)
+	}
+
 	singleNUMANodeNRTs := e2enrt.FilterByTopologyManagerPolicy(nrtList.Items, intnrt.SingleNUMANode)
 	if len(singleNUMANodeNRTs) < minNumberOfNodesWithSameTopology {
 		return fmt.Errorf("Not enough nodes with %q topology (found:%d). Need at least %d", intnrt.SingleNUMANode, len(singleNUMANodeNRTs), minNumberOfNodesWithSameTopology)
@@ -199,4 +207,21 @@ func checkNRTsArePresentForAllNodes(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func validateSMTAlignmentIsOFF(kconfigs map[string]*kubeletconfigv1beta1.KubeletConfiguration) map[string]error {
+	errs := map[string]error{}
+	for nodeName, kconfig := range kconfigs {
+		v, ok := kconfig.CPUManagerPolicyOptions["full-pcpus-only"]
+		if !ok {
+			// SMT alignment is OFF by default
+			continue
+		}
+		// don't check for error, the value has to be valid, kubelet won't start otherwise
+		enable, _ := strconv.ParseBool(v)
+		if enable {
+			errs[nodeName] = fmt.Errorf("SMT alignment is ON for node %q", nodeName)
+		}
+	}
+	return errs
 }
