@@ -17,7 +17,7 @@
 package helper
 
 import (
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	anns "github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 )
 

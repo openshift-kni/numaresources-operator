@@ -31,7 +31,7 @@ import (
 
 	depwait "github.com/k8stopologyawareschedwg/deployer/pkg/deployer/wait"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"

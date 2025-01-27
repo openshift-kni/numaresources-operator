@@ -42,9 +42,6 @@ BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
 
 # Image URL to use all building/pushing image targets
 IMG ?= $(IMAGE_TAG_BASE):$(VERSION)
-CRD_OPTIONS ?= "crd"
-# ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.30
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -53,20 +50,11 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
-GOOS=$(shell go env GOOS)
-GOARCH=$(shell go env GOARCH)
-
-CONTAINER_ENGINE ?= docker
-
-BIN_DIR="bin"
-
-OPERATOR_SDK_VERSION="v1.36.1"
-OPERATOR_SDK_BIN="operator-sdk_$(GOOS)_$(GOARCH)"
-OPERATOR_SDK="$(BIN_DIR)/$(OPERATOR_SDK_BIN)"
-
-OPM_VERSION="v1.48.0"
-OPM_BIN="$(GOOS)-$(GOARCH)-opm"
-OPM="$(BIN_DIR)/$(OPM_BIN)"
+# CONTAINER_ENGINE defines the container tool to be used for building images.
+# Be aware that the target commands are only tested with Docker which is
+# scaffolded by default. However, you might want to replace it to use other
+# tools. (i.e. podman)
+CONTAINER_ENGINE ?= podman
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
@@ -76,20 +64,14 @@ SHELL = /usr/bin/env bash -o pipefail
 
 KUSTOMIZE_DEPLOY_DIR ?= config/default
 
-# golangci-lint variables
-GOLANGCI_LINT_VERSION=1.61.0
-GOLANGCI_LINT_NAME=golangci-lint-$(GOLANGCI_LINT_VERSION)-$(GOOS)-$(GOARCH)
-GOLANGCI_LINT_ARTIFACT_FILE=$(GOLANGCI_LINT_NAME).tar.gz
-GOLANGCI_LINT_EXEC_NAME=golangci-lint
-GOLANGCI_LINT=$(BIN_DIR)/$(GOLANGCI_LINT_EXEC_NAME)
-
+.PHONY: all
 all: build
 
 ##@ General
 
 # The help target prints out all targets with their descriptions organized
 # beneath their categories. The categories are represented by '##@' and the
-# target descriptions by '##'. The awk commands is responsible for reading the
+# target descriptions by '##'. The awk command is responsible for reading the
 # entire set of makefiles included in this invocation, looking for lines of the
 # file as xyz: ## something, and then pretty-format the target and help. Then,
 # if there's a line with ##@ something, that gets pretty-printed as a category.
@@ -98,43 +80,52 @@ all: build
 # More info on the awk command:
 # http://linuxcommand.org/lc3_adv_awk.php
 
+.PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Development
 
-manifests: controller-gen
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+.PHONY: deps-update
+deps-update:
+	go mod tidy && go mod vendor
 
-generate: controller-gen
+.PHONY: manifests
+manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+
+.PHONY: generate
+generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+.PHONY: generate-source
 generate-source: pkg/version/_buildinfo.json
 
-fmt: 
+.PHONY: fmt
+fmt: ## Run go fmt against code.
 	go fmt ./...
 
-# needed otherwise vet complains about trying to embed a missing file.
-# note: this would be missing only at time of vetting, which happens before the build process even starts
-vet: generate-source
+.PHONY: vet
+vet: generate-source ## Run go vet against code.
 	go vet ./...
 
-gosec:
-	gosec ./pkg/... ./rte/pkg/... ./internal/... ./nrovalidate/validator/...
+.PHONY: test
+test: manifests generate fmt vet setup-envtest ## Run tests.
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile coverage.out
 
-test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
-
+.PHONY: test-unit
 test-unit: test-unit-pkgs test-controllers
 
-test-unit-pkgs: generate-source pkg/
-	go test ./api/... ./pkg/... ./rte/pkg/... ./internal/... ./nrovalidate/validator/...
+.PHONY: test-unit-pkgs
+test-unit-pkgs: generate-source
+	go test $$(go list ./... | grep -vE 'controller|test|tools|cmd')
 
+.PHONY: test-unit-pkgs-cover
 test-unit-pkgs-cover: generate-source
-	go test -coverprofile=coverage.out ./api/numaresourcesoperator/v1/helper/... ./api/numaresourcesoperator/v1alpha1/helper/... ./pkg/... ./rte/pkg/... ./internal/... ./nrovalidate/validator/...
+	go test $$(go list ./... | grep -vE 'controller|test|tools|cmd') -coverprofile coverage.out
 
 test-controllers: envtest generate-source
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./controllers/...
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./internal/controller/...
 
 test-e2e: build-e2e-all
 	ENABLE_SCHED_TESTS=true hack/run-test-e2e.sh
@@ -151,67 +142,106 @@ test-upgrade-e2e: build-e2e-all
 test-must-gather-e2e: build-must-gather-e2e
 	hack/run-test-must-gather-e2e.sh
 
+.PHONY: lint
+lint: update-buildinfo golangci-lint ## Run golangci-lint linter
+	$(GOLANGCI_LINT) --verbose run --print-resources-usage
+
+.PHONY: lint-fix
+lint-fix: update-buildinfo golangci-lint ## Run golangci-lint linter and perform fixes
+	$(GOLANGCI_LINT) --verbose run --print-resources-usage --fix
+
+.PHONY: lint-config
+lint-config: golangci-lint ## Verify golangci-lint linter configuration
+	$(GOLANGCI_LINT) --verbose config verify
+
+.PHONY: gosec
+gosec:
+	gosec ./pkg/... ./rte/pkg/... ./internal/... ./nrovalidate/validator/...
+
+.PHONY: cover-view
 cover-view:
 	go tool cover -html=coverage.out
 
+.PHONY: cover-summary
 cover-summary:
 	go tool cover -func=coverage.out
 
 ##@ Build
 
+.PHONY: build-installer
+build-installer: manifests generate kustomize ## Generate a consolidated YAML with CRDs and deployment.
+	mkdir -p dist
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/default > dist/install.yaml
+
+.PHONY: binary
 binary: build-tools
 	LDFLAGS="-s -w"; \
 	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/images.tag=$(VERSION)"; \
-	go build -mod=vendor -o bin/manager -ldflags "$$LDFLAGS" -tags "$$GOTAGS" main.go
+	go build -mod=vendor -o bin/manager -ldflags "$$LDFLAGS" -tags "$$GOTAGS" cmd/main.go
 
+.PHONY: binary-rte
 binary-rte: build-tools
 	LDFLAGS="-s -w"; \
 	go build -mod=vendor -o bin/exporter -ldflags "$$LDFLAGS" -tags "$$GOTAGS" rte/main.go
 
+.PHONY: binary-nrovalidate
 binary-nrovalidate: build-tools
 	LDFLAGS="-s -w"; \
 	go build -mod=vendor -o bin/nrovalidate -ldflags "$$LDFLAGS" -tags "$$GOTAGS" nrovalidate/main.go
 
+.PHONY: binary-numacell
 binary-numacell: build-tools
 	LDFLAGS="-s -w" \
 	CGO_ENABLED=0 go build -mod=vendor -o bin/numacell -ldflags "$$LDFLAGS" test/deviceplugin/cmd/numacell/main.go
 
+.PHONY: binary-all
 binary-all: goversion \
 	binary \
 	binary-rte \
 	binary-nrovalidate \
 	introspect-data
 
+.PHONY: binary-e2e-rte-local
 binary-e2e-rte-local: generate-source
 	go test -c -v -o bin/e2e-nrop-rte-local.test ./test/e2e/rte/local
 
+.PHONY: binary-e2e-rte
 binary-e2e-rte: binary-e2e-rte-local generate-source
 	go test -c -v -o bin/e2e-nrop-rte.test ./test/e2e/rte
 
+.PHONY: binary-e2e-install
 binary-e2e-install: generate-source
 	go test -v -c -o bin/e2e-nrop-install.test ./test/e2e/install && go test -v -c -o bin/e2e-nrop-sched-install.test ./test/e2e/sched/install
 
+.PHONY: binary-e2e-upgrade
 binary-e2e-upgrade: generate-source
 	go test -v -c -o bin/e2e-nrop-upgrade.test ./test/e2e/upgrade
 
+.PHONY: binary-e2e-uninstall
 binary-e2e-uninstall: generate-source
 	go test -v -c -o bin/e2e-nrop-uninstall.test ./test/e2e/uninstall && go test -v -c -o bin/e2e-nrop-sched-uninstall.test ./test/e2e/sched/uninstall
 
+.PHONY: binary-e2e-sched
 binary-e2e-sched: generate-source
 	go test -c -v -o bin/e2e-nrop-sched.test ./test/e2e/sched
 
+.PHONY: binary-e2e-serial
 binary-e2e-serial: generate-source
 	CGO_ENABLED=0 go test -c -v -o bin/e2e-nrop-serial.test -ldflags "$$LDFLAGS" ./test/e2e/serial
 
+.PHONY: binary-e2e-tools
 binary-e2e-tools: generate-source
 	go test -c -v -o bin/e2e-nrop-tools.test ./test/e2e/tools
 
+.PHONY: binary-e2e-must-gather
 binary-e2e-must-gather: generate-source
 	go test -c -v -o bin/e2e-nrop-must-gather.test ./test/e2e/must-gather
 
 # backward compatibility
 binary-must-gather-e2e: binary-e2e-must-gather
 
+.PHONY: binary-e2e-all
 binary-e2e-all: goversion \
 	binary-e2e-install \
 	binary-e2e-upgrade \
@@ -225,59 +255,72 @@ binary-e2e-all: goversion \
 	build-pause \
 	introspect-data
 
+.PHONY: runner-e2e-serial
 runner-e2e-serial: bin/envsubst
 	hack/render-e2e-runner.sh
 	hack/test-e2e-runner.sh
 
+.PHONY: introspect-data
 introspect-data: build-topics build-buildinfo
 
+.PHONY: build-topics
 build-topics:
 	mkdir -p bin && go run tools/lstopics/lstopics.go > bin/topics.json
 
+.PHONY: build-buildinfo
 build-buildinfo: bin/buildhelper
 	bin/buildhelper inspect > bin/buildinfo.json
 
+.PHONY: build
 build: generate generate-source fmt vet binary
 
+.PHONY: build-rte
 build-rte: generate-source fmt vet binary-rte
 
+.PHONY: build-numacell
 build-numacell: fmt vet binary-numacell
 
+.PHONY: build-nrovalidate
 build-nrovalidate: generate-source fmt vet binary-nrovalidate
 
+.PHONY: build-all
 build-all: generate generate-source fmt vet binary binary-rte binary-numacell binary-nrovalidate
 
+.PHONY: build-e2e-rte
 build-e2e-rte: generate-source fmt vet binary-e2e-rte
 
+.PHONY: build-e2e-install
 build-e2e-install: fmt vet binary-e2e-install
 
+.PHONY: build-e2e-upgrade
 build-e2e-upgrade: fmt vet binary-e2e-upgrade
 
+.PHONY: build-e2e-uninstall
 build-e2e-uninstall: fmt vet binary-e2e-uninstall
 
+.PHONY: build-e2e-all
 build-e2e-all: generate-source fmt vet binary-e2e-all
 
+.PHONY: build-e2e-must-gather
 build-e2e-must-gather: fmt vet binary-e2e-must-gather
 
 # backward compatibility
 build-must-gather-e2e: build-e2e-must-gather
 
+.PHONY: build-pause
 build-pause: bin-dir
 	install -m 755 hack/pause bin/
 
+.PHONY: build-pause-gcc
 build-pause-gcc: bin-dir
 	gcc -Wall -g -Os -static -o bin/pause hack/pause.c
 
+.PHONY: bin-dir
 bin-dir:
 	@mkdir -p bin || :
 
 run: manifests generate generate-source fmt vet ## Run a controller from your host.
-	go run ./main.go
-
-# backward compatibility
-docker-build: container-build
-
-docker-push: container-push
+	go run ./cmd/main.go
 
 container-build: #test ## Build container image with the manager.
 	$(CONTAINER_ENGINE) build -t ${IMG} .
@@ -291,52 +334,7 @@ container-build-pause:
 container-push-pause:
 	$(CONTAINER_ENGINE) push ${REPO}/pause:test-ci . 
 
-##@ Deployment
-
-install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
-
-uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl delete -f -
-
-deploy-mco-crds: build-tools
-	@echo "Verifying that the MCO CRDs are present in the cluster"
-	hack/deploy-mco-crds.sh
-
-deploy: manifests kustomize deploy-mco-crds ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build $(KUSTOMIZE_DEPLOY_DIR) | kubectl apply -f -
-
-undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build $(KUSTOMIZE_DEPLOY_DIR) | kubectl delete -f -
-	# do not remove machine config pool CRD here, because the deployment can run on top of the OpenShift environment
-	# do not remove kubeletconfig CRD here, because the deployment can run on top of the OpenShift environment
-
-CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
-controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.16.3)
-
-KUSTOMIZE = $(shell pwd)/bin/kustomize
-kustomize: ## Download kustomize locally if necessary.
-	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5@v5.4.3)
-
-ENVTEST = $(shell pwd)/bin/setup-envtest
-envtest: ## Download envtest-setup locally if necessary.
-	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.18)
-
-# go-install-tool will 'go get' any package $2 and install it to $1.
-PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-define go-install-tool
-@[ -f $(1) ] || { \
-set -e ;\
-TMP_DIR=$$(mktemp -d) ;\
-cd $$TMP_DIR ;\
-go mod init tmp ;\
-echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin go install $(2) ;\
-rm -rf $$TMP_DIR ;\
-}
-endef
+##@ Manifest Bundle
 
 .PHONY: bundle
 bundle: operator-sdk manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
@@ -352,27 +350,6 @@ bundle-build: ## Build the bundle image.
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
 	$(MAKE) container-push IMG=$(BUNDLE_IMG)
-
-.PHONY: operator-sdk
-operator-sdk:
-	@if [ ! -x "$(OPERATOR_SDK)" ]; then\
-		echo "Downloading operator-sdk $(OPERATOR_SDK_VERSION)";\
-		mkdir -p $(BIN_DIR);\
-		curl -JL https://github.com/operator-framework/operator-sdk/releases/download/$(OPERATOR_SDK_VERSION)/$(OPERATOR_SDK_BIN) -o $(OPERATOR_SDK);\
-		chmod +x $(OPERATOR_SDK);\
-	else\
-		echo "Using operator-sdk cached at $(OPERATOR_SDK)";\
-	fi
-
-.PHONY: opm
-opm: ## Download opm locally if necessary.
-	@if [ ! -x "$(OPM)" ]; then\
-		echo "Downloading opm $(OPM_VERSION)";\
-		curl -JL https://github.com/operator-framework/operator-registry/releases/download/$(OPM_VERSION)/$(OPM_BIN) -o $(OPM);\
-		chmod +x $(OPM);\
-	else\
-		echo "Using OPM cached at $(OPM_BIN)";\
-	fi
 
 # A comma-separated list of bundle images (e.g. make catalog-build BUNDLE_IMGS=example.com/operator-bundle:v0.1.0,example.com/operator-bundle:v0.2.0).
 # These images MUST exist in a registry and be pull-able.
@@ -398,13 +375,8 @@ catalog-build: opm ## Build a catalog image.
 catalog-push: ## Push a catalog image.
 	$(MAKE) container-push IMG=$(CATALOG_IMG)
 
-.PHONY: deps-update
-deps-update:
-	go mod tidy && go mod vendor
+##@ Build tools:
 
-
-# Build tools:
-#
 .PHONY: goversion
 goversion:
 	@go version
@@ -418,6 +390,7 @@ build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catku
 pkg/version/_buildinfo.json: bin/buildhelper
 	@bin/buildhelper inspect > pkg/version/_buildinfo.json
 
+.PHONY: update-buildinfo
 update-buildinfo: pkg/version/_buildinfo.json
 
 bin/buildhelper: tools/buildhelper/buildhelper.go
@@ -451,15 +424,88 @@ verify-generated: bundle generate
 install-git-hooks:
 	git config core.hooksPath .githooks	
 
+##@ Deployment
 
-GOLANGCI_LINT_LOCAL_VERSION := $(shell command ${GOLANGCI_LINT} --version 2> /dev/null | awk '{print $$4}')
+ifndef ignore-not-found
+  ignore-not-found = false
+endif
+
+.PHONY: install
+install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
+
+.PHONY: uninstall
+uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+
+.PHONY: deploy-mco-crds
+deploy-mco-crds: build-tools
+	@echo "Verifying that the MCO CRDs are present in the cluster"
+	hack/deploy-mco-crds.sh
+
+.PHONY: deploy
+deploy: manifests kustomize deploy-mco-crds ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
+	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
+
+.PHONY: undeploy
+undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+
+##@ Dependencies
+
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
+
+## Tool Binaries - download binary
+
+GOOS=$(shell go env GOOS)
+GOARCH=$(shell go env GOARCH)
+
+OPERATOR_SDK_VERSION ?= 1.36.1
+OPERATOR_SDK_BIN = "operator-sdk_$(GOOS)_$(GOARCH)"
+OPERATOR_SDK = "$(LOCALBIN)/$(OPERATOR_SDK_BIN)"
+
+OPM_VERSION ?= 1.48.0
+OPM_BIN = "$(GOOS)-$(GOARCH)-opm"
+OPM = "$(LOCALBIN)/$(OPM_BIN)"
+
+GOLANGCI_LINT_VERSION ?= 1.61.0
+GOLANGCI_LINT_NAME = golangci-lint-$(GOLANGCI_LINT_VERSION)-$(GOOS)-$(GOARCH)
+GOLANGCI_LINT_ARTIFACT_FILE = $(GOLANGCI_LINT_NAME).tar.gz
+GOLANGCI_LINT_EXEC_NAME = golangci-lint
+GOLANGCI_LINT = $(LOCALBIN)/$(GOLANGCI_LINT_EXEC_NAME)
+
+.PHONY: operator-sdk
+operator-sdk:
+	@if [ ! -x "$(OPERATOR_SDK)" ]; then\
+		echo "Downloading operator-sdk $(OPERATOR_SDK_VERSION)";\
+		mkdir -p $(LOCALBIN);\
+		curl -JL https://github.com/operator-framework/operator-sdk/releases/download/v$(OPERATOR_SDK_VERSION)/$(OPERATOR_SDK_BIN) -o $(OPERATOR_SDK);\
+		chmod +x $(OPERATOR_SDK);\
+	else\
+		echo "Using operator-sdk cached at $(OPERATOR_SDK)";\
+	fi
+
+.PHONY: opm
+opm: ## Download opm locally if necessary.
+	@if [ ! -x "$(OPM)" ]; then\
+		echo "Downloading opm $(OPM_VERSION)";\
+		curl -JL https://github.com/operator-framework/operator-registry/releases/download/v$(OPM_VERSION)/$(OPM_BIN) -o $(OPM);\
+		chmod +x $(OPM);\
+	else\
+		echo "Using OPM cached at $(OPM_BIN)";\
+	fi
+
 .PHONY: golangci-lint
-golangci-lint: pkg/version/_buildinfo.json
+golangci-lint: ## Download golangci-lint locally if necessary.
 	@if [ ! -x "$(GOLANGCI_LINT)" ]; then\
 		echo "Downloading golangci-lint from https://github.com/golangci/golangci-lint/releases/download/v$(GOLANGCI_LINT_VERSION)/$(GOLANGCI_LINT_ARTIFACT_FILE)";\
-		mkdir -p $(BIN_DIR);\
-		curl -JL https://github.com/golangci/golangci-lint/releases/download/v$(GOLANGCI_LINT_VERSION)/$(GOLANGCI_LINT_ARTIFACT_FILE) -o $(BIN_DIR)/$(GOLANGCI_LINT_ARTIFACT_FILE);\
-		pushd $(BIN_DIR);\
+		mkdir -p $(LOCALBIN);\
+		curl -JL https://github.com/golangci/golangci-lint/releases/download/v$(GOLANGCI_LINT_VERSION)/$(GOLANGCI_LINT_ARTIFACT_FILE) -o $(LOCALBIN)/$(GOLANGCI_LINT_ARTIFACT_FILE);\
+		pushd $(LOCALBIN);\
 		tar --no-same-owner -xzf $(GOLANGCI_LINT_ARTIFACT_FILE)  --strip-components=1 $(GOLANGCI_LINT_NAME)/$(GOLANGCI_LINT_EXEC_NAME);\
 		chmod +x $(GOLANGCI_LINT_EXEC_NAME);\
 		rm -f $(GOLANGCI_LINT_ARTIFACT_FILE);\
@@ -467,4 +513,57 @@ golangci-lint: pkg/version/_buildinfo.json
 	else\
 		echo "Using golangci-lint cached at $(GOLANGCI_LINT), current version $(GOLANGCI_LINT_LOCAL_VERSION) expected version: $(GOLANGCI_LINT_VERSION)";\
 	fi
-	$(GOLANGCI_LINT) run --verbose --print-resources-usage -c .golangci.yaml
+
+## Tool Binaries - go-install binary
+
+KUBECTL ?= kubectl
+KUSTOMIZE ?= $(LOCALBIN)/kustomize
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+ENVTEST ?= $(LOCALBIN)/setup-envtest
+
+## Tool Versions
+KUSTOMIZE_VERSION ?= v5.5.0
+CONTROLLER_TOOLS_VERSION ?= v0.17.1
+#ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
+ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
+#ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
+ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
+
+.PHONY: kustomize
+kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
+$(KUSTOMIZE): $(LOCALBIN)
+	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5,$(KUSTOMIZE_VERSION))
+
+.PHONY: controller-gen
+controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
+$(CONTROLLER_GEN): $(LOCALBIN)
+	$(call go-install-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen,$(CONTROLLER_TOOLS_VERSION))
+
+.PHONY: setup-envtest
+setup-envtest: envtest ## Download the binaries required for ENVTEST in the local bin directory.
+	@echo "Setting up envtest binaries for Kubernetes version $(ENVTEST_K8S_VERSION)..."
+	@$(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path || { \
+		echo "Error: Failed to set up envtest binaries for version $(ENVTEST_K8S_VERSION)."; \
+		exit 1; \
+	}
+
+.PHONY: envtest
+envtest: $(ENVTEST) ## Download setup-envtest locally if necessary.
+$(ENVTEST): $(LOCALBIN)
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest,$(ENVTEST_VERSION))
+
+# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
+# $1 - target path with name of binary
+# $2 - package url which can be installed
+# $3 - specific version of package
+define go-install-tool
+@[ -f "$(1)-$(3)" ] || { \
+set -e; \
+package=$(2)@$(3) ;\
+echo "Downloading $${package}" ;\
+rm -f $(1) || true ;\
+GOBIN=$(LOCALBIN) go install $${package} ;\
+mv $(1) $(1)-$(3) ;\
+} ;\
+ln -sf $(1)-$(3) $(1)
+endef

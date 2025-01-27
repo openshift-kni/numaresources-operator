@@ -19,7 +19,7 @@ package namespacedname
 import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )
 
 func AsObjectKey(nn nropv1.NamespacedName) client.ObjectKey {

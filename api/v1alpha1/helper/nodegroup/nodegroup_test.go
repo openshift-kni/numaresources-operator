@@ -23,15 +23,14 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
 )
 
-func TestFindTreesOpenshift(t *testing.T) {
+func TestFindTrees(t *testing.T) {
 	mcpList := mcov1.MachineConfigPoolList{
 		Items: []mcov1.MachineConfigPool{
 			{
@@ -81,7 +80,7 @@ func TestFindTreesOpenshift(t *testing.T) {
 	testCases := []struct {
 		name     string
 		mcps     *mcov1.MachineConfigPoolList
-		ngs      []nropv1.NodeGroup
+		ngs      []nropv1alpha1.NodeGroup
 		expected []Tree
 	}{
 		{
@@ -91,7 +90,7 @@ func TestFindTreesOpenshift(t *testing.T) {
 		{
 			name: "ng1-mcp1",
 			mcps: &mcpList,
-			ngs: []nropv1.NodeGroup{
+			ngs: []nropv1alpha1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -115,7 +114,7 @@ func TestFindTreesOpenshift(t *testing.T) {
 		{
 			name: "ng1-mcp2",
 			mcps: &mcpList,
-			ngs: []nropv1.NodeGroup{
+			ngs: []nropv1alpha1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -144,7 +143,7 @@ func TestFindTreesOpenshift(t *testing.T) {
 		{
 			name: "ng2-mcpX",
 			mcps: &mcpList,
-			ngs: []nropv1.NodeGroup{
+			ngs: []nropv1alpha1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -186,51 +185,10 @@ func TestFindTreesOpenshift(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "node group with PoolName and MachineConfigPoolSelector in another node group",
-			mcps: &mcpList,
-			ngs: []nropv1.NodeGroup{
-				{
-					PoolName: &mcpList.Items[0].Name,
-				},
-				{
-					MachineConfigPoolSelector: &metav1.LabelSelector{
-						MatchLabels: map[string]string{
-							"mcp-label-3": "test3",
-						},
-					},
-				},
-			},
-			expected: []Tree{
-				{
-					MachineConfigPools: []*mcov1.MachineConfigPool{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "mcp1",
-							},
-						},
-					},
-				},
-				{
-					MachineConfigPools: []*mcov1.MachineConfigPool{
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "mcp3",
-							},
-						},
-						{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "mcp5",
-							},
-						},
-					},
-				},
-			},
-		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := FindTreesOpenshift(tt.mcps, tt.ngs)
+			got, err := FindTrees(tt.mcps, tt.ngs)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -245,49 +203,9 @@ func TestFindTreesOpenshift(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error checking backward compat: %v", err)
 			}
-			compatibleNames := mcpNamesFromList(gotMcps)
-			gotSet := sets.New[string](gotNames...)
-			if !gotSet.HasAll(compatibleNames...) {
-				t.Errorf("Trees mismatch (non backward compatible): got=%v compat=%v", gotNames, compatibleNames)
-			}
-		})
-	}
-}
-
-func TestFindTreesHypershift(t *testing.T) {
-	pn1 := "test1"
-	pn2 := "test2"
-	pn3 := "test3"
-
-	testCases := []struct {
-		name string
-		ngs  []nropv1.NodeGroup
-	}{
-		{
-			name: "no-node-groups",
-		},
-		{
-			name: "ng1-mcp1",
-			ngs: []nropv1.NodeGroup{
-				{
-					PoolName: &pn1,
-				},
-				{
-					PoolName: &pn3,
-				},
-				{
-					PoolName: &pn2,
-				},
-			},
-		},
-	}
-	for _, tt := range testCases {
-		t.Run(tt.name, func(t *testing.T) {
-			got := FindTreesHypershift(tt.ngs)
-			gotNodeGroups := nodeGroupsFromTrees(got)
-
-			if !reflect.DeepEqual(tt.ngs, gotNodeGroups) {
-				t.Errorf("Trees mismatch: got=%+v expected=%+v", gotNodeGroups, tt.ngs)
+			compatNames := mcpNamesFromList(gotMcps)
+			if !reflect.DeepEqual(gotNames, compatNames) {
+				t.Errorf("Trees mismatch (non backward compatible): got=%v compat=%v", gotNames, compatNames)
 			}
 		})
 	}
@@ -343,7 +261,7 @@ func TestFindMachineConfigPools(t *testing.T) {
 	testCases := []struct {
 		name     string
 		mcps     *mcov1.MachineConfigPoolList
-		ngs      []nropv1.NodeGroup
+		ngs      []nropv1alpha1.NodeGroup
 		expected []*mcov1.MachineConfigPool
 	}{
 		{
@@ -353,7 +271,7 @@ func TestFindMachineConfigPools(t *testing.T) {
 		{
 			name: "ng1-mcp1",
 			mcps: &mcpList,
-			ngs: []nropv1.NodeGroup{
+			ngs: []nropv1alpha1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -373,7 +291,7 @@ func TestFindMachineConfigPools(t *testing.T) {
 		{
 			name: "ng1-mcp2",
 			mcps: &mcpList,
-			ngs: []nropv1.NodeGroup{
+			ngs: []nropv1alpha1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -398,7 +316,7 @@ func TestFindMachineConfigPools(t *testing.T) {
 		{
 			name: "ng2-mcpX",
 			mcps: &mcpList,
-			ngs: []nropv1.NodeGroup{
+			ngs: []nropv1alpha1.NodeGroup{
 				{
 					MachineConfigPoolSelector: &metav1.LabelSelector{
 						MatchLabels: map[string]string{
@@ -466,17 +384,8 @@ func mcpNamesFromList(mcps []*mcov1.MachineConfigPool) []string {
 	return result
 }
 
-func nodeGroupsFromTrees(trees []Tree) []nropv1.NodeGroup {
-	var ngs []nropv1.NodeGroup
-	for _, tree := range trees {
-		ng := *tree.NodeGroup
-		ngs = append(ngs, ng)
-	}
-	return ngs
-}
-
 // old implementation acting as reference for comparisons
-func findListByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
+func findListByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1alpha1.NodeGroup) ([]*mcov1.MachineConfigPool, error) {
 	var result []*mcov1.MachineConfigPool
 	for idx := range nodeGroups {
 		nodeGroup := &nodeGroups[idx]

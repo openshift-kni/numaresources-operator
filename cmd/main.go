@@ -53,10 +53,10 @@ import (
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/options"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
-	"github.com/openshift-kni/numaresources-operator/controllers"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/features"
+	"github.com/openshift-kni/numaresources-operator/internal/controller"
 	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
@@ -282,7 +282,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.NUMAResourcesOperatorReconciler{
+	if err = (&controller.NUMAResourcesOperatorReconciler{
 		Client:       mgr.GetClient(),
 		Scheme:       mgr.GetScheme(),
 		Recorder:     mgr.GetEventRecorderFor("numaresources-controller"),
@@ -300,7 +300,7 @@ func main() {
 		klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesOperator")
 		os.Exit(1)
 	}
-	if err = (&controllers.KubeletConfigReconciler{
+	if err = (&controller.KubeletConfigReconciler{
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
 		Recorder:  mgr.GetEventRecorderFor("kubeletconfig-controller"),
@@ -324,7 +324,7 @@ func main() {
 		}
 		klog.InfoS("manifests loaded", "component", "Scheduler")
 
-		if err = (&controllers.NUMAResourcesSchedulerReconciler{
+		if err = (&controller.NUMAResourcesSchedulerReconciler{
 			Client:             mgr.GetClient(),
 			Scheme:             mgr.GetScheme(),
 			SchedulerManifests: schedMf,

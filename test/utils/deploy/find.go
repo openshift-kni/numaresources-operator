@@ -27,7 +27,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )
 
 func FindNUMAResourcesOperatorPod(ctx context.Context, cli client.Client, nrop *nropv1.NUMAResourcesOperator) (*corev1.Pod, error) {
