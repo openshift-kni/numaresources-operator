@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       LOG_DIR: /tmp/test_e2e_logs
+      E2E_NAMESPACE_NAME: numaresources
     steps:
     - name: Checkout
       uses: actions/checkout@v4
