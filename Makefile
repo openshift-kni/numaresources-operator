@@ -143,16 +143,16 @@ test-must-gather-e2e: build-must-gather-e2e
 	hack/run-test-must-gather-e2e.sh
 
 .PHONY: lint
-lint: golangci-lint ## Run golangci-lint linter
-	$(GOLANGCI_LINT) run --verbose --print-resources-usage
+lint: update-buildinfo golangci-lint ## Run golangci-lint linter
+	$(GOLANGCI_LINT) --verbose run --print-resources-usage
 
 .PHONY: lint-fix
-lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
-	$(GOLANGCI_LINT) run --verbose --print-resources-usage --fix
+lint-fix: update-buildinfo golangci-lint ## Run golangci-lint linter and perform fixes
+	$(GOLANGCI_LINT) --verbose run --print-resources-usage --fix
 
 .PHONY: lint-config
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
-	$(GOLANGCI_LINT) -v config verify
+	$(GOLANGCI_LINT) --verbose config verify
 
 .PHONY: gosec
 gosec:
@@ -265,10 +265,12 @@ introspect-data: build-topics build-buildinfo
 
 .PHONY: build-topics
 build-topics:
+	echo "creating topics information"
 	mkdir -p bin && go run tools/lstopics/lstopics.go > bin/topics.json
 
 .PHONY: build-buildinfo
 build-buildinfo: bin/buildhelper
+	echo "creating build information"
 	bin/buildhelper inspect > bin/buildinfo.json
 
 .PHONY: build
