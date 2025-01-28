@@ -35,10 +35,10 @@ import (
 	intbaseload "github.com/openshift-kni/numaresources-operator/internal/baseload"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 
-	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
-	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
-	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
+	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
+	"github.com/openshift-kni/numaresources-operator/test/internal/nrosched"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )

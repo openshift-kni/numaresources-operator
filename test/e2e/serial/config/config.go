@@ -35,8 +35,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/nrovalidate/validator"
 
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
 )
 
 const (

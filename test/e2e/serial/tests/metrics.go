@@ -33,9 +33,9 @@ import (
 	e2etestenv "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/testenv"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	"github.com/openshift-kni/numaresources-operator/test/utils/deploy"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
 const metricsAddress = "127.0.0.1"

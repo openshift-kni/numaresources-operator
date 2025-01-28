@@ -33,10 +33,10 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
-	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
+	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
 var _ = Describe("[serial] numaresources profile update", Serial, Label("feature:wlplacement", "feature:nonrt"), func() {

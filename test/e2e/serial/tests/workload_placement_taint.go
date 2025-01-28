@@ -41,12 +41,12 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
-	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
-	"github.com/openshift-kni/numaresources-operator/test/utils/k8simported/taints"
-	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
-	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
+	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/internal/k8simported/taints"
+	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
+	"github.com/openshift-kni/numaresources-operator/test/internal/nrosched"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
+	e2epadder "github.com/openshift-kni/numaresources-operator/test/internal/padder"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )

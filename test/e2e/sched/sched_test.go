@@ -37,10 +37,10 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	e2eimages "github.com/openshift-kni/numaresources-operator/test/utils/images"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2eobjects "github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	e2eimages "github.com/openshift-kni/numaresources-operator/test/internal/images"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
+	e2eobjects "github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
 var _ = Describe("[Scheduler] imageReplacement", func() {

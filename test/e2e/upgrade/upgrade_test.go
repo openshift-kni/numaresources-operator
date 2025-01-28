@@ -38,9 +38,9 @@ import (
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
 
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	"github.com/openshift-kni/numaresources-operator/test/utils/deploy"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
 var _ = Describe("Upgrade", Label("upgrade"), func() {

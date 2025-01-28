@@ -21,10 +21,10 @@ import (
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2epause "github.com/openshift-kni/numaresources-operator/test/utils/objects/pause"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
+	e2epause "github.com/openshift-kni/numaresources-operator/test/internal/objects/pause"
 )
 
 var _ Deployer = &OpenShiftNRO{}

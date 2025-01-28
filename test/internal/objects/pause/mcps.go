@@ -22,7 +22,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 )
 
 func MachineConfigPoolsByNodeGroups(nodeGroups []nropv1.NodeGroup) (func() error, error) {

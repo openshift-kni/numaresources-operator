@@ -36,7 +36,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
 const (

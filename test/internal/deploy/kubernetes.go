@@ -9,8 +9,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	v1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
 var _ Deployer = &KubernetesNRO{}
