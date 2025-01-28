@@ -32,11 +32,11 @@ var (
 func ServiceAccountForUpdate(current, updated client.Object) (client.Object, error) {
 	curSA, ok := current.(*corev1.ServiceAccount)
 	if !ok {
-		return updated, ErrWrongObjectType
+		return nil, ErrWrongObjectType
 	}
 	updSA, ok := updated.(*corev1.ServiceAccount)
 	if !ok {
-		return updated, ErrMismatchingObjects
+		return nil, ErrMismatchingObjects
 	}
 	updSA.Secrets = curSA.Secrets
 	return MetadataForUpdate(current, updated)
@@ -47,6 +47,9 @@ func ObjectForUpdate(current, updated client.Object) (client.Object, error) {
 }
 
 func MetadataForUpdate(current, updated client.Object) (client.Object, error) {
+	if !isSameKind(current, updated) {
+		return nil, ErrMismatchingObjects
+	}
 	updated.SetCreationTimestamp(current.GetCreationTimestamp())
 	updated.SetSelfLink(current.GetSelfLink())
 	updated.SetGeneration(current.GetGeneration())
@@ -55,13 +58,17 @@ func MetadataForUpdate(current, updated client.Object) (client.Object, error) {
 	updated.SetManagedFields(current.GetManagedFields())
 	updated.SetFinalizers(current.GetFinalizers())
 
-	_ = Annotations(current, updated)
-	_ = Labels(current, updated)
+	_, _ = Annotations(current, updated)
+	_, _ = Labels(current, updated)
 
 	return updated, nil
 }
 
-func Annotations(current, updated client.Object) client.Object {
+func Annotations(current, updated client.Object) (client.Object, error) {
+	if !isSameKind(current, updated) {
+		return nil, ErrMismatchingObjects
+	}
+
 	updatedAnnotations := updated.GetAnnotations()
 	curAnnotations := current.GetAnnotations()
 
@@ -76,10 +83,14 @@ func Annotations(current, updated client.Object) client.Object {
 	if len(curAnnotations) != 0 {
 		updated.SetAnnotations(curAnnotations)
 	}
-	return updated
+	return updated, nil
 }
 
-func Labels(current, updated client.Object) client.Object {
+func Labels(current, updated client.Object) (client.Object, error) {
+	if !isSameKind(current, updated) {
+		return nil, ErrMismatchingObjects
+	}
+
 	updatedLabels := updated.GetLabels()
 	curLabels := current.GetLabels()
 
@@ -94,5 +105,9 @@ func Labels(current, updated client.Object) client.Object {
 	if len(curLabels) != 0 {
 		updated.SetLabels(curLabels)
 	}
-	return updated
+	return updated, nil
+}
+
+func isSameKind(a, b client.Object) bool {
+	return a.GetObjectKind().GroupVersionKind().Kind == b.GetObjectKind().GroupVersionKind().Kind
 }

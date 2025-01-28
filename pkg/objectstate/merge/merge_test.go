@@ -38,6 +38,7 @@ func TestLabels(t *testing.T) {
 		name     string
 		input    input
 		expected client.Object
+		err      error
 	}{
 		{
 			name: "no labels shouldn't affect the current labels",
@@ -81,6 +82,9 @@ func TestLabels(t *testing.T) {
 			name: "empty labels values should be reflected",
 			input: input{
 				current: &corev1.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "ServiceAccount",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "sa-1",
 						Labels: map[string]string{
@@ -90,6 +94,9 @@ func TestLabels(t *testing.T) {
 					},
 				},
 				updated: &corev1.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "ServiceAccount",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "sa-1",
 						Labels: map[string]string{
@@ -99,6 +106,9 @@ func TestLabels(t *testing.T) {
 				},
 			},
 			expected: &corev1.ServiceAccount{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "ServiceAccount",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "sa-1",
 					Labels: map[string]string{
@@ -112,6 +122,9 @@ func TestLabels(t *testing.T) {
 			name: "new labels and values should be reflected",
 			input: input{
 				current: &corev1.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "ServiceAccount",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "sa-1",
 						Labels: map[string]string{
@@ -121,6 +134,9 @@ func TestLabels(t *testing.T) {
 					},
 				},
 				updated: &corev1.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "ServiceAccount",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "sa-1",
 						Labels: map[string]string{
@@ -131,6 +147,9 @@ func TestLabels(t *testing.T) {
 				},
 			},
 			expected: &corev1.ServiceAccount{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "ServiceAccount",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "sa-1",
 					Labels: map[string]string{
@@ -141,11 +160,42 @@ func TestLabels(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "merging labels for 2 different kinds is forbidden",
+			input: input{
+				current: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "nro",
+						Labels: map[string]string{
+							"test1": "label1",
+						},
+					},
+				},
+				updated: &corev1.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "ServiceAccount",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "sa-1",
+						Labels: map[string]string{
+							"test2": "label2",
+						},
+					},
+				},
+			},
+			err: ErrMismatchingObjects,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := Labels(test.input.current, test.input.updated)
+			got, err := Labels(test.input.current, test.input.updated)
+			if err != test.err {
+				t.Errorf("got error: %v, while expected to fail due to: %v", err, test.err)
+			}
 			if !reflect.DeepEqual(got, test.expected) {
 				t.Errorf("expected: %v, got: %v", test.expected, got)
 			}
@@ -158,11 +208,15 @@ func TestAnnotations(t *testing.T) {
 		name     string
 		input    input
 		expected client.Object
+		err      error
 	}{
 		{
 			name: "no annotations shouldn't affect the current ones",
 			input: input{
 				current: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "nro",
 						Annotations: map[string]string{
@@ -172,6 +226,9 @@ func TestAnnotations(t *testing.T) {
 					},
 				},
 				updated: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name:        "nro",
 						Annotations: map[string]string{},
@@ -179,6 +236,9 @@ func TestAnnotations(t *testing.T) {
 				},
 			},
 			expected: &nropv1.NUMAResourcesOperator{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "numaresourcesoperator",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "nro",
 					Annotations: map[string]string{
@@ -192,6 +252,9 @@ func TestAnnotations(t *testing.T) {
 			name: "empty annotation values should be reflected",
 			input: input{
 				current: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "nro",
 						Annotations: map[string]string{
@@ -201,6 +264,9 @@ func TestAnnotations(t *testing.T) {
 					},
 				},
 				updated: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "nro",
 						Annotations: map[string]string{
@@ -210,6 +276,9 @@ func TestAnnotations(t *testing.T) {
 				},
 			},
 			expected: &nropv1.NUMAResourcesOperator{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "numaresourcesoperator",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "nro",
 					Annotations: map[string]string{
@@ -223,6 +292,9 @@ func TestAnnotations(t *testing.T) {
 			name: "new annotations and values should be reflected",
 			input: input{
 				current: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "nro",
 						Annotations: map[string]string{
@@ -232,6 +304,9 @@ func TestAnnotations(t *testing.T) {
 					},
 				},
 				updated: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "nro",
 						Annotations: map[string]string{
@@ -242,6 +317,9 @@ func TestAnnotations(t *testing.T) {
 				},
 			},
 			expected: &nropv1.NUMAResourcesOperator{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "numaresourcesoperator",
+				},
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "nro",
 					Annotations: map[string]string{
@@ -252,11 +330,42 @@ func TestAnnotations(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "merging annotation for 2 different kinds is forbidden",
+			input: input{
+				current: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "nro",
+						Annotations: map[string]string{
+							"ann1": "val1",
+						},
+					},
+				},
+				updated: &corev1.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "ServiceAccount",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "sa-1",
+						Annotations: map[string]string{
+							"ann2": "val2",
+						},
+					},
+				},
+			},
+			err: ErrMismatchingObjects,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := Annotations(test.input.current, test.input.updated)
+			got, err := Annotations(test.input.current, test.input.updated)
+			if err != test.err {
+				t.Errorf("got error: %v, while expected to fail due to: %v", err, test.err)
+			}
 			if !reflect.DeepEqual(got, test.expected) {
 				t.Errorf("expected: %v, got: %v", test.expected, got)
 			}
