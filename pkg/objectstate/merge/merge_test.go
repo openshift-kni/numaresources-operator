@@ -17,8 +17,10 @@
 package merge
 
 import (
+	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -368,6 +370,277 @@ func TestAnnotations(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, test.expected) {
 				t.Errorf("expected: %v, got: %v", test.expected, got)
+			}
+		})
+	}
+}
+
+func TestMetadataForUpdate(t *testing.T) {
+	curtm, _ := time.Parse(time.Layout, "Jan 27, 2024 at 4:04pm  (PST)")
+	oldtm, _ := time.Parse(time.Layout, "Jan 26, 2024 at 8:04pm  (PST)")
+
+	tests := []struct {
+		name     string
+		input    input
+		expected client.Object
+		err      error
+	}{
+		{
+			name: "old metadata should be updated to the new one",
+			input: input{
+				current: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "nro",
+						SelfLink:          "my.nro.url",
+						UID:               "e0870767-1248-42c3-8978-e1ef2e8eaad6",
+						ResourceVersion:   "32695003",
+						Generation:        5,
+						CreationTimestamp: metav1.Time{Time: curtm},
+						Labels: map[string]string{
+							"test1": "label1",
+							"test2": "label2",
+						},
+						Annotations: map[string]string{
+							"ann1": "val1",
+							"ann2": "val2",
+						},
+						Finalizers: []string{"finalizer-newstr"},
+						ManagedFields: []metav1.ManagedFieldsEntry{
+							{
+								Manager:    "manager",
+								Operation:  metav1.ManagedFieldsOperationApply,
+								APIVersion: "v1",
+							},
+						},
+					},
+				},
+				updated: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "nro",
+						UID:               "e0870767-1248-42c3-8978-e1ef2e8eaad6",
+						ResourceVersion:   "12695003",
+						Generation:        4,
+						CreationTimestamp: metav1.Time{Time: oldtm},
+						Labels: map[string]string{
+							"test1": "",
+						},
+						Annotations: map[string]string{
+							"ann1": "val1",
+							"ann3": "val3",
+						},
+					},
+				},
+			},
+			expected: &nropv1.NUMAResourcesOperator{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "numaresourcesoperator",
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "nro",
+					SelfLink:          "my.nro.url",
+					UID:               "e0870767-1248-42c3-8978-e1ef2e8eaad6",
+					ResourceVersion:   "32695003",
+					Generation:        5,
+					CreationTimestamp: metav1.Time{Time: curtm},
+					Labels: map[string]string{
+						"test1": "",
+						"test2": "label2",
+					},
+					Annotations: map[string]string{
+						"ann1": "val1",
+						"ann2": "val2",
+						"ann3": "val3",
+					},
+					Finalizers: []string{"finalizer-newstr"},
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							Manager:    "manager",
+							Operation:  metav1.ManagedFieldsOperationApply,
+							APIVersion: "v1",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "merging 2 different kinds is forbidden",
+			input: input{
+				current: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
+				},
+				updated: &corev1.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "ServiceAccount",
+					},
+				},
+			},
+			err: ErrMismatchingObjects,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := MetadataForUpdate(test.input.current, test.input.updated)
+			if !errors.Is(err, test.err) {
+				t.Errorf("got error: %v, while expected to fail due to: %v", err, test.err)
+			}
+			if !reflect.DeepEqual(got, test.expected) {
+				t.Errorf("expected: %v, got: %v", test.expected, got)
+			}
+		})
+	}
+}
+
+func TestServiceAccountForUpdate(t *testing.T) {
+	curtm, _ := time.Parse(time.Layout, "Jan 27, 2024 at 4:04pm  (PST)")
+	oldtm, _ := time.Parse(time.Layout, "Jan 26, 2024 at 8:04pm  (PST)")
+
+	tests := []struct {
+		name     string
+		input    input
+		expected client.Object
+		err      error
+	}{
+		{
+			name: "call with wrong object type",
+			input: input{
+				current: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
+				},
+				updated: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
+				},
+			},
+			err: ErrWrongObjectType,
+		},
+		{
+			name: "call with mismatching object types",
+			input: input{
+				current: &corev1.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "ServiceAccount",
+					},
+				},
+				updated: &nropv1.NUMAResourcesOperator{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "numaresourcesoperator",
+					},
+				},
+			},
+			err: ErrMismatchingObjects,
+		},
+		{
+			name: "old metadata should be updated to the new one",
+			input: input{
+				current: &corev1.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "serviceaccount",
+					},
+					Secrets: []corev1.ObjectReference{
+						{Name: "builder-dockercfg-XXXX"},
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "builder",
+						SelfLink:          "my.sa.url",
+						UID:               "e0870767-1248-42c3-8978-e1ef2e8eaad6",
+						ResourceVersion:   "32695003",
+						Generation:        5,
+						CreationTimestamp: metav1.Time{Time: curtm},
+						Labels: map[string]string{
+							"test1": "label1",
+							"test2": "label2",
+						},
+						Annotations: map[string]string{
+							"ann1": "val1",
+							"ann2": "val2",
+						},
+						Finalizers: []string{"finalizer-newstr"},
+						ManagedFields: []metav1.ManagedFieldsEntry{
+							{
+								Manager:    "manager",
+								Operation:  metav1.ManagedFieldsOperationApply,
+								APIVersion: "v1",
+							},
+						},
+					},
+				},
+				updated: &corev1.ServiceAccount{
+					TypeMeta: metav1.TypeMeta{
+						Kind: "serviceaccount",
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:              "builder",
+						UID:               "e0870767-1248-42c3-8978-e1ef2e8eaad6",
+						ResourceVersion:   "12695003",
+						Generation:        4,
+						CreationTimestamp: metav1.Time{Time: oldtm},
+						Labels: map[string]string{
+							"test1": "",
+						},
+						Annotations: map[string]string{
+							"ann1": "val1",
+							"ann3": "val3",
+						},
+					},
+				},
+			},
+			expected: &corev1.ServiceAccount{
+				TypeMeta: metav1.TypeMeta{
+					Kind: "serviceaccount",
+				},
+				Secrets: []corev1.ObjectReference{
+					{Name: "builder-dockercfg-XXXX"},
+				},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "builder",
+					SelfLink:          "my.sa.url",
+					UID:               "e0870767-1248-42c3-8978-e1ef2e8eaad6",
+					ResourceVersion:   "32695003",
+					Generation:        5,
+					CreationTimestamp: metav1.Time{Time: curtm},
+					Labels: map[string]string{
+						"test1": "",
+						"test2": "label2",
+					},
+					Annotations: map[string]string{
+						"ann1": "val1",
+						"ann2": "val2",
+						"ann3": "val3",
+					},
+					Finalizers: []string{"finalizer-newstr"},
+					ManagedFields: []metav1.ManagedFieldsEntry{
+						{
+							Manager:    "manager",
+							Operation:  metav1.ManagedFieldsOperationApply,
+							APIVersion: "v1",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := ServiceAccountForUpdate(test.input.current, test.input.updated)
+			if err != test.err {
+				t.Errorf("expected error: %v, got: %v", test.err, err)
+				return
+			}
+			if !reflect.DeepEqual(got, test.expected) {
+				t.Errorf("expected updated service account: %v, got: %v", test.expected, got)
 			}
 		})
 	}
