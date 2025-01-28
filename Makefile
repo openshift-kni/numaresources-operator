@@ -118,7 +118,7 @@ test-unit: test-unit-pkgs test-controllers
 
 .PHONY: test-unit-pkgs
 test-unit-pkgs: generate-source
-	go test $$(go list ./... | grep -vE 'controller|test|tools|cmd')
+	go test $$(go list ./... | grep -vE 'tools|cmd|internal/controller|test/e2e|test/deviceplugin|k8simported')	
 
 .PHONY: test-unit-pkgs-cover
 test-unit-pkgs-cover: generate-source
