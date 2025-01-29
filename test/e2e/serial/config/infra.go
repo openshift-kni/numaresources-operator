@@ -35,7 +35,6 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -43,6 +42,7 @@ import (
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 	numacellmanifests "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
 
+	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/utils/images"
 )
@@ -61,10 +61,9 @@ func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, nrtLi
 
 	Expect(nodeGroups).ToNot(BeEmpty(), "cannot autodetect the TAS node groups from the cluster")
 
-	mcps, err := machineconfigpools.GetListByNodeGroupsV1(context.TODO(), fxt.Client, nodeGroups)
+	poolNames, err := nodegroups.GetPoolNamesFrom(context.TODO(), fxt.Client, nodeGroups)
 	Expect(err).ToNot(HaveOccurred())
-
-	klog.Infof("setting e2e infra for %d MCPs", len(mcps))
+	klog.Infof("setting e2e infra for %d pools", len(poolNames))
 
 	sa := numacellmanifests.ServiceAccount(fxt.Namespace.Name, numacellmanifests.Prefix)
 	err = fxt.Client.Create(context.TODO(), sa)
@@ -79,17 +78,14 @@ func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, nrtLi
 	Expect(err).ToNot(HaveOccurred(), "cannot create the numacell rolebinding %q in the namespace %q", sa.Name, sa.Namespace)
 
 	var dss []*appsv1.DaemonSet
-	for _, mcp := range mcps {
-		if mcp.Spec.NodeSelector == nil {
-			klog.Warningf("the machine config pool %q does not have node selector", mcp.Name)
-			continue
-		}
-
-		dsName := objectnames.GetComponentName(numacellmanifests.Prefix, mcp.Name)
-		klog.Infof("setting e2e infra for %q: daemonset %q", mcp.Name, dsName)
+	for _, poolName := range poolNames {
+		dsName := objectnames.GetComponentName(numacellmanifests.Prefix, poolName)
+		klog.Infof("setting e2e infra for %q: daemonset %q", poolName, dsName)
 
 		pullSpec := GetNUMACellDevicePluginPullSpec()
-		ds := numacellmanifests.DaemonSet(mcp.Spec.NodeSelector.MatchLabels, fxt.Namespace.Name, dsName, sa.Name, pullSpec)
+		labels, err := nodegroups.NodeSelectorFromPoolName(context.TODO(), fxt.Client, poolName)
+		Expect(err).ToNot(HaveOccurred())
+		ds := numacellmanifests.DaemonSet(labels, fxt.Namespace.Name, dsName, sa.Name, pullSpec)
 		err = fxt.Client.Create(context.TODO(), ds)
 		Expect(err).ToNot(HaveOccurred(), "cannot create the numacell daemonset %q in the namespace %q", ds.Name, ds.Namespace)
 

@@ -20,6 +20,9 @@ import (
 	"encoding/json"
 	"errors"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
+
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -45,4 +48,14 @@ func KubeletConfToMCKubeletConf(kcObj *kubeletconfigv1beta1.KubeletConfiguration
 	rawKc, err := json.Marshal(kcObj)
 	kcAsMc.Spec.KubeletConfig.Raw = rawKc
 	return err
+}
+
+func DecodeFromData(data []byte, scheme *runtime.Scheme) (*mcov1.KubeletConfig, error) {
+	mcoKc := &mcov1.KubeletConfig{}
+	yamlSerializer := serializer.NewSerializerWithOptions(
+		serializer.DefaultMetaFactory, scheme, scheme,
+		serializer.SerializerOptions{Yaml: true, Pretty: true, Strict: true})
+
+	_, _, err := yamlSerializer.Decode(data, nil, mcoKc)
+	return mcoKc, err
 }

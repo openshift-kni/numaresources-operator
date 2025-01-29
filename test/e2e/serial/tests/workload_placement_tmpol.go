@@ -150,7 +150,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			for nIdx, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
-
+				//calculate a base load on the node
+				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
+				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
+				klog.Infof("computed base load: %s", baseload)
+				baseload.Apply(paddingRes)
 				for zIdx, zone := range nrtInfo.Zones {
 					podName := fmt.Sprintf("padding-%d-%d", nIdx, zIdx)
 					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingRes)

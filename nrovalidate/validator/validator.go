@@ -34,11 +34,10 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 
 type Report struct {
@@ -176,19 +175,11 @@ func GetNodesByNRO(ctx context.Context, cli client.Client) (sets.Set[string], er
 	if err != nil {
 		return enabledNodeNames, err
 	}
-
-	nroMcps, err := machineconfigpools.GetListByNodeGroupsV1(ctx, cli, nroInstance.Spec.NodeGroups)
+	nodes, err := nodegroups.GetNodesFrom(ctx, cli, nroInstance.Spec.NodeGroups)
 	if err != nil {
 		return enabledNodeNames, err
 	}
-
-	for _, mcp := range nroMcps {
-		nodes, err := getNodeListFromMachineConfigPool(ctx, cli, *mcp)
-		if err != nil {
-			return enabledNodeNames, err
-		}
-		enabledNodeNames.Insert(getNodeNames(nodes)...)
-	}
+	enabledNodeNames.Insert(getNodeNames(nodes)...)
 
 	return enabledNodeNames, nil
 }
