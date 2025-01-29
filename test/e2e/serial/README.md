@@ -61,3 +61,10 @@ they found it before they run.
 Starting Jul 2024, while the master branch is pointing to 4.18, the new preferred way to tag tests is using ginkgo `Label("")` such as `Context("should run pods requesting host-level resources", Label("hostlevel","distruptive"), func(){..})`. Tags aren't forbidden yet; they are just deprecated, so whenever a tag is added, a label is also required.
 - Each test should have the importance tag which is one of the below:
 `tier0` means critical; `tier1` means important; `tier2` means medium priority; `tier3` means low priority test.
+
+### Running on HyperShift platform
+
+To be able to run the serial suite on HyperShift platform, the following environment variables are required:
+
+- `KUBECONFIG` should hold the path of the hosted cluster's kubeconfig file.
+- `HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG` should hold the path of the management/hub cluster's kubeconfig file.
