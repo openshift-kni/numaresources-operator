@@ -34,10 +34,11 @@ We foresee RTE as the first operand to be replaced, and in general is the easies
 and a supported component. On the other hand, the secondary scheduler is likely to stick around for a while more - and that's also easier to
 support because secondary schedulers are not uncommon in the kubernetes ecosystem.
 
-## controllers (`./controllers/...`)
+## controllers (`./internal/controller/...`)
 
-The operator has three controllers and three control loop. Likewise well-formed controllers, they are independent from each other and will
-reconcile the cluster state towards a functional NUMA-aware scheduler installation.
+The operator has three controllers and three control loops.
+Likewise well-formed controllers, they are independent from each other and will reconcile the cluster state towards a functional NUMA-aware
+scheduler installation.
 
 1. the numaresourcesoperator controller manages the NRT API and the RTE daemonsets. There's no obvious place to manage the NRT API, so we
    decide to bundle in the same controller which manages RTE, because the RTE is the component which suffers (slightly) more the lack of
@@ -87,18 +88,35 @@ The kubernetes/openshift stability guarantees is about API endpoints and types. 
 NOT covered by the same guarantee. Nevertheless, the intention is to keep the same stability promises.
 The takeaway is that packages in `pkg/...` must be updated carefully and they must be backward compatible.
 
+### guideline: adding a new package: `pkg` vs `internal` vs `test/internal`
+
+- `pkg`: code consumable by external parties. We try the hardest to ensure API stability, testability, documentation.
+- `internal`: code meant to be used everywhere in the operator tree. Default to add here if unsure.
+- `test/internal`: code meant to be used only by test code. Lowest bar, but also smallest scope.
+
 ### `pkg/...` vs `internal/...`
 
 TL:DR: if unsure, put your package in `./internal/`
 
-The `internal` tree holds packages which are shared across the operator and its support tools (nrovalidate...) and/or
-the e2e serial suite. These packages are usable freely in this context, but these packages are not mature enough
+The `internal` tree holds packages which are shared across the operator codebase, including its support tools (nrovalidate...)
+and/or the e2e serial suite. These packages are usable freely in this context, but these packages are not mature enough
 or supportable for external project to consume.
 
 The `pkg` tree holds packages we are confident and ready to support for external projects, for which we provide
 stability and backward compatibility guarantees.
 
 Code in the `internal` tree is guaranteed compatible *only within the same Z-stream*.
+
+### `internal/...` vs `test/internal/...`
+
+We take testing seriously and our testsuite is pretty big and complex (~15k LOCs and counting).
+Because of that, it includes quite some helper packages, which we place in `test/internal/...`. Packages in this
+subtree are meant to be used only by test code.
+Thus, they receive minimal scrutiny and minimal self-testing.
+
+If you want to add a package, it is recommended to evaluate carefully if it should be added in `internal/...` or `test/internal/...`
+with a bias toward the former. Putting new code in `test/internal/...` do minimizes the scope, but the sword is double
+edged as it reduces also the scrutiny and tends to have the lowest bar.
 
 ### `./tools/...`: internal tooling
 
