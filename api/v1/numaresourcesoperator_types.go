@@ -236,5 +236,9 @@ func (ng *NodeGroup) ToString() string {
 	if ng == nil {
 		return ""
 	}
-	return fmt.Sprintf("PoolName: %s MachineConfigPoolSelector: %s Config: %s", *ng.PoolName, ng.MachineConfigPoolSelector.String(), ng.Config.ToString())
+	return fmt.Sprintf("PoolName: %s "+
+		"MachineConfigPoolSelector: %s "+
+		"Config: %s "+
+		"Annotations: %s",
+		*ng.PoolName, ng.MachineConfigPoolSelector.String(), ng.Config.ToString(), ng.Annotations)
 }

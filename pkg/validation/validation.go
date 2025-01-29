@@ -72,7 +72,7 @@ func MultipleMCPsPerTree(annot map[string]string, trees []nodegroupv1.Tree) erro
 	var err error
 	for _, tree := range trees {
 		if len(tree.MachineConfigPools) > 1 {
-			err = errors.Join(err, fmt.Errorf("found multiple pools matches for node group %v but expected one. Pools found %v", &tree.NodeGroup, tree.MachineConfigPools))
+			err = errors.Join(err, fmt.Errorf("found multiple pools matches for node group %s but expected one. Pools found %v", tree.NodeGroup.ToString(), nodegroupv1.GetTreePoolsNames(tree)))
 		}
 	}
 	return err
