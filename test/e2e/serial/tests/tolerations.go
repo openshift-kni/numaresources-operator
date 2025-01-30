@@ -44,12 +44,12 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
-	"github.com/openshift-kni/numaresources-operator/test/utils/deploy"
-	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
-	"github.com/openshift-kni/numaresources-operator/test/utils/k8simported/taints"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
+	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
+	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/internal/k8simported/taints"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 )

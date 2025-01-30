@@ -43,8 +43,8 @@ import (
 	numacellmanifests "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
 
 	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
-	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
-	"github.com/openshift-kni/numaresources-operator/test/utils/images"
+	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 )
 
 func SetupInfra(fxt *e2efixture.Fixture, nroOperObj *nropv1.NUMAResourcesOperator, nrtList nrtv1alpha2.NodeResourceTopologyList) {

@@ -42,8 +42,8 @@ import (
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/objects"
 	intwait "github.com/openshift-kni/numaresources-operator/internal/wait"
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	"github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

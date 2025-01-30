@@ -44,12 +44,12 @@ import (
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	nrowait "github.com/openshift-kni/numaresources-operator/internal/wait"
 
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
-	"github.com/openshift-kni/numaresources-operator/test/utils/crds"
-	"github.com/openshift-kni/numaresources-operator/test/utils/deploy"
-	e2eimages "github.com/openshift-kni/numaresources-operator/test/utils/images"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
+	"github.com/openshift-kni/numaresources-operator/test/internal/crds"
+	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
+	e2eimages "github.com/openshift-kni/numaresources-operator/test/internal/images"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
 // tests here are not interruptible, so they should not accept contexts.

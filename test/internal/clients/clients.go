@@ -31,7 +31,7 @@ import (
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	"github.com/openshift-kni/numaresources-operator/test/utils/hypershift"
+	"github.com/openshift-kni/numaresources-operator/test/internal/hypershift"
 )
 
 var (

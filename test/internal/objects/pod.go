@@ -29,7 +29,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
-	"github.com/openshift-kni/numaresources-operator/test/utils/images"
+	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 )
 
 func NewTestPodPause(namespace, name string) *corev1.Pod {

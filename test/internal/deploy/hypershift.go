@@ -21,10 +21,10 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	"github.com/openshift-kni/numaresources-operator/test/utils/hypershift"
-	"github.com/openshift-kni/numaresources-operator/test/utils/hypershift/nodepools"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/hypershift"
+	"github.com/openshift-kni/numaresources-operator/test/internal/nodepools"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
 var _ Deployer = &HyperShiftNRO{}

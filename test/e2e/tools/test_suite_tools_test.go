@@ -24,7 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/openshift-kni/numaresources-operator/test/utils/runtime"
+	"github.com/openshift-kni/numaresources-operator/test/internal/runtime"
 )
 
 func TestTools(t *testing.T) {

@@ -56,13 +56,13 @@ import (
 
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
-	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
-	"github.com/openshift-kni/numaresources-operator/test/utils/images"
-	e2enrt "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
-	"github.com/openshift-kni/numaresources-operator/test/utils/nrosched"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
-	e2epadder "github.com/openshift-kni/numaresources-operator/test/utils/padder"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/internal/images"
+	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
+	"github.com/openshift-kni/numaresources-operator/test/internal/nrosched"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
+	e2epadder "github.com/openshift-kni/numaresources-operator/test/internal/padder"
 )
 
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement", Serial, Label("disruptive", "scheduler"), Label("feature:wlplacement"), func() {

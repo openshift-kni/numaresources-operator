@@ -27,8 +27,8 @@ import (
 
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 
-	e2efixture "github.com/openshift-kni/numaresources-operator/test/utils/fixture"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
 type E2EConfig struct {

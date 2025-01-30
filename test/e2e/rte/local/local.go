@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"
-	"github.com/openshift-kni/numaresources-operator/test/utils/runtime"
+	"github.com/openshift-kni/numaresources-operator/test/internal/runtime"
 )
 
 var binaryPath string

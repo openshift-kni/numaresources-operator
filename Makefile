@@ -118,7 +118,7 @@ test-unit: test-unit-pkgs test-controllers
 
 .PHONY: test-unit-pkgs
 test-unit-pkgs: generate-source
-	go test $$(go list ./... | grep -vE 'controller|test|tools|cmd')
+	go test $$(go list ./... | grep -vE 'tools|cmd|internal/controller|test/e2e|test/deviceplugin|k8simported')	
 
 .PHONY: test-unit-pkgs-cover
 test-unit-pkgs-cover: generate-source
@@ -144,7 +144,7 @@ test-must-gather-e2e: build-must-gather-e2e
 
 .PHONY: lint
 lint: update-buildinfo golangci-lint ## Run golangci-lint linter
-	$(GOLANGCI_LINT) --verbose run --print-resources-usage
+	$(GOLANGCI_LINT) --verbose run --print-resources-usage --exclude-dirs test/internal/k8simported
 
 .PHONY: lint-fix
 lint-fix: update-buildinfo golangci-lint ## Run golangci-lint linter and perform fixes

@@ -41,9 +41,9 @@ import (
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 
-	"github.com/openshift-kni/numaresources-operator/test/utils/fixture"
-	nrtutil "github.com/openshift-kni/numaresources-operator/test/utils/noderesourcetopologies"
-	"github.com/openshift-kni/numaresources-operator/test/utils/objects"
+	"github.com/openshift-kni/numaresources-operator/test/internal/fixture"
+	nrtutil "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
 // This package allows to control the amount of available allocationTarget under the nodes.
