@@ -18,10 +18,8 @@ package status
 
 import (
 	"errors"
+	"reflect"
 	"time"
-
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -51,12 +49,13 @@ const (
 )
 
 func IsUpdatedNUMAResourcesOperator(oldStatus, newStatus *nropv1.NUMAResourcesOperatorStatus) bool {
-	options := []cmp.Option{
-		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime"),
-		cmpopts.IgnoreFields(metav1.Condition{}, "ObservedGeneration"),
-	}
+	os := oldStatus.DeepCopy()
+	ns := newStatus.DeepCopy()
 
-	return !cmp.Equal(newStatus, oldStatus, options...)
+	resetIncomparableConditionFields(os.Conditions)
+	resetIncomparableConditionFields(ns.Conditions)
+
+	return !reflect.DeepEqual(os, ns)
 }
 
 // UpdateConditions compute new conditions based on arguments, and then compare with given current conditions.
@@ -65,12 +64,13 @@ func IsUpdatedNUMAResourcesOperator(oldStatus, newStatus *nropv1.NUMAResourcesOp
 func UpdateConditions(currentConditions []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
 	conditions := NewConditions(condition, reason, message)
 
-	options := []cmp.Option{
-		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime"),
-		cmpopts.IgnoreFields(metav1.Condition{}, "ObservedGeneration"),
-	}
+	cond := clone(conditions)
+	curCond := clone(currentConditions)
 
-	if cmp.Equal(conditions, currentConditions, options...) {
+	resetIncomparableConditionFields(cond)
+	resetIncomparableConditionFields(curCond)
+
+	if reflect.DeepEqual(cond, curCond) {
 		return currentConditions, false
 	}
 	return conditions, true
@@ -150,4 +150,17 @@ func MessageFromError(err error) string {
 		return err.Error()
 	}
 	return unwErr.Error()
+}
+
+func resetIncomparableConditionFields(conditions []metav1.Condition) {
+	for idx := range conditions {
+		conditions[idx].LastTransitionTime = metav1.Time{}
+		conditions[idx].ObservedGeneration = 0
+	}
+}
+
+func clone(conditions []metav1.Condition) []metav1.Condition {
+	var c = make([]metav1.Condition, len(conditions))
+	copy(c, conditions)
+	return c
 }
