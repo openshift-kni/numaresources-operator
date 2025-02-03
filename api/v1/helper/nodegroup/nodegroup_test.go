@@ -511,3 +511,60 @@ func findListByNodeGroups(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1
 
 	return result, nil
 }
+
+func TestGetTreePoolsNames(t *testing.T) {
+	poolName := "pool1"
+
+	tests := []struct {
+		name     string
+		tree     Tree
+		expected []string
+	}{
+		{
+			name:     "empty tree",
+			tree:     Tree{},
+			expected: nil,
+		},
+		{
+			name: "with mcps",
+			tree: Tree{
+				NodeGroup: &nropv1.NodeGroup{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{
+							"label": "test",
+						},
+					},
+				},
+				MachineConfigPools: []*mcov1.MachineConfigPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "mcp1",
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "mcp2",
+						},
+					},
+				},
+			},
+			expected: []string{"mcp1", "mcp2"},
+		},
+		{
+			name: "with node pool",
+			tree: Tree{
+				NodeGroup: &nropv1.NodeGroup{
+					PoolName: &poolName,
+				},
+			},
+			expected: []string{poolName},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetTreePoolsNames(tt.tree); !reflect.DeepEqual(got, tt.expected) {
+				t.Errorf("got %v, expected %v", got, tt.expected)
+			}
+		})
+	}
+}

@@ -46,7 +46,7 @@ func TestNodeGroupConfigToString(t *testing.T) {
 	}{
 		{
 			name:     "nil config",
-			expected: "",
+			expected: "nil",
 		},
 		{
 			name:     "empty fields should reflect default values",
@@ -94,7 +94,17 @@ func TestNodeGroupToString(t *testing.T) {
 	}{
 		{
 			name:     "nil group",
-			expected: "",
+			expected: "nil",
+		},
+		{
+			name: "empty PoolName",
+			input: &NodeGroup{
+				PoolName: nil,
+				Annotations: map[string]string{
+					"ann1": "val1",
+				},
+			},
+			expected: "PoolName: nil MachineConfigPoolSelector: nil Config: nil Annotations: map[ann1:val1]",
 		},
 		{
 			name: "empty fields should reflect default values",
@@ -105,8 +115,11 @@ func TestNodeGroupToString(t *testing.T) {
 					InfoRefreshMode:    &refMode,
 				},
 				PoolName: &pn, // although not allowed more than a specifier but we still need to display and here is not the right place to perform validations
+				Annotations: map[string]string{
+					"ann1": "val1",
+				},
 			},
-			expected: "PoolName: pn MachineConfigPoolSelector: nil Config: PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {10s} InfoRefreshPause: Disabled Tolerations: []",
+			expected: "PoolName: pn MachineConfigPoolSelector: nil Config: PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {10s} InfoRefreshPause: Disabled Tolerations: [] Annotations: map[ann1:val1]",
 		},
 	}
 	for _, tc := range testcases {
