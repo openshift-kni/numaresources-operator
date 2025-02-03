@@ -523,7 +523,7 @@ func TestGetTreePoolsNames(t *testing.T) {
 		{
 			name:     "empty tree",
 			tree:     Tree{},
-			expected: []string{},
+			expected: nil,
 		},
 		{
 			name: "with mcps",

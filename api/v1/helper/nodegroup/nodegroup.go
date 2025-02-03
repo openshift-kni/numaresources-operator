@@ -134,15 +134,18 @@ func FindMachineConfigPools(mcps *mcov1.MachineConfigPoolList, nodeGroups []nrop
 
 // GetTreePoolsNames returns a slice of all the MachineConfigPool matching the configured node groups
 func GetTreePoolsNames(tree Tree) []string {
-	names := []string{}
 	if tree.NodeGroup == nil {
-		return names
+		return nil
 	}
 
 	if tree.MachineConfigPools == nil {
-		names = append(names, *tree.NodeGroup.PoolName)
+		if tree.NodeGroup.PoolName == nil {
+			return nil
+		}
+		return []string{*tree.NodeGroup.PoolName}
 	}
 
+	names := []string{}
 	for _, mcp := range tree.MachineConfigPools {
 		names = append(names, mcp.Name)
 	}

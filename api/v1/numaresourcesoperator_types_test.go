@@ -46,7 +46,7 @@ func TestNodeGroupConfigToString(t *testing.T) {
 	}{
 		{
 			name:     "nil config",
-			expected: "",
+			expected: "nil",
 		},
 		{
 			name:     "empty fields should reflect default values",
@@ -94,7 +94,17 @@ func TestNodeGroupToString(t *testing.T) {
 	}{
 		{
 			name:     "nil group",
-			expected: "",
+			expected: "nil",
+		},
+		{
+			name: "empty PoolName",
+			input: &NodeGroup{
+				PoolName: nil,
+				Annotations: map[string]string{
+					"ann1": "val1",
+				},
+			},
+			expected: "PoolName: nil MachineConfigPoolSelector: nil Config: nil Annotations: map[ann1:val1]",
 		},
 		{
 			name: "empty fields should reflect default values",
