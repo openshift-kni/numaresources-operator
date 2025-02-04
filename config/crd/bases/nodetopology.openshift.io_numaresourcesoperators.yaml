@@ -198,6 +198,11 @@ spec:
                         to
                       type: string
                   type: object
+                  x-kubernetes-validations:
+                  - message: Exactly one of 'PoolName' or 'MachineConfigPoolSelector'
+                      must be set for NodeGroup.
+                    rule: 'has(self.poolName) ? !has(self.machineConfigPoolSelector)
+                      : has(self.machineConfigPoolSelector)'
                 type: array
               podExcludes:
                 description: Optional Namespace/Name glob patterns of pod to ignore
