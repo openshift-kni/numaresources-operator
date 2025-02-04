@@ -1015,18 +1015,14 @@ func makePaddingPod(namespace, nodeName string, zone nrtv1alpha2.Zone, podReqs c
 
 func newPaddingPod(nodeName, zoneName, namespace string, resourceReqs corev1.ResourceList) *corev1.Pod {
 	var zero int64
-	labels := map[string]string{
-		"e2e-serial-pad-node": nodeName,
-	}
-	if len(zoneName) != 0 {
-		labels["e2e-serial-pad-numazone"] = zoneName
-	}
-
-	padPod := &corev1.Pod{
+	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "padpod-",
 			Namespace:    namespace,
-			Labels:       labels,
+			Labels: map[string]string{
+				"e2e-serial-pad-node":     nodeName,
+				"e2e-serial-pad-numazone": zoneName,
+			},
 		},
 		Spec: corev1.PodSpec{
 			TerminationGracePeriodSeconds: &zero,
@@ -1042,7 +1038,6 @@ func newPaddingPod(nodeName, zoneName, namespace string, resourceReqs corev1.Res
 			},
 		},
 	}
-	return padPod
 }
 
 func pinPodTo(pod *corev1.Pod, nodeName, zoneName string) (*corev1.Pod, error) {
