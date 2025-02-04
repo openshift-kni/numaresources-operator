@@ -23,11 +23,13 @@ import (
 	"strconv"
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
+	. "github.com/onsi/gomega"
+
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
-	. "github.com/onsi/gomega"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	nrtv1alpha2attr "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
@@ -153,7 +155,7 @@ func CheckNodesTopology(ctx context.Context) error {
 	}
 
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
-	err = e2eclient.Client.List(context.TODO(), &nrtList)
+	err = e2eclient.Client.List(ctx, &nrtList)
 	if err != nil {
 		return fmt.Errorf("error while trying to get NodeResourceTopology objects. error: %w", err)
 	}
@@ -165,7 +167,7 @@ func CheckNodesTopology(ctx context.Context) error {
 		return fmt.Errorf("Following nodes have incoherent info in KubeletConfig/NRT data:\n%#v\n", errText)
 	}
 
-	if err := checkNRTsArePresentForAllNodes(ctx); err != nil {
+	if err := checkNRTsArePresentForAllNodes(ctx, nrtList); err != nil {
 		return fmt.Errorf("an NRT object must be associated with each node: %v", err)
 	}
 
@@ -192,17 +194,14 @@ func errorMapToString(errs map[string]error) string {
 	return sb.String()
 }
 
-func checkNRTsArePresentForAllNodes(ctx context.Context) error {
-	nodeList := v1.NodeList{}
-	if err := e2eclient.Client.List(ctx, &nodeList); err != nil {
+func checkNRTsArePresentForAllNodes(ctx context.Context, nrtList nrtv1alpha2.NodeResourceTopologyList) error {
+	workers, err := nodes.GetWorkers(&deployer.Environment{Cli: e2eclient.Client, Ctx: ctx})
+	if err != nil {
 		return err
 	}
-	nrtList := nrtv1alpha2.NodeResourceTopologyList{}
-	if err := e2eclient.Client.List(ctx, &nrtList); err != nil {
-		return err
-	}
-	for _, node := range nodeList.Items {
+	for _, node := range workers {
 		if _, err := e2enrt.FindFromList(nrtList.Items, node.Name); err != nil {
+			klog.InfoS("NRT data missing", "workerNode", node.Name)
 			return err
 		}
 	}
