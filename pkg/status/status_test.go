@@ -72,7 +72,7 @@ func TestFindCondition(t *testing.T) {
 	}
 }
 
-func TestUpdate(t *testing.T) {
+func TestUpdateConditions(t *testing.T) {
 	err := nropv1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		t.Errorf("nropv1.AddToScheme() failed with: %v", err)
@@ -81,7 +81,12 @@ func TestUpdate(t *testing.T) {
 	nro := testobjs.NewNUMAResourcesOperator("test-nro")
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(nro).Build()
 
-	nro.Status.Conditions, _ = UpdateConditions(nro.Status.Conditions, ConditionProgressing, "testReason", "test message")
+	var ok bool
+	nro.Status.Conditions, ok = UpdateConditions(nro.Status.Conditions, ConditionProgressing, "testReason", "test message")
+	if !ok {
+		t.Errorf("Update did not change status, but it should")
+	}
+
 	err = fakeClient.Update(context.TODO(), nro)
 	if err != nil {
 		t.Errorf("Update() failed with: %v", err)
@@ -98,24 +103,9 @@ func TestUpdate(t *testing.T) {
 	if progressingCondition.Status != metav1.ConditionTrue {
 		t.Errorf("Update() failed to set correct status, expected: %q, got: %q", metav1.ConditionTrue, progressingCondition.Status)
 	}
-}
-
-func TestUpdateIfNeeded(t *testing.T) {
-	err := nropv1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		t.Errorf("nropv1.AddToScheme() failed with: %v", err)
-	}
-
-	nro := testobjs.NewNUMAResourcesOperator("test-nro")
-
-	var ok bool
-	nro.Status.Conditions, ok = UpdateConditions(nro.Status.Conditions, ConditionAvailable, "", "")
-	if !ok {
-		t.Errorf("Update did not change status, but it should")
-	}
 
 	// same status twice in a row. We should not overwrite identical status to save transactions.
-	_, ok = UpdateConditions(nro.Status.Conditions, ConditionAvailable, "", "")
+	_, ok = UpdateConditions(nro.Status.Conditions, ConditionProgressing, "testReason", "test message")
 	if ok {
 		t.Errorf("Update did change status, but it should not")
 	}
