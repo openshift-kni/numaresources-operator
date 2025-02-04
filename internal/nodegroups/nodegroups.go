@@ -18,6 +18,7 @@ package nodegroups
 
 import (
 	"context"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/klog/v2"
@@ -70,10 +71,10 @@ func GetNodesFrom(ctx context.Context, cli client.Client, nodeGroups []nropv1.No
 }
 
 func GetPoolNamesFrom(ctx context.Context, cli client.Client, nodeGroups []nropv1.NodeGroup) ([]string, error) {
-	poolNames := make([]string, 0)
+	poolNames := make([]string, 0, len(nodeGroups))
 	for _, nodeGroup := range nodeGroups {
 		// this should cover HyperShift cases and OpenShift cases when PoolName in use
-		if *nodeGroup.PoolName != "" {
+		if nodeGroup.PoolName != nil && *nodeGroup.PoolName != "" {
 			poolNames = append(poolNames, *nodeGroup.PoolName)
 			continue
 		}
