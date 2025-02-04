@@ -201,7 +201,7 @@ var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, La
 				// but that would be the most correct and stricter testing.
 				failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodListAllRunning(context.TODO(), testPods)
 				dumpFailedPodInfo(fxt, failedPods)
-				Expect(len(failedPods)).To(BeZero(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
+				Expect(failedPods).To(BeEmpty(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
 
 				for _, updatedPod := range updatedPods {
 					schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
@@ -298,7 +298,7 @@ var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, La
 					dumpFailedPodInfo(fxt, failedPods)
 					elapsed := time.Since(startTime)
 					klog.Infof("test pods (payload + interference) gone running in %v", elapsed)
-					Expect(len(failedPods)).To(BeZero(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
+					Expect(failedPods).To(BeEmpty(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
 
 					By("checking the test pods once running")
 					for _, updatedPod := range updatedPods {
@@ -429,8 +429,8 @@ var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, La
 				// So we wait a bit too much unnecessarily, but wetake this chance to ensure the pod(s) which are supposed to be pending
 				// stay pending at least up until timeout
 				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodListAllRunning(context.TODO(), testPods)
-				Expect(len(updatedPods)).To(Equal(hostsRequired))
-				Expect(len(failedPods)).To(Equal(expectedPending))
+				Expect(updatedPods).To(HaveLen(hostsRequired))
+				Expect(failedPods).To(HaveLen(expectedPending))
 				Expect(len(updatedPods) + len(failedPods)).To(Equal(desiredPods))
 
 				var usedNodes []string
@@ -549,8 +549,8 @@ var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, La
 				// So we wait a bit too much unnecessarily, but wetake this chance to ensure the pod(s) which are supposed to be pending
 				// stay pending at least up until timeout
 				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodListAllRunning(context.TODO(), testPods)
-				Expect(len(updatedPods)).To(Equal(hostsRequired))
-				Expect(len(failedPods)).To(Equal(expectedPending))
+				Expect(updatedPods).To(HaveLen(hostsRequired))
+				Expect(failedPods).To(HaveLen(expectedPending))
 
 				var usedNodes []string
 				for _, updatedPod := range updatedPods {
@@ -597,7 +597,7 @@ var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, La
 				// NRT updater, resync loop, scheduler retry loop.
 				failedPods, updatedPods = wait.With(fxt.Client).Timeout(5*time.Minute).ForPodListAllRunning(context.TODO(), expectedRunningPods)
 				dumpFailedPodInfo(fxt, failedPods)
-				Expect(len(updatedPods)).To(Equal(hostsRequired))
+				Expect(updatedPods).To(HaveLen(hostsRequired))
 				Expect(failedPods).To(BeEmpty())
 			})
 		})

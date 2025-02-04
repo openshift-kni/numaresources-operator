@@ -691,7 +691,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 				// the assumption here is that the configured node group selector will be targeting one mcp
 				Expect(nroOperObj.Status.MachineConfigPools[0].Name).To(Equal(nroOperObj.Status.NodeGroups[0].PoolName))
-				Expect(len(nroOperObj.Status.DaemonSets)).To(Equal(1)) // always one daemonset per MCP
+				Expect(nroOperObj.Status.DaemonSets).To(HaveLen(1)) // always one daemonset per MCP
 				Expect(nroOperObj.Status.DaemonSets[0]).To(Equal(nroOperObj.Status.NodeGroups[0].DaemonSet))
 
 				statusConfFromMCP := nroOperObj.Status.MachineConfigPools[0].Config // shortcut
@@ -766,7 +766,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			By("checking the DP owned by NROSched")
 			dps, err := objects.GetDeploymentOwnedBy(fxt.Client, nroSchedObj.ObjectMeta)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(dps)).To(Equal(1), "unexpected amount of scheduler deployments: %d", len(dps))
+			Expect(dps).To(HaveLen(1), "unexpected amount of scheduler deployments: %d", len(dps))
 
 			By("checking the relatedObjects for NROSched")
 			nrsExpected := objRefListToStringList(relatedobjects.Scheduler(dps[0].Namespace, nroSchedObj.Status.Deployment))
@@ -1005,7 +1005,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 			schedPods, err := podlist.With(fxt.Client).ByDeployment(ctx, *schedDeployment)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(schedPods)).To(Equal(1))
+			Expect(schedPods).To(HaveLen(1))
 
 			schedulerName = nroSchedObj.Status.SchedulerName
 			Expect(schedulerName).ToNot(BeEmpty(), "cannot autodetect the TAS scheduler name from the cluster")
@@ -1312,11 +1312,13 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					Expect(reflect.DeepEqual(dsStatus, ds)).To(BeFalse(), "daemonset %+v is still reported in the daemonsets slice in status: %+v", ds, updatedNRO.Status.DaemonSets)
 				}
 				for _, ngStatus := range updatedNRO.Status.NodeGroups {
-					Expect(ngStatus.PoolName).ToNot(Equal(ng.PoolName), "node group status %+v still exists undet the operator status", ngStatus)
+					Expect(ng.PoolName).ToNot(BeNil())
+					Expect(ngStatus.PoolName).ToNot(Equal(*ng.PoolName), "node group status %+v still exists undet the operator status", ngStatus)
 					Expect(reflect.DeepEqual(ngStatus.DaemonSet, ds)).To(BeFalse(), "daemonset %+v is still reported in one of the NodeGroupStatuses: %+v", ds, ngStatus)
 				}
 				for _, mcp := range updatedNRO.Status.MachineConfigPools {
-					Expect(mcp.Name).ToNot(Equal(ng.PoolName), "status MCPs still contain deleted node group: %+v", mcp)
+					Expect(ng.PoolName).ToNot(BeNil())
+					Expect(mcp.Name).ToNot(Equal(*ng.PoolName), "status MCPs still contain deleted node group: %+v", mcp)
 				}
 			})
 		})
@@ -1327,7 +1329,7 @@ func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.Objec
 	klog.InfoS("fetch NRO object", "key", key.String())
 	var updatedNRO nropv1.NUMAResourcesOperator
 	Expect(cli.Get(ctx, key, &updatedNRO)).To(Succeed())
-	Expect(len(updatedNRO.Status.NodeGroups)).To(Equal(len(appliedObj.Spec.NodeGroups)), "NodeGroups Status mismatch: found %d, expected %d", len(updatedNRO.Status.NodeGroups), len(appliedObj.Spec.NodeGroups))
+	Expect(updatedNRO.Status.NodeGroups).To(HaveLen(len(appliedObj.Spec.NodeGroups)), "NodeGroups Status mismatch: found %d, expected %d", len(updatedNRO.Status.NodeGroups), len(appliedObj.Spec.NodeGroups))
 
 	klog.InfoS("successfully fetched NRO object", "key", key.String())
 

@@ -77,7 +77,7 @@ var _ = Describe("metrics exposed securely", Serial, func() {
 			pods, err := e2eclient.K8sClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 				LabelSelector: labelSelector,
 			})
-			Expect(err).To(BeNil(), "Error listing worker pods: %v", err)
+			Expect(err).ToNot(HaveOccurred(), "Error listing worker pods: %v", err)
 			Expect(pods.Items).ToNot(BeEmpty(), "There should be at least one worker pod")
 			workerPod := &pods.Items[0]
 			stdout := fetchMetricsFromPod(ctx, workerPod, metricsAddress, metricsPort)

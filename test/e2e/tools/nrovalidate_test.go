@@ -77,7 +77,7 @@ var _ = Describe("[tools][validation] nrovalidate tools", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(rep.Succeeded).To(BeFalse())
-			Expect(len(rep.Errors)).ToNot(BeZero())
+			Expect(rep.Errors).ToNot(BeEmpty())
 			for _, ve := range rep.Errors {
 				fmt.Fprintf(GinkgoWriter, "reported expected validation error: %v\n", ve)
 			}
@@ -134,7 +134,7 @@ var _ = Describe("[tools][validation] nrovalidate tools", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(rep.Succeeded).To(BeFalse())
-			Expect(len(rep.Errors)).ToNot(BeZero())
+			Expect(rep.Errors).ToNot(BeEmpty())
 			for _, ve := range rep.Errors {
 				fmt.Fprintf(GinkgoWriter, "reported expected validation error: %v\n", ve)
 			}

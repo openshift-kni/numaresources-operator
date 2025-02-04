@@ -454,7 +454,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				pods, err := podlist.With(fxt.Client).ByDaemonset(ctx, *updatedDs)
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset pods %s: %v", dsKey.String(), err)
 				By(fmt.Sprintf("ensuring the RTE DS is running with the same pods count (expected pods=%d)", len(workers)))
-				Expect(len(pods)).To(Equal(len(workers)), "updated DS ready=%v original worker nodes=%d", len(pods), len(workers))
+				Expect(pods).To(HaveLen(len(workers)), "updated DS ready=%v original worker nodes=%d", len(pods), len(workers))
 
 				By("applying the taint 2 - NoExecute")
 				applyTaintToNode(ctx, fxt.Client, targetNode, &tntNoExec[0])
@@ -501,7 +501,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				klog.Info("verify RTE pods before triggering the restart still include the pod on the tainted node")
 				pods, err := podlist.With(fxt.Client).ByDaemonset(ctx, ds)
 				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from daemonset %q: %v", ds.Name, err)
-				Expect(len(pods)).To(Equal(len(workers)), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers), len(pods))
+				Expect(pods).To(HaveLen(len(workers)), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers), len(pods))
 
 				var podToDelete corev1.Pod
 				for _, pod := range pods {

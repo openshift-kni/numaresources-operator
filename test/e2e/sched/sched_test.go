@@ -227,7 +227,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			podList, err := podlist.With(e2eclient.Client).ByDeployment(context.TODO(), *deployment)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(podList).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
-			uid := &podList[0].UID
+			uid := podList[0].UID
 
 			var t time.Duration
 			if nroSchedObj.Spec.CacheResyncPeriod != nil {

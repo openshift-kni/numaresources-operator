@@ -95,7 +95,7 @@ var _ = Describe("Upgrade", Label("upgrade"), func() {
 				}
 
 				err := e2eclient.Client.Get(context.TODO(), mcKey, mc)
-				Expect(err).ToNot(BeNil(), "MachineConfig %s is not expected to to be present", mcKey.String())
+				Expect(err).To(HaveOccurred(), "MachineConfig %s is not expected to to be present", mcKey.String())
 				Expect(errors.IsNotFound(err)).To(BeTrue(), "Unexpected error occurred while getting MachineConfig %s: %v", mcKey.String(), err)
 			}
 		})
