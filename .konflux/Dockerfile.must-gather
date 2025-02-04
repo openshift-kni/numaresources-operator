@@ -22,7 +22,6 @@ ENTRYPOINT ["/usr/bin/gather"]
 
 LABEL com.redhat.component="numaresources-must-gather-container" \
     name="openshift4/numaresources-must-gather-rhel9" \
-    upstream-vcs-type="git" \
     summary="numa resources data gathering image" \
     io.openshift.expose-services="" \
     io.openshift.tags="data,images" \
