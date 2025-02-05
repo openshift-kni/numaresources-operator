@@ -199,7 +199,7 @@ func updateInfoRefreshPause(fxt *e2efixture.Fixture, newVal nropv1.InfoRefreshPa
 			return false
 		}
 		return true
-	}).WithTimeout(2*time.Minute).WithPolling(9*time.Second).Should(Equal(true), "Status of NROP failed to get updated")
+	}).WithTimeout(2*time.Minute).WithPolling(9*time.Second).Should(BeTrue(), "Status of NROP failed to get updated")
 
 	dsKey := wait.ObjectKey{
 		Namespace: updatedObj.Status.DaemonSets[0].Namespace,

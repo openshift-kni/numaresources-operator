@@ -97,7 +97,7 @@ func (h *HyperShiftNRO) Teardown(ctx context.Context, timeout time.Duration) {
 		Expect(e2eclient.MNGClient.Delete(ctx, h.KcConfigMapObj)).To(Succeed())
 
 		By("checking that generated configmap has been deleted")
-		Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(h.NroObj), h.NroObj))
+		Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(h.NroObj), h.NroObj)).To(Succeed())
 		Expect(h.NroObj.Status.DaemonSets).ToNot(BeEmpty())
 		cm := &corev1.ConfigMap{}
 		key := client.ObjectKey{

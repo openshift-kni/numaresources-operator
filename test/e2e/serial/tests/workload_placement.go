@@ -218,7 +218,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(pods)).To(Equal(1))
+			Expect(pods).To(HaveLen(1))
 
 			updatedPod := pods[0]
 			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
@@ -607,7 +607,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(pods)).To(Equal(2))
+			Expect(pods).To(HaveLen(2))
 
 			updatedPod0 := pods[0]
 			checkReplica(updatedPod0, targetNodeName, fxt.K8sClient)

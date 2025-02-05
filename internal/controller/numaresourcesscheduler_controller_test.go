@@ -181,7 +181,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			}
 
 			gomega.Expect(nrs.Status.RelatedObjects).ToNot(gomega.BeEmpty())
-			gomega.Expect(len(nrs.Status.RelatedObjects)).To(gomega.Equal(len(expected)))
+			gomega.Expect(nrs.Status.RelatedObjects).To(gomega.HaveLen(len(expected)))
 			gomega.Expect(nrs.Status.RelatedObjects).To(gomega.ContainElements(expected))
 		})
 
@@ -594,7 +594,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 		ginkgo.DescribeTable("should set the leader election resource parameters depending on replica count", func(replicas int32, expectedEnabled bool) {
 			nrs := nrs.DeepCopy()
 			nrs.Spec.Replicas = &replicas
-			gomega.Eventually(reconciler.Client.Update(context.TODO(), nrs)).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(gomega.Succeed())
+			gomega.Eventually(reconciler.Client.Update).WithArguments(context.TODO(), nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(gomega.Succeed())
 
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})

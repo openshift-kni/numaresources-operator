@@ -221,7 +221,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
 					}
 				}
-				Expect(len(failedPods)).To(BeZero(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
+				Expect(failedPods).To(BeEmpty(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
 
 				for _, updatedPod := range updatedPods {
 					schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)

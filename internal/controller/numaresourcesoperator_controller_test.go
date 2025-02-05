@@ -258,7 +258,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					availableCondition := getConditionByType(nro.Status.Conditions, status.ConditionAvailable)
 					Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
 
-					Expect(len(nro.Status.MachineConfigPools)).To(Equal(2))
+					Expect(nro.Status.MachineConfigPools).To(HaveLen(2))
 					Expect(nro.Status.MachineConfigPools[0].Name).To(Equal(pn1))
 					Expect(nro.Status.MachineConfigPools[1].Name).To(Equal(pn2))
 
@@ -303,8 +303,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).ToNot(HaveOccurred())
 					Expect(nroUpdated.Spec.NodeGroups[0].Config).To(Equal(conf1))
 
-					Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(2))
-					Expect(len(nroUpdated.Status.DaemonSets)).To(Equal(2))
+					Expect(nroUpdated.Status.MachineConfigPools).To(HaveLen(2))
+					Expect(nroUpdated.Status.DaemonSets).To(HaveLen(2))
 
 					// the order of the NodeGroups also preserved under the operator status
 					Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(pn1))
@@ -405,14 +405,17 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							}
 						}
 						ng1WithNodeSelector.PoolName = &pnNew
-						Eventually(func() error {
-							Expect(reconciler.Client.Get(ctx, nroKey, nro))
+						Eventually(func(ctx2 context.Context) error {
+							if err := reconciler.Client.Get(context.TODO(), nroKey, nro); err != nil {
+								return err
+							}
 							nro.Spec.NodeGroups[0] = *ng1WithNodeSelector
 							return reconciler.Client.Update(context.TODO(), nro)
-						}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
+						}).WithContext(ctx).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
 						verifyDegradedCondition(nro, validation.NodeGroupsError, platf)
 					})
 				})
+
 				When("pause annotation enabled", func() {
 					BeforeEach(func() {
 						if nro.Annotations == nil {
@@ -511,12 +514,13 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
 
-					Expect(len(nroUpdated.Status.NodeGroups)).To(Equal(1))
+					Expect(nroUpdated.Status.NodeGroups).To(HaveLen(1))
 					Expect(nroUpdated.Status.NodeGroups[0].Config).To(Equal(conf), "operator status was not updated under NodeGroupStatus field")
 
 					if platf != platform.HyperShift {
-						Expect(len(nroUpdated.Status.MachineConfigPools)).To(Equal(1))
+						Expect(nroUpdated.Status.MachineConfigPools).To(HaveLen(1))
 						Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(pn))
+						Expect(nroUpdated.Status.MachineConfigPools[0].Config).ToNot(BeNil(), "operator status contains nil config")
 						Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(conf), "operator status was not updated")
 					}
 				})
@@ -1506,7 +1510,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								Expect(result).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
 
 								Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
-								Expect(len(nro.Status.MachineConfigPools)).To(Equal(1))
+								Expect(nro.Status.MachineConfigPools).To(HaveLen(1))
 								Expect(nro.Status.MachineConfigPools[0].Name).To(Equal("test1"))
 							})
 						})
@@ -1518,11 +1522,11 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								By("Ensure both MachineConfigPools are ready")
 								Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp1), mcp1)).ToNot(HaveOccurred())
 								ensureMCPIsReady(mcp1, nro.Name)
-								Expect(reconciler.Client.Update(context.TODO(), mcp1))
+								Expect(reconciler.Client.Update(context.TODO(), mcp1)).To(Succeed())
 
 								Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp2), mcp2)).ToNot(HaveOccurred())
 								ensureMCPIsReady(mcp2, nro.Name)
-								Expect(reconciler.Client.Update(context.TODO(), mcp2))
+								Expect(reconciler.Client.Update(context.TODO(), mcp2)).To(Succeed())
 
 								result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 								Expect(err).ToNot(HaveOccurred())
@@ -1636,7 +1640,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 										})
 									}
 
-									Expect(len(nroUpdated.Status.RelatedObjects)).To(Equal(len(expected)))
+									Expect(nroUpdated.Status.RelatedObjects).To(HaveLen(len(expected)))
 									Expect(nroUpdated.Status.RelatedObjects).To(ContainElements(expected))
 								})
 							})

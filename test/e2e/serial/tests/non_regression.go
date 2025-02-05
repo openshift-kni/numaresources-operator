@@ -262,7 +262,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(len(pods)).To(Equal(1))
+			Expect(pods).To(HaveLen(1))
 
 			updatedPod := pods[0]
 

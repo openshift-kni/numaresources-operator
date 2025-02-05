@@ -390,7 +390,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", policyFuncs.policyName(), len(nrts))
 			}
 
-			Expect(len(unsuitableFreeRes)).To(Equal(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
+			Expect(unsuitableFreeRes).To(HaveLen(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
 
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
@@ -1316,7 +1316,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", policyFuncs.policyName(), len(nrts))
 			}
 
-			Expect(len(unsuitableFreeRes)).To(Equal(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
+			Expect(unsuitableFreeRes).To(HaveLen(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
 
 			for _, nrt := range nrts {
 				for _, zone := range nrt.Zones {
