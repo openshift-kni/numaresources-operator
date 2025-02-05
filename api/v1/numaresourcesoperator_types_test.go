@@ -22,6 +22,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"k8s.io/utils/ptr"
 )
 
 func TestNodeGroupConfigToString(t *testing.T) {
@@ -82,6 +84,39 @@ func TestNodeGroupConfigToString(t *testing.T) {
 	}
 }
 
+func TestNodeGroupGetName(t *testing.T) {
+	testcases := []struct {
+		name     string
+		input    *NodeGroup
+		expected string
+	}{
+		{
+			name:     "nil group",
+			expected: "nil",
+		},
+		{
+			name:     "all fields empty",
+			input:    &NodeGroup{},
+			expected: "<missingName>",
+		},
+		{
+			name: "pool name",
+			input: &NodeGroup{
+				PoolName: ptr.To[string]("foobar"),
+			},
+			expected: "foobar",
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			actual := tc.input.GetName()
+			if actual != tc.expected {
+				t.Errorf("expected: %s, actual: %s", tc.expected, actual)
+			}
+		})
+	}
+}
+
 func TestNodeGroupToString(t *testing.T) {
 	pfpMode := PodsFingerprintingDisabled
 	refMode := InfoRefreshEvents
@@ -104,7 +139,7 @@ func TestNodeGroupToString(t *testing.T) {
 					"ann1": "val1",
 				},
 			},
-			expected: "PoolName: nil MachineConfigPoolSelector: nil Config: nil Annotations: map[ann1:val1]",
+			expected: "PoolName: <missingName> Config: nil Annotations: ann1=val1",
 		},
 		{
 			name: "empty fields should reflect default values",
@@ -117,9 +152,28 @@ func TestNodeGroupToString(t *testing.T) {
 				PoolName: &pn, // although not allowed more than a specifier but we still need to display and here is not the right place to perform validations
 				Annotations: map[string]string{
 					"ann1": "val1",
+					"ann2": "val2",
 				},
 			},
-			expected: "PoolName: pn MachineConfigPoolSelector: nil Config: PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {10s} InfoRefreshPause: Disabled Tolerations: [] Annotations: map[ann1:val1]",
+			expected: "PoolName: pn Config: PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {10s} InfoRefreshPause: Disabled Tolerations: [] Annotations: ann1=val1,ann2=val2",
+		},
+		{
+			name: "many annotations",
+			input: &NodeGroup{
+				Config: &NodeGroupConfig{
+					PodsFingerprinting: &pfpMode,
+					InfoRefreshMode:    &refMode,
+				},
+				PoolName: &pn, // although not allowed more than a specifier but we still need to display and here is not the right place to perform validations
+				Annotations: map[string]string{
+					"ann1": "val1",
+					"ann2": "val2",
+					"ann3": "val7",
+					"ann5": "val4",
+					"ann9": "valA",
+				},
+			},
+			expected: "PoolName: pn Config: PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {10s} InfoRefreshPause: Disabled Tolerations: [] Annotations: ann1=val1,ann2=val2,ann3=val7,ann5=val4,ann9=valA",
 		},
 	}
 	for _, tc := range testcases {
