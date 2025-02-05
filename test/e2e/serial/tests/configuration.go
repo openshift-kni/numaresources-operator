@@ -165,13 +165,13 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			mcp := objects.TestMCP()
 			By(fmt.Sprintf("creating new MCP: %q", mcp.Name))
 			// we must have this label in order to match other machine configs that are necessary for proper functionality
-			mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": getLabelRoleMCPTest()}
+			mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": roleMCPTest}
 			mcp.Spec.MachineConfigSelector = &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
 					{
 						Key:      "machineconfiguration.openshift.io/role",
 						Operator: metav1.LabelSelectorOpIn,
-						Values:   []string{depnodes.RoleWorker, getLabelRoleMCPTest()},
+						Values:   []string{depnodes.RoleWorker, roleMCPTest},
 					},
 				},
 			}
