@@ -18,6 +18,8 @@ package v1
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -232,19 +234,38 @@ func (ngc *NodeGroupConfig) ToString() string {
 	return fmt.Sprintf("PodsFingerprinting mode: %s InfoRefreshMode: %s InfoRefreshPeriod: %s InfoRefreshPause: %s Tolerations: %+v", *ngc.PodsFingerprinting, *ngc.InfoRefreshMode, *ngc.InfoRefreshPeriod, *ngc.InfoRefreshPause, ngc.Tolerations)
 }
 
-func (ng *NodeGroup) ToString() string {
+func (ng *NodeGroup) GetName() string {
 	if ng == nil {
 		return "nil"
 	}
 
-	pn := "nil"
 	if ng.PoolName != nil {
-		pn = *ng.PoolName
+		return *ng.PoolName
 	}
 
-	return fmt.Sprintf("PoolName: %s "+
-		"MachineConfigPoolSelector: %s "+
-		"Config: %s "+
-		"Annotations: %s",
-		pn, ng.MachineConfigPoolSelector.String(), ng.Config.ToString(), ng.Annotations)
+	if ng.MachineConfigPoolSelector != nil {
+		return ng.MachineConfigPoolSelector.String()
+	}
+
+	return "<missingName>"
+}
+
+func (ng *NodeGroup) ToString() string {
+	if ng == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("PoolName: %s Config: %s Annotations: %s", ng.GetName(), ng.Config.ToString(), annsToString(ng.Annotations))
+}
+
+func annsToString(anns map[string]string) string {
+	items := make([]string, 0, len(anns))
+	keys := make([]string, 0, len(anns)) // TODO: use `keys := slices.Collect(maps.Keys(anns))` when we move to 1.23
+	for key := range anns {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	for _, key := range keys {
+		items = append(items, key+"="+anns[key])
+	}
+	return strings.Join(items, ",")
 }
