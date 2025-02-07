@@ -86,8 +86,6 @@ var _ = Describe("[rte][local][config] RTE configuration", func() {
 })
 
 func runConfig(argv []string, env map[string]string) rteconfiguration.ProgArgs {
-	GinkgoHelper()
-
 	cmdline := []string{
 		binaryPath,
 		"--dump-config=.andexit",
@@ -125,8 +123,6 @@ func flattenEnv(env map[string]string) []string {
 }
 
 func expectExecutableExists(path string) {
-	GinkgoHelper()
-
 	cmdline := []string{
 		path,
 		"-h",

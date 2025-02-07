@@ -169,8 +169,6 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 })
 
 func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nrtCandidates []nrtv1alpha2.NodeResourceTopology, requiredResources, expectedFreeResources corev1.ResourceList) string {
-	GinkgoHelper()
-
 	nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
 	var ok bool
@@ -228,7 +226,6 @@ func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nrtCandidates []nr
 }
 
 func createPaddingPod(fxt *e2efixture.Fixture, ctx context.Context, podName, nodeName string, zone nrtv1alpha2.Zone, expectedFreeRes corev1.ResourceList) *corev1.Pod {
-	GinkgoHelper()
 	By(fmt.Sprintf("creating padding pod %q for node %q zone %q with resource target %s", podName, nodeName, zone.Name, e2ereslist.ToString(expectedFreeRes)))
 
 	padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, expectedFreeRes)

@@ -111,8 +111,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		var nrtCandidates []nrtv1alpha2.NodeResourceTopology
 
 		setupCluster := func(requiredRes, paddingRes corev1.ResourceList, tmPolicy, tmScope string) {
-			GinkgoHelper()
-
 			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
 			nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, requiredNUMAZones)
@@ -2110,8 +2108,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 })
 
 func setupPadding(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod {
-	GinkgoHelper()
-
 	baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), padInfo.targetNodeName)
 	Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", padInfo.targetNodeName)
 	By(fmt.Sprintf("computed base load: %s", baseload))
@@ -2151,8 +2147,6 @@ func setupPadding(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopol
 }
 
 func setupPaddingForUnsuitableNodes(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopologyList, padInfo paddingInfo) []*corev1.Pod {
-	GinkgoHelper()
-
 	paddingPods := []*corev1.Pod{}
 	// still working under the assumption that len(nrt.Zones) == len(pod.Spec.Containers) == 2
 	for nodeIdx, unsuitableNodeName := range padInfo.unsuitableNodeNames {

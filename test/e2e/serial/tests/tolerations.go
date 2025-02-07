@@ -797,15 +797,12 @@ func isDegradedRTESync(conds []metav1.Condition) bool {
 }
 
 func expectEqualTolerations(tolsA, tolsB []corev1.Toleration) {
-	GinkgoHelper()
 	tA := nropv1.SortedTolerations(tolsA)
 	tB := nropv1.SortedTolerations(tolsB)
 	Expect(tA).To(Equal(tB), "mismatched tolerations")
 }
 
 func setRTETolerations(ctx context.Context, cli client.Client, nroKey client.ObjectKey, tols []corev1.Toleration) *nropv1.NUMAResourcesOperator {
-	GinkgoHelper()
-
 	nropOperObj := nropv1.NUMAResourcesOperator{}
 	Eventually(func(g Gomega) {
 		err := cli.Get(ctx, nroKey, &nropOperObj)
@@ -832,8 +829,6 @@ func sriovToleration() corev1.Toleration {
 }
 
 func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo, updateType MCPUpdateType) {
-	GinkgoHelper()
-
 	mcps := make([]*machineconfigv1.MachineConfigPool, 0, len(mcpsInfo))
 	for _, info := range mcpsInfo {
 		mcps = append(mcps, info.mcpObj)

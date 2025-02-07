@@ -275,8 +275,6 @@ func testToleration() []corev1.Toleration {
 }
 
 func untaintNodes(cli client.Client, taintedNodeNames []string, taint *corev1.Taint) []string {
-	GinkgoHelper()
-
 	var untaintedNodeNames []string
 	// TODO: remove taints in parallel
 	for _, taintedNodeName := range taintedNodeNames {
@@ -305,8 +303,6 @@ func untaintNodes(cli client.Client, taintedNodeNames []string, taint *corev1.Ta
 }
 
 func checkNodesUntainted(cli client.Client, nodeNames []string) {
-	GinkgoHelper()
-
 	// TODO: check taints in parallel
 	for _, nodeName := range nodeNames {
 		Eventually(func() error {
@@ -324,7 +320,6 @@ func checkNodesUntainted(cli client.Client, nodeNames []string) {
 }
 
 func applyTaintToNode(ctx context.Context, cli client.Client, targetNode *corev1.Node, tnt *corev1.Taint) *corev1.Node {
-	GinkgoHelper()
 	var updatedNode *corev1.Node
 	Eventually(func() error {
 		var err error

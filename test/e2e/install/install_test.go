@@ -379,7 +379,6 @@ func findContainerByName(daemonset appsv1.DaemonSet, containerName string) (*cor
 }
 
 func deleteNROPSync(cli client.Client, nropObj *nropv1.NUMAResourcesOperator) {
-	GinkgoHelper()
 	var err error
 	err = cli.Delete(context.TODO(), nropObj)
 	Expect(err).ToNot(HaveOccurred())

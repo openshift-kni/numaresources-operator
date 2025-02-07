@@ -211,7 +211,6 @@ func (fxt *Fixture) DEnvWithContext(ctx context.Context) *deployer.Environment {
 }
 
 func MustSettleNRT(fxt *Fixture) {
-	ginkgo.GinkgoHelper()
 	klog.Infof("cooldown by verifying NRTs data is settled (interval=%v timeout=%v)", settleInterval, settleTimeout)
 	_, err := intwait.With(fxt.Client).Interval(settleInterval).Timeout(settleTimeout).ForNodeResourceTopologiesSettled(context.Background(), cooldownThreshold, intwait.NRTIgnoreNothing)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "NRTs have not settled during the provided cooldown time: %v", err)

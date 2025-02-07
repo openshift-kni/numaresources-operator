@@ -640,8 +640,6 @@ func isInfoRefreshModeEqual(conf *nropv1.NodeGroupConfig, refMode nropv1.InfoRef
 }
 
 func autoSizePodResources(nrtCandidates []nrtv1alpha2.NodeResourceTopology, makeCpuLoad func(cpuNum int64) int64) corev1.ResourceList {
-	GinkgoHelper()
-
 	// we can assume now all the zones from all the nodes are equal from cpu/memory resource perspective
 	referenceNode := nrtCandidates[0]
 	referenceZone := referenceNode.Zones[0]

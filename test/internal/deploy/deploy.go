@@ -70,8 +70,6 @@ func NewForPlatform(plat platform.Platform) Deployer {
 }
 
 func WaitForMCPUpdatedAfterNRODeleted(nroObj *nropv1.NUMAResourcesOperator) {
-	GinkgoHelper()
-
 	if configuration.Plat != platform.OpenShift {
 		// nothing to do
 		return
@@ -109,8 +107,6 @@ func isMachineConfigPoolsUpdatedAfterDeletion(nro *nropv1.NUMAResourcesOperator)
 //
 // see: `TestNROScheduler` to see the specific object characteristics.
 func DeployNROScheduler(ctx context.Context, timeout time.Duration) *nropv1.NUMAResourcesScheduler {
-	GinkgoHelper()
-
 	nroSchedObj := objects.TestNROScheduler()
 
 	Expect(e2eclient.Client.Create(ctx, nroSchedObj)).To(Succeed())
@@ -138,7 +134,6 @@ func DeployNROScheduler(ctx context.Context, timeout time.Duration) *nropv1.NUMA
 }
 
 func TeardownNROScheduler(ctx context.Context, nroSched *nropv1.NUMAResourcesScheduler, timeout time.Duration) {
-	GinkgoHelper()
 	Expect(nroSched).ToNot(BeNil())
 	Expect(e2eclient.Client.Delete(ctx, nroSched)).To(Succeed())
 	Expect(wait.With(e2eclient.Client).Interval(NROSchedulerPollingInterval).Timeout(timeout).ForNUMAResourcesSchedulerDeleted(ctx, nroSched)).To(Succeed(), "NROScheduler %q failed to be deleted", nroSched.Name)

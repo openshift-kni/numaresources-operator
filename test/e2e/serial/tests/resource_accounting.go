@@ -769,8 +769,6 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 // checkNRTConsumedResources returns the updated NRT and the name of the zone on which resources are consumed
 func checkNRTConsumedResources(fxt *e2efixture.Fixture, targetNrtInitial nrtv1alpha2.NodeResourceTopology, requiredRes corev1.ResourceList, updatedPod *corev1.Pod) (nrtv1alpha2.NodeResourceTopology, string) {
-	GinkgoHelper()
-
 	targetNrtCurrent, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), targetNrtInitial, 1*time.Minute)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -783,8 +781,6 @@ func checkNRTConsumedResources(fxt *e2efixture.Fixture, targetNrtInitial nrtv1al
 }
 
 func expectNRTConsumedResources(fxt *e2efixture.Fixture, targetNrtInitial nrtv1alpha2.NodeResourceTopology, requiredRes corev1.ResourceList, updatedPod *corev1.Pod) nrtv1alpha2.NodeResourceTopology {
-	GinkgoHelper()
-
 	targetNrtCurrent, match := checkNRTConsumedResources(fxt, targetNrtInitial, requiredRes, updatedPod)
 	Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \npod resources: %v", intnrt.ToString(targetNrtInitial), intnrt.ToString(targetNrtCurrent), e2ereslist.ToString(requiredRes))
 	return targetNrtCurrent

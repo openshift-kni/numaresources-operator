@@ -39,13 +39,10 @@ type OpenShiftNRO struct {
 // other dependencies, so the controller will be able to install TAS
 // stack properly
 func (o *OpenShiftNRO) Deploy(ctx context.Context, timeout time.Duration) *nropv1.NUMAResourcesOperator {
-	GinkgoHelper()
-
 	return o.deployWithLabels(ctx, timeout, objects.OpenshiftMatchLabels())
 }
 
 func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, timeout time.Duration, matchLabels map[string]string) *nropv1.NUMAResourcesOperator {
-	GinkgoHelper()
 	nroObj := objects.TestNRO(objects.NROWithMCPSelector(matchLabels))
 	kcObj, err := objects.TestKC(matchLabels)
 	Expect(err).To(Not(HaveOccurred()))
@@ -89,8 +86,6 @@ func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, timeout time.Durati
 }
 
 func (o *OpenShiftNRO) Teardown(ctx context.Context, timeout time.Duration) {
-	GinkgoHelper()
-
 	var wg sync.WaitGroup
 	if o.McpObj != nil {
 		err := e2eclient.Client.Delete(ctx, o.McpObj)

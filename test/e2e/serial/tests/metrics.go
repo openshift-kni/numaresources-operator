@@ -88,7 +88,6 @@ var _ = Describe("metrics exposed securely", Serial, func() {
 })
 
 func fetchMetricsFromPod(ctx context.Context, pod *corev1.Pod, metricsAddress, metricsPort string) string {
-	GinkgoHelper()
 	endpoint := net.JoinHostPort(metricsAddress, metricsPort)
 
 	key := client.ObjectKeyFromObject(pod)

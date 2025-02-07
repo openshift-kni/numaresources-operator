@@ -45,8 +45,6 @@ var _ = BeforeSuite(func() {
 })
 
 func expectExecutableExists(path string) {
-	GinkgoHelper()
-
 	cmdline := []string{
 		path,
 		"-h",

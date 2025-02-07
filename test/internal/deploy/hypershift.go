@@ -40,8 +40,6 @@ const (
 )
 
 func (h *HyperShiftNRO) Deploy(ctx context.Context, _ time.Duration) *nropv1.NUMAResourcesOperator {
-	GinkgoHelper()
-
 	hostedClusterName, err := hypershift.GetHostedClusterName()
 	Expect(err).To(Not(HaveOccurred()))
 	np, err := nodepools.GetByClusterName(ctx, e2eclient.MNGClient, hostedClusterName)
@@ -79,7 +77,6 @@ func (h *HyperShiftNRO) Deploy(ctx context.Context, _ time.Duration) *nropv1.NUM
 }
 
 func (h *HyperShiftNRO) Teardown(ctx context.Context, timeout time.Duration) {
-	GinkgoHelper()
 	if h.KcConfigMapObj != nil {
 		hostedClusterName, err := hypershift.GetHostedClusterName()
 		Expect(err).To(Not(HaveOccurred()))
