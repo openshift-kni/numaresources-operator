@@ -34,7 +34,7 @@ linters:
   enable:
 #    - errcheck
     - bodyclose
-#    - copyloopvar
+    - copyloopvar
     - depguard
     - ginkgolinter
     - gosimple
