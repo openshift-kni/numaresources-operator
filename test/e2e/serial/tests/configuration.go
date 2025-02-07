@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/openshift/cluster-node-tuning-operator/pkg/performanceprofile/controller/performanceprofile/resources"
 	"reflect"
 	"sort"
 	"strconv"
@@ -184,7 +183,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 			defer func() {
 				By(fmt.Sprintf("CLEANUP: deleting mcp: %q", mcp.Name))
-				err = fxt.Client.Delete(context.TODO(), mcp)
+				err := fxt.Client.Delete(context.TODO(), mcp)
 				Expect(err).ToNot(HaveOccurred())
 
 				err = wait.With(fxt.Client).
@@ -192,8 +191,8 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					Timeout(configuration.MachineConfigPoolUpdateTimeout).
 					ForMachineConfigPoolDeleted(context.TODO(), mcp)
 				Expect(err).ToNot(HaveOccurred())
-
 			}()
+
 			//so far 0 machine count for mcp-test -> no nodes -> no updates status
 			newMcpInfo := mcpInfo{
 				mcpObj:        mcp,
@@ -217,7 +216,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				initialMcpInfo.initialConfig = updatedMcp.Status.Configuration.Name
 				initialMcpInfo.sampleNode = targetedNode
 
-				err = unlabelFunc()
+				err := unlabelFunc()
 				Expect(err).ToNot(HaveOccurred())
 
 				//this will trigger node reboot as the NROP settings will be reapplied to the unlabelled node, so new node is added under the old mcp hence the MachineCount update type

@@ -857,7 +857,7 @@ func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo
 		// happening on those nodes
 		updatedConfig := updatedMcp.Status.Configuration.Name
 		if updateType == MachineConfig {
-			Expect(updatedConfig).ToNot(Equal(info.initialConfig))
+			Expect(updatedConfig).ToNot(Equal(info.initialConfig), "")
 		}
 
 		// MachineConfig update type will also update the node currentConfig so check that anyway
