@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/openshift/cluster-node-tuning-operator/pkg/performanceprofile/controller/performanceprofile/resources"
 	"reflect"
 	"sort"
 	"strconv"
@@ -131,7 +132,6 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 	Context("cluster has at least one suitable node", func() {
 		timeout := 5 * time.Minute
-
 		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator CR", Label("reboot_required", "slow", "images", "tier2"), func() {
 			fxt.IsRebootTest = true
 			nroOperObj := &nropv1.NUMAResourcesOperator{}
