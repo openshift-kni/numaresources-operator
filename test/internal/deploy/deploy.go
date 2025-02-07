@@ -148,9 +148,9 @@ func WaitForMCPsCondition(cli client.Client, ctx context.Context, condition mach
 	interval := configuration.MachineConfigPoolUpdateInterval // shortcut
 	timeout := configuration.MachineConfigPoolUpdateTimeout   // timeout
 	var eg errgroup.Group
-	for _, mcp := range mcps {
+	for idx := range mcps {
+		mcp := mcps[idx] // intentionally to avoid shadowing (see copyloopvar linter) which is needed to avoid vars overlap in goroutine
 		klog.Infof("wait for mcp %q to meet condition %q", mcp.Name, condition)
-		mcp := mcp
 		eg.Go(func() error {
 			defer GinkgoRecover()
 			ts := time.Now()
