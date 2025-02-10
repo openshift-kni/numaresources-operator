@@ -144,7 +144,7 @@ func TeardownNROScheduler(ctx context.Context, nroSched *nropv1.NUMAResourcesSch
 	Expect(wait.With(e2eclient.Client).Interval(NROSchedulerPollingInterval).Timeout(timeout).ForNUMAResourcesSchedulerDeleted(ctx, nroSched)).To(Succeed(), "NROScheduler %q failed to be deleted", nroSched.Name)
 }
 
-func WaitForMCPsCondition(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool, condition machineconfigv1.MachineConfigPoolConditionType) error {
+func WaitForMCPsCondition(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool, condition machineconfigv1.MachineConfigPoolConditionType, id string) error {
 	interval := configuration.MachineConfigPoolUpdateInterval // shortcut
 	timeout := configuration.MachineConfigPoolUpdateTimeout   // timeout
 	var eg errgroup.Group
@@ -159,5 +159,9 @@ func WaitForMCPsCondition(cli client.Client, ctx context.Context, mcps []*machin
 			return err
 		})
 	}
-	return eg.Wait()
+	err := eg.Wait()
+	if err != nil {
+		klog.InfoS("error while waiting for mcp conditions", "id", id, "err", err)
+	}
+	return err
 }

@@ -337,7 +337,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			if inthelper.IsCustomPolicyEnabled(nroObj) {
-				Expect(deploy.WaitForMCPsCondition(e2eclient.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
+				Expect(deploy.WaitForMCPsCondition(e2eclient.Client, context.TODO(), mcps, machineconfigv1.MachineConfigPoolUpdated, time.Now().String())).To(Succeed())
 			}
 
 			Eventually(func() bool {

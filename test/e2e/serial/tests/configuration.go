@@ -97,6 +97,10 @@ type mcpInfo struct {
 	sampleNode    corev1.Node
 }
 
+func (i mcpInfo) ToString() string {
+	return fmt.Sprintf("name %q; config %q; sample node %q\n", i.mcpObj.Name, i.initialConfig, i.sampleNode.Name)
+}
+
 var _ = Describe("[serial][disruptive] numaresources configuration management", Serial, Label("disruptive"), Label("feature:config"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
@@ -139,6 +143,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 			initialNroOperObj := nroOperObj.DeepCopy()
 
+			// TODO cluster with NROP selective workers will fail this test; use NROP workers which is the workers that have NRTs
 			workers, err := depnodes.GetWorkers(fxt.DEnv())
 			Expect(err).ToNot(HaveOccurred())
 			if len(workers) < 2 {
@@ -160,6 +165,13 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				e2efixture.Skip(fxt, "the test supports single node group")
 			}
 			initialMcp := initialMcps[0]
+
+			initialMcpInfo := mcpInfo{
+				mcpObj:        initialMcp,
+				initialConfig: initialMcp.Status.Configuration.Name,
+				sampleNode:    initialMcpSampleNode,
+			}
+			klog.Infof("initial mcp info: %s", initialMcpInfo.ToString())
 
 			mcp := objects.TestMCP()
 			By(fmt.Sprintf("creating new MCP: %q", mcp.Name))
@@ -194,16 +206,15 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}()
 
 			//so far 0 machine count for mcp-test -> no nodes -> no updates status
+			var updatedNewMcp machineconfigv1.MachineConfigPool
+			Expect(fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp), &updatedNewMcp)).To(Succeed())
+
 			newMcpInfo := mcpInfo{
-				mcpObj:        mcp,
-				initialConfig: mcp.Status.Configuration.Name,
+				mcpObj:        &updatedNewMcp,
+				initialConfig: updatedNewMcp.Status.Configuration.Name,
 				sampleNode:    targetedNode,
 			}
-			initialMcpInfo := mcpInfo{
-				mcpObj:        initialMcp,
-				initialConfig: initialMcp.Status.Configuration.Name,
-				sampleNode:    initialMcpSampleNode,
-			}
+			klog.Infof("new mcp info: %s", newMcpInfo.ToString())
 
 			By(fmt.Sprintf("Label node %q with %q", targetedNode.Name, getLabelRoleMCPTest()))
 			unlabelFunc, err := labelNode(fxt.Client, getLabelRoleMCPTest(), targetedNode.Name)
@@ -220,10 +231,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Expect(err).ToNot(HaveOccurred())
 
 				//this will trigger node reboot as the NROP settings will be reapplied to the unlabelled node, so new node is added under the old mcp hence the MachineCount update type
-				waitForMcpUpdate(fxt.Client, context.TODO(), []mcpInfo{initialMcpInfo}, MachineCount)
+				waitForMcpUpdate(fxt.Client, context.TODO(), []mcpInfo{initialMcpInfo}, MachineCount, time.Now().String())
 			}()
 
-			waitForMcpUpdate(fxt.Client, context.TODO(), []mcpInfo{newMcpInfo}, MachineConfig)
+			klog.Infof("wait for mcp %s to update its machine config")
+			// TODO make waitForMcpUpdate accept single mcp
+			waitForMcpUpdate(fxt.Client, context.TODO(), []mcpInfo{newMcpInfo}, MachineConfig, time.Now().String())
 
 			By(fmt.Sprintf("modifying the NUMAResourcesOperator nodeGroups field to match new mcp: %q labels %q", mcp.Name, mcp.Labels))
 			Eventually(func(g Gomega) {
@@ -259,12 +272,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				By("waiting for mcps to start updating")
 				// this will trigger mcp update only for the initial mcps because the mcp-test nodes are still labeled
 				// with the old labels, so worker mcp will switch back to the NROP mc
-				waitForMcpUpdate(fxt.Client, context.TODO(), []mcpInfo{initialMcpInfo}, MachineConfig)
+				waitForMcpUpdate(fxt.Client, context.TODO(), []mcpInfo{initialMcpInfo}, MachineConfig, time.Now().String())
 			}() //end of defer
 
 			By("waiting for the mcps to update")
 			// on old mcp because the ds will no longer include the worker node that is not labeled with mcp-test, so returning to MC without NROP settings
-			waitForMcpUpdate(fxt.Client, context.TODO(), []mcpInfo{initialMcpInfo}, MachineConfig)
+			waitForMcpUpdate(fxt.Client, context.TODO(), []mcpInfo{initialMcpInfo}, MachineConfig, time.Now().String())
 
 			By(fmt.Sprintf("Verify RTE daemonsets have the updated node selector matching to the new mcp %q", mcp.Name))
 			Eventually(func() (bool, error) {
@@ -563,12 +576,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						)).ToNot(HaveOccurred())
 					}
 					By("waiting for mcp to update")
-					waitForMcpUpdate(fxt.Client, context.TODO(), mcpsInfo, MachineConfig)
+					waitForMcpUpdate(fxt.Client, context.TODO(), mcpsInfo, MachineConfig, time.Now().String())
 				}
 			}()
 
 			By("waiting for mcp to update")
-			waitForMcpUpdate(fxt.Client, context.TODO(), mcpsInfo, MachineConfig)
+			waitForMcpUpdate(fxt.Client, context.TODO(), mcpsInfo, MachineConfig, time.Now().String())
 
 			By("checking that NUMAResourcesOperator's ConfigMap has changed")
 			cmList := &corev1.ConfigMapList{}
@@ -986,12 +999,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					}
 
 					By("waiting for mcp to update")
-					waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineConfig)
+					waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineConfig, time.Now().String())
 				}
 			}()
 
 			By("waiting for mcp to update")
-			waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineConfig)
+			waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineConfig, time.Now().String())
 
 			var schedulerName string
 			var nroSchedObj nropv1.NUMAResourcesScheduler
@@ -1020,7 +1033,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mcpsInfo).ToNot(BeEmpty())
 
-			// Here we are changing the Topology Manager Policy to to single-numa-node
+			// Here we are changing the Topology Manager Policy to single-numa-node
 			// after the scheduler has been deleted and therefore restarted so now we can create a
 			// TopologyAffinityError deployment to see if the deployment's pod will be pending or not.
 			// Changes are made through the kubeletconfig directly or through performance profile.
@@ -1068,7 +1081,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}
 
 			By("waiting for mcp to update")
-			waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineConfig)
+			waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineConfig, time.Now().String())
 
 			By("creating a Topology Affinity Error deployment and check if the pod status is pending")
 			deployment := createTAEDeployment(fxt, ctx, "testdp", serialconfig.Config.SchedulerName, cpuResources)

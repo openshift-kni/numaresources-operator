@@ -83,7 +83,7 @@ func (o *OpenShiftNRO) deployWithLabels(ctx context.Context, timeout time.Durati
 
 	if createKubelet || inthelper.IsCustomPolicyEnabled(nroObj) {
 		By("waiting for MCP to get updated")
-		Expect(WaitForMCPsCondition(e2eclient.Client, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
+		Expect(WaitForMCPsCondition(e2eclient.Client, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated, time.Now().String())).To(Succeed())
 	}
 	return nroObj
 }
