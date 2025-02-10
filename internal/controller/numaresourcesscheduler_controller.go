@@ -28,6 +28,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -58,6 +59,7 @@ import (
 type NUMAResourcesSchedulerReconciler struct {
 	client.Client
 	Scheme             *runtime.Scheme
+	Recorder           record.EventRecorder
 	SchedulerManifests schedmanifests.Manifests
 	Namespace          string
 	AutodetectReplicas int
@@ -138,8 +140,9 @@ func (r *NUMAResourcesSchedulerReconciler) SetupWithManager(mgr ctrl.Manager) er
 }
 
 func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (reconcile.Result, string, error) {
-	schedStatus, err := r.syncNUMASchedulerResources(ctx, instance)
+	schedStatus, updated, err := r.syncNUMASchedulerResources(ctx, instance)
 	if err != nil {
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "ProcessFailed", "Failed to create NUMA scheduler %s: %v", instance.Spec.SchedulerName, err)
 		return ctrl.Result{}, status.ConditionDegraded, fmt.Errorf("FailedSchedulerSync: %w", err)
 	}
 
@@ -148,12 +151,16 @@ func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context
 
 	ok, err := isDeploymentRunning(ctx, r.Client, schedStatus.Deployment)
 	if err != nil {
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "ProcessSkip", "Created NUMA scheduler %s but not running: %v", instance.Spec.SchedulerName, err)
 		return ctrl.Result{}, status.ConditionDegraded, err
 	}
 	if !ok {
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, status.ConditionProgressing, nil
 	}
 
+	if updated {
+		r.Recorder.Eventf(instance, corev1.EventTypeNormal, "ProcessOK", "NUMA Scheduler %s available", instance.Spec.SchedulerName)
+	}
 	return ctrl.Result{}, status.ConditionAvailable, nil
 }
 
@@ -180,7 +187,7 @@ func (r *NUMAResourcesSchedulerReconciler) computeSchedulerReplicas(schedSpec nr
 	return &v
 }
 
-func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (nropv1.NUMAResourcesSchedulerStatus, error) {
+func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (nropv1.NUMAResourcesSchedulerStatus, bool, error) {
 	klog.V(4).Info("SchedulerSync start")
 	defer klog.V(4).Info("SchedulerSync stop")
 
@@ -192,12 +199,12 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	if !ok {
 		err := fmt.Errorf("missing scheduler name in builtin config map")
 		klog.V(2).ErrorS(err, "cannot find the scheduler profile name")
-		return nropv1.NUMAResourcesSchedulerStatus{}, err
+		return nropv1.NUMAResourcesSchedulerStatus{}, false, err
 	}
 	klog.V(4).InfoS("detected scheduler profile", "profileName", schedName)
 
 	if err := schedupdate.SchedulerConfig(r.SchedulerManifests.ConfigMap, schedName, &params); err != nil {
-		return nropv1.NUMAResourcesSchedulerStatus{}, err
+		return nropv1.NUMAResourcesSchedulerStatus{}, false, err
 	}
 
 	schedStatus := nropv1.NUMAResourcesSchedulerStatus{
@@ -219,21 +226,23 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
 	schedupdate.DeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
 	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, "", schedSpec.LogLevel); err != nil {
-		return schedStatus, err
+		return schedStatus, false, err
 	}
 
 	schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec)
 
 	k8swgrbacupdate.RoleForLeaderElection(r.SchedulerManifests.Role, r.Namespace, nrosched.LeaderElectionResourceName)
 
+	var updatedCount int
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
-	for _, objState := range existing.State(r.SchedulerManifests) {
+	objStates := existing.State(r.SchedulerManifests)
+	for _, objState := range objStates {
 		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
-			return schedStatus, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+			return schedStatus, false, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
-		obj, _, err := apply.ApplyObject(ctx, r.Client, objState)
+		obj, updated, err := apply.ApplyObject(ctx, r.Client, objState)
 		if err != nil {
-			return schedStatus, fmt.Errorf("could not apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+			return schedStatus, false, fmt.Errorf("could not apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 
 		if nname, ok := schedstate.DeploymentNamespacedNameFromObject(obj); ok {
@@ -242,8 +251,12 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		if schedName, ok := schedstate.SchedulerNameFromObject(obj); ok {
 			schedStatus.SchedulerName = schedName
 		}
+		if !updated {
+			continue
+		}
+		updatedCount++
 	}
-	return schedStatus, nil
+	return schedStatus, (updatedCount == len(objStates)), nil
 }
 
 func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {

@@ -327,6 +327,7 @@ func main() {
 		if err = (&controller.NUMAResourcesSchedulerReconciler{
 			Client:             mgr.GetClient(),
 			Scheme:             mgr.GetScheme(),
+			Recorder:           mgr.GetEventRecorderFor("scheduler-controller"),
 			SchedulerManifests: schedMf,
 			Namespace:          namespace,
 			AutodetectReplicas: info.NodeCount,

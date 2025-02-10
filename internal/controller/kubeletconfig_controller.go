@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -106,21 +105,12 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// KubeletConfig changes are expected to be sporadic, yet are important enough
 	// to be made visible at kubernetes level. So we generate events to handle them
-	cm, err := r.reconcileConfigMap(ctx, instance, req.NamespacedName)
+	_, err = r.reconcileConfigMap(ctx, instance, req.NamespacedName)
 	if err != nil {
-		var klErr *InvalidKubeletConfig
-		if errors.As(err, &klErr) {
-			r.Recorder.Event(instance, "Normal", "ProcessSkip", "ignored kubelet config "+klErr.ObjectName)
-			return ctrl.Result{}, nil
-		}
-
 		klog.ErrorS(err, "failed to reconcile configmap", "controller", "kubeletconfig")
-
-		r.Recorder.Event(instance, "Warning", "ProcessFailed", "Failed to update RTE config from kubelet config "+req.NamespacedName.String())
 		return ctrl.Result{}, err
 	}
 
-	r.Recorder.Event(instance, "Normal", "ProcessOK", fmt.Sprintf("Updated RTE config %s/%s from kubelet config %s", cm.Namespace, cm.Name, req.NamespacedName.String()))
 	return ctrl.Result{}, nil
 }
 
@@ -179,30 +169,44 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 	// to save all the additional work related for create/update
 	cm, deleted, err := r.deleteConfigMap(ctx, instance, kcKey)
 	if deleted {
+		r.Recorder.Eventf(instance, corev1.EventTypeNormal, "ProcessOK", "Deleted stale ConfigMap %s", kcKey.String())
 		return cm, err
 	}
 
+	cm, updated, err := r.syncConfigMap(ctx, instance, kcKey)
+	if err != nil {
+		var klErr *InvalidKubeletConfig
+		if errors.As(err, &klErr) { // skip looks almost like a success
+			r.Recorder.Eventf(instance, corev1.EventTypeWarning, "ProcessSkip", "Ignoring invalid Kubelet Configuration: %v", err)
+			return cm, nil // must swallow error!
+		}
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "ProcessFailed", "Failed to create Resource-Topology-Exporter Configuration %s: %v", kcKey.String(), err)
+		return nil, err
+	}
+	if updated {
+		r.Recorder.Eventf(instance, corev1.EventTypeNormal, "ProcessOK", "Created Resource-Topology-Exporter Configuration: %s", kcKey.String())
+	}
+	return cm, nil
+}
+
+func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*corev1.ConfigMap, bool, error) {
 	kcHandler, err := r.makeKCHandlerForPlatform(ctx, instance, kcKey)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	kubeletConfig, err := kubeletconfig.MCOKubeletConfToKubeletConf(kcHandler.mcoKc)
 	if err != nil {
 		klog.ErrorS(err, "cannot extract KubeletConfiguration from MCO KubeletConfig", "name", kcKey.Name)
-		return nil, err
+		return nil, false, err
 	}
 
-	return r.syncConfigMap(ctx, kubeletConfig, instance, kcHandler)
-}
-
-func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, instance *nropv1.NUMAResourcesOperator, kcHandler *kubeletConfigHandler) (*corev1.ConfigMap, error) {
 	generatedName := objectnames.GetComponentName(instance.Name, kcHandler.poolName)
 	klog.V(3).InfoS("generated configMap name", "generatedName", generatedName)
 
 	data, err := rteconfig.Render(kubeletConfig, instance.Spec.PodExcludes)
 	if err != nil {
 		klog.ErrorS(err, "rendering config", "namespace", r.Namespace, "name", generatedName)
-		return nil, err
+		return nil, false, err
 	}
 
 	rendered := rteconfig.CreateConfigMap(r.Namespace, generatedName, data)
@@ -210,15 +214,22 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, kubeletConf
 		Config: rteconfig.AddSoftRefLabels(rendered, instance.Name, kcHandler.poolName),
 	}
 	existing := cfgstate.FromClient(ctx, r.Client, r.Namespace, generatedName)
+	objStates := existing.State(cfgManifests)
+	var updatedCount int
 	for _, objState := range existing.State(cfgManifests) {
 		if err := kcHandler.setCtrlRef(kcHandler.ownerObject, objState.Desired, r.Scheme); err != nil {
-			return nil, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+			return nil, false, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
-		if _, _, err := apply.ApplyObject(ctx, r.Client, objState); err != nil {
-			return nil, fmt.Errorf("could not create %s: %w", objState.Desired.GetObjectKind().GroupVersionKind().String(), err)
+		_, updated, err := apply.ApplyObject(ctx, r.Client, objState)
+		if err != nil {
+			return nil, updated, fmt.Errorf("could not create %s: %w", objState.Desired.GetObjectKind().GroupVersionKind().String(), err)
 		}
+		if !updated {
+			continue
+		}
+		updatedCount++
 	}
-	return rendered, nil
+	return rendered, (updatedCount == len(objStates)), nil
 }
 
 func (r *KubeletConfigReconciler) makeKCHandlerForPlatform(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*kubeletConfigHandler, error) {
