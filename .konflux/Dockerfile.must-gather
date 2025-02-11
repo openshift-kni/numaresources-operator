@@ -22,11 +22,11 @@ ENTRYPOINT ["/usr/bin/gather"]
 
 LABEL com.redhat.component="numaresources-must-gather-container" \
     name="openshift4/numaresources-must-gather-rhel9" \
-    upstream-vcs-type="git" \
     summary="numa resources data gathering image" \
     io.openshift.expose-services="" \
     io.openshift.tags="data,images" \
     io.k8s.display-name="numaresources-must-gather" \
+    io.k8s.description="numa resources data gathering image." \ 
     description="numa resources data gathering image." \
     maintainer="openshift-operators@redhat.com" \
     io.openshift.maintainer.component="NUMA Resources Operator" \
