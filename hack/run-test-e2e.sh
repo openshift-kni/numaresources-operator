@@ -5,6 +5,7 @@ set -e
 source hack/common.sh
 
 ENABLE_SCHED_TESTS="${ENABLE_SCHED_TESTS:-true}"
+ENABLE_CLEANUP="${ENABLE_CLEANUP:-false}"
 
 NO_COLOR=""
 if ! which tput &> /dev/null 2>&1 || [[ $(tput -T$TERM colors) -lt 8 ]]; then
@@ -51,12 +52,16 @@ if [ "$ENABLE_SCHED_TESTS" = true ]; then
   # -requireSuite: fail if tests are not executed because of missing suite
   ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.fail-fast --ginkgo.flake-attempts=2 --ginkgo.junit-report=${REPORT_DIR}/e2e-sched.xml
 
-  echo "Running NROScheduler uninstall test suite";
-  ${BIN_DIR}/e2e-nrop-sched-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.junit-report=${REPORT_DIR}/sched-uninstall.xml
+  if [ "$ENABLE_CLEANUP" = true ]; then
+    echo "Running NROScheduler uninstall test suite";
+    ${BIN_DIR}/e2e-nrop-sched-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.junit-report=${REPORT_DIR}/sched-uninstall.xml
+  fi
 fi
 
-echo "Undeploying sample devices for RTE tests"
-rte/hack/undeploy-devices.sh
+if [ "$ENABLE_CLEANUP" = true ]; then
+  echo "Undeploying sample devices for RTE tests"
+  rte/hack/undeploy-devices.sh
 
-echo "Running NRO uninstall test suite";
-${BIN_DIR}/e2e-nrop-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.junit-report=${REPORT_DIR}/uninstall.xml
+  echo "Running NRO uninstall test suite";
+  ${BIN_DIR}/e2e-nrop-uninstall.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.junit-report=${REPORT_DIR}/uninstall.xml
+fi

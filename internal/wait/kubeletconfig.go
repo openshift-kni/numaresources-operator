@@ -32,3 +32,14 @@ func (wt Waiter) ForMCOKubeletConfigDeleted(ctx context.Context, kcName string) 
 		return deletionStatusFromError("MCOKubeletConfig", key, err)
 	})
 }
+
+func (wt Waiter) ForKubeletConfigDeleted(ctx context.Context, kc *machineconfigv1.KubeletConfig) error {
+	immediate := false
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
+		updatedKc := machineconfigv1.KubeletConfig{}
+		key := ObjectKeyFromObject(kc)
+		err := wt.Cli.Get(aContext, key.AsKey(), &updatedKc)
+		return deletionStatusFromError("KubeletConfig", key, err)
+	})
+	return err
+}

@@ -34,32 +34,21 @@ const (
 
 func (wt Waiter) ForMachineConfigPoolDeleted(ctx context.Context, mcp *machineconfigv1.MachineConfigPool) error {
 	immediate := false
-	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(ctx context.Context) (bool, error) {
 		updatedMcp := machineconfigv1.MachineConfigPool{}
 		key := ObjectKeyFromObject(mcp)
-		err := wt.Cli.Get(aContext, key.AsKey(), &updatedMcp)
+		err := wt.Cli.Get(ctx, key.AsKey(), &updatedMcp)
 		return deletionStatusFromError("MachineConfigPool", key, err)
-	})
-	return err
-}
-
-func (wt Waiter) ForKubeletConfigDeleted(ctx context.Context, kc *machineconfigv1.KubeletConfig) error {
-	immediate := false
-	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
-		updatedKc := machineconfigv1.KubeletConfig{}
-		key := ObjectKeyFromObject(kc)
-		err := wt.Cli.Get(aContext, key.AsKey(), &updatedKc)
-		return deletionStatusFromError("KubeletConfig", key, err)
 	})
 	return err
 }
 
 func (wt Waiter) ForMachineConfigPoolCondition(ctx context.Context, mcp *machineconfigv1.MachineConfigPool, condType machineconfigv1.MachineConfigPoolConditionType) error {
 	immediate := false
-	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(ctx context.Context) (bool, error) {
 		updatedMcp := machineconfigv1.MachineConfigPool{}
 		key := ObjectKeyFromObject(mcp)
-		err := wt.Cli.Get(aContext, key.AsKey(), &updatedMcp)
+		err := wt.Cli.Get(ctx, key.AsKey(), &updatedMcp)
 		if err != nil {
 			return false, err
 		}
