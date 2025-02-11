@@ -211,7 +211,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 			newMcpInfo := mcpInfo{
 				mcpObj:        &updatedNewMcp,
-				initialConfig: updatedNewMcp.Status.Configuration.Name,
+				initialConfig: updatedNewMcp.Status.Configuration.Name, // empty config because no nodes yet associated to this mcp
 				sampleNode:    targetedNode,
 			}
 			klog.Infof("new mcp info: %s", newMcpInfo.ToString())
@@ -234,11 +234,11 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				waitForMcpUpdate(fxt.Client, context.TODO(), []mcpInfo{initialMcpInfo}, MachineCount, time.Now().String())
 			}()
 
-			klog.Infof("wait for mcp %s to update its machine config")
+			klog.Infof("wait for mcp %s to update its machine config", newMcpInfo.mcpObj.Name)
 			// TODO make waitForMcpUpdate accept single mcp
 			waitForMcpUpdate(fxt.Client, context.TODO(), []mcpInfo{newMcpInfo}, MachineConfig, time.Now().String())
 
-			By(fmt.Sprintf("modifying the NUMAResourcesOperator nodeGroups field to match new mcp: %q labels %q", mcp.Name, mcp.Labels))
+			By(fmt.Sprintf("modifying the NUMAResourcesOperator nodeGroups field to match new mcp %q labels %q", mcp.Name, mcp.Labels))
 			Eventually(func(g Gomega) {
 				// we need that for the current ResourceVersion
 				err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
@@ -269,12 +269,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					g.Expect(err).ToNot(HaveOccurred())
 				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-				By("waiting for mcps to start updating")
+				//TODO check if new SElinux policy is consumed
+				By("waiting for mcps to update")
 				// this will trigger mcp update only for the initial mcps because the mcp-test nodes are still labeled
 				// with the old labels, so worker mcp will switch back to the NROP mc
-				waitForMcpUpdate(fxt.Client, context.TODO(), []mcpInfo{initialMcpInfo}, MachineConfig, time.Now().String())
+				waitForMcpUpdate(fxt.Client, context.TODO(), []mcpInfo{initialMcpInfo}, MachineConfig, time.Now().String()) ///<----------
 			}() //end of defer
 
+			//TODO check if new SElinux policy is consumed
 			By("waiting for the mcps to update")
 			// on old mcp because the ds will no longer include the worker node that is not labeled with mcp-test, so returning to MC without NROP settings
 			waitForMcpUpdate(fxt.Client, context.TODO(), []mcpInfo{initialMcpInfo}, MachineConfig, time.Now().String())

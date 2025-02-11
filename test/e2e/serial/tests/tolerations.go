@@ -847,6 +847,10 @@ func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo
 	for _, info := range mcpsInfo {
 		mcps = append(mcps, info.mcpObj)
 	}
+	if updateType == MachineConfig {
+		Expect(deploy.WaitForMCPsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdating, identifier)).To(Succeed())
+	}
+
 	Expect(deploy.WaitForMCPsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated, identifier)).To(Succeed())
 
 	for _, info := range mcpsInfo {
@@ -858,8 +862,12 @@ func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo
 		// thus associated to different MC, it could be because new nodes are joining the pool so the MC update is
 		// happening on those nodes
 		updatedConfig := updatedMcp.Status.Configuration.Name
-		if updateType == MachineConfig {
-			Expect(updatedConfig).ToNot(Equal(info.initialConfig), "")
+		initialConfig := info.initialConfig
+		expectedUpdate := (updateType == MachineConfig)
+		klog.InfoS("config values", "old", initialConfig, "new", updatedConfig, "expectedConfigUpdate", expectedUpdate)
+
+		if expectedUpdate {
+			Expect(updatedConfig).ToNot(Equal(initialConfig), "identifier %s; config was not updated", identifier)
 		}
 
 		// MachineConfig update type will also update the node currentConfig so check that anyway
