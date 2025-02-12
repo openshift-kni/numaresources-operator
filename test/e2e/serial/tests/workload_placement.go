@@ -56,7 +56,6 @@ import (
 
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
@@ -423,8 +422,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By(fmt.Sprintf("checking the pod landed on a node which is different than target node %q vs %q", targetNodeName, updatedPod.Spec.NodeName))
 			if updatedPod.Spec.NodeName == targetNodeName {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
-				//print the logs of the scheduler pod
-				logSchedulerPluginLogs(*fxt)
 			}
 			Expect(updatedPod.Spec.NodeName).ToNot(Equal(targetNodeName), "pod should not land on node %q", targetNodeName)
 
@@ -1193,36 +1190,6 @@ func matchLogLevelToKlog(cnt *corev1.Container, level operatorv1.LogLevel) (bool
 
 	val, found := rteFlags.GetFlag("-v")
 	return found, val.Data == kLvl.String()
-}
-
-func logSchedulerPluginLogs(fxt e2efixture.Fixture) {
-	nroSchedObj := objects.TestNROScheduler()
-	err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
-	if err != nil {
-		klog.Warningf("error getting the scheduler plugin CR: %v", err)
-		return
-	}
-	schedDp, err := podlist.With(fxt.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.GetUID())
-	if err != nil {
-		klog.Warningf("error getting the scheduler deployment: %v", err)
-		return
-	}
-	schedPods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *schedDp)
-	if err != nil {
-		klog.Warningf("error getting the scheduler pod: %v", err)
-		return
-	}
-	if len(schedPods) != 1 {
-		klog.Warningf("found %d scheduler pods while expected is 1", len(schedPods))
-		return
-	}
-	schedPod := schedPods[0]
-	logs, err := objects.GetLogsForPod(fxt.K8sClient, schedPod.Namespace, schedPod.Name, schedPod.Spec.Containers[0].Name)
-	if err != nil {
-		klog.Warningf("error getting logs of the scheduler pod %s/%s: %v", schedPod.Namespace, schedPod.Name, err)
-		return
-	}
-	klog.Infof("show logs of the scheduler plugin pod %s/%s:\n%s\n-----\n", schedPod.Namespace, schedPod.Name, logs)
 }
 
 func checkReplica(pod corev1.Pod, targetNodeName string, K8sClient *kubernetes.Clientset) {
