@@ -65,7 +65,7 @@ var _ = Describe("[tools][validation] nrovalidate tools", func() {
 
 			expectExecutableExists(cmdline[0])
 
-			fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
+			_, _ = fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
 
 			cmd := exec.Command(cmdline[0], cmdline[1:]...)
 			cmd.Stderr = GinkgoWriter
@@ -79,7 +79,7 @@ var _ = Describe("[tools][validation] nrovalidate tools", func() {
 			Expect(rep.Succeeded).To(BeFalse())
 			Expect(rep.Errors).ToNot(BeEmpty())
 			for _, ve := range rep.Errors {
-				fmt.Fprintf(GinkgoWriter, "reported expected validation error: %v\n", ve)
+				_, _ = fmt.Fprintf(GinkgoWriter, "reported expected validation error: %v\n", ve)
 			}
 		})
 	})
@@ -91,7 +91,7 @@ var _ = Describe("[tools][validation] nrovalidate tools", func() {
 			}
 			expectExecutableExists(cmdline[0])
 
-			fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
+			_, _ = fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
 
 			cmd := exec.Command(cmdline[0], cmdline[1:]...)
 			cmd.Stderr = GinkgoWriter
@@ -105,7 +105,7 @@ var _ = Describe("[tools][validation] nrovalidate tools", func() {
 			}
 			expectExecutableExists(cmdline[0])
 
-			fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
+			_, _ = fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
 
 			cmd := exec.Command(cmdline[0], cmdline[1:]...)
 			cmd.Stderr = GinkgoWriter
@@ -122,7 +122,7 @@ var _ = Describe("[tools][validation] nrovalidate tools", func() {
 
 			expectExecutableExists(cmdline[0])
 
-			fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
+			_, _ = fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
 
 			cmd := exec.Command(cmdline[0], cmdline[1:]...)
 			cmd.Stderr = GinkgoWriter
@@ -136,7 +136,7 @@ var _ = Describe("[tools][validation] nrovalidate tools", func() {
 			Expect(rep.Succeeded).To(BeFalse())
 			Expect(rep.Errors).ToNot(BeEmpty())
 			for _, ve := range rep.Errors {
-				fmt.Fprintf(GinkgoWriter, "reported expected validation error: %v\n", ve)
+				_, _ = fmt.Fprintf(GinkgoWriter, "reported expected validation error: %v\n", ve)
 			}
 		})
 	})
