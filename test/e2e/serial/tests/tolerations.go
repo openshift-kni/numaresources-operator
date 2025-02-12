@@ -847,9 +847,8 @@ func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo
 	for _, info := range mcpsInfo {
 		mcps = append(mcps, info.mcpObj)
 	}
-	if updateType == MachineConfig {
-		Expect(deploy.WaitForMCPsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdating, identifier)).To(Succeed())
-	}
+	//TODO need to integrate a better way to check for updating state before checking condition is updated, taking into
+	// account waiting for updating state can fail if the updating process is fast enough to make the check fail :/
 
 	Expect(deploy.WaitForMCPsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated, identifier)).To(Succeed())
 
