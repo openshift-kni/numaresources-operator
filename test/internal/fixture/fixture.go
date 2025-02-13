@@ -42,6 +42,7 @@ import (
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/objects"
 	intwait "github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -270,7 +271,7 @@ func teardownNamespace(cli client.Client, ns corev1.Namespace) error {
 }
 
 func RandomizeName(baseName string) string {
-	return fmt.Sprintf("%s-%s", baseName, strconv.Itoa(rand.Intn(10000)))
+	return objectnames.GetComponentName(baseName, strconv.Itoa(rand.Intn(10000)))
 }
 
 func getTimeDurationFromEnvVar(envVarName, description string, fallbackValue time.Duration) time.Duration {
