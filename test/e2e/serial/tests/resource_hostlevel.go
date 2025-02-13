@@ -298,7 +298,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 					}
 
 					klog.Infof("pad node %s with:\n%s", nodeName, intreslist.ToString(paddingResources))
-					pod := newPaddingPod(nodeName, "*", fxt.Namespace.Name, paddingResources)
+					pod := newPaddingPod(nodeName, "all", fxt.Namespace.Name, paddingResources)
 					pod.Spec.NodeName = nodeName // TODO: pinPodToNode?
 
 					err = fxt.Client.Create(ctx, pod)

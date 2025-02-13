@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	kvalidation "k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -133,7 +134,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				Eventually(func(g Gomega) {
 					err := fxt.Client.Get(ctx, nroKey, &updatedNropObj)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(isDegradedRTESync(updatedNropObj.Status.Conditions)).To(BeTrue(), "Condition not degraded because RTE sync")
+					g.Expect(isDegradedInternalError(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String())).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 			})
 
@@ -162,7 +163,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				Eventually(func(g Gomega) {
 					err := fxt.Client.Get(ctx, nroKey, &updatedNropObj)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(isDegradedRTESync(updatedNropObj.Status.Conditions)).To(BeTrue(), "Condition not degraded because RTE sync")
+					g.Expect(isDegradedInternalError(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String())).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 			})
 		})
@@ -785,7 +786,7 @@ func isRTEPodFoundOnNode(cli client.Client, ctx context.Context, nodeName string
 	return matchingPod, found
 }
 
-func isDegradedRTESync(conds []metav1.Condition) bool {
+func isDegradedInternalError(conds []metav1.Condition, msgContains string) bool {
 	cond := status.FindCondition(conds, status.ConditionDegraded)
 	if cond == nil {
 		return false
@@ -793,7 +794,15 @@ func isDegradedRTESync(conds []metav1.Condition) bool {
 	if cond.Status != metav1.ConditionTrue {
 		return false
 	}
-	return strings.Contains(cond.Message, "FailedRTESync") // TODO: magic constant
+	if !strings.Contains(cond.Message, msgContains) {
+		klog.InfoS("Degraded message is not as expected", "condition", cond.String(), "expected message to contain", msgContains)
+		return false
+	}
+	if cond.Reason != status.ReasonInternalError {
+		klog.InfoS("Degraded reason is not as expected", "condition", cond.String(), "expected", status.ReasonInternalError)
+		return false
+	}
+	return true
 }
 
 func expectEqualTolerations(tolsA, tolsB []corev1.Toleration) {
@@ -832,8 +841,6 @@ func sriovToleration() corev1.Toleration {
 }
 
 func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo, updateType MCPUpdateType) {
-	GinkgoHelper()
-
 	mcps := make([]*machineconfigv1.MachineConfigPool, 0, len(mcpsInfo))
 	for _, info := range mcpsInfo {
 		mcps = append(mcps, info.mcpObj)

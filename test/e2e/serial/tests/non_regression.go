@@ -116,7 +116,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			numOfNodeToBePadded := len(nrts) - 1
 
 			rl := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceCPU:    resource.MustParse("2"),
 				corev1.ResourceMemory: resource.MustParse("4G"),
 			}
 			By("padding the nodes before test start")
@@ -152,7 +152,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pSpec := &testPod.Spec
 
-			By(fmt.Sprintf("explicitly mentioning which we want pod to land on node %q", targetNodeName))
+			By(fmt.Sprintf("explicitly mentioning which node we want the pod to land on: %q", targetNodeName))
 			pSpec.NodeName = targetNodeName
 
 			By("setting a fake schedule name under the pod to make sure pod not scheduled by any scheduler")
@@ -161,7 +161,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			cnt := &testPod.Spec.Containers[0]
 			requiredRes := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceCPU:    resource.MustParse("2"),
 				corev1.ResourceMemory: resource.MustParse("100Mi"),
 			}
 			cnt.Resources.Requests = requiredRes
