@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -42,6 +41,7 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/eventrecorder"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
@@ -64,7 +64,7 @@ const (
 type KubeletConfigReconciler struct {
 	client.Client
 	Scheme    *runtime.Scheme
-	Recorder  record.EventRecorder
+	Recorder  eventrecorder.OptimizedRecorder
 	Namespace string
 	Platform  platform.Platform
 	// garbageCollectionFor is a list of objects
@@ -179,6 +179,8 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 	// to save all the additional work related for create/update
 	cm, deleted, err := r.deleteConfigMap(ctx, instance, kcKey)
 	if deleted {
+		klog.InfoS("configmap deleted for KubeletConfig", "KubeletConfig", kcKey.String())
+		r.Recorder.LoadEvent()
 		return cm, err
 	}
 
@@ -202,6 +204,7 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, kubeletConf
 	data, err := rteconfig.Render(kubeletConfig, instance.Spec.PodExcludes)
 	if err != nil {
 		klog.ErrorS(err, "rendering config", "namespace", r.Namespace, "name", generatedName)
+		r.Recorder.LoadEvent()
 		return nil, err
 	}
 
@@ -212,10 +215,15 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, kubeletConf
 	existing := cfgstate.FromClient(ctx, r.Client, r.Namespace, generatedName)
 	for _, objState := range existing.State(cfgManifests) {
 		if err := kcHandler.setCtrlRef(kcHandler.ownerObject, objState.Desired, r.Scheme); err != nil {
+			r.Recorder.LoadEvent()
 			return nil, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
-		if _, _, err := apply.ApplyObject(ctx, r.Client, objState); err != nil {
+		_, updated, err := apply.ApplyObject(ctx, r.Client, objState)
+		if err != nil {
 			return nil, fmt.Errorf("could not create %s: %w", objState.Desired.GetObjectKind().GroupVersionKind().String(), err)
+		}
+		if updated {
+			r.Recorder.LoadEvent()
 		}
 	}
 	return rendered, nil

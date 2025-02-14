@@ -57,6 +57,7 @@ import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/features"
 	"github.com/openshift-kni/numaresources-operator/internal/controller"
+	"github.com/openshift-kni/numaresources-operator/internal/eventrecorder"
 	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
@@ -303,7 +304,7 @@ func main() {
 	if err = (&controller.KubeletConfigReconciler{
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
-		Recorder:  mgr.GetEventRecorderFor("kubeletconfig-controller"),
+		Recorder:  &eventrecorder.OptimizedRecorder{EventRecorder: mgr.GetEventRecorderFor("kubeletconfig-controller")},
 		Namespace: namespace,
 		Platform:  clusterPlatform,
 	}).SetupWithManager(mgr); err != nil {
