@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/klog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,7 +56,7 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 			By("Looking for oc tool")
 			ocExec, err := exec.LookPath("oc")
 			if err != nil {
-				fmt.Fprintf(GinkgoWriter, "Unable to find oc executable: %v\n", err)
+				_, _ = fmt.Fprintf(GinkgoWriter, "Unable to find oc executable: %v\n", err)
 				Skip(fmt.Sprintf("unable to find 'oc' executable %v\n", err))
 			}
 
@@ -82,7 +83,10 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 			if _, ok := os.LookupEnv("E2E_NROP_MUSTGATHER_CLEANUP_SKIP"); ok {
 				return
 			}
-			os.RemoveAll(destDir)
+			err := os.RemoveAll(destDir)
+			if err != nil {
+				klog.Warningf("unable to remove temporary directory %q: %v", destDir, err)
+			}
 		})
 
 		It("check NRO data files have been collected", func(ctx context.Context) {
