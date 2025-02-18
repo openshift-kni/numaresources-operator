@@ -24,7 +24,6 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-
 // SetDefaults_Deployment sets additional defaults compared to its counterpart
 // in extensions. These addons are:
 // - MaxUnavailable during rolling update set to 25% (1 in extensions)

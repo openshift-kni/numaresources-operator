@@ -20,7 +20,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 )
 
-
 func SetDefaults_ClusterRoleBinding(obj *rbacv1.ClusterRoleBinding) {
 	if len(obj.RoleRef.APIGroup) == 0 {
 		obj.RoleRef.APIGroup = rbacv1.GroupName
