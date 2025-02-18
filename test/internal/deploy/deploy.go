@@ -155,9 +155,9 @@ func WaitForMCPsCondition(cli client.Client, ctx context.Context, mcps []*machin
 			defer GinkgoRecover()
 			ts := time.Now()
 			err := wait.With(cli).Interval(interval).Timeout(timeout).ForMachineConfigPoolCondition(ctx, mcp, condition)
-			klog.Infof("MCP %q condition=%s err=%v after %v", mcp.Name, condition, err, time.Since(ts))
+			klog.InfoS("wait.ForMachineConfigPoolCondition result", "MCP", mcp.Name, "condition", condition, "err", err, "after", time.Since(ts))
 			return err
 		})
 	}
-	return eg.Wait()
+	return eg.Wait() // will block the flow until goroutines are finished or return on first error
 }

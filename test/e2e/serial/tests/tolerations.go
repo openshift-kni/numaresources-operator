@@ -841,11 +841,18 @@ func sriovToleration() corev1.Toleration {
 }
 
 func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo, updateType MCPUpdateType) {
+	waitForMcpUpdateWithID(cli, ctx, mcpsInfo, updateType, time.Now().String())
+}
+
+func waitForMcpUpdateWithID(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo, updateType MCPUpdateType, id string) {
+	klog.InfoS("waitForMcpUpdate START", "ID", id)
+	defer klog.InfoS("waitForMcpUpdate END", "ID", id)
+
 	mcps := make([]*machineconfigv1.MachineConfigPool, 0, len(mcpsInfo))
 	for _, info := range mcpsInfo {
 		mcps = append(mcps, info.mcpObj)
 	}
-	Expect(deploy.WaitForMCPsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
+	Expect(deploy.WaitForMCPsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed(), "failed to have the condistion updated; ID %q", id)
 
 	for _, info := range mcpsInfo {
 		// check the sample node is updated with new config in its annotations, both for desired and current, is a must
@@ -856,16 +863,20 @@ func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo
 		// thus associated to different MC, it could be because new nodes are joining the pool so the MC update is
 		// happening on those nodes
 		updatedConfig := updatedMcp.Status.Configuration.Name
-		if updateType == MachineConfig {
-			Expect(updatedConfig).ToNot(Equal(info.initialConfig))
-		}
+		initialConfig := info.initialConfig
+		expectedUpdate := (updateType == MachineConfig)
+		klog.InfoS("config values", "old", initialConfig, "new", updatedConfig, "expectedConfigUpdate", expectedUpdate)
 
+		if expectedUpdate {
+			Expect(updatedConfig).ToNot(Equal(initialConfig), "waitForMcpUpdate ID %s: config was not updated", id)
+		}
 		// MachineConfig update type will also update the node currentConfig so check that anyway
 		klog.Info("verify mcp config is updated by ensuring the sample node has updated MC")
 		ok, err := verifyUpdatedMCOnNodes(cli, ctx, info.sampleNode, updatedConfig)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(ok).To(BeTrue())
 	}
+
 }
 
 func verifyUpdatedMCOnNodes(cli client.Client, ctx context.Context, node corev1.Node, desired string) (bool, error) {
