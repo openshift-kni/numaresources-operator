@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/openshift/cluster-node-tuning-operator/pkg/performanceprofile/controller/performanceprofile/resources"
 	"reflect"
 	"sort"
 	"strconv"
@@ -98,6 +97,10 @@ type mcpInfo struct {
 	sampleNode    corev1.Node
 }
 
+func (i mcpInfo) ToString() string {
+	return fmt.Sprintf("name %q; config %q; sample node %q\n", i.mcpObj.Name, i.initialConfig, i.sampleNode.Name)
+}
+
 var _ = Describe("[serial][disruptive] numaresources configuration management", Serial, Label("disruptive"), Label("feature:config"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
@@ -132,6 +135,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 	Context("cluster has at least one suitable node", func() {
 		timeout := 5 * time.Minute
+
 		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator CR", Label("reboot_required", "slow", "images", "tier2"), func() {
 			fxt.IsRebootTest = true
 			nroOperObj := &nropv1.NUMAResourcesOperator{}
@@ -160,7 +164,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			if len(initialMcps) > 1 {
 				e2efixture.Skip(fxt, "the test supports single node group")
 			}
+
 			initialMcp := initialMcps[0]
+			initialMcpInfo := mcpInfo{
+				mcpObj:        initialMcp,
+				initialConfig: initialMcp.Status.Configuration.Name,
+				sampleNode:    initialMcpSampleNode,
+			}
+			klog.Infof("initial mcp info: %s", initialMcpInfo.ToString())
 
 			mcp := objects.TestMCP()
 			By(fmt.Sprintf("creating new MCP: %q", mcp.Name))
@@ -200,11 +211,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				initialConfig: mcp.Status.Configuration.Name,
 				sampleNode:    targetedNode,
 			}
-			initialMcpInfo := mcpInfo{
-				mcpObj:        initialMcp,
-				initialConfig: initialMcp.Status.Configuration.Name,
-				sampleNode:    initialMcpSampleNode,
-			}
+			klog.Infof("new mcp info: %s", newMcpInfo.ToString())
 
 			By(fmt.Sprintf("Label node %q with %q", targetedNode.Name, getLabelRoleMCPTest()))
 			unlabelFunc, err := labelNode(fxt.Client, getLabelRoleMCPTest(), targetedNode.Name)
