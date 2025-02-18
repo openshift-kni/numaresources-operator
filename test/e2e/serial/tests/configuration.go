@@ -144,18 +144,18 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 			initialNroOperObj := nroOperObj.DeepCopy()
 
-			workers, err := depnodes.GetWorkers(fxt.DEnv())
-			Expect(err).ToNot(HaveOccurred())
-			if len(workers) < 2 {
-				e2efixture.Skipf(fxt, "the test requires at least 2 worker nodes, found %d", len(workers))
-			}
-
-			targetIdx, ok := e2efixture.PickNodeIndex(workers)
-			Expect(ok).To(BeTrue())
-			targetedNode := workers[targetIdx]
+			nodesNameSet := e2enrt.AccumulateNames(nrts)
+			// nrts > 1 is checked in the setup
+			targetedNodeName, _ := nodesNameSet.PopAny()
+			targetedNode := &corev1.Node{}
+			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: targetedNodeName}, targetedNode)
+			Expect(err).ToNot(HaveOccurred(), "failed to pull node %s object", targetedNodeName)
 
 			// we need to save a node that will still be associated to the initial mcps so later we conduct the MachineConfig check on it
-			initialMcpSampleNode := workers[len(workers)-targetIdx-1]
+			initialMCPNodeName, _ := nodesNameSet.PopAny()
+			initialMCPNode := &corev1.Node{}
+			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: initialMCPNodeName}, initialMCPNode)
+			Expect(err).ToNot(HaveOccurred(), "failed to pull node %s object", initialMCPNodeName)
 
 			// save the initial nrop mcp to use it later while waiting for mcp to get updated
 			initialMcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroOperObj.Spec.NodeGroups)
@@ -169,7 +169,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			initialMcpInfo := mcpInfo{
 				mcpObj:        initialMcp,
 				initialConfig: initialMcp.Status.Configuration.Name,
-				sampleNode:    initialMcpSampleNode,
+				sampleNode:    *initialMCPNode,
 			}
 			klog.Infof("initial mcp info: %s", initialMcpInfo.ToString())
 
@@ -213,7 +213,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			newMcpInfo := mcpInfo{
 				mcpObj:        updatedNewMcp,
 				initialConfig: updatedNewMcp.Status.Configuration.Name,
-				sampleNode:    targetedNode,
+				sampleNode:    *targetedNode,
 			}
 			klog.Infof("new mcp info: %s", newMcpInfo.ToString())
 
@@ -226,7 +226,6 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				var updatedMcp machineconfigv1.MachineConfigPool
 				Expect(fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialMcpInfo.mcpObj), &updatedMcp)).To(Succeed())
 				initialMcpInfo.initialConfig = updatedMcp.Status.Configuration.Name
-				initialMcpInfo.sampleNode = targetedNode
 
 				err = unlabelFunc()
 				Expect(err).ToNot(HaveOccurred())
