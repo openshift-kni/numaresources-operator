@@ -114,6 +114,7 @@ func (obj machineConfigPoolFinder) FindState(mf Manifests, tree nodegroupv1.Tree
 			Desired:     desiredDaemonSet,
 			Compare:     compare.Object,
 			Merge:       merge.ObjectForUpdate,
+			Default:     defaulter.DaemonSet,
 		})
 	}
 	return ret
