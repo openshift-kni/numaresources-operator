@@ -62,7 +62,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
-	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
@@ -1137,35 +1136,11 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 				By(fmt.Sprintf("modifying the NUMAResourcesOperator by appending a node group with several pool specifiers: %+v", ng))
 				var updatedNRO nropv1.NUMAResourcesOperator
-				Eventually(func(g Gomega) {
-					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-					updatedNRO.Spec.NodeGroups = append(updatedNRO.Spec.NodeGroups, ng)
-					g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
-				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
-
-				defer func() {
-					By(fmt.Sprintf("revert initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name))
-					var updatedNRO nropv1.NUMAResourcesOperator
-					Eventually(func(g Gomega) {
-						g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-						updatedNRO.Spec.NodeGroups = initialOperObj.Spec.NodeGroups
-						g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
-					}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
-
-					By("verify the operator is in Available condition")
-					Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-					cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
-					Expect(cond).ToNot(BeNil(), "condition Available was not found: %+v", updatedNRO.Status.Conditions)
-					Expect(cond.Status).To(Equal(metav1.ConditionTrue), "expected operators condition to be Available but was found something else: %+v", updatedNRO.Status.Conditions)
-				}()
-
-				By("verify degraded condition is found due to node group with multiple selectors")
 				Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-				cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionDegraded)
-				Expect(cond).NotTo(BeNil(), "condition Degraded was not found: %+v", updatedNRO.Status.Conditions)
-				Expect(cond.Reason).To(Equal(validation.NodeGroupsError), "reason of the conditions is different from expected: expected %q found %q", validation.NodeGroupsError, cond.Reason)
-				expectedCondMsg := "must have only a single specifier set"
-				Expect(strings.Contains(cond.Message, expectedCondMsg)).To(BeTrue(), "different degrade message was found: expected to contains %q but found %q", "must have only a single specifier set", expectedCondMsg, cond.Message)
+				updatedNRO.Spec.NodeGroups = append(updatedNRO.Spec.NodeGroups, ng)
+				err := fxt.Client.Update(ctx, &updatedNRO)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("Exactly one of 'PoolName' or 'MachineConfigPoolSelector' must be set for NodeGroup."))
 			})
 
 			It("[tier1] should report the NodeGroupConfig in the NodeGroupStatus with NodePool set and allow updates", func(ctx context.Context) {
