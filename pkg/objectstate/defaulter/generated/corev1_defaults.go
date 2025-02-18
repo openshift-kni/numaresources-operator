@@ -28,7 +28,6 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-
 func SetDefaults_ResourceList(obj *v1.ResourceList) {
 	for key, val := range *obj {
 		// TODO(#18538): We round up resource values to milli scale to maintain API compatibility.
