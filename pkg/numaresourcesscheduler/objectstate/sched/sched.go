@@ -32,6 +32,7 @@ import (
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/defaulter"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 )
 
@@ -61,6 +62,7 @@ func (em ExistingManifests) State(mf schedmanifests.Manifests) []objectstate.Obj
 			Desired:  mf.ServiceAccount.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ServiceAccountForUpdate,
+			Default:  defaulter.None,
 		},
 		{
 			Existing: em.Existing.ConfigMap,
@@ -68,6 +70,7 @@ func (em ExistingManifests) State(mf schedmanifests.Manifests) []objectstate.Obj
 			Desired:  mf.ConfigMap.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.MetadataForUpdate,
+			Default:  defaulter.None,
 		},
 		{
 			Existing: em.Existing.ClusterRole,
@@ -75,6 +78,7 @@ func (em ExistingManifests) State(mf schedmanifests.Manifests) []objectstate.Obj
 			Desired:  mf.ClusterRole.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.MetadataForUpdate,
+			Default:  defaulter.None,
 		},
 		{
 			Existing: em.Existing.ClusterRoleBindingK8S,
@@ -82,6 +86,7 @@ func (em ExistingManifests) State(mf schedmanifests.Manifests) []objectstate.Obj
 			Desired:  mf.ClusterRoleBindingK8S.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.MetadataForUpdate,
+			Default:  defaulter.ClusterRoleBinding,
 		},
 		{
 			Existing: em.Existing.ClusterRoleBindingNRT,
@@ -89,6 +94,7 @@ func (em ExistingManifests) State(mf schedmanifests.Manifests) []objectstate.Obj
 			Desired:  mf.ClusterRoleBindingNRT.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.MetadataForUpdate,
+			Default:  defaulter.ClusterRoleBinding,
 		},
 		{
 			Existing: em.Existing.Role,
@@ -96,6 +102,7 @@ func (em ExistingManifests) State(mf schedmanifests.Manifests) []objectstate.Obj
 			Desired:  mf.Role.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.MetadataForUpdate,
+			Default:  defaulter.None,
 		},
 		{
 			Existing: em.Existing.RoleBinding,
@@ -103,13 +110,15 @@ func (em ExistingManifests) State(mf schedmanifests.Manifests) []objectstate.Obj
 			Desired:  mf.RoleBinding.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.MetadataForUpdate,
+			Default:  defaulter.RoleBinding,
 		},
 		{
 			Existing: em.Existing.Deployment,
 			Error:    em.deploymentError,
 			Desired:  mf.Deployment.DeepCopy(),
 			Compare:  compare.Object,
-			Merge:    merge.MetadataForUpdate,
+			Merge:    merge.ObjectForUpdate,
+			Default:  defaulter.Deployment,
 		},
 	}
 }
