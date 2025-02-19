@@ -1188,11 +1188,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 				By("verify degraded condition is found due to node group with multiple selectors")
 				Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-				cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionDegraded)
-				Expect(cond).NotTo(BeNil(), "condition Degraded was not found: %+v", updatedNRO.Status.Conditions)
-				Expect(cond.Reason).To(Equal(validation.NodeGroupsError), "reason of the conditions is different from expected: expected %q found %q", validation.NodeGroupsError, cond.Reason)
-				expectedCondMsg := "must have only a single specifier set"
-				Expect(strings.Contains(cond.Message, expectedCondMsg)).To(BeTrue(), "different degrade message was found: expected to contains %q but found %q", "must have only a single specifier set", expectedCondMsg, cond.Message)
+				Expect(isDegradedWith(updatedNRO.Status.Conditions, "must have only a single specifier set", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
 			})
 
 			It("[tier1] should report the NodeGroupConfig in the NodeGroupStatus with NodePool set and allow updates", func(ctx context.Context) {
