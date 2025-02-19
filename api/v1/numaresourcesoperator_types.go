@@ -37,7 +37,7 @@ type NUMAResourcesOperatorSpec struct {
 	// Optional Resource Topology Exporter image URL
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Optional RTE image URL",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	ExporterImage string `json:"imageSpec,omitempty"`
-	// Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+	// RTE log verbosity. Valid values are: "Normal", "Debug", "Trace", "TraceAll".
 	// Defaults to "Normal".
 	// +optional
 	// +kubebuilder:default=Normal
@@ -47,6 +47,10 @@ type NUMAResourcesOperatorSpec struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Optional ignore pod namespace/name glob patterns"
 	PodExcludes []NamespacedName `json:"podExcludes,omitempty"`
+	// Operator verbosity value, set the same way as the commandline
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Operator verbosity"
+	Verbose *int `json:"verbose,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=Disabled;Enabled;EnabledExclusiveResources
@@ -180,6 +184,9 @@ type NUMAResourcesOperatorStatus struct {
 	// RelatedObjects list of objects of interest for this operator
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Related Objects"
 	RelatedObjects []configv1.ObjectReference `json:"relatedObjects,omitempty"`
+	// Verbose is the current log verbosity of the operator.
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Operator log verbosity"
+	Verbose int `json:"verbose"`
 }
 
 // MachineConfigPool defines the observed state of each MachineConfigPool selected by node groups

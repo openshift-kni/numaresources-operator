@@ -89,7 +89,7 @@ spec:
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
       - description: |-
-          Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+          RTE log verbosity. Valid values are: "Normal", "Debug", "Trace", "TraceAll".
           Defaults to "Normal".
         displayName: RTE log verbosity
         path: logLevel
@@ -131,6 +131,9 @@ spec:
           level
         displayName: Optional ignore pod namespace/name glob patterns
         path: podExcludes
+      - description: Operator verbosity value, set the same way as the commandline
+        displayName: Operator verbosity
+        path: verbose
       statusDescriptors:
       - description: Conditions show the current state of the NUMAResourcesOperator
           Operator
@@ -168,6 +171,9 @@ spec:
       - description: RelatedObjects list of objects of interest for this operator
         displayName: Related Objects
         path: relatedObjects
+      - description: Verbose is the current log verbosity of the operator.
+        displayName: Operator log verbosity
+        path: verbose
       version: v1
     - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
         API

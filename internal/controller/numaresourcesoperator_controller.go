@@ -69,6 +69,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/status/conditioninfo"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 
+	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	intreconcile "github.com/openshift-kni/numaresources-operator/internal/reconcile"
 )
 
@@ -92,6 +93,7 @@ type NUMAResourcesOperatorReconciler struct {
 	ImagePullPolicy corev1.PullPolicy
 	Recorder        record.EventRecorder
 	ForwardMCPConds bool
+	Verbose         int
 }
 
 // TODO: narrow down
@@ -146,10 +148,17 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.degradeStatus(ctx, instance, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, err)
 	}
 
+	nropv1.NormalizeSpec(&instance.Spec)
+	// can't be API normalization because the value is dynamic
+	normalizeSpecVerboseFromRuntime(&instance.Spec, r.Verbose)
+
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
 		klog.V(2).InfoS("Pause reconciliation enabled", "object", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
+
+	// validation step. This is not expected to fail often, hence log messages, if any, needs to be loud
+	// regardless by verbosiness value, including the value dynamically set.
 
 	if err := validation.NodeGroups(instance.Spec.NodeGroups, r.Platform); err != nil {
 		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
@@ -223,6 +232,20 @@ func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, ins
 	return ctrl.Result{}, nil
 }
 
+func (r *NUMAResourcesOperatorReconciler) UpdateVerbosity(ctx context.Context, verbose *int) int {
+	// do as early as possible, but always after validation so we don't miss log messages
+	if verb := *verbose; verb != r.Verbose {
+		err := intkloglevel.Set(klog.Level(verb))
+		if err != nil {
+			klog.InfoS("cannot updated log level dynamically", "desiredLevel", verb)
+		} else {
+			r.Verbose = verb
+		}
+	}
+
+	return r.Verbose
+}
+
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) intreconcile.Step {
 	applied, err := r.syncNodeResourceTopologyAPI(ctx)
 	if err != nil {
@@ -289,6 +312,9 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) intreconcile.Step {
+	// this must be the first, and must be done as early as possible. Should not make the reconciliation attempt fail (best-effort)
+	instance.Status.Verbose = r.UpdateVerbosity(ctx, instance.Spec.Verbose)
+
 	if step := r.reconcileResourceAPI(ctx, instance, trees); step.EarlyStop() {
 		updateStatusConditionsIfNeeded(instance, step.ConditionInfo)
 		return step
@@ -777,4 +803,11 @@ func getTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nr
 	default:
 		return nil, fmt.Errorf("unsupported platform")
 	}
+}
+
+func normalizeSpecVerboseFromRuntime(spec *nropv1.NUMAResourcesOperatorSpec, verb int) {
+	if spec.Verbose != nil {
+		return
+	}
+	spec.Verbose = &verb
 }
