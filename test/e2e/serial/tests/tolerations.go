@@ -134,7 +134,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				Eventually(func(g Gomega) {
 					err := fxt.Client.Get(ctx, nroKey, &updatedNropObj)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(isDegradedInternalError(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String())).To(BeTrue(), "Condition not degraded as expected")
+					g.Expect(isDegradedWith(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String(), status.ReasonInternalError)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 			})
 
@@ -163,7 +163,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				Eventually(func(g Gomega) {
 					err := fxt.Client.Get(ctx, nroKey, &updatedNropObj)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(isDegradedInternalError(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String())).To(BeTrue(), "Condition not degraded as expected")
+					g.Expect(isDegradedWith(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String(), status.ReasonInternalError)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 			})
 		})
@@ -786,7 +786,7 @@ func isRTEPodFoundOnNode(cli client.Client, ctx context.Context, nodeName string
 	return matchingPod, found
 }
 
-func isDegradedInternalError(conds []metav1.Condition, msgContains string) bool {
+func isDegradedWith(conds []metav1.Condition, msgContains string, reason string) bool {
 	cond := status.FindCondition(conds, status.ConditionDegraded)
 	if cond == nil {
 		return false
@@ -798,8 +798,8 @@ func isDegradedInternalError(conds []metav1.Condition, msgContains string) bool 
 		klog.InfoS("Degraded message is not as expected", "condition", cond.String(), "expected message to contain", msgContains)
 		return false
 	}
-	if cond.Reason != status.ReasonInternalError {
-		klog.InfoS("Degraded reason is not as expected", "condition", cond.String(), "expected", status.ReasonInternalError)
+	if cond.Reason != reason {
+		klog.InfoS("Degraded reason is not as expected", "condition", cond.String(), "expected", reason)
 		return false
 	}
 	return true
