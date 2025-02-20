@@ -571,3 +571,9 @@ mv $(1) $(1)-$(3) ;\
 } ;\
 ln -sf $(1)-$(3) $(1)
 endef
+
+
+.PHONY: defaults
+defaults:
+	@echo "generating defaults"
+	hack/generate-defaults.sh
