@@ -6,67 +6,63 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
+	_ "k8s.io/kubernetes/pkg/util/parsers"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	securityv1 "github.com/openshift/api/security/v1"
 	"github.com/openshift/apiserver-library-go/pkg/securitycontextconstraints/sccdefaults"
 )
 
-func Service(original, mutated client.Object) client.Object {
+func Service(mutated client.Object) client.Object {
 	service := mutated.(*corev1.Service)
-	defaultServiceSpec(&original.(*corev1.Service).Spec, &service.Spec)
+	SetObjectDefaults_Service(service)
 	return service
 }
 
-func CRD(original, mutated client.Object) client.Object {
+func CRD(mutated client.Object) client.Object {
 	customResourceDefinition := mutated.(*apiextensionsv1.CustomResourceDefinition)
 	apiextensionsv1.SetDefaults_CustomResourceDefinition(customResourceDefinition)
 	return customResourceDefinition
 }
 
-func Deployment(original, mutated client.Object) client.Object {
+func Deployment(mutated client.Object) client.Object {
 	deployment := mutated.(*appsv1.Deployment)
-	defaultDeploymentSpec(&original.(*appsv1.Deployment).Spec, &deployment.Spec)
+	SetObjectDefaults_Deployment(deployment)
 	return deployment
 }
 
-func DaemonSet(original, mutated client.Object) client.Object {
+func DaemonSet(mutated client.Object) client.Object {
 	daemonSet := mutated.(*appsv1.DaemonSet)
-	defaultDaemonSetSpec(&original.(*appsv1.DaemonSet).Spec, &daemonSet.Spec)
+	SetObjectDefaults_DaemonSet(daemonSet)
+	// for backport compatability
+	daemonSet.Spec.Template.Spec.DeprecatedServiceAccount = daemonSet.Spec.Template.Spec.ServiceAccountName
 	return daemonSet
 }
 
-func ClusterRoleBinding(original, mutated client.Object) client.Object {
+func ClusterRoleBinding(mutated client.Object) client.Object {
 	clusterRoleBinding := mutated.(*rbacv1.ClusterRoleBinding)
-	for i := range clusterRoleBinding.Subjects {
-		subject := &clusterRoleBinding.Subjects[i]
-		defaultSubject(subject)
-	}
+	SetObjectDefaults_ClusterRoleBinding(clusterRoleBinding)
 	return clusterRoleBinding
 }
 
-func RoleBinding(original, mutated client.Object) client.Object {
+func RoleBinding(mutated client.Object) client.Object {
 	roleBinding := mutated.(*rbacv1.RoleBinding)
-	for i := range roleBinding.Subjects {
-		subject := &roleBinding.Subjects[i]
-		defaultSubject(subject)
-	}
+	SetObjectDefaults_RoleBinding(roleBinding)
 	return roleBinding
 }
 
-func SecurityContextConstraints(original, mutated client.Object) client.Object {
+func SecurityContextConstraints(mutated client.Object) client.Object {
 	securityContextConstraints := mutated.(*securityv1.SecurityContextConstraints)
 	sccdefaults.SetDefaults_SCC(securityContextConstraints)
 	return securityContextConstraints
 }
 
-func None(original, mutated client.Object) client.Object {
+func None(mutated client.Object) client.Object {
 	return mutated
 }
 
 // Below defaulting funcs. Their code is based on upstream code that is
-// not in staging unfortunately so we can't import it:
+// not in staging unfortunately and is not generated either so we can't import it:
 // * https://github.com/kubernetes/kubernetes/blob/e5976909c6fb129228a67515e0f86336a53884f0/pkg/apis/core/v1/zz_generated.defaults.go
 // * https://github.com/kubernetes/kubernetes/blob/e5976909c6fb129228a67515e0f86336a53884f0/pkg/apis/apps/v1/zz_generated.defaults.go
 // * https://github.com/kubernetes/kubernetes/blob/e5976909c6fb129228a67515e0f86336a53884f0/pkg/apis/rbac/v1/zz_generated.defaults.go
@@ -291,19 +287,6 @@ func defaultCRDSpec(mutated *apiextensionsv1.CustomResourceDefinitionSpec) {
 	if mutated.Conversion == nil {
 		mutated.Conversion = &apiextensionsv1.CustomResourceConversion{
 			Strategy: apiextensionsv1.NoneConverter,
-		}
-	}
-}
-
-func defaultSubject(mutated *rbacv1.Subject) {
-	if len(mutated.APIGroup) == 0 {
-		switch mutated.Kind {
-		case rbacv1.ServiceAccountKind:
-			mutated.APIGroup = ""
-		case rbacv1.UserKind:
-			mutated.APIGroup = rbacv1.GroupName
-		case rbacv1.GroupKind:
-			mutated.APIGroup = rbacv1.GroupName
 		}
 	}
 }
