@@ -571,3 +571,10 @@ mv $(1) $(1)-$(3) ;\
 } ;\
 ln -sf $(1)-$(3) $(1)
 endef
+
+
+.PHONY: defaults
+defaults:
+	@echo "generating defaults"
+	# generated are under pkg/objectstate/defaulter/generated
+	hack/generate-defaults.sh
