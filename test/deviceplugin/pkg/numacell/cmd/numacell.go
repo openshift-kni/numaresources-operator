@@ -38,9 +38,17 @@ import (
 func summarize(topoInfo *topology.Info) string {
 	var buf strings.Builder
 	for _, node := range topoInfo.Nodes {
-		fmt.Fprintf(&buf, "NUMA node %d\n", node.ID)
+		_, err := fmt.Fprintf(&buf, "NUMA node %d\n", node.ID)
+		if err != nil {
+			klog.Warningf("failed writing data to builder: %v\n", err)
+			return buf.String()
+		}
 		for _, core := range node.Cores {
-			fmt.Fprintf(&buf, "\t%s\n", core.String())
+			_, err := fmt.Fprintf(&buf, "\t%s\n", core.String())
+			if err != nil {
+				klog.Warningf("failed writing data to builder: %v\n", err)
+				return buf.String()
+			}
 		}
 	}
 	return buf.String()
@@ -62,7 +70,10 @@ func render(w io.Writer) int {
 		if err != nil {
 			return 1
 		}
-		fmt.Fprintf(w, "---\n%s", string(data))
+		_, err = fmt.Fprintf(w, "---\n%s", string(data))
+		if err != nil {
+			klog.Warningf("failed writing manifests to the console: %v\n", err)
+		}
 	}
 	return 0
 }
