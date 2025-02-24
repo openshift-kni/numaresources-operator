@@ -244,8 +244,7 @@ func parseArgs(args ...string) (ProgArgs, error) {
 	flags.BoolVar(&pArgs.Version, "version", false, "Output version and exit")
 	flags.BoolVar(&pArgs.DumpNodes, "dump-nodes", false, "Force node PFP status dump")
 	flags.Usage = func() {
-		fmt.Fprintf(flags.Output(), "Usage: %s [options] [node0 [node1] ... [nodeN]]\noptions:\n", os.Args[0])
-		flags.PrintDefaults()
+		_, _ = fmt.Fprintf(flags.Output(), "Usage: %s [options] [node0 [node1] ... [nodeN]]\noptions:\n", os.Args[0])
 	}
 
 	klog.InitFlags(flags)

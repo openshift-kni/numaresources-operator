@@ -48,7 +48,11 @@ func TestReadValidData(t *testing.T) {
 	if err != nil {
 		t.Errorf("creating tempfile: %v", err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer func(name string) {
+		if err := os.Remove(name); err != nil {
+			t.Errorf("error while removing tempfile: %v", err)
+		}
+	}(tmpfile.Name())
 
 	if _, err := tmpfile.Write(content); err != nil {
 		t.Errorf("writing content into tempfile: %v", err)

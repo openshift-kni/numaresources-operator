@@ -45,7 +45,7 @@ var _ = Describe("[tools] Auxiliary tools", Label("tools"), func() {
 
 			expectExecutableExists(cmdline[0])
 
-			fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
+			_, _ = fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
 
 			cmd := exec.Command(cmdline[0], cmdline[1:]...)
 			cmd.Stderr = GinkgoWriter
@@ -65,7 +65,7 @@ var _ = Describe("[tools] Auxiliary tools", Label("tools"), func() {
 			}
 			expectExecutableExists(cmdline[0])
 
-			fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
+			_, _ = fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
 
 			cmd := exec.Command(cmdline[0], cmdline[1:]...)
 			cmd.Stderr = GinkgoWriter
