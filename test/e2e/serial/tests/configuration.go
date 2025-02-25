@@ -44,6 +44,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	depnodes "github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -53,6 +54,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
+	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
@@ -66,6 +68,7 @@ import (
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
+	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
@@ -168,6 +171,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			if len(initialMcps) > 1 {
 				e2efixture.Skip(fxt, "the test supports single node group")
 			}
+			customPolicySupportEnabled := isCustomPolicySupportEnabled(nroOperObj)
 
 			initialMcp := initialMcps[0]
 			initialMcpInfo := mcpInfo{
@@ -208,6 +212,10 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					ForMachineConfigPoolDeleted(context.TODO(), mcp)
 				Expect(err).ToNot(HaveOccurred())
 
+				if !customPolicySupportEnabled {
+					Expect(deploy.WaitForMCPsCondition(fxt.Client, context.TODO(), machineconfigv1.MachineConfigPoolUpdating, initialMcpInfo.mcpObj)).To(Succeed())
+					waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, time.Now().String(), initialMcpInfo)
+				}
 			}()
 
 			//so far 0 machine count for mcp-test -> no nodes -> no updates status -> empty status
@@ -234,8 +242,9 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				err = unlabelFunc()
 				Expect(err).ToNot(HaveOccurred())
 
-				//this will trigger node reboot as the NROP settings will be reapplied to the unlabelled node, so new node is added under the old mcp hence the MachineCount update type
-				waitForMcpUpdate(fxt.Client, context.TODO(), MachineCount, time.Now().String(), newMcpInfo)
+				Expect(deploy.WaitForMCPsCondition(fxt.Client, context.TODO(), machineconfigv1.MachineConfigPoolUpdating, initialMcpInfo.mcpObj)).To(Succeed())
+				// node reboot will be applied to the target node because it will belong now back to worker mcp which has specific KC/PP applied; NROP setting here will not affect here because the worker already has worker label; this is a sign we have an issue in NROP: one node group can init RTE on nodes from different MCPs! see bug from one customer back then
+				waitForMcpUpdate(fxt.Client, context.TODO(), MachineCount, time.Now().String(), initialMcpInfo)
 			}()
 
 			waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, time.Now().String(), newMcpInfo)
@@ -246,9 +255,8 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroOperObj), nroOperObj)
 				g.Expect(err).ToNot(HaveOccurred())
 
-				for i := range nroOperObj.Spec.NodeGroups {
-					nroOperObj.Spec.NodeGroups[i].MachineConfigPoolSelector.MatchLabels = mcp.Labels
-				}
+				// as filtered at the beginning of the test, it supports single node group
+				nroOperObj.Spec.NodeGroups[0].MachineConfigPoolSelector.MatchLabels = mcp.Labels
 				err = fxt.Client.Update(context.TODO(), nroOperObj)
 				g.Expect(err).ToNot(HaveOccurred())
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
@@ -271,15 +279,20 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					g.Expect(err).ToNot(HaveOccurred())
 				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-				By("waiting for mcps to start updating")
-				// this will trigger mcp update only for the initial mcps because the mcp-test nodes are still labeled
-				// with the old labels, so worker mcp will switch back to the NROP mc
-
-				waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, time.Now().String(), initialMcpInfo)
+				if customPolicySupportEnabled {
+					// this will trigger mcp update only for the initial mcps because the mcp-test nodes are still labeled
+					// with the old labels, so worker mcp will switch back to the NROP mc
+					By(fmt.Sprintf("waiting for mcp %q to start updating", initialMcpInfo.mcpObj.Name))
+					Expect(deploy.WaitForMCPsCondition(fxt.Client, context.TODO(), machineconfigv1.MachineConfigPoolUpdating, initialMcpInfo.mcpObj)).To(Succeed())
+					By(fmt.Sprintf("waiting for mcp %q to complete update", initialMcpInfo.mcpObj.Name))
+					waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, time.Now().String(), initialMcpInfo)
+				}
 			}() //end of defer
 
 			By("waiting for the mcps to update")
-			// on old mcp because the ds will no longer include the worker node that is not labeled with mcp-test, so returning to MC without NROP settings
+			By(fmt.Sprintf("waiting for mcp %q to start updating", initialMcpInfo.mcpObj.Name))
+			Expect(deploy.WaitForMCPsCondition(fxt.Client, context.TODO(), machineconfigv1.MachineConfigPoolUpdating, initialMcpInfo.mcpObj)).To(Succeed())
+			By(fmt.Sprintf("waiting for mcp %q to complete update", initialMcpInfo.mcpObj.Name))
 			waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, time.Now().String(), initialMcpInfo)
 
 			By(fmt.Sprintf("Verify RTE daemonsets have the updated node selector matching to the new mcp %q", mcp.Name))
@@ -1135,7 +1148,6 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 		Context("[ngpoolname] node group with PoolName support", Label("ngpoolname"), Label("feature:ngpoolname"), func() {
 			initialOperObj := &nropv1.NUMAResourcesOperator{}
 			nroKey := objects.NROObjectKey()
-
 			It("[tier2] should not allow configuring PoolName and MCP selector on same node group", Label("tier2"), func(ctx context.Context) {
 				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
 
@@ -1514,4 +1526,20 @@ func getLabelRoleWorker() string {
 
 func getLabelRoleMCPTest() string {
 	return fmt.Sprintf("%s/%s", depnodes.LabelRole, roleMCPTest)
+}
+
+func isCustomPolicySupportEnabled(nro *nropv1.NUMAResourcesOperator) bool {
+	GinkgoHelper()
+
+	const minCustomSupportingVString = "4.18"
+	minCustomSupportingVersion, err := platform.ParseVersion(minCustomSupportingVString)
+	Expect(err).NotTo(HaveOccurred(), "failed to parse version string %q", minCustomSupportingVString)
+
+	customSupportAvailable, err := configuration.PlatVersion.AtLeast(minCustomSupportingVersion)
+	Expect(err).NotTo(HaveOccurred(), "failed to compare versions: %v vs %v", configuration.PlatVersion, minCustomSupportingVersion)
+
+	if !customSupportAvailable { // < 4.18
+		return true
+	}
+	return inthelper.IsCustomPolicyEnabled(nro)
 }
