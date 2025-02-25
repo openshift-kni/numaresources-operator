@@ -45,6 +45,19 @@ func ServiceAccountForUpdate(current, updated client.Object) (client.Object, err
 	return MetadataForUpdate(current, updated)
 }
 
+func ServiceForUpdate(current, updated client.Object) (client.Object, error) {
+	curSE, ok := current.(*corev1.Service)
+	if !ok {
+		return updated, ErrWrongObjectType
+	}
+	updSE, ok := updated.(*corev1.Service)
+	if !ok {
+		return updated, ErrMismatchingObjects
+	}
+	preserveIPConfigurations(&curSE.Spec, &updSE.Spec)
+	return MetadataForUpdate(current, updated)
+}
+
 func ObjectForUpdate(current, updated client.Object) (client.Object, error) {
 	updated, err := MetadataForUpdate(current, updated)
 	if err != nil {
@@ -147,4 +160,21 @@ func preserveServiceAccountPullSecrets(original, mutated *corev1.ServiceAccount)
 	}
 
 	mutated.Secrets = original.Secrets
+}
+
+// preserveIPConfigurations preserve the IP configuration from the original object since
+// those are assigned by external operator (not ours)
+func preserveIPConfigurations(original, mutated *corev1.ServiceSpec) {
+	if mutated.ClusterIP == "" {
+		mutated.ClusterIP = original.ClusterIP
+	}
+	if mutated.ClusterIPs == nil {
+		mutated.ClusterIPs = original.ClusterIPs
+	}
+	if mutated.IPFamilies == nil {
+		mutated.IPFamilies = original.IPFamilies
+	}
+	if mutated.IPFamilyPolicy == nil {
+		mutated.IPFamilyPolicy = original.IPFamilyPolicy
+	}
 }
