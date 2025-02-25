@@ -316,7 +316,7 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 		Error:    em.errs.Metrics.Service,
 		Desired:  mf.Metrics.Service.DeepCopy(),
 		Compare:  compare.Object,
-		Merge:    merge.MetadataForUpdate,
+		Merge:    merge.ServiceForUpdate,
 		Default:  defaulter.Service,
 	})
 
