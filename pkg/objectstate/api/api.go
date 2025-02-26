@@ -28,6 +28,7 @@ import (
 
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/defaulter"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 )
 
@@ -43,7 +44,8 @@ func (em *ExistingManifests) State(mf apimanifests.Manifests) []objectstate.Obje
 			Error:    em.CrdError,
 			Desired:  mf.Crd.DeepCopy(),
 			Compare:  compare.Object,
-			Merge:    merge.MetadataForUpdate,
+			Merge:    merge.ObjectForUpdate,
+			Default:  defaulter.CRD,
 		},
 	}
 }

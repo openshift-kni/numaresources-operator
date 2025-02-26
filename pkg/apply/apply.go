@@ -68,15 +68,21 @@ func ApplyObject(ctx context.Context, cli k8sclient.Client, objState objectstate
 		return objState.Desired, true, nil
 	}
 
+	// set default to the desired object to avoid the comparison from failing
+	// on default values which are set by the API server
+	desiredWithDefault := objState.Default(objState.Desired)
+
 	// Merge the desired object with what actually exists
-	merged, err := objState.Merge(objState.Existing, objState.Desired)
+	merged, err := objState.Merge(objState.Existing, desiredWithDefault)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not merge object %s with existing: %w", objDesc, err)
 	}
+
 	ok, err := objState.Compare(objState.Existing, merged)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not compare object %s with existing: %w", objDesc, err)
 	}
+
 	updated := false
 	if !ok {
 		klog.InfoS("updating", "object", objDesc)
