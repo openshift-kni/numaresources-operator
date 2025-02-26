@@ -41,7 +41,7 @@ import (
 const metricsAddress = "127.0.0.1"
 
 // This test verifies that the HTTPS metrics endpoints, are accessible and serving metrics.
-var _ = Describe("metrics exposed securely", Serial, func() {
+var _ = Describe("metrics exposed securely", Serial, Label("feature:metrics"), func() {
 	ctx := context.Background()
 	var namespace string
 	var nropObj *nropv1.NUMAResourcesOperator
