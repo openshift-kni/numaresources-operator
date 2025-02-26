@@ -542,7 +542,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					err = fxt.Client.Delete(ctx, &nroOperObj)
 					Expect(err).ToNot(HaveOccurred())
 
-					waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineConfig)
+					waitForMcpUpdate(fxt.Client, ctx, MachineConfig, mcpsInfo...)
 
 					By("taint one worker node")
 					workers, err = nodes.GetWorkers(fxt.DEnv())
@@ -581,7 +581,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 						Expect(err).ToNot(HaveOccurred())
 						Expect(mcpsInfo).ToNot(BeEmpty())
 
-						waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineCount)
+						waitForMcpUpdate(fxt.Client, ctx, MachineCount, mcpsInfo...)
 					} else {
 						Eventually(func(g Gomega) {
 							err := fxt.Client.Get(ctx, nroKey, nropNewObj)
@@ -613,7 +613,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					Expect(err).ToNot(HaveOccurred())
 					Expect(mcpsInfo).ToNot(BeEmpty())
 
-					waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineCount)
+					waitForMcpUpdate(fxt.Client, ctx, MachineCount, mcpsInfo...)
 
 					klog.Info("waiting for DaemonSet to be ready")
 					ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
@@ -657,7 +657,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					Expect(err).ToNot(HaveOccurred())
 					Expect(mcpsInfo).ToNot(BeEmpty())
 
-					waitForMcpUpdate(fxt.Client, ctx, mcpsInfo, MachineCount)
+					waitForMcpUpdate(fxt.Client, ctx, MachineCount, mcpsInfo...)
 
 					klog.Info("waiting for DaemonSet to be ready")
 					ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
@@ -840,12 +840,12 @@ func sriovToleration() corev1.Toleration {
 	}
 }
 
-func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo, updateType MCPUpdateType) {
+func waitForMcpUpdate(cli client.Client, ctx context.Context, updateType MCPUpdateType, mcpsInfo ...mcpInfo) {
 	mcps := make([]*machineconfigv1.MachineConfigPool, 0, len(mcpsInfo))
 	for _, info := range mcpsInfo {
 		mcps = append(mcps, info.mcpObj)
 	}
-	Expect(deploy.WaitForMCPsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
+	Expect(deploy.WaitForMCPsCondition(cli, ctx, machineconfigv1.MachineConfigPoolUpdated, mcps...)).To(Succeed())
 
 	for _, info := range mcpsInfo {
 		// check the sample node is updated with new config in its annotations, both for desired and current, is a must

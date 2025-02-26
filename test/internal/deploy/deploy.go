@@ -144,7 +144,7 @@ func TeardownNROScheduler(ctx context.Context, nroSched *nropv1.NUMAResourcesSch
 	Expect(wait.With(e2eclient.Client).Interval(NROSchedulerPollingInterval).Timeout(timeout).ForNUMAResourcesSchedulerDeleted(ctx, nroSched)).To(Succeed(), "NROScheduler %q failed to be deleted", nroSched.Name)
 }
 
-func WaitForMCPsCondition(cli client.Client, ctx context.Context, mcps []*machineconfigv1.MachineConfigPool, condition machineconfigv1.MachineConfigPoolConditionType) error {
+func WaitForMCPsCondition(cli client.Client, ctx context.Context, condition machineconfigv1.MachineConfigPoolConditionType, mcps ...*machineconfigv1.MachineConfigPool) error {
 	interval := configuration.MachineConfigPoolUpdateInterval // shortcut
 	timeout := configuration.MachineConfigPoolUpdateTimeout   // timeout
 	var eg errgroup.Group

@@ -45,9 +45,13 @@ import (
 )
 
 const (
-	MultiNUMALabel                   = "numa.hardware.openshift-kni.io/cell-count"
+	MultiNUMALabel    = "numa.hardware.openshift-kni.io/cell-count"
+	SchedulerTestName = "test-topology-scheduler"
+	DefaultVerbosity  = 4
+)
+
+const (
 	nropTestCIImage                  = "quay.io/openshift-kni/resource-topology-exporter:test-ci"
-	SchedulerTestName                = "test-topology-scheduler"
 	minNumberOfNodesWithSameTopology = 2
 )
 
