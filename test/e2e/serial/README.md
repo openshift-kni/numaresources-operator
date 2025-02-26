@@ -21,6 +21,7 @@ they found it before they run.
 
 ### configuring using the environment variables
 
+- `E2E_NROP_VERBOSE` (accepts integer, e.g 2,4) sets the logger verbosity. Same rules about klog verbosity apply.
 - `E2E_NROP_INSTALL_SKIP_KC` (accepts boolean, e.g. `true`) instructs the suite to NOT deploy the builtin
   `kubeletconfig`. With this enabled, the suite will expect a `kubeletconfig` already deployed (and consumed)
   in the cluster against it is running.
