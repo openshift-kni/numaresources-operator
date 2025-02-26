@@ -740,8 +740,21 @@ func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest) e
 		return err
 	}
 	if gdm.ClusterPlatform != platform.Kubernetes {
-		klog.V(4).InfoS("DaemonSet update: selinux options", "contextType", gdm.SecOpts.SELinuxContextType, "contextName", gdm.SecOpts.SecurityContextName)
-		k8swgrteupdate.SecurityContextWithOpts(gdm.DaemonSet, gdm.SecOpts)
+		if gdm.IsCustomPolicyEnabled && gdm.ClusterPlatform == platform.OpenShift {
+			k8swgrteupdate.SecurityContextWithOpts(gdm.DaemonSet,
+				k8swgrteupdate.SecurityContextOptions{
+					SELinuxContextType:  selinux.RTEContextTypeLegacy,
+					SecurityContextName: rteupdate.MainContainerName,
+				})
+			klog.V(5).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextTypeLegacy)
+		} else {
+			k8swgrteupdate.SecurityContextWithOpts(gdm.DaemonSet,
+				k8swgrteupdate.SecurityContextOptions{
+					SELinuxContextType:  selinux.RTEContextType,
+					SecurityContextName: rteupdate.SecurityContextName,
+				})
+			klog.V(5).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextType)
+		}
 	}
 	// it's possible that the hash will be empty if kubelet controller hasn't created a configmap
 	rteupdate.DaemonSetHashAnnotation(gdm.DaemonSet, gdm.RTEConfigHash)
