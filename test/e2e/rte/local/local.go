@@ -96,7 +96,7 @@ func runConfig(argv []string, env map[string]string) rteconfiguration.ProgArgs {
 
 	expectExecutableExists(cmdline[0])
 
-	fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
+	_, _ = fmt.Fprintf(GinkgoWriter, "running: %v\n", cmdline)
 
 	cmd := exec.Command(cmdline[0], cmdline[1:]...)
 	cmd.Stderr = GinkgoWriter
@@ -105,13 +105,13 @@ func runConfig(argv []string, env map[string]string) rteconfiguration.ProgArgs {
 	}
 
 	out, err := cmd.Output()
-	fmt.Fprintf(GinkgoWriter, "out: %v\n", string(out))
+	_, _ = fmt.Fprintf(GinkgoWriter, "out: %v\n", string(out))
 	Expect(err).ToNot(HaveOccurred())
 
 	var args rteconfiguration.ProgArgs
 	err = yaml.Unmarshal(out, &args)
 	Expect(err).ToNot(HaveOccurred())
-	fmt.Fprintf(GinkgoWriter, "out: %+v\n", args)
+	_, _ = fmt.Fprintf(GinkgoWriter, "out: %+v\n", args)
 
 	return args
 }

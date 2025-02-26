@@ -32,9 +32,9 @@ issues:
 linters:
   disable-all: true
   enable:
-#    - errcheck
+    - errcheck
     - bodyclose
-#    - copyloopvar
+    - copyloopvar
     - depguard
     - ginkgolinter
     - gosimple
