@@ -158,6 +158,10 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 gosec:
 	gosec ./pkg/... ./rte/pkg/... ./internal/... ./nrovalidate/validator/...
 
+.PHONY: govulncheck
+govulncheck:
+	govulncheck -show=verbose ./...
+
 .PHONY: cover-view
 cover-view:
 	go tool cover -html=coverage.out
