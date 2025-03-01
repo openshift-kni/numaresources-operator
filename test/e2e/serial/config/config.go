@@ -26,6 +26,9 @@ import (
 	. "github.com/onsi/gomega"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/textlogger"
+	ctrl "sigs.k8s.io/controller-runtime"
+
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
@@ -42,9 +45,13 @@ import (
 )
 
 const (
-	MultiNUMALabel                   = "numa.hardware.openshift-kni.io/cell-count"
+	MultiNUMALabel    = "numa.hardware.openshift-kni.io/cell-count"
+	SchedulerTestName = "test-topology-scheduler"
+	DefaultVerbosity  = 4
+)
+
+const (
 	nropTestCIImage                  = "quay.io/openshift-kni/resource-topology-exporter:test-ci"
-	SchedulerTestName                = "test-topology-scheduler"
 	minNumberOfNodesWithSameTopology = 2
 )
 
@@ -66,6 +73,9 @@ const (
 // each test "owns" the cluster - but again, must leave no leftovers.
 
 func Setup() {
+	config := textlogger.NewConfig(textlogger.Verbosity(GetVerbosity()))
+	ctrl.SetLogger(textlogger.NewLogger(config))
+
 	err := SetupFixture()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
@@ -90,6 +100,19 @@ func Teardown() {
 	// numacell daemonset automatically cleaned up when we remove the namespace
 	err := TeardownFixture()
 	Expect(err).NotTo(HaveOccurred())
+}
+
+func GetVerbosity() int {
+	rawLevel, ok := os.LookupEnv("E2E_NROP_VERBOSE")
+	if !ok {
+		return DefaultVerbosity
+	}
+	level, err := strconv.Atoi(rawLevel)
+	if err != nil {
+		// TODO: log how?
+		return DefaultVerbosity
+	}
+	return level
 }
 
 func GetRteCiImage() string {
