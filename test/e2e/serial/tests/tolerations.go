@@ -134,7 +134,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				Eventually(func(g Gomega) {
 					err := fxt.Client.Get(ctx, nroKey, &updatedNropObj)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(isDegradedInternalError(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String())).To(BeTrue(), "Condition not degraded as expected")
+					g.Expect(isDegradedWith(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String(), status.ReasonInternalError)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 			})
 
@@ -163,7 +163,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				Eventually(func(g Gomega) {
 					err := fxt.Client.Get(ctx, nroKey, &updatedNropObj)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(isDegradedInternalError(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String())).To(BeTrue(), "Condition not degraded as expected")
+					g.Expect(isDegradedWith(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String(), status.ReasonInternalError)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 			})
 		})
@@ -786,7 +786,7 @@ func isRTEPodFoundOnNode(cli client.Client, ctx context.Context, nodeName string
 	return matchingPod, found
 }
 
-func isDegradedInternalError(conds []metav1.Condition, msgContains string) bool {
+func isDegradedWith(conds []metav1.Condition, msgContains string, reason string) bool {
 	cond := status.FindCondition(conds, status.ConditionDegraded)
 	if cond == nil {
 		return false
@@ -798,8 +798,8 @@ func isDegradedInternalError(conds []metav1.Condition, msgContains string) bool 
 		klog.InfoS("Degraded message is not as expected", "condition", cond.String(), "expected message to contain", msgContains)
 		return false
 	}
-	if cond.Reason != status.ReasonInternalError {
-		klog.InfoS("Degraded reason is not as expected", "condition", cond.String(), "expected", status.ReasonInternalError)
+	if cond.Reason != reason {
+		klog.InfoS("Degraded reason is not as expected", "condition", cond.String(), "expected", reason)
 		return false
 	}
 	return true
@@ -841,11 +841,18 @@ func sriovToleration() corev1.Toleration {
 }
 
 func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo, updateType MCPUpdateType) {
+	waitForMcpUpdateWithID(cli, ctx, mcpsInfo, updateType, time.Now().String())
+}
+
+func waitForMcpUpdateWithID(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo, updateType MCPUpdateType, id string) {
+	klog.InfoS("waitForMcpUpdate START", "ID", id)
+	defer klog.InfoS("waitForMcpUpdate END", "ID", id)
+
 	mcps := make([]*machineconfigv1.MachineConfigPool, 0, len(mcpsInfo))
 	for _, info := range mcpsInfo {
 		mcps = append(mcps, info.mcpObj)
 	}
-	Expect(deploy.WaitForMCPsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed())
+	Expect(deploy.WaitForMCPsCondition(cli, ctx, mcps, machineconfigv1.MachineConfigPoolUpdated)).To(Succeed(), "failed to have the condistion updated; ID %q", id)
 
 	for _, info := range mcpsInfo {
 		// check the sample node is updated with new config in its annotations, both for desired and current, is a must
@@ -856,10 +863,13 @@ func waitForMcpUpdate(cli client.Client, ctx context.Context, mcpsInfo []mcpInfo
 		// thus associated to different MC, it could be because new nodes are joining the pool so the MC update is
 		// happening on those nodes
 		updatedConfig := updatedMcp.Status.Configuration.Name
-		if updateType == MachineConfig {
-			Expect(updatedConfig).ToNot(Equal(info.initialConfig))
-		}
+		initialConfig := info.initialConfig
+		expectedUpdate := (updateType == MachineConfig)
+		klog.InfoS("config values", "old", initialConfig, "new", updatedConfig, "expectedConfigUpdate", expectedUpdate)
 
+		if expectedUpdate {
+			Expect(updatedConfig).ToNot(Equal(initialConfig), "waitForMcpUpdate ID %s: config was not updated", id)
+		}
 		// MachineConfig update type will also update the node currentConfig so check that anyway
 		klog.Info("verify mcp config is updated by ensuring the sample node has updated MC")
 		ok, err := verifyUpdatedMCOnNodes(cli, ctx, info.sampleNode, updatedConfig)
