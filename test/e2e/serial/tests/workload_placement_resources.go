@@ -35,6 +35,7 @@ import (
 	intbaseload "github.com/openshift-kni/numaresources-operator/internal/baseload"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 
+	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/internal/nrosched"
@@ -86,7 +87,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 		// FIXME: this is a slight abuse of DescribeTable, but we need to run
 		// the same code with a different test_id per tmscope
 		DescribeTable("[tier0][ressched] a guaranteed pod with one container should be placed and aligned on the node",
-			Label("tier0", "ressched"),
+			Label(label.Tier0, "ressched"),
 			func(tmPolicy, tmScope string, requiredRes, expectedFreeRes corev1.ResourceList) {
 				ctx := context.TODO()
 

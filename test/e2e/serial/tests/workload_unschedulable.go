@@ -42,6 +42,7 @@ import (
 
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
+	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
@@ -277,7 +278,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 		})
 
-		It("[test_id:47619][tier3][unsched][default-scheduler] a deployment with a guaranteed pod resources available on one node but not on a single numa; scheduled by default scheduler", Label("tier2", "unsched", "default-scheduler"), func() {
+		It("[test_id:47619][tier3][unsched][default-scheduler] a deployment with a guaranteed pod resources available on one node but not on a single numa; scheduled by default scheduler", Label(label.Tier2, "unsched", "default-scheduler"), func() {
 			By("Scheduling the testing deployment")
 			deploymentName := "test-dp-with-default-sched"
 			var replicas int32 = 1
@@ -317,7 +318,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 	})
 
 	Context("with at least two nodes with two numa zones and enough resources in one numa zone", func() {
-		It("[test_id:47592][tier2][unsched][failalign] a daemonset with a guaranteed pod resources available on one node/one single numa zone but not in any other node", Label("tier2", "unsched", "failalign"), func() {
+		It("[test_id:47592][tier2][unsched][failalign] a daemonset with a guaranteed pod resources available on one node/one single numa zone but not in any other node", Label(label.Tier2, "unsched", "failalign"), func() {
 			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
@@ -446,7 +447,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 	})
 
 	Context("with at least one node", func() {
-		It("[test_id:47616][tier2][tmscope:pod][failalign] pod with two containers each on one numa zone can NOT be scheduled", Label("tier2", "tmscope:pod", "failalign"), func() {
+		It("[test_id:47616][tier2][tmscope:pod][failalign] pod with two containers each on one numa zone can NOT be scheduled", Label(label.Tier2, "tmscope:pod", "failalign"), func() {
 			// Requirements:
 			// Need at least this nodes
 			neededNodes := 1
@@ -619,7 +620,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 	// other than the other tests, here we expect all the worker nodes (including none-bm hosts) to be padded
 	Context("with zero suitable nodes", func() {
-		It("[test_id:47615][tier2][unsched] a deployment with multiple guaranteed pods resources that doesn't fit at the NUMA level", Label("tier2", "unsched"), func() {
+		It("[test_id:47615][tier2][unsched] a deployment with multiple guaranteed pods resources that doesn't fit at the NUMA level", Label(label.Tier2, "unsched"), func() {
 			neededNodes := 1
 			numOfnrtCandidates := len(nrts)
 			if numOfnrtCandidates < neededNodes {
@@ -843,7 +844,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			e2efixture.MustSettleNRT(fxt)
 		})
 
-		It("[test_id:47614][tier3][unsched][pod] workload requests guaranteed pod resources available on one node but not on a single numa", Label("tier3", "unsched", "pod"), func() {
+		It("[test_id:47614][tier3][unsched][pod] workload requests guaranteed pod resources available on one node but not on a single numa", Label(label.Tier3, "unsched", "pod"), func() {
 
 			By("Scheduling the testing pod")
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
@@ -861,7 +862,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("[test_id:47614][tier3][unsched][deployment] a deployment with a guaranteed pod resources available on one node but not on a single numa", Label("tier3", "unsched", "deployment"), func() {
+		It("[test_id:47614][tier3][unsched][deployment] a deployment with a guaranteed pod resources available on one node but not on a single numa", Label(label.Tier3, "unsched", "deployment"), func() {
 
 			By("Scheduling the testing deployment")
 			deploymentName := "test-dp"
@@ -896,7 +897,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 		})
 
-		It("[test_id:47614][tier3][unsched][daemonset] a daemonset with a guaranteed pod resources available on one node but not on a single numa", Label("tier3", "unsched", "daemonset"), func() {
+		It("[test_id:47614][tier3][unsched][daemonset] a daemonset with a guaranteed pod resources available on one node but not on a single numa", Label(label.Tier3, "unsched", "daemonset"), func() {
 
 			By("Scheduling the testing daemonset")
 			dsName := "test-ds"
