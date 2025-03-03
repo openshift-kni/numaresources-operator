@@ -18,6 +18,7 @@ package serial
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -38,6 +39,7 @@ func TestSerial(t *testing.T) {
 
 var _ = BeforeSuite(func() {
 	ctx := context.Background()
+	serialconfig.DumpEnvironment(os.Stderr) // logging is not fully setup yet, we need to bruteforce
 	Expect(serialconfig.CheckNodesTopology(ctx)).Should(Succeed())
 	serialconfig.Setup()
 	setupExecuted = true
