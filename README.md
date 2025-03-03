@@ -59,3 +59,16 @@ PRs fixing issues may link either
    Please link the PR using the `OCPBUGS-12345: ` or `RFE-9876: ` prefix in the PR description.
 
 we currently don't support other issue trackers.
+
+## Troubleshooting
+
+In case RTE pods are stuck in `CrashLoopBackOff` state after upgrade, and the following message shown in the logs:
+```
+ error while updating node allocatable: rpc error: code = Unavailable desc = connection error: desc = "transport: Error while dialing: dial unix /host-podresources/kubelet.sock: connect: permission denied"
+```
+
+Try the following steps to recover the pod's state:
+1. Upgrade the operator to latest minor release (x.y → x.z)
+2. Run [restore-selinux-context.sh](hack/restore-selinux-context.sh) script to restore the right security context.
+
+
