@@ -55,7 +55,7 @@ func Deployment(mutated client.Object) client.Object {
 func DaemonSet(mutated client.Object) client.Object {
 	daemonSet := mutated.(*appsv1.DaemonSet)
 	generated.SetObjectDefaults_DaemonSet(daemonSet)
-	// for backport compatability
+	// for backport compatibility
 	daemonSet.Spec.Template.Spec.DeprecatedServiceAccount = daemonSet.Spec.Template.Spec.ServiceAccountName
 	return daemonSet
 }
