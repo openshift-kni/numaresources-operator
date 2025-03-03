@@ -112,8 +112,13 @@ EOF
     done
 }
 
+function format() {
+  gofmt -s -w ${TARGET_DIR}
+}
+
 function cleanup() {
     annotate_packages "delete" "${API_PACKAGES[@]}"
+    format
     go mod tidy
     go mod vendor
 }
