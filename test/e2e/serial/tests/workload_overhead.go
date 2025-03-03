@@ -41,6 +41,7 @@ import (
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
+	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
@@ -138,7 +139,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					}
 				}
 			})
-			It("[test_id:47582][tier2] schedule a guaranteed Pod in a single NUMA zone and check overhead is not accounted in NRT", Label("tier2"), func() {
+			It("[test_id:47582][tier2] schedule a guaranteed Pod in a single NUMA zone and check overhead is not accounted in NRT", Label(label.Tier2), func() {
 
 				// even if it is not a hard rule, and even if there are a LOT of edge cases, a good starting point is usually
 				// in the ballpark of 5x the base load. We start like this
@@ -273,7 +274,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 			})
 
-			It("[test_id:53819][tier2][unsched] Pod pending when resources requested + pod overhead don't fit on the target node; NRT objects are not updated", Label("tier2", "unsched"), Label("feature:unsched"), func() {
+			It("[test_id:53819][tier2][unsched] Pod pending when resources requested + pod overhead don't fit on the target node; NRT objects are not updated", Label(label.Tier2, "unsched"), Label("feature:unsched"), func() {
 				var targetNodeName string
 				var targetNrtInitial *nrtv1alpha2.NodeResourceTopology
 				var targetNrtListInitial nrtv1alpha2.NodeResourceTopologyList

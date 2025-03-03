@@ -46,6 +46,7 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
+	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 
 	intbaseload "github.com/openshift-kni/numaresources-operator/internal/baseload"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
@@ -151,7 +152,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 		})
 
-		It("[test_id:47591][tier1] should modify workload post scheduling while keeping the resource requests available", Label("tier1"), func() {
+		It("[test_id:47591][tier1] should modify workload post scheduling while keeping the resource requests available", Label(label.Tier1), func() {
 			paddedNodeNames := sets.New[string](padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
@@ -539,7 +540,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 		})
 
-		It("[test_id:48746][tier2] should modify workload post scheduling while keeping the resource requests available across all NUMA node", Label("tier2"), func() {
+		It("[test_id:48746][tier2] should modify workload post scheduling while keeping the resource requests available across all NUMA node", Label(label.Tier2), func() {
 			paddedNodeNames := sets.New[string](padder.GetPaddedNodes()...)
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			// the only node which was not padded is the targetedNode
