@@ -299,13 +299,15 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 	} else {
 		informerMode = k8swgmanifests.CacheInformerShared
 	}
-	if schedSpec.ScoringStrategy.Type == nropv1.LeastAllocated {
+
+	switch sst := schedSpec.ScoringStrategy.Type; sst {
+	case nropv1.LeastAllocated:
 		scoringStrategyType = k8swgmanifests.ScoringStrategyLeastAllocated
-	} else if schedSpec.ScoringStrategy.Type == nropv1.BalancedAllocation {
+	case nropv1.BalancedAllocation:
 		scoringStrategyType = k8swgmanifests.ScoringStrategyBalancedAllocation
-	} else if schedSpec.ScoringStrategy.Type == nropv1.MostAllocated {
+	case nropv1.MostAllocated:
 		scoringStrategyType = k8swgmanifests.ScoringStrategyMostAllocated
-	} else {
+	default:
 		scoringStrategyType = k8swgmanifests.ScoringStrategyLeastAllocated
 	}
 	params.ScoringStrategy.Type = scoringStrategyType

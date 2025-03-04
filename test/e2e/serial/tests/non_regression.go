@@ -325,25 +325,25 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 	Context("Requesting resources that are greater than allocatable at numa level", func() {
 		It("[test_id:47613][tier3][nonreg][unsched] should not schedule a pod requesting resources that are not allocatable at numa level", Label("tier3", "nonreg", "unsched"), Label("feature:unsched"), func() {
-			//the test can run on node with any numa number, so no need to filter the nrts
+			// the test can run on node with any numa number, so no need to filter the nrts
 			nrtNames := e2enrt.AccumulateNames(nrts)
 
-			//select target node
+			// select target node
 			targetNodeName, ok := e2efixture.PopNodeName(nrtNames)
 			Expect(ok).To(BeTrue(), "cannot select a node among %#v", e2efixture.ListNodeNames(nrtNames))
 			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
 
-			//pad non target nodes
+			// pad non target nodes
 			By("padding non target nodes leaving room for the baseload only")
 			var paddingPods []*corev1.Pod
 			for _, nodeName := range e2efixture.ListNodeNames(nrtNames) {
 
-				//calculate base load on the node
+				// calculate base load on the node
 				baseload, err := baseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 				klog.Infof("computed base load: %s", baseload)
 
-				//get nrt info of the node
+				// get nrt info of the node
 				klog.Infof("preparing node %q to fit the test case", nodeName)
 				nrtInfo, err := e2enrt.FindFromList(nrts, nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", nodeName)
@@ -371,8 +371,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("waiting for the NRT data to settle")
 			e2efixture.MustSettleNRT(fxt)
 
-			//prepare the test pod
-			//get maximum allocatable resources across all numas of the target node
+			// prepare the test pod
+			// get maximum allocatable resources across all numas of the target node
 			var targetNrtListInitial nrtv1alpha2.NodeResourceTopologyList
 			err := fxt.Client.List(context.TODO(), &targetNrtListInitial)
 			Expect(err).ToNot(HaveOccurred())
@@ -383,7 +383,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				corev1.ResourceCPU:    e2enrt.GetMaxAllocatableResourceNumaLevel(*targetNrtInitial, corev1.ResourceCPU),
 				corev1.ResourceMemory: e2enrt.GetMaxAllocatableResourceNumaLevel(*targetNrtInitial, corev1.ResourceMemory),
 			}
-			//add minimal amount of cpu and memory to the max allocatable resources to ensure the requested amount is greater than allocatable would afford
+			// add minimal amount of cpu and memory to the max allocatable resources to ensure the requested amount is greater than allocatable would afford
 			minRes := corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("1"),
 				corev1.ResourceMemory: resource.MustParse("100Mi"),

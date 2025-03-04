@@ -259,10 +259,10 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 
 			By("deleting the last placeholder pod that was scheduled on the target node")
-			//Delete the LAst placeholder pod that was created because once verifying the NRT was updated properly,
+			// Delete the Last placeholder pod that was created because once verifying the NRT was updated properly,
 			// we'll compare with targetNrtBefore which is the topology of the target node without the last placeholder pod,
 			// this way we'll be sure that the test pod landed (should land otherwise it's a bug) on the correct numa zone that
-			//released the placeholder pod and is now feasible to accommodate the test pod
+			// released the placeholder pod and is now feasible to accommodate the test pod
 			targetPaddingPod := targetPaddingPods[len(targetPaddingPods)-1]
 			err = fxt.Client.Delete(context.TODO(), targetPaddingPod)
 			Expect(err).ToNot(HaveOccurred())
@@ -341,12 +341,12 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).NotTo(HaveOccurred())
 			klog.Infof("initial NRT target: %s", intnrt.ToString(*targetNrtInitial))
 
-			//calculate base load on the target node
+			// calculate base load on the target node
 			baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 			By(fmt.Sprintf("considering the computed base load: %s", baseload))
 
-			//get maximum available node CPU and Memory
+			// get maximum available node CPU and Memory
 			reqResources = corev1.ResourceList{
 				corev1.ResourceCPU:    availableResourceType(*targetNrtInitial, corev1.ResourceCPU),
 				corev1.ResourceMemory: availableResourceType(*targetNrtInitial, corev1.ResourceMemory),
@@ -365,12 +365,12 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 				err = fxt.Client.Get(context.TODO(), nodeKey, node)
 				Expect(err).NotTo(HaveOccurred())
 
-				//calculate base load on the node
+				// calculate base load on the node
 				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 				klog.Infof("computed base load: %s", baseload)
 
-				//get nrt info of the node
+				// get nrt info of the node
 				klog.Infof("preparing node %q to fit the test case", nodeName)
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", nodeName)
@@ -517,7 +517,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 				serialconfig.MultiNUMALabel: "2",
 			}
 
-			//calculate base load on the target node
+			// calculate base load on the target node
 			baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 			klog.Infof("computed base load: %s", baseload)

@@ -71,7 +71,6 @@ func main() {
 	stdin := bufio.NewScanner(os.Stdin)
 
 	fmt.Printf("start verifying commits from stdin\n")
-	defer fmt.Printf("done verifying commits from stdin\n")
 
 	for stdin.Scan() {
 		commit := GitCommit{}
@@ -94,4 +93,5 @@ func main() {
 			os.Exit(2)
 		}
 	}
+	fmt.Printf("done verifying commits from stdin\n")
 }

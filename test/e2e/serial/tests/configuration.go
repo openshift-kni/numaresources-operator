@@ -194,7 +194,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Expect(err).ToNot(HaveOccurred())
 
 			}()
-			//so far 0 machine count for mcp-test -> no nodes -> no updates status
+			// so far 0 machine count for mcp-test -> no nodes -> no updates status
 			newMcpInfo := mcpInfo{
 				mcpObj:        mcp,
 				initialConfig: mcp.Status.Configuration.Name,
@@ -220,7 +220,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				err = unlabelFunc()
 				Expect(err).ToNot(HaveOccurred())
 
-				//this will trigger node reboot as the NROP settings will be reapplied to the unlabelled node, so new node is added under the old mcp hence the MachineCount update type
+				// this will trigger node reboot as the NROP settings will be reapplied to the unlabelled node, so new node is added under the old mcp hence the MachineCount update type
 				waitForMcpUpdate(fxt.Client, context.TODO(), MachineCount, initialMcpInfo)
 			}()
 
@@ -261,7 +261,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				// this will trigger mcp update only for the initial mcps because the mcp-test nodes are still labeled
 				// with the old labels, so worker mcp will switch back to the NROP mc
 				waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, initialMcpInfo)
-			}() //end of defer
+			}() // end of defer
 
 			By("waiting for the mcps to update")
 			// on old mcp because the ds will no longer include the worker node that is not labeled with mcp-test, so returning to MC without NROP settings
@@ -365,7 +365,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 			By(fmt.Sprintf("modifying the NUMAResourcesScheduler SchedulerName field to %q", serialconfig.SchedulerTestName))
 			Eventually(func(g Gomega) {
-				//updates must be done on object.Spec and active values should be fetched from object.Status
+				// updates must be done on object.Spec and active values should be fetched from object.Status
 				err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroSchedObj), nroSchedObj)
 				g.Expect(err).ToNot(HaveOccurred())
 
@@ -461,7 +461,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}
 			Expect(targetedKC).ToNot(BeNil(), "there should be at least one kubeletconfig.machineconfiguration object")
 
-			//save initial Topology Manager scope to use it when restoring kc
+			// save initial Topology Manager scope to use it when restoring kc
 			kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
 			Expect(err).ToNot(HaveOccurred())
 			initialTMScope := kcObj.TopologyManagerScope
@@ -469,7 +469,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(initialTMScope).ToNot(Equal(newTMScope))
 
 			By("verify owner reference of kubeletconfig")
-			Expect(len(targetedKC.OwnerReferences)).To(BeNumerically("<", 2)) //so 0 or 1
+			Expect(len(targetedKC.OwnerReferences)).To(BeNumerically("<", 2)) // so 0 or 1
 			if len(targetedKC.OwnerReferences) == 0 {
 				By("modifying Topology Manager Scope under kubeletconfig")
 				Eventually(func(g Gomega) {
@@ -493,7 +493,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					Skip(fmt.Sprintf("owner object %q is not supported in this test", ref.Kind))
 				}
 
-				//update kubeletconfig via the performanceprofile
+				// update kubeletconfig via the performanceprofile
 				klog.Infof("update configuration via the kubeletconfig owner %s/%s", ref.Kind, ref.Name)
 				err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: ref.Name}, &performanceProfile)
 				Expect(err).ToNot(HaveOccurred())

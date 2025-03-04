@@ -121,7 +121,7 @@ func CheckPODSchedulingFailedForAlignment(k8sCli *kubernetes.Clientset, podNames
 	var alignmentErr string
 	if scope == intnrt.Container {
 		alignmentErr = ErrorCannotAlignContainer
-	} else { //intnrt.Pod
+	} else {
 		alignmentErr = ErrorCannotAlignPod
 	}
 
@@ -155,10 +155,10 @@ func CheckPODWasScheduledWith(k8sCli *kubernetes.Clientset, podNamespace, podNam
 	return checkPODEvents(k8sCli, podNamespace, podName, isScheduledWith)
 }
 
-func CheckNROSchedulerAvailable(cli client.Client, NUMAResourcesSchedObjName string) *nropv1.NUMAResourcesScheduler {
+func CheckNROSchedulerAvailable(cli client.Client, schedObjName string) *nropv1.NUMAResourcesScheduler {
 	nroSchedObj := &nropv1.NUMAResourcesScheduler{}
 	Eventually(func() bool {
-		By(fmt.Sprintf("checking %q for the condition Available=true", NUMAResourcesSchedObjName))
+		By(fmt.Sprintf("checking %q for the condition Available=true", schedObjName))
 
 		err := cli.Get(context.TODO(), objects.NROSchedObjectKey(), nroSchedObj)
 		if err != nil {
@@ -179,8 +179,8 @@ func CheckNROSchedulerAvailable(cli client.Client, NUMAResourcesSchedObjName str
 	return nroSchedObj
 }
 
-func GetNROSchedulerName(cli client.Client, NUMAResourcesSchedObjName string) string {
-	nroSchedObj := CheckNROSchedulerAvailable(cli, NUMAResourcesSchedObjName)
+func GetNROSchedulerName(cli client.Client, schedObjName string) string {
+	nroSchedObj := CheckNROSchedulerAvailable(cli, schedObjName)
 	return nroSchedObj.Status.SchedulerName
 }
 

@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"k8s.io/klog/v2"
 	"log"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,7 +60,8 @@ func main() {
 		nrtObjs := topologyv1alpha2.NodeResourceTopologyList{}
 		wa, err := cli.Watch(ctx, &nrtObjs)
 		if err != nil {
-			log.Fatalf("cannot watch NRT objects: %v", err)
+			klog.Errorf("cannot watch NRT objects: %v", err)
+			return
 		}
 
 		for {

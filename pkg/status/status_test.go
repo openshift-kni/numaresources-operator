@@ -98,7 +98,7 @@ func TestUpdateConditions(t *testing.T) {
 		t.Errorf("failed to get NUMAResourcesOperator object: %v", err)
 	}
 
-	//shortcut
+	// shortcut
 	progressingCondition := &updatedNro.Status.Conditions[2]
 	if progressingCondition.Status != metav1.ConditionTrue {
 		t.Errorf("Update() failed to set correct status, expected: %q, got: %q", metav1.ConditionTrue, progressingCondition.Status)

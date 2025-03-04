@@ -50,6 +50,7 @@ linters:
     - unused
     - wastedassign
     - whitespace
+    - gocritic
 linters-settings:
   revive:
     rules:

@@ -244,7 +244,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				},
 				corev1.PodQOSBurstable,
 			),
-			Entry("[test_id:74252][qos:be] with ephemeral storage, multi-container", //TODO test with devices and hugepages requests and fix automation
+			Entry("[test_id:74252][qos:be] with ephemeral storage, multi-container", // TODO test with devices and hugepages requests and fix automation
 				Label("qos:be"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod

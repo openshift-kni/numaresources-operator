@@ -150,7 +150,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			for nIdx, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
-				//calculate a base load on the node
+				// calculate a base load on the node
 				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 				klog.Infof("computed base load: %s", baseload)
@@ -1495,7 +1495,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				{
 					// the baseload will be added to the first numa zone upon padding, this need to consider
 					// that baseCpus + targetNodeFreeCpus does not make the first numa a candidate for any of the containers. Take into account that the baseCpus can be at least 2 cpus
-					//so for example if cpus(cont1) = 5 and cpus(cont2) = 5 then cpus(numa0)<5 and since the basecpus usually is 2 then we should make pass at most 2 free cpus as the free cpus in numa0
+					// so for example if cpus(cont1) = 5 and cpus(cont2) = 5 then cpus(numa0)<5 and since the basecpus usually is 2 then we should make pass at most 2 free cpus as the free cpus in numa0
 					corev1.ResourceCPU:    resource.MustParse("1"),
 					corev1.ResourceMemory: resource.MustParse("4Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
@@ -1643,7 +1643,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			[]corev1.ResourceList{
 				{
 					corev1.ResourceCPU: resource.MustParse("4"),
-					//the base memory on the node could be 4.5Gi, so we need to consider that 4.5Gi + 1Gi is not enough for any of the pod containers
+					// the base memory on the node could be 4.5Gi, so we need to consider that 4.5Gi + 1Gi is not enough for any of the pod containers
 					corev1.ResourceMemory: resource.MustParse("1Gi"),
 					"hugepages-2Mi":       resource.MustParse("32Mi"),
 					"hugepages-1Gi":       resource.MustParse("1Gi"),

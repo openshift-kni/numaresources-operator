@@ -100,7 +100,7 @@ func EqualResourceInfoWithDeviation(resInfoA, resInfoB nrtv1alpha2.ResourceInfo)
 		 sure that there is no memory amount request equal or less than 52Mi thus it is safe to continue with this
 		  without confusing with a real difference caused by unsettled NRTs.
 	*/
-	dev, _ := resource.ParseQuantity("54525952") //52 Mi
+	dev, _ := resource.ParseQuantity("54525952") // 52 Mi
 
 	if resInfoA.Name != resInfoB.Name {
 		return false, fmt.Errorf("mismatched resource name initial=%q vs updated=%q", resInfoA.Name, resInfoB.Name)

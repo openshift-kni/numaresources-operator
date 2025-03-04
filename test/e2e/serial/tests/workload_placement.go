@@ -384,8 +384,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				return fxt.Client.Update(context.TODO(), updatedDp)
 			}).WithTimeout(2 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
 
-			//between updating the object and having the deployment in complete state, a creation of replicaset acctually happens.
-			//The check of the deployment completeness is not enough in this context because:
+			// between updating the object and having the deployment in complete state, a creation of replicaset acctually happens.
+			// The check of the deployment completeness is not enough in this context because:
 			// 1. the test updates an existing deployment. the deployment was "complete" in earlier stages and
 			//    it will remain as such (even if the new pod after the update is in pending state, the old pod will still exists -> deployment is counted as complete)
 			// 2. this check may happen before the new replicaset is created,hence applying the later checks on an old pod -> failing the test
@@ -1192,13 +1192,13 @@ func matchLogLevelToKlog(cnt *corev1.Container, level operatorv1.LogLevel) (bool
 	return found, val.Data == kLvl.String()
 }
 
-func checkReplica(pod corev1.Pod, targetNodeName string, K8sClient *kubernetes.Clientset) {
+func checkReplica(pod corev1.Pod, targetNodeName string, k8sClient *kubernetes.Clientset) {
 	By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", pod.Spec.NodeName, targetNodeName))
 	Expect(pod.Spec.NodeName).To(Equal(targetNodeName),
 		"node landed on %q instead of on %v", pod.Spec.NodeName, targetNodeName)
 
 	By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
-	schedOK, err := nrosched.CheckPODWasScheduledWith(K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+	schedOK, err := nrosched.CheckPODWasScheduledWith(k8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 }
