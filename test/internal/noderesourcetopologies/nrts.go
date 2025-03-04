@@ -258,8 +258,8 @@ func DropHostLevelResources(res corev1.ResourceList) corev1.ResourceList {
 	return newList
 }
 func SaturateNodeUntilLeft(nrtInfo nrtv1alpha2.NodeResourceTopology, requiredRes corev1.ResourceList) (map[string]corev1.ResourceList, error) {
-	//TODO: support splitting the requiredRes on multiple numas
-	//corrently the function deducts the requiredRes from the first Numa
+	// TODO: support splitting the requiredRes on multiple numas
+	// currently the function deducts the requiredRes from the first Numa
 
 	paddingRes := make(map[string]corev1.ResourceList)
 

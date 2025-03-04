@@ -32,9 +32,9 @@ issues:
 linters:
   disable-all: true
   enable:
-#    - errcheck
+    - errcheck
     - bodyclose
-#    - copyloopvar
+    - copyloopvar
     - depguard
     - ginkgolinter
     - gosimple
@@ -50,6 +50,7 @@ linters:
     - unused
     - wastedassign
     - whitespace
+    - gocritic
 linters-settings:
   revive:
     rules:

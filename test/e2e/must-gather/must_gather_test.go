@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"k8s.io/klog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -55,7 +56,7 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 			By("Looking for oc tool")
 			ocExec, err := exec.LookPath("oc")
 			if err != nil {
-				fmt.Fprintf(GinkgoWriter, "Unable to find oc executable: %v\n", err)
+				_, _ = fmt.Fprintf(GinkgoWriter, "Unable to find oc executable: %v\n", err)
 				Skip(fmt.Sprintf("unable to find 'oc' executable %v\n", err))
 			}
 
@@ -82,7 +83,10 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 			if _, ok := os.LookupEnv("E2E_NROP_MUSTGATHER_CLEANUP_SKIP"); ok {
 				return
 			}
-			os.RemoveAll(destDir)
+			err := os.RemoveAll(destDir)
+			if err != nil {
+				klog.Warningf("unable to remove temporary directory %q: %v", destDir, err)
+			}
 		})
 
 		It("check NRO data files have been collected", func(ctx context.Context) {
@@ -244,14 +248,14 @@ func getMachineConfigPools(folder string) (mcov1.MachineConfigPoolList, error) {
 	return retval, nil
 }
 
-// return true if B keys and values respectively are part of A, otherwise false
-func isMapSubsetOf(A map[string]string, B map[string]string) bool {
-	if len(A) < len(B) || len(A) == 0 {
+// return true if b keys and values respectively are part of a, otherwise false
+func isMapSubsetOf(a map[string]string, b map[string]string) bool {
+	if len(a) < len(b) || len(a) == 0 {
 		return false
 	}
 
-	for k, bv := range B {
-		av, ok := A[k]
+	for k, bv := range b {
+		av, ok := a[k]
 
 		if !ok || av != bv {
 			return false

@@ -592,8 +592,8 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 							g.Expect(err).ToNot(HaveOccurred())
 						}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-						//the current set of tests does not update the mcplabels in the NROP CR,
-						//thus there is no need to wait for MCP updates after updating the CR
+						// the current set of tests does not update the mcplabels in the NROP CR,
+						// thus there is no need to wait for MCP updates after updating the CR
 
 					}
 				})

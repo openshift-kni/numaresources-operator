@@ -36,7 +36,7 @@ func WaitForPaddingPodsRunning(fxt *Fixture, paddingPods []*corev1.Pod) []string
 	failedPods, _ := wait.With(fxt.Client).ForPodListAllRunning(context.TODO(), paddingPods)
 	for _, failedPod := range failedPods {
 		_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
-		//note that this test does not use podOverhead thus pod req and lim would be the pod's resources as set upon creating
+		// note that this test does not use podOverhead thus pod req and lim would be the pod's resources as set upon creating
 		req, lim := resourcehelper.PodRequestsAndLimits(failedPod)
 		klog.Infof("Resources for pod %s/%s: requests: %s ; limits: %s", failedPod.Namespace, failedPod.Name, e2ereslist.ToString(req), e2ereslist.ToString(lim))
 

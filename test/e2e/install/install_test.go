@@ -292,7 +292,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 				var err error
 				ds, err = getDaemonSetByOwnerReference(uid)
 				return err
-			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeNil())
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 
 			deleteNROPSync(e2eclient.Client, nroObj)
 
@@ -359,7 +359,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 })
 
 func findContainerByName(daemonset appsv1.DaemonSet, containerName string) (*corev1.Container, error) {
-	//shortcut
+	// shortcut
 	containers := daemonset.Spec.Template.Spec.Containers
 
 	if len(containers) == 0 {

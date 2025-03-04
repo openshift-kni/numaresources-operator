@@ -330,7 +330,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					By("unlabel nodes during execution and check that the test's pod was not evicted due to shaked matching criteria")
 					nodesUnlabeled = true
 					err = unlabelTarget()
-					//if at least one of the unlabeling failed, set nodesUnlabeled to false to try again in afterEach
+					// if at least one of the unlabeling failed, set nodesUnlabeled to false to try again in afterEach
 					if err != nil {
 						nodesUnlabeled = false
 						klog.Errorf("Error while trying to unlabel node %q. %v", targetNodeName, err)
@@ -341,7 +341,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 						klog.Errorf("Error while trying to unlabel node %q. %v", alternativeNodeName, err)
 					}
 
-					//check that it didn't stop running for some time
+					// check that it didn't stop running for some time
 					By(fmt.Sprintf("ensuring the deployment %q keep being ready", deployment.Name))
 					Eventually(func() bool {
 						updatedDp := &appsv1.Deployment{}

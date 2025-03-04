@@ -184,11 +184,12 @@ func TestFindBySelector(t *testing.T) {
 				t.Errorf("got no error but expected %v", tc.expectedErr)
 			} else if err != nil && tc.expectedErr == nil {
 				t.Errorf("got error %v but expected none", err)
-			} else if err != nil && tc.expectedErr != nil {
-				if !errors.Is(err, tc.expectedErr) {
-					t.Errorf("got error %v but expected %v", err, tc.expectedErr)
-				}
 			}
+
+			if !errors.Is(err, tc.expectedErr) {
+				t.Errorf("got error %v but expected %v", err, tc.expectedErr)
+			}
+
 			if !reflect.DeepEqual(tc.expectedMCP, got) {
 				t.Errorf("expected MCP %v got %v", tc.expectedMCP, got)
 			}

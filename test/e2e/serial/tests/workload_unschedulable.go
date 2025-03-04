@@ -120,7 +120,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 
-			//TODO: we should calculate requiredRes from NUMA zones in cluster nodes instead.
+			// TODO: we should calculate requiredRes from NUMA zones in cluster nodes instead.
 			requiredRes = corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("16"),
 				corev1.ResourceMemory: resource.MustParse("16Gi"),
@@ -332,7 +332,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			targetNodeName, ok := e2efixture.PopNodeName(nrtCandidateNames)
 			Expect(ok).To(BeTrue(), "unable to get targetNodeName")
 
-			//TODO: we should calculate requiredRes from NUMA zones in cluster nodes instead.
+			// TODO: we should calculate requiredRes from NUMA zones in cluster nodes instead.
 			requiredRes := corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("16"),
 				corev1.ResourceMemory: resource.MustParse("16Gi"),
@@ -520,7 +520,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 
 			By("Padding target node")
-			//calculate base load on the target node
+			// calculate base load on the target node
 			targetNodeBaseLoad, err := intbaseload.ForNode(fxt.Client, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
 
@@ -538,7 +538,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			for zoneIdx, zone := range targetNrt.Zones {
 				zoneRes := paddingResources.DeepCopy()
-				if zoneIdx == 0 { //any zone would do it, we just choose one.
+				if zoneIdx == 0 { // any zone would do it, we just choose one.
 					targetNodeBaseLoad.Apply(zoneRes)
 				}
 
@@ -800,7 +800,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: targetNodeName}, &targetNrtInitial)
 			Expect(err).ToNot(HaveOccurred())
 
-			//get maximum available node CPU and Memory
+			// get maximum available node CPU and Memory
 			requiredRes = corev1.ResourceList{
 				corev1.ResourceCPU:    allocatableResourceType(targetNrtInitial, corev1.ResourceCPU),
 				corev1.ResourceMemory: allocatableResourceType(targetNrtInitial, corev1.ResourceMemory),
@@ -810,12 +810,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			var paddingPods []*corev1.Pod
 			for _, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 
-				//calculate base load on the node
+				// calculate base load on the node
 				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 				klog.Infof("computed base load: %s", baseload)
 
-				//get nrt info of the node
+				// get nrt info of the node
 				klog.Infof("preparing node %q to fit the test case", nodeName)
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", nodeName)

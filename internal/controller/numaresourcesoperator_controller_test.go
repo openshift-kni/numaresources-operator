@@ -399,7 +399,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						if ng1.MachineConfigPoolSelector != nil {
 							ng1WithNodeSelector.PoolName = &pnNew
 						} else {
-							//must be PoolName that's set, so set the MCP selector
+							// must be PoolName that's set, so set the MCP selector
 							ng1WithNodeSelector.MachineConfigPoolSelector = &metav1.LabelSelector{
 								MatchLabels: map[string]string{pnNew: pnNew},
 							}
@@ -1533,7 +1533,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							})
 							It("should continue with creation of additional components", func() {
 								// check reconcile second loop result
-								//	triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
+								// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
 								Expect(result).To(Equal(reconcile.Result{}))
 
 								ctx := context.Background()
@@ -1611,7 +1611,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 									nroUpdated := &nropv1.NUMAResourcesOperator{}
 									Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).ToNot(HaveOccurred())
 
-									//Should have this object references ...
+									// Should have this object references ...
 									expected := []configv1.ObjectReference{
 										{
 											Resource: "namespaces",

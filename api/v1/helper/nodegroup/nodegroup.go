@@ -52,9 +52,9 @@ func (ttr Tree) Clone() Tree {
 	return ret
 }
 
-// FindTrees [DEPRECATED] an alias of FindTreesOpenshift, it finds the MCPs per node group and returns []Tree
+// FindTrees an alias of FindTreesOpenshift, it finds the MCPs per node group and returns []Tree
 // As the operator advances, it is being supported on different platforms in which []Tree is calculated differently
-// This function is deprecated please use platform-specific functions instead
+// Deprecated: please use platform-specific functions instead
 func FindTrees(mcps *mcov1.MachineConfigPoolList, nodeGroups []nropv1.NodeGroup) ([]Tree, error) {
 	return FindTreesOpenshift(mcps, nodeGroups)
 }

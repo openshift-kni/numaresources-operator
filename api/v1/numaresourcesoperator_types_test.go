@@ -28,7 +28,7 @@ import (
 
 func TestNodeGroupConfigToString(t *testing.T) {
 	defaultConfig := DefaultNodeGroupConfig()
-	//non default values for config fields
+	// non default values for config fields
 	d, err := time.ParseDuration("33s")
 	if err != nil {
 		t.Fatal(err)

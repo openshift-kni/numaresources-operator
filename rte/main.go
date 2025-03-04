@@ -140,14 +140,15 @@ func setupTopologyManagerConfig(parsedArgs *rteconfiguration.ProgArgs) {
 
 func dump(parsedArgs *rteconfiguration.ProgArgs) error {
 	conf := parsedArgs.ToYAMLString()
-	if parsedArgs.DumpConfig == "-" {
+	switch dc := parsedArgs.DumpConfig; dc {
+	case "-":
 		fmt.Println(conf)
-	} else if parsedArgs.DumpConfig == ".andexit" {
+	case ".andexit":
 		fmt.Println(conf)
 		os.Exit(0)
-	} else if parsedArgs.DumpConfig == ".log" {
+	case ".log":
 		klog.Infof("current configuration:\n%s", conf)
-	} else {
+	default:
 		err := os.WriteFile(parsedArgs.DumpConfig, []byte(conf), 0644)
 		if err != nil {
 			klog.Fatalf("failed to write the config to %q: %v", parsedArgs.DumpConfig, err)

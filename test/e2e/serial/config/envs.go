@@ -24,13 +24,13 @@ import (
 )
 
 func DumpEnvironment(w io.Writer) {
-	fmt.Fprintf(w, "E2E NROP environment variables dump BEGIN\n")
-	defer fmt.Fprintf(w, "E2E NROP environment variables dump END\n")
+	_, _ = fmt.Fprintf(w, "E2E NROP environment variables dump BEGIN\n")
+	defer func() { _, _ = fmt.Fprintf(w, "E2E NROP environment variables dump END\n") }()
 	for _, keyVal := range os.Environ() {
 		if !looksLikeE2ENROPEnv(keyVal) {
 			continue
 		}
-		fmt.Fprintf(w, "- %s\n", keyVal)
+		_, _ = fmt.Fprintf(w, "- %s\n", keyVal)
 	}
 }
 
