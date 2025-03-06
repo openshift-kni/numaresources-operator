@@ -18,12 +18,16 @@ package noderesourcetopology
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/klog"
+
+	"github.com/openshift-kni/numaresources-operator/internal/devices"
 )
 
 func EqualZones(zonesA, zonesB nrtv1alpha2.ZoneList, isRebootTest bool) (bool, error) {
@@ -71,7 +75,16 @@ func EqualResourceInfos(resInfosA, resInfosB nrtv1alpha2.ResourceInfoList, isReb
 
 func EqualResourceInfo(resInfoA, resInfoB nrtv1alpha2.ResourceInfo, isRebootTest bool) (bool, error) {
 	if isRebootTest && strings.Compare(resInfoA.Name, string(corev1.ResourceMemory)) == 0 {
-		return EqualResourceInfoWithDeviation(resInfoA, resInfoB)
+		return EqualMemoryWithDeviation(resInfoA, resInfoB)
+	}
+
+	// TODO we almost never use real devices but in case we do we still pass the names using same env variables as for
+	// sample devices; need a way to distinguish between real vs sample devices used in the ci
+	if isRebootTest && resourceIsDevice(resInfoA.Name) {
+		// TODO: Feb 2025: NROP serial is using sample-device plugin which has a known issue that after operations like node reboot or taints update,
+		// quantity of the device resources is messed up, so this is a workaround for reboot tests should be removed once
+		// https://issues.redhat.com/browse/CNF-12824 is resolved. Note that this doesn't happen with real devices like sriov.
+		return EqualDevicesWithDeviation(resInfoA, resInfoB)
 	}
 
 	if resInfoA.Name != resInfoB.Name {
@@ -89,7 +102,58 @@ func EqualResourceInfo(resInfoA, resInfoB nrtv1alpha2.ResourceInfo, isRebootTest
 	return true, nil
 }
 
-func EqualResourceInfoWithDeviation(resInfoA, resInfoB nrtv1alpha2.ResourceInfo) (bool, error) {
+func EqualDevicesWithDeviation(a, b nrtv1alpha2.ResourceInfo) (bool, error) {
+	if a.Name != b.Name {
+		return false, fmt.Errorf("mismatched resource name initial=%q vs updated=%q", a.Name, b.Name)
+	}
+	if a.Capacity.Cmp(b.Capacity) != 0 {
+		klog.Warningf("mismatched resource Capacity initial=%v vs updated=%v", ResourceInfoToString(a), ResourceInfoToString(b))
+	}
+	if a.Allocatable.Cmp(b.Allocatable) != 0 {
+		klog.Warningf("mismatched resource Allocatable initial=%v vs updated=%v", ResourceInfoToString(a), ResourceInfoToString(b))
+		// we shouldn't tolerate different consumptions ratios though
+		ac := a.Capacity
+		bc := b.Capacity
+		ac.Sub(a.Allocatable)
+		bc.Sub(b.Allocatable)
+		if ac.Cmp(bc) != 0 {
+			return false, fmt.Errorf("mismatched resource consumption; expected %v==%v=true", ac.String(), bc.String())
+		}
+	}
+	if a.Available.Cmp(b.Available) != 0 {
+		klog.Warningf("mismatched resource Available initial=%v vs updated=%v", ResourceInfoToString(a), ResourceInfoToString(b))
+		// we shouldn't tolerate different consumptions ratios though
+		ac := a.Capacity
+		bc := b.Capacity
+		ac.Sub(a.Available)
+		bc.Sub(b.Available)
+		if ac.Cmp(bc) != 0 {
+			return false, fmt.Errorf("mismatched resource consumption; expected %v==%v=true", ac.String(), bc.String())
+		}
+	}
+	return true, nil
+}
+
+func resourceIsDevice(resName string) bool {
+	var name string
+	var ok bool
+
+	name, ok = os.LookupEnv(devices.DevType1EnvVar)
+	if ok && resName == name {
+		return true
+	}
+	name, ok = os.LookupEnv(devices.DevType2EnvVar)
+	if ok && resName == name {
+		return true
+	}
+	name, ok = os.LookupEnv(devices.DevType3EnvVar)
+	if ok && resName == name {
+		return true
+	}
+	return false
+}
+
+func EqualMemoryWithDeviation(resInfoA, resInfoB nrtv1alpha2.ResourceInfo) (bool, error) {
 	/*
 		tests that involve reboot show a difference in the memory capacity on numa nodes, e.g memory capacity
 		 is reallocated across numa nodes upon startup. This is a a kernel behavior which we have no control
