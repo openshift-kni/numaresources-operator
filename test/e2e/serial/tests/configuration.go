@@ -97,6 +97,14 @@ type mcpInfo struct {
 	sampleNode    corev1.Node
 }
 
+func (i mcpInfo) ToString() string {
+	mcpname := ""
+	if i.mcpObj != nil {
+		mcpname = i.mcpObj.Name
+	}
+	return fmt.Sprintf("name %q; config %q; sample node %q", mcpname, i.initialConfig, i.sampleNode.Name)
+}
+
 var _ = Describe("[serial][disruptive] numaresources configuration management", Serial, Label("disruptive"), Label("feature:config"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
@@ -160,7 +168,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			if len(initialMcps) > 1 {
 				e2efixture.Skip(fxt, "the test supports single node group")
 			}
+
 			initialMcp := initialMcps[0]
+			initialMcpInfo := mcpInfo{
+				mcpObj:        initialMcp,
+				initialConfig: initialMcp.Status.Configuration.Name,
+				sampleNode:    initialMcpSampleNode,
+			}
+			klog.Infof("initial mcp info: %s", initialMcpInfo.ToString())
 
 			mcp := objects.TestMCP()
 			By(fmt.Sprintf("creating new MCP: %q", mcp.Name))
@@ -200,11 +215,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				initialConfig: mcp.Status.Configuration.Name,
 				sampleNode:    targetedNode,
 			}
-			initialMcpInfo := mcpInfo{
-				mcpObj:        initialMcp,
-				initialConfig: initialMcp.Status.Configuration.Name,
-				sampleNode:    initialMcpSampleNode,
-			}
+			klog.Infof("new mcp info: %s", newMcpInfo.ToString())
 
 			By(fmt.Sprintf("Label node %q with %q", targetedNode.Name, getLabelRoleMCPTest()))
 			unlabelFunc, err := labelNode(fxt.Client, getLabelRoleMCPTest(), targetedNode.Name)
