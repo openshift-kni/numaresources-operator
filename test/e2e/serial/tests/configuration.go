@@ -209,10 +209,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Expect(err).ToNot(HaveOccurred())
 
 			}()
-			//so far 0 machine count for mcp-test -> no nodes -> no updates status
+
+			//so far 0 machine count for mcp-test -> no nodes -> no updates status -> empty status
+			var updatedNewMcp machineconfigv1.MachineConfigPool
+			Expect(fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(mcp), &updatedNewMcp)).To(Succeed())
+
 			newMcpInfo := mcpInfo{
-				mcpObj:        mcp,
-				initialConfig: mcp.Status.Configuration.Name,
+				mcpObj:        &updatedNewMcp,
+				initialConfig: updatedNewMcp.Status.Configuration.Name,
 				sampleNode:    targetedNode,
 			}
 			klog.Infof("new mcp info: %s", newMcpInfo.ToString())
