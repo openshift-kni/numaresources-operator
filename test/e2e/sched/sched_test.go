@@ -40,7 +40,6 @@ import (
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	e2eimages "github.com/openshift-kni/numaresources-operator/test/internal/images"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
-	e2eobjects "github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
 var _ = Describe("[Scheduler] imageReplacement", func() {
@@ -153,7 +152,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 				}
 
 				for i := 0; i < len(cmList.Items); i++ {
-					if e2eobjects.IsOwnedBy(cmList.Items[i].ObjectMeta, nroSchedObj.ObjectMeta) {
+					if objects.IsOwnedBy(cmList.Items[i].ObjectMeta, nroSchedObj.ObjectMeta) {
 						nroCM = &cmList.Items[i]
 					}
 				}
@@ -267,7 +266,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 
 			var nroschedCM *corev1.ConfigMap
 			for i := 0; i < len(cmList.Items); i++ {
-				if e2eobjects.IsOwnedBy(cmList.Items[i].ObjectMeta, nroSchedObj.ObjectMeta) {
+				if objects.IsOwnedBy(cmList.Items[i].ObjectMeta, nroSchedObj.ObjectMeta) {
 					nroschedCM = &cmList.Items[i]
 					break
 				}

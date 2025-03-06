@@ -51,6 +51,7 @@ linters:
     - wastedassign
     - whitespace
     - gocritic
+    - stylecheck
 linters-settings:
   revive:
     rules:
@@ -89,3 +90,11 @@ linters-settings:
   gocritic:
     disabled-checks:
       - commentFormatting
+  stylecheck:
+    checks:
+      # A function's error value should be its last return value.
+      # https://staticcheck.dev/docs/checks/#ST1008
+      - ST1008
+      # Importing the same package multiple times.
+      # https://staticcheck.dev/docs/checks/#ST1019
+      - ST1019

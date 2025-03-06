@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
@@ -184,7 +183,7 @@ func GetNodesByNRO(ctx context.Context, cli client.Client) (sets.Set[string], er
 	return enabledNodeNames, nil
 }
 
-type ValidateFunc func(data ValidatorData) ([]validator.ValidationResult, error)
+type ValidateFunc func(data ValidatorData) ([]deployervalidator.ValidationResult, error)
 
 func Validators() map[string]ValidateFunc {
 	return map[string]ValidateFunc{
@@ -206,7 +205,7 @@ func Validate(data ValidatorData) (Report, error) {
 		valFns = append(valFns, fn)
 	}
 
-	var ret []validator.ValidationResult
+	var ret []deployervalidator.ValidationResult
 	for _, helper := range valFns {
 		res, err := helper(data)
 		if err != nil {

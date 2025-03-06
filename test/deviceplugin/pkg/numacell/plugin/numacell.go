@@ -27,7 +27,6 @@ import (
 	"github.com/jaypipes/ghw/pkg/topology"
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
 
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 )
 
@@ -40,8 +39,8 @@ type NUMACellLister struct {
 
 func NewNUMACellLister(topoInfo *topology.Info, deviceCount int) NUMACellLister {
 	if deviceCount <= 0 {
-		klog.Warningf("invalid devices count, reset to %d", api.NUMACellDefaultDeviceCount)
-		deviceCount = api.NUMACellDefaultDeviceCount
+		klog.Warningf("invalid devices count, reset to %d", numacellapi.NUMACellDefaultDeviceCount)
+		deviceCount = numacellapi.NUMACellDefaultDeviceCount
 	}
 	klog.Infof("NUMACell: %d devices per NUMA cell", deviceCount)
 	return NUMACellLister{
