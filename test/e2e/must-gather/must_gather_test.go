@@ -248,14 +248,14 @@ func getMachineConfigPools(folder string) (mcov1.MachineConfigPoolList, error) {
 	return retval, nil
 }
 
-// return true if B keys and values respectively are part of A, otherwise false
-func isMapSubsetOf(A map[string]string, B map[string]string) bool {
-	if len(A) < len(B) || len(A) == 0 {
+// return true if b keys and values respectively are part of a, otherwise false
+func isMapSubsetOf(a map[string]string, b map[string]string) bool {
+	if len(a) < len(b) || len(a) == 0 {
 		return false
 	}
 
-	for k, bv := range B {
-		av, ok := A[k]
+	for k, bv := range b {
+		av, ok := a[k]
 
 		if !ok || av != bv {
 			return false

@@ -236,6 +236,11 @@ func TestApplyState(t *testing.T) {
 			if err != nil {
 				t.Errorf("%q failed to apply object with error: %v", tc.name, err)
 			}
+
+			if !(tc.expectCreatedOrUpdated || tc.expectDeleted || tc.expectSkip) {
+				t.Errorf("inconsistent action in %q", tc.name)
+			}
+
 			if tc.expectCreatedOrUpdated {
 				if !done {
 					t.Errorf("%q failed to apply: done=false", tc.name)
@@ -250,7 +255,8 @@ func TestApplyState(t *testing.T) {
 				if diff := cmp.Diff(obj, tc.scratch); diff != "" {
 					t.Errorf("%q failed to set object into its desired state, diff %v", tc.name, diff)
 				}
-			} else if tc.expectSkip {
+			}
+			if tc.expectSkip {
 				if done {
 					t.Errorf("%q failed to skip: done=true", tc.name)
 				}
@@ -264,7 +270,8 @@ func TestApplyState(t *testing.T) {
 				if diff := cmp.Diff(obj, tc.scratch); diff != "" {
 					t.Errorf("%q failed to set object into its desired state, diff %v", tc.name, diff)
 				}
-			} else if tc.expectDeleted {
+			}
+			if tc.expectDeleted {
 				if !done {
 					t.Errorf("%q failed to apply: done=false", tc.name)
 				}
@@ -272,8 +279,6 @@ func TestApplyState(t *testing.T) {
 				if err == nil || !apierrors.IsNotFound(err) {
 					t.Errorf("%q get succeeded, it should have failed: %v", tc.name, err)
 				}
-			} else {
-				t.Fatalf("inconsistent action in %q", tc.name)
 			}
 		})
 	}
@@ -321,19 +326,19 @@ func Test_describeObject(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := describeObject(tc.obj)
-			gotErr := (err != nil)
-			expErr := (tc.expError != nil)
-			if gotErr != expErr {
-				if !gotErr && expErr {
-					t.Fatalf("expected error, got none")
-				} else if gotErr && !expErr {
-					t.Fatalf("expected no error, got one")
-				}
-			} else if expErr {
+			if err != nil && tc.expError == nil {
+				t.Fatalf("expected no error, got one")
+			}
+			if err == nil && tc.expError != nil {
+				t.Fatalf("expected error, got none")
+			}
+			if err != nil && tc.expError != nil {
 				if err.Error() != tc.expError.Error() {
 					t.Fatalf("got error %v expected %v", err, tc.expError)
 				}
-			} else if got != tc.expString {
+			}
+
+			if got != tc.expString {
 				t.Fatalf("got desc {%q} expected {%q}", got, tc.expString)
 			}
 		})

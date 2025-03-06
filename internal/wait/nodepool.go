@@ -11,8 +11,8 @@ import (
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 )
 
-func ForUpdatingConfig(ctx context.Context, c client.Client, NpName, namespace string) error {
-	return waitForCondition(ctx, c, NpName, namespace, func(conds []hypershiftv1beta1.NodePoolCondition) bool {
+func ForUpdatingConfig(ctx context.Context, c client.Client, npName, namespace string) error {
+	return waitForCondition(ctx, c, npName, namespace, func(conds []hypershiftv1beta1.NodePoolCondition) bool {
 		for _, cond := range conds {
 			if cond.Type == hypershiftv1beta1.NodePoolUpdatingConfigConditionType {
 				return cond.Status == corev1.ConditionTrue
@@ -22,8 +22,8 @@ func ForUpdatingConfig(ctx context.Context, c client.Client, NpName, namespace s
 	})
 }
 
-func ForConfigToBeReady(ctx context.Context, c client.Client, NpName, namespace string) error {
-	return waitForCondition(ctx, c, NpName, namespace, func(conds []hypershiftv1beta1.NodePoolCondition) bool {
+func ForConfigToBeReady(ctx context.Context, c client.Client, npName, namespace string) error {
+	return waitForCondition(ctx, c, npName, namespace, func(conds []hypershiftv1beta1.NodePoolCondition) bool {
 		for _, cond := range conds {
 			if cond.Type == hypershiftv1beta1.NodePoolUpdatingConfigConditionType {
 				return cond.Status == corev1.ConditionFalse
@@ -33,10 +33,10 @@ func ForConfigToBeReady(ctx context.Context, c client.Client, NpName, namespace 
 	})
 }
 
-func waitForCondition(ctx context.Context, c client.Client, NpName, namespace string, conditionFunc func([]hypershiftv1beta1.NodePoolCondition) bool) error {
+func waitForCondition(ctx context.Context, c client.Client, npName, namespace string, conditionFunc func([]hypershiftv1beta1.NodePoolCondition) bool) error {
 	return wait.PollUntilContextTimeout(ctx, time.Second*10, time.Minute*60, false, func(ctx context.Context) (done bool, err error) {
 		np := &hypershiftv1beta1.NodePool{}
-		key := client.ObjectKey{Name: NpName, Namespace: namespace}
+		key := client.ObjectKey{Name: npName, Namespace: namespace}
 		err = c.Get(ctx, key, np)
 		if err != nil {
 			return false, err

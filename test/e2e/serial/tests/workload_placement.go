@@ -1192,13 +1192,13 @@ func matchLogLevelToKlog(cnt *corev1.Container, level operatorv1.LogLevel) (bool
 	return found, val.Data == kLvl.String()
 }
 
-func checkReplica(pod corev1.Pod, targetNodeName string, K8sClient *kubernetes.Clientset) {
+func checkReplica(pod corev1.Pod, targetNodeName string, k8sClient *kubernetes.Clientset) {
 	By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", pod.Spec.NodeName, targetNodeName))
 	Expect(pod.Spec.NodeName).To(Equal(targetNodeName),
 		"node landed on %q instead of on %v", pod.Spec.NodeName, targetNodeName)
 
 	By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
-	schedOK, err := nrosched.CheckPODWasScheduledWith(K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+	schedOK, err := nrosched.CheckPODWasScheduledWith(k8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 }

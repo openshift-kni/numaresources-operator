@@ -50,6 +50,7 @@ linters:
     - unused
     - wastedassign
     - whitespace
+    - gocritic
 linters-settings:
   revive:
     rules:
@@ -85,3 +86,6 @@ linters-settings:
   errcheck:
     exclude-functions:
       - fmt.Fprintf
+  gocritic:
+    disabled-checks:
+      - commentFormatting

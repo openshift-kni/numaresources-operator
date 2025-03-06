@@ -24,6 +24,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -59,7 +60,8 @@ func main() {
 		nrtObjs := topologyv1alpha2.NodeResourceTopologyList{}
 		wa, err := cli.Watch(ctx, &nrtObjs)
 		if err != nil {
-			log.Fatalf("cannot watch NRT objects: %v", err)
+			klog.Errorf("cannot watch NRT objects: %v", err)
+			return
 		}
 
 		for {

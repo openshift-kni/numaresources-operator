@@ -47,10 +47,10 @@ func AttachConfigObject(ctx context.Context, cli client.Client, object client.Ob
 	return nil
 }
 
-func addObjectRef(object client.Object, Config []corev1.LocalObjectReference) []corev1.LocalObjectReference {
+func addObjectRef(object client.Object, config []corev1.LocalObjectReference) []corev1.LocalObjectReference {
 	updatedConfig := []corev1.LocalObjectReference{{Name: object.GetName()}}
-	for i := range Config {
-		config := Config[i]
+	for i := range config {
+		config := config[i]
 		if config.Name != object.GetName() {
 			updatedConfig = append(updatedConfig, config)
 		}
@@ -58,11 +58,11 @@ func addObjectRef(object client.Object, Config []corev1.LocalObjectReference) []
 	return updatedConfig
 }
 
-func removeObjectRef(object client.Object, Config []corev1.LocalObjectReference) []corev1.LocalObjectReference {
+func removeObjectRef(object client.Object, config []corev1.LocalObjectReference) []corev1.LocalObjectReference {
 	var updatedConfig []corev1.LocalObjectReference
-	for i := range Config {
-		if Config[i].Name != object.GetName() {
-			updatedConfig = append(updatedConfig, Config[i])
+	for i := range config {
+		if config[i].Name != object.GetName() {
+			updatedConfig = append(updatedConfig, config[i])
 		}
 	}
 	return updatedConfig
