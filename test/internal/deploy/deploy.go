@@ -155,7 +155,7 @@ func WaitForMCPsCondition(cli client.Client, ctx context.Context, condition mach
 			defer GinkgoRecover()
 			ts := time.Now()
 			err := wait.With(cli).Interval(interval).Timeout(timeout).ForMachineConfigPoolCondition(ctx, mcp, condition)
-			klog.Infof("MCP %q condition=%s err=%v after %v", mcp.Name, condition, err, time.Since(ts))
+			klog.InfoS("wait.ForMachineConfigPoolCondition result", "MCP", mcp.Name, "condition", condition, "err", err, "after", time.Since(ts))
 			return err
 		})
 	}

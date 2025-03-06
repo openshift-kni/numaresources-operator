@@ -542,7 +542,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					err = fxt.Client.Delete(ctx, &nroOperObj)
 					Expect(err).ToNot(HaveOccurred())
 
-					waitForMcpUpdate(fxt.Client, ctx, MachineConfig, mcpsInfo...)
+					waitForMcpUpdate(fxt.Client, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
 
 					By("taint one worker node")
 					workers, err = nodes.GetWorkers(fxt.DEnv())
@@ -581,7 +581,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 						Expect(err).ToNot(HaveOccurred())
 						Expect(mcpsInfo).ToNot(BeEmpty())
 
-						waitForMcpUpdate(fxt.Client, ctx, MachineCount, mcpsInfo...)
+						waitForMcpUpdate(fxt.Client, ctx, MachineCount, time.Now().String(), mcpsInfo...)
 					} else {
 						Eventually(func(g Gomega) {
 							err := fxt.Client.Get(ctx, nroKey, nropNewObj)
@@ -613,7 +613,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					Expect(err).ToNot(HaveOccurred())
 					Expect(mcpsInfo).ToNot(BeEmpty())
 
-					waitForMcpUpdate(fxt.Client, ctx, MachineCount, mcpsInfo...)
+					waitForMcpUpdate(fxt.Client, ctx, MachineCount, time.Now().String(), mcpsInfo...)
 
 					klog.Info("waiting for DaemonSet to be ready")
 					ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
@@ -657,7 +657,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					Expect(err).ToNot(HaveOccurred())
 					Expect(mcpsInfo).ToNot(BeEmpty())
 
-					waitForMcpUpdate(fxt.Client, ctx, MachineCount, mcpsInfo...)
+					waitForMcpUpdate(fxt.Client, ctx, MachineCount, time.Now().String(), mcpsInfo...)
 
 					klog.Info("waiting for DaemonSet to be ready")
 					ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
@@ -840,12 +840,15 @@ func sriovToleration() corev1.Toleration {
 	}
 }
 
-func waitForMcpUpdate(cli client.Client, ctx context.Context, updateType MCPUpdateType, mcpsInfo ...mcpInfo) {
+func waitForMcpUpdate(cli client.Client, ctx context.Context, updateType MCPUpdateType, id string, mcpsInfo ...mcpInfo) {
+	klog.InfoS("waitForMcpUpdate START", "ID", id)
+	defer klog.InfoS("waitForMcpUpdate END", "ID", id)
+
 	mcps := make([]*machineconfigv1.MachineConfigPool, 0, len(mcpsInfo))
 	for _, info := range mcpsInfo {
 		mcps = append(mcps, info.mcpObj)
 	}
-	Expect(deploy.WaitForMCPsCondition(cli, ctx, machineconfigv1.MachineConfigPoolUpdated, mcps...)).To(Succeed())
+	Expect(deploy.WaitForMCPsCondition(cli, ctx, machineconfigv1.MachineConfigPoolUpdated, mcps...)).To(Succeed(), "failed to have the condistion updated; ID %q", id)
 
 	for _, info := range mcpsInfo {
 		// check the sample node is updated with new config in its annotations, both for desired and current, is a must
@@ -856,10 +859,13 @@ func waitForMcpUpdate(cli client.Client, ctx context.Context, updateType MCPUpda
 		// thus associated to different MC, it could be because new nodes are joining the pool so the MC update is
 		// happening on those nodes
 		updatedConfig := updatedMcp.Status.Configuration.Name
-		if updateType == MachineConfig {
-			Expect(updatedConfig).ToNot(Equal(info.initialConfig))
-		}
+		initialConfig := info.initialConfig
+		expectedUpdate := (updateType == MachineConfig)
+		klog.InfoS("config values", "old", initialConfig, "new", updatedConfig, "expectedConfigUpdate", expectedUpdate)
 
+		if expectedUpdate {
+			Expect(updatedConfig).ToNot(Equal(initialConfig), "waitForMcpUpdate ID %s: config was not updated", id)
+		}
 		// MachineConfig update type will also update the node currentConfig so check that anyway
 		klog.Info("verify mcp config is updated by ensuring the sample node has updated MC")
 		ok, err := verifyUpdatedMCOnNodes(cli, ctx, info.sampleNode, updatedConfig)
