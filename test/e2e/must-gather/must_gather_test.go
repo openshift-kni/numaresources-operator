@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/klog"
 	"sigs.k8s.io/yaml"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
@@ -82,7 +83,10 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 			if _, ok := os.LookupEnv("E2E_NROP_MUSTGATHER_CLEANUP_SKIP"); ok {
 				return
 			}
-			os.RemoveAll(destDir)
+			err := os.RemoveAll(destDir)
+			if err != nil {
+				klog.Warningf("unable to remove temporary directory %q: %v", destDir, err)
+			}
 		})
 
 		It("check NRO data files have been collected", func(ctx context.Context) {

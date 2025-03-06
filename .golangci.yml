@@ -32,7 +32,7 @@ issues:
 linters:
   disable-all: true
   enable:
-#    - errcheck
+    - errcheck
     - bodyclose
     - copyloopvar
     - depguard
@@ -82,3 +82,6 @@ linters-settings:
   ginkgolinter:
     # Trigger warning for ginkgo focus containers like `FDescribe`, `FContext`, `FWhen` or `FIt`
     forbid-focus-container: true
+  errcheck:
+    exclude-functions:
+      - fmt.Fprintf
