@@ -226,6 +226,11 @@ func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, ins
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) intreconcile.Step {
+	if annotations.IsNRTAPIDefinitionCluster(instance.Annotations) {
+		// should never happen, so let's be vocal. Very vocal.
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "SkipCRDInstall", "Skipped to install Node Resource Topology CRD: caused by annotation")
+		return intreconcile.StepSuccess()
+	}
 	applied, err := r.syncNodeResourceTopologyAPI(ctx)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedCRDInstall", "Failed to install Node Resource Topology CRD: %v", err)
