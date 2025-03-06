@@ -66,6 +66,22 @@ func expectedDCOCoauthorTag(commit GitCommit) string {
 }
 
 func main() {
+	// As part of making the logging more clear for a function we defer executing
+	// some code to the end of the check.However, deferred code is not reachable
+	// if the function calls `os.Exit` at anypoint even in nested functions. Since
+	// `os.Exit(<code>)` functionality cannot be substituted, and we desire to
+	// keep using	`defer`, the logic of verifying	commits is implemented in
+	// `scanAndVerify`and this in turn returns an error and exit code on failure.
+	// This result is examined here main() and the program exists with the return
+	// code or succeeds.
+	exitcode, err := scanAndVerify()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(exitcode)
+	}
+}
+
+func scanAndVerify() (int, error) {
 	var err error
 	commits := []GitCommit{}
 	stdin := bufio.NewScanner(os.Stdin)
@@ -78,8 +94,7 @@ func main() {
 		line := stdin.Text()
 		err = json.Unmarshal([]byte(line), &commit)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error decoding git commit: %v\n", err)
-			os.Exit(1)
+			return 1, fmt.Errorf("error decoding git commit: %v\n", err)
 		}
 		fmt.Printf("commit: %+v\n", commit)
 		commits = append(commits, commit)
@@ -90,8 +105,8 @@ func main() {
 	for _, commit := range commits {
 		err := validate(commit)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "invalid commit: %v\n", err)
-			os.Exit(2)
+			return 2, fmt.Errorf("invalid commit: %v\n", err)
 		}
 	}
+	return 0, nil
 }

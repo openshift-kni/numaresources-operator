@@ -38,7 +38,6 @@ import (
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
-	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
@@ -155,19 +154,19 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				// need a zone with resources for overhead, pod and a little bit more to avoid zone saturation
-				klog.Infof("kubernetes pod fixed overhead: %s", e2ereslist.ToString(rtClass.Overhead.PodFixed))
+				klog.Infof("kubernetes pod fixed overhead: %s", resourcelist.ToString(rtClass.Overhead.PodFixed))
 				podFixedOverheadCPU, podFixedOverheadMem := resourcelist.RoundUpCoreResources(*rtClass.Overhead.PodFixed.Cpu(), *rtClass.Overhead.PodFixed.Memory())
 				podFixedOverhead := corev1.ResourceList{
 					corev1.ResourceCPU:    podFixedOverheadCPU,
 					corev1.ResourceMemory: podFixedOverheadMem,
 				}
-				klog.Infof("kubernetes pod fixed overhead rounded to: %s", e2ereslist.ToString(podFixedOverhead))
+				klog.Infof("kubernetes pod fixed overhead rounded to: %s", resourcelist.ToString(podFixedOverhead))
 
 				zoneRequiredResources := podResources.DeepCopy()
 				resourcelist.AddCoreResources(zoneRequiredResources, podFixedOverhead)
 				resourcelist.AddCoreResources(zoneRequiredResources, minRes)
 
-				resStr := e2ereslist.ToString(zoneRequiredResources)
+				resStr := resourcelist.ToString(zoneRequiredResources)
 				klog.Infof("kubernetes final zone required resources: %s", resStr)
 
 				nrtCandidates := e2enrt.FilterAnyZoneMatchingResources(nrtTwoZoneCandidates, zoneRequiredResources)
@@ -294,7 +293,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				// need a zone with resources for overhead, pod and a little bit more to avoid zone saturation
-				klog.Infof("kubernetes pod fixed overhead: %s", e2ereslist.ToString(rtClass.Overhead.PodFixed))
+				klog.Infof("kubernetes pod fixed overhead: %s", resourcelist.ToString(rtClass.Overhead.PodFixed))
 
 				candidateNodeNames := e2enrt.AccumulateNames(nrtTwoZoneCandidates)
 
@@ -325,13 +324,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					corev1.ResourceCPU:    podFixedOverheadCPU,
 					corev1.ResourceMemory: podFixedOverheadMem,
 				}
-				klog.Infof("kubernetes pod fixed overhead rounded to: %s", e2ereslist.ToString(podFixedOverhead))
+				klog.Infof("kubernetes pod fixed overhead rounded to: %s", resourcelist.ToString(podFixedOverhead))
 
 				zoneRequiredResources := podResources.DeepCopy()
 				resourcelist.AddCoreResources(zoneRequiredResources, podFixedOverhead)
 				resourcelist.AddCoreResources(zoneRequiredResources, minRes)
 
-				resStr := e2ereslist.ToString(zoneRequiredResources)
+				resStr := resourcelist.ToString(zoneRequiredResources)
 				klog.Infof("kubernetes final zone required resources: %s", resStr)
 
 				By("padding non-target nodes")

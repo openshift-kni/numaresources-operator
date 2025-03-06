@@ -81,10 +81,8 @@ func TestGetByClusterName(t *testing.T) {
 					if !strings.Contains(err.Error(), tc.expectedError) {
 						t.Errorf("expected error %v, got %v", tc.expectedError, err)
 					}
-				} else {
-					if tc.expectedObjectKey != client.ObjectKeyFromObject(np).String() {
-						t.Errorf("expected object key %v, got %v", tc.expectedObjectKey, client.ObjectKeyFromObject(np).String())
-					}
+				} else if tc.expectedObjectKey != client.ObjectKeyFromObject(np).String() {
+					t.Errorf("expected object key %v, got %v", tc.expectedObjectKey, client.ObjectKeyFromObject(np).String())
 				}
 			})
 		}

@@ -33,7 +33,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
-	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 	nrtv1alpha2attr "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
@@ -352,7 +351,7 @@ func FilterByTopologyManagerPolicyAndScope(nrts []nrtv1alpha2.NodeResourceTopolo
 func filterByAttribute(nrts []nrtv1alpha2.NodeResourceTopology, attrInfo nrtv1alpha2.AttributeInfo) []nrtv1alpha2.NodeResourceTopology {
 	ret := []nrtv1alpha2.NodeResourceTopology{}
 	for _, nrt := range nrts {
-		attr, ok := attribute.Get(nrt.Attributes, attrInfo.Name)
+		attr, ok := nrtv1alpha2attr.Get(nrt.Attributes, attrInfo.Name)
 		if !ok {
 			klog.Errorf("SKIP: node %q doesn't have required attribute %s", nrt.Name, attrInfo.Name)
 			continue

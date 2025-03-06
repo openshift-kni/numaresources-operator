@@ -653,7 +653,7 @@ func expectCacheParams(cli client.Client, resyncMethod, foreignPodsDetect string
 	gomega.Expect(*cfg.Cache.InformerMode).To(gomega.Equal(informerMode))
 }
 
-func expectScoringStrategyParams(cli client.Client, ScoringStrategyType string, resources []depmanifests.ResourceSpecParams) {
+func expectScoringStrategyParams(cli client.Client, scoringStrategyType string, resources []depmanifests.ResourceSpecParams) {
 	ginkgo.GinkgoHelper()
 
 	key := client.ObjectKey{
@@ -670,7 +670,7 @@ func expectScoringStrategyParams(cli client.Client, ScoringStrategyType string, 
 	gomega.Expect(cfgs).To(gomega.HaveLen(1), "unexpected config params count: %d", len(cfgs))
 	cfg := cfgs[0]
 
-	gomega.Expect(cfg.ScoringStrategy.Type).To(gomega.Equal(ScoringStrategyType))
+	gomega.Expect(cfg.ScoringStrategy.Type).To(gomega.Equal(scoringStrategyType))
 	gomega.Expect(cfg.ScoringStrategy.Resources).To(gomega.Equal(resources))
 }
 

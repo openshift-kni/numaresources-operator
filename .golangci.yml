@@ -32,9 +32,9 @@ issues:
 linters:
   disable-all: true
   enable:
-#    - errcheck
+    - errcheck
     - bodyclose
-#    - copyloopvar
+    - copyloopvar
     - depguard
     - ginkgolinter
     - gosimple
@@ -50,6 +50,8 @@ linters:
     - unused
     - wastedassign
     - whitespace
+    - gocritic
+    - stylecheck
 linters-settings:
   revive:
     rules:
@@ -82,3 +84,17 @@ linters-settings:
   ginkgolinter:
     # Trigger warning for ginkgo focus containers like `FDescribe`, `FContext`, `FWhen` or `FIt`
     forbid-focus-container: true
+  errcheck:
+    exclude-functions:
+      - fmt.Fprintf
+  gocritic:
+    disabled-checks:
+      - commentFormatting
+  stylecheck:
+    checks:
+      # A function's error value should be its last return value.
+      # https://staticcheck.dev/docs/checks/#ST1008
+      - ST1008
+      # Importing the same package multiple times.
+      # https://staticcheck.dev/docs/checks/#ST1019
+      - ST1019
