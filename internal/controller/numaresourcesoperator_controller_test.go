@@ -444,7 +444,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						By(fmt.Sprintf("Check that container %s image did not change", cnt.Name))
 						Expect(cnt.Image).To(Equal("madeup-image:1"))
 					})
-
 				})
 			})
 
@@ -1122,6 +1121,180 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(nro).To(BeDegradedWithReason(validation.NodeGroupsError))
 			})
 		})
+
+		When("the NRT API definition annotation is provided", Label("feature:nrtcrdanns"), func() {
+			var nro *nropv1.NUMAResourcesOperator
+			var mcp1 *machineconfigv1.MachineConfigPool
+			var mcp1Selector *metav1.LabelSelector
+			var nroKey client.ObjectKey
+
+			var reconciler *NUMAResourcesOperatorReconciler
+			var ng1 nropv1.NodeGroup
+
+			pn1 := "test1"
+
+			BeforeEach(func() {
+				mcp1Selector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						pn1: pn1,
+					},
+				}
+				ng1 = nropv1.NodeGroup{
+					PoolName: &pn1,
+				}
+
+				nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1)
+				nroKey = client.ObjectKeyFromObject(nro)
+
+				mcp1 = testobjs.NewMachineConfigPool(pn1, mcp1Selector.MatchLabels, mcp1Selector, mcp1Selector)
+
+				var err error
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platf, defaultOCPVersion, nro, mcp1)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should be NOT create the CRD object while the annotation is present", func() {
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+					if nroUpdated.Annotations == nil {
+						nroUpdated.Annotations = make(map[string]string)
+					}
+					nroUpdated.Annotations[annotations.NRTAPIDefinitionAnnotation] = annotations.NRTAPIFromCluster
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
+
+				nroUpdated := &nropv1.NUMAResourcesOperator{}
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+
+				availableCondition := getConditionByType(nroUpdated.Status.Conditions, status.ConditionAvailable)
+				Expect(availableCondition).ToNot(BeNil())
+				Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
+
+				crd := &apiextensionsv1.CustomResourceDefinition{}
+				crdKey := client.ObjectKey{
+					Name: "noderesourcetopologies.topology.node.k8s.io",
+				}
+				err := reconciler.Client.Get(context.TODO(), crdKey, crd)
+				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "unexpected error: %v", err)
+			})
+
+			It("should stop reconciling the CRD object while the annotation is present", func() {
+				// ensure no annotations. Just to be sure
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+					nroUpdated.Annotations = nil
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
+
+				var nroUpdated nropv1.NUMAResourcesOperator
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &nroUpdated)).To(Succeed())
+
+				availableCondition := getConditionByType(nroUpdated.Status.Conditions, status.ConditionAvailable)
+				Expect(availableCondition).ToNot(BeNil())
+				Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
+
+				var crd apiextensionsv1.CustomResourceDefinition
+				crdKey := client.ObjectKey{
+					Name: "noderesourcetopologies.topology.node.k8s.io",
+				}
+				Expect(reconciler.Client.Get(context.TODO(), crdKey, &crd)).To(Succeed())
+
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+					if nroUpdated.Annotations == nil {
+						nroUpdated.Annotations = make(map[string]string)
+					}
+					nroUpdated.Annotations[annotations.NRTAPIDefinitionAnnotation] = annotations.NRTAPIFromCluster
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+				Expect(reconciler.Client.Delete(context.TODO(), &crd)).To(Succeed())
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
+
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &nroUpdated)).To(Succeed())
+
+				availableCondition = getConditionByType(nroUpdated.Status.Conditions, status.ConditionAvailable)
+				Expect(availableCondition).ToNot(BeNil())
+				Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
+
+				err := reconciler.Client.Get(context.TODO(), crdKey, &crd)
+				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "unexpected error: %v", err)
+			})
+
+			It("should reconcile again the CRD object when the annotation is removed", func() {
+				// ensure no annotations. Just to be sure
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+					nroUpdated.Annotations = nil
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
+
+				var nroUpdated nropv1.NUMAResourcesOperator
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &nroUpdated)).To(Succeed())
+
+				availableCondition := getConditionByType(nroUpdated.Status.Conditions, status.ConditionAvailable)
+				Expect(availableCondition).ToNot(BeNil())
+				Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
+
+				var crd apiextensionsv1.CustomResourceDefinition
+				crdKey := client.ObjectKey{
+					Name: "noderesourcetopologies.topology.node.k8s.io",
+				}
+				Expect(reconciler.Client.Get(context.TODO(), crdKey, &crd)).To(Succeed())
+
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+					if nroUpdated.Annotations == nil {
+						nroUpdated.Annotations = make(map[string]string)
+					}
+					nroUpdated.Annotations[annotations.NRTAPIDefinitionAnnotation] = annotations.NRTAPIFromCluster
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+				Expect(reconciler.Client.Delete(context.TODO(), &crd)).To(Succeed())
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
+
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &nroUpdated)).To(Succeed())
+
+				availableCondition = getConditionByType(nroUpdated.Status.Conditions, status.ConditionAvailable)
+				Expect(availableCondition).ToNot(BeNil())
+				Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
+
+				err := reconciler.Client.Get(context.TODO(), crdKey, &crd)
+				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "unexpected error: %v", err)
+
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+					nroUpdated.Annotations = nil
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
+
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &nroUpdated)).To(Succeed())
+
+				availableCondition = getConditionByType(nroUpdated.Status.Conditions, status.ConditionAvailable)
+				Expect(availableCondition).ToNot(BeNil())
+				Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
+
+				Expect(reconciler.Client.Get(context.TODO(), crdKey, &crd)).To(Succeed())
+			})
+		})
+
 	},
 		Entry("Openshift Platform", platform.OpenShift),
 		Entry("Hypershift Platform", platform.HyperShift),
