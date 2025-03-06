@@ -21,6 +21,11 @@ import (
 	"fmt"
 	"time"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
+	gomegatypes "github.com/onsi/gomega/types"
+
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -32,8 +37,6 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	corev1 "k8s.io/api/core/v1"
@@ -300,7 +303,150 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				})
 			})
 		})
+
+		When("the NRT API definition annotation is provided", Label("feature:nrtcrdanns"), func() {
+			var nro *nropv1.NUMAResourcesOperator
+			var mcp1 *machineconfigv1.MachineConfigPool
+			var nroKey client.ObjectKey
+
+			var reconciler *NUMAResourcesOperatorReconciler
+
+			BeforeEach(func() {
+				label1 = map[string]string{
+					"test1": "test1",
+				}
+				nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, []*metav1.LabelSelector{
+					{MatchLabels: label1},
+				})
+
+				mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
+
+				nroKey = client.ObjectKeyFromObject(nro)
+
+				var err error
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1)
+				Expect(err).ToNot(HaveOccurred())
+			})
+
+			It("should be NOT create the CRD object while the annotation is present", func() {
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+					if nroUpdated.Annotations == nil {
+						nroUpdated.Annotations = make(map[string]string)
+					}
+					nroUpdated.Annotations[annotations.NRTAPIDefinitionAnnotation] = annotations.NRTAPIFromCluster
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).To(CauseRequeue())
+
+				nroUpdated := &nropv1.NUMAResourcesOperator{}
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+
+				crd := &apiextensionsv1.CustomResourceDefinition{}
+				crdKey := client.ObjectKey{
+					Name: "noderesourcetopologies.topology.node.k8s.io",
+				}
+				err := reconciler.Client.Get(context.TODO(), crdKey, crd)
+				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "unexpected error: %v", err)
+			})
+
+			It("should stop reconciling the CRD object while the annotation is present", func() {
+				// ensure no annotations. Just to be sure
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+					nroUpdated.Annotations = nil
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).To(CauseRequeue())
+
+				var nroUpdated nropv1.NUMAResourcesOperator
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &nroUpdated)).To(Succeed())
+
+				var crd apiextensionsv1.CustomResourceDefinition
+				crdKey := client.ObjectKey{
+					Name: "noderesourcetopologies.topology.node.k8s.io",
+				}
+				Expect(reconciler.Client.Get(context.TODO(), crdKey, &crd)).To(Succeed())
+
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+					if nroUpdated.Annotations == nil {
+						nroUpdated.Annotations = make(map[string]string)
+					}
+					nroUpdated.Annotations[annotations.NRTAPIDefinitionAnnotation] = annotations.NRTAPIFromCluster
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+				Expect(reconciler.Client.Delete(context.TODO(), &crd)).To(Succeed())
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).To(CauseRequeue())
+
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &nroUpdated)).To(Succeed())
+
+				err := reconciler.Client.Get(context.TODO(), crdKey, &crd)
+				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "unexpected error: %v", err)
+			})
+
+			It("should reconcile again the CRD object when the annotation is removed", func() {
+				// ensure no annotations. Just to be sure
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+					nroUpdated.Annotations = nil
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).To(CauseRequeue())
+
+				var nroUpdated nropv1.NUMAResourcesOperator
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &nroUpdated)).To(Succeed())
+
+				var crd apiextensionsv1.CustomResourceDefinition
+				crdKey := client.ObjectKey{
+					Name: "noderesourcetopologies.topology.node.k8s.io",
+				}
+				Expect(reconciler.Client.Get(context.TODO(), crdKey, &crd)).To(Succeed())
+
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+					if nroUpdated.Annotations == nil {
+						nroUpdated.Annotations = make(map[string]string)
+					}
+					nroUpdated.Annotations[annotations.NRTAPIDefinitionAnnotation] = annotations.NRTAPIFromCluster
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+				Expect(reconciler.Client.Delete(context.TODO(), &crd)).To(Succeed())
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).To(CauseRequeue())
+
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &nroUpdated)).To(Succeed())
+
+				err := reconciler.Client.Get(context.TODO(), crdKey, &crd)
+				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "unexpected error: %v", err)
+
+				Eventually(func() error {
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).To(Succeed())
+					nroUpdated.Annotations = nil
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).To(CauseRequeue())
+
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, &nroUpdated)).To(Succeed())
+
+				Expect(reconciler.Client.Get(context.TODO(), crdKey, &crd)).To(Succeed())
+			})
+		})
 	})
+
 	Context("with correct NRO CR", func() {
 		var nro *nropv1.NUMAResourcesOperator
 		var mcp1 *machineconfigv1.MachineConfigPool
@@ -1171,4 +1317,10 @@ func reconcileObjects(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.Ma
 
 	Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
 	return reconciler
+}
+
+func CauseRequeue() gomegatypes.GomegaMatcher {
+	return gcustom.MakeMatcher(func(rr reconcile.Result) (bool, error) {
+		return rr.RequeueAfter > 0, nil
+	}).WithTemplate("Reconciliation step should cause requeue")
 }

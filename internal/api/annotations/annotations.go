@@ -19,10 +19,20 @@ package annotations
 const (
 	PauseReconciliationAnnotation        = "config.numa-operator.openshift.io/pause-reconciliation"
 	PauseReconciliationAnnotationEnabled = "enabled"
+
+	NRTAPIDefinitionAnnotation = "config.numa-operator.openshift.io/nrt-api-definition"
+	NRTAPIFromCluster          = "cluster" // trust whatever it is already in the cluster, if at all
 )
 
 func IsPauseReconciliationEnabled(annot map[string]string) bool {
 	if v, ok := annot[PauseReconciliationAnnotation]; ok && v == PauseReconciliationAnnotationEnabled {
+		return true
+	}
+	return false
+}
+
+func IsNRTAPIDefinitionCluster(annot map[string]string) bool {
+	if v, ok := annot[NRTAPIDefinitionAnnotation]; ok && v == NRTAPIFromCluster {
 		return true
 	}
 	return false
