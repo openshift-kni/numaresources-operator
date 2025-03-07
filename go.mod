@@ -98,7 +98,7 @@ require (
 	github.com/stretchr/objx v0.4.0 // indirect
 	github.com/vincent-petithory/dataurl v1.0.0 // indirect
 	go.uber.org/ratelimit v0.2.0 // indirect
-	golang.org/x/crypto v0.35.0 // indirect
+	golang.org/x/crypto v0.33.0 // indirect
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/oauth2 v0.26.0 // indirect
