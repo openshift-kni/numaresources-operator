@@ -20,12 +20,8 @@ import (
 	"os"
 
 	"k8s.io/klog/v2"
-)
 
-const (
-	devType1EnvVar = "E2E_NROP_DEVICE_TYPE_1"
-	devType2EnvVar = "E2E_NROP_DEVICE_TYPE_2"
-	devType3EnvVar = "E2E_NROP_DEVICE_TYPE_3"
+	"github.com/openshift-kni/numaresources-operator/internal/devices"
 )
 
 var (
@@ -36,17 +32,17 @@ var (
 
 func init() {
 	var ok bool
-	devType1, ok = os.LookupEnv(devType1EnvVar)
+	devType1, ok = os.LookupEnv(devices.DevType1EnvVar)
 	if !ok {
-		klog.Errorf("%q environment variable is not set", devType1EnvVar)
+		klog.Errorf("%q environment variable is not set", devices.DevType1EnvVar)
 	}
-	devType2, ok = os.LookupEnv(devType2EnvVar)
+	devType2, ok = os.LookupEnv(devices.DevType2EnvVar)
 	if !ok {
-		klog.Errorf("%q environment variable is not set", devType2EnvVar)
+		klog.Errorf("%q environment variable is not set", devices.DevType2EnvVar)
 	}
-	devType3, ok = os.LookupEnv(devType3EnvVar)
+	devType3, ok = os.LookupEnv(devices.DevType3EnvVar)
 	if !ok {
-		klog.Errorf("%q environment variable is not set", devType3EnvVar)
+		klog.Errorf("%q environment variable is not set", devices.DevType3EnvVar)
 	}
 }
 
