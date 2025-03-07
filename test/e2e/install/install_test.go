@@ -292,7 +292,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 				var err error
 				ds, err = getDaemonSetByOwnerReference(uid)
 				return err
-			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeNil())
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 
 			deleteNROPSync(e2eclient.Client, nroObj)
 
