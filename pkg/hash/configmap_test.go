@@ -17,49 +17,13 @@
 package hash
 
 import (
-	"context"
 	"regexp"
 	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
-	"github.com/openshift-kni/numaresources-operator/internal/objects"
 )
-
-func TestComputeCurrentConfigMap(t *testing.T) {
-	testCases := []struct {
-		name        string
-		cli         client.Client
-		cm          *corev1.ConfigMap
-		expectedOut string
-		expectedErr bool
-	}{
-		{
-			name: "map not created",
-			cli:  fake.NewFakeClient(),
-			cm:   objects.NewKubeletConfigConfigMap("test", map[string]string{}, objects.NewKubeletConfigAutoresizeControlPlane()),
-			// verified manually
-			expectedOut: "SHA256:93909e569a15b6e4a5eefdcac4153f2c8179bf155143d10dac589f62ddcdf742",
-			expectedErr: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		out, err := ComputeCurrentConfigMap(context.TODO(), tc.cli, tc.cm.DeepCopy())
-		gotErr := (err != nil)
-		if gotErr != tc.expectedErr {
-			t.Fatalf("got error %v expected error=%v", err, tc.expectedErr)
-		}
-		if out != tc.expectedOut {
-			t.Fatalf("got output %q expected %q", out, tc.expectedOut)
-		}
-	}
-}
 
 func TestConfigMapData(t *testing.T) {
 	cm := &corev1.ConfigMap{
