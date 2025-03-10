@@ -217,3 +217,21 @@ func GetDaemonSetListFromNodeGroupStatuses(groups []nropv1.NodeGroupStatus) []nr
 	}
 	return dss
 }
+
+// NewRTEConfigMap create a configmap similar to one created by KubeletController
+func NewRTEConfigMap(name, ns, policy, scope string) *corev1.ConfigMap {
+	data := fmt.Sprintf("kubelet:\n\t\ttopologyManagerPolicy: %s\ntopologyManagerScope: %s", policy, scope)
+	return &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+		Data: map[string]string{
+			"config.yaml": data,
+		},
+	}
+}

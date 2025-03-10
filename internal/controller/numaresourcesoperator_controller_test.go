@@ -54,6 +54,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
+	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
@@ -191,6 +192,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				var mcp2 *machineconfigv1.MachineConfigPool
 				var mcp1Selector, mcp2Selector *metav1.LabelSelector
 				var nroKey client.ObjectKey
+				var cm1, cm2 *corev1.ConfigMap
 
 				var reconciler *NUMAResourcesOperatorReconciler
 				var ng1, ng2 nropv1.NodeGroup
@@ -224,8 +226,11 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					mcp1 = testobjs.NewMachineConfigPool(pn1, mcp1Selector.MatchLabels, mcp1Selector, mcp1Selector)
 					mcp2 = testobjs.NewMachineConfigPool(pn2, mcp2Selector.MatchLabels, mcp2Selector, mcp2Selector)
 
+					cm1 = testobjs.NewRTEConfigMap(objectnames.GetComponentName(nro.Name, mcp1.Name), testNamespace, "single-numa-node", "pod")
+					cm2 = testobjs.NewRTEConfigMap(objectnames.GetComponentName(nro.Name, mcp2.Name), testNamespace, "single-numa-node", "container")
+
 					var err error
-					reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+					reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2, cm1, cm2)
 					Expect(err).ToNot(HaveOccurred())
 
 					// on the first iteration with the default RTE SELinux policy we expect immediate update, thus the reconciliation result is empty
@@ -239,19 +244,28 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				})
 
 				It("should create all CRDs and objects and operator status are updated from the first reconcile iteration", func() {
-					By("Check DaemonSets are created")
+					By("Check DaemonSet1 is created")
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn1),
 						Namespace: testNamespace,
 					}
 					ds := &appsv1.DaemonSet{}
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
+					By("Check DaemonSet1 has configmap hash")
+					annot, ok := ds.Spec.Template.Annotations[hash.ConfigMapAnnotation]
+					Expect(ok).To(BeTrue())
+					Expect(annot).To(BeEquivalentTo(hash.ConfigMapData(cm1)), "plain text data: %s", cm1.Data)
 
+					By("Check DaemonSet2 is created")
 					dsKey = client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn2),
 						Namespace: testNamespace,
 					}
 					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
+					By("Check DaemonSet2 has configmap hash")
+					annot, ok = ds.Spec.Template.Annotations[hash.ConfigMapAnnotation]
+					Expect(ok).To(BeTrue())
+					Expect(annot).To(BeEquivalentTo(hash.ConfigMapData(cm2)), "plain text data: %s", cm2.Data)
 
 					By("Check status is updated")
 					Expect(reconciler.Client.Get(context.TODO(), nroKey, nro)).ToNot(HaveOccurred())
