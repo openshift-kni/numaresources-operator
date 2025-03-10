@@ -21,11 +21,13 @@ import (
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -53,6 +55,11 @@ func (obj nodeGroupFinder) UpdateFromClient(ctx context.Context, cli client.Clie
 	if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
 		dsm.daemonSet = ds
 	}
+	cm := &corev1.ConfigMap{}
+	if err := cli.Get(ctx, key, cm); err == nil {
+		// we're storing the updated hash only in the case that kubelet controller created a configmap
+		dsm.rteConfigHash = hash.ConfigMapData(cm)
+	}
 	obj.em.daemonSets[generatedName] = dsm
 }
 
@@ -60,6 +67,7 @@ func (obj nodeGroupFinder) FindState(mf Manifests, tree nodegroupv1.Tree) []obje
 	var ret []objectstate.ObjectState
 	var existingDs client.Object
 	var loadError error
+	var rteConfigHash string
 
 	poolName := *tree.NodeGroup.PoolName
 
@@ -68,6 +76,7 @@ func (obj nodeGroupFinder) FindState(mf Manifests, tree nodegroupv1.Tree) []obje
 	if ok {
 		existingDs = existingDaemonSet.daemonSet
 		loadError = existingDaemonSet.daemonSetError
+		rteConfigHash = existingDaemonSet.rteConfigHash
 	} else {
 		loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.Core.DaemonSet.Namespace, mf.Core.DaemonSet.Name)
 	}
@@ -85,6 +94,7 @@ func (obj nodeGroupFinder) FindState(mf Manifests, tree nodegroupv1.Tree) []obje
 		MachineConfigPool:     nil,
 		NodeGroup:             tree.NodeGroup.DeepCopy(),
 		DaemonSet:             desiredDaemonSet,
+		RTEConfigHash:         rteConfigHash,
 		IsCustomPolicyEnabled: annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations),
 	}
 
