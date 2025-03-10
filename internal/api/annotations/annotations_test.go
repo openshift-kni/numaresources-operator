@@ -122,3 +122,38 @@ func TestIsPauseReconciliationEnabled(t *testing.T) {
 		})
 	}
 }
+
+func TestIsNRTAPIDefinitionCluster(t *testing.T) {
+	testcases := []struct {
+		description string
+		annotations map[string]string
+		expected    bool
+	}{
+		{
+			description: "empty map",
+			annotations: map[string]string{},
+			expected:    false,
+		},
+		{
+			description: "annotation set to anything but not \"cluster\" means the source is the operator",
+			annotations: map[string]string{
+				NRTAPIDefinitionAnnotation: "operator",
+			},
+			expected: false,
+		},
+		{
+			description: "skipping NRT CRD reconciliation",
+			annotations: map[string]string{
+				NRTAPIDefinitionAnnotation: NRTAPIFromCluster,
+			},
+			expected: true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			if got := IsNRTAPIDefinitionCluster(tc.annotations); got != tc.expected {
+				t.Errorf("expected %v got %v", tc.expected, got)
+			}
+		})
+	}
+}
