@@ -62,7 +62,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-01-24T14:17:15Z"
+    createdAt: "2025-02-16T14:22:58Z"
     olm.skipRange: '>=4.18.0 <4.19.0'
     operatorframework.io/cluster-monitoring: "true"
     operators.operatorframework.io/builder: operator-sdk-v1.36.1
@@ -496,6 +496,7 @@ spec:
           template:
             metadata:
               annotations:
+                openshift.io/required-scc: anyuid
                 target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
               labels:
                 app: numaresources-operator

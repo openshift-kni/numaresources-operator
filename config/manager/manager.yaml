@@ -25,6 +25,7 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        openshift.io/required-scc: "anyuid"
       labels:
         app: numaresources-operator
         control-plane: controller-manager
