@@ -63,6 +63,7 @@ import (
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
@@ -381,7 +382,100 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}
 				return true, nil
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with LogLevel %q", operatorv1.Trace)
+		})
 
+		It("[replaces-47674] should be able to modify the configurable values under the NUMAResourcesOperator CR", Label("images", label.Tier2), func(ctx context.Context) {
+			var initialNroOperObj nropv1.NUMAResourcesOperator
+			nroKey := objects.NROObjectKey()
+			Expect(fxt.Client.Get(ctx, nroKey, &initialNroOperObj)).To(Succeed())
+
+			testMCP := objects.TestMCP()
+			By(fmt.Sprintf("creating new MCP: %q", testMCP.Name))
+			// we must have this label in order to match other machine configs that are necessary for proper functionality
+			testMCP.Labels = map[string]string{"machineconfiguration.openshift.io/role": roleMCPTest}
+			testMCP.Spec.MachineConfigSelector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"machineconfiguration.openshift.io/role": depnodes.RoleWorker,
+					"test-id":                                "47674",
+				},
+			}
+			testMCP.Spec.NodeSelector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{getLabelRoleMCPTest(): ""},
+			}
+
+			Expect(fxt.Client.Create(context.TODO(), testMCP)).To(Succeed())
+			defer func() {
+				By(fmt.Sprintf("CLEANUP: deleting mcp: %q", testMCP.Name))
+				Expect(fxt.Client.Delete(context.TODO(), testMCP)).To(Succeed())
+
+				err := wait.With(fxt.Client).
+					Interval(configuration.MachineConfigPoolUpdateInterval).
+					Timeout(configuration.MachineConfigPoolUpdateTimeout).
+					ForMachineConfigPoolDeleted(context.TODO(), testMCP)
+				Expect(err).ToNot(HaveOccurred())
+			}()
+			// keep the mcp with zero machine count intentionally to avoid reboots
+
+			testNG := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: testMCP.Labels,
+				},
+			}
+
+			By(fmt.Sprintf("modifying the NUMAResourcesOperator nodeGroups field to include new group: %q labels %q", testMCP.Name, testMCP.Labels))
+			var nroOperObj nropv1.NUMAResourcesOperator
+			newLogLevel := operatorv1.Trace
+			Eventually(func(g Gomega) {
+				// we need that for the current ResourceVersion
+				g.Expect(fxt.Client.Get(ctx, nroKey, &nroOperObj)).To(Succeed())
+
+				newNGs := append(nroOperObj.Spec.NodeGroups, testNG)
+				nroOperObj.Spec.NodeGroups = newNGs
+				nroOperObj.Spec.ExporterImage = serialconfig.GetRteCiImage()
+
+				if nroOperObj.Spec.LogLevel == operatorv1.Trace {
+					newLogLevel = operatorv1.Debug
+				}
+				nroOperObj.Spec.LogLevel = newLogLevel
+
+				g.Expect(fxt.Client.Update(ctx, &nroOperObj)).To(Succeed())
+			}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+			defer func() {
+				By("CLEANUP: reverting the changes under the NUMAResourcesOperator object")
+				Eventually(func(g Gomega) {
+					// we need that for the current ResourceVersion
+					g.Expect(fxt.Client.Get(ctx, nroKey, &nroOperObj)).To(Succeed())
+
+					nroOperObj.Spec = initialNroOperObj.Spec
+					g.Expect(fxt.Client.Update(ctx, &nroOperObj)).To(Succeed())
+				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+			}() //end of defer
+
+			By("verify new RTE daemonset is created and all the RTE dameonsets are updated")
+			Eventually(func(g Gomega) {
+				Expect(fxt.Client.Get(ctx, nroKey, &nroOperObj)).To(Succeed())
+				dss, err := objects.GetDaemonSetsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
+				g.Expect(err).ToNot(HaveOccurred())
+				// assumption 1:1 mapping to testMCP
+				g.Expect(dss).To(HaveLen(len(nroOperObj.Spec.NodeGroups)), "daemonsets found owned by NRO object doesn't align with specified NodeGroups")
+
+				for _, ds := range dss {
+					By(fmt.Sprintf("check RTE daemonset %q", ds.Name))
+					if ds.Name == objectnames.GetComponentName(nroOperObj.Name, roleMCPTest) {
+						By("check the correct match labels for the new RTE daemonset")
+						g.Expect(ds.Spec.Template.Spec.NodeSelector).To(Equal(testMCP.Spec.NodeSelector.MatchLabels))
+					}
+					By("check the correct image")
+					cnt := ds.Spec.Template.Spec.Containers[0]
+					g.Expect(cnt.Image).To(Equal(serialconfig.GetRteCiImage()))
+
+					By("checking the correct LogLevel")
+					found, match := matchLogLevelToKlog(&cnt, newLogLevel)
+					g.Expect(found).To(BeTrue(), "-v flag doesn't exist in container %q args under DaemonSet: %q", cnt.Name, ds.Name)
+					g.Expect(match).To(BeTrue(), "LogLevel %s doesn't match the existing -v flag in container: %q managed by DaemonSet: %q", nroOperObj.Spec.LogLevel, cnt.Name, ds.Name)
+				}
+			}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update RTE daemonset node selector")
 		})
 
 		It("[test_id:54916] should be able to modify the configurable values under the NUMAResourcesScheduler CR", Label(label.Tier2, "schedrst"), Label("feature:schedrst"), func() {
