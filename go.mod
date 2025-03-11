@@ -148,5 +148,6 @@ replace (
 	github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.4.0
 	github.com/onsi/gomega => github.com/onsi/gomega v1.23.0
 	github.com/openshift/machine-config-operator => github.com/openshift/machine-config-operator v0.0.1-0.20231106161944-36b955cd2bc0 // release-4.13
+	golang.org/x/oauth2 => github.com/openshift/golang-oauth2 v0.26.1-0.20250310184649-06a918c6239d
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.14.6
 )
