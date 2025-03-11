@@ -145,3 +145,5 @@ replace (
 
 // local pinning
 replace github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
+
+replace golang.org/x/oauth2 => github.com/openshift/golang-oauth2 v0.26.1-0.20250310184649-06a918c6239d

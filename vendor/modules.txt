@@ -395,7 +395,7 @@ golang.org/x/net/internal/socks
 golang.org/x/net/internal/timeseries
 golang.org/x/net/proxy
 golang.org/x/net/trace
-# golang.org/x/oauth2 v0.26.0
+# golang.org/x/oauth2 v0.26.0 => github.com/openshift/golang-oauth2 v0.26.1-0.20250310184649-06a918c6239d
 ## explicit; go 1.18
 golang.org/x/oauth2
 golang.org/x/oauth2/internal
@@ -1146,3 +1146,4 @@ sigs.k8s.io/yaml/goyaml.v2
 # k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.29.3
 # k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.29.3
 # github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
+# golang.org/x/oauth2 => github.com/openshift/golang-oauth2 v0.26.1-0.20250310184649-06a918c6239d
