@@ -387,7 +387,7 @@ github.com/vincent-petithory/dataurl
 # go.uber.org/ratelimit v0.2.0
 ## explicit; go 1.14
 go.uber.org/ratelimit
-# golang.org/x/crypto v0.33.0
+# golang.org/x/crypto v0.33.0 => github.com/openshift/golang-crypto v0.33.1-0.20250310193910-9003f682e581
 ## explicit; go 1.20
 golang.org/x/crypto/pkcs12
 golang.org/x/crypto/pkcs12/internal/rc2
@@ -410,7 +410,7 @@ golang.org/x/net/internal/socks
 golang.org/x/net/internal/timeseries
 golang.org/x/net/proxy
 golang.org/x/net/trace
-# golang.org/x/oauth2 v0.26.0
+# golang.org/x/oauth2 v0.26.0 => github.com/openshift/golang-oauth2 v0.26.1-0.20250310184649-06a918c6239d
 ## explicit; go 1.18
 golang.org/x/oauth2
 golang.org/x/oauth2/authhandler
@@ -1143,4 +1143,6 @@ sigs.k8s.io/yaml
 # github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.9.5
 # github.com/onsi/gomega => github.com/onsi/gomega v1.27.7
 # github.com/openshift/machine-config-operator => github.com/openshift/machine-config-operator v0.0.1-0.20221101091906-fa5e7ae3f0e9
+# golang.org/x/crypto => github.com/openshift/golang-crypto v0.33.1-0.20250310193910-9003f682e581
+# golang.org/x/oauth2 => github.com/openshift/golang-oauth2 v0.26.1-0.20250310184649-06a918c6239d
 # sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.13.2
