@@ -17,39 +17,18 @@
 package hash
 
 import (
-	"context"
 	"crypto/sha256"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // hash package purpose is to compute a ConfigMap hash
 // that will be attached as an annotation to workload resources (DaemonSet, Deployment, etc.)
-// in order to allow them to track ConfigMap changes
+//  to allow them to track ConfigMap changes
 // more about this technique here: https://blog.questionable.services/article/kubernetes-deployments-configmap-change/
 
 const ConfigMapAnnotation = "configmap.hash"
-
-func ComputeCurrentConfigMap(ctx context.Context, cli client.Reader, cm *corev1.ConfigMap) (string, error) {
-	updatedConfigMap := &corev1.ConfigMap{}
-	key := client.ObjectKeyFromObject(cm)
-
-	if err := cli.Get(ctx, key, updatedConfigMap); err != nil {
-		// ConfigMap not created yet, use the data from the manifests
-		if apierrors.IsNotFound(err) {
-			updatedConfigMap = cm
-		} else {
-			return "", fmt.Errorf("could not calculate ConfigMap %q hash: %w", key.String(), err)
-		}
-	}
-	cmHash := ConfigMapData(updatedConfigMap)
-	klog.InfoS("configmap hash calculated", "hash", cmHash)
-	return cmHash, nil
-}
 
 func ConfigMapData(cm *corev1.ConfigMap) string {
 	var dataAsString string
