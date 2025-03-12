@@ -28,7 +28,6 @@ import (
 	k8swgschedupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/sched"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 )
 
@@ -106,16 +105,12 @@ func FindEnvVarByName(envs []corev1.EnvVar, name string) *corev1.EnvVar {
 	return nil
 }
 
-func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
+func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName string) {
 	template := &dp.Spec.Template // shortcut
 	// CAUTION HERE! the deployment template has a placeholder for volumes[0].
 	// we should clean up and clarify what we expect from the deployment template
 	// and what we manage programmatically, because there's hidden context here.
 	template.Spec.Volumes[0] = schedstate.NewSchedConfigVolume(schedstate.SchedulerConfigMapVolumeName, cmName)
-	if template.Annotations == nil {
-		template.Annotations = map[string]string{}
-	}
-	template.Annotations[hash.ConfigMapAnnotation] = cmHash
 }
 
 func SchedulerConfig(cm *corev1.ConfigMap, name string, params *k8swgmanifests.ConfigParams) error {
