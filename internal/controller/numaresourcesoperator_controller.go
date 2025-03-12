@@ -58,7 +58,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/dangling"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
-	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
@@ -540,15 +539,6 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		return dsPoolPairs, err
 	}
 
-	// ConfigMap should be provided by the kubeletconfig reconciliation loop
-	if r.RTEManifests.Core.ConfigMap != nil {
-		cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.RTEManifests.Core.ConfigMap)
-		if err != nil {
-			return dsPoolPairs, err
-		}
-		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.Core.DaemonSet, cmHash)
-	}
-
 	rteupdate.SecurityContextConstraint(r.RTEManifests.Core.SecurityContextConstraint, true) // force to legacy context
 	// SCC v2 needs no updates
 
@@ -758,6 +748,8 @@ func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest) e
 			klog.V(5).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextType)
 		}
 	}
+	// it's possible that the hash will be empty if kubelet controller hasn't created a configmap
+	rteupdate.DaemonSetHashAnnotation(gdm.DaemonSet, gdm.RTEConfigHash)
 	return nil
 }
 

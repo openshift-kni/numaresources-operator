@@ -56,6 +56,7 @@ type rteHelper interface {
 type daemonSetManifest struct {
 	daemonSet      *appsv1.DaemonSet
 	daemonSetError error
+	rteConfigHash  string
 }
 
 type machineConfigManifest struct {
@@ -227,6 +228,8 @@ type GeneratedDesiredManifest struct {
 	NodeGroup         *nropv1.NodeGroup
 	// generated manifests
 	DaemonSet             *appsv1.DaemonSet
+	RTEConfigHash         string
+	ConfigMap             *corev1.ConfigMap
 	IsCustomPolicyEnabled bool
 }
 
