@@ -99,7 +99,7 @@ require (
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
-	google.golang.org/grpc v1.56.2 // indirect
+	google.golang.org/grpc v1.58.3 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
@@ -144,7 +144,6 @@ replace (
 )
 
 // local pinning
-replace (
-	github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
-	google.golang.org/grpc => google.golang.org/grpc v1.58.3
-)
+replace github.com/containerd/containerd => github.com/containerd/containerd v1.4.11
+
+replace golang.org/x/oauth2 => github.com/openshift/golang-oauth2 v0.26.1-0.20250310184649-06a918c6239d
