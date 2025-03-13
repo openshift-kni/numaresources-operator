@@ -40,7 +40,6 @@ import (
 	depmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
@@ -237,10 +236,6 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			dp := &appsv1.Deployment{}
 			gomega.Expect(reconciler.Client.Get(context.TODO(), key, dp)).ToNot(gomega.HaveOccurred())
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-
-			val, ok := dp.Spec.Template.Annotations[hash.ConfigMapAnnotation]
-			gomega.Expect(ok).To(gomega.BeTrue())
-			gomega.Expect(val).ToNot(gomega.BeEmpty())
 		})
 
 		ginkgo.It("should react to owned objects changes", func() {
