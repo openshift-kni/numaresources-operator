@@ -34,6 +34,8 @@ type GitCommit struct {
 	DCOCoauthorTag   string `json:"dcoCoauthorTag"`
 }
 
+const dependabot = "dependabot[bot]"
+
 func validate(commit GitCommit) error {
 	var errs error
 	if "<"+commit.Author+">" == commit.AuthorEmailLocal {
@@ -58,6 +60,9 @@ func validate(commit GitCommit) error {
 }
 
 func expectedDCOSignTag(commit GitCommit) string {
+	if commit.Author == dependabot {
+		return fmt.Sprintf("Signed-off-by: %s", commit.Author)
+	}
 	return fmt.Sprintf("Signed-off-by: %s %s", commit.Author, commit.AuthorEmail)
 }
 
