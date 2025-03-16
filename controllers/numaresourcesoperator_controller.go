@@ -55,7 +55,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
-	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
@@ -459,15 +458,6 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		return daemonSetsNName, err
 	}
 
-	// ConfigMap should be provided by the kubeletconfig reconciliation loop
-	if r.RTEManifests.ConfigMap != nil {
-		cmHash, err := hash.ComputeCurrentConfigMap(ctx, r.Client, r.RTEManifests.ConfigMap)
-		if err != nil {
-			return daemonSetsNName, err
-		}
-		rteupdate.DaemonSetHashAnnotation(r.RTEManifests.DaemonSet, cmHash)
-	}
-
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
 	for _, objState := range existing.State(r.RTEManifests, daemonsetUpdater) {
 		if objState.Error != nil {
@@ -762,6 +752,8 @@ func daemonsetUpdater(mcpName string, gdm *rtestate.GeneratedDesiredManifest) er
 		klog.V(5).InfoS("DaemonSet update: cannot update config", "mcp", mcpName, "daemonset", gdm.DaemonSet.Name, "error", err)
 		return err
 	}
+	// it's possible that the hash will be empty if kubelet controller hasn't created a configmap
+	rteupdate.DaemonSetHashAnnotation(gdm.DaemonSet, gdm.RTEConfigHash)
 	return nil
 }
 
