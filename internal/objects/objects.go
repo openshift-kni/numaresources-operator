@@ -18,6 +18,7 @@ package objects
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -168,5 +169,23 @@ func NamespaceLabels() map[string]string {
 		"pod-security.kubernetes.io/enforce":             "privileged",
 		"pod-security.kubernetes.io/warn":                "privileged",
 		"security.openshift.io/scc.podSecurityLabelSync": "false",
+	}
+}
+
+// NewRTEConfigMap create a configmap similar to one created by KubeletController
+func NewRTEConfigMap(name, ns, policy, scope string) *corev1.ConfigMap {
+	data := fmt.Sprintf("kubelet:\n\t\ttopologyManagerPolicy: %s\ntopologyManagerScope: %s", policy, scope)
+	return &corev1.ConfigMap{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "ConfigMap",
+			APIVersion: corev1.SchemeGroupVersion.String(),
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+		Data: map[string]string{
+			"config.yaml": data,
+		},
 	}
 }

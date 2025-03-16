@@ -48,6 +48,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
@@ -135,6 +136,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 		var nro *nropv1.NUMAResourcesOperator
 		var mcp1 *machineconfigv1.MachineConfigPool
 		var mcp2 *machineconfigv1.MachineConfigPool
+		var cm1, cm2 *corev1.ConfigMap
 
 		var reconciler *NUMAResourcesOperatorReconciler
 		var label1, label2 map[string]string
@@ -155,8 +157,11 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
 			mcp2 = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
 
+			cm1 = testobjs.NewRTEConfigMap(objectnames.GetComponentName(nro.Name, mcp1.Name), testNamespace, "single-numa-node", "pod")
+			cm2 = testobjs.NewRTEConfigMap(objectnames.GetComponentName(nro.Name, mcp2.Name), testNamespace, "single-numa-node", "container")
+
 			var err error
-			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2, cm1, cm2)
 			Expect(err).ToNot(HaveOccurred())
 
 			key := client.ObjectKeyFromObject(nro)
@@ -198,19 +203,28 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(secondLoopResult).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
 
-			By("Check DaemonSets are created")
+			By("Check DaemonSet1 is created")
 			mcp1DSKey := client.ObjectKey{
 				Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
 				Namespace: testNamespace,
 			}
 			ds := &appsv1.DaemonSet{}
 			Expect(reconciler.Client.Get(context.TODO(), mcp1DSKey, ds)).ToNot(HaveOccurred())
+			By("Check DaemonSet1 has configmap hash")
+			annot, ok := ds.Spec.Template.Annotations[hash.ConfigMapAnnotation]
+			Expect(ok).To(BeTrue())
+			Expect(annot).To(BeEquivalentTo(hash.ConfigMapData(cm1)), "plain text data: %s", cm1.Data)
 
+			By("Check DaemonSet2 is created")
 			mcp2DSKey := client.ObjectKey{
 				Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
 				Namespace: testNamespace,
 			}
 			Expect(reconciler.Client.Get(context.TODO(), mcp2DSKey, ds)).To(Succeed())
+			By("Check DaemonSet2 has configmap hash")
+			annot, ok = ds.Spec.Template.Annotations[hash.ConfigMapAnnotation]
+			Expect(ok).To(BeTrue())
+			Expect(annot).To(BeEquivalentTo(hash.ConfigMapData(cm2)), "plain text data: %s", cm2.Data)
 		})
 		When("a NodeGroup is deleted", func() {
 			BeforeEach(func() {
