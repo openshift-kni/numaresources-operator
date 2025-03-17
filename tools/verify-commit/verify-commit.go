@@ -70,20 +70,12 @@ func expectedDCOCoauthorTag(commit GitCommit) string {
 	return fmt.Sprintf("Co-authored-by: %s %s", commit.Author, commit.AuthorEmail)
 }
 
-func main() {
-	// As part of making the logging more clear for a function we defer executing
-	// some code to the end of the check.However, deferred code is not reachable
-	// if the function calls `os.Exit` at anypoint even in nested functions. Since
-	// `os.Exit(<code>)` functionality cannot be substituted, and we desire to
-	// keep using	`defer`, the logic of verifying	commits is implemented in
-	// `scanAndVerify`and this in turn returns an error and exit code on failure.
-	// This result is examined here main() and the program exists with the return
-	// code or succeeds.
-	exitcode, err := scanAndVerify()
+func toJSON(obj any) string {
+	data, err := json.Marshal(obj)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(exitcode)
+		return "<ERROR>"
 	}
+	return string(data)
 }
 
 func scanAndVerify() (int, error) {
@@ -101,7 +93,7 @@ func scanAndVerify() (int, error) {
 		if err != nil {
 			return 1, fmt.Errorf("error decoding git commit: %v\n", err)
 		}
-		fmt.Printf("commit: %+v\n", commit)
+		fmt.Printf("commit: %s\n", toJSON(commit))
 		commits = append(commits, commit)
 	}
 
@@ -114,4 +106,20 @@ func scanAndVerify() (int, error) {
 		}
 	}
 	return 0, nil
+}
+
+func main() {
+	// As part of making the logging more clear for a function we defer executing
+	// some code to the end of the check.However, deferred code is not reachable
+	// if the function calls `os.Exit` at anypoint even in nested functions. Since
+	// `os.Exit(<code>)` functionality cannot be substituted, and we desire to
+	// keep using	`defer`, the logic of verifying	commits is implemented in
+	// `scanAndVerify`and this in turn returns an error and exit code on failure.
+	// This result is examined here main() and the program exists with the return
+	// code or succeeds.
+	exitcode, err := scanAndVerify()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(exitcode)
+	}
 }
