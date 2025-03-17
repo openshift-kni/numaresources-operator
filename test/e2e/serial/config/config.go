@@ -23,23 +23,22 @@ import (
 	"strconv"
 	"strings"
 
-	. "github.com/onsi/gomega"
-
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
-	ctrl "sigs.k8s.io/controller-runtime"
 
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	nrtv1alpha2attr "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
-
-	"github.com/openshift-kni/numaresources-operator/nrovalidate/validator"
+	. "github.com/onsi/gomega"
 
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
+	"github.com/openshift-kni/numaresources-operator/nrovalidate/validator"
+
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
 )

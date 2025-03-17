@@ -24,8 +24,6 @@ import (
 	"os"
 	"strings"
 
-	securityv1 "github.com/openshift/api/security/v1"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -35,9 +33,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
+
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	securityv1 "github.com/openshift/api/security/v1"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nrovalidator "github.com/openshift-kni/numaresources-operator/nrovalidate/validator"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"

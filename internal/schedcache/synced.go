@@ -24,7 +24,6 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
@@ -33,11 +32,11 @@ import (
 
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	"github.com/openshift-kni/numaresources-operator/pkg/status"
 )
 
 const (

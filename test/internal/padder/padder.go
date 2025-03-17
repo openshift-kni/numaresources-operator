@@ -34,12 +34,11 @@ import (
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
+	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
-
-	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
-	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 
 	"github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	nrtutil "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"

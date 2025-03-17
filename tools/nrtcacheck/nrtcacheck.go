@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
 	appsv1 "k8s.io/api/apps/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -33,9 +32,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
 
-	securityv1 "github.com/openshift/api/security/v1"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-
+	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
@@ -43,14 +40,15 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
-	"github.com/openshift-kni/numaresources-operator/pkg/version"
+	securityv1 "github.com/openshift/api/security/v1"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/schedcache"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
+	"github.com/openshift-kni/numaresources-operator/pkg/version"
 )
 
 var (

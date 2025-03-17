@@ -20,12 +20,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-	configv1 "github.com/openshift/api/config/v1"
-
 	"github.com/google/go-cmp/cmp"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -39,15 +34,19 @@ import (
 
 	depmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	configv1 "github.com/openshift/api/config/v1"
+
+	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
-
-	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
 const testSchedulerName = "testSchedulerName"
