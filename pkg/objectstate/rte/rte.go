@@ -33,6 +33,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -45,6 +46,7 @@ const MachineConfigLabelKey = "machineconfiguration.openshift.io/role"
 type daemonSetManifest struct {
 	daemonSet      *appsv1.DaemonSet
 	daemonSetError error
+	rteConfigHash  string
 }
 
 type machineConfigManifest struct {
@@ -129,7 +131,8 @@ type GeneratedDesiredManifest struct {
 	MachineConfigPool *machineconfigv1.MachineConfigPool
 	NodeGroup         *nropv1.NodeGroup
 	// generated manifests
-	DaemonSet *appsv1.DaemonSet
+	DaemonSet     *appsv1.DaemonSet
+	RTEConfigHash string
 }
 
 type GenerateDesiredManifestUpdater func(mcpName string, gdm *GeneratedDesiredManifest) error
@@ -196,12 +199,14 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 		for _, mcp := range tree.MachineConfigPools {
 			var existingDs client.Object
 			var loadError error
+			var rteConfigHash string
 
 			generatedName := objectnames.GetComponentName(em.instance.Name, mcp.Name)
 			existingDaemonSet, ok := em.daemonSets[generatedName]
 			if ok {
 				existingDs = existingDaemonSet.daemonSet
 				loadError = existingDaemonSet.daemonSetError
+				rteConfigHash = existingDaemonSet.rteConfigHash
 			} else {
 				loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.DaemonSet.Namespace, mf.DaemonSet.Name)
 			}
@@ -222,6 +227,7 @@ func (em *ExistingManifests) State(mf rtemanifests.Manifests, updater GenerateDe
 					MachineConfigPool: mcp.DeepCopy(),
 					NodeGroup:         tree.NodeGroup.DeepCopy(),
 					DaemonSet:         desiredDaemonSet,
+					RTEConfigHash:     rteConfigHash,
 				}
 
 				err := updater(mcp.Name, &gdm)
@@ -302,6 +308,11 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 			dsm := daemonSetManifest{}
 			if dsm.daemonSetError = cli.Get(ctx, key, ds); dsm.daemonSetError == nil {
 				dsm.daemonSet = ds
+			}
+			cm := &corev1.ConfigMap{}
+			if err := cli.Get(ctx, key, cm); err == nil {
+				// we're storing the updated hash only in the case that kubelet controller created a configmap
+				dsm.rteConfigHash = hash.ConfigMapData(cm)
 			}
 			ret.daemonSets[generatedName] = dsm
 

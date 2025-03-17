@@ -412,9 +412,6 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 	if err != nil {
 		return mf, err
 	}
-	if mf.ConfigMap != nil {
-		rteupdate.DaemonSetHashAnnotation(mf.DaemonSet, hash.ConfigMapData(mf.ConfigMap))
-	}
 	return mf, err
 }
 
