@@ -26,12 +26,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
-	perfprof "github.com/openshift/cluster-node-tuning-operator/pkg/apis/performanceprofile/v2"
-	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
-	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/test/internal/hypershift"
+	perfprof "github.com/openshift/cluster-node-tuning-operator/pkg/apis/performanceprofile/v2"
+	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
+	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 var (

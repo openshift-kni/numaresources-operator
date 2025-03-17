@@ -20,9 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	configv1 "github.com/openshift/api/config/v1"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 func TestResourceTopologyExporter(t *testing.T) {

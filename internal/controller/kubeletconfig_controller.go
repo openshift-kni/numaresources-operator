@@ -38,9 +38,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
-
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
@@ -48,6 +47,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	cfgstate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/cfg"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
+	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 )
 
 const (

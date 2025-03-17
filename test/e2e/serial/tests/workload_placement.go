@@ -22,10 +22,6 @@ import (
 	"math"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"sigs.k8s.io/yaml"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -37,24 +33,25 @@ import (
 	corev1qos "k8s.io/kubectl/pkg/util/qos"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	operatorv1 "github.com/openshift/api/operator/v1"
-
-	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
-	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
+	"sigs.k8s.io/yaml"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
-
-	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	intbaseload "github.com/openshift-kni/numaresources-operator/internal/baseload"
+	operatorv1 "github.com/openshift/api/operator/v1"
+
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 
-	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"

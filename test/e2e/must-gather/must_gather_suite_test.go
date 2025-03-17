@@ -25,14 +25,13 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
-
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
 const (

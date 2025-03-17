@@ -23,9 +23,6 @@ import (
 	"sync"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -33,16 +30,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
+	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 	numacellmanifests "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
 
-	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 )

@@ -28,14 +28,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/google/go-cmp/cmp"
+
+	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	e2eimages "github.com/openshift-kni/numaresources-operator/test/internal/images"

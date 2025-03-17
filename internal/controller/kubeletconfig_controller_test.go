@@ -19,9 +19,6 @@ package controller
 import (
 	"context"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -33,11 +30,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
+	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 )
 
 type reconcilerBuilderFunc func(...runtime.Object) (*KubeletConfigReconciler, error)
