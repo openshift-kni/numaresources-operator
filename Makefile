@@ -571,3 +571,7 @@ mv $(1) $(1)-$(3) ;\
 } ;\
 ln -sf $(1)-$(3) $(1)
 endef
+
+.PHONY: sort-imports
+sort-imports:
+	@go run tools/sortimports/main.go --paths=$(shell pwd) --exclude-dirs=$(shell pwd)/vendor --verbose=true
