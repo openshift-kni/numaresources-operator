@@ -2,7 +2,7 @@
 
 # generate /must-gather/version file
 . version
-echo "performance-addon-operator/must-gather" > /must-gather/version
+echo "numaresources-operator/must-gather" > /must-gather/version
 version >> /must-gather/version
 
 # machine/node resources
