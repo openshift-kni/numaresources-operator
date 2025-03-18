@@ -4,7 +4,7 @@
 . namespace
 NRO_NAMESPACE=$(nro_namespace)
 
-if [ -z "$NRO_NAMESPACE" ]
+if [ -z "${NRO_NAMESPACE}" ]
 then
     echo "NUMAresources Operator namespace not detected. Skipping NRO data gathering"
 else
@@ -18,5 +18,5 @@ else
         oc adm inspect --dest-dir must-gather ${crd_name}
     done
 
-    oc adm inspect --dest-dir must-gather ns/${NRO_NAMESPACE}
+    oc adm inspect --dest-dir must-gather ns/"${NRO_NAMESPACE}"
 fi
