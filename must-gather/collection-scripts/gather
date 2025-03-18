@@ -1,12 +1,28 @@
 #!/bin/bash
 
+
+function is_hypershift() {
+  control_plane_topology=$(/usr/bin/oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}'
+  if [[ "${control_plane_topology}" == "External" ]]; then
+    return 0
+  fi
+  return 1
+}
+
 # generate /must-gather/version file
 . version
 echo "numaresources-operator/must-gather" > /must-gather/version
 version >> /must-gather/version
 
 # machine/node resources
-resources+=(nodes machineconfigs machineconfigpools featuregates kubeletconfigs)
+resources+=(nodes featuregates)
+
+if is_hypershift; then
+  # collect kubeletconfig configmap
+  /usr/bin/oc adm inspect --dest-dir must-gather --namespace openshift-config-managed configmaps
+else
+  resources+=(machineconfigs machineconfigpools kubeletconfigs)
+fi
 
 # run the collection of resources using must-gather
 for resource in "${resources[@]}"; do
