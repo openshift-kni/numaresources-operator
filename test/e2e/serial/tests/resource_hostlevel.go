@@ -66,7 +66,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 		// It should behave exactly like scope=pod. But we keep these tests as non-regression
 		// to have a signal the system is behaving as expected.
 		// This is the reason we don't filter for scope, but only by policy.
-		DescribeTable("[tier0][hostlevel] a pod should be placed and aligned on the node", Label(label.Tier0, "hostlevel"),
+		DescribeTable("a pod should be placed and aligned on the node", Label(label.Tier0, "hostlevel"),
 			func(tmPolicy string, requiredRes []corev1.ResourceList, expectedQOS corev1.PodQOSClass) {
 				ctx := context.TODO()
 				nrtCandidates := filterNodes(fxt, desiredNodesState{
@@ -344,7 +344,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				Expect(err).ToNot(HaveOccurred())
 				Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", updatedPod.Namespace, updatedPod.Name, updatedPod.Spec.SchedulerName)
 			},
-			Entry("[test_id:74253][tier2][qos:gu][unsched] with ephemeral storage, multi-container",
+			Entry("[test_id:74253] with ephemeral storage, multi-container",
 				Label(label.Tier2, "qos:gu", "unsched"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
@@ -362,7 +362,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				},
 				corev1.PodQOSGuaranteed,
 			),
-			Entry("[test_id:74254][tier2][qos:bu][unsched] with ephemeral storage, multi-container",
+			Entry("[test_id:74254] with ephemeral storage, multi-container",
 				Label(label.Tier2, "qos:bu", "unsched"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
@@ -379,7 +379,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				},
 				corev1.PodQOSBurstable,
 			),
-			Entry("[test_id:74255][tier3][qos:be][unsched] with ephemeral storage, multi-container",
+			Entry("[test_id:74255] with ephemeral storage, multi-container",
 				Label(label.Tier3, "qos:be", "unsched"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod

@@ -19,6 +19,7 @@ package install
 import (
 	"context"
 	"fmt"
+	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -70,7 +71,7 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 	})
 
 	Context("with a running cluster with all the components", func() {
-		It("[test_id:47574][tier0] should perform overall deployment and verify the condition is reported as available", func() {
+		It("[test_id:47574] should perform overall deployment and verify the condition is reported as available", Label(label.Tier0), func() {
 			deployer := deploy.NewForPlatform(configuration.Plat)
 			nroObj := deployer.Deploy(context.TODO(), configuration.MachineConfigPoolUpdateTimeout)
 			nname := client.ObjectKeyFromObject(nroObj)
@@ -203,7 +204,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 			deployer.Teardown(context.TODO(), 5*time.Minute)
 		})
 
-		It("[test_id:47587][tier1] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", func() {
+		It("[test_id:47587] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", Label(label.Tier1), func() {
 			By("getting up-to-date NRO object")
 			nroKey := objects.NROObjectKey()
 

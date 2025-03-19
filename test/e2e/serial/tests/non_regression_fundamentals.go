@@ -43,7 +43,7 @@ import (
 
 type setupPodFunc func(pod *corev1.Pod)
 
-var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundamentals non-regression", Serial, Label("fundamentals", "scheduler", "nonreg"), Label("feature:nonreg"), func() {
+var _ = Describe("numaresources fundamentals non-regression", Serial, Label("serial", "fundamentals", "scheduler", "feature:nonreg"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
@@ -148,20 +148,20 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 				}
 			},
-			Entry("should handle a burst of qos=guaranteed pods [tier0]", Label(label.Tier0), func(pod *corev1.Pod) {
+			Entry("should handle a burst of qos=guaranteed pods", Label(label.Tier0), func(pod *corev1.Pod) {
 				pod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
 					corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 					corev1.ResourceMemory: resource.MustParse("64Mi"),
 				}
 			}),
-			Entry("should handle a burst of qos=burstable pods [tier1]", Label(label.Tier1), func(pod *corev1.Pod) {
+			Entry("should handle a burst of qos=burstable pods", Label(label.Tier1), func(pod *corev1.Pod) {
 				pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
 					corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 					corev1.ResourceMemory: resource.MustParse("64Mi"),
 				}
 			}),
 			// this is REALLY REALLY to prevent the most catastrophic regressions
-			Entry("should handle a burst of qos=best-effort pods [tier2]", Label(label.Tier2), func(pod *corev1.Pod) {}),
+			Entry("should handle a burst of qos=best-effort pods", Label(label.Tier2), func(pod *corev1.Pod) {}),
 		)
 
 		DescribeTable("[nodeAll] against all the available worker nodes", Label("nodeAll"),
@@ -244,20 +244,20 @@ var _ = Describe("[serial][fundamentals][scheduler][nonreg] numaresources fundam
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 				}
 			},
-			Entry("should handle a burst of qos=guaranteed pods [tier0]", Label(label.Tier0), func(pod *corev1.Pod) {
+			Entry("should handle a burst of qos=guaranteed pods", Label(label.Tier0), func(pod *corev1.Pod) {
 				pod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
 					corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 					corev1.ResourceMemory: resource.MustParse("64Mi"),
 				}
 			}),
-			Entry("should handle a burst of qos=burstable pods [tier1]", Label(label.Tier1), func(pod *corev1.Pod) {
+			Entry("should handle a burst of qos=burstable pods", Label(label.Tier1), func(pod *corev1.Pod) {
 				pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
 					corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 					corev1.ResourceMemory: resource.MustParse("64Mi"),
 				}
 			}),
 			// this is REALLY REALLY to prevent the most catastrophic regressions
-			Entry("should handle a burst of qos=best-effort pods [tier2]", Label(label.Tier2), func(pod *corev1.Pod) {}),
+			Entry("should handle a burst of qos=best-effort pods", Label(label.Tier2), func(pod *corev1.Pod) {}),
 		)
 
 		// TODO: mixed

@@ -141,7 +141,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 		})
 
-		It("[test_id:47584][tier2][nonreg] should be able to schedule guaranteed pod in selective way", Label(label.Tier2, "nonreg"), func() {
+		It("[test_id:47584] should be able to schedule guaranteed pod in selective way", Label(label.Tier2), func() {
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 			targetNodeName, ok := e2efixture.PopNodeName(nodesNameSet)
 			Expect(ok).To(BeTrue())
@@ -203,7 +203,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(ok).To(BeTrue(), "NRT resources not restored correctly on %q", targetNodeName)
 		})
 
-		It("[test_id:48964][tier3][nonreg] should be able to schedule a guaranteed deployment pod to a specific node", Label(label.Tier3, "nonreg"), func() {
+		It("[test_id:48964] should be able to schedule a guaranteed deployment pod to a specific node", Label(label.Tier3), func() {
 			nrtInitialList := nrtv1alpha2.NodeResourceTopologyList{}
 
 			err := fxt.Client.List(context.TODO(), &nrtInitialList)
@@ -325,7 +325,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	})
 
 	Context("Requesting resources that are greater than allocatable at numa level", func() {
-		It("[test_id:47613][tier3][nonreg][unsched] should not schedule a pod requesting resources that are not allocatable at numa level", Label(label.Tier3, "nonreg", "unsched"), Label("feature:unsched"), func() {
+		It("[test_id:47613] should not schedule a pod requesting resources that are not allocatable at numa level", Label(label.Tier3, "nonreg", "unsched"), Label("feature:unsched"), func() {
 			//the test can run on node with any numa number, so no need to filter the nrts
 			nrtNames := e2enrt.AccumulateNames(nrts)
 

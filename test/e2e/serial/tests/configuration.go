@@ -144,7 +144,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 	Context("cluster has at least one suitable node", func() {
 		timeout := 5 * time.Minute
 
-		It("[test_id:47674][reboot_required][slow][images][tier2] should be able to modify the configurable values under the NUMAResourcesOperator CR", Label("reboot_required", label.Slow, "images", label.Tier2), func() {
+		It("[test_id:47674] should be able to modify the configurable values under the NUMAResourcesOperator CR", Label("reboot_required", label.Slow, "images", label.Tier2), func() {
 			fxt.IsRebootTest = true
 			nroOperObj := &nropv1.NUMAResourcesOperator{}
 			nroKey := objects.NROObjectKey()
@@ -385,7 +385,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 		})
 
-		It("[test_id:54916][tier2][schedrst] should be able to modify the configurable values under the NUMAResourcesScheduler CR", Label(label.Tier2, "schedrst"), Label("feature:schedrst"), func() {
+		It("[test_id:54916] should be able to modify the configurable values under the NUMAResourcesScheduler CR", Label(label.Tier2, "schedrst"), Label("feature:schedrst"), func() {
 			initialNroSchedObj := &nropv1.NUMAResourcesScheduler{}
 			nroSchedKey := objects.NROSchedObjectKey()
 			err := fxt.Client.Get(context.TODO(), nroSchedKey, initialNroSchedObj)
@@ -451,7 +451,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
 		})
 
-		It("[test_id:47585][reboot_required][slow] can change kubeletconfig and controller should adapt", Label("reboot_required", label.Slow), func() {
+		It("[test_id:47585] can change kubeletconfig and controller should adapt", Label("reboot_required", label.Slow), func() {
 			fxt.IsRebootTest = true
 			var performanceProfile perfprof.PerformanceProfile
 			var targetedKC *machineconfigv1.KubeletConfig
@@ -803,7 +803,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(nrsGot).To(Equal(nrsExpected), "mismatching related objects for NUMAResourcesScheduler")
 		})
 
-		It("[slow][tier1] ignores non-matching kubeletconfigs", Label(label.Slow, label.Tier1), func(ctx context.Context) {
+		It("ignores non-matching kubeletconfigs", Label(label.Slow, label.Tier1), func(ctx context.Context) {
 			By("getting the NROP object")
 			nroOperObj := &nropv1.NUMAResourcesOperator{}
 			nroKey := objects.NROObjectKey()
@@ -838,7 +838,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}).WithContext(ctx).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Equal(kcCmNamesPre))
 		})
 
-		It("[test_id:75354][reboot_required][slow][unsched][schedrst][tier2] should be able to correctly identify topology manager policy without scheduler restarting", Label("reboot_required", label.Slow, "unsched", "schedrst", label.Tier2), Label("feature:schedattrwatch", "feature:schedrst"), func(ctx context.Context) {
+		It("[test_id:75354] should be able to correctly identify topology manager policy without scheduler restarting", Label("reboot_required", label.Slow, "unsched", "schedrst", label.Tier2), Label("feature:schedattrwatch", "feature:schedrst"), func(ctx context.Context) {
 			// https://issues.redhat.com/browse/OCPBUGS-34583
 			fxt.IsRebootTest = true
 			By("getting the number of cpus that is required for a numa zone to create a Topology Affinity Error deployment")
@@ -1149,7 +1149,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 		Context("[ngpoolname] node group with PoolName support", Label("ngpoolname"), Label("feature:ngpoolname"), func() {
 			initialOperObj := &nropv1.NUMAResourcesOperator{}
 			nroKey := objects.NROObjectKey()
-			It("[tier2] should not allow configuring PoolName and MCP selector on same node group", Label(label.Tier2), func(ctx context.Context) {
+			It("should not allow configuring PoolName and MCP selector on same node group", Label(label.Tier2), func(ctx context.Context) {
 				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
 
 				labelSel := &metav1.LabelSelector{
@@ -1192,7 +1192,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Expect(isDegradedWith(updatedNRO.Status.Conditions, "must have only a single specifier set", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
 			})
 
-			It("[tier1] should report the NodeGroupConfig in the NodeGroupStatus with NodePool set and allow updates", Label(label.Tier1), func(ctx context.Context) {
+			It("should report the NodeGroupConfig in the NodeGroupStatus with NodePool set and allow updates", Label(label.Tier1), func(ctx context.Context) {
 				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
 
 				mcp := objects.TestMCP()
