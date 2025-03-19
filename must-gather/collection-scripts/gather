@@ -2,7 +2,7 @@
 
 
 function is_hypershift() {
-  control_plane_topology=$(/usr/bin/oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}'
+  control_plane_topology=$(/usr/bin/oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}')
   if [[ "${control_plane_topology}" == "External" ]]; then
     return 0
   fi
