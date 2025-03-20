@@ -144,7 +144,7 @@ test-must-gather-e2e: build-must-gather-e2e
 
 .PHONY: lint
 lint: update-buildinfo golangci-lint ## Run golangci-lint linter
-	$(GOLANGCI_LINT) --verbose run --print-resources-usage --exclude-dirs test/internal/k8simported
+	$(GOLANGCI_LINT) --verbose run --print-resources-usage --exclude-dirs 'test/internal/k8simported|pkg/objectstate/defaulter/generated'
 
 .PHONY: lint-fix
 lint-fix: update-buildinfo golangci-lint ## Run golangci-lint linter and perform fixes
@@ -571,3 +571,10 @@ mv $(1) $(1)-$(3) ;\
 } ;\
 ln -sf $(1)-$(3) $(1)
 endef
+
+
+.PHONY: defaults
+defaults:
+	@echo "generating defaults"
+	# generated are under pkg/objectstate/defaulter/generated
+	hack/generate-defaults.sh

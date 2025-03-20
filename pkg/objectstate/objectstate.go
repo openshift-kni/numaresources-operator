@@ -31,6 +31,7 @@ type ObjectState struct {
 	UpdateError error // error updating the object (merge or update)
 	Compare     func(existing, desired client.Object) (bool, error)
 	Merge       func(existing, desired client.Object) (client.Object, error)
+	Default     func(desired client.Object) client.Object
 }
 
 func (obst ObjectState) IsNotFoundError() bool {

@@ -31,6 +31,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/defaulter"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 )
 
@@ -110,6 +111,7 @@ func (obj nodeGroupFinder) FindState(mf Manifests, tree nodegroupv1.Tree) []obje
 		Desired:     desiredDaemonSet,
 		Compare:     compare.Object,
 		Merge:       merge.ObjectForUpdate,
+		Default:     defaulter.DaemonSet,
 	})
 	return ret
 }
