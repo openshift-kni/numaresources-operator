@@ -23,19 +23,23 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/yaml"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/internal/hypershift/consts"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
@@ -114,15 +118,31 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 				nropInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesoperators", objects.NROObjectKey().Name))
 				nroschedInstanceFileName := fmt.Sprintf("%s.yaml", filepath.Join("cluster-scoped-resources/nodetopology.openshift.io/numaresourcesschedulers", nroSchedObj.Name))
 
-				collectedMCPs, err := getMachineConfigPools(filepath.Join(mgContentFolder, "cluster-scoped-resources/machineconfiguration.openshift.io/machineconfigpools"))
-				Expect(err).ToNot(HaveOccurred())
-
 				nro := &nropv1.NUMAResourcesOperator{}
-				Expect(e2eclient.Client.Get(context.TODO(), objects.NROObjectKey(), nro)).To(Succeed())
-				ngMCPs, err := nodegroupv1.FindMachineConfigPools(&collectedMCPs, nro.Spec.NodeGroups)
-				Expect(err).ToNot(HaveOccurred())
+				ok, err := getResourceOfType(filepath.Join(mgContentFolder, "cluster-scoped-resources/nodetopology.openshift.io/numaresourcesoperators"), objects.NROObjectKey().Name, nro)
+				Expect(ok).To(BeTrue(), "numaresourcesoperators resources named %s was not found", objects.NROObjectKey().Name)
+				Expect(err).NotTo(HaveOccurred())
 
-				nglabels := collectMachineConfigPoolsNodeSelector(ngMCPs)
+				var nglabels []map[string]string
+				if configuration.Plat == platform.OpenShift {
+					collectedMCPs, err := getMachineConfigPools(filepath.Join(mgContentFolder, "cluster-scoped-resources/machineconfiguration.openshift.io/machineconfigpools"))
+					Expect(err).ToNot(HaveOccurred())
+					ngMCPs, err := nodegroupv1.FindMachineConfigPools(&collectedMCPs, nro.Spec.NodeGroups)
+					Expect(err).ToNot(HaveOccurred())
+					nglabels = collectMachineConfigPoolsNodeSelector(ngMCPs)
+				}
+				if configuration.Plat == platform.HyperShift {
+					for _, ng := range nro.Spec.NodeGroups {
+						nglabels = append(nglabels, map[string]string{
+							consts.NodePoolNameLabel: *ng.PoolName,
+						})
+					}
+					By("Check that the ConfigMaps have been collected")
+					configMapsFolder := filepath.Join(mgContentFolder, "namespaces/openshift-config-managed/core/configmaps")
+					re := regexp.MustCompile(`^kubeletconfig-.*\.yaml`)
+					found := checkfileExistByRegex(configMapsFolder, re)
+					Expect(found).To(BeTrue(), "couldn't find a file starts with \"kubeletconfig-\" prefix in directory %q", configMapsFolder)
+				}
 				workerNodesNames, err := getWorkerNodesNames(filepath.Join(mgContentFolder, "cluster-scoped-resources/core/nodes"), nglabels)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -182,6 +202,22 @@ func checkfilesExist(listOfFiles []string, path string) error {
 		}
 	}
 	return nil
+}
+
+func checkfileExistByRegex(dirPath string, regexp *regexp.Regexp) bool {
+	GinkgoHelper()
+	dirEntry, err := os.ReadDir(dirPath)
+	Expect(err).ToNot(HaveOccurred())
+
+	for _, entry := range dirEntry {
+		if entry.IsDir() {
+			continue
+		}
+		if regexp.MatchString(entry.Name()) {
+			return true
+		}
+	}
+	return false
 }
 
 // Look for node yaml manifest in `folder` and return
@@ -246,6 +282,28 @@ func getMachineConfigPools(folder string) (mcov1.MachineConfigPoolList, error) {
 		retval.Items = append(retval.Items, *mcp)
 	}
 	return retval, nil
+}
+
+func getResourceOfType(folder, resourceName string, resource any) (bool, error) {
+	items, err := os.ReadDir(folder)
+	if err != nil {
+		return false, err
+	}
+	for _, item := range items {
+		if item.IsDir() {
+			continue
+		}
+		if item.Name() != fmt.Sprintf("%s.yaml", resourceName) {
+			continue
+		}
+
+		data, err := os.ReadFile(filepath.Join(folder, item.Name()))
+		if err != nil {
+			return false, err
+		}
+		return true, yaml.Unmarshal(data, resource)
+	}
+	return false, nil
 }
 
 // return true if b keys and values respectively are part of a, otherwise false

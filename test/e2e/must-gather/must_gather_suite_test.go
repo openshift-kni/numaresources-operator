@@ -23,8 +23,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
@@ -61,10 +59,6 @@ func TestMustGather(t *testing.T) {
 }
 
 var _ = ginkgo.BeforeSuite(func() {
-	if configuration.Plat != platform.OpenShift {
-		ginkgo.Skip(fmt.Sprintf("running on %q platform but must-gather is only supported on %q platform", configuration.Plat, platform.OpenShift))
-	}
-
 	mustGatherImage = getStringValueFromEnv(envVarMustGatherImage, defaultMustGatherImage)
 	mustGatherTag = getStringValueFromEnv(envVarMustGatherTag, defaultMustGatherTag)
 	ginkgo.By(fmt.Sprintf("Using must-gather image %q tag %q", mustGatherImage, mustGatherTag))

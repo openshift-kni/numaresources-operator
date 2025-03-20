@@ -4,9 +4,9 @@
 . namespace
 NRO_NAMESPACE=$(nro_namespace)
 
-if [ -z "$NRO_NAMESPACE" ]
+if [ -z "${NRO_NAMESPACE}" ]
 then
-    echo "NUMAresources Operator namespace not detected. Skipping NRO data gathering"
+    echo "NUMAResources Operator namespace not detected. Skipping NRO data gathering"
 else
     # get crds
     for crd_name in numaresourcesschedulers.nodetopology.openshift.io numaresourcesoperators.nodetopology.openshift.io noderesourcetopologies.topology.node.k8s.io
@@ -18,5 +18,5 @@ else
         oc adm inspect --dest-dir must-gather ${crd_name}
     done
 
-    oc adm inspect --dest-dir must-gather ns/${NRO_NAMESPACE}
+    oc adm inspect --dest-dir must-gather ns/"${NRO_NAMESPACE}"
 fi

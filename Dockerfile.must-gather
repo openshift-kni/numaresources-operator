@@ -2,4 +2,4 @@ FROM quay.io/openshift/origin-cli:4.19
 
 COPY must-gather/collection-scripts/* /usr/bin/
 
-ENTRYPOINT /usr/bin/gather
+ENTRYPOINT ["/usr/bin/gather"]
