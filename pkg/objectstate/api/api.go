@@ -19,11 +19,10 @@ package api
 import (
 	"context"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
-
 	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
