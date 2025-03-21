@@ -37,6 +37,7 @@ import (
 	e2enrtint "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
@@ -64,7 +65,7 @@ type interferenceDesc struct {
 	ratio int
 }
 
-var _ = Describe("[serial][scheduler][cache][tier0] scheduler cache", Serial, Label("scheduler", "cache", "tier0"), Label("feature:cache"), func() {
+var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cache", "feature:cache"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 
