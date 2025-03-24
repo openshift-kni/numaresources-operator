@@ -29,6 +29,7 @@ const (
 	defaultCacheResyncDetection = CacheResyncDetectionRelaxed
 	defaultScoringStrategy      = LeastAllocated
 	defaultReplicas             = int32(1)
+	defaultLogTracing           = LogTracingDisabled
 )
 
 func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
@@ -57,5 +58,9 @@ func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
 	if spec.Replicas == nil {
 		replicas := defaultReplicas
 		spec.Replicas = &replicas
+	}
+	if spec.LogTracing == nil {
+		logTracing := defaultLogTracing
+		spec.LogTracing = &logTracing
 	}
 }
