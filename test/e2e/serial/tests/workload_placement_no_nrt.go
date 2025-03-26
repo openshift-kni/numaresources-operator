@@ -32,6 +32,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
@@ -88,7 +89,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			updateInfoRefreshPause(fxt, initialInfoRefreshPause, nropObjInitial)
 		})
 
-		It("[tier1] should make a best-effort pod running", Label("tier1"), func() {
+		It("should make a best-effort pod running", Label(label.Tier1), func() {
 			By("create best-effort pod expect it to start running")
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
@@ -102,7 +103,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("[tier1] should make a burstable pod running", Label("tier1"), func() {
+		It("should make a burstable pod running", Label(label.Tier1), func() {
 			By("create burstable pod and expect it to run")
 			testPod = objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
@@ -119,7 +120,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("[tier1][test_id:47611] should make a guaranteed pod running", Label("tier1"), func() {
+		It("[test_id:47611] should make a guaranteed pod running", Label(label.Tier1), func() {
 			By("create guaranteed pod and expect it to run")
 			testPod = objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName

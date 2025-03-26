@@ -19,6 +19,7 @@ package install
 import (
 	"context"
 	"fmt"
+	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -43,7 +44,7 @@ import (
 
 var _ = Describe("[Scheduler] install", func() {
 	Context("with a running cluster with all the components", func() {
-		It("[test_id:48598][tier2] should perform the scheduler deployment and verify the condition is reported as available", func() {
+		It("[test_id:48598] should perform the scheduler deployment and verify the condition is reported as available", Label(label.Tier2), func() {
 			var err error
 			nroSchedObj := objects.TestNROScheduler()
 
