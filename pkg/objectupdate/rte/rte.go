@@ -41,6 +41,7 @@ import (
 // these should be provided by a deployer API
 const (
 	MainContainerName   = "resource-topology-exporter"
+	SecurityContextName = "resource-topology-exporter"
 	HelperContainerName = "shared-pool-container"
 
 	pfpStatusMountName = "run-pfpstatus"
