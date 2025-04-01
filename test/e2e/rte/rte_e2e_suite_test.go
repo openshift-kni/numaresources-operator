@@ -19,11 +19,11 @@ package rte
 import (
 	"testing"
 
+	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte"
+	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/rte"
-	_ "github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/topology_updater"
 	_ "github.com/openshift-kni/numaresources-operator/test/e2e/rte/local"
 )
 

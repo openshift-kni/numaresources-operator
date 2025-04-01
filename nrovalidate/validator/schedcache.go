@@ -26,7 +26,6 @@ import (
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 	"github.com/openshift-kni/numaresources-operator/internal/schedcache"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
