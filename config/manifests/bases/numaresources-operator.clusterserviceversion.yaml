@@ -209,6 +209,11 @@ spec:
           Defaults to "Normal".
         displayName: Scheduler log verbosity
         path: logLevel
+      - description: Control log tracing
+        displayName: Scheduler log tracing
+        path: logTracing
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: Replicas control how many scheduler pods must be configured for
           High Availability (HA)
         displayName: Scheduler replicas

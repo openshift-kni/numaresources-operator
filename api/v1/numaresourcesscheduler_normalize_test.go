@@ -33,6 +33,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 	cacheResyncDetection := defaultCacheResyncDetection
 	schedInformer := defaultSchedulerInformer
 	scoringStrategyType := defaultScoringStrategy
+	logTracing := defaultLogTracing
 
 	cacheResyncPeriodCustom := 42 * time.Second
 	cacheResyncDebugCustom := CacheResyncDebugDisabled
@@ -42,6 +43,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 		Type:      MostAllocated,
 		Resources: []ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}},
 	}
+	logTracingCustom := LogTracingEnabled
 
 	type testCase struct {
 		description string
@@ -62,7 +64,8 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: ptr.To[int32](defaultReplicas),
+				Replicas:   ptr.To[int32](defaultReplicas),
+				LogTracing: &logTracing,
 			},
 		},
 		{
@@ -83,7 +86,8 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: ptr.To[int32](defaultReplicas),
+				Replicas:   ptr.To[int32](defaultReplicas),
+				LogTracing: &logTracing,
 			},
 		},
 		{
@@ -107,7 +111,8 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: ptr.To[int32](defaultReplicas),
+				Replicas:   ptr.To[int32](defaultReplicas),
+				LogTracing: &logTracing,
 			},
 		},
 		{
@@ -132,7 +137,8 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: ptr.To[int32](defaultReplicas),
+				Replicas:   ptr.To[int32](defaultReplicas),
+				LogTracing: &logTracing,
 			},
 		},
 		{
@@ -157,7 +163,8 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: ptr.To[int32](defaultReplicas),
+				Replicas:   ptr.To[int32](defaultReplicas),
+				LogTracing: &logTracing,
 			},
 		},
 		{
@@ -181,6 +188,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDetection: &cacheResyncDetection,
 				ScoringStrategy:      &scoringStrategyCustom,
 				Replicas:             ptr.To[int32](defaultReplicas),
+				LogTracing:           &logTracing,
 			},
 		},
 		{
@@ -205,6 +213,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDetection: &cacheResyncDetection,
 				ScoringStrategy:      &scoringStrategyCustom,
 				Replicas:             ptr.To[int32](1),
+				LogTracing:           &logTracing,
 			},
 		},
 		{
@@ -217,6 +226,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				},
 				ScoringStrategy: &scoringStrategyCustom,
 				Replicas:        ptr.To[int32](5),
+				LogTracing:      &logTracing,
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
@@ -229,6 +239,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDetection: &cacheResyncDetection,
 				ScoringStrategy:      &scoringStrategyCustom,
 				Replicas:             ptr.To[int32](5),
+				LogTracing:           &logTracing,
 			},
 		},
 		{
@@ -242,6 +253,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDetection: &cacheResyncDetectionCustom,
 				ScoringStrategy:      &scoringStrategyCustom,
 				Replicas:             ptr.To[int32](5),
+				LogTracing:           &logTracingCustom,
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				CacheResyncPeriod: &metav1.Duration{
@@ -252,6 +264,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDetection: &cacheResyncDetectionCustom,
 				ScoringStrategy:      &scoringStrategyCustom,
 				Replicas:             ptr.To[int32](5),
+				LogTracing:           &logTracingCustom,
 			},
 		},
 		{
@@ -274,7 +287,8 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: ptr.To[int32](defaultReplicas),
+				Replicas:   ptr.To[int32](defaultReplicas),
+				LogTracing: &logTracing,
 			},
 		},
 		{
@@ -291,6 +305,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDetection: &cacheResyncDetectionCustom,
 				ScoringStrategy:      &scoringStrategyCustom,
 				Replicas:             ptr.To[int32](5),
+				LogTracing:           &logTracingCustom,
 			},
 			expected: NUMAResourcesSchedulerSpec{
 				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
@@ -304,6 +319,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				CacheResyncDetection: &cacheResyncDetectionCustom,
 				ScoringStrategy:      &scoringStrategyCustom,
 				Replicas:             ptr.To[int32](5),
+				LogTracing:           &logTracingCustom,
 			},
 		},
 	}

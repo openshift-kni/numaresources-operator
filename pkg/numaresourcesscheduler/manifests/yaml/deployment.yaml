@@ -57,6 +57,8 @@ spec:
               name: "etckubernetes"
             - mountPath: "/run/pfpstatus"
               name: "runpfpstatus"
+            - mountPath: "/run/logtracr"
+              name: "runlogtracr"
       serviceAccountName: "secondary-scheduler"
       tolerations:
         - effect: NoSchedule
@@ -69,4 +71,8 @@ spec:
         emptyDir:
           medium: Memory
           sizeLimit: 64Mi
+      - name: "runlogtracr"
+        emptyDir:
+          medium: Memory
+          sizeLimit: 1Gi
 

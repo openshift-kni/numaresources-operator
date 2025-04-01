@@ -74,6 +74,12 @@ spec:
                 - Trace
                 - TraceAll
                 type: string
+              logTracing:
+                description: Control log tracing
+                enum:
+                - Enabled
+                - Disabled
+                type: string
               replicas:
                 description: Replicas control how many scheduler pods must be configured
                   for High Availability (HA)

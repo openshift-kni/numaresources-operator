@@ -18,10 +18,13 @@ package controller
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
+	"github.com/onsi/gomega/gcustom"
+	"github.com/onsi/gomega/types"
 	configv1 "github.com/openshift/api/config/v1"
 
 	"github.com/google/go-cmp/cmp"
@@ -605,8 +608,63 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			ginkgo.Entry("replicas=1", int32(1), false),
 			ginkgo.Entry("replicas=3", int32(3), true),
 		)
+
+		ginkgo.It("should NOT expose the KNI log tracing settings in the deployment by default", func() {
+			ctx := context.TODO()
+
+			_, cnt := getUpdatedDeployment(ctx, reconciler, nrs)
+
+			gomega.Expect(cnt.Args).ToNot(IncludesStringPrefix("--log-tracr-"))
+		})
+
+		ginkgo.It("should expose the KNI log tracing settings in the deployment once enabled", func() {
+			ctx := context.TODO()
+			logTracingEnabled := nropv1.LogTracingEnabled
+
+			nrs := nrs.DeepCopy()
+			nrs.Spec.LogTracing = &logTracingEnabled
+			gomega.Eventually(reconciler.Client.Update).WithArguments(ctx, nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(gomega.Succeed())
+
+			_, cnt := getUpdatedDeployment(ctx, reconciler, nrs)
+
+			gomega.Expect(cnt.Args).To(IncludesStringPrefix("--log-tracr-"))
+		})
+
+		ginkgo.It("should NOT expose the KNI log tracing settings in the deployment if disabled explicitly", func() {
+			ctx := context.TODO()
+			logTracingDisabled := nropv1.LogTracingDisabled
+
+			nrs := nrs.DeepCopy()
+			nrs.Spec.LogTracing = &logTracingDisabled
+			gomega.Eventually(reconciler.Client.Update).WithArguments(ctx, nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(gomega.Succeed())
+
+			_, cnt := getUpdatedDeployment(ctx, reconciler, nrs)
+
+			gomega.Expect(cnt.Args).ToNot(IncludesStringPrefix("--log-tracr-"))
+		})
 	})
 })
+
+func getUpdatedDeployment(ctx context.Context, reconciler *NUMAResourcesSchedulerReconciler, nrs *nropv1.NUMAResourcesScheduler) (*appsv1.Deployment, *corev1.Container) {
+	ginkgo.GinkgoHelper()
+
+	key := client.ObjectKeyFromObject(nrs)
+	_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+	gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+	key = client.ObjectKey{
+		Name:      "secondary-scheduler",
+		Namespace: testNamespace,
+	}
+
+	dp := appsv1.Deployment{}
+	gomega.Expect(reconciler.Client.Get(ctx, key, &dp)).To(gomega.Succeed())
+
+	cnt := depobjupdate.FindContainerByName(dp.Spec.Template.Spec.Containers, schedupdate.MainContainerName)
+	gomega.Expect(cnt).ToNot(gomega.BeNil(), "cannot find container %q in deployment", schedupdate.MainContainerName)
+
+	return &dp, cnt
+}
 
 func pop(m map[string]string, k string) string {
 	v := m[k]
@@ -694,4 +752,15 @@ func expectLeaderElectParams(cli client.Client, enabled bool, resourceNamespace,
 	gomega.Expect(cfg.LeaderElection.LeaderElect).To(gomega.Equal(enabled))
 	gomega.Expect(cfg.LeaderElection.ResourceNamespace).To(gomega.Equal(resourceNamespace))
 	gomega.Expect(cfg.LeaderElection.ResourceName).To(gomega.Equal(resourceName))
+}
+
+func IncludesStringPrefix(pfx string) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(strs []string) (bool, error) {
+		for _, str := range strs {
+			if strings.HasPrefix(str, pfx) {
+				return true, nil
+			}
+		}
+		return false, nil
+	}).WithTemplate("failed {{.To}} find any string with prefix {{.Data}} in strings {{.Actual}}", pfx)
 }

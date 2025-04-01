@@ -76,8 +76,19 @@ const (
 	// CacheResyncDetectionRelaxed makes the NodeResourceTopologyMatch plugin reconcile the node state only when detecting guaranteed QoS pods request NUMA-specific resources.
 	CacheResyncDetectionRelaxed CacheResyncDetectionMode = "Relaxed"
 
-	// CacheResyncDetectionRelaxed makes the NodeResourceTopologyMatch plugin reconcile the node state when detecting any guaranteed QoS pods.
+	// CacheResyncDetectionAggressive makes the NodeResourceTopologyMatch plugin reconcile the node state when detecting any guaranteed QoS pods.
 	CacheResyncDetectionAggressive CacheResyncDetectionMode = "Aggressive"
+)
+
+// +kubebuilder:validation:Enum=Enabled;Disabled
+type LogTracingMode string
+
+const (
+	// LogTracingEnabled enabled log tracing
+	LogTracingEnabled LogTracingMode = "Enabled"
+
+	// LogTracingDisabled enabled log tracing
+	LogTracingDisabled LogTracingMode = "Disabled"
 )
 
 // NUMAResourcesSchedulerSpec defines the desired state of NUMAResourcesScheduler
@@ -118,6 +129,10 @@ type NUMAResourcesSchedulerSpec struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler replicas",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:int"}
 	Replicas *int32 `json:"replicas,omitempty"`
+	// Control log tracing
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler log tracing",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	LogTracing *LogTracingMode `json:"logTracing,omitempty"`
 }
 
 // NUMAResourcesSchedulerStatus defines the observed state of NUMAResourcesScheduler

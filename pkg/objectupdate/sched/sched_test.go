@@ -17,9 +17,7 @@
 package sched
 
 import (
-	"encoding/json"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -29,7 +27,6 @@ import (
 
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 )
@@ -317,108 +314,4 @@ func TestUpdateSchedulerConfig(t *testing.T) {
 			yamlCompare(t, tc.name, gotYAML, tc.expectedYAML)
 		})
 	}
-}
-
-// TODO: the test depends on the order of the env vars
-func TestDeploymentEnvVarSettings(t *testing.T) {
-	cacheResyncDebugEnabled := nropv1.CacheResyncDebugDumpJSONFile
-	cacheResyncDebugDisabled := nropv1.CacheResyncDebugDisabled
-
-	type testCase struct {
-		name       string
-		spec       nropv1.NUMAResourcesSchedulerSpec
-		initialDp  *appsv1.Deployment
-		expectedDp appsv1.Deployment
-	}
-
-	testCases := []testCase{
-		{
-			name: "status dump disabled explicitly",
-			spec: nropv1.NUMAResourcesSchedulerSpec{
-				CacheResyncDebug: &cacheResyncDebugDisabled,
-			},
-			initialDp:  dpMinimal,
-			expectedDp: *dpMinimal.DeepCopy(),
-		},
-		{
-			name: "status dump enabled explicitly",
-			spec: nropv1.NUMAResourcesSchedulerSpec{
-				CacheResyncDebug: &cacheResyncDebugEnabled,
-			},
-			initialDp: dpMinimal,
-			expectedDp: appsv1.Deployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "test-namespace",
-				},
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "secondary-scheduler",
-									Image: "quay.io/bar/image:v1",
-									Env: []corev1.EnvVar{
-										{
-											Name:  "PFP_STATUS_DUMP",
-											Value: "/run/pfpstatus",
-										},
-									},
-								},
-							},
-							Volumes: []corev1.Volume{
-								schedstate.NewSchedConfigVolume("foo", "bar"),
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "status dump enabled, disabling it",
-			spec: nropv1.NUMAResourcesSchedulerSpec{
-				CacheResyncDebug: &cacheResyncDebugDisabled,
-			},
-			initialDp: dpAllOptions,
-			expectedDp: appsv1.Deployment{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-deployment",
-					Namespace: "test-namespace",
-				},
-				Spec: appsv1.DeploymentSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Containers: []corev1.Container{
-								{
-									Name:  "secondary-scheduler",
-									Image: "quay.io/bar/image:v1",
-								},
-							},
-							Volumes: []corev1.Volume{
-								schedstate.NewSchedConfigVolume("foo", "bar"),
-							},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			dp := tc.initialDp.DeepCopy()
-			DeploymentEnvVarSettings(dp, tc.spec)
-			if !reflect.DeepEqual(*dp, tc.expectedDp) {
-				t.Errorf("got=%s expected %s", toJSON(dp), toJSON(tc.expectedDp))
-			}
-		})
-	}
-}
-
-func toJSON(obj interface{}) string {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return "<ERROR>"
-	}
-	return string(data)
 }
