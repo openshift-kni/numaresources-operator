@@ -451,7 +451,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
 		})
 
-		It("[test_id:47585] can change kubeletconfig and controller should adapt", Label("reboot_required", label.Slow), func() {
+		It("[test_id:47585] can change kubeletconfig and controller should adapt", Label("reboot_required", label.Slow, label.Tier2), func() {
 			fxt.IsRebootTest = true
 			var performanceProfile perfprof.PerformanceProfile
 			var targetedKC *machineconfigv1.KubeletConfig
