@@ -531,7 +531,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				Expect(found).To(BeFalse(), "RTE pod was found on node %q while expected not to be found", taintedNode.Name)
 			})
 
-			When("RTE pods are not running yet", func() {
+			When("RTE pods are not running yet", Label(label.OpenShift), func() {
 				var taintedNode *corev1.Node
 
 				BeforeEach(func(ctx context.Context) {

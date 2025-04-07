@@ -68,7 +68,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	Context("using a NodeGroup with periodic unevented updates", Label("periodic_update"), func() {
+	Context("using a NodeGroup with periodic unevented updates", Label("periodic_update", label.OpenShift), func() {
 		var nroKey client.ObjectKey
 		var nroOperObj nropv1.NUMAResourcesOperator
 		var nroSchedKey client.ObjectKey
