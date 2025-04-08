@@ -45,21 +45,27 @@ import (
 
 var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources scheduler removal on a live cluster", Serial, Label("disruptive", "scheduler", "schedrst"), Label("feature:schedrst"), func() {
 	var fxt *e2efixture.Fixture
+	var nroSchedObj *nropv1.NUMAResourcesScheduler
+	var config *textlogger.Config
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
 		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
 
+		config = textlogger.NewConfig(textlogger.Verbosity(1))
+
 		var err error
 		fxt, err = e2efixture.Setup("e2e-test-sched-remove", serialconfig.Config.NRTList)
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
-		nrosched.CheckNROSchedulerAvailable(fxt.Client, serialconfig.Config.NROSchedObj.Name)
+		nroSchedObj = nrosched.CheckNROSchedulerAvailable(fxt.Client, serialconfig.Config.NROSchedObj.Name)
+		Expect(nroSchedObj).ToNot(BeNil())
 	})
 
 	AfterEach(func() {
 		restoreScheduler(fxt, serialconfig.Config.NROSchedObj)
-		nrosched.CheckNROSchedulerAvailable(fxt.Client, serialconfig.Config.NROSchedObj.Name)
+		nroSchedObj = nrosched.CheckNROSchedulerAvailable(fxt.Client, serialconfig.Config.NROSchedObj.Name)
+		Expect(nroSchedObj).ToNot(BeNil())
 
 		err := e2efixture.Teardown(fxt)
 		Expect(err).NotTo(HaveOccurred())
@@ -68,11 +74,16 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 	When("removing the topology aware scheduler from a live cluster", func() {
 		It("[case:1][test_id:47593] should keep existing workloads running", Label(label.Tier1), func() {
 			var err error
+			dpNName := nroSchedObj.Status.Deployment
 
 			dp := createDeploymentSync(fxt, "testdp", serialconfig.Config.SchedulerName)
 
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name))
 			err = fxt.Client.Delete(context.TODO(), serialconfig.Config.NROSchedObj)
+			Expect(err).ToNot(HaveOccurred())
+
+			// make sure scheduler deployment is gone
+			err = depwait.With(fxt.Client, textlogger.NewLogger(config)).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(context.TODO(), dpNName.Namespace, dpNName.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			maxStep := 3
@@ -92,8 +103,14 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 		It("[case:2][test_id:49093]should keep new scheduled workloads pending", Label(label.Tier1, "unsched", "feature:unsched"), func() {
 			var err error
 
+			dpNName := nroSchedObj.Status.Deployment
+
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name))
 			err = fxt.Client.Delete(context.TODO(), serialconfig.Config.NROSchedObj)
+			Expect(err).ToNot(HaveOccurred())
+
+			// make sure scheduler deployment is gone
+			err = depwait.With(fxt.Client, textlogger.NewLogger(config)).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(context.TODO(), dpNName.Namespace, dpNName.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			dp := createDeployment(fxt, "testdp", serialconfig.Config.SchedulerName)

@@ -176,6 +176,13 @@ func CheckNROSchedulerAvailable(cli client.Client, schedObjName string) *nropv1.
 
 		return cond.Status == metav1.ConditionTrue
 	}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "Scheduler condition did not become available")
+
+	dpNName := nroSchedObj.Status.Deployment
+	if dpNName.Namespace == "" || dpNName.Name == "" {
+		klog.Errorf("scheduler deployment missing: %q", dpNName.String())
+		return nil
+	}
+
 	return nroSchedObj
 }
 
