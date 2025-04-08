@@ -19,8 +19,9 @@ package controlplane
 import (
 	"context"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
 	"k8s.io/klog/v2"
+
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
 )
 
 func Defaults() detect.ControlPlaneInfo {
