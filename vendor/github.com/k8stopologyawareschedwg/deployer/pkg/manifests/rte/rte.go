@@ -18,8 +18,8 @@ package rte
 
 import (
 	selinuxassets "github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -125,7 +125,13 @@ func (mf Manifests) Render(opts options.UpdaterDaemon) (Manifests, error) {
 		}
 		ocpupdate.SecurityContextConstraint(ret.SecurityContextConstraint, ret.ServiceAccount)
 		ocpupdate.SecurityContextConstraint(ret.SecurityContextConstraintV2, ret.ServiceAccount)
-		rteupdate.SecurityContext(ret.DaemonSet, selinuxTypeFromSCCVersion(opts.DaemonSet.SCCVersion, (mf.MachineConfig != nil)))
+		rteupdate.SecurityContextWithOpts(
+			ret.DaemonSet,
+			rteupdate.SecurityContextOptions{
+				SELinuxContextType:  selinuxTypeFromSCCVersion(opts.DaemonSet.SCCVersion, (mf.MachineConfig != nil)),
+				SecurityContextName: mf.SecurityContextConstraint.Name,
+			},
+		)
 	}
 
 	return ret, nil
@@ -192,19 +198,18 @@ func New(plat platform.Platform) Manifests {
 	return mf
 }
 
-func GetManifests(plat platform.Platform, version platform.Version, namespace string, withCRIHooks, withCustomSELinuxPolicy bool) (Manifests, error) {
+func NewWithOptions(opts options.Render) (Manifests, error) {
 	var err error
-	mf := New(plat)
+	mf := New(opts.Platform)
 
-	if plat == platform.OpenShift || plat == platform.HyperShift {
-		if withCustomSELinuxPolicy {
-			mf.MachineConfig, err = manifests.MachineConfig(manifests.ComponentResourceTopologyExporter, version, withCRIHooks)
-			if err != nil {
-				return mf, err
-			}
+	if opts.Platform == platform.OpenShift && opts.CustomSELinuxPolicy {
+		mf.MachineConfig, err = manifests.MachineConfig(manifests.ComponentResourceTopologyExporter, opts.PlatformVersion, opts.EnableCRIHooks)
+		if err != nil {
+			return mf, err
 		}
-
-		mf.SecurityContextConstraint, err = manifests.SecurityContextConstraint(manifests.ComponentResourceTopologyExporter, withCustomSELinuxPolicy)
+	}
+	if opts.Platform != platform.Kubernetes {
+		mf.SecurityContextConstraint, err = manifests.SecurityContextConstraint(manifests.ComponentResourceTopologyExporter, opts.CustomSELinuxPolicy)
 		if err != nil {
 			return mf, err
 		}
@@ -214,15 +219,15 @@ func GetManifests(plat platform.Platform, version platform.Version, namespace st
 		}
 	}
 
-	mf.ServiceAccount, err = manifests.ServiceAccount(manifests.ComponentResourceTopologyExporter, "", namespace)
+	mf.ServiceAccount, err = manifests.ServiceAccount(manifests.ComponentResourceTopologyExporter, "", opts.Namespace)
 	if err != nil {
 		return mf, err
 	}
-	mf.Role, err = manifests.Role(manifests.ComponentResourceTopologyExporter, "", namespace)
+	mf.Role, err = manifests.Role(manifests.ComponentResourceTopologyExporter, "", opts.Namespace)
 	if err != nil {
 		return mf, err
 	}
-	mf.RoleBinding, err = manifests.RoleBinding(manifests.ComponentResourceTopologyExporter, "", "", namespace)
+	mf.RoleBinding, err = manifests.RoleBinding(manifests.ComponentResourceTopologyExporter, "", "", opts.Namespace)
 	if err != nil {
 		return mf, err
 	}
@@ -234,9 +239,20 @@ func GetManifests(plat platform.Platform, version platform.Version, namespace st
 	if err != nil {
 		return mf, err
 	}
-	mf.DaemonSet, err = manifests.DaemonSet(manifests.ComponentResourceTopologyExporter, "", namespace)
+	mf.DaemonSet, err = manifests.DaemonSet(manifests.ComponentResourceTopologyExporter, "", opts.Namespace)
 	if err != nil {
 		return mf, err
 	}
 	return mf, nil
+}
+
+// GetManifests is deprecated, use NewWithOptions in new code
+func GetManifests(plat platform.Platform, version platform.Version, namespace string, withCRIHooks, withCustomSELinuxPolicy bool) (Manifests, error) {
+	return NewWithOptions(options.Render{
+		Platform:            plat,
+		PlatformVersion:     version,
+		Namespace:           namespace,
+		EnableCRIHooks:      withCRIHooks,
+		CustomSELinuxPolicy: withCustomSELinuxPolicy,
+	})
 }

@@ -111,6 +111,14 @@ type Updater struct {
 	CustomSELinuxPolicy bool
 }
 
+type Render struct {
+	Platform            platform.Platform
+	PlatformVersion     platform.Version
+	Namespace           string
+	EnableCRIHooks      bool
+	CustomSELinuxPolicy bool
+}
+
 func ForDaemonSet(commonOpts *Options) DaemonSet {
 	return DaemonSet{
 		PullIfNotPresent:   commonOpts.PullIfNotPresent,
