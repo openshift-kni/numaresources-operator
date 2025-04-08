@@ -34,6 +34,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 
+	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 	"github.com/openshift-kni/numaresources-operator/test/internal/nrosched"
@@ -65,7 +66,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 	})
 
 	When("removing the topology aware scheduler from a live cluster", func() {
-		It("[case:1][test_id:47593][tier1] should keep existing workloads running", Label("tier1"), func() {
+		It("[case:1][test_id:47593] should keep existing workloads running", Label(label.Tier1), func() {
 			var err error
 
 			dp := createDeploymentSync(fxt, "testdp", serialconfig.Config.SchedulerName)
@@ -88,7 +89,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 			}
 		})
 
-		It("[case:2][test_id:49093][tier1][unsched] should keep new scheduled workloads pending", Label("tier1", "unsched"), Label("feature:unsched"), func() {
+		It("[case:2][test_id:49093]should keep new scheduled workloads pending", Label(label.Tier1, "unsched", "feature:unsched"), func() {
 			var err error
 
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name))
@@ -140,7 +141,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 	})
 
 	When("restarting the topology aware scheduler in a live cluster", func() {
-		It("[case:1][test_id:48069][tier2] should schedule any pending workloads submitted while the scheduler was unavailable", Label("tier2"), func() {
+		It("[case:1][test_id:48069] should schedule any pending workloads submitted while the scheduler was unavailable", Label(label.Tier2), func() {
 			var err error
 
 			dpNName := nroSchedObj.Status.Deployment // shortcut
