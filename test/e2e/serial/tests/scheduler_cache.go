@@ -86,7 +86,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	Context("using a NodeGroup with periodic unevented updates", Label("periodic_update"), func() {
+	Context("using a NodeGroup with periodic unevented updates", Label("periodic_update", label.OpenShift), func() {
 		var nroKey client.ObjectKey
 		var nroOperObj nropv1.NUMAResourcesOperator
 		var nrtCandidates []nrtv1alpha2.NodeResourceTopology
