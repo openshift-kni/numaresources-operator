@@ -125,6 +125,7 @@ const (
 
 // NodeGroup defines group of nodes that will run resource topology exporter daemon set
 // You can choose the group of node by MachineConfigPoolSelector or by PoolName
+// +kubebuilder:validation:XValidation:rule="has(self.poolName) ? !has(self.machineConfigPoolSelector) : has(self.machineConfigPoolSelector)",message="Exactly one of 'PoolName' or 'MachineConfigPoolSelector' must be set for NodeGroup."
 type NodeGroup struct {
 	// MachineConfigPoolSelector defines label selector for the machine config pool
 	// +optional
