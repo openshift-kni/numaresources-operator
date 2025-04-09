@@ -666,7 +666,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("should make a pod with three gu cnt land on a node with enough resources, containers should be spread on a different zone",
-			Label(label.Tier1, "tmscope:cnt, testtype4"),
+			Label(label.Tier1, "tmscope:cnt", "testtype4"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
