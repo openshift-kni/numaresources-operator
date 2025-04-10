@@ -45,6 +45,7 @@ import (
 
 var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources scheduler removal on a live cluster", Serial, Label("disruptive", "scheduler", "schedrst"), Label("feature:schedrst"), func() {
 	var fxt *e2efixture.Fixture
+	var nroSchedObj *nropv1.NUMAResourcesScheduler
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
@@ -54,7 +55,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 		fxt, err = e2efixture.Setup("e2e-test-sched-remove", serialconfig.Config.NRTList)
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
-		nrosched.CheckNROSchedulerAvailable(fxt.Client, serialconfig.Config.NROSchedObj.Name)
+		nroSchedObj = nrosched.CheckNROSchedulerAvailable(fxt.Client, serialconfig.Config.NROSchedObj.Name)
 	})
 
 	AfterEach(func() {
@@ -71,8 +72,18 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 
 			dp := createDeploymentSync(fxt, "testdp", serialconfig.Config.SchedulerName)
 
+			dpNName := nroSchedObj.Status.Deployment
+			if dpNName.Namespace == "" || dpNName.Name == "" {
+				Fail(fmt.Sprintf("scheduler deployment missing: %q", dpNName.String()))
+			}
+
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name))
 			err = fxt.Client.Delete(context.TODO(), serialconfig.Config.NROSchedObj)
+			Expect(err).ToNot(HaveOccurred())
+
+			// make sure scheduler deployment is gone
+			config := textlogger.NewConfig(textlogger.Verbosity(1))
+			err = depwait.With(fxt.Client, textlogger.NewLogger(config)).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(context.TODO(), dpNName.Namespace, dpNName.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			maxStep := 3
@@ -92,8 +103,18 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 		It("[case:2][test_id:49093]should keep new scheduled workloads pending", Label(label.Tier1, "unsched", "feature:unsched"), func() {
 			var err error
 
+			dpNName := nroSchedObj.Status.Deployment
+			if dpNName.Namespace == "" || dpNName.Name == "" {
+				Fail(fmt.Sprintf("scheduler deployment missing: %q", dpNName.String()))
+			}
+
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name))
 			err = fxt.Client.Delete(context.TODO(), serialconfig.Config.NROSchedObj)
+			Expect(err).ToNot(HaveOccurred())
+
+			// make sure scheduler deployment is gone
+			config := textlogger.NewConfig(textlogger.Verbosity(1))
+			err = depwait.With(fxt.Client, textlogger.NewLogger(config)).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(context.TODO(), dpNName.Namespace, dpNName.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			dp := createDeployment(fxt, "testdp", serialconfig.Config.SchedulerName)
