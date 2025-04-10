@@ -21,6 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/klog/v2"
 
@@ -96,7 +97,8 @@ type Errors struct {
 		ClusterRoleBinding error
 	}
 	Metrics struct {
-		Service error
+		Service       error
+		NetworkPolicy error
 	}
 }
 
@@ -239,6 +241,14 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 		Merge:    merge.ServiceForUpdate,
 	})
 
+	ret = append(ret, objectstate.ObjectState{
+		Existing: em.existing.Metrics.NetworkPolicy,
+		Error:    em.errs.Metrics.NetworkPolicy,
+		Desired:  mf.Metrics.NetworkPolicy.DeepCopy(),
+		Compare:  compare.Object,
+		Merge:    merge.MetadataForUpdate,
+	})
+
 	return ret
 }
 
@@ -326,6 +336,11 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 	ser := &corev1.Service{}
 	if ok := getObject(ctx, cli, keyFor(mf.Metrics.Service), ser, &ret.errs.Metrics.Service); ok {
 		ret.existing.Metrics.Service = ser
+	}
+
+	networkPolicy := &networkingv1.NetworkPolicy{}
+	if ok := getObject(ctx, cli, keyFor(mf.Metrics.NetworkPolicy), networkPolicy, &ret.errs.Metrics.NetworkPolicy); ok {
+		ret.existing.Metrics.NetworkPolicy = networkPolicy
 	}
 
 	return &ret
