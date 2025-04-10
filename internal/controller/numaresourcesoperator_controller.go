@@ -742,10 +742,18 @@ func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest) e
 	}
 	if gdm.ClusterPlatform != platform.Kubernetes {
 		if gdm.IsCustomPolicyEnabled && gdm.ClusterPlatform == platform.OpenShift {
-			k8swgrteupdate.SecurityContext(gdm.DaemonSet, selinux.RTEContextTypeLegacy)
+			k8swgrteupdate.SecurityContextWithOpts(gdm.DaemonSet,
+				k8swgrteupdate.SecurityContextOptions{
+					SELinuxContextType:  selinux.RTEContextTypeLegacy,
+					SecurityContextName: rteupdate.MainContainerName,
+				})
 			klog.V(5).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextTypeLegacy)
 		} else {
-			k8swgrteupdate.SecurityContext(gdm.DaemonSet, selinux.RTEContextType)
+			k8swgrteupdate.SecurityContextWithOpts(gdm.DaemonSet,
+				k8swgrteupdate.SecurityContextOptions{
+					SELinuxContextType:  selinux.RTEContextType,
+					SecurityContextName: rteupdate.SecurityContextName,
+				})
 			klog.V(5).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextType)
 		}
 	}
