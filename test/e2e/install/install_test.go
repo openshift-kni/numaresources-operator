@@ -19,7 +19,6 @@ package install
 import (
 	"context"
 	"fmt"
-	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -51,6 +50,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
 	e2eimages "github.com/openshift-kni/numaresources-operator/test/internal/images"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
+
+	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 )
 
 // tests here are not interruptible, so they should not accept contexts.
