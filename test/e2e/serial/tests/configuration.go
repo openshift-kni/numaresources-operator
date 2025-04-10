@@ -1030,15 +1030,20 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 					By("verify the operator is in Available condition")
-					Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-					cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
-					Expect(cond).ToNot(BeNil(), "condition Available was not found: %+v", updatedNRO.Status.Conditions)
-					Expect(cond.Status).To(Equal(metav1.ConditionTrue), "expected operators condition to be Available but was found something else: %+v", updatedNRO.Status.Conditions)
+					Eventually(func(g Gomega) {
+						g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+						cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
+						g.Expect(cond).ToNot(BeNil(), "condition Available was not found: %+v", updatedNRO.Status.Conditions)
+						g.Expect(cond.Status).To(Equal(metav1.ConditionTrue), "Expected operators condition to be Available, but was found something else: %+v", updatedNRO.Status.Conditions)
+					}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "operator did not return to Available state in time")
 				}()
 
 				By("verify degraded condition is found due to node group with multiple selectors")
-				Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-				Expect(isDegradedWith(updatedNRO.Status.Conditions, "must have only a single specifier set", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
+				Eventually(func(g Gomega) {
+					var updated nropv1.NUMAResourcesOperator
+					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed())
+					g.Expect(isDegradedWith(updated.Status.Conditions, "must have only a single specifier set", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
+				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			})
 
 			It("should report the NodeGroupConfig in the NodeGroupStatus with NodePool set and allow updates", Label(label.Tier1), func(ctx context.Context) {
@@ -1201,8 +1206,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.ObjectKey, appliedObj nropv1.NUMAResourcesOperator, expectedPoolName string, expectedConf nropv1.NodeGroupConfig) {
 	klog.InfoS("fetch NRO object", "key", key.String())
 	var updatedNRO nropv1.NUMAResourcesOperator
-	Expect(cli.Get(ctx, key, &updatedNRO)).To(Succeed())
-	Expect(updatedNRO.Status.NodeGroups).To(HaveLen(len(appliedObj.Spec.NodeGroups)), "NodeGroups Status mismatch: found %d, expected %d", len(updatedNRO.Status.NodeGroups), len(appliedObj.Spec.NodeGroups))
+	Eventually(func(g Gomega) {
+		g.Expect(cli.Get(ctx, key, &updatedNRO)).To(Succeed())
+		g.Expect(updatedNRO.Status.NodeGroups).To(HaveLen(len(appliedObj.Spec.NodeGroups)),
+			"NodeGroups Status mismatch: found %d, expected %d", len(updatedNRO.Status.NodeGroups), len(appliedObj.Spec.NodeGroups))
+		g.Expect(status.IsUpdatedNUMAResourcesOperator(&appliedObj.Status, &updatedNRO.Status)).To(BeTrue())
+	}).WithTimeout(10 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
 
 	klog.InfoS("successfully fetched NRO object", "key", key.String())
 
