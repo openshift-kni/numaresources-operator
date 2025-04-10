@@ -21,6 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/klog/v2"
 
@@ -43,15 +44,17 @@ const (
 )
 
 type ExistingManifests struct {
-	Existing                   schedmanifests.Manifests
-	serviceAccountError        error
-	configMapError             error
-	clusterRoleError           error
-	clusterRoleBindingK8SError error
-	clusterRoleBindingNRTError error
-	roleError                  error
-	roleBindingError           error
-	deploymentError            error
+	Existing                    schedmanifests.Manifests
+	serviceAccountError         error
+	configMapError              error
+	clusterRoleError            error
+	clusterRoleBindingK8SError  error
+	clusterRoleBindingNRTError  error
+	roleError                   error
+	roleBindingError            error
+	deploymentError             error
+	DefaultNetworkPolicyError   error
+	APIserverNetworkPolicyError error
 }
 
 func (em ExistingManifests) State(mf schedmanifests.Manifests) []objectstate.ObjectState {
@@ -112,6 +115,20 @@ func (em ExistingManifests) State(mf schedmanifests.Manifests) []objectstate.Obj
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
 		},
+		{
+			Existing: em.Existing.DefaultNetworkPolicy,
+			Error:    em.DefaultNetworkPolicyError,
+			Desired:  mf.DefaultNetworkPolicy.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.MetadataForUpdate,
+		},
+		{
+			Existing: em.Existing.APIserverNetworkPolicy,
+			Error:    em.APIserverNetworkPolicyError,
+			Desired:  mf.APIserverNetworkPolicy.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.MetadataForUpdate,
+		},
 	}
 }
 
@@ -157,6 +174,16 @@ func FromClient(ctx context.Context, cli client.Client, mf schedmanifests.Manife
 	dp := &appsv1.Deployment{}
 	if ret.deploymentError = cli.Get(ctx, client.ObjectKeyFromObject(mf.Deployment), dp); ret.deploymentError == nil {
 		ret.Existing.Deployment = dp
+	}
+
+	np := &networkingv1.NetworkPolicy{}
+	if ret.DefaultNetworkPolicyError = cli.Get(ctx, client.ObjectKeyFromObject(mf.DefaultNetworkPolicy), np); ret.DefaultNetworkPolicyError == nil {
+		ret.Existing.DefaultNetworkPolicy = np
+	}
+
+	npAPI := &networkingv1.NetworkPolicy{}
+	if ret.APIserverNetworkPolicyError = cli.Get(ctx, client.ObjectKeyFromObject(mf.APIserverNetworkPolicy), npAPI); ret.APIserverNetworkPolicyError == nil {
+		ret.Existing.APIserverNetworkPolicy = npAPI
 	}
 	return ret
 }
