@@ -39,4 +39,10 @@ func TestLoad(t *testing.T) {
 	if obj, err := Deployment(""); obj == nil || err != nil {
 		t.Errorf("Deployment() failed: err=%v", err)
 	}
+	if obj, err := DenyAllNetworkPolicy(""); obj == nil || err != nil {
+		t.Errorf("DenyAllNetworkPolicy() failed: err=%v", err)
+	}
+	if obj, err := APIserverNetworkPolicy(""); obj == nil || err != nil {
+		t.Errorf("APIserverNetworkPolicy() failed: err=%v", err)
+	}
 }
