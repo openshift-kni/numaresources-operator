@@ -1,0 +1,11 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: scheduler-default-deny-all
+spec:
+  podSelector:
+    matchLabels:
+      app: secondary-scheduler
+  policyTypes:
+  - Ingress
+  - Egress
