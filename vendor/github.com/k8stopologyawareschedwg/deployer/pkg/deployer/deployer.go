@@ -33,6 +33,9 @@ type Environment struct {
 }
 
 func (env *Environment) EnsureClient() error {
+	if env.Cli != nil {
+		return nil // nothing to do!
+	}
 	cli, err := clientutil.New()
 	if err != nil {
 		return err
