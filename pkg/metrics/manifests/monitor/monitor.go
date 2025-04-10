@@ -18,6 +18,7 @@ package sched
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -25,18 +26,21 @@ import (
 )
 
 type Manifests struct {
-	Service *corev1.Service
+	Service       *corev1.Service
+	NetworkPolicy *networkingv1.NetworkPolicy
 }
 
 func (mf Manifests) ToObjects() []client.Object {
 	return []client.Object{
 		mf.Service,
+		mf.NetworkPolicy,
 	}
 }
 
 func (mf Manifests) Clone() Manifests {
 	return Manifests{
-		Service: mf.Service.DeepCopy(),
+		Service:       mf.Service.DeepCopy(),
+		NetworkPolicy: mf.NetworkPolicy.DeepCopy(),
 	}
 }
 
@@ -45,6 +49,11 @@ func GetManifests(namespace string) (Manifests, error) {
 	mf := Manifests{}
 
 	mf.Service, err = manifests.Service(namespace)
+	if err != nil {
+		return mf, err
+	}
+
+	mf.NetworkPolicy, err = manifests.NetworkPolicy(namespace)
 	if err != nil {
 		return mf, err
 	}
