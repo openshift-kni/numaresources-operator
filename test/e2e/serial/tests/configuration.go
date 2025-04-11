@@ -66,6 +66,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
@@ -74,6 +75,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
+	"github.com/openshift-kni/numaresources-operator/test/internal/hypershift"
+	"github.com/openshift-kni/numaresources-operator/test/internal/nodepools"
 )
 
 /*
@@ -530,6 +533,81 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			By(fmt.Sprintf("checking NRT for target node %q updated correctly", testPod.Spec.NodeName))
 			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
 			expectNRTConsumedResources(fxt, *nrtPreCreate, rl, testPod)
+		})
+
+		It("[test_id:80821] Verify Performance Profile updates on management cluster reflect in NRT resources", Label("reboot_required", label.HyperShift), func() {
+			fxt.IsRebootTest = true
+
+			By("fetching the initial TM policy set in NRT")
+			initialNrtList := nrtv1alpha2.NodeResourceTopologyList{}
+			initialNrtList, err := e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
+			Expect(err).ToNot(HaveOccurred(), "cannot get any NodeResourceTopology object from the cluster")
+			Expect(initialNrtList.Items).ToNot(BeEmpty(), "no NodeResourceTopology items found")
+
+			initialNrt := initialNrtList.Items[0]
+			var initialTMPolicy string
+			for _, attr := range initialNrt.Attributes {
+				if attr.Name == "topologyManagerPolicy" {
+					initialTMPolicy = attr.Value
+					break
+				}
+			}
+			Expect(initialTMPolicy).ToNot(BeEmpty(), "topologyManagerPolicy not found in initial NRT")
+			newTMPolicy := getNewTopologyManagerPolicyValue(initialTMPolicy)
+			Expect(initialTMPolicy).ToNot(Equal(newTMPolicy), "new TM policy should differ from the initial one")
+
+			By("retrieving the PerformanceProfile configmap from the management cluster")
+			hostedClusterName, err := hypershift.GetHostedClusterName()
+			Expect(err).To(Not(HaveOccurred()))
+			nodePool, err := nodepools.GetByClusterName(context.TODO(), e2eclient.MNGClient, hostedClusterName)
+			Expect(err).To(Not(HaveOccurred()))
+
+			By("validating the tuningConfig name against ConfigMaps in the management cluster")
+			tuningConfigName := nodePool.Spec.TuningConfig[0].Name
+			Expect(tuningConfigName).ToNot(BeEmpty(), "NodePool tuningConfig name is empty")
+
+			cmList := &corev1.ConfigMapList{}
+			err = e2eclient.MNGClient.List(context.TODO(), cmList, &client.ListOptions{
+				Namespace: "clusters",
+			})
+			Expect(err).ToNot(HaveOccurred(), "failed to list ConfigMaps in namespace: clusters")
+
+			var targetCM *corev1.ConfigMap
+			for i := range cmList.Items {
+				if cmList.Items[i].Name == tuningConfigName {
+					targetCM = &cmList.Items[i]
+					break
+				}
+			}
+			Expect(targetCM).ToNot(BeNil(), fmt.Sprintf("ConfigMap %q not found in namespace: clusters", tuningConfigName))
+
+			By("updating the ConfigMap with the new TM policy")
+			yamlData := targetCM.Data["tuning"]
+			Expect(yamlData).ToNot(BeEmpty(), "tuning section not found in ConfigMap")
+
+			modifiedYaml := strings.Replace(yamlData, initialTMPolicy, newTMPolicy, 1)
+			Expect(modifiedYaml).ToNot(Equal(yamlData), "no changes applied to ConfigMap YAML")
+
+			targetCM.Data["tuning"] = modifiedYaml
+			err = e2eclient.MNGClient.Update(context.TODO(), targetCM)
+			Expect(err).ToNot(HaveOccurred(), "failed to update the ConfigMap with new TM policy")
+
+			By("waiting for the NRT to reflect the new TM policy")
+			Eventually(func(g Gomega) {
+				updatedNrtList := nrtv1alpha2.NodeResourceTopologyList{}
+				updatedNrtList, err = e2enrt.GetUpdated(fxt.Client, updatedNrtList, timeout)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(updatedNrtList.Items).ToNot(BeEmpty())
+
+				var updatedTM string
+				for _, attr := range updatedNrtList.Items[0].Attributes {
+					if attr.Name == "topologyManagerPolicy" {
+						updatedTM = attr.Value
+						break
+					}
+				}
+				g.Expect(updatedTM).To(Equal(newTMPolicy), "Expected updated TM policy %q, but got %q", newTMPolicy, updatedTM)
+			}, 10*time.Minute, 25*time.Second).Should(Succeed(), "NRT did not reflect updated TM policy in time")
 		})
 
 		It("should report the NodeGroupConfig in the status", Label("tier2", "openshift"), func() {
@@ -1324,6 +1402,14 @@ func getNewTopologyManagerScopeValue(oldTopologyManagerScopeValue string) string
 		newTopologyManagerScopeValue = "pod"
 	}
 	return newTopologyManagerScopeValue
+}
+
+func getNewTopologyManagerPolicyValue(oldTopologyManagerPolicyValue string) string {
+	newTopologyManagerPolicyValue := "best-effort"
+	if oldTopologyManagerPolicyValue == newTopologyManagerPolicyValue || oldTopologyManagerPolicyValue == "" {
+		newTopologyManagerPolicyValue = "single-numa-node"
+	}
+	return newTopologyManagerPolicyValue
 }
 
 func rteConfigFrom(data string) (*rteconfig.Config, error) {
