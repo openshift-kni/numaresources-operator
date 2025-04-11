@@ -32,6 +32,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	rtemetrics "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -94,6 +95,29 @@ type ExistingManifests struct {
 	namespace string
 	updater   GenerateDesiredManifestUpdater
 	helper    rteHelper
+}
+
+func getDaemonSetManifest(ctx context.Context, cli client.Client, namespace, name string) daemonSetManifest {
+	key := client.ObjectKey{
+		Namespace: namespace,
+		Name:      name,
+	}
+
+	ds := appsv1.DaemonSet{}
+	dsm := daemonSetManifest{}
+	if dsm.daemonSetError = cli.Get(ctx, key, &ds); dsm.daemonSetError == nil {
+		dsm.daemonSet = &ds
+	}
+
+	cm := corev1.ConfigMap{}
+	if err := cli.Get(ctx, key, &cm); err == nil {
+		// we're storing the updated hash only in the case that kubelet controller created a configmap
+		hval := hash.ConfigMapData(&cm)
+		klog.V(4).InfoS("rte configmap hash computed", "cm", key.String(), "hashValue", hval)
+		dsm.rteConfigHash = hval
+	}
+
+	return dsm
 }
 
 func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName, bool) {
