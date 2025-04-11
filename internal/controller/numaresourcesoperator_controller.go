@@ -743,10 +743,10 @@ func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest) e
 	if gdm.ClusterPlatform != platform.Kubernetes {
 		if gdm.IsCustomPolicyEnabled && gdm.ClusterPlatform == platform.OpenShift {
 			k8swgrteupdate.SecurityContext(gdm.DaemonSet, selinux.RTEContextTypeLegacy)
-			klog.V(5).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextTypeLegacy)
+			klog.V(4).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextTypeLegacy)
 		} else {
 			k8swgrteupdate.SecurityContext(gdm.DaemonSet, selinux.RTEContextType)
-			klog.V(5).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextType)
+			klog.V(4).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextType)
 		}
 	}
 	// it's possible that the hash will be empty if kubelet controller hasn't created a configmap
