@@ -22,7 +22,7 @@ package v1
 
 import (
 	configv1 "github.com/openshift/api/config/v1"
-	machineconfiguration_openshift_iov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	machineconfigurationv1 "github.com/openshift/api/machineconfiguration/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -33,7 +33,7 @@ func (in *MachineConfigPool) DeepCopyInto(out *MachineConfigPool) {
 	*out = *in
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
-		*out = make([]machineconfiguration_openshift_iov1.MachineConfigPoolCondition, len(*in))
+		*out = make([]machineconfigurationv1.MachineConfigPoolCondition, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

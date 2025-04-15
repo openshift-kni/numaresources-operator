@@ -20,7 +20,7 @@ import (
 	"errors"
 	"testing"
 
-	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 )
 

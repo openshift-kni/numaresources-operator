@@ -31,7 +31,7 @@ import (
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 	hypershiftconsts "github.com/openshift-kni/numaresources-operator/internal/hypershift/consts"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
-	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 )
 
 const (

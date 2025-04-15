@@ -19,7 +19,7 @@ package wait
 import (
 	"context"
 
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 )
 

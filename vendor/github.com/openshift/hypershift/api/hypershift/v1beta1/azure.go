@@ -2,8 +2,6 @@ package v1beta1
 
 import (
 	"fmt"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 // AzureVMImageType is used to specify the source of the Azure VM boot image.
@@ -243,21 +241,27 @@ type UserManagedDiagnostics struct {
 	StorageAccountURI string `json:"storageAccountURI,omitempty"`
 }
 
-// +kubebuilder:validation:Enum=Standard;StandardSSD;PremiumSSD;UltraSSD
+// +kubebuilder:validation:Enum=Premium_LRS;PremiumV2_LRS;Standard_LRS;StandardSSD_LRS;UltraSSD_LRS
 type AzureDiskStorageAccountType string
 
+// Values copied from https://github.com/openshift/cluster-api-provider-azure/blob/release-4.18/vendor/github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5/constants.go#L614
+// excluding zone redundant storage(ZRS) types as they are not available in all regions.
 const (
-	// StandardStorageAccountType is the standard HDD storage account type.
-	StandardStorageAccountType AzureDiskStorageAccountType = "Standard"
-
-	// StandardSSDStorageAccountType is the standard SSD storage account type.
-	StandardSSDStorageAccountType AzureDiskStorageAccountType = "StandardSSD"
-
-	// PremiumSSDStorageAccountType is the premium SSD storage account type.
-	PremiumSSDStorageAccountType AzureDiskStorageAccountType = "PremiumSSD"
-
-	// UltraSSDStorageAccountType is the ultra SSD storage account type.
-	UltraSSDStorageAccountType AzureDiskStorageAccountType = "UltraSSD"
+	// DiskStorageAccountTypesPremiumLRS - Premium SSD locally redundant storage. Best for production and performance sensitive
+	// workloads.
+	DiskStorageAccountTypesPremiumLRS AzureDiskStorageAccountType = "Premium_LRS"
+	// DiskStorageAccountTypesPremiumV2LRS - Premium SSD v2 locally redundant storage. Best for production and performance-sensitive
+	// workloads that consistently require low latency and high IOPS and throughput.
+	DiskStorageAccountTypesPremiumV2LRS AzureDiskStorageAccountType = "PremiumV2_LRS"
+	// DiskStorageAccountTypesStandardLRS - Standard HDD locally redundant storage. Best for backup, non-critical, and infrequent
+	// access.
+	DiskStorageAccountTypesStandardLRS AzureDiskStorageAccountType = "Standard_LRS"
+	// DiskStorageAccountTypesStandardSSDLRS - Standard SSD locally redundant storage. Best for web servers, lightly used enterprise
+	// applications and dev/test.
+	DiskStorageAccountTypesStandardSSDLRS AzureDiskStorageAccountType = "StandardSSD_LRS"
+	// DiskStorageAccountTypesUltraSSDLRS - Ultra SSD locally redundant storage. Best for IO-intensive workloads such as SAP HANA,
+	// top tier databases (for example, SQL, Oracle), and other transaction-heavy workloads.
+	DiskStorageAccountTypesUltraSSDLRS AzureDiskStorageAccountType = "UltraSSD_LRS"
 )
 
 // +kubebuilder:validation:Enum=Persistent;Ephemeral
@@ -271,10 +275,10 @@ const (
 	EphemeralDiskPersistence AzureDiskPersistence = "Ephemeral"
 )
 
-// +kubebuilder:validation:XValidation:rule="!has(self.diskStorageAccountType) || self.diskStorageAccountType != 'UltraSSD' || self.sizeGiB <= 32767",message="When not using storageAccountType UltraSSD, the SizeGB value must be less than or equal to 32,767"
+// +kubebuilder:validation:XValidation:rule="!has(self.diskStorageAccountType) || self.diskStorageAccountType != 'UltraSSD_LRS' || self.sizeGiB <= 32767",message="When not using diskStorageAccountType UltraSSD_LRS, the SizeGB value must be less than or equal to 32,767"
 type AzureNodePoolOSDisk struct {
 	// SizeGiB is the size in GiB (1024^3 bytes) to assign to the OS disk.
-	// This should be between 16 and 65,536 when using the UltraSSD storage account type and between 16 and 32,767 when using any other storage account type.
+	// This should be between 16 and 65,536 when using the UltraSSD_LRS storage account type and between 16 and 32,767 when using any other storage account type.
 	// When not set, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.
 	// The current default is 30.
 	//
@@ -283,13 +287,13 @@ type AzureNodePoolOSDisk struct {
 	// +optional
 	SizeGiB int32 `json:"sizeGiB,omitempty"`
 
-	// storageAccountType is the disk storage account type to use.
-	// Valid values are Standard, StandardSSD, PremiumSSD and UltraSSD and omitted.
+	// diskStorageAccountType is the disk storage account type to use.
+	// Valid values are Premium_LRS, PremiumV2_LRS, Standard_LRS, StandardSSD_LRS, UltraSSD_LRS.
 	// Note that Standard means a HDD.
 	// The disk performance is tied to the disk type, please refer to the Azure documentation for further details
 	// https://docs.microsoft.com/en-us/azure/virtual-machines/disks-types#disk-type-comparison.
 	// When omitted this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.
-	// The current default is PremiumSSD.
+	// The current default is Premium SSD LRS.
 	//
 	// +optional
 	DiskStorageAccountType AzureDiskStorageAccountType `json:"diskStorageAccountType,omitempty"`
@@ -332,13 +336,6 @@ type AzureNodePoolOSDisk struct {
 // would be pre-created and then their names would be used respectively in the ResourceGroupName, SubnetName, VnetName
 // fields of the Hosted Cluster CR. An existing cloud resource is expected to exist under the same SubscriptionID.
 type AzurePlatformSpec struct {
-	// Credentials is the object containing existing Azure credentials needed for creating and managing cloud
-	// infrastructure resources.
-	//
-	// +kubebuilder:validation:Required
-	// +required
-	Credentials corev1.LocalObjectReference `json:"credentials"`
-
 	// Cloud is the cloud environment identifier, valid values could be found here: https://github.com/Azure/go-autorest/blob/4c0e21ca2bbb3251fe7853e6f9df6397f53dd419/autorest/azure/environments.go#L33
 	//
 	// +kubebuilder:validation:Enum=AzurePublicCloud;AzureUSGovernmentCloud;AzureChinaCloud;AzureGermanCloud;AzureStackCloud
@@ -436,7 +433,16 @@ type AzurePlatformSpec struct {
 	// +kubebuilder:validation:Required
 	// +openshift:enable:FeatureGate=AROHCPManagedIdentities
 	ManagedIdentities AzureResourceManagedIdentities `json:"managedIdentities,omitempty"`
+
+	// tenantID is a unique identifier for the tenant where Azure resources will be created and managed in.
+	//
+	// +required
+	TenantID string `json:"tenantID"`
 }
+
+// ObjectEncodingFormat is the type of encoding for an Azure Key Vault secret
+// +kubebuilder:validation:Enum:=utf-8;hex;base64
+type ObjectEncodingFormat string
 
 // ManagedAzureKeyVault is an Azure Key Vault on the management cluster.
 type ManagedAzureKeyVault struct {
@@ -460,7 +466,11 @@ type AzureResourceManagedIdentities struct {
 	// +kubebuilder:validation:Required
 	ControlPlane ControlPlaneManagedIdentities `json:"controlPlane"`
 
-	// Future placeholder - DataPlaneMIs * DataPlaneManagedIdentities
+	// dataPlane contains the client IDs of all the managed identities on the data plane needing to authenticate with
+	// Azure's API.
+	//
+	// +kubebuilder:validation:Required
+	DataPlane DataPlaneManagedIdentities `json:"dataPlane"`
 }
 
 // ManagedIdentity contains the client ID, and its certificate name, of a managed identity. This managed identity is
@@ -477,6 +487,20 @@ type ManagedIdentity struct {
 	//
 	// +kubebuilder:validation:Required
 	CertificateName string `json:"certificateName"`
+
+	// objectEncoding represents the encoding for the Azure Key Vault secret containing the certificate related to
+	// CertificateName. objectEncoding needs to match the encoding format used when the certificate was stored in the
+	// Azure Key Vault. If objectEncoding doesn't match the encoding format of the certificate, the certificate will
+	// unsuccessfully be read by the Secrets CSI driver and an error will occur. This error will only be visible on the
+	// SecretProviderClass custom resource related to the managed identity.
+	//
+	// The default value is utf-8.
+	//
+	// See this for more info - https://github.com/Azure/secrets-store-csi-driver-provider-azure/blob/master/website/content/en/getting-started/usage/_index.md
+	//
+	// +kubebuilder:validation:Enum:=utf-8;hex;base64
+	// +kubebuilder:default:="utf-8"
+	ObjectEncoding ObjectEncodingFormat `json:"objectEncoding"`
 }
 
 // ControlPlaneManagedIdentities contains the managed identities on the HCP control plane needing to authenticate with
@@ -533,6 +557,26 @@ type ControlPlaneManagedIdentities struct {
 	//
 	// +kubebuilder:validation:Required
 	File ManagedIdentity `json:"file"`
+}
+
+// DataPlaneManagedIdentities contains the client IDs of all the managed identities on the data plane needing to
+// authenticate with Azure's API.
+type DataPlaneManagedIdentities struct {
+	// imageRegistryMSIClientID is the client ID of a pre-existing managed identity ID associated with the image
+	//registry controller.
+	//
+	// +kubebuilder:validation:Required
+	ImageRegistryMSIClientID string `json:"imageRegistryMSIClientID"`
+
+	// diskMSIClientID is the client ID of a pre-existing managed identity ID associated with the CSI Disk driver.
+	//
+	// +kubebuilder:validation:Required
+	DiskMSIClientID string `json:"diskMSIClientID"`
+
+	// fileMSIClientID is the client ID of a pre-existing managed identity ID associated with the CSI File driver.
+	//
+	// +kubebuilder:validation:Required
+	FileMSIClientID string `json:"fileMSIClientID"`
 }
 
 // AzureKMSSpec defines metadata about the configuration of the Azure KMS Secret Encryption provider using Azure key vault

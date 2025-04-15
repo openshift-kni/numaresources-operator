@@ -29,7 +29,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"

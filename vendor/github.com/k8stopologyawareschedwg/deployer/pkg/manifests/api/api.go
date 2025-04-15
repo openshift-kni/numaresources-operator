@@ -23,6 +23,7 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/options"
 )
 
 type Manifests struct {
@@ -57,9 +58,9 @@ func New(plat platform.Platform) Manifests {
 	}
 }
 
-func GetManifests(plat platform.Platform) (Manifests, error) {
+func NewWithOptions(opts options.Render) (Manifests, error) {
 	var err error
-	mf := New(plat)
+	mf := New(opts.Platform)
 
 	mf.Crd, err = manifests.APICRD()
 	if err != nil {
@@ -67,4 +68,11 @@ func GetManifests(plat platform.Platform) (Manifests, error) {
 	}
 
 	return mf, nil
+}
+
+// GetManifests is deprecated, use NewWithOptions in new code
+func GetManifests(plat platform.Platform) (Manifests, error) {
+	return NewWithOptions(options.Render{
+		Platform: plat,
+	})
 }
