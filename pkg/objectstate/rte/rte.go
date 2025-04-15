@@ -32,9 +32,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
-	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	rtemetrics "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
@@ -105,118 +103,6 @@ func DaemonSetNamespacedNameFromObject(obj client.Object) (nropv1.NamespacedName
 	}
 	_, ok := obj.(*appsv1.DaemonSet)
 	return res, ok
-}
-
-type MCPWaitForUpdatedFunc func(string, *machineconfigv1.MachineConfigPool) bool
-
-func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.ObjectState, MCPWaitForUpdatedFunc) {
-	var ret []objectstate.ObjectState
-	if mf.Core.MachineConfig == nil {
-		return ret, nullMachineConfigPoolUpdated
-	}
-	enabledMCCount := 0
-	for _, tree := range em.trees {
-		for _, mcp := range tree.MachineConfigPools {
-			mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
-			if mcp.Spec.MachineConfigSelector == nil {
-				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
-				continue
-			}
-
-			existingMachineConfig, ok := em.machineConfigs[mcName]
-			if !ok {
-				klog.Warningf("failed to find machine config %q in namespace %q", mcName, em.namespace)
-				continue
-			}
-
-			if !annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations) {
-				// caution here: we want a *nil interface value*, not an *interface which points to nil*.
-				// the latter would lead to apparently correct code leading to runtime panics. See:
-				// https://trstringer.com/go-nil-interface-and-interface-with-nil-concrete-value/
-				// (and many other docs like this)
-				ret = append(ret,
-					objectstate.ObjectState{
-						Existing: existingMachineConfig.machineConfig,
-						Error:    existingMachineConfig.machineConfigError,
-						Desired:  nil,
-					},
-				)
-				continue
-			}
-
-			desiredMachineConfig := mf.Core.MachineConfig.DeepCopy()
-			// prefix machine config name to guarantee that we will have an option to override it
-			desiredMachineConfig.Name = mcName
-			desiredMachineConfig.Labels = GetMachineConfigLabel(mcp)
-
-			ret = append(ret,
-				objectstate.ObjectState{
-					Existing: existingMachineConfig.machineConfig,
-					Error:    existingMachineConfig.machineConfigError,
-					Desired:  desiredMachineConfig,
-					Compare:  compare.Object,
-					Merge:    merge.ObjectForUpdate,
-				},
-			)
-			enabledMCCount++
-		}
-	}
-
-	klog.V(4).InfoS("machineConfigsState", "enabledMachineConfigs", enabledMCCount)
-	if enabledMCCount > 0 {
-		return ret, IsMachineConfigPoolUpdated
-	}
-	return ret, IsMachineConfigPoolUpdatedAfterDeletion
-}
-
-func nullMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	return true
-}
-
-func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	if !existsMachineConfig(instanceName, mcp) {
-		return false
-	}
-	if MatchMachineConfigPoolCondition(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated, corev1.ConditionFalse) {
-		return false
-	}
-	return true
-}
-
-func IsMachineConfigPoolUpdatedAfterDeletion(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	if existsMachineConfig(instanceName, mcp) {
-		return false
-	}
-	if MatchMachineConfigPoolCondition(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated, corev1.ConditionFalse) {
-		return false
-	}
-	return true
-}
-
-func existsMachineConfig(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	mcName := objectnames.GetMachineConfigName(instanceName, mcp.Name)
-	for _, s := range mcp.Status.Configuration.Source {
-		if s.Name == mcName {
-			return true
-		}
-	}
-	return false
-}
-
-// GetMachineConfigLabel returns machine config labels that should be used under the machine config pool
-// machine config selector
-func GetMachineConfigLabel(mcp *machineconfigv1.MachineConfigPool) map[string]string {
-	if len(mcp.Spec.MachineConfigSelector.MatchLabels) > 0 {
-		return mcp.Spec.MachineConfigSelector.MatchLabels
-	}
-
-	// true only for custom machine config pools
-	klog.Warningf("no match labels was found under the machine config pool %q machine config selector", mcp.Name)
-	labels := map[string]string{
-		"machineconfiguration.openshift.io/role": mcp.Name,
-	}
-	klog.Warningf("generated labels %v, make sure the label is selected by the machine config pool %q", labels, mcp.Name)
-	return labels
 }
 
 type GeneratedDesiredManifest struct {
