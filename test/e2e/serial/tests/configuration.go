@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -31,16 +30,11 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
-	"k8s.io/kubelet/config/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/yaml"
 
 	"github.com/google/go-cmp/cmp"
 	depnodes "github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
@@ -48,19 +42,14 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
-	perfprof "github.com/openshift/cluster-node-tuning-operator/pkg/apis/performanceprofile/v2"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
-	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
-	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
-	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
-	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
@@ -68,7 +57,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
-	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/internal/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
@@ -87,9 +75,6 @@ type MCPUpdateType string
 const (
 	MachineConfig MCPUpdateType = "MachineConfig"
 	MachineCount  MCPUpdateType = "MachineCount"
-
-	// The number here was chosen here based on a couple of test runs which should stabalize the test.
-	maxPodsWithTAE = 10
 )
 
 type mcpInfo struct {
@@ -300,238 +285,6 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
 		})
 
-		It("[test_id:47585] can change kubeletconfig and controller should adapt", Label("reboot_required", label.Slow, label.Tier2, label.OpenShift), func() {
-			fxt.IsRebootTest = true
-			var performanceProfile perfprof.PerformanceProfile
-			var targetedKC *machineconfigv1.KubeletConfig
-
-			nroOperObj := &nropv1.NUMAResourcesOperator{}
-			nroKey := objects.NROObjectKey()
-			err := fxt.Client.Get(context.TODO(), nroKey, nroOperObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
-
-			initialNrtList := nrtv1alpha2.NodeResourceTopologyList{}
-			initialNrtList, err = e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
-			Expect(err).ToNot(HaveOccurred(), "cannot get any NodeResourceTopology object from the cluster")
-
-			mcpsInfo, err := buildMCPsInfo(fxt.Client, context.TODO(), *nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(mcpsInfo).ToNot(BeEmpty())
-
-			mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), fxt.Client, nroOperObj.Spec.NodeGroups)
-			Expect(err).ToNot(HaveOccurred(), "cannot get MCPs associated with NUMAResourcesOperator %q", nroOperObj.Name)
-
-			kcList := &machineconfigv1.KubeletConfigList{}
-			err = fxt.Client.List(context.TODO(), kcList)
-			Expect(err).ToNot(HaveOccurred())
-
-			for _, mcp := range mcps {
-				for i := 0; i < len(kcList.Items); i++ {
-					kc := &kcList.Items[i]
-					kcMcpSel, err := metav1.LabelSelectorAsSelector(kc.Spec.MachineConfigPoolSelector)
-					Expect(err).ToNot(HaveOccurred())
-
-					if kcMcpSel.Matches(labels.Set(mcp.Labels)) {
-						// pick the first one you find
-						targetedKC = kc
-					}
-				}
-			}
-			Expect(targetedKC).ToNot(BeNil(), "there should be at least one kubeletconfig.machineconfiguration object")
-
-			//save initial Topology Manager scope to use it when restoring kc
-			kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
-			Expect(err).ToNot(HaveOccurred())
-			initialTMScope := kcObj.TopologyManagerScope
-			newTMScope := getNewTopologyManagerScopeValue(kcObj.TopologyManagerScope)
-			Expect(initialTMScope).ToNot(Equal(newTMScope))
-
-			By("verify owner reference of kubeletconfig")
-			Expect(len(targetedKC.OwnerReferences)).To(BeNumerically("<", 2)) //so 0 or 1
-			if len(targetedKC.OwnerReferences) == 0 {
-				By("modifying Topology Manager Scope under kubeletconfig")
-				Eventually(func(g Gomega) {
-					err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), targetedKC)
-					Expect(err).ToNot(HaveOccurred())
-
-					kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
-					Expect(err).ToNot(HaveOccurred())
-
-					kcObj.TopologyManagerScope = newTMScope
-					err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
-					Expect(err).ToNot(HaveOccurred())
-
-					err = fxt.Client.Update(context.TODO(), targetedKC)
-					g.Expect(err).ToNot(HaveOccurred())
-				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
-			}
-			if len(targetedKC.OwnerReferences) == 1 {
-				ref := targetedKC.OwnerReferences[0]
-				if ref.Kind != "PerformanceProfile" {
-					Skip(fmt.Sprintf("owner object %q is not supported in this test", ref.Kind))
-				}
-
-				//update kubeletconfig via the performanceprofile
-				klog.Infof("update configuration via the kubeletconfig owner %s/%s", ref.Kind, ref.Name)
-				err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: ref.Name}, &performanceProfile)
-				Expect(err).ToNot(HaveOccurred())
-				updatedProfile := performanceProfile.DeepCopy()
-
-				tmScopeAnn := fmt.Sprintf("{\"topologyManagerScope\": %q, \"cpuManagerPolicyOptions\": {\"full-pcpus-only\": \"false\"}}", newTMScope)
-				updatedProfile.Annotations = map[string]string{
-					"kubeletconfig.experimental": tmScopeAnn}
-				annotations, err := json.Marshal(updatedProfile.Annotations)
-				Expect(err).ToNot(HaveOccurred())
-
-				By("Applying changes in performance profile and waiting until mcp will start updating")
-				klog.Infof("updating annotations from current:\n%+v\nto desired:\n%+v\n", performanceProfile.Annotations, updatedProfile.Annotations)
-				Expect(fxt.Client.Patch(context.TODO(), updatedProfile,
-					client.RawPatch(
-						types.JSONPatchType,
-						[]byte(fmt.Sprintf(`[{ "op": "replace", "path": "/metadata/annotations", "value": %s }]`, annotations)),
-					),
-				)).ToNot(HaveOccurred())
-			}
-
-			defer func() {
-				By("restore kubeletconfig settings")
-				var mcoKC machineconfigv1.KubeletConfig
-				err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), &mcoKC)
-				Expect(err).ToNot(HaveOccurred())
-
-				kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(&mcoKC)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(len(mcoKC.OwnerReferences)).To(BeNumerically("<", 2))
-
-				currentTMScope := kcObj.TopologyManagerScope
-
-				mcpsInfo, err := buildMCPsInfo(fxt.Client, context.TODO(), *nroOperObj)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(mcpsInfo).ToNot(BeEmpty())
-
-				if currentTMScope != initialTMScope {
-					if len(mcoKC.OwnerReferences) == 0 {
-						Eventually(func(g Gomega) {
-							err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), &mcoKC)
-							Expect(err).ToNot(HaveOccurred())
-
-							kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(&mcoKC)
-							Expect(err).ToNot(HaveOccurred())
-
-							kcObj.TopologyManagerScope = initialTMScope
-							err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, &mcoKC)
-							Expect(err).ToNot(HaveOccurred())
-
-							err = fxt.Client.Update(context.TODO(), &mcoKC)
-							g.Expect(err).ToNot(HaveOccurred())
-						}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
-					}
-					if len(targetedKC.OwnerReferences) == 1 {
-						initialAnnotations, err := json.Marshal(performanceProfile.Annotations)
-						Expect(err).ToNot(HaveOccurred())
-						err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(&performanceProfile), &performanceProfile)
-						Expect(err).ToNot(HaveOccurred())
-
-						By("Applying changes in performance profile")
-						klog.Infof("updating annotations from:\n%+v\nto:\n%+v\n", performanceProfile.Annotations, string(initialAnnotations))
-						Expect(fxt.Client.Patch(context.TODO(), &performanceProfile,
-							client.RawPatch(
-								types.JSONPatchType,
-								[]byte(fmt.Sprintf(`[{ "op": "replace", "path": "/metadata/annotations", "value": %s }]`, initialAnnotations)),
-							),
-						)).ToNot(HaveOccurred())
-					}
-					By("waiting for mcp to update")
-					waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, time.Now().String(), mcpsInfo...)
-				}
-			}()
-
-			By("waiting for mcp to update")
-			waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, time.Now().String(), mcpsInfo...)
-
-			By("checking that NUMAResourcesOperator's ConfigMap has changed")
-			cmList := &corev1.ConfigMapList{}
-			err = fxt.Client.List(context.TODO(), cmList)
-			Expect(err).ToNot(HaveOccurred())
-
-			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), targetedKC)
-			Expect(err).ToNot(HaveOccurred())
-
-			var nropCm *corev1.ConfigMap
-			for i := 0; i < len(cmList.Items); i++ {
-				// the owner should be the KubeletConfig object and not the NUMAResourcesOperator CR
-				// so when KubeletConfig gets deleted, the ConfigMap gets deleted as well
-				if objects.IsOwnedBy(cmList.Items[i].ObjectMeta, targetedKC.ObjectMeta) {
-					nropCm = &cmList.Items[i]
-					break
-				}
-			}
-			Expect(nropCm).ToNot(BeNil(), "NUMAResourcesOperator %q should have a ConfigMap owned by KubeletConfig %q", nroOperObj.Name, targetedKC.Name)
-
-			cmKey := client.ObjectKeyFromObject(nropCm)
-			Eventually(func() bool {
-				err = fxt.Client.Get(context.TODO(), cmKey, nropCm)
-				Expect(err).ToNot(HaveOccurred())
-
-				data, ok := nropCm.Data["config.yaml"]
-				Expect(ok).To(BeTrue(), "failed to obtain config.yaml key from ConfigMap %q data", cmKey.String())
-
-				conf, err := rteConfigFrom(data)
-				Expect(err).ToNot(HaveOccurred(), "failed to obtain rteConfig from ConfigMap %q error: %v", cmKey.String(), err)
-
-				if conf.Kubelet.TopologyManagerScope == initialTMScope {
-					klog.Warningf("ConfigMap %q has not been updated with new TopologyManagerScope after kubeletconfig modification", cmKey.String())
-					return false
-				}
-				return true
-			}).WithTimeout(timeout).WithPolling(time.Second * 30).Should(BeTrue())
-
-			By("schedule another workload requesting resources")
-			nroSchedObj := &nropv1.NUMAResourcesScheduler{}
-			nroSchedKey := objects.NROSchedObjectKey()
-			err = fxt.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
-			schedulerName := nroSchedObj.Status.SchedulerName
-
-			nrtPreCreatePodList, err := e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
-			Expect(err).ToNot(HaveOccurred())
-
-			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomizeName("testpod"))
-			testPod.Spec.SchedulerName = schedulerName
-			rl := corev1.ResourceList{
-				corev1.ResourceCPU:    resource.MustParse("1"),
-				corev1.ResourceMemory: resource.MustParse("100M"),
-			}
-			testPod.Spec.Containers[0].Resources.Limits = rl
-			testPod.Spec.Containers[0].Resources.Requests = rl
-
-			err = fxt.Client.Create(context.TODO(), testPod)
-			Expect(err).ToNot(HaveOccurred())
-
-			testPod, err = wait.With(fxt.Client).Timeout(timeout).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
-			if err != nil {
-				_ = objects.LogEventsForPod(fxt.K8sClient, testPod.Namespace, testPod.Name)
-			}
-			Expect(err).ToNot(HaveOccurred())
-
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, testPod.Namespace, testPod.Name, schedulerName)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", testPod.Namespace, testPod.Name, schedulerName)
-
-			rl = e2ereslist.FromGuaranteedPod(*testPod)
-
-			nrtPreCreate, err := e2enrt.FindFromList(nrtPreCreatePodList.Items, testPod.Spec.NodeName)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("Waiting for the NRT data to stabilize")
-			e2efixture.MustSettleNRT(fxt)
-
-			By(fmt.Sprintf("checking NRT for target node %q updated correctly", testPod.Spec.NodeName))
-			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
-			expectNRTConsumedResources(fxt, *nrtPreCreate, rl, testPod)
-		})
-
 		It("should report the NodeGroupConfig in the status", Label("tier2", "openshift"), func() {
 			nroKey := objects.NROObjectKey()
 			nroOperObj := nropv1.NUMAResourcesOperator{}
@@ -685,314 +438,6 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				klog.Infof("current set of configmaps from kubeletconfigs: %v", strings.Join(kcCmNamesCur, ","))
 				return kcCmNamesCur
 			}).WithContext(ctx).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Equal(kcCmNamesPre))
-		})
-
-		It("[test_id:75354]should be able to correctly identify topology manager policy without scheduler restarting", Label("reboot_required", label.Slow, "unsched", "schedrst", label.Tier2, label.OpenShift), Label("feature:schedattrwatch", "feature:schedrst"), func(ctx context.Context) {
-			// https://issues.redhat.com/browse/OCPBUGS-34583
-			fxt.IsRebootTest = true
-			By("getting the number of cpus that is required for a numa zone to create a Topology Affinity Error deployment")
-			const (
-				NUMAZonesRequired     = 2
-				hostsRequired         = 1
-				cpuResourcePercentage = 1.5 // 1.5 meaning 150 percent
-			)
-			var nrtCandidates []nrtv1alpha2.NodeResourceTopology
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
-			nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
-			if len(nrtCandidates) < hostsRequired {
-				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
-			}
-
-			// choosing the first node because the nodes should be similar in topology so it doesnt matter which one we choose
-			referenceNode := nrtCandidates[0]
-			referenceZone := referenceNode.Zones[0]
-
-			cpuQty, ok := e2enrt.FindResourceAvailableByName(referenceZone.Resources, string(corev1.ResourceCPU))
-			Expect(ok).To(BeTrue(), "no CPU resource in zone %q node %q", referenceZone.Name, referenceNode.Name)
-
-			cpuNum, ok := cpuQty.AsInt64()
-			Expect(ok).To(BeTrue(), "invalid CPU resource in zone %q node %q: %v", referenceZone.Name, referenceNode.Name, cpuQty)
-			klog.Infof("available CPUs per numa on the node: %d, ", cpuNum)
-
-			cpuResources := strconv.Itoa(int(float64(cpuNum) * cpuResourcePercentage))
-			klog.Infof("CPU resources requested to create a topology affinity error deployment %s", cpuResources)
-
-			By("fetching the matching kubeletconfig for the numaresources-operator cr")
-			var nroOperObj nropv1.NUMAResourcesOperator
-			nroKey := objects.NROObjectKey()
-			err := fxt.Client.Get(ctx, nroKey, &nroOperObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
-
-			mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(mcpsInfo).ToNot(BeEmpty())
-
-			mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, fxt.Client, nroOperObj.Spec.NodeGroups)
-			Expect(err).ToNot(HaveOccurred(), "cannot get MCPs associated with NUMAResourcesOperator %q", nroOperObj.Name)
-
-			kcList := &machineconfigv1.KubeletConfigList{}
-			err = fxt.Client.List(ctx, kcList)
-			Expect(err).ToNot(HaveOccurred())
-
-			var targetedKC *machineconfigv1.KubeletConfig
-			for _, mcp := range mcps {
-				for i := 0; i < len(kcList.Items); i++ {
-					kc := &kcList.Items[i]
-					kcMcpSel, err := metav1.LabelSelectorAsSelector(kc.Spec.MachineConfigPoolSelector)
-					Expect(err).ToNot(HaveOccurred())
-
-					if kcMcpSel.Matches(labels.Set(mcp.Labels)) {
-						targetedKC = kc
-					}
-				}
-			}
-			Expect(targetedKC).ToNot(BeNil(), "there should be at least one kubeletconfig.machineconfiguration object")
-			numTargetedKCOwnerReferences := len(targetedKC.OwnerReferences)
-
-			kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
-			Expect(err).ToNot(HaveOccurred())
-			initialTopologyManagerPolicy := kcObj.TopologyManagerPolicy
-
-			// Before restarting the scheduler, we change here the Topology Manager Policy to 'none'.
-			// This ensures that if we later change it to 'single NUMA node' and attempt to create
-			// a deployment that is expected to fail due to TopologyAffinityError it will otherwise fail for failed scheduling.
-			// We expect that failure to occur only when the bug is present.
-			// Changes are made through the kubeletconfig directly or through performance profile.
-			By("verify owner reference of kubeletconfig")
-			Expect(numTargetedKCOwnerReferences).To(BeNumerically("<", 2)) // so 0 or 1
-
-			var performanceProfile perfprof.PerformanceProfile
-
-			if initialTopologyManagerPolicy != v1beta1.NoneTopologyManagerPolicy {
-				if numTargetedKCOwnerReferences == 0 {
-					By("modifying Topology Manager Policy to 'none' under kubeletconfig")
-					Eventually(func(g Gomega) {
-						err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(targetedKC), targetedKC)
-						Expect(err).ToNot(HaveOccurred())
-
-						kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
-						Expect(err).ToNot(HaveOccurred())
-
-						kcObj.TopologyManagerPolicy = v1beta1.NoneTopologyManagerPolicy
-						err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
-						Expect(err).ToNot(HaveOccurred())
-
-						err = fxt.Client.Update(ctx, targetedKC)
-						g.Expect(err).ToNot(HaveOccurred())
-					}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
-				}
-
-				if numTargetedKCOwnerReferences == 1 {
-					ref := targetedKC.OwnerReferences[0]
-					if ref.Kind != "PerformanceProfile" {
-						e2efixture.Skipf(fxt, "owner object %q is not supported in this test", ref.Kind)
-					}
-
-					By("modifying Topology Manager Policy to 'none' under performance profile")
-					klog.Infof("update Topology Manager Policy to 'none' via the kubeletconfig owner %s/%s", ref.Kind, ref.Name)
-					err = fxt.Client.Get(ctx, client.ObjectKey{Name: ref.Name}, &performanceProfile)
-					Expect(err).ToNot(HaveOccurred())
-
-					policy := v1beta1.NoneTopologyManagerPolicy
-					updatedProfile := performanceProfile.DeepCopy()
-					updatedProfile.Spec.NUMA = &perfprof.NUMA{
-						TopologyPolicy: &policy,
-					}
-					spec, err := json.Marshal(updatedProfile.Spec)
-					Expect(err).ToNot(HaveOccurred())
-
-					Expect(fxt.Client.Patch(ctx, updatedProfile,
-						client.RawPatch(
-							types.JSONPatchType,
-							[]byte(fmt.Sprintf(`[{ "op": "replace", "path": "/spec", "value": %s }]`, spec)),
-						))).ToNot(HaveOccurred())
-				}
-			}
-
-			defer func() {
-				err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(targetedKC), targetedKC)
-				Expect(err).ToNot(HaveOccurred())
-
-				kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
-				Expect(err).ToNot(HaveOccurred())
-
-				mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, nroOperObj)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(mcpsInfo).ToNot(BeEmpty())
-
-				if initialTopologyManagerPolicy != kcObj.TopologyManagerPolicy {
-					if numTargetedKCOwnerReferences == 0 {
-						By("reverting kuebeletconfig changes to the initial state under kubeletconfig")
-						Eventually(func(g Gomega) {
-							err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(targetedKC), targetedKC)
-							Expect(err).ToNot(HaveOccurred())
-
-							kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
-							Expect(err).ToNot(HaveOccurred())
-
-							kcObj.TopologyManagerPolicy = initialTopologyManagerPolicy
-							err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
-							Expect(err).ToNot(HaveOccurred())
-
-							err = fxt.Client.Update(ctx, targetedKC)
-							Expect(err).ToNot(HaveOccurred())
-						}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
-
-					}
-
-					if numTargetedKCOwnerReferences == 1 {
-						ref := targetedKC.OwnerReferences[0]
-						if ref.Kind != "PerformanceProfile" {
-							e2efixture.Skipf(fxt, "owner object %q is not supported in this test", ref.Kind)
-						}
-
-						By("reverting kuebeletconfig changes to the initial state under performance profile")
-						klog.Infof("reverting configuration via the kubeletconfig owner %s/%s", ref.Kind, ref.Name)
-						err = fxt.Client.Get(ctx, client.ObjectKey{Name: ref.Name}, &performanceProfile)
-						Expect(err).ToNot(HaveOccurred())
-
-						performanceProfile.Spec.NUMA = &perfprof.NUMA{
-							TopologyPolicy: &initialTopologyManagerPolicy,
-						}
-						spec, err := json.Marshal(performanceProfile.Spec)
-						Expect(err).ToNot(HaveOccurred())
-
-						Expect(fxt.Client.Patch(ctx, &performanceProfile,
-							client.RawPatch(
-								types.JSONPatchType,
-								[]byte(fmt.Sprintf(`[{ "op": "replace", "path": "/spec", "value": %s }]`, spec)),
-							))).ToNot(HaveOccurred())
-					}
-
-					By("waiting for mcp to update")
-					waitForMcpUpdate(fxt.Client, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
-				}
-			}()
-
-			By("waiting for mcp to update")
-			waitForMcpUpdate(fxt.Client, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
-
-			var schedulerName string
-			var nroSchedObj nropv1.NUMAResourcesScheduler
-			nroSchedKey := objects.NROSchedObjectKey()
-			err = fxt.Client.Get(ctx, nroSchedKey, &nroSchedObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
-
-			schedDeployment, err := podlist.With(fxt.Client).DeploymentByOwnerReference(ctx, nroSchedObj.GetUID())
-			Expect(err).ToNot(HaveOccurred(), "failed to get the scheduler deployment")
-
-			schedPods, err := podlist.With(fxt.Client).ByDeployment(ctx, *schedDeployment)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(schedPods).To(HaveLen(1))
-
-			schedulerName = nroSchedObj.Status.SchedulerName
-			Expect(schedulerName).ToNot(BeEmpty(), "cannot autodetect the TAS scheduler name from the cluster")
-
-			By(fmt.Sprintf("deleting the NRO Scheduler object to trigger the pod to restart: %s", nroSchedObj.Name))
-			err = fxt.Client.Delete(ctx, &schedPods[0])
-			Expect(err).ToNot(HaveOccurred())
-
-			_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(ctx, schedDeployment)
-			Expect(err).ToNot(HaveOccurred())
-
-			mcpsInfo, err = buildMCPsInfo(fxt.Client, ctx, nroOperObj)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(mcpsInfo).ToNot(BeEmpty())
-
-			// Here we are changing the Topology Manager Policy to to single-numa-node
-			// after the scheduler has been deleted and therefore restarted so now we can create a
-			// TopologyAffinityError deployment to see if the deployment's pod will be pending or not.
-			// Changes are made through the kubeletconfig directly or through performance profile.
-			if numTargetedKCOwnerReferences == 0 {
-				By("modifying the Topology Manager Policy to 'single-numa-node' under kubeletconfig")
-				Eventually(func(g Gomega) {
-					err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(targetedKC), targetedKC)
-					Expect(err).ToNot(HaveOccurred())
-
-					kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
-					Expect(err).ToNot(HaveOccurred())
-					kcObj.TopologyManagerPolicy = v1beta1.SingleNumaNodeTopologyManagerPolicy
-					err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
-					Expect(err).ToNot(HaveOccurred())
-
-					err = fxt.Client.Update(ctx, targetedKC)
-					g.Expect(err).ToNot(HaveOccurred())
-				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
-			}
-
-			if numTargetedKCOwnerReferences == 1 {
-				ref := targetedKC.OwnerReferences[0]
-				if ref.Kind != "PerformanceProfile" {
-					e2efixture.Skipf(fxt, "owner object %q is not supported in this test", ref.Kind)
-				}
-
-				By("modifying Topology Manager Policy to 'single-numa-node' under performance profile")
-				klog.Infof("update Topology Manager Policy to 'single-numa-node' via the kubeletconfig owner %s/%s", ref.Kind, ref.Name)
-				err = fxt.Client.Get(ctx, client.ObjectKey{Name: ref.Name}, &performanceProfile)
-				Expect(err).ToNot(HaveOccurred())
-
-				policy := v1beta1.SingleNumaNodeTopologyManagerPolicy
-				updatedProfile := performanceProfile.DeepCopy()
-				updatedProfile.Spec.NUMA = &perfprof.NUMA{
-					TopologyPolicy: &policy,
-				}
-				spec, err := json.Marshal(updatedProfile.Spec)
-				Expect(err).ToNot(HaveOccurred())
-
-				Expect(fxt.Client.Patch(ctx, updatedProfile,
-					client.RawPatch(
-						types.JSONPatchType,
-						[]byte(fmt.Sprintf(`[{ "op": "replace", "path": "/spec", "value": %s }]`, spec)),
-					))).ToNot(HaveOccurred())
-			}
-
-			By("waiting for mcp to update")
-			waitForMcpUpdate(fxt.Client, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
-
-			By("creating a Topology Affinity Error deployment and check if the pod status is pending")
-			deployment := createTAEDeployment(fxt, ctx, "testdp", serialconfig.Config.SchedulerName, cpuResources)
-
-			maxStep := 3
-			updatedDeployment := appsv1.Deployment{}
-			for step := 0; step < maxStep; step++ {
-				time.Sleep(10 * time.Second)
-				By(fmt.Sprintf("ensuring the deployment %q keep being pending %d/%d", deployment.Name, step+1, maxStep))
-				err = fxt.Client.Get(ctx, client.ObjectKeyFromObject(deployment), &updatedDeployment)
-				Expect(err).ToNot(HaveOccurred())
-				Expect(wait.IsDeploymentComplete(deployment, &updatedDeployment.Status)).To(BeFalse(), "deployment %q become ready", deployment.Name)
-			}
-
-			By("checking the deployment pod has failed scheduling and its at the pending status")
-			pods, err := podlist.With(fxt.Client).ByDeployment(ctx, updatedDeployment)
-			Expect(err).ToNot(HaveOccurred())
-
-			// Based on a couple of test runs it accurs that some pods sometimes may be created in cases that the time frame
-			// between the kubeletchanges and the deployment being created are too small for the scheduler to pick up the new changes and recover
-			// (sometimes even a second is too much), and it can create pods with Topology Affinity Error that have zero effect on the deployment itself
-			// and theirs status is ContainerStatusUnknown, the count of these pods needs to be bounded once the pending pod comes up.
-			// The conclusion is as long as there is exactly one pod that is pending the scheduler is behaving correctly.
-			if len(pods) > maxPodsWithTAE {
-				klog.Warningf("current length of the pods list: %d, is bigger than %d", len(pods), maxPodsWithTAE)
-			}
-
-			By("checking to see if there is more than one pod that is pending")
-			pendingPod := corev1.Pod{}
-			numPendingPods := 0
-
-			for _, pod := range pods {
-				if pod.Status.Phase == corev1.PodPending {
-					pendingPod = pod
-					numPendingPods++
-				}
-			}
-			Expect(numPendingPods).To(Equal(1))
-
-			schedulerName = nroSchedObj.Status.SchedulerName
-			Expect(schedulerName).ToNot(BeEmpty(), "cannot autodetect the TAS scheduler name from the cluster")
-
-			isFailed, err := nrosched.CheckPodSchedulingFailedWithMsg(fxt.K8sClient, pendingPod.Namespace, pendingPod.Name, schedulerName, fmt.Sprintf("cannot align %s", kcObj.TopologyManagerScope))
-			Expect(err).ToNot(HaveOccurred())
-			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pendingPod.Namespace, pendingPod.Name, schedulerName)
 		})
 
 		Context("[ngpoolname] node group with PoolName support", Label("ngpoolname"), Label("feature:ngpoolname"), func() {
@@ -1260,27 +705,6 @@ func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.Objec
 	klog.InfoS("result of checking the status from NodeGroupStatus", "NRO Object", key.String(), "status", toJSON(statusFromNodeGroups), "spec", toJSON(expectedConf), "match", matchFromGroupStatus)
 	Expect(matchFromMCP && matchFromGroupStatus).To(BeTrue(), "config status mismatch")
 }
-func createTAEDeployment(fxt *e2efixture.Fixture, ctx context.Context, name, schedulerName, cpus string) *appsv1.Deployment {
-	var err error
-	var replicas int32 = 1
-
-	podLabels := map[string]string{
-		"test": "test-dp",
-	}
-	nodeSelector := map[string]string{}
-	deployment := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, name, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
-	deployment.Spec.Template.Spec.SchedulerName = schedulerName
-	deployment.Spec.Template.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
-		corev1.ResourceCPU:    resource.MustParse(cpus),
-		corev1.ResourceMemory: resource.MustParse("256Mi"),
-	}
-
-	By(fmt.Sprintf("creating a topology affinity error deployment %q", name))
-	err = fxt.Client.Create(ctx, deployment)
-	Expect(err).ToNot(HaveOccurred())
-
-	return deployment
-}
 
 func daemonSetListToNamespacedNameList(dss []*appsv1.DaemonSet) []nropv1.NamespacedName {
 	ret := make([]nropv1.NamespacedName, 0, len(dss))
@@ -1306,34 +730,6 @@ func objRefListToStringList(objRefs []configv1.ObjectReference) []string {
 	}
 	sort.Strings(ret)
 	return ret
-}
-
-// each KubeletConfig has a field for TopologyManagerScope
-// since we don't care about the value itself, and we just want to trigger a machine-config change, we just pick some random value.
-// the current TopologyManagerScope value is unknown in runtime, hence there are two options here:
-// 1. the current value is equal to the random value we choose.
-// 2. the current value is not equal to the random value we choose.
-// in option number 2 we are good to go, but if happened, and we land on option number 1,
-// it won't trigger a machine-config change (because the value has left the same) so we just pick another value,
-// which now we are certain that it is different from the existing one.
-// in conclusion, the maximum attempts is 2.
-func getNewTopologyManagerScopeValue(oldTopologyManagerScopeValue string) string {
-	newTopologyManagerScopeValue := "container"
-	// if it happens to be the same, pick something else
-	if oldTopologyManagerScopeValue == newTopologyManagerScopeValue || oldTopologyManagerScopeValue == "" {
-		newTopologyManagerScopeValue = "pod"
-	}
-	return newTopologyManagerScopeValue
-}
-
-func rteConfigFrom(data string) (*rteconfig.Config, error) {
-	conf := &rteconfig.Config{}
-
-	err := yaml.Unmarshal([]byte(data), conf)
-	if err != nil {
-		return nil, err
-	}
-	return conf, nil
 }
 
 func toJSON(obj interface{}) string {
