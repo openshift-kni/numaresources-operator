@@ -62,7 +62,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-04-15T14:14:32Z"
+    createdAt: "2025-04-15T15:54:00Z"
     olm.skipRange: '>=4.18.0 <4.19.0'
     operatorframework.io/cluster-monitoring: "true"
     operators.operatorframework.io/builder: operator-sdk-v1.36.1

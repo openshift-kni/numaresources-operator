@@ -1938,8 +1938,6 @@ github.com/openshift/client-go v0.0.0-20240510131258-f646d5f29250 h1:WQ0e89xebsN
 github.com/openshift/client-go v0.0.0-20240510131258-f646d5f29250/go.mod h1:tjGjTE59N1+5W0YE4Wqf0zJpFLIY4d+EpMihDKOn1oA=
 github.com/openshift/hypershift/api v0.0.0-20241115183703-d41904871380 h1:rvDZDAURpDOO/+pf3cR6t+0J8ZT5ueP07LTW47PLy4s=
 github.com/openshift/hypershift/api v0.0.0-20241115183703-d41904871380/go.mod h1:NIT2Bs83re4seKsT3Xp+ENOOCN2Gl++mguuGGhNnN/8=
-github.com/openshift/machine-config-operator v0.0.1-0.20230724174830-7b54f1dcce4e h1:lgQ2Iy0NHk/iBaR9yvqSqROCiOovpkbc8MRYSIpHf+M=
-github.com/openshift/machine-config-operator v0.0.1-0.20230724174830-7b54f1dcce4e/go.mod h1:xwAAOZMhwF91Ii8/yfOwp+yH5+GJS7VX90NI39RmSyo=
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
 github.com/orisano/pixelmatch v0.0.0-20220722002657-fb0b55479cde/go.mod h1:nZgzbfBr3hhjoZnS66nKrHmduYNpc34ny7RK4z5/HM0=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=

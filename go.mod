@@ -19,7 +19,6 @@ require (
 	github.com/onsi/gomega v1.36.1
 	github.com/openshift/api v0.0.0-20250305013520-e7f23be12279 // release-4.18
 	github.com/openshift/hypershift/api v0.0.0-20241115183703-d41904871380 // release-4.18
-	github.com/openshift/machine-config-operator v0.0.1-0.20230724174830-7b54f1dcce4e // release-4.13
 	github.com/sergi/go-diff v1.1.0
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/sync v0.12.0
@@ -93,6 +92,7 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opentelemetry.io/otel v1.28.0 // indirect
 	go.opentelemetry.io/otel/trace v1.28.0 // indirect
+	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/ratelimit v0.2.0 // indirect
 	golang.org/x/mod v0.21.0 // indirect
 	golang.org/x/net v0.38.0 // indirect

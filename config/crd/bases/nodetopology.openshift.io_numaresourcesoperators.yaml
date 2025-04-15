@@ -327,12 +327,6 @@ spec:
                             description: type of the condition, currently ('Done',
                               'Updating', 'Failed').
                             type: string
-                        required:
-                        - lastTransitionTime
-                        - message
-                        - reason
-                        - status
-                        - type
                         type: object
                       type: array
                     config:
@@ -810,12 +804,6 @@ spec:
                             description: type of the condition, currently ('Done',
                               'Updating', 'Failed').
                             type: string
-                        required:
-                        - lastTransitionTime
-                        - message
-                        - reason
-                        - status
-                        - type
                         type: object
                       type: array
                     config:
