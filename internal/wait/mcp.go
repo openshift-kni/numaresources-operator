@@ -24,7 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 )
 
 const (

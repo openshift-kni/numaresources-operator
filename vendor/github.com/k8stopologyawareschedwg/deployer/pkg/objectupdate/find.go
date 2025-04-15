@@ -21,10 +21,30 @@ import (
 )
 
 func FindContainerByName(conts []corev1.Container, name string) *corev1.Container {
-	for i := range conts {
-		cont := &conts[i]
+	for idx := range conts {
+		cont := &conts[idx]
 		if cont.Name == name {
 			return cont
+		}
+	}
+	return nil
+}
+
+func FindContainerEnvVarByName(envs []corev1.EnvVar, name string) *corev1.EnvVar {
+	for idx := range envs {
+		env := &envs[idx]
+		if env.Name == name {
+			return env
+		}
+	}
+	return nil
+}
+
+func FindContainerPortByName(ports []corev1.ContainerPort, name string) *corev1.ContainerPort {
+	for idx := range ports {
+		cp := &ports[idx]
+		if cp.Name == name {
+			return cp
 		}
 	}
 	return nil

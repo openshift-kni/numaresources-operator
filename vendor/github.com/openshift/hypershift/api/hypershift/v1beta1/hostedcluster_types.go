@@ -349,15 +349,42 @@ const (
 	ControlPlaneOperatorV2EnvVar = "CPO_V2"
 )
 
+// +kubebuilder:validation:Enum=ImageRegistry
+type OptionalCapability string
+
+const ImageRegistryCapability OptionalCapability = OptionalCapability(configv1.ClusterVersionCapabilityImageRegistry)
+
+// capabilities allows disabling optional components at install time.
+// Once set, it cannot be changed.
+type Capabilities struct {
+	// disabled when specified, sets the cluster version baselineCapabilitySet to None
+	// and sets all additionalEnabledCapabilities BUT the ones supplied in disabled.
+	// This effectively disables that capability on the hosted cluster.
+	//
+	// When this is not supplied, the cluster will use the DefaultCapabilitySet defined for the respective
+	// OpenShift version.
+	//
+	// Once set, this field cannot be changed.
+	//
+	// +listType=atomic
+	// +immutable
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="Disabled is immutable. Changes might result in unpredictable and disruptive behavior."
+	Disabled []OptionalCapability `json:"disabled,omitempty"`
+}
+
 // HostedClusterSpec is the desired behavior of a HostedCluster.
 
+// +kubebuilder:validation:XValidation:rule="self.platform.type == 'IBMCloud' ? size(self.services) >= 3 : size(self.services) >= 4",message="spec.services in body should have at least 4 items or 3 for IBMCloud"
 // +kubebuilder:validation:XValidation:rule=`self.platform.type != "IBMCloud" ? self.services == oldSelf.services : true`, message="Services is immutable. Changes might result in unpredictable and disruptive behavior."
 // +kubebuilder:validation:XValidation:rule=`self.platform.type == "Azure" ? self.services.exists(s, s.service == "APIServer" && s.servicePublishingStrategy.type == "Route" && s.servicePublishingStrategy.route.hostname != "") : true`,message="Azure platform requires APIServer Route service with a hostname to be defined"
 // +kubebuilder:validation:XValidation:rule=`self.platform.type == "Azure" ? self.services.exists(s, s.service == "OAuthServer" && s.servicePublishingStrategy.type == "Route" && s.servicePublishingStrategy.route.hostname != "") : true`,message="Azure platform requires OAuthServer Route service with a hostname to be defined"
 // +kubebuilder:validation:XValidation:rule=`self.platform.type == "Azure" ? self.services.exists(s, s.service == "Konnectivity" && s.servicePublishingStrategy.type == "Route" && s.servicePublishingStrategy.route.hostname != "") : true`,message="Azure platform requires Konnectivity Route service with a hostname to be defined"
 // +kubebuilder:validation:XValidation:rule=`self.platform.type == "Azure" ? self.services.exists(s, s.service == "Ignition" && s.servicePublishingStrategy.type == "Route" && s.servicePublishingStrategy.route.hostname != "") : true`,message="Azure platform requires Ignition Route service with a hostname to be defined"
 // +kubebuilder:validation:XValidation:rule=`has(self.issuerURL) || !has(self.serviceAccountSigningKey)`,message="If serviceAccountSigningKey is set, issuerURL must be set"
-
+// TODO(alberto): Use CEL cidr library for all these validation when all management clusters are >= 1.31.
+// TODO(alberto): Move this down to the networking section when IBMCloud has finished valid input migration.
+// +kubebuilder:validation:XValidation:rule=`(self.platform.type == "IBMCloud" || !has(self.networking.machineNetwork) && self.networking.clusterNetwork.all(c, self.networking.serviceNetwork.all(s, c.cidr != s.cidr)) || (has(self.networking.machineNetwork) && (self.networking.machineNetwork.all(m, self.networking.clusterNetwork.all(c, m.cidr != c.cidr)) && self.networking.machineNetwork.all(m, self.networking.serviceNetwork.all(s, m.cidr != s.cidr)) && self.networking.clusterNetwork.all(c, self.networking.serviceNetwork.all(s, c.cidr != s.cidr)))))`,message="CIDR ranges in machineNetwork, clusterNetwork, and serviceNetwork must be unique and non-overlapping"
 type HostedClusterSpec struct {
 	// release specifies the desired OCP release payload for all the hosted cluster components.
 	// This includes those components running management side like the Kube API Server and the CVO but also the operands which land in the hosted cluster data plane like the ingress controller, ovn agents, etc.
@@ -469,12 +496,11 @@ type HostedClusterSpec struct {
 	// Max is 6 to account for OIDC;OVNSbDb for backward compability though they are no-op.
 	//
 	// +kubebuilder:validation:MaxItems=6
-	// +kubebuilder:validation:MinItems=4
 	// +kubebuilder:validation:ListType=atomic
-	// +kubebuilder:validation:XValidation:rule="self.all(s, !(s.service == 'APIServer' && s.servicePublishingStrategy.type == 'Route') || has(s.servicePublishingStrategy.route.hostname))",message="If serviceType is 'APIServer' and publishing strategy is 'Route', then hostname must be set"
-	// +kubebuilder:validation:XValidation:rule="['APIServer', 'OAuthServer', 'Konnectivity', 'Ignition'].all(requiredType, self.exists(s, s.service == requiredType))",message="Services list must contain at least 'APIServer', 'OAuthServer', 'Konnectivity', and 'Ignition' service types"
-	// +kubebuilder:validation:XValidation:rule="self.filter(s, s.servicePublishingStrategy.type == 'Route' && has(s.servicePublishingStrategy.route) && has(s.servicePublishingStrategy.route.hostname)).all(x, self.filter(y, y.servicePublishingStrategy.type == 'Route' && (has(y.servicePublishingStrategy.route) && has(y.servicePublishingStrategy.route.hostname) && y.servicePublishingStrategy.route.hostname == x.servicePublishingStrategy.route.hostname)).size() <= 1)",message="Each route publishingStrategy 'hostname' must be unique within the Services list."
-	// +kubebuilder:validation:XValidation:rule="self.filter(s, s.servicePublishingStrategy.type == 'NodePort' && has(s.servicePublishingStrategy.nodePort) && has(s.servicePublishingStrategy.nodePort.address) && has(s.servicePublishingStrategy.nodePort.port)).all(x, self.filter(y, y.servicePublishingStrategy.type == 'NodePort' && (has(y.servicePublishingStrategy.nodePort) && has(y.servicePublishingStrategy.nodePort.address) && y.servicePublishingStrategy.nodePort.address == x.servicePublishingStrategy.nodePort.address && has(y.servicePublishingStrategy.nodePort.port) && y.servicePublishingStrategy.nodePort.port == x.servicePublishingStrategy.nodePort.port )).size() <= 1)",message="Each nodePort publishingStrategy 'nodePort' and 'hostname' must be unique within the Services list."
+	// -kubebuilder:validation:XValidation:rule="self.all(s, !(s.service == 'APIServer' && s.servicePublishingStrategy.type == 'Route') || has(s.servicePublishingStrategy.route.hostname))",message="If serviceType is 'APIServer' and publishing strategy is 'Route', then hostname must be set"
+	// -kubebuilder:validation:XValidation:rule="self.platform.type == 'IBMCloud' ? ['APIServer', 'OAuthServer', 'Konnectivity'].all(requiredType, self.exists(s, s.service == requiredType))",message="Services list must contain at least 'APIServer', 'OAuthServer', and 'Konnectivity' service types" : ['APIServer', 'OAuthServer', 'Konnectivity', 'Ignition'].all(requiredType, self.exists(s, s.service == requiredType))",message="Services list must contain at least 'APIServer', 'OAuthServer', 'Konnectivity', and 'Ignition' service types"	// -kubebuilder:validation:XValidation:rule="self.filter(s, s.servicePublishingStrategy.type == 'Route' && has(s.servicePublishingStrategy.route) && has(s.servicePublishingStrategy.route.hostname)).all(x, self.filter(y, y.servicePublishingStrategy.type == 'Route' && (has(y.servicePublishingStrategy.route) && has(y.servicePublishingStrategy.route.hostname) && y.servicePublishingStrategy.route.hostname == x.servicePublishingStrategy.route.hostname)).size() <= 1)",message="Each route publishingStrategy 'hostname' must be unique within the Services list."
+	// -kubebuilder:validation:XValidation:rule="self.filter(s, s.servicePublishingStrategy.type == 'NodePort' && has(s.servicePublishingStrategy.nodePort) && has(s.servicePublishingStrategy.nodePort.address) && has(s.servicePublishingStrategy.nodePort.port)).all(x, self.filter(y, y.servicePublishingStrategy.type == 'NodePort' && (has(y.servicePublishingStrategy.nodePort) && has(y.servicePublishingStrategy.nodePort.address) && y.servicePublishingStrategy.nodePort.address == x.servicePublishingStrategy.nodePort.address && has(y.servicePublishingStrategy.nodePort.port) && y.servicePublishingStrategy.nodePort.port == x.servicePublishingStrategy.nodePort.port )).size() <= 1)",message="Each nodePort publishingStrategy 'nodePort' and 'hostname' must be unique within the Services list."
+	// TODO(alberto): this breaks the cost budget for < 4.17. We should figure why and enable it back. And If not fixable, consider imposing a minimum version on the management cluster.
 	// +required
 	// +immutable
 	Services []ServicePublishingStrategyMapping `json:"services"`
@@ -610,6 +636,27 @@ type HostedClusterSpec struct {
 	//
 	// +optional
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+
+	// labels when specified, define what custom labels are added to the hcp pods.
+	// Changing this day 2 will cause a rollout of all hcp pods.
+	// Duplicate keys are not supported. If duplicate keys are defined, only the last key/value pair is preserved.
+	// Valid values are those in https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#syntax-and-character-set
+	//
+	// -kubebuilder:validation:XValidation:rule=`self.all(key, size(key) <= 317 && key.matches('^(([A-Za-z0-9]+(\\.[A-Za-z0-9]+)?)*[A-Za-z0-9]\\/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$'))`, message="label key must have two segments: an optional prefix and name, separated by a slash (/). The name segment is required and must be 63 characters or less, beginning and ending with an alphanumeric character ([a-z0-9A-Z]) with dashes (-), underscores (_), dots (.), and alphanumerics between. The prefix is optional. If specified, the prefix must be a DNS subdomain: a series of DNS labels separated by dots (.), not longer than 253 characters in total, followed by a slash (/)"
+	// -kubebuilder:validation:XValidation:rule=`self.all(key, size(self[key]) <= 63 && self[key].matches('^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$'))`, message="label value must be 63 characters or less (can be empty), consist of alphanumeric characters, dashes (-), underscores (_) or dots (.), and begin and end with an alphanumeric character"
+	// TODO: key/value validations break cost budget for <=4.17. We should figure why and enable it back.
+	// +kubebuilder:validation:MaxProperties=20
+	// +optional
+	// +openshift:enable:FeatureGate=HCPPodsLabels
+	Labels map[string]string `json:"labels,omitempty"`
+
+	// capabilities allows for disabling optional components at cluster install time.
+	// This field is optional and once set cannot be changed.
+	// +immutable
+	// +optional
+	// +kubebuilder:default={}
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="Capabilities is immutable. Changes might result in unpredictable and disruptive behavior."
+	Capabilities *Capabilities `json:"capabilities,omitempty"`
 }
 
 // OLMCatalogPlacement is an enum specifying the placement of OLM catalog components.
@@ -837,9 +884,6 @@ type DNSSpec struct {
 // clusterNetworking specifies network configuration for a cluster.
 // All CIDRs must be unique. Additional validation to check for CIDRs overlap and consistent network stack is perfomed by the controllers.
 // Failing that validation will result in the HostedCluster being degraded and the validConfiguration condition being false.
-// TODO this is available in vanilla kube from 1.31 API servers and in Openshift from 4.16.
-// TODO(alberto): Use CEL cidr library for all these validation when all management clusters are >= 1.31.
-// +kubebuilder:validation:XValidation:rule="(!has(self.machineNetwork) && self.clusterNetwork.all(c, self.serviceNetwork.all(s, c.cidr != s.cidr)) || (has(self.machineNetwork) && (self.machineNetwork.all(m, self.clusterNetwork.all(c, m.cidr != c.cidr)) && self.machineNetwork.all(m, self.serviceNetwork.all(s, m.cidr != s.cidr)) && self.clusterNetwork.all(c, self.serviceNetwork.all(s, c.cidr != s.cidr)))))",message="CIDR ranges in machineNetwork, clusterNetwork, and serviceNetwork must be unique and non-overlapping"
 type ClusterNetworking struct {
 	// machineNetwork is the list of IP address pools for machines.
 	// This might be used among other things to generate appropriate networking security groups in some clouds providers.
