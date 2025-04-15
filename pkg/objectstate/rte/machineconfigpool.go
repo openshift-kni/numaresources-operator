@@ -131,3 +131,12 @@ func (obj machineConfigPoolFinder) FindState(mf Manifests, tree nodegroupv1.Tree
 	}
 	return ret
 }
+
+func MatchMachineConfigPoolCondition(conditions []machineconfigv1.MachineConfigPoolCondition, conditionType machineconfigv1.MachineConfigPoolConditionType, status corev1.ConditionStatus) bool {
+	for _, condition := range conditions {
+		if condition.Type == conditionType {
+			return condition.Status == status
+		}
+	}
+	return false
+}

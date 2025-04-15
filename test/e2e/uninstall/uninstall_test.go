@@ -19,8 +19,10 @@ package uninstall
 import (
 	"context"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -32,6 +34,7 @@ import (
 
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
@@ -110,7 +113,7 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 							}
 						}
 
-						if machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
+						if rtestate.MatchMachineConfigPoolCondition(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated, corev1.ConditionFalse) {
 							return false
 						}
 					}

@@ -174,28 +174,26 @@ func nullMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.Mach
 }
 
 func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	existing := isMachineConfigExists(instanceName, mcp)
-
-	// the Machine Config Pool still did not apply the machine config wait for one minute
-	if !existing || machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
+	if !existsMachineConfig(instanceName, mcp) {
 		return false
 	}
-
+	if MatchMachineConfigPoolCondition(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated, corev1.ConditionFalse) {
+		return false
+	}
 	return true
 }
 
 func IsMachineConfigPoolUpdatedAfterDeletion(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	existing := isMachineConfigExists(instanceName, mcp)
-
-	// the Machine Config Pool still has the machine config return false
-	if existing || machineconfigv1.IsMachineConfigPoolConditionFalse(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated) {
+	if existsMachineConfig(instanceName, mcp) {
 		return false
 	}
-
+	if MatchMachineConfigPoolCondition(mcp.Status.Conditions, machineconfigv1.MachineConfigPoolUpdated, corev1.ConditionFalse) {
+		return false
+	}
 	return true
 }
 
-func isMachineConfigExists(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
+func existsMachineConfig(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
 	mcName := objectnames.GetMachineConfigName(instanceName, mcp.Name)
 	for _, s := range mcp.Status.Configuration.Source {
 		if s.Name == mcName {
