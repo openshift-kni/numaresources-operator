@@ -46,6 +46,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
+	"github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
@@ -545,8 +546,11 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					PoolName: &mcp.Name,
 					Config:   &conf, // intentionally set the shorter config to ensure the status was normalized when published
 				}
+
+				origNodeGroups := nodegroup.CloneList(initialOperObj.Spec.NodeGroups)
+
 				klog.InfoS("the new node group to add", "node group", ng.ToString())
-				newNodeGroups := append(initialOperObj.Spec.NodeGroups, ng)
+				newNodeGroups := append(nodegroup.CloneList(initialOperObj.Spec.NodeGroups), ng)
 				var updatedNRO nropv1.NUMAResourcesOperator
 				Eventually(func(g Gomega) {
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
@@ -561,7 +565,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					if !reflect.DeepEqual(updatedNRO.Spec.NodeGroups, initialOperObj.Spec.NodeGroups) {
 						Eventually(func(g Gomega) {
 							g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-							updatedNRO.Spec.NodeGroups = initialOperObj.Spec.NodeGroups
+							updatedNRO.Spec.NodeGroups = origNodeGroups
 							g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
 						}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 					}
@@ -594,7 +598,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					Config:   &conf,
 				}
 				klog.InfoS("the updated node group to apply", "node group", ng.ToString())
-				newNodeGroups = append(initialOperObj.Spec.NodeGroups, ng)
+				newNodeGroups = append(nodegroup.CloneList(initialOperObj.Spec.NodeGroups), ng)
 
 				Eventually(func(g Gomega) {
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
@@ -620,7 +624,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				By("delete the node group")
 				Eventually(func(g Gomega) {
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-					updatedNRO.Spec.NodeGroups = initialOperObj.Spec.NodeGroups
+					updatedNRO.Spec.NodeGroups = origNodeGroups
 					g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
 				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
