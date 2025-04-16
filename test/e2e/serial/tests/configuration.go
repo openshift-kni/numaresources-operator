@@ -441,11 +441,16 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 		})
 
 		Context("[ngpoolname] node group with PoolName support", Label("ngpoolname"), Label("feature:ngpoolname"), func() {
-			initialOperObj := &nropv1.NUMAResourcesOperator{}
-			nroKey := objects.NROObjectKey()
-			It("should not allow configuring PoolName and MCP selector on same node group", Label(label.Tier2), func(ctx context.Context) {
-				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
+			var initialOperObj *nropv1.NUMAResourcesOperator
+			var nroKey client.ObjectKey
 
+			BeforeEach(func(ctx context.Context) {
+				initialOperObj = &nropv1.NUMAResourcesOperator{}
+				nroKey = objects.NROObjectKey()
+				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
+			})
+
+			It("should not allow configuring PoolName and MCP selector on same node group", Label(label.Tier2), func(ctx context.Context) {
 				labelSel := &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"test2": "test2",
@@ -492,8 +497,6 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			})
 
 			It("should report the NodeGroupConfig in the NodeGroupStatus with NodePool set and allow updates", Label(label.Tier1, label.OpenShift), func(ctx context.Context) {
-				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
-
 				mcp := objects.TestMCP()
 				By(fmt.Sprintf("create new MCP %q", mcp.Name))
 				// we rely on the fact that RTE DS will be created for a valid MCP even with machine count 0, that will
