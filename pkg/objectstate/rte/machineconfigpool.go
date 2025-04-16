@@ -98,6 +98,7 @@ func (obj machineConfigPoolFinder) FindState(mf Manifests, tree nodegroupv1.Tree
 			DaemonSet:             desiredDaemonSet,
 			RTEConfigHash:         rteConfigHash,
 			IsCustomPolicyEnabled: annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations),
+			SecOpts:               mf.securityContextOptions(annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)),
 		}
 
 		err := obj.em.updater(mcp.Name, &gdm)
