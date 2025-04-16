@@ -212,6 +212,11 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	// TODO: if replicas doesn't make sense (autodetect disabled and user set impossible value) then we
 	// should set a degraded state
 
+	wantsTrace := isLogTracingEnabled(&schedSpec)
+	if err := schedupdate.ToggleLogTracingParameters(&r.SchedulerManifests.Deployment.Spec.Template.Spec, wantsTrace); err != nil {
+		klog.Error(err, "cannot set log tracing", "desiredStatus", wantsTrace)
+	}
+
 	// node-critical so the pod won't be preempted by pods having the most critical priority class
 	r.SchedulerManifests.Deployment.Spec.Template.Spec.PriorityClassName = nrosched.SchedulerPriorityClassName
 
@@ -357,4 +362,11 @@ func strStringPtr(sp *string) string {
 		return "N/A"
 	}
 	return *sp
+}
+
+func isLogTracingEnabled(schedSpec *nropv1.NUMAResourcesSchedulerSpec) bool {
+	if schedSpec.LogTracing == nil {
+		return false
+	}
+	return *schedSpec.LogTracing == nropv1.LogTracingEnabled
 }
