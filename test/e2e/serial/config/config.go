@@ -18,16 +18,17 @@ package config
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 
 	. "github.com/onsi/gomega"
 
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
@@ -122,18 +123,18 @@ func GetRteCiImage() string {
 	return nropTestCIImage
 }
 
-func getTopologyConsistencyErrors(kconfigs map[string]*kubeletconfigv1beta1.KubeletConfiguration, nrts []nrtv1alpha2.NodeResourceTopology) map[string]error {
-	ret := make(map[string]error)
+func validateTopologyManagerConfiguration(kconfigs map[string]*kubeletconfigv1beta1.KubeletConfiguration, nrts []nrtv1alpha2.NodeResourceTopology) error {
+	var errs []error
 	for nodeName, kconfig := range kconfigs {
 		nrt, err := e2enrt.FindFromList(nrts, nodeName)
 		if err != nil {
-			ret[nodeName] = fmt.Errorf("Unable to find NRT for node %q", nodeName)
+			errs = append(errs, fmt.Errorf("Unable to find NRT for node %q", nodeName))
 			continue
 		}
 
 		nrtTMPolicy, ok := nrtv1alpha2attr.Get(nrt.Attributes, tmPolicyAttr)
 		if !ok {
-			ret[nodeName] = fmt.Errorf("Attribute %q not reported on NRT %q", tmPolicyAttr, nodeName)
+			errs = append(errs, fmt.Errorf("Attribute %q not reported on NRT %q", tmPolicyAttr, nodeName))
 			continue
 		}
 		kconfTMPolicy := kconfig.TopologyManagerPolicy
@@ -142,13 +143,13 @@ func getTopologyConsistencyErrors(kconfigs map[string]*kubeletconfigv1beta1.Kube
 			kconfTMPolicy = tmPolicyDefault
 		}
 		if nrtTMPolicy.Value != kconfTMPolicy {
-			ret[nodeName] = fmt.Errorf("Inconsistent topology manager policy for node %q: NRT=%q KConfig=%q", nodeName, nrtTMPolicy.Value, kconfTMPolicy)
+			errs = append(errs, fmt.Errorf("Inconsistent topology manager policy for node %q: NRT=%q KConfig=%q", nodeName, nrtTMPolicy.Value, kconfTMPolicy))
 			continue
 		}
 
 		nrtTMScope, ok := nrtv1alpha2attr.Get(nrt.Attributes, tmScopeAttr)
 		if !ok {
-			ret[nodeName] = fmt.Errorf("Attribute %q not reported on NRT %q", tmScopeAttr, nodeName)
+			errs = append(errs, fmt.Errorf("Attribute %q not reported on NRT %q", tmScopeAttr, nodeName))
 			continue
 		}
 		kconfTMScope := kconfig.TopologyManagerScope
@@ -157,67 +158,65 @@ func getTopologyConsistencyErrors(kconfigs map[string]*kubeletconfigv1beta1.Kube
 			kconfTMScope = tmScopeDefault
 		}
 		if nrtTMScope.Value != kconfTMScope {
-			ret[nodeName] = fmt.Errorf("Inconsistent topology manager scope for node %q: NRT=%q KConfig=%q", nodeName, nrtTMScope.Value, kconfTMScope)
+			errs = append(errs, fmt.Errorf("Inconsistent topology manager scope for node %q: NRT=%q KConfig=%q", nodeName, nrtTMScope.Value, kconfTMScope))
 			continue
 		}
 	}
 
 	for _, nrt := range nrts {
 		if _, ok := kconfigs[nrt.Name]; !ok {
-			ret[nrt.Name] = fmt.Errorf("Unable to find KubeletConfig for node %q", nrt.Name)
+			errs = append(errs, fmt.Errorf("Unable to find KubeletConfig for node %q", nrt.Name))
 		}
 	}
 
-	return ret
+	return errors.Join(errs...)
 }
 
 func CheckNodesTopology(ctx context.Context) error {
 	kconfigs, err := validator.GetKubeletConfigurationsFromTASEnabledNodes(ctx, e2eclient.Client)
 	if err != nil {
-		return fmt.Errorf("error while trying to get KubeletConfigurations. error: %w", err)
+		return err
 	}
 
-	var nrtList nrtv1alpha2.NodeResourceTopologyList
-	err = e2eclient.Client.List(ctx, &nrtList)
+	nrtList, err := getNRTList(ctx, e2eclient.Client)
 	if err != nil {
-		return fmt.Errorf("error while trying to get NodeResourceTopology objects. error: %w", err)
+		return err
 	}
 
-	errorMap := getTopologyConsistencyErrors(kconfigs, nrtList.Items)
-	if len(errorMap) != 0 {
-		errText := errorMapToString(errorMap)
-		klog.Infof("incoeherent NRT/KubeletConfig data: %v", errText)
-		return fmt.Errorf("Following nodes have incoherent info in KubeletConfig/NRT data:\n%#v\n", errText)
+	err = validateTopologyManagerConfiguration(kconfigs, nrtList.Items)
+	if err != nil {
+		return err
 	}
 
-	if err := checkNRTsArePresentForAllNodes(ctx, nrtList); err != nil {
-		return fmt.Errorf("an NRT object must be associated with each node: %v", err)
+	err = validateNRTAvailability(ctx, nrtList)
+	if err != nil {
+		return err
 	}
 
-	errorMap = validateSMTAlignmentIsOFF(kconfigs)
-	if len(errorMap) != 0 {
-		errText := errorMapToString(errorMap)
-		klog.Infof("SMT alignment is ON in some of the nodes and should be disabled: %v", errText)
-		return fmt.Errorf("Following nodes have SMT alignment enabled:\n%#v\n", errText)
-	}
-
-	singleNUMANodeNRTs := e2enrt.FilterByTopologyManagerPolicy(nrtList.Items, intnrt.SingleNUMANode)
-	if len(singleNUMANodeNRTs) < minNumberOfNodesWithSameTopology {
-		return fmt.Errorf("Not enough nodes with %q topology (found:%d). Need at least %d", intnrt.SingleNUMANode, len(singleNUMANodeNRTs), minNumberOfNodesWithSameTopology)
+	err = validateSMTAlignmentDisabled(kconfigs)
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func errorMapToString(errs map[string]error) string {
-	var sb strings.Builder
-	for node, err := range errs {
-		fmt.Fprintf(&sb, "%s: %v\n", node, err)
+func getNRTList(ctx context.Context, cli client.Client) (nrtv1alpha2.NodeResourceTopologyList, error) {
+	var nrtList nrtv1alpha2.NodeResourceTopologyList
+	err := cli.List(ctx, &nrtList)
+	if err != nil {
+		return nrtList, fmt.Errorf("error while trying to get NodeResourceTopology objects. error: %w", err)
 	}
-	return sb.String()
+
+	singleNUMANodeNRTs := e2enrt.FilterByTopologyManagerPolicy(nrtList.Items, intnrt.SingleNUMANode)
+	if len(singleNUMANodeNRTs) < minNumberOfNodesWithSameTopology {
+		return nrtList, fmt.Errorf("Not enough nodes with %q topology found %d needed %d", intnrt.SingleNUMANode, len(singleNUMANodeNRTs), minNumberOfNodesWithSameTopology)
+	}
+
+	return nrtList, nil
 }
 
-func checkNRTsArePresentForAllNodes(ctx context.Context, nrtList nrtv1alpha2.NodeResourceTopologyList) error {
+func validateNRTAvailability(ctx context.Context, nrtList nrtv1alpha2.NodeResourceTopologyList) error {
 	workers, err := nodes.GetWorkers(&deployer.Environment{Cli: e2eclient.Client, Ctx: ctx})
 	if err != nil {
 		return err
@@ -231,19 +230,19 @@ func checkNRTsArePresentForAllNodes(ctx context.Context, nrtList nrtv1alpha2.Nod
 	return nil
 }
 
-func validateSMTAlignmentIsOFF(kconfigs map[string]*kubeletconfigv1beta1.KubeletConfiguration) map[string]error {
-	errs := map[string]error{}
+func validateSMTAlignmentDisabled(kconfigs map[string]*kubeletconfigv1beta1.KubeletConfiguration) error {
+	var errs []error
 	for nodeName, kconfig := range kconfigs {
 		v, ok := kconfig.CPUManagerPolicyOptions["full-pcpus-only"]
 		if !ok {
-			// SMT alignment is OFF by default
+			// SMT alignment disabled by default
 			continue
 		}
 		// don't check for error, the value has to be valid, kubelet won't start otherwise
 		enable, _ := strconv.ParseBool(v)
 		if enable {
-			errs[nodeName] = fmt.Errorf("SMT alignment is ON for node %q", nodeName)
+			errs = append(errs, fmt.Errorf("SMT alignment enabled for node %q", nodeName))
 		}
 	}
-	return errs
+	return errors.Join(errs...)
 }
