@@ -651,6 +651,108 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					Expect(mcp.Name).ToNot(Equal(*ng.PoolName), "status MCPs still contain deleted node group: %+v", mcp)
 				}
 			})
+
+			DescribeTable("[test_id:80823] should not allow duplicate and empty PoolName values on the same node group", Label(label.HyperShift), func(ctx context.Context, msgType string) {
+				initialOperObj := &nropv1.NUMAResourcesOperator{}
+				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
+				originalOperObj := initialOperObj.DeepCopy()
+				var expectedMsg, poolName string
+				switch msgType {
+				case "duplicate":
+					poolName = *initialOperObj.Spec.NodeGroups[0].PoolName
+					expectedMsg = fmt.Sprintf("the pool name %q has duplicates", *initialOperObj.Spec.NodeGroups[0].PoolName)
+				case "empty":
+					poolName = ""
+					expectedMsg = "pool name for pool #1 cannot be empty"
+				}
+
+				defer func() {
+					By(fmt.Sprintf("reverting initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name))
+					var updatedNRO nropv1.NUMAResourcesOperator
+
+					Eventually(func(g Gomega) {
+						g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+						updatedNRO.Spec.NodeGroups = originalOperObj.Spec.NodeGroups
+						g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
+					}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+					By("verifying the operator is in Available condition")
+					Eventually(func(g Gomega) {
+						g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+						cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
+						g.Expect(cond).ToNot(BeNil(), "condition Available was not found: %+v", updatedNRO.Status.Conditions)
+						g.Expect(cond.Status).To(Equal(metav1.ConditionTrue), "Expected operator condition to be Available=True, but got something else: %+v", updatedNRO.Status.Conditions)
+					}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "operator did not return to Available state in time")
+				}()
+
+				ng := nropv1.NodeGroup{
+					PoolName: &poolName,
+				}
+
+				By(fmt.Sprintf("modifying the NUMAResourcesOperator by appending a node group with pool name: %q", poolName))
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Eventually(func(g Gomega) {
+					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+					updatedNRO.Spec.NodeGroups = append(updatedNRO.Spec.NodeGroups, ng)
+					g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
+				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
+
+				By(fmt.Sprintf("verifying degraded condition due to pool name: %q", poolName))
+				Eventually(func(g Gomega) {
+					var updated nropv1.NUMAResourcesOperator
+					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed())
+					g.Expect(isDegradedWith(updated.Status.Conditions, expectedMsg, validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected for pool name: %q", poolName)
+				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
+			},
+				Entry("duplicate pool name", context.TODO(), "duplicate"),
+				Entry("empty pool name", context.TODO(), "empty"),
+			)
+
+			It("[test_id:80912] should not allow MCP selector on hypershift", Label("feature:ngpoolname"), Label(label.Tier2, label.HyperShift), func(ctx context.Context) {
+				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
+
+				labelSel := &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"test2": "test2",
+					},
+				}
+				ng := nropv1.NodeGroup{
+					MachineConfigPoolSelector: labelSel,
+				}
+
+				By(fmt.Sprintf("modifying the NUMAResourcesOperator by appending a node group with MCP selector specifier only: %+v", ng))
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Eventually(func(g Gomega) {
+					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+					updatedNRO.Spec.NodeGroups = append(updatedNRO.Spec.NodeGroups, ng)
+					g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
+				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
+
+				defer func() {
+					By(fmt.Sprintf("revert initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name))
+					var updatedNRO nropv1.NUMAResourcesOperator
+					Eventually(func(g Gomega) {
+						g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+						updatedNRO.Spec.NodeGroups = initialOperObj.Spec.NodeGroups
+						g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
+					}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+					By("verify the operator is in Available condition")
+					Eventually(func(g Gomega) {
+						g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+						cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
+						g.Expect(cond).ToNot(BeNil(), "condition Available was not found: %+v", updatedNRO.Status.Conditions)
+						g.Expect(cond.Status).To(Equal(metav1.ConditionTrue), "Expected operators condition to be Available=True, but was found something else: %+v", updatedNRO.Status.Conditions)
+					}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "operator did not return to Available state in time")
+				}()
+
+				By("verify degraded condition is found due to node group with MCP selector specifier only")
+				Eventually(func(g Gomega) {
+					var updated nropv1.NUMAResourcesOperator
+					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed())
+					g.Expect(isDegradedWith(updated.Status.Conditions, "Should specify PoolName only", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
+				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
+			})
 		})
 	})
 })
