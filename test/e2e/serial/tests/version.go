@@ -23,6 +23,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/klog/v2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
@@ -61,13 +62,18 @@ var _ = Describe("[serial] numaresources version", Serial, Label("feature:config
 			// older version may miss the buildinfo.json, and that's fine
 			if err != nil {
 				By("running against NUMAResources UNKNOWN UNKNOWN")
-			} else {
-				nropBi := buildinfo.BuildInfo{}
-				Expect(json.Unmarshal(stdout, &nropBi)).To(Succeed())
-
-				By("running against NUMAResources " + nropBi.String())
+				return
 			}
 
+			// this should not happen, but since we are sneaking in, not worth to fail
+			nropBi := buildinfo.BuildInfo{}
+			if err := json.Unmarshal(stdout, &nropBi); err != nil {
+				klog.ErrorS(err, "buildinfo unmarshal failure", "nropNamespace", pod.Namespace, "nropName", pod.Name)
+				By("running against NUMAResources UNKNOWN UNKNOWN")
+				return
+			}
+
+			By("running against NUMAResources " + nropBi.String())
 			// cannot really fail, we are abusing gingko here
 		})
 	})

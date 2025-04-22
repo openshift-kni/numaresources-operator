@@ -127,7 +127,7 @@ func DaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
 		template.Annotations = map[string]string{}
 	}
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
-	klog.V(4).InfoS("DaemonSet RTE ConfigMap hash annotation updated", "namespace", ds.Namespace, "DaemonSetName", ds.Name, "hash", cmHash)
+	klog.V(4).InfoS("DaemonSet RTE ConfigMap hash annotation updated", "namespace", ds.Namespace, "name", ds.Name, "hashValue", cmHash)
 }
 
 const _MiB = 1024 * 1024

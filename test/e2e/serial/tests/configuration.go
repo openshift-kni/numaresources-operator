@@ -46,6 +46,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
+	"github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
@@ -441,11 +442,16 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 		})
 
 		Context("[ngpoolname] node group with PoolName support", Label("ngpoolname"), Label("feature:ngpoolname"), func() {
-			initialOperObj := &nropv1.NUMAResourcesOperator{}
-			nroKey := objects.NROObjectKey()
-			It("should not allow configuring PoolName and MCP selector on same node group", Label(label.Tier2), func(ctx context.Context) {
-				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
+			var initialOperObj *nropv1.NUMAResourcesOperator
+			var nroKey client.ObjectKey
 
+			BeforeEach(func(ctx context.Context) {
+				initialOperObj = &nropv1.NUMAResourcesOperator{}
+				nroKey = objects.NROObjectKey()
+				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
+			})
+
+			It("should not allow configuring PoolName and MCP selector on same node group", Label(label.Tier2), func(ctx context.Context) {
 				labelSel := &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"test2": "test2",
@@ -492,8 +498,6 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			})
 
 			It("should report the NodeGroupConfig in the NodeGroupStatus with NodePool set and allow updates", Label(label.Tier1, label.OpenShift), func(ctx context.Context) {
-				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
-
 				mcp := objects.TestMCP()
 				By(fmt.Sprintf("create new MCP %q", mcp.Name))
 				// we rely on the fact that RTE DS will be created for a valid MCP even with machine count 0, that will
@@ -542,8 +546,11 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					PoolName: &mcp.Name,
 					Config:   &conf, // intentionally set the shorter config to ensure the status was normalized when published
 				}
+
+				origNodeGroups := nodegroup.CloneList(initialOperObj.Spec.NodeGroups)
+
 				klog.InfoS("the new node group to add", "node group", ng.ToString())
-				newNodeGroups := append(initialOperObj.Spec.NodeGroups, ng)
+				newNodeGroups := append(nodegroup.CloneList(initialOperObj.Spec.NodeGroups), ng)
 				var updatedNRO nropv1.NUMAResourcesOperator
 				Eventually(func(g Gomega) {
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
@@ -558,7 +565,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					if !reflect.DeepEqual(updatedNRO.Spec.NodeGroups, initialOperObj.Spec.NodeGroups) {
 						Eventually(func(g Gomega) {
 							g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-							updatedNRO.Spec.NodeGroups = initialOperObj.Spec.NodeGroups
+							updatedNRO.Spec.NodeGroups = origNodeGroups
 							g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
 						}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 					}
@@ -591,7 +598,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					Config:   &conf,
 				}
 				klog.InfoS("the updated node group to apply", "node group", ng.ToString())
-				newNodeGroups = append(initialOperObj.Spec.NodeGroups, ng)
+				newNodeGroups = append(nodegroup.CloneList(initialOperObj.Spec.NodeGroups), ng)
 
 				Eventually(func(g Gomega) {
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
@@ -617,7 +624,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				By("delete the node group")
 				Eventually(func(g Gomega) {
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-					updatedNRO.Spec.NodeGroups = initialOperObj.Spec.NodeGroups
+					updatedNRO.Spec.NodeGroups = origNodeGroups
 					g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
 				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 

@@ -1,0 +1,20 @@
+apiVersion: performance.openshift.io/v2
+kind: PerformanceProfile
+metadata:
+  name: perfprof-nrop
+  annotations:
+    kubeletconfig.experimental: "{\"cpuManagerPolicyOptions\": {\"full-pcpus-only\": \"false\"}}"
+spec:
+  globallyDisableIrqLoadBalancing: true
+  hugepages:
+    defaultHugepagesSize: 1G
+    pages:
+    - size: "1G"
+      count: 16
+  cpu:
+    isolated: 4-103
+    reserved: 0-3
+  nodeSelector:
+    node-role.kubernetes.io/worker: ""
+  numa:
+    topologyPolicy: single-numa-node

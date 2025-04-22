@@ -159,3 +159,12 @@ func flattenTrees(trees []Tree) []*mcov1.MachineConfigPool {
 	}
 	return result
 }
+
+func CloneList(nodeGroups []nropv1.NodeGroup) []nropv1.NodeGroup {
+	ret := make([]nropv1.NodeGroup, 0, len(nodeGroups))
+	for idx := range nodeGroups {
+		ng := &nodeGroups[idx] // shortcut
+		ng.DeepCopyInto(&ret[idx])
+	}
+	return ret
+}
