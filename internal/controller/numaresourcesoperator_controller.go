@@ -97,6 +97,7 @@ type NUMAResourcesOperatorReconciler struct {
 
 // Namespace Scoped
 //+kubebuilder:rbac:groups="",resources=services,verbs=*,namespace="numaresources"
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=*,namespace="numaresources"
 
 // Cluster Scoped
 //+kubebuilder:rbac:groups=topology.node.k8s.io,resources=noderesourcetopologies,verbs=get;list;create;update

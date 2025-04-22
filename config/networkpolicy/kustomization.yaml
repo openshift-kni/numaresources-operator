@@ -1,0 +1,4 @@
+resources:
+- deny-all.yaml
+- egress-to-api-server.yaml
+- ingress-to-metrics.yaml
