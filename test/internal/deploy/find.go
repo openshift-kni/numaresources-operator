@@ -31,11 +31,11 @@ import (
 )
 
 func FindNUMAResourcesOperatorPod(ctx context.Context, cli client.Client, nrop *nropv1.NUMAResourcesOperator) (*corev1.Pod, error) {
-	if len(nrop.Status.NodeGroups) < 1 {
+	if len(nrop.Status.DaemonSets) < 1 {
 		return nil, errors.New("node groups not reported, nothing to do")
 	}
 	// nrop places all daemonsets in the same namespace on which it resides, so any group is fine
-	namespace := nrop.Status.NodeGroups[0].DaemonSet.Namespace // shortcut
+	namespace := nrop.Status.DaemonSets[0].Namespace // shortcut
 	klog.InfoS("NROP pod", "namespace", namespace)
 
 	sel, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
