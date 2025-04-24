@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	"reflect"
 	"sort"
 	"strings"
@@ -30,15 +32,20 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 
 	"github.com/google/go-cmp/cmp"
 	depnodes "github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
@@ -47,6 +54,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
@@ -56,6 +64,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
@@ -754,8 +763,265 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			})
 		})
+		Context("KubeletConfig changes are being tracked correctly by the operator", func() {
+			var nroObj *nropv1.NUMAResourcesOperator
+
+			BeforeEach(func(ctx context.Context) {
+				nroObj = &nropv1.NUMAResourcesOperator{}
+				nroKey := objects.NROObjectKey()
+				Expect(fxt.Client.Get(ctx, nroKey, nroObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
+			})
+
+			It("should reflect correct TM configuration in the NRT object attributes", Label(label.Tier0), func(ctx context.Context) {
+				rteConfigMap := &corev1.ConfigMap{}
+				Eventually(func() bool {
+					updatedConfigMaps := &corev1.ConfigMapList{}
+					opts := client.ListOptions{LabelSelector: labels.SelectorFromSet(map[string]string{
+						rteconfig.LabelOperatorName: nroObj.Name,
+					})}
+					err := e2eclient.Client.List(ctx, updatedConfigMaps, &opts)
+					Expect(err).ToNot(HaveOccurred())
+
+					if len(updatedConfigMaps.Items) == 0 {
+						klog.Warningf("expected at least 1 RTE configmap, got: %d", len(updatedConfigMaps.Items))
+						return false
+					}
+					// choose the first one arbitrary
+					rteConfigMap = &updatedConfigMaps.Items[0]
+					return true
+				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
+				klog.InfoS("found RTE configmap", "rteConfigMap", rteConfigMap)
+
+				poolName := rteConfigMap.Labels[rteconfig.LabelNodeGroupName+"/"+rteconfig.LabelNodeGroupKindMachineConfigPool]
+				nodeSelector, err := nodegroups.NodeSelectorFromPoolName(ctx, e2eclient.Client, poolName)
+				Expect(err).ToNot(HaveOccurred())
+
+				selector := labels.SelectorFromSet(nodeSelector)
+				nodes, err := nodes.GetNodesBySelector(e2eclient.K8sClient, selector)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(nodes).ToNot(BeEmpty(), "no nodes found with the nodeSelector", selector.String())
+
+				cfg, err := validateAndExtractRTEConfigData(rteConfigMap)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("checking that NRT reflects the correct data from RTE configmap")
+				for _, node := range nodes {
+					Eventually(func() bool {
+						updatedNrtObj := &nrtv1alpha2.NodeResourceTopology{}
+						err := e2eclient.Client.Get(ctx, client.ObjectKey{Name: node.Name}, updatedNrtObj)
+						Expect(err).ToNot(HaveOccurred())
+
+						matchingErr := checkTopologyManagerConfigMatching(updatedNrtObj, &cfg)
+						if matchingErr != "" {
+							klog.Warningf("NRT %q doesn't match topologyManager configuration: %s", updatedNrtObj.Name, matchingErr)
+							return false
+						}
+						return true
+					}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
+				}
+			})
+
+			It("should change NRT attributes correctly when RTE is pointing to a different nodeGroup", Label(label.OpenShift, label.Slow, label.Tier2), func(ctx context.Context) {
+				fxt.IsRebootTest = true
+				waitForMCPUpdateFunc := func(mcp *machineconfigv1.MachineConfigPool) {
+					_ = wait.With(fxt.Client).
+						Interval(configuration.MachineConfigPoolUpdateInterval).
+						Timeout(configuration.MachineConfigPoolUpdateTimeout).
+						ForMachineConfigPoolCondition(ctx, mcp, machineconfigv1.MachineConfigPoolUpdating)
+
+					_ = wait.With(fxt.Client).
+						Interval(configuration.MachineConfigPoolUpdateInterval).
+						Timeout(configuration.MachineConfigPoolUpdateTimeout).
+						ForMachineConfigPoolCondition(ctx, mcp, machineconfigv1.MachineConfigPoolUpdated)
+				}
+				mcp := objects.TestMCP()
+				By(fmt.Sprintf("create new MCP %q", mcp.Name))
+
+				mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": roleMCPTest}
+				mcp.Spec.MachineConfigSelector = &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "machineconfiguration.openshift.io/role",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{depnodes.RoleWorker, roleMCPTest},
+						},
+					},
+				}
+				mcp.Spec.NodeSelector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{getLabelRoleMCPTest(): ""},
+				}
+				Expect(fxt.Client.Create(ctx, mcp)).To(Succeed())
+				defer func() {
+					Expect(fxt.Client.Delete(ctx, mcp)).To(Succeed())
+				}()
+
+				// the default policy is container, so let's change it to pod to make sure it actually changed.
+				kc, err := objects.TestKC(mcp.Labels, objects.WithTMScope("pod"))
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(fxt.Client.Create(ctx, kc)).To(Succeed(), "failed to create KubeletConfig")
+				defer func() {
+					Expect(fxt.Client.Delete(ctx, kc)).To(Succeed())
+					// we don't need to wait for deleted because at this point mcp should be empty
+				}()
+
+				workerNodes, err := nodes.GetWorkerNodes(e2eclient.K8sClient)
+				Expect(err).ToNot(HaveOccurred())
+
+				targetNode, targetNodeInitial, initialCustomRoleLabelKey := mutateNodeCustomLabel(workerNodes)
+				Expect(e2eclient.Client.Patch(ctx, targetNode, client.MergeFrom(targetNodeInitial))).To(Succeed())
+				waitForMCPUpdateFunc(mcp)
+
+				defer func() {
+					klog.InfoS("reverting node back to its initial state", "nodeName", targetNodeInitial.Name)
+					baseTargetNode := targetNode.DeepCopy()
+					targetNode.Labels = targetNodeInitial.Labels
+					Expect(fxt.Client.Patch(ctx, targetNode, client.MergeFrom(baseTargetNode))).To(Succeed())
+
+					var targetedMCP *machineconfigv1.MachineConfigPool
+					mcpList := &machineconfigv1.MachineConfigPoolList{}
+					Expect(fxt.Client.List(ctx, mcpList)).To(Succeed())
+					for i := range mcpList.Items {
+						nodeSelector := mcpList.Items[i].Spec.NodeSelector
+						// find the mcp which the mutated node belongs to
+						if _, ok := nodeSelector.MatchLabels[initialCustomRoleLabelKey]; ok {
+							targetedMCP = &mcpList.Items[i]
+						}
+					}
+					if targetedMCP == nil {
+						// initialCustomRoleLabelKey is empty, so we didn't find any custom mcp
+						// this means the node is part of the standard worker MCP
+						Expect(fxt.Client.Get(ctx, client.ObjectKey{Name: "worker"}, targetedMCP)).To(Succeed())
+					}
+					waitForMCPUpdateFunc(targetedMCP)
+				}()
+
+				klog.InfoS("adding nodeGroup with poolName", "poolName", mcp.Name)
+				testNG := nropv1.NodeGroup{
+					PoolName: ptr.To(mcp.Name),
+				}
+				initialNroObj := nroObj.DeepCopy()
+				nroObj.Spec.NodeGroups = append(nroObj.Spec.NodeGroups, testNG)
+				Expect(e2eclient.Client.Patch(ctx, nroObj, client.MergeFrom(initialNroObj))).To(Succeed())
+				customPolicySupportEnabled := isCustomPolicySupportEnabled(nroObj)
+				if customPolicySupportEnabled {
+					waitForMCPUpdateFunc(mcp)
+				}
+				defer func() {
+					baseNroObj := nroObj.DeepCopy()
+					nroObj.Spec = initialNroObj.Spec
+					Expect(e2eclient.Client.Patch(ctx, nroObj, client.MergeFrom(baseNroObj))).To(Succeed())
+					if customPolicySupportEnabled {
+						waitForMCPUpdateFunc(mcp)
+					}
+				}()
+
+				ns := nroObj.Status.DaemonSets[0].Namespace
+				dsName := objectnames.GetComponentName(nroObj.Name, mcp.Name)
+				dsKey := wait.ObjectKey{Namespace: ns, Name: dsName}
+				By(fmt.Sprintf("waiting for DaemonSet %q to be ready", dsKey))
+				_, err = wait.With(fxt.Client).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("Checking RTE ConfigMap has been created")
+				rteConfigMap := &corev1.ConfigMap{}
+				Eventually(func() bool {
+					updatedConfigMap := &corev1.ConfigMap{}
+					key := client.ObjectKey{Namespace: ns, Name: dsName}
+					err := e2eclient.Client.Get(ctx, client.ObjectKey{Namespace: ns, Name: dsName}, updatedConfigMap)
+					if err != nil {
+						if errors.IsNotFound(err) {
+							klog.Warningf("expected RTE ConfigMap map to be found %q", key)
+							return false
+						}
+						Expect(err).ToNot(HaveOccurred())
+					}
+					rteConfigMap = updatedConfigMap
+					return true
+				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
+				klog.InfoS("found RTE configmap", "rteConfigMap", rteConfigMap)
+
+				poolName := rteConfigMap.Labels[rteconfig.LabelNodeGroupName+"/"+rteconfig.LabelNodeGroupKindMachineConfigPool]
+				nodeSelector, err := nodegroups.NodeSelectorFromPoolName(ctx, e2eclient.Client, poolName)
+				Expect(err).ToNot(HaveOccurred())
+
+				selector := labels.SelectorFromSet(nodeSelector)
+				selectedNodes, err := nodes.GetNodesBySelector(e2eclient.K8sClient, selector)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(selectedNodes).ToNot(BeEmpty(), "no nodes found with the nodeSelector", selector.String())
+
+				cfg, err := validateAndExtractRTEConfigData(rteConfigMap)
+				Expect(err).ToNot(HaveOccurred())
+
+				By("checking that NRT reflects the correct data from RTE configmap")
+				for _, node := range selectedNodes {
+					Eventually(func() bool {
+						updatedNrtObj := &nrtv1alpha2.NodeResourceTopology{}
+						if err := e2eclient.Client.Get(ctx, client.ObjectKey{Name: node.Name}, updatedNrtObj); err != nil {
+							if errors.IsNotFound(err) {
+								klog.Warningf("NRT %q was not found, waiting for its creation", updatedNrtObj.Name)
+								return false
+							}
+							Expect(err).ToNot(HaveOccurred())
+						}
+						matchingErr := checkTopologyManagerConfigMatching(updatedNrtObj, &cfg)
+						if matchingErr != "" {
+							klog.Warningf("NRT %q doesn't match topologyManager configuration: %s", updatedNrtObj.Name, matchingErr)
+							return false
+						}
+						return true
+					}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
+				}
+			})
+		})
 	})
 })
+
+func mutateNodeCustomLabel(nodes []corev1.Node) (*corev1.Node, *corev1.Node, string) {
+	targetNode := nodeWithoutCustomRole(nodes)
+	var customRoleKey string
+	if targetNode == nil {
+		// choose an arbitrary node and remove its custom role
+		targetNode = &nodes[0]
+
+		for k := range targetNode.Labels {
+			if strings.HasPrefix(k, depnodes.LabelRole) && k != fmt.Sprintf("%s/%s", depnodes.LabelRole, depnodes.RoleWorker) {
+				customRoleKey = k
+				break
+			}
+		}
+	}
+	targetNodeInitial := targetNode.DeepCopy()
+	if customRoleKey != "" {
+		klog.InfoS("changing node labels", "targetNode", targetNode.Name, "adding", getLabelRoleMCPTest(), "removing", customRoleKey)
+		delete(targetNode.Labels, customRoleKey)
+	} else {
+		klog.InfoS("changing node labels", "targetNode", targetNode.Name, "adding", getLabelRoleMCPTest())
+	}
+	targetNode.Labels[getLabelRoleMCPTest()] = ""
+	return targetNode, targetNodeInitial, customRoleKey
+}
+
+func nodeWithoutCustomRole(nodes []corev1.Node) *corev1.Node {
+	for i := range nodes {
+		// a node without custom role is a node that only had the node-role.kubernetes.io/worker role.
+		// if there's already a custom role like node-role.kubernetes.io/worker-cnf
+		// mco operator won't be able to apply configuration on that node if another custom role label is added:
+		// https://github.com/openshift/machine-config-operator/blob/57275dcc13a1fef106ebd5a1a890043dddbba91b/pkg/helpers/helpers.go#L103
+		roleCount := 0
+		node := &nodes[i]
+		for k := range node.Labels {
+			if strings.HasPrefix(k, depnodes.LabelRole) {
+				roleCount++
+			}
+		}
+		// meaning the node only has the node-role.kubernetes.io/worker role which is fine
+		if roleCount < 2 {
+			return node
+		}
+	}
+	return nil
+}
 
 func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.ObjectKey, appliedObj nropv1.NUMAResourcesOperator, expectedPoolName string, expectedConf nropv1.NodeGroupConfig) {
 	klog.InfoS("fetch NRO object", "key", key.String())
@@ -882,4 +1148,52 @@ const (
 
 func getLabelRoleMCPTest() string {
 	return fmt.Sprintf("%s/%s", depnodes.LabelRole, roleMCPTest)
+}
+
+// validateAndExtractRTEConfigData extracts and validates the RTE config from the given ConfigMap
+func validateAndExtractRTEConfigData(cm *corev1.ConfigMap) (rteconfig.Config, error) {
+	var cfg rteconfig.Config
+	raw, ok := cm.Data[rteconfig.Key]
+	if !ok {
+		return cfg, fmt.Errorf("config.yaml not found in ConfigMap %s/%s", cm.Namespace, cm.Name)
+	}
+
+	if err := yaml.Unmarshal([]byte(raw), &cfg); err != nil {
+		return cfg, fmt.Errorf("failed to unmarshal config.yaml: %w", err)
+	}
+
+	if cfg.Kubelet.TopologyManagerPolicy != "single-numa-node" {
+		return cfg, fmt.Errorf("invalid topologyManagerPolicy: got %q, want \"single-numa-node\"", cfg.Kubelet.TopologyManagerPolicy)
+	}
+
+	return cfg, nil
+}
+
+func checkTopologyManagerConfigMatching(nrt *nrtv1alpha2.NodeResourceTopology, cfg *rteconfig.Config) string {
+	var matchingErr string
+	for _, attr := range nrt.Attributes {
+		if attr.Name == "topologyManagerPolicy" && attr.Value != cfg.Kubelet.TopologyManagerPolicy {
+			matchingErr += fmt.Sprintf("%q value is different; want: %s got: %s\n", attr.Name, cfg.Kubelet.TopologyManagerPolicy, attr.Value)
+		}
+		if attr.Name == "topologyManagerScope" && cfg.Kubelet.TopologyManagerScope != "" && attr.Value != cfg.Kubelet.TopologyManagerScope {
+			matchingErr += fmt.Sprintf("%q value is different; want: %s got: %s\n", attr.Name, cfg.Kubelet.TopologyManagerScope, attr.Value)
+		}
+	}
+	return matchingErr
+}
+
+func isCustomPolicySupportEnabled(nro *nropv1.NUMAResourcesOperator) bool {
+	GinkgoHelper()
+
+	const minCustomSupportingVString = "4.18"
+	minCustomSupportingVersion, err := platform.ParseVersion(minCustomSupportingVString)
+	Expect(err).NotTo(HaveOccurred(), "failed to parse version string %q", minCustomSupportingVString)
+
+	customSupportAvailable, err := configuration.PlatVersion.AtLeast(minCustomSupportingVersion)
+	Expect(err).NotTo(HaveOccurred(), "failed to compare versions: %v vs %v", configuration.PlatVersion, minCustomSupportingVersion)
+
+	if !customSupportAvailable { // < 4.18
+		return true
+	}
+	return inthelper.IsCustomPolicyEnabled(nro)
 }

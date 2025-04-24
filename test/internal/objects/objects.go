@@ -120,8 +120,12 @@ func TestMCP() *machineconfigv1.MachineConfigPool {
 	}
 }
 
-func TestKC(matchLabels map[string]string) (*machineconfigv1.KubeletConfig, error) {
-	data, err := json.Marshal(getKubeletConfig())
+func TestKC(matchLabels map[string]string, opts ...func(*kubeletconfigv1beta1.KubeletConfiguration)) (*machineconfigv1.KubeletConfig, error) {
+	kc := getKubeletConfig()
+	for _, opt := range opts {
+		opt(kc)
+	}
+	data, err := json.Marshal(kc)
 	if err != nil {
 		return nil, err
 	}
@@ -144,6 +148,12 @@ func TestKC(matchLabels map[string]string) (*machineconfigv1.KubeletConfig, erro
 			},
 		},
 	}, nil
+}
+
+func WithTMScope(scope string) func(*kubeletconfigv1beta1.KubeletConfiguration) {
+	return func(configuration *kubeletconfigv1beta1.KubeletConfiguration) {
+		configuration.TopologyManagerScope = scope
+	}
 }
 
 func IsOwnedBy(obj metav1.ObjectMeta, owner metav1.ObjectMeta) bool {
