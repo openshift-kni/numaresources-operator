@@ -25,7 +25,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
@@ -98,6 +98,7 @@ func (obj machineConfigPoolFinder) FindState(mf Manifests, tree nodegroupv1.Tree
 			DaemonSet:             desiredDaemonSet,
 			RTEConfigHash:         rteConfigHash,
 			IsCustomPolicyEnabled: annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations),
+			SecOpts:               mf.securityContextOptions(annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)),
 		}
 
 		err := obj.em.updater(mcp.Name, &gdm)

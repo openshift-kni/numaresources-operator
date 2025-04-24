@@ -25,10 +25,13 @@ import (
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	k8swgdepselinux "github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
+
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
-	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
@@ -66,6 +69,19 @@ type machineConfigManifest struct {
 type Manifests struct {
 	Core    rtemanifests.Manifests
 	Metrics rtemetrics.Manifests
+}
+
+func (mf Manifests) securityContextOptions(legacyMode bool) k8swgrteupdate.SecurityContextOptions {
+	if legacyMode {
+		return k8swgrteupdate.SecurityContextOptions{
+			SELinuxContextType:  k8swgdepselinux.RTEContextTypeLegacy,
+			SecurityContextName: mf.Core.SecurityContextConstraint.Name,
+		}
+	}
+	return k8swgrteupdate.SecurityContextOptions{
+		SELinuxContextType:  k8swgdepselinux.RTEContextType,
+		SecurityContextName: mf.Core.SecurityContextConstraintV2.Name,
+	}
 }
 
 type Errors struct {
@@ -134,6 +150,7 @@ type GeneratedDesiredManifest struct {
 	ClusterPlatform   platform.Platform
 	MachineConfigPool *machineconfigv1.MachineConfigPool
 	NodeGroup         *nropv1.NodeGroup
+	SecOpts           k8swgrteupdate.SecurityContextOptions
 	// generated manifests
 	DaemonSet             *appsv1.DaemonSet
 	RTEConfigHash         string

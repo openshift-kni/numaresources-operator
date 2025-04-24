@@ -18,68 +18,47 @@ package detect
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
+	"github.com/go-logr/logr"
+
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 )
 
-type PlatformInfo struct {
-	AutoDetected platform.Platform `json:"autoDetected"`
-	UserSupplied platform.Platform `json:"userSupplied"`
-	Discovered   platform.Platform `json:"discovered"`
-}
-
-type VersionInfo struct {
-	AutoDetected platform.Version `json:"autoDetected"`
-	UserSupplied platform.Version `json:"userSupplied"`
-	Discovered   platform.Version `json:"discovered"`
-}
-
-type ClusterInfo struct {
-	Platform PlatformInfo `json:"platform"`
-	Version  VersionInfo  `json:"version"`
-}
-
-type ControlPlaneInfo struct {
-	NodeCount int `json:"nodeCount"`
-}
-
-func (cpi ControlPlaneInfo) String() string {
-	return fmt.Sprintf("nodes=%d", cpi.NodeCount)
-}
-
-func (cpi ControlPlaneInfo) ToJSON() string {
-	data, err := json.Marshal(cpi)
-	if err != nil {
-		return `{"error":` + fmt.Sprintf("%q", err) + `}`
-	}
-	return string(data)
-}
-
-func (ci ClusterInfo) String() string {
-	return fmt.Sprintf("%s:%s", ci.Platform.Discovered, ci.Version.Discovered)
-}
-
-func (ci ClusterInfo) ToJSON() string {
-	data, err := json.Marshal(ci)
-	if err != nil {
-		return `{"error":` + fmt.Sprintf("%q", err) + `}`
-	}
-	return string(data)
-}
-
-const (
-	DetectedFromUser    string = "user-supplied"
-	DetectedFromCluster string = "autodetected from cluster"
-	DetectedFailure     string = "autodetection failed"
-)
-
 func FindPlatform(ctx context.Context, userSupplied platform.Platform) (PlatformInfo, string, error) {
+	env := platform.Environment{
+		Environment: deployer.Environment{
+			Ctx: ctx,
+			Log: logr.Discard(),
+		},
+	}
+	if err := env.EnsureClient(); err != nil {
+		return PlatformInfo{}, DetectedFailure, err
+	}
+	return FindPlatformFromEnv(&env, userSupplied)
+}
+
+func FindVersion(ctx context.Context, plat platform.Platform, userSupplied platform.Version) (VersionInfo, string, error) {
+	env := platform.Environment{
+		Environment: deployer.Environment{
+			Ctx: ctx,
+			Log: logr.Discard(),
+		},
+	}
+	if err := env.EnsureClient(); err != nil {
+		return VersionInfo{}, DetectedFailure, err
+	}
+	return FindVersionFromEnv(&env, plat, userSupplied)
+}
+
+func FindPlatformFromEnv(env *platform.Environment, userSupplied platform.Platform) (PlatformInfo, string, error) {
 	do := PlatformInfo{
 		AutoDetected: platform.Unknown,
 		UserSupplied: userSupplied,
 		Discovered:   platform.Unknown,
+	}
+	if err := env.EnsureClient(); err != nil {
+		return do, DetectedFailure, err
 	}
 
 	if do.UserSupplied != platform.Unknown {
@@ -87,7 +66,7 @@ func FindPlatform(ctx context.Context, userSupplied platform.Platform) (Platform
 		return do, DetectedFromUser, nil
 	}
 
-	dp, err := Platform(ctx)
+	dp, err := PlatformFromEnv(env)
 	if err != nil {
 		return do, DetectedFailure, err
 	}
@@ -97,11 +76,14 @@ func FindPlatform(ctx context.Context, userSupplied platform.Platform) (Platform
 	return do, DetectedFromCluster, nil
 }
 
-func FindVersion(ctx context.Context, plat platform.Platform, userSupplied platform.Version) (VersionInfo, string, error) {
+func FindVersionFromEnv(env *platform.Environment, plat platform.Platform, userSupplied platform.Version) (VersionInfo, string, error) {
 	do := VersionInfo{
 		AutoDetected: platform.MissingVersion,
 		UserSupplied: userSupplied,
 		Discovered:   platform.MissingVersion,
+	}
+	if err := env.EnsureClient(); err != nil {
+		return do, DetectedFailure, err
 	}
 
 	if do.UserSupplied != platform.MissingVersion {
@@ -109,7 +91,7 @@ func FindVersion(ctx context.Context, plat platform.Platform, userSupplied platf
 		return do, DetectedFromUser, nil
 	}
 
-	dv, err := Version(ctx, plat)
+	dv, err := VersionFromEnv(env, plat)
 	if err != nil {
 		return do, DetectedFailure, err
 	}
