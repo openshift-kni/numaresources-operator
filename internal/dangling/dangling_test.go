@@ -22,15 +22,18 @@ import (
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	mcov1 "github.com/openshift/api/machineconfiguration/v1"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-	mcov1 "github.com/openshift/api/machineconfiguration/v1"
+	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 )
 
 const (
@@ -209,6 +212,82 @@ func TestDeleteUnusedDaemonSets(t *testing.T) {
 	}
 }
 
+func TestDeleteUnusedConfigMaps(t *testing.T) {
+	targetMCPName := "mcp1"
+
+	nro := nropv1.NUMAResourcesOperator{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      nroName,
+			Namespace: nroNs,
+			UID:       nrouid,
+		},
+	}
+
+	trees := []nodegroupv1.Tree{
+		{
+			NodeGroup: &nropv1.NodeGroup{
+				PoolName: &targetMCPName,
+			},
+			MachineConfigPools: []*mcov1.MachineConfigPool{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: targetMCPName,
+					},
+				},
+			},
+		},
+	}
+
+	cms := []v1.ConfigMap{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      objectnames.GetComponentName(nroName, targetMCPName),
+				Namespace: nroNs,
+				Labels: map[string]string{
+					rteconfig.LabelOperatorName: nro.Name,
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      objectnames.GetComponentName(nroName, "mcp2"),
+				Namespace: nroNs,
+				Labels: map[string]string{
+					rteconfig.LabelOperatorName: nro.Name, // owned by NRO object but dangling
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "cm99", // not owned by NRO object
+				Namespace: nroNs,
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(&cms[0], &cms[1], &cms[2]).Build()
+
+	err := isConfigMapFound(fakeClient, context.TODO(), cms...)
+	if err != nil {
+		t.Errorf("failed to find configmaps: %v", err)
+	}
+
+	err = DeleteUnusedConfigMaps(fakeClient, context.TODO(), &nro, trees)
+	if err != nil {
+		t.Errorf("failed to delete unused dangling configmaps: %v", err)
+		return
+	}
+
+	err = isConfigMapFound(fakeClient, context.TODO(), cms[0], cms[2])
+	if err != nil {
+		t.Errorf("failed to find configmap that is owned by the NRO object and not dangling: %v", err)
+	}
+	err = isConfigMapFound(fakeClient, context.TODO(), cms[1])
+	if err == nil {
+		t.Errorf("found dangling configmap %s/%s from fake client which was expected to be deleted", cms[1].Namespace, cms[1].Name)
+	}
+}
+
 func isMachineConfigFound(cli client.Client, ctx context.Context, objs ...mcov1.MachineConfig) error {
 	var mc mcov1.MachineConfig
 	for _, obj := range objs {
@@ -226,6 +305,17 @@ func isDaemonSetFound(cli client.Client, ctx context.Context, objs ...appsv1.Dae
 		err := cli.Get(ctx, client.ObjectKeyFromObject(&obj), &ds)
 		if err != nil {
 			return fmt.Errorf("failed to get daemonset object %s from fake client: %v", obj.Name, err)
+		}
+	}
+	return nil
+}
+
+func isConfigMapFound(cli client.Client, ctx context.Context, objs ...v1.ConfigMap) error {
+	var cm v1.ConfigMap
+	for _, obj := range objs {
+		err := cli.Get(ctx, client.ObjectKeyFromObject(&obj), &cm)
+		if err != nil {
+			return fmt.Errorf("failed to get configmap object %s from fake client: %v", obj.Name, err)
 		}
 	}
 	return nil

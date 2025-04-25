@@ -523,6 +523,11 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		}
 	}
 
+	err = dangling.DeleteUnusedConfigMaps(r.Client, ctx, instance, trees)
+	if err != nil {
+		klog.ErrorS(err, "failed to deleted unused configmaps")
+	}
+
 	// using a slice of poolDaemonSet instead of a map because Go maps assignment order is not consistent and non-deterministic
 	dsPoolPairs := []poolDaemonSet{}
 	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.Core.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)

@@ -27,7 +27,9 @@ import (
 	"errors"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 
@@ -38,6 +40,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 )
 
 func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) error {
@@ -110,6 +113,40 @@ func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance
 	}
 	if deleted > 0 {
 		klog.V(2).InfoS("Delete dangling Machineconfigs", "deletedCount", deleted)
+	}
+	return errs
+}
+
+func DeleteUnusedConfigMaps(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) error {
+	klog.V(3).Info("Delete dangling ConfigMaps start")
+	defer klog.V(3).Info("Delete dangling ConfigMaps end")
+
+	var configMapList corev1.ConfigMapList
+	opts := client.ListOptions{LabelSelector: labels.SelectorFromSet(map[string]string{rteconfig.LabelOperatorName: instance.Name})}
+	if err := cli.List(ctx, &configMapList, &opts); err != nil {
+		klog.ErrorS(err, "error while getting ConfigMap list")
+		return err
+	}
+
+	// CM and DS of the same group have the same name
+	expectedConfigMapNames := buildDaemonSetNames(instance, trees)
+
+	var errs error
+	deleted := 0
+	for _, cm := range configMapList.Items {
+		if expectedConfigMapNames.Has(cm.Name) {
+			continue
+		}
+		if err := cli.Delete(ctx, &cm); err != nil {
+			klog.ErrorS(err, "error while deleting dangling ConfigMap", "ConfigMap", cm.Name)
+			errs = errors.Join(errs, err)
+			continue
+		}
+		klog.V(3).InfoS("dangling ConfigMap deleted", "name", cm.Name)
+		deleted += 1
+	}
+	if deleted > 0 {
+		klog.V(2).InfoS("Deleted dangling ConfigMap", "deletedCount", deleted)
 	}
 	return errs
 }
