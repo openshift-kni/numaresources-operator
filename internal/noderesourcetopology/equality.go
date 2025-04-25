@@ -38,6 +38,18 @@ func EqualZones(zonesA, zonesB nrtv1alpha2.ZoneList, isRebootTest bool) (bool, e
 	zA := SortedZoneList(zonesA)
 	zB := SortedZoneList(zonesB)
 
+	klog.Infof("ensure memory resources on node level are maintained with same amounts")
+	/*
+		the need for this came mainly because of tests requiring reboot. The reason is that in such tests it was observed that there is a slight difference
+		in the memory resources set by the kernel on NUMA zones but the total memory resources on node level is kept the same. This verification ensures that
+		is achieved on every test which is true and not only for tests that involve reboot. For now the check is for memory resources only as there were no
+		similar observations for other types of resources.
+	*/
+	_, err := equalMemoryNodeLevel(zonesA, zonesB)
+	if err != nil {
+		return false, err
+	}
+
 	for idx := range zA {
 		zoneA := &zA[idx]
 		zoneB := &zB[idx]
@@ -53,6 +65,38 @@ func EqualZones(zonesA, zonesB nrtv1alpha2.ZoneList, isRebootTest bool) (bool, e
 	}
 
 	return true, nil
+}
+
+func equalMemoryNodeLevel(zonesA, zonesB nrtv1alpha2.ZoneList) (bool, error) {
+	totalCapacityA, totalAvailableA, totalAllocatableA := getTotalMemory(zonesA)
+	totalCapacityB, totalAvailableB, totalAllocatableB := getTotalMemory(zonesB)
+
+	if totalCapacityA.Cmp(totalCapacityB) != 0 {
+		return false, fmt.Errorf("mismatched total capacity memory initial=%v vs updated=%v", totalCapacityA, totalCapacityB)
+	}
+	if totalAvailableA.Cmp(totalAvailableB) != 0 {
+		return false, fmt.Errorf("mismatched total available memory initial=%v vs updated=%v", totalAvailableA, totalAvailableB)
+	}
+	if totalAllocatableA.Cmp(totalAllocatableB) != 0 {
+		return false, fmt.Errorf("mismatched total allocatable memory initial=%v vs updated=%v", totalAllocatableA, totalAllocatableB)
+	}
+	return true, nil
+}
+
+func getTotalMemory(zoneList nrtv1alpha2.ZoneList) (resource.Quantity, resource.Quantity, resource.Quantity) {
+	var totalCapacity, totalAvailable, totalAllocatable resource.Quantity
+	for _, zone := range zoneList {
+		res := zone.Resources
+		for _, resource := range res {
+			if resource.Name != string(corev1.ResourceMemory) {
+				continue
+			}
+			totalCapacity.Add(resource.Capacity)
+			totalAvailable.Add(resource.Available)
+			totalAllocatable.Add(resource.Allocatable)
+		}
+	}
+	return totalCapacity, totalAvailable, totalAllocatable
 }
 
 func EqualResourceInfos(resInfosA, resInfosB nrtv1alpha2.ResourceInfoList, isRebootTest bool) (bool, error) {

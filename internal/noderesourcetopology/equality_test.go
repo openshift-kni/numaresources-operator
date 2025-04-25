@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
@@ -31,6 +32,7 @@ func TestEqualZones(t *testing.T) {
 		name     string
 		data1    nrtv1alpha2.ZoneList
 		data2    nrtv1alpha2.ZoneList
+		isReboot bool
 		expected bool
 	}{
 		{
@@ -185,10 +187,164 @@ func TestEqualZones(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name:     "with memory deviation but total is equal on node level - reboot test",
+			isReboot: true, // because we don't want the NUMA level check to fail
+			data1: nrtv1alpha2.ZoneList{
+				{
+					Name: "Zone-000",
+					Resources: nrtv1alpha2.ResourceInfoList{
+						{
+							Name:        "foo",
+							Capacity:    resource.MustParse("2"),
+							Allocatable: resource.MustParse("2"),
+							Available:   resource.MustParse("2"),
+						},
+						{
+							Name:        string(corev1.ResourceMemory),
+							Capacity:    resource.MustParse("154525950"),
+							Allocatable: resource.MustParse("154525950"),
+							Available:   resource.MustParse("154000000"),
+						},
+					},
+				},
+				{
+					Name: "Zone-001",
+					Resources: nrtv1alpha2.ResourceInfoList{
+						{
+							Name:        string(corev1.ResourceMemory),
+							Capacity:    resource.MustParse("100000000"),
+							Allocatable: resource.MustParse("100000000"),
+							Available:   resource.MustParse("100000000"),
+						},
+						{
+							Name:        "foo",
+							Capacity:    resource.MustParse("2"),
+							Allocatable: resource.MustParse("2"),
+							Available:   resource.MustParse("2"),
+						},
+					},
+				},
+			},
+			data2: nrtv1alpha2.ZoneList{
+				{
+					Name: "Zone-001",
+					Resources: nrtv1alpha2.ResourceInfoList{
+						{
+							Name:        "foo",
+							Capacity:    resource.MustParse("2"),
+							Allocatable: resource.MustParse("2"),
+							Available:   resource.MustParse("2"),
+						},
+						{
+							Name:        string(corev1.ResourceMemory),
+							Capacity:    resource.MustParse("154525950"),
+							Allocatable: resource.MustParse("154525950"),
+							Available:   resource.MustParse("154000000"),
+						},
+					},
+				},
+				{
+					Name: "Zone-000",
+					Resources: nrtv1alpha2.ResourceInfoList{
+						{
+							Name:        "foo",
+							Capacity:    resource.MustParse("2"),
+							Allocatable: resource.MustParse("2"),
+							Available:   resource.MustParse("2"),
+						},
+						{
+							Name:        string(corev1.ResourceMemory),
+							Capacity:    resource.MustParse("100000000"),
+							Allocatable: resource.MustParse("100000000"),
+							Available:   resource.MustParse("100000000"),
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:     "with memory deviation but total is NOT equal on node level - reboot test",
+			isReboot: true,
+			data1: nrtv1alpha2.ZoneList{
+				{
+					Name: "Zone-000",
+					Resources: nrtv1alpha2.ResourceInfoList{
+						{
+							Name:        "foo",
+							Capacity:    resource.MustParse("2"),
+							Allocatable: resource.MustParse("2"),
+							Available:   resource.MustParse("2"),
+						},
+						{
+							Name:        string(corev1.ResourceMemory),
+							Capacity:    resource.MustParse("154525950"),
+							Allocatable: resource.MustParse("154525950"),
+							Available:   resource.MustParse("154000000"),
+						},
+					},
+				},
+				{
+					Name: "Zone-001",
+					Resources: nrtv1alpha2.ResourceInfoList{
+						{
+							Name:        string(corev1.ResourceMemory),
+							Capacity:    resource.MustParse("100000000"),
+							Allocatable: resource.MustParse("100000000"),
+							Available:   resource.MustParse("100000000"),
+						},
+						{
+							Name:        "foo",
+							Capacity:    resource.MustParse("2"),
+							Allocatable: resource.MustParse("2"),
+							Available:   resource.MustParse("2"),
+						},
+					},
+				},
+			},
+			data2: nrtv1alpha2.ZoneList{
+				{
+					Name: "Zone-001",
+					Resources: nrtv1alpha2.ResourceInfoList{
+						{
+							Name:        "foo",
+							Capacity:    resource.MustParse("2"),
+							Allocatable: resource.MustParse("2"),
+							Available:   resource.MustParse("2"),
+						},
+						{
+							Name:        string(corev1.ResourceMemory),
+							Capacity:    resource.MustParse("154525950"),
+							Allocatable: resource.MustParse("154525950"),
+							Available:   resource.MustParse("154000000"),
+						},
+					},
+				},
+				{
+					Name: "Zone-000",
+					Resources: nrtv1alpha2.ResourceInfoList{
+						{
+							Name:        "foo",
+							Capacity:    resource.MustParse("2"),
+							Allocatable: resource.MustParse("2"),
+							Available:   resource.MustParse("2"),
+						},
+						{
+							Name:        string(corev1.ResourceMemory),
+							Capacity:    resource.MustParse("154525950"),
+							Allocatable: resource.MustParse("154525950"),
+							Available:   resource.MustParse("154000000"),
+						},
+					},
+				},
+			},
+			expected: false,
+		},
 	}
 	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
-			got, _ := EqualZones(tt.data1, tt.data2, false)
+			got, _ := EqualZones(tt.data1, tt.data2, tt.isReboot)
 			if got != tt.expected {
 				t.Errorf("got=%v expected=%v\ndata1=%s\ndata2=%s", got, tt.expected, toJSON(tt.data1), toJSON(tt.data2))
 			}
