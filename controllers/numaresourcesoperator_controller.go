@@ -66,6 +66,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/status/conditioninfo"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
+	"github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
 	intreconcile "github.com/openshift-kni/numaresources-operator/internal/reconcile"
 )
@@ -612,6 +613,14 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 		},
 	}
 
+	configMapPredicates := predicate.NewPredicateFuncs(func(object client.Object) bool {
+		cm := object.(*corev1.ConfigMap)
+		cmLabels := cm.GetLabels()
+		// return only configmap with the operator name label
+		_, ok := cmLabels[config.LabelOperatorName]
+		return ok
+	})
+
 	b := ctrl.NewControllerManagedBy(mgr).For(&nropv1.NUMAResourcesOperator{})
 	if r.Platform == platform.OpenShift {
 		b.Watches(
@@ -621,7 +630,10 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 			Owns(&securityv1.SecurityContextConstraints{}).
 			Owns(&machineconfigv1.MachineConfig{}, builder.WithPredicates(p))
 	}
-	return b.Owns(&apiextensionv1.CustomResourceDefinition{}).
+	return b.Watches(&corev1.ConfigMap{},
+		handler.EnqueueRequestsFromMapFunc(r.configMapToNUMAResourceOperator),
+		builder.WithPredicates(configMapPredicates)).
+		Owns(&apiextensionv1.CustomResourceDefinition{}).
 		Owns(&corev1.ServiceAccount{}, builder.WithPredicates(p)).
 		Owns(&rbacv1.RoleBinding{}, builder.WithPredicates(p)).
 		Owns(&rbacv1.Role{}, builder.WithPredicates(p)).
@@ -674,6 +686,36 @@ func (r *NUMAResourcesOperatorReconciler) mcpToNUMAResourceOperator(ctx context.
 	}
 
 	return requests
+}
+
+func (r *NUMAResourcesOperatorReconciler) configMapToNUMAResourceOperator(ctx context.Context, cmObj client.Object) []reconcile.Request {
+	cm := &corev1.ConfigMap{}
+
+	key := client.ObjectKey{
+		Namespace: cmObj.GetNamespace(),
+		Name:      cmObj.GetName(),
+	}
+
+	if err := r.Get(ctx, key, cm); err != nil {
+		klog.Errorf("failed to get configmap %+v; %v", key, err)
+		return nil
+	}
+	name, ok := cm.Labels[config.LabelOperatorName]
+	if !ok {
+		return nil
+	}
+	key = client.ObjectKey{
+		Name: name,
+	}
+	nro := &nropv1.NUMAResourcesOperator{}
+	if err := r.Get(ctx, key, nro); err != nil {
+		klog.Error("failed to get numa-resources operator")
+		return nil
+	}
+
+	return []reconcile.Request{{NamespacedName: client.ObjectKey{
+		Name: nro.Name,
+	}}}
 }
 
 func validateUpdateEvent(e *event.UpdateEvent) bool {
