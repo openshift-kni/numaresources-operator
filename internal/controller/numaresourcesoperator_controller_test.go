@@ -226,8 +226,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					mcp1 = testobjs.NewMachineConfigPool(pn1, mcp1Selector.MatchLabels, mcp1Selector, mcp1Selector)
 					mcp2 = testobjs.NewMachineConfigPool(pn2, mcp2Selector.MatchLabels, mcp2Selector, mcp2Selector)
 
-					cm1 = testobjs.NewRTEConfigMap(objectnames.GetComponentName(nro.Name, mcp1.Name), testNamespace, "single-numa-node", "pod")
-					cm2 = testobjs.NewRTEConfigMap(objectnames.GetComponentName(nro.Name, mcp2.Name), testNamespace, "single-numa-node", "container")
+					cm1 = testobjs.NewRTEConfigMap(objectnames.GetComponentName(nro.Name, mcp1.Name), testNamespace, nro.Name, "single-numa-node", "pod")
+					cm2 = testobjs.NewRTEConfigMap(objectnames.GetComponentName(nro.Name, mcp2.Name), testNamespace, nro.Name, "single-numa-node", "container")
 
 					var err error
 					reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2, cm1, cm2)
@@ -369,6 +369,15 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 							Namespace: testNamespace,
 						}
 						Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(HaveOccurred(), "error: Daemonset %v should have been deleted", dsKey)
+					})
+					It("should delete dangling configmap", func() {
+						cm := corev1.ConfigMap{}
+						cmKey := client.ObjectKey{
+							Name:      objectnames.GetComponentName(nro.Name, pn2),
+							Namespace: testNamespace,
+						}
+						Expect(reconciler.Client.Get(context.TODO(), cmKey, &cm)).To(HaveOccurred(), "error: configmap %v should have been deleted", cmKey)
+
 					})
 
 					When("a NOT owned Daemonset exists", func() {
@@ -1308,7 +1317,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(reconciler.Client.Get(context.TODO(), crdKey, &crd)).To(Succeed())
 			})
 		})
-
 	},
 		Entry("Openshift Platform", platform.OpenShift),
 		Entry("Hypershift Platform", platform.HyperShift),

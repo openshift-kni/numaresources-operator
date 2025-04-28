@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"time"
 
-	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,7 +29,10 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 )
 
 func NewNUMAResourcesOperator(name string, nodeGroups ...nropv1.NodeGroup) *nropv1.NUMAResourcesOperator {
@@ -219,7 +221,7 @@ func GetDaemonSetListFromNodeGroupStatuses(groups []nropv1.NodeGroupStatus) []nr
 }
 
 // NewRTEConfigMap create a configmap similar to one created by KubeletController
-func NewRTEConfigMap(name, ns, policy, scope string) *corev1.ConfigMap {
+func NewRTEConfigMap(name, ns, nroName, policy, scope string) *corev1.ConfigMap {
 	data := fmt.Sprintf("kubelet:\n\t\ttopologyManagerPolicy: %s\ntopologyManagerScope: %s", policy, scope)
 	return &corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{
@@ -229,6 +231,9 @@ func NewRTEConfigMap(name, ns, policy, scope string) *corev1.ConfigMap {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
+			Labels: map[string]string{
+				rteconfig.LabelOperatorName: nroName,
+			},
 		},
 		Data: map[string]string{
 			"config.yaml": data,
