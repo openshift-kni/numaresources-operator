@@ -27,6 +27,8 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -531,23 +533,30 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				Expect(found).To(BeFalse(), "RTE pod was found on node %q while expected not to be found", taintedNode.Name)
 			})
 
-			When("RTE pods are not running yet", Label(label.OpenShift), func() {
+			When("RTE pods are not running yet", func() {
 				var taintedNode *corev1.Node
+				customPolicySupportEnabled := isCustomPolicySupportEnabled(&nroOperObj)
 
 				BeforeEach(func(ctx context.Context) {
-					By("delete current NROP CR from the cluster")
-					mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, nroOperObj)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(mcpsInfo).ToNot(BeEmpty())
-
-					err = fxt.Client.Delete(ctx, &nroOperObj)
-					Expect(err).ToNot(HaveOccurred())
-
-					waitForMcpUpdate(fxt.Client, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
-
-					By("taint one worker node")
+					By("Get list of worker nodes")
+					var err error
 					workers, err = nodes.GetWorkers(fxt.DEnv())
 					Expect(err).ToNot(HaveOccurred())
+
+					By("delete current NROP CR from the cluster")
+					if customPolicySupportEnabled {
+						mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, nroOperObj)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(mcpsInfo).ToNot(BeEmpty())
+
+						err = fxt.Client.Delete(ctx, &nroOperObj)
+						Expect(err).ToNot(HaveOccurred())
+
+						waitForMcpUpdate(fxt.Client, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
+					} else {
+						err := fxt.Client.Delete(ctx, &nroOperObj)
+						Expect(err).ToNot(HaveOccurred())
+					}
 
 					tnts, _, err = taints.ParseTaints([]string{testTaint()})
 					Expect(err).ToNot(HaveOccurred())
@@ -574,15 +583,15 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 						nropNewObj.ObjectMeta = metav1.ObjectMeta{
 							Name: nroOperObj.Name,
 						}
-
 						err = fxt.Client.Create(ctx, nropNewObj)
 						Expect(err).ToNot(HaveOccurred())
 
-						mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
-						Expect(err).ToNot(HaveOccurred())
-						Expect(mcpsInfo).ToNot(BeEmpty())
-
-						waitForMcpUpdate(fxt.Client, ctx, MachineCount, time.Now().String(), mcpsInfo...)
+						if customPolicySupportEnabled {
+							mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
+							Expect(err).ToNot(HaveOccurred())
+							Expect(mcpsInfo).ToNot(BeEmpty())
+							waitForMcpUpdate(fxt.Client, ctx, MachineCount, time.Now().String(), mcpsInfo...)
+						}
 					} else {
 						Eventually(func(g Gomega) {
 							err := fxt.Client.Get(ctx, nroKey, nropNewObj)
@@ -595,12 +604,14 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 						//the current set of tests does not update the mcplabels in the NROP CR,
 						//thus there is no need to wait for MCP updates after updating the CR
-
 					}
 				})
 
 				It("[test_id:72854] should add tolerations in-place while RTEs are running", Label("reboot_required", label.Slow, label.Tier2), func(ctx context.Context) {
-					fxt.IsRebootTest = true
+					if customPolicySupportEnabled {
+						fxt.IsRebootTest = true
+					}
+
 					By("create NROP CR with no tolerations to the tainted node")
 					nropNewObj := nroOperObj.DeepCopy()
 					nropNewObj.ObjectMeta = metav1.ObjectMeta{
@@ -610,11 +621,12 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					err := fxt.Client.Create(ctx, nropNewObj)
 					Expect(err).ToNot(HaveOccurred())
 
-					mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(mcpsInfo).ToNot(BeEmpty())
-
-					waitForMcpUpdate(fxt.Client, ctx, MachineCount, time.Now().String(), mcpsInfo...)
+					if customPolicySupportEnabled {
+						mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(mcpsInfo).ToNot(BeEmpty())
+						waitForMcpUpdate(fxt.Client, ctx, MachineCount, time.Now().String(), mcpsInfo...)
+					}
 
 					klog.Info("waiting for DaemonSet to be ready")
 					ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
@@ -640,7 +652,9 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				})
 
 				It("[test_id:72855] should tolerate node taint on NROP CR creation", Label("reboot_required", label.Slow, label.Tier2), func(ctx context.Context) {
-					fxt.IsRebootTest = true
+					if customPolicySupportEnabled {
+						fxt.IsRebootTest = true
+					}
 					By("add tolerations to NROP CR to tolerate the taint - no RTE running yet on any node")
 					nropNewObj := nroOperObj.DeepCopy()
 					nropNewObj.ObjectMeta = metav1.ObjectMeta{
@@ -654,11 +668,12 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					err := fxt.Client.Create(ctx, nropNewObj)
 					Expect(err).ToNot(HaveOccurred())
 
-					mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(mcpsInfo).ToNot(BeEmpty())
-
-					waitForMcpUpdate(fxt.Client, ctx, MachineCount, time.Now().String(), mcpsInfo...)
+					if customPolicySupportEnabled {
+						mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, *nropNewObj)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(mcpsInfo).ToNot(BeEmpty())
+						waitForMcpUpdate(fxt.Client, ctx, MachineCount, time.Now().String(), mcpsInfo...)
+					}
 
 					klog.Info("waiting for DaemonSet to be ready")
 					ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
@@ -873,6 +888,22 @@ func waitForMcpUpdate(cli client.Client, ctx context.Context, updateType MCPUpda
 		Expect(err).ToNot(HaveOccurred())
 		Expect(ok).To(BeTrue())
 	}
+}
+
+func isCustomPolicySupportEnabled(nro *nropv1.NUMAResourcesOperator) bool {
+	GinkgoHelper()
+
+	const minCustomSupportingVString = "4.18"
+	minCustomSupportingVersion, err := platform.ParseVersion(minCustomSupportingVString)
+	Expect(err).NotTo(HaveOccurred(), "failed to parse version string %q", minCustomSupportingVString)
+
+	customSupportAvailable, err := configuration.PlatVersion.AtLeast(minCustomSupportingVersion)
+	Expect(err).NotTo(HaveOccurred(), "failed to compare versions: %v vs %v", configuration.PlatVersion, minCustomSupportingVersion)
+
+	if !customSupportAvailable { // < 4.18
+		return true
+	}
+	return inthelper.IsCustomPolicyEnabled(nro)
 }
 
 func verifyUpdatedMCOnNodes(cli client.Client, ctx context.Context, node corev1.Node, desired string) (bool, error) {
