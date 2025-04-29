@@ -20,8 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	"reflect"
 	"sort"
 	"strings"
@@ -40,7 +38,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/yaml"
 
 	"github.com/google/go-cmp/cmp"
 	depnodes "github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
@@ -51,9 +48,11 @@ import (
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
+	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
@@ -801,7 +800,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(nodes).ToNot(BeEmpty(), "no nodes found with the nodeSelector", selector.String())
 
-				cfg, err := validateAndExtractRTEConfigData(rteConfigMap)
+				cfg, err := configuration.ValidateAndExtractRTEConfigData(rteConfigMap)
 				Expect(err).ToNot(HaveOccurred())
 
 				By("checking that NRT reflects the correct data from RTE configmap")
@@ -811,7 +810,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						err := e2eclient.Client.Get(ctx, client.ObjectKey{Name: node.Name}, updatedNrtObj)
 						Expect(err).ToNot(HaveOccurred())
 
-						matchingErr := checkTopologyManagerConfigMatching(updatedNrtObj, &cfg)
+						matchingErr := configuration.CheckTopologyManagerConfigMatching(updatedNrtObj, &cfg)
 						if matchingErr != "" {
 							klog.Warningf("NRT %q doesn't match topologyManager configuration: %s", updatedNrtObj.Name, matchingErr)
 							return false
@@ -950,7 +949,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(selectedNodes).ToNot(BeEmpty(), "no nodes found with the nodeSelector", selector.String())
 
-				cfg, err := validateAndExtractRTEConfigData(rteConfigMap)
+				cfg, err := configuration.ValidateAndExtractRTEConfigData(rteConfigMap)
 				Expect(err).ToNot(HaveOccurred())
 
 				By("checking that NRT reflects the correct data from RTE configmap")
@@ -964,7 +963,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 							}
 							Expect(err).ToNot(HaveOccurred())
 						}
-						matchingErr := checkTopologyManagerConfigMatching(updatedNrtObj, &cfg)
+						matchingErr := configuration.CheckTopologyManagerConfigMatching(updatedNrtObj, &cfg)
 						if matchingErr != "" {
 							klog.Warningf("NRT %q doesn't match topologyManager configuration: %s", updatedNrtObj.Name, matchingErr)
 							return false
@@ -1148,38 +1147,6 @@ const (
 
 func getLabelRoleMCPTest() string {
 	return fmt.Sprintf("%s/%s", depnodes.LabelRole, roleMCPTest)
-}
-
-// validateAndExtractRTEConfigData extracts and validates the RTE config from the given ConfigMap
-func validateAndExtractRTEConfigData(cm *corev1.ConfigMap) (rteconfig.Config, error) {
-	var cfg rteconfig.Config
-	raw, ok := cm.Data[rteconfig.Key]
-	if !ok {
-		return cfg, fmt.Errorf("config.yaml not found in ConfigMap %s/%s", cm.Namespace, cm.Name)
-	}
-
-	if err := yaml.Unmarshal([]byte(raw), &cfg); err != nil {
-		return cfg, fmt.Errorf("failed to unmarshal config.yaml: %w", err)
-	}
-
-	if cfg.Kubelet.TopologyManagerPolicy != "single-numa-node" {
-		return cfg, fmt.Errorf("invalid topologyManagerPolicy: got %q, want \"single-numa-node\"", cfg.Kubelet.TopologyManagerPolicy)
-	}
-
-	return cfg, nil
-}
-
-func checkTopologyManagerConfigMatching(nrt *nrtv1alpha2.NodeResourceTopology, cfg *rteconfig.Config) string {
-	var matchingErr string
-	for _, attr := range nrt.Attributes {
-		if attr.Name == "topologyManagerPolicy" && attr.Value != cfg.Kubelet.TopologyManagerPolicy {
-			matchingErr += fmt.Sprintf("%q value is different; want: %s got: %s\n", attr.Name, cfg.Kubelet.TopologyManagerPolicy, attr.Value)
-		}
-		if attr.Name == "topologyManagerScope" && cfg.Kubelet.TopologyManagerScope != "" && attr.Value != cfg.Kubelet.TopologyManagerScope {
-			matchingErr += fmt.Sprintf("%q value is different; want: %s got: %s\n", attr.Name, cfg.Kubelet.TopologyManagerScope, attr.Value)
-		}
-	}
-	return matchingErr
 }
 
 func isCustomPolicySupportEnabled(nro *nropv1.NUMAResourcesOperator) bool {
