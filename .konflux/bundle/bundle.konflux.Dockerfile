@@ -1,3 +1,31 @@
+# Runtime image is used to overlay clusterserviceversion.yaml for Konflux
+
+# yq is required for merging the yaml files
+# Run the overlay in a container
+ARG YQ_IMAGE=quay.io/konflux-ci/yq:latest
+FROM ${YQ_IMAGE} AS overlay
+
+# Set work dir
+WORKDIR /tmp
+
+# Copy bundle manifests
+ENV MANIFESTS_PATH=/tmp/manifests
+COPY --chown=yq:yq bundle/manifests $MANIFESTS_PATH
+
+# Copy overlay scripts
+ENV OVERLAY_PATH=/tmp/overlay
+RUN mkdir -p $OVERLAY_PATH
+COPY .konflux/bundle/overlay/ $OVERLAY_PATH
+
+# Run the overlay
+RUN $OVERLAY_PATH/overlay.bash --set-pinning-file $OVERLAY_PATH/pin_images.in.yaml --set-csv-file $MANIFESTS_PATH/numaresources-operator.clusterserviceversion.yaml
+
+# From here downwards this should mostly match the non-konflux bundle, i.e., `bundle.Dockerfile`
+# However there are a few exceptions:
+# 1. The label 'operators.operatorframework.io.bundle.channels.v1'
+# 2. The label 'operators.operatorframework.io.bundle.channels.default.v1'
+# 3. The copy of the manifests (copy from the overlay instead of from the git repo)
+
 FROM scratch
 
 LABEL com.redhat.component="numaresources-operator-bundle-container"
@@ -46,6 +74,10 @@ LABEL com.redhat.openshift.versions="=v${OPENSHIFT_VERSION}"
 LABEL com.redhat.delivery.backport=false
 
 # Copy files to locations specified by labels.
-COPY bundle/manifests /manifests/
+COPY --from=overlay /tmp/manifests /manifests/
 COPY bundle/metadata /metadata/
 COPY bundle/tests/scorecard /tests/scorecard/
+
+# Replace additional bundle files
+COPY .konflux/bundle/metadata/annotations.yaml /metadata/
+COPY .konflux/bundle/tests/scorecard/config.yaml /tests/scorecard/
