@@ -3,4 +3,4 @@ kind: NUMAResourcesScheduler
 metadata:
   name: numaresourcesscheduler
 spec:
-  imageSpec: "quay.io/openshift-kni/scheduler-plugins:4.19-snapshot"
+  imageSpec: "quay.io/openshift-kni/scheduler-plugins:4.20-snapshot"
