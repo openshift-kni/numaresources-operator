@@ -1,0 +1,73 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/nudge_renovate_config_map: namespace-wide-nudging-renovate-config
+    build.appstudio.openshift.io/repo: https://github.com/openshift-kni/numaresources-operator?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/on-cel-expression: |
+      event == "push" &&
+      target_branch == "main" &&
+      (
+        '.tekton/build-pipeline.yaml'.pathChanged() ||
+        '.konflux/container-build.args'.pathChanged() ||
+        'api/***'.pathChanged() ||
+        'cmd/***'.pathChanged() ||
+        'config/***'.pathChanged() ||
+        'hack/***'.pathChanged() ||
+        'internal/***'.pathChanged() ||
+        'must-gather/***'.pathChanged() ||
+        'nrovalidate/***'.pathChanged() ||
+        'pkg/***'.pathChanged() ||
+        'rte/***'.pathChanged() ||
+        'tools/***'.pathChanged() ||
+        'vendor/***'.pathChanged() ||
+        'go.mod'.pathChanged() ||
+        'go.sum'.pathChanged() ||
+        '.tekton/numaresources-operator-4-20-push.yaml'.pathChanged() ||
+        '.konflux/operator/konflux.Dockerfile'.pathChanged()
+      )
+  creationTimestamp: null
+  labels:
+    appstudio.openshift.io/application: numaresources-operator-4-20
+    appstudio.openshift.io/component: numaresources-operator-4-20
+    pipelines.appstudio.openshift.io/type: build
+  name: numaresources-operator-4-20-on-push
+  namespace: telco-5g-tenant
+spec:
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: output-image
+    value: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-4-20:{{revision}}
+  - name: build-platforms
+    value:
+    - linux/x86_64
+  - name: dockerfile
+    value: .konflux/operator/konflux.Dockerfile
+  - name: hermetic
+    value: "true"
+  - name: dev-package-managers
+    value: "true"
+  - name: prefetch-input
+    value: '[{"type": "rpm", "path": ".konflux/operator"}, {"type": "gomod", "path": "."}]'
+  - name: build-source-image
+    value: "true"
+  - name: skip-preflight
+    value: "true"
+  - name: build-args-file
+    value: .konflux/container-build.args
+  pipelineRef:
+    name: build-pipeline
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-numaresources-operator-4-20
+  workspaces:
+  - name: git-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
+status: {}
