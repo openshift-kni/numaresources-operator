@@ -9,4 +9,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: quay.io/openshift-kni/numaresources-operator
-  newTag: 4.19.999-snapshot
+  newTag: 4.20.999-snapshot
