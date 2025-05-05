@@ -49,6 +49,10 @@ spec:
     value: "true"
   - name: skip-preflight
     value: "true"
+  - name: build-image-index
+    value: "false"
+  - name: image-append-platform
+    value: "false"
   - name: build-args-file
     value: .konflux/container-build.args
   pipelineRef:

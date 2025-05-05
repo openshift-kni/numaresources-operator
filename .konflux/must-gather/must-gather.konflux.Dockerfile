@@ -1,4 +1,4 @@
-FROM brew.registry.redhat.io/rh-osbs/openshift-ose-must-gather-rhel9:v4.19 as mgbuilder
+FROM brew.registry.redhat.io/rh-osbs/openshift-ose-must-gather-rhel9:v4.20 as mgbuilder
 
 COPY . .
 
@@ -30,4 +30,8 @@ LABEL com.redhat.component="numaresources-must-gather-container" \
     description="numa resources data gathering image." \
     maintainer="openshift-operators@redhat.com" \
     io.openshift.maintainer.component="NUMA Resources Operator" \
-    io.openshift.maintainer.product="OpenShift Container Platform"
+    io.openshift.maintainer.product="OpenShift Container Platform" \
+    distribution-scope="public" \
+    release="${OPENSHIFT_VERSION}" \
+    url="https://github.com/openshift-kni/numaresources-operator" \
+    vendor="Red Hat, Inc."
