@@ -28,17 +28,22 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
-	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
 	nrowait "github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/pkg/status"
+	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/utils/clients"
 	"github.com/openshift-kni/numaresources-operator/test/utils/configuration"
@@ -333,8 +338,79 @@ var _ = Describe("[Install] durability", func() {
 				return ds.Spec.Template.Spec.Containers[0].Image == e2eimages.RTETestImageCI
 			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
 		})
+		It("should have the desired topology manager configuration under the NRT object", func() {
+			rteConfigMap := &corev1.ConfigMap{}
+			Eventually(func() bool {
+				updatedConfigMaps := &corev1.ConfigMapList{}
+				opts := client.ListOptions{LabelSelector: labels.SelectorFromSet(map[string]string{rteconfig.LabelOperatorName: deployedObj.NroObj.Name})}
+				err := e2eclient.Client.List(context.TODO(), updatedConfigMaps, &opts)
+				Expect(err).ToNot(HaveOccurred())
+
+				if len(updatedConfigMaps.Items) != 1 {
+					klog.Warningf("expected exactly 1 RTE configmap, got: %d", len(updatedConfigMaps.Items))
+					return false
+				}
+				rteConfigMap = &updatedConfigMaps.Items[0]
+				return true
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
+			klog.InfoS("found RTE configmap", "rteConfigMap", rteConfigMap)
+
+			cfg, err := validateAndExtractRTEConfigData(rteConfigMap)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("checking that NRT reflects the correct data from RTE configmap")
+			Eventually(func() bool {
+				updatedNrtObjs := &nrtv1alpha2.NodeResourceTopologyList{}
+				err := e2eclient.Client.List(context.TODO(), updatedNrtObjs)
+				Expect(err).ToNot(HaveOccurred())
+
+				for i := range updatedNrtObjs.Items {
+					nrt := &updatedNrtObjs.Items[i]
+					// in this specific test deployment,
+					// the same configuration should apply to all NRT objects
+					matchingErr := checkTopologyManagerConfigMatching(nrt, &cfg)
+					if matchingErr != "" {
+						klog.Warningf("NRT %q doesn't match topologyManager configuration: %s", nrt.Name, matchingErr)
+						return false
+					}
+				}
+				return true
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
+		})
 	})
 })
+
+// validateAndExtractRTEConfigData extracts and validates the RTE config from the given ConfigMap
+func validateAndExtractRTEConfigData(cm *corev1.ConfigMap) (rteconfig.Config, error) {
+	var cfg rteconfig.Config
+	raw, ok := cm.Data[rteconfig.Key]
+	if !ok {
+		return cfg, fmt.Errorf("config.yaml not found in ConfigMap %s/%s", cm.Namespace, cm.Name)
+	}
+
+	if err := yaml.Unmarshal([]byte(raw), &cfg); err != nil {
+		return cfg, fmt.Errorf("failed to unmarshal config.yaml: %w", err)
+	}
+
+	if cfg.TopologyManagerPolicy != "single-numa-node" {
+		return cfg, fmt.Errorf("invalid topologyManagerPolicy: got %q, want \"single-numa-node\"", cfg.TopologyManagerPolicy)
+	}
+
+	return cfg, nil
+}
+
+func checkTopologyManagerConfigMatching(nrt *nrtv1alpha2.NodeResourceTopology, cfg *rteconfig.Config) string {
+	var matchingErr string
+	for _, attr := range nrt.Attributes {
+		if attr.Name == "topologyManagerPolicy" && attr.Value != cfg.TopologyManagerPolicy {
+			matchingErr += fmt.Sprintf("%q value is different; want: %s got: %s\n", attr.Name, cfg.TopologyManagerPolicy, attr.Value)
+		}
+		if attr.Name == "topologyManagerScope" && cfg.TopologyManagerScope != "" && attr.Value != cfg.TopologyManagerScope {
+			matchingErr += fmt.Sprintf("%q value is different; want: %s got: %s\n", attr.Name, cfg.TopologyManagerScope, attr.Value)
+		}
+	}
+	return matchingErr
+}
 
 func findContainerByName(daemonset appsv1.DaemonSet, containerName string) (*corev1.Container, error) {
 	//shortcut

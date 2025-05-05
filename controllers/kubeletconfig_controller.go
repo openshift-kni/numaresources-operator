@@ -22,6 +22,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -33,7 +34,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	mcov1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
@@ -114,10 +117,22 @@ func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return false
 		},
 	}
-
+	numaResourcesOperatorPredicate := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			nroOld := e.ObjectOld.(*nropv1.NUMAResourcesOperator)
+			nroNew := e.ObjectNew.(*nropv1.NUMAResourcesOperator)
+			oldNodeGroups := nroOld.Spec.NodeGroups
+			newNodeGroups := nroNew.Spec.NodeGroups
+			// if nodeGroups has changed,
+			// it means that we should iterate and create/delete ConfigMap data for RTE pods
+			return equality.Semantic.DeepEqual(oldNodeGroups, newNodeGroups)
+		},
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&mcov1.KubeletConfig{}, builder.WithPredicates(p)).
 		Owns(&corev1.ConfigMap{}).
+		Watches(&nropv1.NUMAResourcesOperator{}, handler.EnqueueRequestsFromMapFunc(r.numaResourcesOperatorToKubeletConfig),
+			builder.WithPredicates(numaResourcesOperatorPredicate)).
 		Complete(r)
 }
 
@@ -204,6 +219,20 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, mcoKc *mcov
 		}
 	}
 	return rendered, nil
+}
+
+func (r *KubeletConfigReconciler) numaResourcesOperatorToKubeletConfig(ctx context.Context, object client.Object) []reconcile.Request {
+	var requests []reconcile.Request
+	kcList := &mcov1.KubeletConfigList{}
+	if err := r.Client.List(ctx, kcList); err != nil {
+		klog.ErrorS(err, "failed to list KubeletConfigs %v")
+	}
+	for _, kc := range kcList.Items {
+		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKey{
+			Name: kc.Name,
+		}})
+	}
+	return requests
 }
 
 func podExcludesListToMap(podExcludes []nropv1.NamespacedName) map[string]string {
