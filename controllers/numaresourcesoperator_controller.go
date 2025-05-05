@@ -29,6 +29,7 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
+	
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -63,6 +64,7 @@ import (
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
+	"github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 )
 
 const numaResourcesRetryPeriod = 1 * time.Minute
@@ -589,12 +591,23 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 		},
 	}
 
+	configMapPredicates := predicate.NewPredicateFuncs(func(object client.Object) bool {
+		cm := object.(*corev1.ConfigMap)
+		cmLabels := cm.GetLabels()
+		// return only configmap with the operator name label
+		_, ok := cmLabels[config.LabelOperatorName]
+		return ok
+	})
+
 	b := ctrl.NewControllerManagedBy(mgr).For(&nropv1.NUMAResourcesOperator{})
 	if r.Platform == platform.OpenShift {
 		b = b.Owns(&securityv1.SecurityContextConstraints{}).
 			Owns(&machineconfigv1.MachineConfig{}, builder.WithPredicates(p))
 	}
-	return b.Owns(&apiextensionv1.CustomResourceDefinition{}).
+	return b.Watches(&corev1.ConfigMap{},
+		handler.EnqueueRequestsFromMapFunc(r.configMapToNUMAResourceOperator),
+		builder.WithPredicates(configMapPredicates)).
+		Owns(&apiextensionv1.CustomResourceDefinition{}).
 		Owns(&corev1.ServiceAccount{}, builder.WithPredicates(p)).
 		Owns(&rbacv1.RoleBinding{}, builder.WithPredicates(p)).
 		Owns(&rbacv1.Role{}, builder.WithPredicates(p)).
@@ -651,6 +664,36 @@ func (r *NUMAResourcesOperatorReconciler) mcpToNUMAResourceOperator(ctx context.
 	}
 
 	return requests
+}
+
+func (r *NUMAResourcesOperatorReconciler) configMapToNUMAResourceOperator(ctx context.Context, cmObj client.Object) []reconcile.Request {
+	cm := &corev1.ConfigMap{}
+
+	key := client.ObjectKey{
+		Namespace: cmObj.GetNamespace(),
+		Name:      cmObj.GetName(),
+	}
+
+	if err := r.Get(ctx, key, cm); err != nil {
+		klog.Errorf("failed to get configmap %+v; %v", key, err)
+		return nil
+	}
+	name, ok := cm.Labels[config.LabelOperatorName]
+	if !ok {
+		return nil
+	}
+	key = client.ObjectKey{
+		Name: name,
+	}
+	nro := &nropv1.NUMAResourcesOperator{}
+	if err := r.Get(ctx, key, nro); err != nil {
+		klog.Error("failed to get numa-resources operator")
+		return nil
+	}
+
+	return []reconcile.Request{{NamespacedName: client.ObjectKey{
+		Name: nro.Name,
+	}}}
 }
 
 func validateUpdateEvent(e *event.UpdateEvent) bool {
