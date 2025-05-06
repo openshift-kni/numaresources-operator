@@ -62,7 +62,6 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: ptr.To[int32](defaultReplicas),
 			},
 		},
 		{
@@ -83,7 +82,6 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: ptr.To[int32](defaultReplicas),
 			},
 		},
 		{
@@ -107,7 +105,6 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: ptr.To[int32](defaultReplicas),
 			},
 		},
 		{
@@ -132,7 +129,6 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: ptr.To[int32](defaultReplicas),
 			},
 		},
 		{
@@ -157,7 +153,6 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: ptr.To[int32](defaultReplicas),
 			},
 		},
 		{
@@ -180,7 +175,6 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				SchedulerInformer:    &schedInformer,
 				CacheResyncDetection: &cacheResyncDetection,
 				ScoringStrategy:      &scoringStrategyCustom,
-				Replicas:             ptr.To[int32](defaultReplicas),
 			},
 		},
 		{
@@ -274,7 +268,6 @@ func TestSetDefaults_NUMAResourcesSchedulerSpec(t *testing.T) {
 				ScoringStrategy: &ScoringStrategyParams{
 					Type: scoringStrategyType,
 				},
-				Replicas: ptr.To[int32](defaultReplicas),
 			},
 		},
 		{

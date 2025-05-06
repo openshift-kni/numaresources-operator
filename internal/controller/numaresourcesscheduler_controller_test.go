@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -93,11 +95,14 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 	ginkgo.Context("with correct NRS CR", func() {
 		var nrs *nropv1.NUMAResourcesScheduler
 		var reconciler *NUMAResourcesSchedulerReconciler
+		numOfMasters := 3
 
 		ginkgo.BeforeEach(func() {
 			var err error
 			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
-			reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(nrs)
+			initObjects := []runtime.Object{nrs}
+			initObjects = append(initObjects, fakeNodes(numOfMasters, 3)...)
+			reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
@@ -585,10 +590,20 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 		})
 
 		ginkgo.It("should set the leader election resource parameters by default", func() {
+			nrs := nrs.DeepCopy()
+			nrs.Spec.Replicas = ptr.To(int32(1))
+			gomega.Eventually(reconciler.Client.Update).WithArguments(context.TODO(), nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(gomega.Succeed())
+
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: client.ObjectKeyFromObject(nrs)})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			expectLeaderElectParams(reconciler.Client, false, testNamespace, nrosched.LeaderElectionResourceName)
+		})
+
+		ginkgo.It("should set the leader election resource parameters to true default", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			expectLeaderElectParams(reconciler.Client, false, testNamespace, nrosched.LeaderElectionResourceName)
+			expectLeaderElectParams(reconciler.Client, true, testNamespace, nrosched.LeaderElectionResourceName)
 		})
 
 		ginkgo.DescribeTable("should set the leader election resource parameters depending on replica count", func(replicas int32, expectedEnabled bool) {
@@ -605,6 +620,16 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			ginkgo.Entry("replicas=1", int32(1), false),
 			ginkgo.Entry("replicas=3", int32(3), true),
 		)
+
+		ginkgo.It("should detect replicas number by default when spec.Replicas is unset", func() {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			dp := &appsv1.Deployment{}
+			gomega.Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(gomega.Succeed())
+			gomega.Expect(*dp.Spec.Replicas).To(gomega.Equal(int32(numOfMasters)), "number of replicas is different than number of control-planes nodes; want=%d got=%d", numOfMasters, *dp.Spec.Replicas)
+		})
 	})
 })
 
@@ -694,4 +719,29 @@ func expectLeaderElectParams(cli client.Client, enabled bool, resourceNamespace,
 	gomega.Expect(cfg.LeaderElection.LeaderElect).To(gomega.Equal(enabled))
 	gomega.Expect(cfg.LeaderElection.ResourceNamespace).To(gomega.Equal(resourceNamespace))
 	gomega.Expect(cfg.LeaderElection.ResourceName).To(gomega.Equal(resourceName))
+}
+
+func fakeNodes(numOfMasters, numOfWorkers int) []runtime.Object {
+	var nodes []runtime.Object
+	for i := range numOfMasters {
+		nodes = append(nodes, &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("master-node-%d", i+1),
+				Labels: map[string]string{
+					"node-role.kubernetes.io/control-plane": "",
+				},
+			},
+		})
+	}
+	for i := range numOfWorkers {
+		nodes = append(nodes, &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("worker-node-%d", i+1),
+				Labels: map[string]string{
+					"node-role.kubernetes.io/worker": "",
+				},
+			},
+		})
+	}
+	return nodes
 }
