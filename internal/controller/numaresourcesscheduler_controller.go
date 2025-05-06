@@ -27,8 +27,10 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -171,13 +173,22 @@ func isDeploymentRunning(ctx context.Context, c client.Client, key nropv1.Namesp
 	return false, nil
 }
 
-func (r *NUMAResourcesSchedulerReconciler) computeSchedulerReplicas(schedSpec nropv1.NUMAResourcesSchedulerSpec) *int32 {
-	// the api validation/normalization layer must ensure this value is != nil
-	if *schedSpec.Replicas >= 0 { // 0 is legit value to disable the deployment
-		return schedSpec.Replicas
+func (r *NUMAResourcesSchedulerReconciler) computeSchedulerReplicas(ctx context.Context, schedSpec nropv1.NUMAResourcesSchedulerSpec) (*int32, error) {
+	// do not autodetect if explicitly set by the user
+	if schedSpec.Replicas != nil {
+		return schedSpec.Replicas, nil
 	}
-	v := int32(r.AutodetectReplicas)
-	return &v
+	nodeList := &corev1.NodeList{}
+	if err := r.Client.List(ctx, nodeList, &client.ListOptions{
+		LabelSelector: labels.SelectorFromSet(map[string]string{
+			"node-role.kubernetes.io/control-plane": "",
+		}),
+	}); err != nil {
+		return schedSpec.Replicas, err
+	}
+	replicas := ptr.To(int32(len(nodeList.Items)))
+	klog.InfoS("autodetect scheduler replicas", "replicas", *replicas)
+	return replicas, nil
 }
 
 func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (nropv1.NUMAResourcesSchedulerStatus, error) {
@@ -186,6 +197,11 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 
 	schedSpec := instance.Spec.Normalize()
 	cacheResyncPeriod := unpackAPIResyncPeriod(schedSpec.CacheResyncPeriod)
+	replicas, err := r.computeSchedulerReplicas(ctx, schedSpec)
+	if err != nil {
+		return nropv1.NUMAResourcesSchedulerStatus{}, fmt.Errorf("failed to compute scheduler replicas: %w", err)
+	}
+	schedSpec.Replicas = replicas
 	params := configParamsFromSchedSpec(schedSpec, cacheResyncPeriod, r.Namespace)
 
 	schedName, ok := schedstate.SchedulerNameFromObject(r.SchedulerManifests.ConfigMap)
@@ -207,7 +223,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		},
 	}
 
-	r.SchedulerManifests.Deployment.Spec.Replicas = r.computeSchedulerReplicas(schedSpec)
+	r.SchedulerManifests.Deployment.Spec.Replicas = schedSpec.Replicas
 	klog.V(4).InfoS("using scheduler replicas", "replicas", *r.SchedulerManifests.Deployment.Spec.Replicas)
 	// TODO: if replicas doesn't make sense (autodetect disabled and user set impossible value) then we
 	// should set a degraded state
