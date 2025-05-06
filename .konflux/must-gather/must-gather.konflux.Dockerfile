@@ -1,4 +1,4 @@
-FROM brew.registry.redhat.io/rh-osbs/openshift-ose-must-gather-rhel9:v4.20 as mgbuilder
+FROM brew.registry.redhat.io/rh-osbs/openshift-ose-must-gather-rhel9:v4.20@sha256:dec17bbfe2171444e97b45a13e30eae306adc734ca1648817098937ff686191e as mgbuilder
 
 COPY . .
 
@@ -8,7 +8,7 @@ RUN mv /usr/bin/gather /usr/bin/gather_original
 RUN mkdir -p /usr/libexec/must-gather/numaresources-operator && \
     cp /must-gather/collection-scripts/* /usr/libexec/must-gather/numaresources-operator/
 
-FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4
+FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4@sha256:65e57c845402711c5515af0989a2c3c69bf4066396008efd8002be0790fee6c3
 
 RUN microdnf install -y procps-ng tar rsync ; microdnf clean all
 

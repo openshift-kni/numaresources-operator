@@ -1,6 +1,6 @@
 ARG OPERATOR_VERSION
 
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_1.23 as builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:v1.23@sha256:8c881edc745eeb6ea246f1bac55b09b5ae5dc16f7ed9d0d73b5ffda28e582bab as builder
 
 WORKDIR /go/src/github.com/openshift-kni/numaresources-operator
 COPY . .
@@ -14,7 +14,7 @@ RUN \
 	NRO_BUILD_VERSION=${OPERATOR_VERSION} \
 	make binary-all
 
-FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4
+FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4@sha256:65e57c845402711c5515af0989a2c3c69bf4066396008efd8002be0790fee6c3
 
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/manager /bin/numaresources-operator
 # bundle the operand, and use a backward compatible name for RTE
