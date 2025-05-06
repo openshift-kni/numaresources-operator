@@ -27,6 +27,9 @@ RUN $OVERLAY_PATH/overlay.bash --set-pinning-file $OVERLAY_PATH/pin_images.in.ya
 
 FROM scratch
 
+ARG OPERATOR_VERSION
+ARG OPENSHIFT_VERSION
+
 LABEL com.redhat.component="numaresources-operator-bundle-container"
 LABEL name="openshift4/numaresources-operator-bundle"
 LABEL version="v${OPERATOR_VERSION}"

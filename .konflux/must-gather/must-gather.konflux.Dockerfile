@@ -10,6 +10,8 @@ RUN mkdir -p /usr/libexec/must-gather/numaresources-operator && \
 
 FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4@sha256:65e57c845402711c5515af0989a2c3c69bf4066396008efd8002be0790fee6c3
 
+ARG OPENSHIFT_VERSION
+
 RUN microdnf install -y procps-ng tar rsync ; microdnf clean all
 
 # Copy must-gather required binaries

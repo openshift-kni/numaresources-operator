@@ -28,7 +28,7 @@ metadata:
         'go.mod'.pathChanged() ||
         'go.sum'.pathChanged() ||
         '.tekton/numaresources-operator-4-20-push.yaml'.pathChanged() ||
-        '.konflux/operator/konflux.Dockerfile'.pathChanged()
+        '.konflux/operator/***'.pathChanged()
       )
   creationTimestamp: null
   labels:

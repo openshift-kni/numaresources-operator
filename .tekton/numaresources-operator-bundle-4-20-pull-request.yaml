@@ -15,8 +15,8 @@ metadata:
         '.tekton/build-pipeline.yaml'.pathChanged() ||
         '.konflux/container-build.args'.pathChanged() ||
         'bundle/***'.pathChanged() ||
-        'config/***'.pathChanged() ||
         'hack/***'.pathChanged() ||
+        '.konflux/bundle/overlay/***'.pathChanged() ||
         '.tekton/numaresources-operator-bundle-4-20-pull-request.yaml'.pathChanged() ||
         '.konflux/bundle/bundle.konflux.Dockerfile'.pathChanged()
       )
