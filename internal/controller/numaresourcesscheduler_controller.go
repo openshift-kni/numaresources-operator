@@ -62,7 +62,6 @@ type NUMAResourcesSchedulerReconciler struct {
 	Scheme             *runtime.Scheme
 	SchedulerManifests schedmanifests.Manifests
 	Namespace          string
-	AutodetectReplicas int
 }
 
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*

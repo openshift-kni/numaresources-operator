@@ -61,7 +61,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/controlplane"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
@@ -159,7 +158,7 @@ func (pa *Params) FromFlags() {
 	flag.BoolVar(&pa.enableMCPCondsForward, "enable-mcp-conds-fwd", pa.enableMCPCondsForward, "enable MCP Status Condition forwarding")
 	flag.StringVar(&pa.image.Exporter, "image-exporter", pa.image.Exporter, "use this image as default for the RTE")
 	flag.StringVar(&pa.image.Scheduler, "image-scheduler", pa.image.Scheduler, "use this image as default for the scheduler")
-	flag.BoolVar(&pa.enableReplicasDetect, "detect-replicas", pa.enableReplicasDetect, "autodetect optimal replica count")
+	flag.BoolVar(&pa.enableReplicasDetect, "detect-replicas", pa.enableReplicasDetect, "autodetect optimal replica count.(DEPRECATED) autodetect enabled by default and should be configured from the NUMAResourcesScheduler CR")
 
 	flag.Parse()
 
@@ -312,11 +311,6 @@ func main() {
 	}
 
 	if params.enableScheduler {
-		info := controlplane.Defaults()
-		if params.enableReplicasDetect {
-			info = controlplane.Discover(ctx)
-		}
-
 		schedMf, err := schedmanifests.GetManifests(namespace)
 		if err != nil {
 			klog.ErrorS(err, "unable to load the Scheduler manifests")
@@ -329,7 +323,6 @@ func main() {
 			Scheme:             mgr.GetScheme(),
 			SchedulerManifests: schedMf,
 			Namespace:          namespace,
-			AutodetectReplicas: info.NodeCount,
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
 			os.Exit(1)
