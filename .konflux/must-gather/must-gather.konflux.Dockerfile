@@ -1,4 +1,4 @@
-FROM brew.registry.redhat.io/rh-osbs/openshift-ose-must-gather-rhel9:v4.19 as mgbuilder
+FROM brew.registry.redhat.io/rh-osbs/openshift-ose-must-gather-rhel9:v4.20@sha256:dec17bbfe2171444e97b45a13e30eae306adc734ca1648817098937ff686191e as mgbuilder
 
 COPY . .
 
@@ -8,7 +8,9 @@ RUN mv /usr/bin/gather /usr/bin/gather_original
 RUN mkdir -p /usr/libexec/must-gather/numaresources-operator && \
     cp /must-gather/collection-scripts/* /usr/libexec/must-gather/numaresources-operator/
 
-FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4
+FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4@sha256:65e57c845402711c5515af0989a2c3c69bf4066396008efd8002be0790fee6c3
+
+ARG OPENSHIFT_VERSION
 
 RUN microdnf install -y procps-ng tar rsync ; microdnf clean all
 
@@ -30,4 +32,8 @@ LABEL com.redhat.component="numaresources-must-gather-container" \
     description="numa resources data gathering image." \
     maintainer="openshift-operators@redhat.com" \
     io.openshift.maintainer.component="NUMA Resources Operator" \
-    io.openshift.maintainer.product="OpenShift Container Platform"
+    io.openshift.maintainer.product="OpenShift Container Platform" \
+    distribution-scope="public" \
+    release="${OPENSHIFT_VERSION}" \
+    url="https://github.com/openshift-kni/numaresources-operator" \
+    vendor="Red Hat, Inc."
