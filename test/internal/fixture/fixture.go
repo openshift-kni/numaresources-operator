@@ -211,11 +211,12 @@ func (fxt *Fixture) DEnvWithContext(ctx context.Context) *deployer.Environment {
 	}
 }
 
-func MustSettleNRT(fxt *Fixture) {
+func MustSettleNRT(fxt *Fixture) nrtv1alpha2.NodeResourceTopologyList {
 	ginkgo.GinkgoHelper()
 	klog.Infof("cooldown by verifying NRTs data is settled (interval=%v timeout=%v)", settleInterval, settleTimeout)
-	_, err := intwait.With(fxt.Client).Interval(settleInterval).Timeout(settleTimeout).ForNodeResourceTopologiesSettled(context.Background(), cooldownThreshold, intwait.NRTIgnoreNothing)
+	nrtList, err := intwait.With(fxt.Client).Interval(settleInterval).Timeout(settleTimeout).ForNodeResourceTopologiesSettled(context.Background(), cooldownThreshold, intwait.NRTIgnoreNothing)
 	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "NRTs have not settled during the provided cooldown time: %v", err)
+	return nrtList
 }
 
 func setupNamespace(cli client.Client, baseName string, randomize bool) (corev1.Namespace, error) {

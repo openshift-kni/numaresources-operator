@@ -166,3 +166,24 @@ func RoundUpCoreResources(cpu, mem resource.Quantity) (resource.Quantity, resour
 func roundUp(num, multiple int64) int64 {
 	return ((num + multiple - 1) / multiple) * multiple
 }
+
+func Highest(rls ...corev1.ResourceList) corev1.ResourceList {
+	if len(rls) == 0 {
+		return make(corev1.ResourceList)
+	}
+	ret := rls[0].DeepCopy()
+	if len(rls) == 1 {
+		return ret
+	}
+	for _, rl := range rls[1:] {
+		tmp := ret.DeepCopy()
+		for resName, resQty := range ret {
+			curQty := rl[resName]
+			if curQty.Cmp(resQty) > 0 {
+				tmp[resName] = curQty
+			}
+		}
+		ret = tmp
+	}
+	return ret
+}

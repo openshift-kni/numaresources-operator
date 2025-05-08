@@ -228,6 +228,7 @@ func accumulateNodeAvailableResources(nrt nrtv1alpha2.NodeResourceTopology, reas
 	klog.Infof("resInfoList available %s: %s", reason, e2enrt.ResourceInfoListToString(resInfoList))
 	return resInfoList, nil
 }
+
 func SaturateZoneUntilLeft(zone nrtv1alpha2.Zone, requiredRes corev1.ResourceList, filter func(corev1.ResourceList) corev1.ResourceList) (corev1.ResourceList, error) {
 	paddingRes := make(corev1.ResourceList)
 	filteredRes := filter(requiredRes)
@@ -256,6 +257,7 @@ func DropHostLevelResources(res corev1.ResourceList) corev1.ResourceList {
 	delete(newList, corev1.ResourceEphemeralStorage)
 	return newList
 }
+
 func SaturateNodeUntilLeft(nrtInfo nrtv1alpha2.NodeResourceTopology, requiredRes corev1.ResourceList) (map[string]corev1.ResourceList, error) {
 	//TODO: support splitting the requiredRes on multiple numas
 	//corrently the function deducts the requiredRes from the first Numa

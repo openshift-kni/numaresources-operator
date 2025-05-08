@@ -59,10 +59,9 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 		fxt, err = e2efixture.Setup("e2e-test-sched-remove", serialconfig.Config.NRTList)
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
-		nroSchedObj = nrosched.CheckNROSchedulerAvailable(fxt.Client, serialconfig.Config.NROSchedObj.Name)
+		nroSchedObj = nrosched.CheckNROSchedulerAvailable(context.TODO(), fxt.Client, serialconfig.Config.NROSchedObj.Name)
 		Expect(nroSchedObj).ToNot(BeNil())
 		dpNName = nroSchedObj.Status.Deployment
-
 	})
 
 	AfterEach(func() {
@@ -73,7 +72,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 	When("removing the topology aware scheduler from a live cluster", func() {
 		AfterEach(func() {
 			restoreScheduler(fxt, serialconfig.Config.NROSchedObj)
-			nroSchedObj = nrosched.CheckNROSchedulerAvailable(fxt.Client, serialconfig.Config.NROSchedObj.Name)
+			nroSchedObj = nrosched.CheckNROSchedulerAvailable(context.TODO(), fxt.Client, serialconfig.Config.NROSchedObj.Name)
 			Expect(nroSchedObj).ToNot(BeNil())
 		})
 
@@ -136,12 +135,14 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 		It("[case:1][test_id:48069] should schedule any pending workloads submitted while the scheduler was unavailable", Label(label.Tier2), func() {
 			var err error
 
+			ctx := context.TODO()
+
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", nroSchedObj.Name))
-			err = fxt.Client.Delete(context.TODO(), nroSchedObj)
+			err = fxt.Client.Delete(ctx, nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			// make sure scheduler deployment is gone
-			err = depwait.With(fxt.Client, textlogger.NewLogger(config)).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(context.TODO(), dpNName.Namespace, dpNName.Name)
+			err = depwait.With(fxt.Client, textlogger.NewLogger(config)).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(ctx, dpNName.Namespace, dpNName.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			dp := createDeployment(fxt, "testdp", nroSchedObj.Status.SchedulerName)
@@ -153,18 +154,18 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 
 				By(fmt.Sprintf("ensuring the deployment %q keep being pending %d/%d", dp.Name, step+1, maxStep))
 
-				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
+				err = fxt.Client.Get(ctx, client.ObjectKeyFromObject(dp), updatedDp)
 				Expect(err).ToNot(HaveOccurred())
 
 				Expect(wait.IsDeploymentComplete(dp, &updatedDp.Status)).To(BeFalse(), "deployment %q become ready", dp.Name)
 			}
 
 			restoreScheduler(fxt, nroSchedObj)
-			nroSchedObj = nrosched.CheckNROSchedulerAvailable(fxt.Client, nroSchedObj.Name)
+			nroSchedObj = nrosched.CheckNROSchedulerAvailable(ctx, fxt.Client, nroSchedObj.Name)
 			Expect(nroSchedObj).ToNot(BeNil())
 
 			By(fmt.Sprintf("waiting for the test deployment %q to become complete and ready", updatedDp.Name))
-			_, err = wait.With(fxt.Client).Interval(2*time.Second).Interval(30*time.Second).ForDeploymentComplete(context.TODO(), updatedDp)
+			_, err = wait.With(fxt.Client).Interval(2*time.Second).Interval(30*time.Second).ForDeploymentComplete(ctx, updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
