@@ -18,6 +18,7 @@ package resourcelist
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -165,4 +166,46 @@ func RoundUpCoreResources(cpu, mem resource.Quantity) (resource.Quantity, resour
 
 func roundUp(num, multiple int64) int64 {
 	return ((num + multiple - 1) / multiple) * multiple
+}
+
+func Highest(rls ...corev1.ResourceList) corev1.ResourceList {
+	if len(rls) == 0 {
+		return make(corev1.ResourceList)
+	}
+	ret := rls[0].DeepCopy()
+	if len(rls) == 1 {
+		return ret
+	}
+	for _, rl := range rls[1:] {
+		tmp := ret.DeepCopy()
+		for resName, resQty := range ret {
+			curQty := rl[resName]
+			if curQty.Cmp(resQty) > 0 {
+				tmp[resName] = curQty
+			}
+		}
+		ret = tmp
+	}
+	return ret
+}
+
+func ScaleCoreResources(rl corev1.ResourceList, scaleNum, scaleDen int) corev1.ResourceList {
+	ret := rl.DeepCopy()
+	if cpuQty, ok := rl[corev1.ResourceCPU]; ok {
+		newVal := scaleQuantity(cpuQty, scaleNum, scaleDen)
+		ret[corev1.ResourceCPU] = *resource.NewQuantity(newVal, resource.DecimalSI)
+	}
+	if memQty, ok := rl[corev1.ResourceMemory]; ok {
+		// rounding up is unnecessary but unharmful either, and makes testing and inspection easier
+		newVal := scaleQuantity(memQty, scaleNum, scaleDen)
+		newVal = roundUp(newVal, 1024)
+		ret[corev1.ResourceMemory] = *resource.NewQuantity(newVal, resource.DecimalSI)
+	}
+	return ret
+}
+
+func scaleQuantity(qty resource.Quantity, scaleNum, scaleDen int) int64 {
+	val, _ := qty.AsInt64() // TODO: handle !ok?
+	// we use Ceil, not Round, to make sure to include the fractional amounts
+	return int64(math.Ceil(float64(val*int64(scaleNum)) / float64(scaleDen)))
 }

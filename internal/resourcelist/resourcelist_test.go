@@ -430,3 +430,171 @@ func TestAccumulate(t *testing.T) {
 		})
 	}
 }
+
+func TestHighest(t *testing.T) {
+	type testCase struct {
+		name     string
+		ress     []corev1.ResourceList
+		expected corev1.ResourceList
+	}
+
+	testCases := []testCase{
+		{
+			name: "empty",
+		},
+		{
+			name: "one entry only",
+			ress: []corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("1"),
+					corev1.ResourceMemory: resource.MustParse("1Gi"),
+				},
+			},
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		{
+			name: "two identical entries",
+			ress: []corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+			},
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
+			},
+		},
+		{
+			name: "biggest everything",
+			ress: []corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("2"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("5"),
+					corev1.ResourceMemory: resource.MustParse("11Gi"),
+				},
+			},
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("5"),
+				corev1.ResourceMemory: resource.MustParse("11Gi"),
+			},
+		},
+		{
+			name: "sparse peaks",
+			ress: []corev1.ResourceList{
+				{
+					corev1.ResourceCPU:    resource.MustParse("12"),
+					corev1.ResourceMemory: resource.MustParse("4Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("5"),
+					corev1.ResourceMemory: resource.MustParse("16Gi"),
+				},
+				{
+					corev1.ResourceCPU:    resource.MustParse("8"),
+					corev1.ResourceMemory: resource.MustParse("8Gi"),
+				},
+			},
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("12"),
+				corev1.ResourceMemory: resource.MustParse("16Gi"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Highest(tc.ress...)
+			if !Equal(got, tc.expected) {
+				t.Errorf("expected %v got %v", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestScaleCoreResources(t *testing.T) {
+	type testCase struct {
+		name     string
+		res      corev1.ResourceList
+		scaleNum int
+		scaleDen int
+		expected corev1.ResourceList
+	}
+
+	testCases := []testCase{
+		{
+			name: "empty",
+		},
+		{
+			name: "scale 1",
+			res: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			scaleNum: 1,
+			scaleDen: 1,
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+		},
+		{
+			name: "scale 4",
+			res: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			scaleNum: 4,
+			scaleDen: 1,
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceMemory: resource.MustParse("4Gi"),
+			},
+		},
+		{
+			name: "scale 3/2",
+			res: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			scaleNum: 3,
+			scaleDen: 2,
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("1610612736"),
+			},
+		},
+		{
+			name: "scale 7/3",
+			res: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			scaleNum: 7,
+			scaleDen: 3,
+			expected: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("3"),
+				corev1.ResourceMemory: resource.MustParse("2505398272"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := ScaleCoreResources(tc.res, tc.scaleNum, tc.scaleDen)
+			if !Equal(got, tc.expected) {
+				t.Errorf("expected %v got %v", ToString(tc.expected), ToString(got))
+			}
+		})
+	}
+}

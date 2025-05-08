@@ -419,7 +419,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			isEqual, err := e2enrt.CheckEqualAvailableResources(*targetNrtInitial, *nrtPostCreate)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(isEqual).To(BeTrue(), "new changes were detected in the nrt of the target node, but expected no change")
-
 		})
 	})
 })
