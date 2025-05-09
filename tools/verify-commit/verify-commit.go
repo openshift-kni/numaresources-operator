@@ -38,6 +38,10 @@ const dependabot = "dependabot[bot]"
 
 func validate(commit GitCommit) error {
 	var errs error
+	if commit.Author == "red-hat-konflux[bot]" {
+		fmt.Printf("git commit authored by konflux bot\n")
+		return nil
+	}
 	if "<"+commit.Author+">" == commit.AuthorEmailLocal {
 		errs = errors.Join(errs, fmt.Errorf("missing author name - equals to email local part"))
 	}
