@@ -19,7 +19,10 @@ package merge
 import (
 	"fmt"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -38,12 +41,46 @@ func ServiceAccountForUpdate(current, updated client.Object) (client.Object, err
 	if !ok {
 		return nil, ErrMismatchingObjects
 	}
-	updSA.Secrets = curSA.Secrets
+	preserveServiceAccountPullSecrets(curSA, updSA)
+	return MetadataForUpdate(current, updated)
+}
+
+func ServiceForUpdate(current, updated client.Object) (client.Object, error) {
+	curSE, ok := current.(*corev1.Service)
+	if !ok {
+		return updated, ErrWrongObjectType
+	}
+	updSE, ok := updated.(*corev1.Service)
+	if !ok {
+		return updated, ErrMismatchingObjects
+	}
+	preserveIPConfigurations(&curSE.Spec, &updSE.Spec)
 	return MetadataForUpdate(current, updated)
 }
 
 func ObjectForUpdate(current, updated client.Object) (client.Object, error) {
-	return MetadataForUpdate(current, updated)
+	updated, err := MetadataForUpdate(current, updated)
+	if err != nil {
+		return nil, err
+	}
+	// merge the status (if any) from the existing object
+	return StatusForUpdate(current, updated)
+}
+
+func StatusForUpdate(current client.Object, updated client.Object) (client.Object, error) {
+	switch currentTyped := current.(type) {
+	case *appsv1.Deployment:
+		updated.(*appsv1.Deployment).Status = currentTyped.Status
+	case *appsv1.DaemonSet:
+		updated.(*appsv1.DaemonSet).Status = currentTyped.Status
+	case *corev1.Service:
+		updated.(*corev1.Service).Status = currentTyped.Status
+	case *v1.CustomResourceDefinition:
+		updated.(*v1.CustomResourceDefinition).Status = currentTyped.Status
+	default:
+		return updated, nil
+	}
+	return updated, nil
 }
 
 func MetadataForUpdate(current, updated client.Object) (client.Object, error) {
@@ -110,4 +147,34 @@ func Labels(current, updated client.Object) (client.Object, error) {
 
 func isSameKind(a, b client.Object) bool {
 	return a.GetObjectKind().GroupVersionKind().Kind == b.GetObjectKind().GroupVersionKind().Kind
+}
+
+func preserveServiceAccountPullSecrets(original, mutated *corev1.ServiceAccount) {
+	// keep original pull secrets, as those will be injected after the serviceAccount is created.
+	// this is necessary to avoid infinite update loop.
+	imagePullSecretsSet := sets.New(mutated.ImagePullSecrets...)
+	for _, pullSecret := range original.ImagePullSecrets {
+		if !imagePullSecretsSet.Has(pullSecret) {
+			mutated.ImagePullSecrets = append(mutated.ImagePullSecrets, pullSecret)
+		}
+	}
+
+	mutated.Secrets = original.Secrets
+}
+
+// preserveIPConfigurations preserve the IP configuration from the original object since
+// those are assigned by external operator (not ours)
+func preserveIPConfigurations(original, mutated *corev1.ServiceSpec) {
+	if mutated.ClusterIP == "" {
+		mutated.ClusterIP = original.ClusterIP
+	}
+	if mutated.ClusterIPs == nil {
+		mutated.ClusterIPs = original.ClusterIPs
+	}
+	if mutated.IPFamilies == nil {
+		mutated.IPFamilies = original.IPFamilies
+	}
+	if mutated.IPFamilyPolicy == nil {
+		mutated.IPFamilyPolicy = original.IPFamilyPolicy
+	}
 }

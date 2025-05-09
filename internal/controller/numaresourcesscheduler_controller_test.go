@@ -44,6 +44,7 @@ import (
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/defaulter"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
@@ -303,6 +304,9 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			key = client.ObjectKeyFromObject(dp)
 			err = reconciler.Client.Get(context.TODO(), key, dp)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			// we should set the default fields of the initial object
+			// because there's no actual API server here that usually does it for us
+			defaulter.Deployment(initialDP)
 			gomega.Expect(dp.Spec.Template.Spec).To(gomega.Equal(initialDP.Spec.Template.Spec))
 		})
 
