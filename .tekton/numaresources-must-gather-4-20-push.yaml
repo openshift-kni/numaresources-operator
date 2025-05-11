@@ -31,6 +31,8 @@ spec:
     value: .konflux/must-gather/must-gather.konflux.Dockerfile
   - name: build-source-image
     value: "true"
+  - name: hermetic
+    value: "true"
   pipelineRef:
     name: build-pipeline-must-gather
   taskRunTemplate:
