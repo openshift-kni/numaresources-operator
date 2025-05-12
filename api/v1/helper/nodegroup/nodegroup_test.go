@@ -21,10 +21,14 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 
@@ -564,6 +568,119 @@ func TestGetTreePoolsNames(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := GetTreePoolsNames(tt.tree); !reflect.DeepEqual(got, tt.expected) {
 				t.Errorf("got %v, expected %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestCloneList(t *testing.T) {
+	tests := []struct {
+		name string
+		data []nropv1.NodeGroup
+		exp  []nropv1.NodeGroup
+	}{
+		{
+			name: "nil",
+			data: nil,
+			exp:  []nropv1.NodeGroup{},
+		},
+		{
+			name: "empty",
+			data: []nropv1.NodeGroup{},
+			exp:  []nropv1.NodeGroup{},
+		},
+		{
+			name: "1-element",
+			data: []nropv1.NodeGroup{
+				{
+					PoolName: ptr.To[string]("1-element"),
+					Annotations: map[string]string{
+						"ann-1": "val-1",
+					},
+				},
+			},
+			exp: []nropv1.NodeGroup{
+				{
+					PoolName: ptr.To[string]("1-element"),
+					Annotations: map[string]string{
+						"ann-1": "val-1",
+					},
+				},
+			},
+		},
+		{
+			name: "3-element",
+			data: []nropv1.NodeGroup{
+				{
+					PoolName: ptr.To[string]("3-element-1"),
+					Config: &nropv1.NodeGroupConfig{
+						PodsFingerprinting: ptr.To[nropv1.PodsFingerprintingMode](nropv1.PodsFingerprintingEnabled),
+					},
+				},
+				{
+					PoolName: ptr.To[string]("3-element-2"),
+					Annotations: map[string]string{
+						"ann-1": "val-1",
+					},
+				},
+				{
+					PoolName: ptr.To[string]("3-element-3"),
+					Config: &nropv1.NodeGroupConfig{
+						Tolerations: []corev1.Toleration{
+							{
+								Key:   "Foo",
+								Value: "Bar",
+							},
+						},
+					},
+				},
+			},
+			exp: []nropv1.NodeGroup{
+				{
+					PoolName: ptr.To[string]("3-element-1"),
+					Config: &nropv1.NodeGroupConfig{
+						PodsFingerprinting: ptr.To[nropv1.PodsFingerprintingMode](nropv1.PodsFingerprintingEnabled),
+					},
+				},
+				{
+					PoolName: ptr.To[string]("3-element-2"),
+					Annotations: map[string]string{
+						"ann-1": "val-1",
+					},
+				},
+				{
+					PoolName: ptr.To[string]("3-element-3"),
+					Config: &nropv1.NodeGroupConfig{
+						Tolerations: []corev1.Toleration{
+							{
+								Key:   "Foo",
+								Value: "Bar",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CloneList(tt.data)
+			delta := cmp.Diff(got, tt.exp)
+			if len(delta) > 0 {
+				t.Errorf("unexpected diff: <%s>", delta)
+			}
+			// mutate the copy; mutation should not be reflected back in the original
+			if len(tt.data) < 1 {
+				return // nothing to do
+			}
+			// mutate the first so we don't have to figure out the size or anything
+			got[0].Annotations = map[string]string{
+				"ann-1": "mutated-exp-1",
+			}
+			got2 := CloneList(tt.data)
+			delta2 := cmp.Diff(got2, tt.exp)
+			if len(delta2) > 0 {
+				t.Errorf("unexpected mutation: <%s>", delta2)
 			}
 		})
 	}
