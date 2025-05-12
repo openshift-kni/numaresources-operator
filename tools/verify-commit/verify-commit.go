@@ -34,12 +34,20 @@ type GitCommit struct {
 	DCOCoauthorTag   string `json:"dcoCoauthorTag"`
 }
 
-const dependabot = "dependabot[bot]"
+const (
+	dependabot = "dependabot[bot]"
+	konflux    = "red-hat-konflux"
+)
 
 func validate(commit GitCommit) error {
 	var errs error
+
 	if "<"+commit.Author+">" == commit.AuthorEmailLocal {
 		errs = errors.Join(errs, fmt.Errorf("missing author name - equals to email local part"))
+	}
+	if strings.Contains(commit.Author, konflux) {
+		fmt.Printf("git commit authored by konflux bot\n")
+		return nil
 	}
 	if commit.DCOSignTag == "" {
 		errs = errors.Join(errs, fmt.Errorf("DCO signoff trailer missing"))
