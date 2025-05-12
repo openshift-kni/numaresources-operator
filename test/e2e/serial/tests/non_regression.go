@@ -40,6 +40,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 
 	"github.com/openshift-kni/numaresources-operator/internal/baseload"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
@@ -419,6 +420,117 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			isEqual, err := e2enrt.CheckEqualAvailableResources(*targetNrtInitial, *nrtPostCreate)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(isEqual).To(BeTrue(), "new changes were detected in the nrt of the target node, but expected no change")
+		})
+	})
+
+	Context("with suitable nodes", func() {
+		var nodeSelector map[string]string
+
+		BeforeEach(func() {
+			nodeSelector = map[string]string{
+				serialconfig.MultiNUMALabel: "2",
+			}
+		})
+
+		It("should handle deployment scaleup such as nodes can be fully utilized", Label(label.Tier2, "nonreg"), func(ctx context.Context) {
+			neededNodes := 2
+
+			// random "high enough" value to let the infra pods run comfortably
+			expectedFreeRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("6"),
+				corev1.ResourceMemory: resource.MustParse("6Gi"),
+			}
+
+			nrtCandidates := e2enrt.FilterAnyZoneMatchingResources(nrts, expectedFreeRes)
+			if len(nrtCandidates) < neededNodes {
+				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes)
+			}
+			// note we assume all NRT zones are equal, then we take the most accessible
+			refZone := nrts[0].Zones[0]
+			// abuse the function to compute the resources for the workload, not for the padding pods
+			// the desired result is to have workload pods which almost saturate a NUMA zone.
+			requiredRes, err := e2enrt.SaturateZoneUntilLeft(refZone, expectedFreeRes, e2enrt.DropHostLevelResources)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("waiting for the NRT data to settle")
+			e2efixture.MustSettleNRT(fxt)
+
+			dpName := "test-dp-scaleup"
+			replicas := int32(len(nrtCandidates)) // initially. Then the final value will be 1 replica per NUMA node
+			By(fmt.Sprintf("creating a deployment %q with replicas %d candidate nodes %d", dpName, replicas, len(nrtCandidates)))
+
+			nroSchedObj := nrosched.CheckNROSchedulerAvailable(ctx, fxt.Client, objectnames.DefaultNUMAResourcesSchedulerCrName)
+
+			podLabels := map[string]string{
+				"test": dpName,
+			}
+
+			schedulerName := nroSchedObj.Status.SchedulerName // shortcut
+			podSpec := corev1.PodSpec{
+				SchedulerName: schedulerName,
+				Containers: []corev1.Container{
+					{
+						Name:  dpName + "-cnt",
+						Image: images.GetPauseImage(),
+						Command: []string{
+							images.PauseCommand,
+						},
+						Resources: corev1.ResourceRequirements{
+							Requests: requiredRes,
+							Limits:   requiredRes,
+						},
+					},
+				},
+				RestartPolicy: corev1.RestartPolicyAlways,
+			}
+			dp := objects.NewTestDeploymentWithPodSpec(replicas, podLabels, nodeSelector, fxt.Namespace.Name, dpName, podSpec)
+			Expect(fxt.Client.Create(ctx, dp)).To(Succeed())
+
+			// although the deployment pods will be pending thus the deployment will not be counted as complete,
+			// we need to wait until all the replicas are created despite their status before moving forward with the checks
+			By("wait for the deployment to be up with its pod created")
+			dp, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDeploymentReplicasReadiness(ctx, dp, replicas)
+			Expect(err).NotTo(HaveOccurred())
+
+			By(fmt.Sprintf("checking deployment pods have been scheduled by %q ", schedulerName))
+			pods, err := podlist.With(fxt.Client).ByDeployment(ctx, *dp)
+			Expect(err).ToNot(HaveOccurred(), "unable to get pods from deployment %q:  %v", dp.Name, err)
+			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", dp.Namespace, dp.Name)
+
+			errorPods := 0
+			for _, pod := range pods {
+				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
+				if err != nil {
+					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+				}
+				Expect(err).ToNot(HaveOccurred())
+				if !schedOK {
+					errorPods += 1
+					klog.Warningf("pod %s/%s was NOT scheduled with %q", pod.Namespace, pod.Name, schedulerName)
+					continue
+				}
+			}
+			Expect(errorPods).To(BeZero(), "some pods not scheduled with %s", schedulerName)
+
+			replicas *= 2
+
+			By("updating deployment in such way each node will have a pod per NUMA zone")
+			Eventually(func() error {
+				err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(dp), dp)
+				if err != nil {
+					return err
+				}
+				klog.Infof("upscaling replicas: %v -> %v", *dp.Spec.Replicas, replicas)
+				dp.Spec.Replicas = &replicas
+				return fxt.Client.Update(ctx, dp)
+			}).WithPolling(1*time.Second).WithTimeout(1*time.Minute).Should(Succeed(), "cannot downsize the test deployment %q", dp.Name)
+
+			By("waiting for some of the pods to be running")
+			dp, err = wait.With(fxt.Client).Interval(30*time.Second).Timeout(5*time.Minute).ForDeploymentReplicasReadiness(ctx, dp, replicas)
+			Expect(err).ToNot(HaveOccurred(), "deployment %s/%s failed to have %d running replicas within the defined period", dp.Namespace, dp.Name, replicas)
+
+			By("wait for NRT data to settle")
+			e2efixture.MustSettleNRT(fxt)
 		})
 	})
 })
