@@ -26,8 +26,8 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
-
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -543,6 +543,21 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					workers, err = nodes.GetWorkers(fxt.DEnv())
 					Expect(err).ToNot(HaveOccurred())
 
+					By("list the DSs owned by NROP")
+					dss, err := objects.GetDaemonSetsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(dss).To(HaveLen(1))
+
+					dssExpected := namespacedNameListToStringList(nroOperObj.Status.DaemonSets)
+					dssGot := namespacedNameListToStringList(daemonSetListToNamespacedNameList(dss))
+					Expect(dssGot).To(Equal(dssExpected), "mismatching RTE daemonsets for NUMAResourcesOperator")
+
+					By("get list of RTE pods owned by the daemonset before NROP CR deletion")
+					ds := dss[0]
+					rtePods, err := podlist.With(fxt.Client).ByDaemonset(ctx, *ds)
+					Expect(err).ToNot(HaveOccurred(), "unable to get pods from daemonset %q:  %v", ds.Name, err)
+					Expect(rtePods).ToNot(BeEmpty(), "cannot find any pods for daemonset %s/%s", ds.Namespace, ds.Name)
+
 					By("delete current NROP CR from the cluster")
 					if customPolicySupportEnabled {
 						mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, nroOperObj)
@@ -557,6 +572,14 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 						err := fxt.Client.Delete(ctx, &nroOperObj)
 						Expect(err).ToNot(HaveOccurred())
 					}
+
+					By("wait for daemonset to be deleted")
+					err = wait.With(fxt.Client).Interval(30*time.Second).Timeout(2*time.Minute).ForDaemonSetDeleted(ctx, dsKey)
+					Expect(err).ToNot(HaveOccurred())
+
+					By("wait for all the RTE pods owned by the daemonset to be deleted")
+					err = wait.With(fxt.Client).Interval(30*time.Second).Timeout(2*time.Minute).ForPodListAllDeleted(ctx, rtePods)
+					Expect(err).ToNot(HaveOccurred(), "Expected all RTE pods owned by the DaemonSet to be deleted within the timeout")
 
 					tnts, _, err = taints.ParseTaints([]string{testTaint()})
 					Expect(err).ToNot(HaveOccurred())
