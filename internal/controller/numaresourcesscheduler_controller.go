@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -127,6 +128,18 @@ func (r *NUMAResourcesSchedulerReconciler) SetupWithManager(mgr ctrl.Manager) er
 				!apiequality.Semantic.DeepEqual(e.ObjectNew.GetAnnotations(), e.ObjectOld.GetAnnotations())
 		},
 	}
+	nodesPredicate := predicate.Funcs{
+		// we only care about cases when nodes are getting created or deleted
+		CreateFunc: func(e event.TypedCreateEvent[client.Object]) bool {
+			return true
+		},
+		DeleteFunc: func(e event.TypedDeleteEvent[client.Object]) bool {
+			return true
+		},
+		UpdateFunc: func(e event.TypedUpdateEvent[client.Object]) bool {
+			return false
+		},
+	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&nropv1.NUMAResourcesScheduler{}).
@@ -135,7 +148,23 @@ func (r *NUMAResourcesSchedulerReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Owns(&corev1.ServiceAccount{}, builder.WithPredicates(p)).
 		Owns(&corev1.ConfigMap{}, builder.WithPredicates(p)).
 		Owns(&appsv1.Deployment{}, builder.WithPredicates(p)).
+		Watches(&corev1.Node{}, handler.EnqueueRequestsFromMapFunc(r.nodeToNUMAResourcesScheduler),
+			builder.WithPredicates(nodesPredicate)).
 		Complete(r)
+}
+
+func (r *NUMAResourcesSchedulerReconciler) nodeToNUMAResourcesScheduler(ctx context.Context, object client.Object) []reconcile.Request {
+	var requests []reconcile.Request
+	nross := &nropv1.NUMAResourcesSchedulerList{}
+	if err := r.List(ctx, nross); err != nil {
+		klog.ErrorS(err, "failed to List NUMAResourcesScheduler")
+	}
+	for _, instance := range nross.Items {
+		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKey{
+			Name: instance.Name,
+		}})
+	}
+	return requests
 }
 
 func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (reconcile.Result, string, error) {
