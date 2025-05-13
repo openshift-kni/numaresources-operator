@@ -33,6 +33,7 @@ import (
 
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/defaulter"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
 )
 
@@ -96,6 +97,7 @@ func TestApplyObject(t *testing.T) {
 				Desired:  mutateCM(cmExist),
 				Compare:  compare.Object,
 				Merge:    merge.MetadataForUpdate,
+				Default:  defaulter.None,
 			},
 			expectApplied: true,
 		},
@@ -106,6 +108,7 @@ func TestApplyObject(t *testing.T) {
 				Desired:  mutateDS(dsExist),
 				Compare:  compare.Object,
 				Merge:    merge.MetadataForUpdate,
+				Default:  defaulter.DaemonSet,
 			},
 			expectApplied: true,
 		},
@@ -116,6 +119,7 @@ func TestApplyObject(t *testing.T) {
 				Desired:  mutateCM(cmExist),
 				Compare:  compare.Object,
 				Merge:    merge.MetadataForUpdate,
+				Default:  defaulter.None,
 			},
 			expectApplied: true,
 		},
@@ -127,6 +131,7 @@ func TestApplyObject(t *testing.T) {
 				Desired:  dsExist,
 				Compare:  compare.Object,
 				Merge:    merge.MetadataForUpdate,
+				Default:  defaulter.DaemonSet,
 			},
 			expectApplied: false,
 		},
@@ -167,6 +172,7 @@ func TestApplyState(t *testing.T) {
 				Desired:  mutateCM(cmExist),
 				Compare:  compare.Object,
 				Merge:    merge.MetadataForUpdate,
+				Default:  defaulter.None,
 			},
 			scratch:                &corev1.ConfigMap{},
 			expectCreatedOrUpdated: true,
@@ -178,6 +184,7 @@ func TestApplyState(t *testing.T) {
 				Desired:  mutateDS(dsExist),
 				Compare:  compare.Object,
 				Merge:    merge.MetadataForUpdate,
+				Default:  defaulter.DaemonSet,
 			},
 			scratch:                &appsv1.DaemonSet{},
 			expectCreatedOrUpdated: true,
@@ -189,6 +196,7 @@ func TestApplyState(t *testing.T) {
 				Desired:  mutateCM(cmExist),
 				Compare:  compare.Object,
 				Merge:    merge.MetadataForUpdate,
+				Default:  defaulter.None,
 			},
 			scratch:                &corev1.ConfigMap{},
 			expectCreatedOrUpdated: true,
@@ -201,6 +209,7 @@ func TestApplyState(t *testing.T) {
 				Desired:  dsExist,
 				Compare:  compare.Object,
 				Merge:    merge.MetadataForUpdate,
+				Default:  defaulter.DaemonSet,
 			},
 			scratch:    &appsv1.DaemonSet{},
 			expectSkip: true,
@@ -212,6 +221,7 @@ func TestApplyState(t *testing.T) {
 				Desired:  nil,
 				Compare:  compare.Object,
 				Merge:    merge.MetadataForUpdate,
+				Default:  defaulter.None,
 			},
 			scratch:       &corev1.ConfigMap{},
 			expectDeleted: true,
@@ -223,6 +233,7 @@ func TestApplyState(t *testing.T) {
 				Desired:  nil,
 				Compare:  compare.Object,
 				Merge:    merge.MetadataForUpdate,
+				Default:  defaulter.DaemonSet,
 			},
 			scratch:       &appsv1.DaemonSet{},
 			expectDeleted: true,
