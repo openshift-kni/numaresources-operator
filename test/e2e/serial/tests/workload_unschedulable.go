@@ -63,8 +63,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 	var nrts []nrtv1alpha2.NodeResourceTopology
 	var tmScope string
+	var requiredNUMAZones int
 
 	BeforeEach(func() {
+		requiredNUMAZones = 2 // TODO: exactly 2. Adjust (among many other instances) when we get machines with more than 2 NUMA zones.
+
 		Expect(serialconfig.Config).ToNot(BeNil())
 
 		var err error
@@ -84,9 +87,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 		}
 
-		nrts = e2enrt.FilterZoneCountEqual(nrts, 2)
-		if len(nrts) < 2 {
-			e2efixture.Skipf(fxt, "not enough nodes with %d NUMA zones - found %d", 2, len(nrts))
+		nrts = e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
+		if len(nrts) < requiredNUMAZones {
+			e2efixture.Skipf(fxt, "not enough nodes with %d NUMA zones - found %d", requiredNUMAZones, len(nrts))
 		}
 
 		// we expect having the same policy across all NRTs
@@ -116,7 +119,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 		BeforeEach(func() {
 			neededNodes := 1
 
-			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
 			nrtCandidates = e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
 			if len(nrtCandidates) < neededNodes {
@@ -323,7 +325,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 	Context("with at least two nodes with two numa zones and enough resources in one numa zone", func() {
 		It("[test_id:47592] a daemonset with a guaranteed pod resources available on one node/one single numa zone but not in any other node", Label(label.Tier2, "unsched", "failalign"), func() {
-			requiredNUMAZones := 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
 
@@ -455,8 +456,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			// Requirements:
 			// Need at least this nodes
 			neededNodes := 1
-			// with at least this number of numa zones
-			requiredNUMAZones := 2
 			// and with this policy/scope
 			tmPolicy := intnrt.SingleNUMANode
 			tmScope := intnrt.Pod
@@ -645,7 +644,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			xload := resourcelist.Highest(ress...)
 			klog.Infof("highest base load resource cost (overall): %s", resourcelist.ToString(xload))
 
-			labSel, err := labels.Parse(serialconfig.MultiNUMALabel + "=2")
+			labSel, err := labels.Parse(fmt.Sprintf("%s=%d", serialconfig.MultiNUMALabel, requiredNUMAZones))
 			Expect(err).ToNot(HaveOccurred())
 			nodesNameSet := e2enrt.AccumulateNames(nrts)
 
@@ -667,7 +666,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			nrtInitialList := e2efixture.MustSettleNRT(fxt)
 
 			dpName := "test-dp-47615"
-			replicas := int32(len(nrts)*2 + 1) // at least 1 replica won't fit
+			replicas := int32(len(nrts)*requiredNUMAZones + 1) // at least 1 replica won't fit
 			By(fmt.Sprintf("creating a deployment %q with replicas %d candidate nodes %d", dpName, replicas, len(nrts)))
 
 			nroSchedObj := nrosched.CheckNROSchedulerAvailable(ctx, fxt.Client, objectnames.DefaultNUMAResourcesSchedulerCrName)
@@ -759,7 +758,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			// we should expect 'expectedReadyReplicas' out of total replica pods to be running
 			// each NUMA cell should hold a single pod, so we should expect the number of replicas to be equal to number of available NUMAs
 			// multiNUMACandidates nodes has 2 NUMAs each
-			expectedReadyReplicas := int32(len(nrts) * 2)
+			expectedReadyReplicas := int32(len(nrts) * requiredNUMAZones)
 
 			By("updating deployment in such way that some pods will fit into NUMA nodes")
 			var updateAttempt int
@@ -827,7 +826,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 		var err error
 
 		BeforeEach(func() {
-			const requiredNUMAZones = 2
 			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
 			nrtCandidates = e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
 
