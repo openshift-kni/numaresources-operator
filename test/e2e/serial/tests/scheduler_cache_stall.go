@@ -47,6 +47,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
+type setupJobFunc func(job *batchv1.Job)
+
 var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("scheduler", "cache", "stall"), Label("feature:cache", "feature:stall"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
@@ -116,11 +118,12 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 			var hostsRequired int
 			var NUMAZonesRequired int
 			var expectedJobPodsPerNode int
-			var cpusPerPod int64 = 2 // must be even. Must be >= 2
+			var cpusPerPod int64
 
 			BeforeEach(func() {
 				hostsRequired = 2
 				NUMAZonesRequired = 2
+				cpusPerPod = 2 // must be even. Must be >= 2
 
 				By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
 				nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
@@ -128,113 +131,153 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
 				}
 				klog.Infof("Found %d nodes with %d NUMA zones", len(nrtCandidates), NUMAZonesRequired)
-
-				expectedJobPodsPerNode = 2 // anything >= 1 should be fine
-				idleJob = makeIdleJob(fxt.Namespace.Name, expectedJobPodsPerNode, len(nrtCandidates))
-
-				err := fxt.Client.Create(context.TODO(), idleJob) // will be removed by the fixture
-				Expect(err).ToNot(HaveOccurred())
-
-				_, err = wait.With(fxt.Client).Interval(3*time.Second).Timeout(30*time.Second).ForJobCompleted(context.TODO(), namespacedname.FromObject(idleJob))
-				Expect(err).ToNot(HaveOccurred())
-
-				// ensure foreign pods are reported
-				e2efixture.MustSettleNRT(fxt)
 			})
 
-			It("should be able to schedule pods with no stalls", func() {
+			DescribeTable("should be able to schedule pods with no stalls",
+				func(setupJob setupJobFunc) {
+					ctx := context.TODO()
 
-				desiredPodsPerNode := 2
-				desiredPods := hostsRequired * desiredPodsPerNode
+					expectedJobPodsPerNode = 2 // anything >= 1 should be fine
 
-				// we use 2 Nodes each with 2 NUMA zones for practicality: this is the simplest scenario needed, which is also good
-				// for HW availability. Adding more nodes is trivial, consuming more NUMA zones is doable but requires careful re-evaluation.
-				// We want to run more pods that can be aligned correctly on nodes, considering pessimistic overreserve
+					idleJob = makeIdleJob(fxt.Namespace.Name, expectedJobPodsPerNode, len(nrtCandidates))
+					setupJob(idleJob)
 
-				// we can assume now all the zones from all the nodes are equal from cpu/memory resource perspective
-				referenceNode := nrtCandidates[0]
-				referenceZone := referenceNode.Zones[0]
-				cpuQty, ok := e2enrt.FindResourceAvailableByName(referenceZone.Resources, string(corev1.ResourceCPU))
-				Expect(ok).To(BeTrue(), "no CPU resource in zone %q node %q", referenceZone.Name, referenceNode.Name)
+					Expect(fxt.Client.Create(ctx, idleJob)).To(Succeed()) // will be removed by the fixture
+					_, err := wait.With(fxt.Client).Interval(3*time.Second).Timeout(30*time.Second).ForJobCompleted(ctx, namespacedname.FromObject(idleJob))
+					Expect(err).ToNot(HaveOccurred())
+					// ensure foreign pods are reported
+					e2efixture.MustSettleNRT(fxt)
 
-				cpuNum, ok := cpuQty.AsInt64()
-				Expect(ok).To(BeTrue(), "invalid CPU resource in zone %q node %q: %v", referenceZone.Name, referenceNode.Name, cpuQty)
+					desiredPodsPerNode := 2
+					desiredPods := hostsRequired * desiredPodsPerNode
 
-				cpuPerPod := int(float64(cpuNum) * 0.6) // anything that consumes > 50% (because overreserve over 2 NUMA zones) is fine
-				memoryPerPod := 8 * 1024 * 1024 * 1024  // random non-zero amount
+					// we use 2 Nodes each with 2 NUMA zones for practicality: this is the simplest scenario needed, which is also good
+					// for HW availability. Adding more nodes is trivial, consuming more NUMA zones is doable but requires careful re-evaluation.
+					// We want to run more pods that can be aligned correctly on nodes, considering pessimistic overreserve
 
-				// so we have now:
-				// - because of CPU request > 51% of available, a NUMA zone can run at most 1 pod.
-				// - because of the overreservation, a single pod will consume resources on BOTH NUMA zones
-				// - hence at most 1 pod per compute node should be running until reconciliation catches up
+					// we can assume now all the zones from all the nodes are equal from cpu/memory resource perspective
+					referenceNode := nrtCandidates[0]
+					referenceZone := referenceNode.Zones[0]
+					cpuQty, ok := e2enrt.FindResourceAvailableByName(referenceZone.Resources, string(corev1.ResourceCPU))
+					Expect(ok).To(BeTrue(), "no CPU resource in zone %q node %q", referenceZone.Name, referenceNode.Name)
 
-				podRequiredRes := corev1.ResourceList{
-					corev1.ResourceMemory: *resource.NewQuantity(int64(memoryPerPod), resource.BinarySI),
-					corev1.ResourceCPU:    *resource.NewQuantity(int64(cpuPerPod), resource.DecimalSI),
-				}
+					cpuNum, ok := cpuQty.AsInt64()
+					Expect(ok).To(BeTrue(), "invalid CPU resource in zone %q node %q: %v", referenceZone.Name, referenceNode.Name, cpuQty)
 
-				var zero int64
-				testPods := []*corev1.Pod{}
-				for seqno := 0; seqno < desiredPods; seqno++ {
-					pod := &corev1.Pod{
-						ObjectMeta: metav1.ObjectMeta{
-							Name:      fmt.Sprintf("stall-generic-pod-%d", seqno),
-							Namespace: fxt.Namespace.Name,
-						},
-						Spec: corev1.PodSpec{
-							SchedulerName:                 serialconfig.Config.SchedulerName,
-							TerminationGracePeriodSeconds: &zero,
-							Containers: []corev1.Container{
-								{
-									Name:    fmt.Sprintf("stall-generic-cnt-%d", seqno),
-									Image:   images.GetPauseImage(),
-									Command: []string{images.PauseCommand},
-									Resources: corev1.ResourceRequirements{
-										Limits: podRequiredRes,
+					cpuPerPod := int(float64(cpuNum) * 0.6) // anything that consumes > 50% (because overreserve over 2 NUMA zones) is fine
+					memoryPerPod := 8 * 1024 * 1024 * 1024  // random non-zero amount
+
+					// so we have now:
+					// - because of CPU request > 51% of available, a NUMA zone can run at most 1 pod.
+					// - because of the overreservation, a single pod will consume resources on BOTH NUMA zones
+					// - hence at most 1 pod per compute node should be running until reconciliation catches up
+
+					podRequiredRes := corev1.ResourceList{
+						corev1.ResourceMemory: *resource.NewQuantity(int64(memoryPerPod), resource.BinarySI),
+						corev1.ResourceCPU:    *resource.NewQuantity(int64(cpuPerPod), resource.DecimalSI),
+					}
+
+					var zero int64
+					testPods := []*corev1.Pod{}
+					for seqno := 0; seqno < desiredPods; seqno++ {
+						pod := &corev1.Pod{
+							ObjectMeta: metav1.ObjectMeta{
+								Name:      fmt.Sprintf("stall-generic-pod-%d", seqno),
+								Namespace: fxt.Namespace.Name,
+							},
+							Spec: corev1.PodSpec{
+								SchedulerName:                 serialconfig.Config.SchedulerName,
+								TerminationGracePeriodSeconds: &zero,
+								Containers: []corev1.Container{
+									{
+										Name:    fmt.Sprintf("stall-generic-cnt-%d", seqno),
+										Image:   images.GetPauseImage(),
+										Command: []string{images.PauseCommand},
+										Resources: corev1.ResourceRequirements{
+											Limits: podRequiredRes,
+										},
 									},
 								},
 							},
-						},
+						}
+						testPods = append(testPods, pod)
 					}
-					testPods = append(testPods, pod)
-				}
 
-				// note a compute node can handle exactly 2 pods because how we constructed the requirements.
-				// scheduling 2 pods right off the bat on the same compute node is actually correct (it will work)
-				// but it's not the behavior we expect. A conforming scheduler is expected to send first two pods,
-				// wait for reconciliation, then send the missing two.
+					// note a compute node can handle exactly 2 pods because how we constructed the requirements.
+					// scheduling 2 pods right off the bat on the same compute node is actually correct (it will work)
+					// but it's not the behavior we expect. A conforming scheduler is expected to send first two pods,
+					// wait for reconciliation, then send the missing two.
 
-				klog.Infof("Creating %d pods each requiring %q", desiredPods, e2ereslist.ToString(podRequiredRes))
-				for _, testPod := range testPods {
-					err := fxt.Client.Create(context.TODO(), testPod)
-					Expect(err).ToNot(HaveOccurred())
-				}
-				// note the cleanup is done automatically once the ns on which we run is deleted - the fixture takes care
-
-				// very generous timeout here. It's hard and racy to check we had 2 pods pending (expected phased scheduling),
-				// but that would be the most correct and stricter testing.
-				failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodListAllRunning(context.TODO(), testPods)
-				if len(failedPods) > 0 {
-					nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
-					klog.Infof("%s", intnrt.ListToString(nrtListFailed.Items, "post failure"))
-
-					for _, failedPod := range failedPods {
-						_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
+					klog.Infof("Creating %d pods each requiring %q", desiredPods, e2ereslist.ToString(podRequiredRes))
+					for _, testPod := range testPods {
+						err := fxt.Client.Create(context.TODO(), testPod)
+						Expect(err).ToNot(HaveOccurred())
 					}
-				}
-				Expect(failedPods).To(BeEmpty(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
+					// note the cleanup is done automatically once the ns on which we run is deleted - the fixture takes care
 
-				for _, updatedPod := range updatedPods {
-					schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
-				}
-			})
+					// very generous timeout here. It's hard and racy to check we had 2 pods pending (expected phased scheduling),
+					// but that would be the most correct and stricter testing.
+					failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodListAllRunning(context.TODO(), testPods)
+					if len(failedPods) > 0 {
+						nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
+						klog.Infof("%s", intnrt.ListToString(nrtListFailed.Items, "post failure"))
+
+						for _, failedPod := range failedPods {
+							_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
+						}
+					}
+					Expect(failedPods).To(BeEmpty(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
+
+					for _, updatedPod := range updatedPods {
+						schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+					}
+				},
+				Entry("vs best-effort pods", Label(label.Tier1), func(job *batchv1.Job) {
+					klog.Infof("Creating a job whose containers have requests=none")
+				}),
+				Entry("vs burstable pods", Label(label.Tier1), func(job *batchv1.Job) {
+					jobRequiredRes := corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("256Mi"),
+					}
+					for idx := 0; idx < len(idleJob.Spec.Template.Spec.Containers); idx++ {
+						cnt := &idleJob.Spec.Template.Spec.Containers[idx] // shortcut
+						cnt.Resources = corev1.ResourceRequirements{
+							Requests: jobRequiredRes,
+						}
+					}
+					klog.Infof("Creating a job whose containers have requests=%q", e2ereslist.ToString(jobRequiredRes))
+				}),
+				Entry("vs guaranteed pods", Label(label.Tier1), func(job *batchv1.Job) {
+					jobRequiredRes := corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("256Mi"),
+					}
+					for idx := 0; idx < len(idleJob.Spec.Template.Spec.Containers); idx++ {
+						cnt := &idleJob.Spec.Template.Spec.Containers[idx] // shortcut
+						cnt.Resources = corev1.ResourceRequirements{
+							Limits: jobRequiredRes,
+						}
+					}
+					klog.Infof("Creating a job whose containers have limits=%q", e2ereslist.ToString(jobRequiredRes))
+				}),
+			)
 
 			DescribeTable("[nodeAll] against all the available worker nodes", Label("nodeAll"),
 				// like non-regression tests, but with jobs present
-
 				func(setupPod setupPodFunc) {
+					expectedJobPodsPerNode = 2 // anything >= 1 should be fine
+					idleJob = makeIdleJob(fxt.Namespace.Name, expectedJobPodsPerNode, len(nrtCandidates))
+
+					ctx := context.TODO()
+					Expect(fxt.Client.Create(ctx, idleJob)).To(Succeed()) // will be removed by the fixture
+					_, err := wait.With(fxt.Client).Interval(3*time.Second).Timeout(30*time.Second).ForJobCompleted(ctx, namespacedname.FromObject(idleJob))
+					Expect(err).ToNot(HaveOccurred())
+					// ensure foreign pods are reported
+					e2efixture.MustSettleNRT(fxt)
+
 					timeout := nroSchedObj.Status.CacheResyncPeriod.Round(time.Second) * 10
 					klog.Infof("pod running timeout: %v", timeout)
 
@@ -346,10 +389,11 @@ func makeIdleJob(jobNamespace string, expectedJobPodsPerNode, numWorkerNodes int
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
-							Name:    "generic-job-idle",
-							Image:   images.GetPauseImage(),
-							Command: []string{"/bin/sleep"},
-							Args:    []string{"1s"},
+							Name:      "generic-job-idle",
+							Image:     images.GetPauseImage(),
+							Command:   []string{"/bin/sleep"},
+							Args:      []string{"1s"},
+							Resources: corev1.ResourceRequirements{},
 						},
 					},
 					RestartPolicy: corev1.RestartPolicyNever,
