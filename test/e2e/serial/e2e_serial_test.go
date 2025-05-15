@@ -24,6 +24,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	_ "github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
@@ -38,6 +39,8 @@ func TestSerial(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
+	Expect(e2eclient.ClientsEnabled).To(BeTrue(), "cannot create kubernetes clients")
+
 	ctx := context.Background()
 	serialconfig.DumpEnvironment(os.Stderr) // logging is not fully setup yet, we need to bruteforce
 	Expect(serialconfig.CheckNodesTopology(ctx)).Should(Succeed())
