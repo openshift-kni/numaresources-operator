@@ -44,7 +44,7 @@ func TestReadMalformed(t *testing.T) {
 
 func TestReadValidData(t *testing.T) {
 	content := []byte(testData)
-	tmpfile, err := os.CreateTemp("", "testrteconfig")
+	tmpfile, err := os.CreateTemp(t.TempDir(), "testrteconfig")
 	if err != nil {
 		t.Errorf("creating tempfile: %v", err)
 	}
