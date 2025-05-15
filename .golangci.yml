@@ -44,10 +44,10 @@ linters:
     - nolintlint
     - nosprintfhostport
     - staticcheck
-    - tenv
     - typecheck
     - unconvert
     - unused
+    - usetesting
     - wastedassign
     - whitespace
     - gocritic
