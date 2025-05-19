@@ -22,6 +22,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	corev1 "k8s.io/api/core/v1"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
@@ -108,4 +110,40 @@ func (wt Waiter) ForPodListAllRunning(ctx context.Context, pods []*corev1.Pod) (
 	}
 	wg.Wait()
 	return failed, updated
+}
+
+func (wt Waiter) ForPodListAllDeleted(ctx context.Context, pods []corev1.Pod) error {
+	if len(pods) == 0 {
+		klog.Infof("ForPodListAllDeleted called with an empty list of pods. Nothing to do.")
+		return nil
+	}
+
+	klog.Infof("Waiting for %d pod(s) to be deleted.", len(pods))
+
+	var eg errgroup.Group
+	for idx := range pods {
+		pod := pods[idx]
+		podKey := client.ObjectKeyFromObject(&pod).String()
+
+		eg.Go(func() error {
+			klog.Infof("Goroutine started: waiting for pod %s to be deleted.", podKey)
+			err := wt.ForPodDeleted(ctx, pod.Namespace, pod.Name)
+			if err != nil {
+				klog.Warningf("Failed to confirm deletion for pod %s: %v", podKey, err)
+			} else {
+				klog.Infof("Successfully confirmed deletion for pod %s.", podKey)
+			}
+			return err
+		})
+	}
+
+	err := eg.Wait()
+
+	if err != nil {
+		klog.Warningf("One or more pods were not deleted successfully: %v", err)
+	} else {
+		klog.Info("All pods were successfully deleted")
+	}
+
+	return err
 }
