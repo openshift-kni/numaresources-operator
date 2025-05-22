@@ -1,0 +1,22 @@
+---
+lockfileVersion: 1
+lockfileVendor: redhat
+arches:
+- arch: x86_64
+  packages:
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.4/x86_64/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 361526
+    checksum: sha256:506ad778f63821e8d9647ca8e0a3ff21b8af9c1666060d5200f9b26ee718333c
+    name: procps-ng
+    evr: 3.3.17-14.el9
+    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.4/x86_64/baseos/os/Packages/r/rsync-3.2.3-19.el9.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 411313
+    checksum: sha256:ee29f2138b7f732ba3e552281c4bdf56c71112a17c19dd941135aa56c22cb2c8
+    name: rsync
+    evr: 3.2.3-19.el9
+    sourcerpm: rsync-3.2.3-19.el9.src.rpm
+  source: []
+  module_metadata: []
