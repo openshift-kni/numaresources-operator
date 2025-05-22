@@ -76,7 +76,7 @@ func TestToString(t *testing.T) {
 	}
 }
 
-func TestAddCoreResources(t *testing.T) {
+func TestAddInPlace(t *testing.T) {
 	type testCase struct {
 		res      corev1.ResourceList
 		resToAdd corev1.ResourceList
@@ -108,7 +108,7 @@ func TestAddCoreResources(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(ToString(tc.expected), func(t *testing.T) {
 			res := tc.res.DeepCopy()
-			AddCoreResources(res, tc.resToAdd)
+			AddInPlace(res, tc.resToAdd)
 			// comparing strings it just easier
 			got := ToString(res)
 			expected := ToString(tc.expected)
@@ -119,7 +119,7 @@ func TestAddCoreResources(t *testing.T) {
 	}
 }
 
-func TestSubCoreResources(t *testing.T) {
+func TestSubInPlace(t *testing.T) {
 	type testCase struct {
 		res      corev1.ResourceList
 		resToSub corev1.ResourceList
@@ -168,7 +168,7 @@ func TestSubCoreResources(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(ToString(tc.expected), func(t *testing.T) {
 			res := tc.res.DeepCopy()
-			err := SubCoreResources(res, tc.resToSub)
+			err := SubInPlace(res, tc.resToSub)
 			if err != nil {
 				t.Errorf("Error while calculating resources: %s", err.Error())
 			}

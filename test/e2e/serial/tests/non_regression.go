@@ -390,7 +390,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				corev1.ResourceCPU:    resource.MustParse("1"),
 				corev1.ResourceMemory: resource.MustParse("100Mi"),
 			}
-			e2ereslist.AddCoreResources(requiredRes, minRes)
+			e2ereslist.AddInPlace(requiredRes, minRes)
 
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName

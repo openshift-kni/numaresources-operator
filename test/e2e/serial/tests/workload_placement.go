@@ -635,7 +635,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			dataAfter, err := yaml.Marshal(nrtPostCreate)
 			Expect(err).ToNot(HaveOccurred())
 			// Adding resources of both the replicas
-			e2ereslist.AddCoreResources(rl0, rl1)
+			e2ereslist.AddInPlace(rl0, rl1)
 
 			match, err := checkConsumedRes(*nrtInitial, *nrtPostCreate, rl0, corev1qos.GetPodQOS(&updatedPod0))
 			Expect(err).ToNot(HaveOccurred())
@@ -649,7 +649,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				corev1.ResourceMemory: resource.MustParse("100Mi"),
 			}
 
-			err = e2ereslist.SubCoreResources(reqResources, resourceDiff)
+			err = e2ereslist.SubInPlace(reqResources, resourceDiff)
 			Expect(err).ToNot(HaveOccurred())
 
 			updatedDp.Spec.Template.Spec.Containers[0].Resources.Requests = reqResources
@@ -701,7 +701,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			dataAfterUpdate, err := yaml.Marshal(nrtPostUpdate)
 			Expect(err).ToNot(HaveOccurred())
 			// Adding resources of both the replicas
-			e2ereslist.AddCoreResources(rl0, rl1)
+			e2ereslist.AddInPlace(rl0, rl1)
 			match, err = checkConsumedRes(*nrtInitial, *nrtPostUpdate, rl0, corev1qos.GetPodQOS(&updatedPod0))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(BeEmpty(), "inconsistent accounting: no resources consumed by the running pod,\nNRT before test's pod: %s \nNRT after: %s \n total required resources: %s", dataBefore, dataAfterUpdate, e2ereslist.ToString(rl0))

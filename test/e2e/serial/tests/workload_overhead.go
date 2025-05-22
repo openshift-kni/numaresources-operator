@@ -164,8 +164,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				klog.Infof("kubernetes pod fixed overhead rounded to: %s", resourcelist.ToString(podFixedOverhead))
 
 				zoneRequiredResources := podResources.DeepCopy()
-				resourcelist.AddCoreResources(zoneRequiredResources, podFixedOverhead)
-				resourcelist.AddCoreResources(zoneRequiredResources, minRes)
+				resourcelist.AddInPlace(zoneRequiredResources, podFixedOverhead)
+				resourcelist.AddInPlace(zoneRequiredResources, minRes)
 
 				resStr := resourcelist.ToString(zoneRequiredResources)
 				klog.Infof("kubernetes final zone required resources: %s", resStr)
@@ -251,7 +251,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
 				podResourcesWithOverhead := podResources.DeepCopy()
-				resourcelist.AddCoreResources(podResourcesWithOverhead, podFixedOverhead)
+				resourcelist.AddInPlace(podResourcesWithOverhead, podFixedOverhead)
 
 				for _, pod := range pods {
 					Expect(pod.Spec.NodeName).To(Equal(targetNodeName))
@@ -328,8 +328,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				klog.Infof("kubernetes pod fixed overhead rounded to: %s", resourcelist.ToString(podFixedOverhead))
 
 				zoneRequiredResources := podResources.DeepCopy()
-				resourcelist.AddCoreResources(zoneRequiredResources, podFixedOverhead)
-				resourcelist.AddCoreResources(zoneRequiredResources, minRes)
+				resourcelist.AddInPlace(zoneRequiredResources, podFixedOverhead)
+				resourcelist.AddInPlace(zoneRequiredResources, minRes)
 
 				resStr := resourcelist.ToString(zoneRequiredResources)
 				klog.Infof("kubernetes final zone required resources: %s", resStr)
