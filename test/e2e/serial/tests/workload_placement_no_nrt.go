@@ -18,6 +18,7 @@ package tests
 
 import (
 	"context"
+	"github.com/openshift-kni/numaresources-operator/test/internal/hypershift"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -64,7 +65,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 	Context("[no_nrt] using the NUMA-aware scheduler without updated NRT data", Label("no_nrt"), func() {
 		var testPod *corev1.Pod
 		nropObjInitial := &nropv1.NUMAResourcesOperator{}
-		initialInfoRefreshPause := *nropv1.DefaultNodeGroupConfig().InfoRefreshPause
+		var initialInfoRefreshPause nropv1.InfoRefreshPauseMode
 		nroKey := objects.NROObjectKey()
 
 		BeforeEach(func() {
@@ -76,10 +77,14 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			if len(nropObjInitial.Spec.NodeGroups) != 1 {
 				Skip("this test doesn't support more than one node group")
 			}
-			// temporary w/a for OCPBUGS-16058
-			if nropObjInitial.Spec.NodeGroups[0].Config != nil && nropObjInitial.Spec.NodeGroups[0].Config.InfoRefreshPause != nil {
-				initialInfoRefreshPause = *nropObjInitial.Spec.NodeGroups[0].Config.InfoRefreshPause
+
+			if hypershift.IsHypershiftCluster() {
+				initialInfoRefreshPause = *nropObjInitial.Status.NodeGroups[0].Config.InfoRefreshPause
+			} else {
+				// keep fetching Status.MachineConfigPools because the Status.NodeGroups is not backward compatible
+				initialInfoRefreshPause = *nropObjInitial.Status.MachineConfigPools[0].Config.InfoRefreshPause
 			}
+
 			infoRefreshPauseMode := nropv1.InfoRefreshPauseEnabled
 			updateInfoRefreshPause(fxt, infoRefreshPauseMode, nropObjInitial)
 		})
@@ -163,11 +168,7 @@ func updateInfoRefreshPause(fxt *e2efixture.Fixture, newVal nropv1.InfoRefreshPa
 	currentNrop := &nropv1.NUMAResourcesOperator{}
 	err := fxt.Client.Get(context.TODO(), nroKey, currentNrop)
 	Expect(err).ToNot(HaveOccurred())
-	currentVal := *nropv1.DefaultNodeGroupConfig().InfoRefreshPause
-	// temporary w/a for OCPBUGS-16058
-	if currentNrop.Spec.NodeGroups[0].Config != nil && currentNrop.Spec.NodeGroups[0].Config.InfoRefreshPause != nil {
-		currentVal = *currentNrop.Spec.NodeGroups[0].Config.InfoRefreshPause
-	}
+	currentVal := *currentNrop.Status.MachineConfigPools[0].Config.InfoRefreshPause
 	if currentVal == newVal {
 		klog.Infof("profile already has the updated InfoRefreshPause: %s=%s", currentVal, newVal)
 		return
@@ -188,17 +189,22 @@ func updateInfoRefreshPause(fxt *e2efixture.Fixture, newVal nropv1.InfoRefreshPa
 
 	klog.Info("wait long enough to verify the NROP object is updated")
 	updatedObj := &nropv1.NUMAResourcesOperator{}
+	var currentMode nropv1.InfoRefreshPauseMode
 	Eventually(func() bool {
 		err = fxt.Client.Get(context.TODO(), nroKey, updatedObj)
 		Expect(err).ToNot(HaveOccurred())
 
-		// TODO replace with updatedObj.Status.MachineConfigPools[0].Config.InfoRefreshPause when OCPBUGS-16058 is resolved.
-		// currently the functionality of the new flag works bt is matter of not reflecting it in resources status. also we
-		// wait for the respective ds to get ready with the new pods so we should be safe
-		if *updatedObj.Spec.NodeGroups[0].Config.InfoRefreshPause != newVal {
-			klog.Warningf("resource status is not updated yet: expected %q found %q", newVal, *updatedObj.Spec.NodeGroups[0].Config.InfoRefreshPause)
+		if hypershift.IsHypershiftCluster() {
+			currentMode = *updatedObj.Status.NodeGroups[0].Config.InfoRefreshPause
+		} else {
+			// keep fetching Status.MachineConfigPools because the Status.NodeGroups is not backward compatible
+			currentMode = *updatedObj.Status.MachineConfigPools[0].Config.InfoRefreshPause
+		}
+		if currentMode != newVal {
+			klog.Warningf("resource status is not updated yet: expected %q found %q", newVal, currentMode)
 			return false
 		}
+
 		return true
 	}).WithTimeout(2*time.Minute).WithPolling(9*time.Second).Should(BeTrue(), "Status of NROP failed to get updated")
 
