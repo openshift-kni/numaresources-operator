@@ -1,4 +1,4 @@
-FROM brew.registry.redhat.io/rh-osbs/openshift-ose-must-gather-rhel9:v4.20@sha256:23a673af8dfe9e048c4a348a671d8c3b741e4a2fff37b54c0f825b9810940d99 as mgbuilder
+FROM brew.registry.redhat.io/rh-osbs/openshift-ose-must-gather-rhel9:v4.20@sha256:e8c0c8e368ec57d35bb9e7a31ef52216133fd9719933688ab3ddbdfdebf97028 as mgbuilder
 
 COPY . .
 
