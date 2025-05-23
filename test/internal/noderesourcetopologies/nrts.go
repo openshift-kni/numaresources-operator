@@ -228,6 +228,7 @@ func accumulateNodeAvailableResources(nrt nrtv1alpha2.NodeResourceTopology, reas
 	klog.Infof("resInfoList available %s: %s", reason, e2enrt.ResourceInfoListToString(resInfoList))
 	return resInfoList, nil
 }
+
 func SaturateZoneUntilLeft(zone nrtv1alpha2.Zone, requiredRes corev1.ResourceList, filter func(corev1.ResourceList) corev1.ResourceList) (corev1.ResourceList, error) {
 	paddingRes := make(corev1.ResourceList)
 	filteredRes := filter(requiredRes)
@@ -256,6 +257,7 @@ func DropHostLevelResources(res corev1.ResourceList) corev1.ResourceList {
 	delete(newList, corev1.ResourceEphemeralStorage)
 	return newList
 }
+
 func SaturateNodeUntilLeft(nrtInfo nrtv1alpha2.NodeResourceTopology, requiredRes corev1.ResourceList) (map[string]corev1.ResourceList, error) {
 	//TODO: support splitting the requiredRes on multiple numas
 	//corrently the function deducts the requiredRes from the first Numa
@@ -533,47 +535,6 @@ func ResourceInfoListToResourceList(ri nrtv1alpha2.ResourceInfoList) corev1.Reso
 		rl[corev1.ResourceName(res.Name)] = res.Available
 	}
 	return rl
-}
-
-func FilterAnyZoneProvidingResourcesAtMost(nrts []nrtv1alpha2.NodeResourceTopology, resourceName string, maxResources int64, maxZones int) []nrtv1alpha2.NodeResourceTopology {
-	maxQty := *resource.NewQuantity(maxResources, resource.DecimalSI)
-	ret := []nrtv1alpha2.NodeResourceTopology{}
-	for _, nrt := range nrts {
-		matches := 0
-		for _, zone := range nrt.Zones {
-			klog.Infof(" ----> node %q zone %q provides %s request resource %q", nrt.Name, zone.Name, e2ereslist.ToString(AvailableFromZone(zone)), resourceName)
-			if !ResourceInfoProvidingAtMost(zone.Resources, resourceName, maxQty) {
-				continue
-			}
-			matches++
-		}
-		if matches == 0 {
-			klog.Warningf("SKIP: node %q does NOT provide %q at all!", nrt.Name, resourceName)
-			continue
-		}
-		if matches > maxZones {
-			klog.Warningf("SKIP: node %q provides %q on %d zones (looking max=%d)", nrt.Name, resourceName, matches, maxZones)
-			continue
-		}
-		klog.Infof("ADD : node %q provides %q on %d/%d zones", nrt.Name, resourceName, matches, len(nrt.Zones))
-		ret = append(ret, nrt)
-	}
-	return ret
-}
-
-func ResourceInfoProvidingAtMost(resources []nrtv1alpha2.ResourceInfo, resName string, resQty resource.Quantity) bool {
-	zoneQty, ok := FindResourceAvailableByName(resources, resName)
-	klog.Infof("  +--> checking if resources include %q in (0, %s] (zoneQty=%s found=%v)", resName, resQty.String(), zoneQty.String(), ok)
-	if !ok {
-		return false
-	}
-	if zoneQty.IsZero() {
-		return false
-	}
-	if zoneQty.Cmp(resQty) < 0 {
-		return false
-	}
-	return true
 }
 
 func EqualNRTListsItems(nrtListA, nrtListB nrtv1alpha2.NodeResourceTopologyList) (bool, error) {

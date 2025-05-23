@@ -89,13 +89,13 @@ func (nl Load) String() string {
 // Apply adjust the given ResourceList with the current node load by mutating
 // the parameter in place
 func (nl Load) Apply(res corev1.ResourceList) {
-	resourcelist.AddCoreResources(res, nl.Resources)
+	resourcelist.AddInPlace(res, nl.Resources)
 }
 
 // Deduct subtract the current node load from the given ResourceList by mutating
 // the parameter in place
 func (nl Load) Deduct(res corev1.ResourceList) error {
-	return resourcelist.SubCoreResources(res, nl.Resources)
+	return resourcelist.SubInPlace(res, nl.Resources)
 }
 
 func (nl Load) CPU() resource.Quantity {
