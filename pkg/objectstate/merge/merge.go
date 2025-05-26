@@ -17,7 +17,7 @@
 package merge
 
 import (
-	"fmt"
+	"errors"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -28,8 +28,8 @@ import (
 )
 
 var (
-	ErrWrongObjectType    = fmt.Errorf("given object does not match the merger")
-	ErrMismatchingObjects = fmt.Errorf("given objects have mismatching types")
+	ErrWrongObjectType    = errors.New("given object does not match the merger")
+	ErrMismatchingObjects = errors.New("given objects have mismatching types")
 )
 
 func ServiceAccountForUpdate(current, updated client.Object) (client.Object, error) {
