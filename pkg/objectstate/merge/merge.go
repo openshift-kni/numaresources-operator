@@ -42,7 +42,7 @@ func ServiceAccountForUpdate(current, updated client.Object) (client.Object, err
 		return nil, ErrMismatchingObjects
 	}
 	preserveServiceAccountPullSecrets(curSA, updSA)
-	return MetadataForUpdate(current, updated)
+	return ObjectForUpdate(current, updated)
 }
 
 func ServiceForUpdate(current, updated client.Object) (client.Object, error) {
@@ -55,7 +55,7 @@ func ServiceForUpdate(current, updated client.Object) (client.Object, error) {
 		return updated, ErrMismatchingObjects
 	}
 	preserveIPConfigurations(&curSE.Spec, &updSE.Spec)
-	return MetadataForUpdate(current, updated)
+	return ObjectForUpdate(current, updated)
 }
 
 func ObjectForUpdate(current, updated client.Object) (client.Object, error) {
