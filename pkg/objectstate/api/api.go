@@ -29,6 +29,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/setdefault"
 )
 
 type ExistingManifests struct {
@@ -44,6 +45,7 @@ func (em *ExistingManifests) State(mf apimanifests.Manifests) []objectstate.Obje
 			Desired:  mf.Crd.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
+			Default:  setdefault.None,
 		},
 	}
 }

@@ -34,6 +34,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/setdefault"
 )
 
 type machineConfigPoolFinder struct {
@@ -113,6 +114,7 @@ func (obj machineConfigPoolFinder) FindState(mf Manifests, tree nodegroupv1.Tree
 			Desired:     desiredDaemonSet,
 			Compare:     compare.Object,
 			Merge:       merge.ObjectForUpdate,
+			Default:     setdefault.None,
 		})
 	}
 	return ret
@@ -176,6 +178,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 					Desired:  desiredMachineConfig,
 					Compare:  compare.Object,
 					Merge:    merge.ObjectForUpdate,
+					Default:  setdefault.None,
 				},
 			)
 			enabledMCCount++
