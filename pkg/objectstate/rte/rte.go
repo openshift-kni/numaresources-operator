@@ -40,6 +40,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/setdefault"
 )
 
 const (
@@ -172,6 +173,7 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 			Desired:  mf.Core.ServiceAccount.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ServiceAccountForUpdate,
+			Default:  setdefault.None,
 		},
 		{
 			Existing: em.existing.Core.Role,
@@ -179,6 +181,7 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 			Desired:  mf.Core.Role.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
+			Default:  setdefault.None,
 		},
 		{
 			Existing: em.existing.Core.RoleBinding,
@@ -186,6 +189,7 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 			Desired:  mf.Core.RoleBinding.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
+			Default:  setdefault.None,
 		},
 		{
 			Existing: em.existing.Core.ClusterRole,
@@ -193,6 +197,7 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 			Desired:  mf.Core.ClusterRole.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
+			Default:  setdefault.None,
 		},
 		{
 			Existing: em.existing.Core.ClusterRoleBinding,
@@ -200,6 +205,7 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 			Desired:  mf.Core.ClusterRoleBinding.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
+			Default:  setdefault.None,
 		},
 	}
 
@@ -210,6 +216,7 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 			Desired:  mf.Core.SecurityContextConstraint.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
+			Default:  setdefault.None,
 		})
 	}
 	if mf.Core.SecurityContextConstraintV2 != nil {
@@ -219,6 +226,7 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 			Desired:  mf.Core.SecurityContextConstraintV2.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
+			Default:  setdefault.None,
 		})
 	}
 
@@ -235,7 +243,8 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 		Error:    em.errs.Metrics.Service,
 		Desired:  mf.Metrics.Service.DeepCopy(),
 		Compare:  compare.Object,
-		Merge:    merge.MetadataForUpdate,
+		Merge:    merge.ServiceForUpdate,
+		Default:  setdefault.None,
 	})
 
 	return ret
