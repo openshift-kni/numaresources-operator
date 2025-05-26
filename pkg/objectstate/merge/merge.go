@@ -21,7 +21,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -75,8 +75,8 @@ func StatusForUpdate(current client.Object, updated client.Object) (client.Objec
 		updated.(*appsv1.DaemonSet).Status = currentTyped.Status
 	case *corev1.Service:
 		updated.(*corev1.Service).Status = currentTyped.Status
-	case *v1.CustomResourceDefinition:
-		updated.(*v1.CustomResourceDefinition).Status = currentTyped.Status
+	case *apiextv1.CustomResourceDefinition:
+		updated.(*apiextv1.CustomResourceDefinition).Status = currentTyped.Status
 	default:
 		return updated, nil
 	}
