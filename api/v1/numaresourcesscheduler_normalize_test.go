@@ -37,7 +37,7 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 	cacheResyncPeriodCustom := 42 * time.Second
 	cacheResyncDebugCustom := CacheResyncDebugDisabled
 	cacheResyncDetectionCustom := CacheResyncDetectionAggressive
-	schedInformerCustom := SchedulerInformerShared
+	schedInformerCustom := SchedulerInformerDedicated
 	scoringStrategyCustom := ScoringStrategyParams{
 		Type:      MostAllocated,
 		Resources: []ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}},
