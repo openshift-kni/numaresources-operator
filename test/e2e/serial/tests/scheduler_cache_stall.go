@@ -80,10 +80,11 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 		var mcpName string
 
 		BeforeEach(func() {
+			ctx := context.TODO()
 			var err error
 
 			nroSchedKey = objects.NROSchedObjectKey()
-			err = fxt.Client.Get(context.TODO(), nroSchedKey, &nroSchedObj)
+			err = fxt.Client.Get(ctx, nroSchedKey, &nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			if nroSchedObj.Status.CacheResyncPeriod == nil { // should never trigger
@@ -91,7 +92,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 			}
 
 			nroKey = objects.NROObjectKey()
-			err = fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
+			err = fxt.Client.Get(ctx, nroKey, &nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 
 			if len(nroOperObj.Status.MachineConfigPools) != 1 {
@@ -210,14 +211,14 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 
 					klog.Infof("Creating %d pods each requiring %q", desiredPods, e2ereslist.ToString(podRequiredRes))
 					for _, testPod := range testPods {
-						err := fxt.Client.Create(context.TODO(), testPod)
+						err := fxt.Client.Create(ctx, testPod)
 						Expect(err).ToNot(HaveOccurred())
 					}
 					// note the cleanup is done automatically once the ns on which we run is deleted - the fixture takes care
 
 					// very generous timeout here. It's hard and racy to check we had 2 pods pending (expected phased scheduling),
 					// but that would be the most correct and stricter testing.
-					failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodListAllRunning(context.TODO(), testPods)
+					failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodListAllRunning(ctx, testPods)
 					if len(failedPods) > 0 {
 						nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
 						klog.Infof("%s", intnrt.ListToString(nrtListFailed.Items, "post failure"))
@@ -250,9 +251,25 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					}
 					klog.Infof("Creating a job whose containers have requests=%q", e2ereslist.ToString(jobRequiredRes))
 				}),
-				Entry("vs guaranteed pods", Label(label.Tier1), func(job *batchv1.Job) {
+				// GAP: pinnable cpu (but not memory)
+				// however with the recommended config, we can't have pinnable CPUs without pinnable memory;
+				// we would need cpumanager policy=static and memorymanager policy=none, which we don't recommend.
+				Entry("vs guaranteed pods with pinnable memory", Label(label.Tier1), func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("256Mi"),
+					}
+					for idx := 0; idx < len(idleJob.Spec.Template.Spec.Containers); idx++ {
+						cnt := &idleJob.Spec.Template.Spec.Containers[idx] // shortcut
+						cnt.Resources = corev1.ResourceRequirements{
+							Limits: jobRequiredRes,
+						}
+					}
+					klog.Infof("Creating a job whose containers have limits=%q", e2ereslist.ToString(jobRequiredRes))
+				}),
+				Entry("vs guaranteed pods with pinnable memory and CPU", Label(label.Tier1), func(job *batchv1.Job) {
+					jobRequiredRes := corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("1"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
 					}
 					for idx := 0; idx < len(idleJob.Spec.Template.Spec.Containers); idx++ {
@@ -328,13 +345,13 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						}
 
 						By(fmt.Sprintf("creating pod %s/%s", testPod.Namespace, testPod.Name))
-						err = fxt.Client.Create(context.TODO(), testPod)
+						err = fxt.Client.Create(ctx, testPod)
 						Expect(err).ToNot(HaveOccurred())
 
 						testPods = append(testPods, testPod)
 					}
 
-					failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodListAllRunning(context.TODO(), testPods)
+					failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodListAllRunning(ctx, testPods)
 
 					for _, failedPod := range failedPods {
 						_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
