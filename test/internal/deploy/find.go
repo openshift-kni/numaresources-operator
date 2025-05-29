@@ -60,3 +60,32 @@ func FindNUMAResourcesOperatorPod(ctx context.Context, cli client.Client, nrop *
 
 	return &podList.Items[0], nil
 }
+
+func FindNUMAResourcesSchedulerPod(ctx context.Context, cli client.Client, nrScheduler *nropv1.NUMAResourcesScheduler) (*corev1.Pod, error) {
+	if nrScheduler.Status.Deployment.Name == "" || nrScheduler.Status.Deployment.Namespace == "" {
+		return nil, errors.New("scheduler deployment not reported in status")
+	}
+	klog.InfoS("NRO scheduler pod", "namespace", nrScheduler.Status.Deployment.Namespace)
+
+	sel, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"app": "secondary-scheduler",
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	klog.InfoS("NRO scheduler pod", "selector", sel.String())
+
+	podList := corev1.PodList{}
+	err = cli.List(ctx, &podList, &client.ListOptions{Namespace: nrScheduler.Status.Deployment.Namespace, LabelSelector: sel})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(podList.Items) < 1 {
+		return nil, fmt.Errorf("unexpected number of pods found: %d", len(podList.Items))
+	}
+
+	return &podList.Items[0], nil
+}
