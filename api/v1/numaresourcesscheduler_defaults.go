@@ -25,7 +25,7 @@ import (
 const (
 	defaultCacheResyncPeriod    = 5 * time.Second
 	defaultCacheResyncDebug     = CacheResyncDebugDumpJSONFile
-	defaultSchedulerInformer    = SchedulerInformerDedicated
+	defaultSchedulerInformer    = SchedulerInformerShared
 	defaultCacheResyncDetection = CacheResyncDetectionRelaxed
 	defaultScoringStrategy      = LeastAllocated
 	defaultReplicas             = int32(1)
