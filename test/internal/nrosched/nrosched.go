@@ -155,40 +155,32 @@ func CheckPODWasScheduledWith(k8sCli *kubernetes.Clientset, podNamespace, podNam
 	return checkPODEvents(k8sCli, podNamespace, podName, isScheduledWith)
 }
 
-func CheckNROSchedulerAvailable(cli client.Client, schedObjName string) *nropv1.NUMAResourcesScheduler {
-	nroSchedObj := &nropv1.NUMAResourcesScheduler{}
-	Eventually(func() bool {
-		By(fmt.Sprintf("checking %q for the condition Available=true", schedObjName))
+func CheckNROSchedulerAvailable(ctx context.Context, cli client.Client, schedObjName string) *nropv1.NUMAResourcesScheduler {
+	GinkgoHelper()
 
+	nroSchedObj := &nropv1.NUMAResourcesScheduler{}
+	Eventually(func() error {
+		By(fmt.Sprintf("checking %q for the condition Available=true", schedObjName))
 		err := cli.Get(context.TODO(), objects.NROSchedObjectKey(), nroSchedObj)
 		if err != nil {
-			klog.Warningf("failed to get the scheduler resource: %v", err)
-			return false
+			return fmt.Errorf("failed to get the scheduler resource: %v", err)
 		}
-
 		cond := status.FindCondition(nroSchedObj.Status.Conditions, status.ConditionAvailable)
 		if cond == nil {
-			klog.Warningf("missing conditions in %v", nroSchedObj)
-			return false
+			return fmt.Errorf("missing conditions in %v", nroSchedObj)
 		}
-
 		klog.Infof("condition: %v", cond)
-
-		return cond.Status == metav1.ConditionTrue
-	}, 5*time.Minute, 10*time.Second).Should(BeTrue(), "Scheduler condition did not become available")
+		if cond.Status != metav1.ConditionTrue {
+			return fmt.Errorf("available condition not satisfied")
+		}
+		return nil
+	}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "Scheduler condition did not become available")
 
 	dpNName := nroSchedObj.Status.Deployment
-	if dpNName.Namespace == "" || dpNName.Name == "" {
-		klog.Errorf("scheduler deployment missing: %q", dpNName.String())
-		return nil
-	}
+	Expect(dpNName.Namespace).ToNot(BeEmpty(), "scheduler deployment missing: %q", dpNName.String())
+	Expect(dpNName.Name).ToNot(BeEmpty(), "scheduler deployment missing: %q", dpNName.String())
 
 	return nroSchedObj
-}
-
-func GetNROSchedulerName(cli client.Client, schedObjName string) string {
-	nroSchedObj := CheckNROSchedulerAvailable(cli, schedObjName)
-	return nroSchedObj.Status.SchedulerName
 }
 
 func eventToString(ev corev1.Event) string {
