@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
+	"k8s.io/klog/v2/textlogger"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/k8shelpers"
@@ -62,6 +64,9 @@ func main() {
 		// in case of an error, dump exits loudly
 		_ = dump(&parsedArgs)
 	}
+
+	config := textlogger.NewConfig(textlogger.Verbosity(parsedArgs.Global.Verbose))
+	ctrl.SetLogger(textlogger.NewLogger(config))
 
 	k8scli, err := k8shelpers.GetK8sClient(parsedArgs.Global.KubeConfig)
 	if err != nil {
