@@ -211,7 +211,7 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/client
 # github.com/k8stopologyawareschedwg/podfingerprint v0.2.2
 ## explicit; go 1.17
 github.com/k8stopologyawareschedwg/podfingerprint
-# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.20.3
+# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.20.3 => github.com/ffromani/resource-topology-exporter v0.20.99401
 ## explicit; go 1.22.0
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/dump
@@ -224,6 +224,7 @@ github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/notification
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podreadiness
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/api/v1
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/filter
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/filter/numalocality
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude
@@ -1099,7 +1100,6 @@ k8s.io/kubectl/pkg/util/resource
 ## explicit; go 1.22.0
 k8s.io/kubelet/config/v1beta1
 k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1
-k8s.io/kubelet/pkg/apis/podresources/v1
 # k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 ## explicit; go 1.18
 k8s.io/utils/buffer
@@ -1204,3 +1204,4 @@ sigs.k8s.io/yaml/goyaml.v2
 # k8s.io/mount-utils => k8s.io/mount-utils v0.31.2
 # k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.31.2
 # k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.31.2
+# github.com/k8stopologyawareschedwg/resource-topology-exporter => github.com/ffromani/resource-topology-exporter v0.20.99401

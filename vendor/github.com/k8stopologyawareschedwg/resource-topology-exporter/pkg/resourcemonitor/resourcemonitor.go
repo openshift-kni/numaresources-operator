@@ -35,7 +35,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog/v2"
-	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
+
+	podresourcesapi "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/api/v1"
 
 	"github.com/jaypipes/ghw"
 	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
@@ -157,6 +158,7 @@ type resourceMonitor struct {
 	coreIDToNodeIDMap map[int]int
 	nodeCapacity      perNUMAResourceCounter
 	nodeAllocatable   perNUMAResourceCounter
+	listFilters       podresourcesapi.ListPodResourcesFilterRequest
 }
 
 func NewResourceMonitor(hnd Handle, args Args, options ...func(*resourceMonitor)) (*resourceMonitor, error) {
@@ -206,6 +208,12 @@ func NewResourceMonitor(hnd Handle, args Args, options ...func(*resourceMonitor)
 	} else {
 		klog.Infof("watching all namespaces")
 	}
+
+	if err := rm.updateServerInfo(); err != nil {
+		// carry on, not critical
+		klog.Warningf("cannot get server info: %v", err)
+	}
+
 	return rm, nil
 }
 
@@ -230,26 +238,44 @@ func WithNodeName(name string) func(*resourceMonitor) {
 func (rm *resourceMonitor) Scan(excludeList ResourceExclude) (ScanResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultPodResourcesTimeout)
 	defer cancel()
-	resp, err := rm.podResCli.List(ctx, &podresourcesapi.ListPodResourcesRequest{})
+
+	filt := rm.listFilters // always use a local copy
+	req := podresourcesapi.ListPodResourcesRequest{
+		Filters: &filt,
+	}
+
+	resp, err := rm.podResCli.List(ctx, &req)
 	if err != nil {
 		metrics.UpdatePodResourceApiCallsFailureMetric("list")
 		return ScanResponse{}, err
 	}
 
+	respPodRes := resp.GetPodResources()
+	klog.V(6).InfoS("podresources list", "pods", collectPodsFromPodResources(respPodRes))
+
+	appliedFilters := resp.GetAppliedFilters()
+	if filt.GetActiveOnly() && !appliedFilters.GetActiveOnly() {
+		metrics.UpdatePodResourceApiCallsFailureMetric("list")
+		return ScanResponse{}, fmt.Errorf("list activeOnly requested supported %v applied %v", (appliedFilters != nil), appliedFilters.GetActiveOnly())
+	}
+
 	st := podfingerprint.MakeStatus(rm.nodeName)
 	scanRes := ScanResponse{
-		Attributes:  topologyv1alpha2.AttributeList{},
+		Attributes: topologyv1alpha2.AttributeList{
+			{
+				Name:  "podListingMethod",
+				Value: podListingMethodToString(appliedFilters),
+			},
+		},
 		Annotations: map[string]string{},
 	}
 
-	respPodRes := resp.GetPodResources()
-
 	if rm.args.PodSetFingerprint {
-		podresFilter := numalocality.Required
+		podresVerify := numalocality.Verify
 		if rm.args.PodSetFingerprintMethod == podfingerprint.MethodAll {
-			podresFilter = podresfilter.AlwaysPass
+			podresVerify = podresfilter.VerifyAlwaysPass
 		}
-		pfpSign := ComputePodFingerprint(respPodRes, &st, podresFilter)
+		pfpSign := computePodFingerprintFromPodResources(respPodRes, &st, podresVerify)
 		scanRes.Attributes = append(scanRes.Attributes, topologyv1alpha2.AttributeInfo{
 			Name:  podfingerprint.Attribute,
 			Value: pfpSign,
@@ -353,6 +379,32 @@ func (rm *resourceMonitor) Scan(excludeList ResourceExclude) (ScanResponse, erro
 	return scanRes, nil
 }
 
+func podListingMethodToString(appliedFilters *podresourcesapi.ListPodResourcesFilterResponse) string {
+	if appliedFilters == nil {
+		return "all"
+	}
+	if appliedFilters.GetActiveOnly() {
+		return "activeOnly"
+	}
+	return "all"
+}
+
+func (rm *resourceMonitor) updateServerInfo() error {
+	ctx, cancel := context.WithTimeout(context.Background(), defaultPodResourcesTimeout)
+	defer cancel()
+	resp, err := rm.podResCli.List(ctx, &podresourcesapi.ListPodResourcesRequest{})
+	if err != nil {
+		return err
+	}
+	supportedFilters := resp.GetSupportedFilters()
+	if supportedFilters == nil {
+		return fmt.Errorf("server does not support filtering")
+	}
+	rm.listFilters.ActiveOnly = supportedFilters.GetActiveOnly()
+	klog.Infof("list filters: activeOnly=%v", rm.listFilters.ActiveOnly)
+	return nil
+}
+
 func (rm *resourceMonitor) updateNodeCapacity() error {
 	memCounters, err := sysinfo.GetMemoryResourceCounters(sysinfo.Handle{})
 	if err != nil {
@@ -434,6 +486,37 @@ func (rm *resourceMonitor) updateNodeResources() error {
 	return nil
 }
 
+func computePodFingerprintFromPodResources(podRes []*podresourcesapi.PodResources, st *podfingerprint.Status, verifyFunc func(*podresourcesapi.PodResources) podresfilter.Result) string {
+	fp := podfingerprint.NewTracingFingerprint(len(podRes), st)
+	for _, pr := range podRes {
+		res := verifyFunc(pr)
+		if !res.Allow {
+			continue
+		}
+		_ = fp.AddPod(pr)
+	}
+	return fp.Sign()
+}
+
+func collectPodsFromPodResources(podRes []*podresourcesapi.PodResources) string {
+	var sb strings.Builder
+	for _, pr := range podRes {
+		desc := ""
+		nl := numalocality.Verify(pr)
+		if nl.Allow {
+			desc = "/" + nl.Ident + "=" + nl.Reason
+		}
+		// note the separator is 2 spaces
+		sb.WriteString("  " + pr.Namespace + "/" + pr.Name + desc)
+	}
+	val := sb.String()
+	if len(val) == 0 {
+		return ""
+	}
+	return val[2:]
+}
+
+// GetAllContainerDevices is deprecated and will be unexported in a future version
 func GetAllContainerDevices(podRes []*podresourcesapi.PodResources, namespace string, coreIDToNodeIDMap map[int]int) []*podresourcesapi.ContainerDevices {
 	allCntRes := []*podresourcesapi.ContainerDevices{}
 	for _, pr := range podRes {
@@ -448,6 +531,7 @@ func GetAllContainerDevices(podRes []*podresourcesapi.PodResources, namespace st
 	return allCntRes
 }
 
+// ComputePodFingerprint is deprecated and will be unexported in a future version
 func ComputePodFingerprint(podRes []*podresourcesapi.PodResources, st *podfingerprint.Status, allowFilter func(*podresourcesapi.PodResources) bool) string {
 	fp := podfingerprint.NewTracingFingerprint(len(podRes), st)
 	for _, pr := range podRes {

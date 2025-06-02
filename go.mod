@@ -150,3 +150,5 @@ replace (
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.31.2
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.31.2
 )
+
+replace github.com/k8stopologyawareschedwg/resource-topology-exporter => github.com/ffromani/resource-topology-exporter v0.20.99401
