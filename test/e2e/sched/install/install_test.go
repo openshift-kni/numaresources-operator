@@ -19,7 +19,6 @@ package install
 import (
 	"context"
 	"fmt"
-	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -37,6 +36,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
+	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/crds"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
@@ -112,6 +112,9 @@ var _ = Describe("[Scheduler] install", func() {
 			By("checking the NumaResourcesScheduler CRD is deployed")
 			_, err = crds.GetByName(e2eclient.Client, crds.CrdNROSName)
 			Expect(err).NotTo(HaveOccurred())
+
+			By("checking deployment has number of replicas equal to number of control plane nodes")
+			Expect(*deployment.Spec.Replicas).To(Equal(int32(len(nodeList))), "wrong number of replicas configured for the deployment; want=%d got=%d", int32(len(nodeList)), *deployment.Spec.Replicas)
 		})
 	})
 })
