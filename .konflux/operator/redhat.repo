@@ -1,0 +1,13 @@
+[rhel-9-for-x86_64-baseos-rpms]
+name = Red Hat Enterprise Linux 9 for x86_64 - BaseOS (RPMs)
+baseurl = https://cdn.redhat.com/content/dist/rhel9/9.4/x86_64/baseos/os
+enabled = 1
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+sslverify = 1
+sslcacert = /etc/rhsm/ca/redhat-uep.pem
+sslclientkey = /etc/pki/entitlement/3622275715183804590-key.pem
+sslclientcert = /etc/pki/entitlement/3622275715183804590.pem
+sslverifystatus = 1
+metadata_expire = 86400
+enabled_metadata = 1
