@@ -82,3 +82,26 @@ func (wt Waiter) ForDeploymentReplicasCreation(ctx context.Context, dp *appsv1.D
 	})
 	return updatedDp, err
 }
+
+func (wt Waiter) ForDeploymentReplicasReadiness(ctx context.Context, dp *appsv1.Deployment, expectedReplicas int32) (*appsv1.Deployment, error) {
+	key := ObjectKeyFromObject(dp)
+	updatedDp := &appsv1.Deployment{}
+	immediate := true
+	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(aContext context.Context) (bool, error) {
+		err := wt.Cli.Get(aContext, key.AsKey(), updatedDp)
+		if err != nil {
+			klog.Warningf("failed to get the deployment %s: %v", key.String(), err)
+			return false, err
+		}
+
+		if updatedDp.Status.ReadyReplicas != expectedReplicas {
+			klog.Warningf("Waiting for deployment: %q to have %d replicas, current number of: %d/%d/%d (ready/updated/total)",
+				key.String(), expectedReplicas, updatedDp.Status.ReadyReplicas, updatedDp.Status.UpdatedReplicas, updatedDp.Status.Replicas)
+			return false, nil
+		}
+
+		klog.Infof("replicas of deployment %q are all created", key.String())
+		return true, nil
+	})
+	return updatedDp, err
+}

@@ -350,7 +350,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 				deviceName := e2efixture.GetDeviceType3Name()
 				if deviceName == "" {
-					e2efixture.Skipf(fxt, "missing required device name (device1)")
+					e2efixture.Skipf(fxt, "missing required device name (device3)")
 				}
 
 				Expect(desiredPods).To(BeNumerically(">", hostsRequired)) // this is more like a C assert. Should never ever fail.
@@ -369,7 +369,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 				NUMAZonesWithDevice := 1
 				By(fmt.Sprintf("filtering available nodes which provide %q on exactly %d zones", deviceName, NUMAZonesWithDevice))
-				nrtCandidates = e2enrt.FilterAnyZoneProvidingResourcesAtMost(nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
+				nrtCandidates = filterAnyZoneProvidingResourcesAtMost(nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with at most %d NUMA Zones offering %q: found %d", NUMAZonesWithDevice, deviceName, len(nrtCandidates))
 				}
@@ -472,7 +472,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 				deviceName := e2efixture.GetDeviceType3Name()
 				if deviceName == "" {
-					e2efixture.Skipf(fxt, "missing required device name (device1)")
+					e2efixture.Skipf(fxt, "missing required device name (device3)")
 				}
 
 				expectedPending := desiredPods - hostsRequired
@@ -489,7 +489,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 				NUMAZonesWithDevice := 1
 				By(fmt.Sprintf("filtering available nodes which provide %q on exactly %d zones", deviceName, NUMAZonesWithDevice))
-				nrtCandidates = e2enrt.FilterAnyZoneProvidingResourcesAtMost(nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
+				nrtCandidates = filterAnyZoneProvidingResourcesAtMost(nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with at most %d NUMA Zones offering %q: found %d", NUMAZonesWithDevice, deviceName, len(nrtCandidates))
 				}
@@ -672,4 +672,33 @@ func podQOSClassToTag(qos corev1.PodQOSClass) string {
 		return "be"
 	}
 	return ""
+}
+
+// filter out nodes, represented as NRT, which do NOT have
+// - up to (at most) maxZones Zones which in turn provide
+// - resourceAmount or more (at least) resourceNames.
+func filterAnyZoneProvidingResourcesAtMost(nrts []nrtv1alpha2.NodeResourceTopology, resourceName string, resourceAmount int64, maxZones int) []nrtv1alpha2.NodeResourceTopology {
+	resQty := *resource.NewQuantity(resourceAmount, resource.DecimalSI)
+	ret := []nrtv1alpha2.NodeResourceTopology{}
+	for _, nrt := range nrts {
+		matches := 0
+		for _, zone := range nrt.Zones {
+			klog.Infof(" ----> node %q zone %q provides %s request resource %q", nrt.Name, zone.Name, e2ereslist.ToString(e2enrt.AvailableFromZone(zone)), resourceName)
+			if !e2enrt.ResourceInfoProviding(zone.Resources, resourceName, resQty, true) {
+				continue
+			}
+			matches++
+		}
+		if matches == 0 {
+			klog.Warningf("SKIP: node %q does NOT provide %q at all!", nrt.Name, resourceName)
+			continue
+		}
+		if matches > maxZones {
+			klog.Warningf("SKIP: node %q provides %q on %d zones (looking max=%d)", nrt.Name, resourceName, matches, maxZones)
+			continue
+		}
+		klog.Infof(" ADD: node %q provides %q on %d/%d zones", nrt.Name, resourceName, matches, len(nrt.Zones))
+		ret = append(ret, nrt)
+	}
+	return ret
 }
