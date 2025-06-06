@@ -1,0 +1,19 @@
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: os-layer-kubelet
+spec:
+  osImageURL: quay.io/rhn_support_shajmakh/kubelet:podres-fix-0.1
+  config:
+    ignition:
+      version: 3.1.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,ZW5hYmxlZAo=
+        mode: 420
+        overwrite: true
+        path: /etc/kubernetes/openshift-llc-alignment
+

@@ -178,23 +178,28 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 			gotTolerations := dsObj.Spec.Template.Spec.Tolerations                       // shortcut
 			expectEqualTolerations(gotTolerations, expectedTolerations)
 
+			By("list RTE pods before the CR update")
+			dsNsName := nroOperObj.Status.DaemonSets[0]
+			rtePods := getPodsOfDaemonSet(ctx, fxt, dsNsName)
+			klog.InfoS("RTE pods before reverting tolerations", "daemonset", nroOperObj.Status.DaemonSets[0], "pods", toString(rtePods))
+
 			By("adding extra tolerations")
 			updatedNropObj := setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{sriovToleration()})
 			defer func(ctx context.Context) {
+				By("list RTE pods before the CR update")
+				dsNsName := updatedNropObj.Status.DaemonSets[0]
+				rtePods := getPodsOfDaemonSet(ctx, fxt, dsNsName)
+				klog.InfoS("RTE pods before reverting tolerations", "daemonset", updatedNropObj.Status.DaemonSets[0], "pods", toString(rtePods))
+
 				By("removing extra tolerations")
 				_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{})
-				By("waiting for DaemonSet to be ready")
-				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetUpdateByKey(ctx, dsKey)
-				Expect(err).ToNot(HaveOccurred(), "daemonset %s did not start updated: %v", dsKey.String(), err)
-				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
-				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+
+				By("ensure that RTE pods are recreated and DS is ready")
+				waitForDaemonSetUpdate(ctx, fxt, dsNsName, rtePods)
 			}(ctx)
 
-			By("waiting for DaemonSet to be ready")
-			_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetUpdateByKey(ctx, dsKey)
-			Expect(err).ToNot(HaveOccurred(), "daemonset %s did not start updated: %v", dsKey.String(), err)
-			_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
-			Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+			By("ensure that RTE pods are recreated and DS is ready")
+			waitForDaemonSetUpdate(ctx, fxt, dsNsName, rtePods)
 
 			By("checking the tolerations in the owned DaemonSet")
 			err = fxt.Client.Get(ctx, client.ObjectKey{Namespace: dsKey.Namespace, Name: dsKey.Name}, &dsObj)
@@ -255,11 +260,10 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				targetNodeNames = append(targetNodeNames, updatedNode.Name)
 
 				By(fmt.Sprintf("waiting for DaemonSet to be ready - should match worker nodes count %d", len(workers)))
-				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetUpdateByKey(ctx, dsKey)
+				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
 				Expect(err).ToNot(HaveOccurred(), "daemonset %s did not start updated: %v", dsKey.String(), err)
 				updatedDs, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
-				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)), "updated DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers))
 
 				// extra check, not required by the test case
 				By("deleting the DS to force the system recreate the pod")
@@ -277,13 +281,12 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{})
 				extraTols = false
 				By("waiting for DaemonSet to be ready")
-				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetUpdateByKey(ctx, dsKey)
-				Expect(err).ToNot(HaveOccurred(), "daemonset %s did not start updated: %v", dsKey.String(), err)
-				updatedDs, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
-				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 				// note we still have the taint
-				By(fmt.Sprintf("ensuring the RTE DS is running with less pods because taints (expected pods=%d)", len(workers)-1))
-				Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)-1), "updated DS ready=%v original worker nodes=%d", updatedDs.Status.NumberReady, len(workers)-1)
+				klog.Infof("ensuring the RTE DS is running with less pods because taints (expected pods=%d)", len(workers)-1)
+				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
+				Expect(err).ToNot(HaveOccurred(), "daemonset %s did not start updated: %v", dsKey.String(), err)
+				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 			})
 
 			It("should evict running RTE pod if taint-toleration matching criteria is shaken - NROP CR toleration update", Label(label.Tier3, label.Slow), func(ctx context.Context) {
