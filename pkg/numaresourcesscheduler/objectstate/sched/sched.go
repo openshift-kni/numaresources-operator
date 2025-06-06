@@ -109,7 +109,7 @@ func (em ExistingManifests) State(mf schedmanifests.Manifests) []objectstate.Obj
 			Error:    em.deploymentError,
 			Desired:  mf.Deployment.DeepCopy(),
 			Compare:  compare.Object,
-			Merge:    merge.MetadataForUpdate,
+			Merge:    merge.ObjectForUpdate,
 		},
 	}
 }
