@@ -19,11 +19,16 @@ package configuration
 import (
 	"context"
 	"fmt"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"os"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/yaml"
+
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
+	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 )
 
 const (
@@ -69,4 +74,36 @@ func getMachineConfigPoolUpdateValueFromEnv(envVar string, fallback time.Duratio
 		return fallback, nil
 	}
 	return time.ParseDuration(val)
+}
+
+// ValidateAndExtractRTEConfigData extracts and validates the RTE config from the given ConfigMap
+func ValidateAndExtractRTEConfigData(cm *corev1.ConfigMap) (rteconfig.Config, error) {
+	var cfg rteconfig.Config
+	raw, ok := cm.Data[rteconfig.Key]
+	if !ok {
+		return cfg, fmt.Errorf("config.yaml not found in ConfigMap %s/%s", cm.Namespace, cm.Name)
+	}
+
+	if err := yaml.Unmarshal([]byte(raw), &cfg); err != nil {
+		return cfg, fmt.Errorf("failed to unmarshal config.yaml: %w", err)
+	}
+
+	if cfg.Kubelet.TopologyManagerPolicy != "single-numa-node" {
+		return cfg, fmt.Errorf("invalid topologyManagerPolicy: got %q, want \"single-numa-node\"", cfg.Kubelet.TopologyManagerPolicy)
+	}
+
+	return cfg, nil
+}
+
+func CheckTopologyManagerConfigMatching(nrt *nrtv1alpha2.NodeResourceTopology, cfg *rteconfig.Config) string {
+	var matchingErr string
+	for _, attr := range nrt.Attributes {
+		if attr.Name == "topologyManagerPolicy" && attr.Value != cfg.Kubelet.TopologyManagerPolicy {
+			matchingErr += fmt.Sprintf("%q value is different; want: %s got: %s\n", attr.Name, cfg.Kubelet.TopologyManagerPolicy, attr.Value)
+		}
+		if attr.Name == "topologyManagerScope" && cfg.Kubelet.TopologyManagerScope != "" && attr.Value != cfg.Kubelet.TopologyManagerScope {
+			matchingErr += fmt.Sprintf("%q value is different; want: %s got: %s\n", attr.Name, cfg.Kubelet.TopologyManagerScope, attr.Value)
+		}
+	}
+	return matchingErr
 }

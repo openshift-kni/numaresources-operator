@@ -26,9 +26,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-
-	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -911,22 +908,6 @@ func waitForMcpUpdate(cli client.Client, ctx context.Context, updateType MCPUpda
 		Expect(err).ToNot(HaveOccurred())
 		Expect(ok).To(BeTrue())
 	}
-}
-
-func isCustomPolicySupportEnabled(nro *nropv1.NUMAResourcesOperator) bool {
-	GinkgoHelper()
-
-	const minCustomSupportingVString = "4.18"
-	minCustomSupportingVersion, err := platform.ParseVersion(minCustomSupportingVString)
-	Expect(err).NotTo(HaveOccurred(), "failed to parse version string %q", minCustomSupportingVString)
-
-	customSupportAvailable, err := configuration.PlatVersion.AtLeast(minCustomSupportingVersion)
-	Expect(err).NotTo(HaveOccurred(), "failed to compare versions: %v vs %v", configuration.PlatVersion, minCustomSupportingVersion)
-
-	if !customSupportAvailable { // < 4.18
-		return true
-	}
-	return inthelper.IsCustomPolicyEnabled(nro)
 }
 
 func verifyUpdatedMCOnNodes(cli client.Client, ctx context.Context, node corev1.Node, desired string) (bool, error) {
