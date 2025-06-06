@@ -38,10 +38,11 @@ const (
 type SchedulerInformerMode string
 
 const (
-	// SchedulerInformerDedicated makes the NodeResourceTopologyMatch plugin use the default framework informer.
+	// SchedulerInformerShared makes the NodeResourceTopologyMatch plugin use the default framework informer. Default.
 	SchedulerInformerShared SchedulerInformerMode = "Shared"
 
-	// SchedulerInformerDedicated sets an additional separate informer just for the NodeResourceTopologyMatch plugin. Default.
+	// SchedulerInformerDedicated sets an additional separate informer just for the NodeResourceTopologyMatch plugin.
+	// DEPRECATED: TBD
 	SchedulerInformerDedicated SchedulerInformerMode = "Dedicated"
 )
 
