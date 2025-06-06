@@ -44,7 +44,7 @@ spec:
   - name: dev-package-managers
     value: "true"
   - name: prefetch-input
-    value: gomod
+    value: ""
   - name: build-source-image
     value: "true"
   - name: skip-preflight
