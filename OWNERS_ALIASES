@@ -2,15 +2,17 @@
 
 aliases:
   numaresources-reviewers:
-    - MarSik
     - ffromani
-    - yanirq
-    - Tal-or
-    - jlojosnegros
+    - shajmakh
     - swatisehgal
+    - Tal-or
   numaresources-approvers:
-    - MarSik
     - ffromani
-    - yanirq
-    - Tal-or
+    - shajmakh
     - swatisehgal
+    - Tal-or
+    - yanirq
+  konflux-approvers:
+    - yanirq
+    - shajmakh
+    - rbaturov
