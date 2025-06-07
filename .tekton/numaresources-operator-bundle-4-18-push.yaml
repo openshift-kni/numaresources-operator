@@ -1,0 +1,66 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/openshift-kni/numaresources-operator?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    pipelinesascode.tekton.dev/on-cel-expression: |
+      event == "push" &&
+      target_branch == "release-4.18" &&
+      (
+        '.tekton/build-pipeline.yaml'.pathChanged() ||
+        '.konflux/container-build.args'.pathChanged() ||
+        'bundle/***'.pathChanged() ||
+        'hack/***'.pathChanged() ||
+        '.konflux/bundle/overlay/***'.pathChanged() ||        
+        '.tekton/numaresources-operator-bundle-4-18-push.yaml'.pathChanged() ||
+        '.konflux/bundle/bundle.konflux.Dockerfile'.pathChanged()
+      )
+  creationTimestamp: null
+  labels:
+    appstudio.openshift.io/application: numaresources-operator-4-18
+    appstudio.openshift.io/component: numaresources-operator-bundle-4-18
+    pipelines.appstudio.openshift.io/type: build
+  name: numaresources-operator-bundle-4-18-on-push
+  namespace: telco-5g-tenant
+spec:
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: output-image
+    value: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-18:{{revision}}
+  - name: build-platforms
+    value:
+    - linux/x86_64
+  - name: dockerfile
+    value: .konflux/bundle/bundle.konflux.Dockerfile
+  - name: hermetic
+    value: "true"
+  - name: dev-package-managers
+    value: "true"
+  - name: prefetch-input
+    value: ""
+  - name: build-source-image
+    value: "true"
+  - name: skip-preflight
+    value: "true"
+  - name: build-image-index
+    value: "false"
+  - name: image-append-platform
+    value: "false"
+  - name: build-args-file
+    value: .konflux/container-build.args
+  pipelineRef:
+    name: build-pipeline
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-numaresources-operator-bundle-4-18
+  workspaces:
+  - name: git-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
+status: {}
