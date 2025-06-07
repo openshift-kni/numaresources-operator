@@ -12,3 +12,7 @@ aliases:
     - swatisehgal
     - Tal-or
     - yanirq
+  konflux-approvers:
+    - yanirq
+    - shajmakh
+    - rbaturov
