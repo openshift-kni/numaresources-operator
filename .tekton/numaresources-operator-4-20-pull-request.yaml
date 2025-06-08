@@ -57,7 +57,7 @@ spec:
   - name: dev-package-managers
     value: "true"    
   - name: prefetch-input
-    value: '[{"type": "rpm", "path": ".konflux/operator"}, {"type": "gomod", "path": "."}]'
+    value: '[{"type": "rpm", "path": ".konflux/operator"}]'
   - name: build-source-image
     value: "true"
   - name: skip-preflight

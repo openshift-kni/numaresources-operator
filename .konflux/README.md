@@ -35,7 +35,7 @@ The push/pull tekton yaml files in `.tekton` have been configured to setup a her
 2. Enable rpm pre-fetch
 ```yaml
    - name: prefetch-input
-     value: '[{"type": "rpm", "path": ".konflux/operator"}, {"type": "gomod", "path": "."}]'
+     value: '[{"type": "rpm", "path": ".konflux/operator"}]'
 ```
 3. Enable dev package managers
 ```yaml
