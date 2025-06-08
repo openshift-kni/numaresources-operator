@@ -239,6 +239,9 @@ spec:
           value: $(tasks.prefetch-dependencies.results.CACHI2_ARTIFACT)
         - name: IMAGE_APPEND_PLATFORM
           value: "$(params.image-append-platform)"
+        - name: LABELS
+          value:
+            - $(tasks.generate-labels.results.labels[*])
       runAfter:
         - prefetch-dependencies
       taskRef:
