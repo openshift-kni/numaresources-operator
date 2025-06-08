@@ -31,12 +31,10 @@ RUN $OVERLAY_PATH/overlay.bash \
 
 FROM scratch
 
-ARG OPERATOR_VERSION
 ARG OPENSHIFT_VERSION
 
 LABEL com.redhat.component="numaresources-operator-bundle-container"
 LABEL name="openshift4/numaresources-operator-bundle"
-LABEL version="v${OPERATOR_VERSION}"
 LABEL summary="NUMA resources operator for OpenShift"
 LABEL io.k8s.display-name="numaresources-operator"
 LABEL io.k8s.description="NUMA resurces support for OpenShift"
