@@ -5,6 +5,12 @@
     "gomod": {
         "enabled": false
     },
+    "packageRules": [
+        {
+            "matchUpdateTypes": ["minor"],
+            "enabled": false
+        }
+    ],    
     "prConcurrentLimit": 0,
     "pruneBranchAfterAutomerge": true,
     "tekton": {
@@ -19,6 +25,17 @@
         "includePaths": [
             ".tekton/**"
         ],
+        "packageRules": [
+            {
+                "addLabels": [
+                    "approved",
+                    "lgtm"
+                ],
+                "matchUpdateTypes": [
+                    "digest"
+                ]
+            }
+        ],        
         "platformAutomerge": true
     }
 }
