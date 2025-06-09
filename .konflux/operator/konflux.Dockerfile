@@ -1,5 +1,3 @@
-ARG OPERATOR_VERSION
-
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.23@sha256:4805e1cb2d1bd9d3c5de5d6986056bbda94ca7b01642f721d83d26579d333c60 as builder
 
 WORKDIR /go/src/github.com/openshift-kni/numaresources-operator
@@ -10,13 +8,10 @@ ENV CGO_ENABLED=1
 ENV GOTAGS="strictfipsruntime"
 
 # Build
-RUN \
-	NRO_BUILD_VERSION=${OPERATOR_VERSION} \
-	make binary-all
+RUN make binary-all
 
 FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4@sha256:9aadcce1175ddce06e83bb5ddfceb1713d79b1f549330aacf2ff72e3ede77693
 
-ARG OPERATOR_VERSION
 ARG OPENSHIFT_VERSION
 
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/manager /bin/numaresources-operator
@@ -32,7 +27,6 @@ USER 65532:65532
 ENTRYPOINT ["/bin/numaresources-operator"]
 LABEL com.redhat.component="numaresources-operator-container" \
       name="openshift4/numaresources-operator-rhel9" \
-      version="v${OPERATOR_VERSION}" \
       summary="numaresources-operator" \
       io.openshift.expose-services="" \
       io.openshift.tags="operator" \
