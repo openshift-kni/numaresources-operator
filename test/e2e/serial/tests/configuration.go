@@ -820,7 +820,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}
 			})
 
-			It("should change NRT attributes correctly when RTE is pointing to a different nodeGroup", Label(label.OpenShift, label.Slow, label.Tier2), func(ctx context.Context) {
+			It("should change NRT attributes correctly when RTE is pointing to a different nodeGroup", Label(label.OpenShift, label.Slow, label.Tier2, label.Reboot), func(ctx context.Context) {
 				fxt.IsRebootTest = true
 				waitForMCPUpdateFunc := func(mcp *machineconfigv1.MachineConfigPool) {
 					_ = wait.With(fxt.Client).
