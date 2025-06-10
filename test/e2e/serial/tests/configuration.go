@@ -890,6 +890,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					if targetedMCP == nil {
 						// initialCustomRoleLabelKey is empty, so we didn't find any custom mcp
 						// this means the node is part of the standard worker MCP
+						targetedMCP = &machineconfigv1.MachineConfigPool{}
 						Expect(fxt.Client.Get(ctx, client.ObjectKey{Name: "worker"}, targetedMCP)).To(Succeed())
 					}
 					waitForMCPUpdateFunc(targetedMCP)
