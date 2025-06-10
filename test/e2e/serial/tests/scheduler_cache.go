@@ -201,7 +201,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 				// very generous timeout here. It's hard and racy to check we had 2 pods pending (expected phased scheduling),
 				// but that would be the most correct and stricter testing.
-				failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodListAllRunning(context.TODO(), testPods)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodsAllRunning(context.TODO(), testPods)
 				dumpFailedPodInfo(fxt, failedPods)
 				Expect(failedPods).To(BeEmpty(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
 
@@ -296,7 +296,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 					By("waiting for the test pods to go running")
 					// even more generous timeout here. We need to tolerate more reconciliation time because of the interference
 					startTime := time.Now()
-					failedPods, updatedPods := wait.With(fxt.Client).Interval(5*time.Second).Timeout(5*time.Minute).ForPodListAllRunning(context.TODO(), testPods)
+					failedPods, updatedPods := wait.With(fxt.Client).Interval(5*time.Second).Timeout(5*time.Minute).ForPodsAllRunning(context.TODO(), testPods)
 					dumpFailedPodInfo(fxt, failedPods)
 					elapsed := time.Since(startTime)
 					klog.InfoS("test pods (payload + interference) gone running", "elapsed", elapsed)
@@ -430,7 +430,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				// this is a slight abuse. We want to wait for hostsRequired < desiredPods to be running. Other pod(s) must be pending.
 				// So we wait a bit too much unnecessarily, but wetake this chance to ensure the pod(s) which are supposed to be pending
 				// stay pending at least up until timeout
-				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodListAllRunning(context.TODO(), testPods)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodsAllRunning(context.TODO(), testPods)
 				Expect(updatedPods).To(HaveLen(hostsRequired))
 				Expect(failedPods).To(HaveLen(expectedPending))
 				Expect(len(updatedPods) + len(failedPods)).To(Equal(desiredPods))
@@ -550,7 +550,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				// this is a slight abuse. We want to wait for hostsRequired < desiredPods to be running. Other pod(s) must be pending.
 				// So we wait a bit too much unnecessarily, but wetake this chance to ensure the pod(s) which are supposed to be pending
 				// stay pending at least up until timeout
-				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodListAllRunning(context.TODO(), testPods)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodsAllRunning(context.TODO(), testPods)
 				Expect(updatedPods).To(HaveLen(hostsRequired))
 				Expect(failedPods).To(HaveLen(expectedPending))
 
@@ -597,7 +597,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				// here we really need a quite long timeout. Still 300s is a bit of overshot (expected so).
 				// The reason to be supercareful here is the potentially long interplay between
 				// NRT updater, resync loop, scheduler retry loop.
-				failedPods, updatedPods = wait.With(fxt.Client).Timeout(5*time.Minute).ForPodListAllRunning(context.TODO(), expectedRunningPods)
+				failedPods, updatedPods = wait.With(fxt.Client).Timeout(5*time.Minute).ForPodsAllRunning(context.TODO(), expectedRunningPods)
 				dumpFailedPodInfo(fxt, failedPods)
 				Expect(updatedPods).To(HaveLen(hostsRequired))
 				Expect(failedPods).To(BeEmpty())

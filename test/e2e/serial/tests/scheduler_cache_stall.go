@@ -220,7 +220,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 
 					// very generous timeout here. It's hard and racy to check we had 2 pods pending (expected phased scheduling),
 					// but that would be the most correct and stricter testing.
-					failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodListAllRunning(ctx, testPods)
+					failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodsAllRunning(ctx, testPods)
 					if len(failedPods) > 0 {
 						nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
 						// TODO: multi-line value in structured log
@@ -357,7 +357,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						testPods = append(testPods, testPod)
 					}
 
-					failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodListAllRunning(ctx, testPods)
+					failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodsAllRunning(ctx, testPods)
 
 					for _, failedPod := range failedPods {
 						_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)

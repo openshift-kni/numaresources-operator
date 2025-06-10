@@ -203,7 +203,7 @@ func (p *Padder) Pad(timeout time.Duration, options PaddingOptions) error {
 		}
 	}
 
-	if failedPods, _ := wait.With(p.Client).ForPodListAllRunning(context.TODO(), pods); len(failedPods) > 0 {
+	if failedPods, _ := wait.With(p.Client).ForPodsAllRunning(context.TODO(), pods); len(failedPods) > 0 {
 		var asStrings []string
 		for _, pod := range failedPods {
 			asStrings = append(asStrings, fmt.Sprintf("%s/%s", pod.Namespace, pod.Name))

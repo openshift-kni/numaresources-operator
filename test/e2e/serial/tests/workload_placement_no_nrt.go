@@ -224,7 +224,7 @@ func updateInfoRefreshPause(ctx context.Context, fxt *e2efixture.Fixture, newVal
 
 func waitForDaemonSetUpdate(ctx context.Context, fxt *e2efixture.Fixture, dsNsName nropv1.NamespacedName, rtePods []corev1.Pod) {
 	klog.InfoS("ensure old RTE pods of ds are deleted", "daemonset", dsNsName)
-	err := wait.With(fxt.Client).Interval(30*time.Second).Timeout(5*time.Minute).ForPodListAllDeleted(ctx, rtePods)
+	err := wait.With(fxt.Client).Interval(30*time.Second).Timeout(5*time.Minute).ForPodsAllDeleted(ctx, podlist.ToPods(rtePods))
 	Expect(err).ToNot(HaveOccurred(), "Expected old RTE pods owned by the DaemonSet to be deleted within the timeout")
 
 	klog.Info("waiting for DaemonSet to be ready with the new data")
