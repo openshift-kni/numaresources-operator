@@ -19,8 +19,9 @@ package controller
 import (
 	"context"
 	"fmt"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -269,6 +270,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec)
 
 	k8swgrbacupdate.RoleForLeaderElection(r.SchedulerManifests.Role, r.Namespace, nrosched.LeaderElectionResourceName)
+	k8swgrbacupdate.RoleBinding(r.SchedulerManifests.RoleBinding, r.SchedulerManifests.ServiceAccount.Name, r.Namespace)
 
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
 	for _, objState := range existing.State(r.SchedulerManifests) {
