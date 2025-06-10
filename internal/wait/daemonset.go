@@ -20,6 +20,7 @@ import (
 	"context"
 
 	appsv1 "k8s.io/api/apps/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 )
@@ -31,6 +32,10 @@ func (wt Waiter) ForDaemonSetReadyByKey(ctx context.Context, key ObjectKey) (*ap
 	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(ctx context.Context) (bool, error) {
 		err := wt.Cli.Get(ctx, key.AsKey(), updatedDs)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				klog.Warningf("daemonset %s was not found; it may not be created yet", key.String())
+				return false, nil
+			}
 			klog.Warningf("failed to get the daemonset %s: %v", key.String(), err)
 			return false, err
 		}
@@ -66,8 +71,12 @@ func (wt Waiter) ForDaemonsetPodsCreation(ctx context.Context, key ObjectKey, ex
 	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(ctx context.Context) (bool, error) {
 		err := wt.Cli.Get(ctx, key.AsKey(), updatedDs)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				klog.Warningf("daemonset %s was not found; it may not be created yet", key.String())
+				return false, nil
+			}
 			klog.Warningf("failed to get the daemonset %s: %v", key.String(), err)
-			return false, nil
+			return false, err
 		}
 
 		if int(updatedDs.Status.DesiredNumberScheduled) != expectedPods {
@@ -88,6 +97,10 @@ func (wt Waiter) ForDaemonSetUpdateByKey(ctx context.Context, key ObjectKey) (*a
 	err := k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(ctx context.Context) (bool, error) {
 		err := wt.Cli.Get(ctx, key.AsKey(), updatedDs)
 		if err != nil {
+			if apierrors.IsNotFound(err) {
+				klog.Warningf("daemonset %s was not found; it may not be created yet", key.String())
+				return false, nil
+			}
 			klog.Warningf("failed to get the daemonset %s: %v", key.String(), err)
 			return false, err
 		}
