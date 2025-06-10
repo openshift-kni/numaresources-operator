@@ -135,7 +135,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 					testPods = append(testPods, testPod)
 				}
 
-				failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodListAllRunning(context.TODO(), testPods)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodsAllRunning(context.TODO(), testPods)
 
 				for _, failedPod := range failedPods {
 					_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
@@ -231,7 +231,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 					testPods = append(testPods, testPod)
 				}
 
-				failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodListAllRunning(context.TODO(), testPods)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodsAllRunning(context.TODO(), testPods)
 
 				for _, failedPod := range failedPods {
 					_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
