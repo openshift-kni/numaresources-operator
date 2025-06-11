@@ -1,0 +1,984 @@
+I0602 12:28:51.170173       1 main.go:74] "starting noderesourcetopology scheduler" version="v4.18.1-7" goversion="go1.22.12 (Red Hat 1.22.12-2.el9_5) X:strictfipsruntime" platform="linux/amd64"
+I0602 12:28:51.170498       1 pfpstatus.go:49] "PFP Status dump enabled" statusDirectory="/run/pfpstatus"
+I0602 12:28:51.170934       1 flags.go:64] FLAG: --allow-metric-labels="[]"
+I0602 12:28:51.170972       1 flags.go:64] FLAG: --allow-metric-labels-manifest=""
+I0602 12:28:51.170993       1 flags.go:64] FLAG: --authentication-kubeconfig=""
+I0602 12:28:51.171007       1 flags.go:64] FLAG: --authentication-skip-lookup="false"
+I0602 12:28:51.171020       1 flags.go:64] FLAG: --authentication-token-webhook-cache-ttl="10s"
+I0602 12:28:51.171034       1 flags.go:64] FLAG: --authentication-tolerate-lookup-failure="true"
+I0602 12:28:51.171047       1 flags.go:64] FLAG: --authorization-always-allow-paths="[/healthz,/readyz,/livez]"
+I0602 12:28:51.171063       1 flags.go:64] FLAG: --authorization-kubeconfig=""
+I0602 12:28:51.171074       1 flags.go:64] FLAG: --authorization-webhook-cache-authorized-ttl="10s"
+I0602 12:28:51.171087       1 flags.go:64] FLAG: --authorization-webhook-cache-unauthorized-ttl="10s"
+I0602 12:28:51.171099       1 flags.go:64] FLAG: --bind-address="0.0.0.0"
+I0602 12:28:51.171113       1 flags.go:64] FLAG: --cert-dir=""
+I0602 12:28:51.171126       1 flags.go:64] FLAG: --client-ca-file=""
+I0602 12:28:51.171138       1 flags.go:64] FLAG: --config="/etc/kubernetes/config.yaml"
+I0602 12:28:51.171149       1 flags.go:64] FLAG: --contention-profiling="true"
+I0602 12:28:51.171161       1 flags.go:64] FLAG: --disabled-metrics="[]"
+I0602 12:28:51.171174       1 flags.go:64] FLAG: --feature-gates="UnauthenticatedHTTP2DOSMitigation=true"
+I0602 12:28:51.171190       1 flags.go:64] FLAG: --help="false"
+I0602 12:28:51.171202       1 flags.go:64] FLAG: --http2-max-streams-per-connection="0"
+I0602 12:28:51.171215       1 flags.go:64] FLAG: --kube-api-burst="100"
+I0602 12:28:51.171229       1 flags.go:64] FLAG: --kube-api-content-type="application/vnd.kubernetes.protobuf"
+I0602 12:28:51.171242       1 flags.go:64] FLAG: --kube-api-qps="50"
+I0602 12:28:51.171263       1 flags.go:64] FLAG: --kubeconfig=""
+I0602 12:28:51.171276       1 flags.go:64] FLAG: --leader-elect="true"
+I0602 12:28:51.171288       1 flags.go:64] FLAG: --leader-elect-lease-duration="15s"
+I0602 12:28:51.171300       1 flags.go:64] FLAG: --leader-elect-renew-deadline="10s"
+I0602 12:28:51.171311       1 flags.go:64] FLAG: --leader-elect-resource-lock="leases"
+I0602 12:28:51.171323       1 flags.go:64] FLAG: --leader-elect-resource-name="kube-scheduler"
+I0602 12:28:51.171335       1 flags.go:64] FLAG: --leader-elect-resource-namespace="kube-system"
+I0602 12:28:51.171356       1 flags.go:64] FLAG: --leader-elect-retry-period="2s"
+I0602 12:28:51.171368       1 flags.go:64] FLAG: --log-flush-frequency="5s"
+I0602 12:28:51.171381       1 flags.go:64] FLAG: --log-text-info-buffer-size="0"
+I0602 12:28:51.171409       1 flags.go:64] FLAG: --log-text-split-stream="false"
+I0602 12:28:51.171422       1 flags.go:64] FLAG: --logging-format="text"
+I0602 12:28:51.171434       1 flags.go:64] FLAG: --master=""
+I0602 12:28:51.171453       1 flags.go:64] FLAG: --permit-address-sharing="false"
+I0602 12:28:51.171472       1 flags.go:64] FLAG: --permit-port-sharing="false"
+I0602 12:28:51.171491       1 flags.go:64] FLAG: --pod-max-in-unschedulable-pods-duration="5m0s"
+I0602 12:28:51.171517       1 flags.go:64] FLAG: --profiling="true"
+I0602 12:28:51.171536       1 flags.go:64] FLAG: --requestheader-allowed-names="[]"
+I0602 12:28:51.171613       1 flags.go:64] FLAG: --requestheader-client-ca-file=""
+I0602 12:28:51.172404       1 flags.go:64] FLAG: --requestheader-extra-headers-prefix="[x-remote-extra-]"
+I0602 12:28:51.172556       1 flags.go:64] FLAG: --requestheader-group-headers="[x-remote-group]"
+I0602 12:28:51.172589       1 flags.go:64] FLAG: --requestheader-username-headers="[x-remote-user]"
+I0602 12:28:51.172615       1 flags.go:64] FLAG: --secure-port="10259"
+I0602 12:28:51.172634       1 flags.go:64] FLAG: --show-hidden-metrics-for-version=""
+I0602 12:28:51.172648       1 flags.go:64] FLAG: --tls-cert-file=""
+I0602 12:28:51.172660       1 flags.go:64] FLAG: --tls-cipher-suites="[]"
+I0602 12:28:51.172674       1 flags.go:64] FLAG: --tls-min-version=""
+I0602 12:28:51.172687       1 flags.go:64] FLAG: --tls-private-key-file=""
+I0602 12:28:51.172699       1 flags.go:64] FLAG: --tls-sni-cert-key="[]"
+I0602 12:28:51.172714       1 flags.go:64] FLAG: --v="6"
+I0602 12:28:51.172727       1 flags.go:64] FLAG: --version="false"
+I0602 12:28:51.172742       1 flags.go:64] FLAG: --vmodule=""
+I0602 12:28:51.172755       1 flags.go:64] FLAG: --write-config-to=""
+I0602 12:28:52.664717       1 serving.go:380] Generated self-signed cert in-memory
+W0602 12:28:52.666154       1 client_config.go:659] Neither --kubeconfig nor --master was specified.  Using the inClusterConfig.  This might not work.
+I0602 12:28:53.222796       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/namespaces/kube-system/configmaps/extension-apiserver-authentication 200 OK in 8 milliseconds
+I0602 12:28:53.223372       1 requestheader_controller.go:244] Loaded a new request header values for RequestHeaderAuthRequestController
+I0602 12:28:53.268797       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/events.k8s.io/v1 200 OK in 44 milliseconds
+I0602 12:28:53.269451       1 knidebug.go:54] "Creating new KNIDebug plugin"
+I0602 12:28:53.269501       1 features.go:44] "KNIDebug feature gate" name="UnauthenticatedHTTP2DOSMitigation" enabled=true
+I0602 12:28:53.269702       1 plugin.go:77] "creating new noderesourcetopology plugin"
+I0602 12:28:53.269848       1 podprovider.go:47] "start custom pod informer"
+I0602 12:28:53.269896       1 podprovider.go:51] "syncing custom pod informer"
+I0602 12:28:53.270117       1 reflector.go:296] Starting reflector *v1.Pod (0s) from pkg/noderesourcetopology/podprovider/podprovider.go:49
+I0602 12:28:53.270156       1 reflector.go:332] Listing and watching *v1.Pod from pkg/noderesourcetopology/podprovider/podprovider.go:49
+I0602 12:28:53.277474       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/pods?limit=500&resourceVersion=0 200 OK in 7 milliseconds
+I0602 12:28:53.296402       1 reflector.go:359] Caches populated for *v1.Pod from pkg/noderesourcetopology/podprovider/podprovider.go:49
+I0602 12:28:53.297420       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/pods?allowWatchBookmarks=true&resourceVersion=117025&timeout=8m26s&timeoutSeconds=506&watch=true 200 OK in 0 milliseconds
+I0602 12:28:53.370639       1 podprovider.go:53] "synced custom pod informer"
+I0602 12:28:53.371752       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2 200 OK in 0 milliseconds
+I0602 12:28:53.374364       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies 200 OK in 2 milliseconds
+I0602 12:28:53.374799       1 overreserve.go:409] "cache resync scope missing" logger="nrtcache" fallback="All"
+I0602 12:28:53.374843       1 overreserve.go:75] "initializing" logger="nrtcache" noderesourcetopologies=2 method="Autodetect" scope="All"
+I0602 12:28:53.374875       1 store.go:49] "initialized nrtStore" logger="nrtcache" objects=2
+I0602 12:28:53.374905       1 pluginhelpers.go:92] "setting up foreign pods detection" name="topo-aware-scheduler" mode="OnlyExclusiveResources"
+I0602 12:28:53.374925       1 foreign_pods.go:75] "setting up detection" logger="foreignpods" profile="topo-aware-scheduler"
+I0602 12:28:53.374941       1 foreign_pods.go:78] "registered scheduler profiles" logger="foreignpods" names=["topo-aware-scheduler"]
+I0602 12:28:53.375100       1 pluginhelpers.go:73] "enable NodeTopology cache (needs the Reserve plugin)" resyncPeriod="5s"
+I0602 12:28:53.375205       1 framework.go:509] "Skipped MultiPoint expansion because all plugins are disabled for extension point" extension="framework.FilterPlugin"
+I0602 12:28:53.375325       1 framework.go:373] "the scheduler starts to work with those plugins" Plugins={"PreEnqueue":{"Enabled":[{"Name":"SchedulingGates","Weight":0}],"Disabled":null},"QueueSort":{"Enabled":[{"Name":"PrioritySort","Weight":0}],"Disabled":null},"PreFilter":{"Enabled":[{"Name":"NodeAffinity","Weight":0},{"Name":"NodePorts","Weight":0},{"Name":"NodeResourcesFit","Weight":0},{"Name":"VolumeRestrictions","Weight":0},{"Name":"EBSLimits","Weight":0},{"Name":"GCEPDLimits","Weight":0},{"Name":"NodeVolumeLimits","Weight":0},{"Name":"AzureDiskLimits","Weight":0},{"Name":"VolumeBinding","Weight":0},{"Name":"VolumeZone","Weight":0},{"Name":"PodTopologySpread","Weight":0},{"Name":"InterPodAffinity","Weight":0}],"Disabled":null},"Filter":{"Enabled":[{"Name":"NodeUnschedulable","Weight":0},{"Name":"NodeName","Weight":0},{"Name":"TaintToleration","Weight":0},{"Name":"NodeAffinity","Weight":0},{"Name":"NodePorts","Weight":0},{"Name":"KNIDebug","Weight":0},{"Name":"NodeResourcesFit","Weight":0},{"Name":"NodeResourceTopologyMatch","Weight":0},{"Name":"VolumeRestrictions","Weight":0},{"Name":"NodeVolumeLimits","Weight":0},{"Name":"VolumeBinding","Weight":0},{"Name":"VolumeZone","Weight":0},{"Name":"PodTopologySpread","Weight":0},{"Name":"InterPodAffinity","Weight":0}],"Disabled":null},"PostFilter":{"Enabled":[{"Name":"DefaultPreemption","Weight":0}],"Disabled":null},"PreScore":{"Enabled":[{"Name":"TaintToleration","Weight":0},{"Name":"NodeAffinity","Weight":0},{"Name":"NodeResourcesFit","Weight":0},{"Name":"VolumeBinding","Weight":0},{"Name":"PodTopologySpread","Weight":0},{"Name":"InterPodAffinity","Weight":0},{"Name":"NodeResourcesBalancedAllocation","Weight":0}],"Disabled":null},"Score":{"Enabled":[{"Name":"TaintToleration","Weight":3},{"Name":"NodeAffinity","Weight":2},{"Name":"NodeResourcesFit","Weight":1},{"Name":"VolumeBinding","Weight":1},{"Name":"PodTopologySpread","Weight":2},{"Name":"InterPodAffinity","Weight":2},{"Name":"NodeResourcesBalancedAllocation","Weight":1},{"Name":"ImageLocality","Weight":1},{"Name":"NodeResourceTopologyMatch","Weight":1}],"Disabled":null},"Reserve":{"Enabled":[{"Name":"VolumeBinding","Weight":0},{"Name":"NodeResourceTopologyMatch","Weight":0}],"Disabled":null},"Permit":{"Enabled":null,"Disabled":null},"PreBind":{"Enabled":[{"Name":"VolumeBinding","Weight":0}],"Disabled":null},"Bind":{"Enabled":[{"Name":"DefaultBinder","Weight":0}],"Disabled":null},"PostBind":{"Enabled":null,"Disabled":null},"MultiPoint":{"Enabled":null,"Disabled":null}}
+I0602 12:28:53.375692       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-scheduler/installer-5-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="2a1c9bfd-fc16-4e66-8d7e-b6825207677f" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.375715       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-scheduler/installer-5-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="2a1c9bfd-fc16-4e66-8d7e-b6825207677f" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.375701       1 overreserve.go:258] "begin" logger="nrtcache.resync"
+I0602 12:28:53.375729       1 overreserve.go:267] "no dirty nodes detected" logger="nrtcache.resync" generation=0
+I0602 12:28:53.375759       1 overreserve.go:268] "end" logger="nrtcache.resync"
+I0602 12:28:53.375747       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/installer-7-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="d9ecaf87-27e9-4af9-8cdd-73f8ce5ad9c5" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.375796       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/installer-7-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="d9ecaf87-27e9-4af9-8cdd-73f8ce5ad9c5" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.375818       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-scheduler/installer-6-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="902b53e6-6b50-4304-93d2-263f93c60c84" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.375827       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-scheduler/installer-6-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="902b53e6-6b50-4304-93d2-263f93c60c84" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.375848       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-etcd/installer-7-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="beae9d94-f596-4b7b-8f0f-ef7c7d1d2563" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.375856       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-etcd/installer-7-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="beae9d94-f596-4b7b-8f0f-ef7c7d1d2563" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.375865       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/installer-8-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="3c64d711-2a5c-4629-94ba-0794f24f713a" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.375873       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/installer-8-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="3c64d711-2a5c-4629-94ba-0794f24f713a" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.375881       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/revision-pruner-8-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="f573e7d3-d273-41c7-900e-c8685ef2f33a" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.375886       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/revision-pruner-8-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="f573e7d3-d273-41c7-900e-c8685ef2f33a" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.375894       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-controller-manager/installer-6-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="5563acf6-ae10-4d1c-80c6-5cc2aac9e3b2" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.375902       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-controller-manager/installer-6-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="5563acf6-ae10-4d1c-80c6-5cc2aac9e3b2" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.375919       1 overreserve.go:146] "marked with foreign pods" logger="nrtcache" pod="nfs/generic-pause-9dgrf-75xzw" podUID="5e8742c6-905a-4362-bbdc-f66218e9d8c0" node="cnfdr9.telco5g.eng.rdu2.redhat.com" count=1
+I0602 12:28:53.375931       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="nfs/generic-pause-9dgrf-75xzw" podUID="5e8742c6-905a-4362-bbdc-f66218e9d8c0" node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.375939       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-etcd/installer-7-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="bcd0e599-96e8-4384-ac8f-ce4ab7caca0d" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.375946       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-etcd/installer-7-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="bcd0e599-96e8-4384-ac8f-ce4ab7caca0d" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.375953       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-etcd/revision-pruner-8-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="85eebae4-fd22-470a-a306-9cac748ce090" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.375959       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-etcd/revision-pruner-8-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="85eebae4-fd22-470a-a306-9cac748ce090" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.375985       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/installer-5-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="cdd94a74-997b-4517-b488-259751b1b50b" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.375996       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/installer-5-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="cdd94a74-997b-4517-b488-259751b1b50b" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376004       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-scheduler/installer-4-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="5ff128fa-d6aa-4211-a9c5-6df9ff38e77d" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376012       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-scheduler/installer-4-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="5ff128fa-d6aa-4211-a9c5-6df9ff38e77d" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376032       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/installer-8-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="6c3e86df-ab65-4ff5-a8d2-0239d275069f" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376044       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/installer-8-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="6c3e86df-ab65-4ff5-a8d2-0239d275069f" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376059       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-etcd/installer-5-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="55791a8c-3f06-49e5-85f2-558d14ac24c0" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376068       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-etcd/installer-5-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="55791a8c-3f06-49e5-85f2-558d14ac24c0" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376076       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-controller-manager/installer-5-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="e8b91ee1-6d9c-4991-a574-d37d929abce3" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376085       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-controller-manager/installer-5-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="e8b91ee1-6d9c-4991-a574-d37d929abce3" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376038       1 attr_watch.go:43] "start watching NRT objects" logger="nrtcache"
+I0602 12:28:53.376093       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-scheduler/installer-5-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="6f046565-e475-45fc-a20e-93c1f2c9d741" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376099       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-scheduler/installer-5-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="6f046565-e475-45fc-a20e-93c1f2c9d741" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376117       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-controller-manager/installer-4-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="47739559-ecc8-47be-8afd-ae4d2fbf6da1" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376125       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-controller-manager/installer-4-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="47739559-ecc8-47be-8afd-ae4d2fbf6da1" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376142       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-controller-manager/revision-pruner-6-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="458100ad-a616-42df-9ec8-28bcf72d8e24" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376150       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-controller-manager/revision-pruner-6-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="458100ad-a616-42df-9ec8-28bcf72d8e24" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376208       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-controller-manager/installer-6-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="a381a9bd-d74c-4129-a47a-571f6ef86de4" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376219       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-controller-manager/installer-6-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="a381a9bd-d74c-4129-a47a-571f6ef86de4" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376242       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-controller-manager/revision-pruner-6-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="eac36d8c-1ab1-4d48-83bb-218d50007b92" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376250       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-controller-manager/revision-pruner-6-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="eac36d8c-1ab1-4d48-83bb-218d50007b92" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376260       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-scheduler/installer-5-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="94570958-70c2-4669-8834-d5b89f92a01b" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376268       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-scheduler/installer-5-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="94570958-70c2-4669-8834-d5b89f92a01b" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376290       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-etcd/revision-pruner-8-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="b3060637-7b37-42cc-a095-1e04b749c79c" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376298       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-etcd/revision-pruner-8-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="b3060637-7b37-42cc-a095-1e04b749c79c" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376310       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-etcd/revision-pruner-8-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="1b576ac3-16cb-4536-9899-a000b6580fdc" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376319       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-etcd/revision-pruner-8-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="1b576ac3-16cb-4536-9899-a000b6580fdc" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376342       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-controller-manager/installer-6-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="39316df4-4bb2-4158-ab2c-3be8e8b5b710" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376351       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-controller-manager/installer-6-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="39316df4-4bb2-4158-ab2c-3be8e8b5b710" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376371       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-controller-manager/installer-5-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="cca2d69f-9d2a-467d-8448-aae0f62aea48" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376380       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-controller-manager/installer-5-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="cca2d69f-9d2a-467d-8448-aae0f62aea48" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376414       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-etcd/installer-7-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="af51d6a4-3d46-4dff-9bbf-b814b28bb9c7" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376423       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-etcd/installer-7-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="af51d6a4-3d46-4dff-9bbf-b814b28bb9c7" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376435       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-controller-manager/installer-5-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="f6fae6c9-eaa0-45fa-978c-3510b4b4efcd" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376443       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-controller-manager/installer-5-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="f6fae6c9-eaa0-45fa-978c-3510b4b4efcd" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376516       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-etcd/installer-8-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="32a0a29d-0bda-471b-bb58-a4a35104a26a" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376525       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-etcd/installer-8-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="32a0a29d-0bda-471b-bb58-a4a35104a26a" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376542       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/installer-7-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="a70c3ebf-b59b-4867-a550-0ff362537cc8" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376551       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/installer-7-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="a70c3ebf-b59b-4867-a550-0ff362537cc8" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376565       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/revision-pruner-7-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="eb5b7f87-44b7-48c2-8d5b-1324e79053ff" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376573       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/revision-pruner-7-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="eb5b7f87-44b7-48c2-8d5b-1324e79053ff" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376594       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-controller-manager/installer-4-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="e77bf886-fc07-4f3c-b6bf-371cc4ee6a15" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376614       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-controller-manager/installer-4-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="e77bf886-fc07-4f3c-b6bf-371cc4ee6a15" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376681       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-scheduler/revision-pruner-6-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="4841cdaf-92f4-4893-8db4-fd3d40ca64d3" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376695       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-scheduler/revision-pruner-6-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="4841cdaf-92f4-4893-8db4-fd3d40ca64d3" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376733       1 overreserve.go:146] "marked with foreign pods" logger="nrtcache" pod="nfs/generic-pause-9dgrf-ppsxf" podUID="9fd1b134-27a2-4622-a0fe-a26a12d5a24b" node="cnfdr11.telco5g.eng.rdu2.redhat.com" count=1
+I0602 12:28:53.376749       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="nfs/generic-pause-9dgrf-ppsxf" podUID="9fd1b134-27a2-4622-a0fe-a26a12d5a24b" node="cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376798       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/installer-7-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="f072fb01-55b9-4883-ba89-7b2c1a95c129" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376815       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/installer-7-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="f072fb01-55b9-4883-ba89-7b2c1a95c129" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376824       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-scheduler/revision-pruner-6-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="bbcb6df5-d82f-4b1c-8989-2a947e1e1119" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376830       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-scheduler/revision-pruner-6-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="bbcb6df5-d82f-4b1c-8989-2a947e1e1119" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376838       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="numaresources/secondary-scheduler-5ccc465fdb-pz4sg" podUID="d04a2b2b-1d5a-4850-84eb-04455a0460dd" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376844       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="numaresources/secondary-scheduler-5ccc465fdb-pz4sg" podUID="d04a2b2b-1d5a-4850-84eb-04455a0460dd" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376885       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-etcd/revision-pruner-7-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="385f1c15-5e00-4808-b531-409f21e1817f" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376890       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-etcd/revision-pruner-7-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="385f1c15-5e00-4808-b531-409f21e1817f" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376906       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-etcd/installer-8-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="421635cf-00cd-4bc2-a8ce-0a31ae45c2a0" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376912       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-etcd/installer-8-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="421635cf-00cd-4bc2-a8ce-0a31ae45c2a0" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376923       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-scheduler/revision-pruner-6-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="fb624e51-f543-4156-bb0b-a4e582b1cb83" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376929       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-scheduler/revision-pruner-6-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="fb624e51-f543-4156-bb0b-a4e582b1cb83" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.376993       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/installer-8-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="c5312413-7929-45f2-968e-9391dab96541" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.376999       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/installer-8-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="c5312413-7929-45f2-968e-9391dab96541" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377022       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-scheduler/installer-6-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="ead1f18d-fd29-4b9e-a685-e26f1e431b65" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377033       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-scheduler/installer-6-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="ead1f18d-fd29-4b9e-a685-e26f1e431b65" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377050       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/installer-4-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="22616393-2b8f-4baa-ac38-8ffda83986ce" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377055       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/installer-4-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="22616393-2b8f-4baa-ac38-8ffda83986ce" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377071       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-controller-manager/installer-4-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="5cde2223-001b-457c-ae8a-d39f101ced6a" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377076       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-controller-manager/installer-4-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="5cde2223-001b-457c-ae8a-d39f101ced6a" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377129       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/installer-5-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="832c022a-df94-43de-9cc8-5bd59c6e097c" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377135       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/installer-5-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="832c022a-df94-43de-9cc8-5bd59c6e097c" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377148       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-etcd/installer-8-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="ce313342-afe7-4082-8cdd-9e548b26fb9a" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377170       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-etcd/installer-8-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="ce313342-afe7-4082-8cdd-9e548b26fb9a" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377181       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/revision-pruner-7-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="e8e17677-1a5f-4ef7-9971-e4df2e3075c1" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377186       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/revision-pruner-7-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="e8e17677-1a5f-4ef7-9971-e4df2e3075c1" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377194       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/revision-pruner-8-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="c94fbc49-5165-4262-a7e9-6bf7b5fe7226" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377200       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/revision-pruner-8-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="c94fbc49-5165-4262-a7e9-6bf7b5fe7226" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377215       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-etcd/revision-pruner-7-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="69d3208f-0f78-4caa-8814-217c289c5981" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377221       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-etcd/revision-pruner-7-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="69d3208f-0f78-4caa-8814-217c289c5981" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377251       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies?watch=true 200 OK in 1 milliseconds
+I0602 12:28:53.377253       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-etcd/revision-pruner-7-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="73c88548-8665-4610-b41e-ac7c82e1161a" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377300       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-etcd/revision-pruner-7-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" podUID="73c88548-8665-4610-b41e-ac7c82e1161a" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377316       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/installer-5-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="a32900d0-7286-4245-a02a-5e22866bb1c3" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377332       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/installer-5-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="a32900d0-7286-4245-a02a-5e22866bb1c3" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377357       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/revision-pruner-7-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="7957f6b7-b4d7-4928-babd-e51102ef3d01" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377372       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/revision-pruner-7-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="7957f6b7-b4d7-4928-babd-e51102ef3d01" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377384       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-apiserver/revision-pruner-8-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="69ebbc07-360e-4102-a904-b2fac3b3f5f8" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377410       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-apiserver/revision-pruner-8-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="69ebbc07-360e-4102-a904-b2fac3b3f5f8" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377418       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-scheduler/installer-6-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="3c119d4a-b622-4cfd-8017-eafcdef43330" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377424       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-scheduler/installer-6-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" podUID="3c119d4a-b622-4cfd-8017-eafcdef43330" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.377456       1 overreserve.go:142] "ignoring foreign pods" logger="nrtcache" pod="openshift-kube-controller-manager/revision-pruner-6-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="e1df0aea-e3af-49c6-85b6-9f39b13cd520" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" nrtinfo="missing"
+I0602 12:28:53.377465       1 foreign_pods.go:54] "detected foreign pods" logger="foreignpods" pod="openshift-kube-controller-manager/revision-pruner-6-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" podUID="e1df0aea-e3af-49c6-85b6-9f39b13cd520" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.379240       1 configfile.go:94] "Using component config" config=<
+	apiVersion: kubescheduler.config.k8s.io/v1
+	clientConnection:
+	  acceptContentTypes: ""
+	  burst: 100
+	  contentType: application/vnd.kubernetes.protobuf
+	  kubeconfig: ""
+	  qps: 50
+	enableContentionProfiling: true
+	enableProfiling: true
+	kind: KubeSchedulerConfiguration
+	leaderElection:
+	  leaderElect: false
+	  leaseDuration: 15s
+	  renewDeadline: 10s
+	  resourceLock: leases
+	  resourceName: numa-scheduler-leader
+	  resourceNamespace: numaresources
+	  retryPeriod: 2s
+	parallelism: 16
+	percentageOfNodesToScore: 0
+	podInitialBackoffSeconds: 1
+	podMaxBackoffSeconds: 10
+	profiles:
+	- pluginConfig:
+	  - args:
+	      apiVersion: kubescheduler.config.k8s.io/v1
+	      kind: DefaultPreemptionArgs
+	      minCandidateNodesAbsolute: 100
+	      minCandidateNodesPercentage: 10
+	    name: DefaultPreemption
+	  - args:
+	      apiVersion: kubescheduler.config.k8s.io/v1
+	      hardPodAffinityWeight: 1
+	      ignorePreferredTermsOfExistingPods: false
+	      kind: InterPodAffinityArgs
+	    name: InterPodAffinity
+	  - args:
+	      apiVersion: kubescheduler.config.k8s.io/v1
+	      kind: NodeAffinityArgs
+	    name: NodeAffinity
+	  - args:
+	      apiVersion: kubescheduler.config.k8s.io/v1
+	      cache:
+	        foreignPodsDetect: OnlyExclusiveResources
+	        informerMode: Dedicated
+	        resyncMethod: Autodetect
+	      cacheResyncPeriodSeconds: 5
+	      kind: NodeResourceTopologyMatchArgs
+	      scoringStrategy:
+	        resources:
+	        - name: cpu
+	          weight: 1
+	        - name: memory
+	          weight: 1
+	        type: LeastAllocated
+	    name: NodeResourceTopologyMatch
+	  - args:
+	      apiVersion: kubescheduler.config.k8s.io/v1
+	      kind: NodeResourcesBalancedAllocationArgs
+	      resources:
+	      - name: cpu
+	        weight: 1
+	      - name: memory
+	        weight: 1
+	    name: NodeResourcesBalancedAllocation
+	  - args:
+	      apiVersion: kubescheduler.config.k8s.io/v1
+	      kind: NodeResourcesFitArgs
+	      scoringStrategy:
+	        resources:
+	        - name: cpu
+	          weight: 1
+	        - name: memory
+	          weight: 1
+	        type: LeastAllocated
+	    name: NodeResourcesFit
+	  - args:
+	      apiVersion: kubescheduler.config.k8s.io/v1
+	      defaultingType: System
+	      kind: PodTopologySpreadArgs
+	    name: PodTopologySpread
+	  - args:
+	      apiVersion: kubescheduler.config.k8s.io/v1
+	      bindTimeoutSeconds: 600
+	      kind: VolumeBindingArgs
+	    name: VolumeBinding
+	  plugins:
+	    bind: {}
+	    filter:
+	      disabled:
+	      - name: '*'
+	        weight: 0
+	      enabled:
+	      - name: NodeUnschedulable
+	        weight: 0
+	      - name: NodeName
+	        weight: 0
+	      - name: TaintToleration
+	        weight: 0
+	      - name: NodeAffinity
+	        weight: 0
+	      - name: NodePorts
+	        weight: 0
+	      - name: KNIDebug
+	        weight: 0
+	      - name: NodeResourcesFit
+	        weight: 0
+	      - name: NodeResourceTopologyMatch
+	        weight: 0
+	      - name: VolumeRestrictions
+	        weight: 0
+	      - name: NodeVolumeLimits
+	        weight: 0
+	      - name: VolumeBinding
+	        weight: 0
+	      - name: VolumeZone
+	        weight: 0
+	      - name: PodTopologySpread
+	        weight: 0
+	      - name: InterPodAffinity
+	        weight: 0
+	    multiPoint:
+	      enabled:
+	      - name: SchedulingGates
+	        weight: 0
+	      - name: PrioritySort
+	        weight: 0
+	      - name: NodeUnschedulable
+	        weight: 0
+	      - name: NodeName
+	        weight: 0
+	      - name: TaintToleration
+	        weight: 3
+	      - name: NodeAffinity
+	        weight: 2
+	      - name: NodePorts
+	        weight: 0
+	      - name: NodeResourcesFit
+	        weight: 1
+	      - name: VolumeRestrictions
+	        weight: 0
+	      - name: EBSLimits
+	        weight: 0
+	      - name: GCEPDLimits
+	        weight: 0
+	      - name: NodeVolumeLimits
+	        weight: 0
+	      - name: AzureDiskLimits
+	        weight: 0
+	      - name: VolumeBinding
+	        weight: 0
+	      - name: VolumeZone
+	        weight: 0
+	      - name: PodTopologySpread
+	        weight: 2
+	      - name: InterPodAffinity
+	        weight: 2
+	      - name: DefaultPreemption
+	        weight: 0
+	      - name: NodeResourcesBalancedAllocation
+	        weight: 1
+	      - name: ImageLocality
+	        weight: 1
+	      - name: DefaultBinder
+	        weight: 0
+	    permit: {}
+	    postBind: {}
+	    postFilter: {}
+	    preBind: {}
+	    preEnqueue: {}
+	    preFilter: {}
+	    preScore: {}
+	    queueSort: {}
+	    reserve:
+	      enabled:
+	      - name: NodeResourceTopologyMatch
+	        weight: 0
+	    score:
+	      enabled:
+	      - name: NodeResourceTopologyMatch
+	        weight: 0
+	  schedulerName: topo-aware-scheduler
+ >
+I0602 12:28:53.379723       1 server.go:154] "Starting Kubernetes Scheduler" version="v4.18.1-7"
+I0602 12:28:53.379776       1 server.go:156] "Golang settings" GOGC="" GOMAXPROCS="" GOTRACEBACK=""
+I0602 12:28:53.379840       1 healthz.go:166] No default health checks specified. Installing the ping handler.
+I0602 12:28:53.379860       1 healthz.go:170] Installing health checkers for (/healthz): "ping"
+I0602 12:28:53.383978       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/namespaces/kube-system/configmaps/extension-apiserver-authentication 200 OK in 2 milliseconds
+I0602 12:28:53.384561       1 requestheader_controller.go:169] Starting RequestHeaderAuthRequestController
+I0602 12:28:53.384579       1 shared_informer.go:313] Waiting for caches to sync for RequestHeaderAuthRequestController
+I0602 12:28:53.384610       1 tlsconfig.go:200] "Loaded serving cert" certName="Generated self signed cert" certDetail="\"localhost@1748867332\" [serving] validServingFor=[127.0.0.1,localhost,localhost] issuer=\"localhost-ca@1748867332\" (2025-06-02 11:28:51 +0000 UTC to 2026-06-02 11:28:51 +0000 UTC (now=2025-06-02 12:28:53.384590949 +0000 UTC))"
+I0602 12:28:53.384667       1 configmap_cafile_content.go:202] "Starting controller" name="client-ca::kube-system::extension-apiserver-authentication::requestheader-client-ca-file"
+I0602 12:28:53.384614       1 configmap_cafile_content.go:202] "Starting controller" name="client-ca::kube-system::extension-apiserver-authentication::client-ca-file"
+I0602 12:28:53.384706       1 shared_informer.go:313] Waiting for caches to sync for client-ca::kube-system::extension-apiserver-authentication::client-ca-file
+I0602 12:28:53.384725       1 named_certificates.go:53] "Loaded SNI cert" index=0 certName="self-signed loopback" certDetail="\"apiserver-loopback-client@1748867333\" [serving] validServingFor=[apiserver-loopback-client] issuer=\"apiserver-loopback-client-ca@1748867333\" (2025-06-02 11:28:52 +0000 UTC to 2026-06-02 11:28:52 +0000 UTC (now=2025-06-02 12:28:53.384716564 +0000 UTC))"
+I0602 12:28:53.384733       1 shared_informer.go:313] Waiting for caches to sync for client-ca::kube-system::extension-apiserver-authentication::requestheader-client-ca-file
+I0602 12:28:53.384760       1 tlsconfig.go:240] "Starting DynamicServingCertificateController"
+I0602 12:28:53.384824       1 reflector.go:296] Starting reflector *v1.ConfigMap (12h0m0s) from k8s.io/apiserver/pkg/server/dynamiccertificates/configmap_cafile_content.go:206
+I0602 12:28:53.384833       1 reflector.go:332] Listing and watching *v1.ConfigMap from k8s.io/apiserver/pkg/server/dynamiccertificates/configmap_cafile_content.go:206
+I0602 12:28:53.384992       1 reflector.go:296] Starting reflector *v1.ConfigMap (12h0m0s) from k8s.io/apiserver/pkg/server/dynamiccertificates/configmap_cafile_content.go:206
+I0602 12:28:53.385001       1 reflector.go:332] Listing and watching *v1.ConfigMap from k8s.io/apiserver/pkg/server/dynamiccertificates/configmap_cafile_content.go:206
+I0602 12:28:53.384749       1 secure_serving.go:213] Serving securely on [::]:10259
+I0602 12:28:53.385133       1 reflector.go:296] Starting reflector *v1.PodDisruptionBudget (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385138       1 reflector.go:332] Listing and watching *v1.PodDisruptionBudget from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385164       1 reflector.go:296] Starting reflector *v1.CSIDriver (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385169       1 reflector.go:332] Listing and watching *v1.CSIDriver from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385242       1 reflector.go:296] Starting reflector *v1.PersistentVolumeClaim (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385268       1 reflector.go:332] Listing and watching *v1.PersistentVolumeClaim from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385280       1 reflector.go:296] Starting reflector *v1.CSIStorageCapacity (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385288       1 reflector.go:332] Listing and watching *v1.CSIStorageCapacity from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385331       1 reflector.go:296] Starting reflector *v1.PersistentVolume (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385351       1 reflector.go:296] Starting reflector *v1.StorageClass (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385353       1 reflector.go:332] Listing and watching *v1.PersistentVolume from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385356       1 reflector.go:332] Listing and watching *v1.StorageClass from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385375       1 reflector.go:296] Starting reflector *v1.ReplicationController (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385389       1 reflector.go:296] Starting reflector *v1.Pod (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385409       1 reflector.go:332] Listing and watching *v1.Pod from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385439       1 reflector.go:296] Starting reflector *v1.Service (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385450       1 reflector.go:332] Listing and watching *v1.Service from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385466       1 reflector.go:296] Starting reflector *v1.CSINode (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385479       1 reflector.go:332] Listing and watching *v1.CSINode from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385516       1 reflector.go:296] Starting reflector *v1.Node (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385525       1 reflector.go:332] Listing and watching *v1.Node from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385588       1 reflector.go:296] Starting reflector *v1.StatefulSet (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385597       1 reflector.go:332] Listing and watching *v1.StatefulSet from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385604       1 reflector.go:296] Starting reflector *v1.ReplicaSet (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385612       1 reflector.go:332] Listing and watching *v1.ReplicaSet from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385617       1 reflector.go:296] Starting reflector topology.node.k8s.io/v1alpha2, Resource=noderesourcetopologies (0s) from k8s.io/client-go/dynamic/dynamicinformer/informer.go:108
+I0602 12:28:53.385622       1 reflector.go:332] Listing and watching topology.node.k8s.io/v1alpha2, Resource=noderesourcetopologies from k8s.io/client-go/dynamic/dynamicinformer/informer.go:108
+I0602 12:28:53.385725       1 reflector.go:296] Starting reflector *v1.Namespace (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385736       1 reflector.go:332] Listing and watching *v1.Namespace from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.385865       1 reflector.go:296] Starting reflector *v1.ConfigMap (12h0m0s) from k8s.io/apiserver/pkg/authentication/request/headerrequest/requestheader_controller.go:172
+I0602 12:28:53.385878       1 reflector.go:332] Listing and watching *v1.ConfigMap from k8s.io/apiserver/pkg/authentication/request/headerrequest/requestheader_controller.go:172
+I0602 12:28:53.386065       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/policy/v1/poddisruptionbudgets?limit=500&resourceVersion=0 200 OK in 0 milliseconds
+I0602 12:28:53.386109       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/namespaces/kube-system/configmaps?fieldSelector=metadata.name%3Dextension-apiserver-authentication&limit=500&resourceVersion=0 200 OK in 1 milliseconds
+I0602 12:28:53.385403       1 reflector.go:332] Listing and watching *v1.ReplicationController from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.386633       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/storage.k8s.io/v1/csidrivers?limit=500&resourceVersion=0 200 OK in 1 milliseconds
+I0602 12:28:53.386109       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/namespaces/kube-system/configmaps?fieldSelector=metadata.name%3Dextension-apiserver-authentication&limit=500&resourceVersion=0 200 OK in 1 milliseconds
+I0602 12:28:53.386541       1 reflector.go:359] Caches populated for *v1.ConfigMap from k8s.io/apiserver/pkg/server/dynamiccertificates/configmap_cafile_content.go:206
+I0602 12:28:53.386823       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/persistentvolumeclaims?limit=500&resourceVersion=0 200 OK in 1 milliseconds
+I0602 12:28:53.386837       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/storage.k8s.io/v1/csinodes?limit=500&resourceVersion=0 200 OK in 1 milliseconds
+I0602 12:28:53.386851       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/storage.k8s.io/v1/csistoragecapacities?limit=500&resourceVersion=0 200 OK in 1 milliseconds
+I0602 12:28:53.386886       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/nodes?limit=500&resourceVersion=0 200 OK in 1 milliseconds
+I0602 12:28:53.386604       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/namespaces/kube-system/configmaps?fieldSelector=metadata.name%3Dextension-apiserver-authentication&limit=500&resourceVersion=0 200 OK in 0 milliseconds
+I0602 12:28:53.386949       1 reflector.go:359] Caches populated for *v1.CSIDriver from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.387021       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/apps/v1/statefulsets?limit=500&resourceVersion=0 200 OK in 1 milliseconds
+I0602 12:28:53.387143       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies?limit=500&resourceVersion=0 200 OK in 1 milliseconds
+I0602 12:28:53.387208       1 reflector.go:359] Caches populated for *v1.ConfigMap from k8s.io/apiserver/pkg/server/dynamiccertificates/configmap_cafile_content.go:206
+I0602 12:28:53.387290       1 reflector.go:359] Caches populated for *v1.ConfigMap from k8s.io/apiserver/pkg/authentication/request/headerrequest/requestheader_controller.go:172
+I0602 12:28:53.387430       1 reflector.go:359] Caches populated for *v1.CSINode from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.387519       1 reflector.go:359] Caches populated for *v1.PersistentVolumeClaim from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.387611       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/persistentvolumes?limit=500&resourceVersion=0 200 OK in 1 milliseconds
+I0602 12:28:53.387641       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/namespaces?limit=500&resourceVersion=0 200 OK in 1 milliseconds
+I0602 12:28:53.387804       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/storage.k8s.io/v1/csidrivers?allowWatchBookmarks=true&resourceVersion=117014&timeout=5m5s&timeoutSeconds=305&watch=true 200 OK in 0 milliseconds
+I0602 12:28:53.387848       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/namespaces/kube-system/configmaps?allowWatchBookmarks=true&fieldSelector=metadata.name%3Dextension-apiserver-authentication&resourceVersion=116967&timeout=8m50s&timeoutSeconds=530&watch=true 200 OK in 0 milliseconds
+I0602 12:28:53.388181       1 reflector.go:359] Caches populated for *v1.CSIStorageCapacity from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.388213       1 reflector.go:359] Caches populated for *v1.PodDisruptionBudget from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.388310       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/storage.k8s.io/v1/storageclasses?limit=500&resourceVersion=0 200 OK in 2 milliseconds
+I0602 12:28:53.388355       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/replicationcontrollers?limit=500&resourceVersion=0 200 OK in 1 milliseconds
+I0602 12:28:53.388373       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/services?limit=500&resourceVersion=0 200 OK in 2 milliseconds
+I0602 12:28:53.388520       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/namespaces/kube-system/configmaps?allowWatchBookmarks=true&fieldSelector=metadata.name%3Dextension-apiserver-authentication&resourceVersion=116967&timeout=5m21s&timeoutSeconds=321&watch=true 200 OK in 1 milliseconds
+I0602 12:28:53.388555       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/namespaces/kube-system/configmaps?allowWatchBookmarks=true&fieldSelector=metadata.name%3Dextension-apiserver-authentication&resourceVersion=116967&timeout=9m26s&timeoutSeconds=566&watch=true 200 OK in 1 milliseconds
+I0602 12:28:53.388848       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/persistentvolumeclaims?allowWatchBookmarks=true&resourceVersion=117019&timeout=5m42s&timeoutSeconds=342&watch=true 200 OK in 1 milliseconds
+I0602 12:28:53.388891       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/storage.k8s.io/v1/csinodes?allowWatchBookmarks=true&resourceVersion=117009&timeout=6m44s&timeoutSeconds=404&watch=true 200 OK in 1 milliseconds
+I0602 12:28:53.389078       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/apps/v1/replicasets?limit=500&resourceVersion=0 200 OK in 3 milliseconds
+I0602 12:28:53.389216       1 reflector.go:359] Caches populated for topology.node.k8s.io/v1alpha2, Resource=noderesourcetopologies from k8s.io/client-go/dynamic/dynamicinformer/informer.go:108
+I0602 12:28:53.390690       1 reflector.go:359] Caches populated for *v1.StorageClass from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.390823       1 reflector.go:359] Caches populated for *v1.ReplicationController from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.391229       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/storage.k8s.io/v1/csistoragecapacities?allowWatchBookmarks=true&resourceVersion=117019&timeout=9m38s&timeoutSeconds=578&watch=true 200 OK in 2 milliseconds
+I0602 12:28:53.391262       1 reflector.go:359] Caches populated for *v1.PersistentVolume from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.391344       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies?allowWatchBookmarks=true&resourceVersion=117032&timeoutSeconds=447&watch=true 200 OK in 2 milliseconds
+I0602 12:28:53.391369       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/policy/v1/poddisruptionbudgets?allowWatchBookmarks=true&resourceVersion=117032&timeout=6m7s&timeoutSeconds=367&watch=true 200 OK in 3 milliseconds
+I0602 12:28:53.391449       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/pods?fieldSelector=status.phase%21%3DSucceeded%2Cstatus.phase%21%3DFailed&limit=500&resourceVersion=0 200 OK in 5 milliseconds
+I0602 12:28:53.391868       1 reflector.go:359] Caches populated for *v1.Node from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.391932       1 eventhandlers.go:75] "Add event for node" node="cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.391992       1 node_tree.go:65] "Added node in listed group to NodeTree" node="cnfdr11.telco5g.eng.rdu2.redhat.com" zone=""
+I0602 12:28:53.392268       1 eventhandlers.go:75] "Add event for node" node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.392295       1 node_tree.go:65] "Added node in listed group to NodeTree" node="cnfdr9.telco5g.eng.rdu2.redhat.com" zone=""
+I0602 12:28:53.392372       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/storage.k8s.io/v1/storageclasses?allowWatchBookmarks=true&resourceVersion=117031&timeout=5m42s&timeoutSeconds=342&watch=true 200 OK in 1 milliseconds
+I0602 12:28:53.392390       1 eventhandlers.go:75] "Add event for node" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.392453       1 node_tree.go:65] "Added node in listed group to NodeTree" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com" zone=""
+I0602 12:28:53.392536       1 eventhandlers.go:75] "Add event for node" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.392547       1 node_tree.go:65] "Added node in listed group to NodeTree" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com" zone=""
+I0602 12:28:53.392676       1 eventhandlers.go:75] "Add event for node" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.392696       1 node_tree.go:65] "Added node in listed group to NodeTree" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com" zone=""
+I0602 12:28:53.392727       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/replicationcontrollers?allowWatchBookmarks=true&resourceVersion=117019&timeout=6m49s&timeoutSeconds=409&watch=true 200 OK in 1 milliseconds
+I0602 12:28:53.392734       1 reflector.go:359] Caches populated for *v1.Service from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.393099       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/persistentvolumes?allowWatchBookmarks=true&resourceVersion=117013&timeout=6m39s&timeoutSeconds=399&watch=true 200 OK in 1 milliseconds
+I0602 12:28:53.393665       1 reflector.go:359] Caches populated for *v1.StatefulSet from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.393827       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/nodes?allowWatchBookmarks=true&resourceVersion=117027&timeout=7m43s&timeoutSeconds=463&watch=true 200 OK in 1 milliseconds
+I0602 12:28:53.394073       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/services?allowWatchBookmarks=true&resourceVersion=117013&timeout=7m7s&timeoutSeconds=427&watch=true 200 OK in 1 milliseconds
+I0602 12:28:53.394241       1 reflector.go:359] Caches populated for *v1.Namespace from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.396116       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/apps/v1/statefulsets?allowWatchBookmarks=true&resourceVersion=117031&timeout=8m17s&timeoutSeconds=497&watch=true 200 OK in 2 milliseconds
+I0602 12:28:53.396659       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/namespaces?allowWatchBookmarks=true&resourceVersion=117016&timeout=6m28s&timeoutSeconds=388&watch=true 200 OK in 2 milliseconds
+I0602 12:28:53.468688       1 reflector.go:359] Caches populated for *v1.ReplicaSet from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.470207       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/apps/v1/replicasets?allowWatchBookmarks=true&resourceVersion=117026&timeout=5m42s&timeoutSeconds=342&watch=true 200 OK in 1 milliseconds
+I0602 12:28:53.480403       1 reflector.go:359] Caches populated for *v1.Pod from k8s.io/client-go/informers/factory.go:160
+I0602 12:28:53.480547       1 eventhandlers.go:202] "Add event for scheduled pod" pod="nfs/nfs-client-provisioner-5866c7c7cc-sv2mv"
+I0602 12:28:53.480619       1 eventhandlers.go:202] "Add event for scheduled pod" pod="numaresources/numaresources-controller-manager-7fc47c6c59-bpp8z"
+I0602 12:28:53.480650       1 eventhandlers.go:202] "Add event for scheduled pod" pod="numaresources/numaresourcesoperator-worker-bpj5f"
+I0602 12:28:53.480664       1 eventhandlers.go:202] "Add event for scheduled pod" pod="numaresources/numaresourcesoperator-worker-fw5hk"
+I0602 12:28:53.480678       1 eventhandlers.go:202] "Add event for scheduled pod" pod="numaresources/secondary-scheduler-5ccc465fdb-pz4sg"
+I0602 12:28:53.480688       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-apiserver-operator/openshift-apiserver-operator-6bf8db86bb-m7cwt"
+I0602 12:28:53.480701       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-apiserver/apiserver-58878b9b69-6c8zw"
+I0602 12:28:53.480738       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-apiserver/apiserver-58878b9b69-lvwfx"
+I0602 12:28:53.480801       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-apiserver/apiserver-58878b9b69-zjgj5"
+I0602 12:28:53.480860       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-authentication-operator/authentication-operator-66f4ffdc5f-bwfn4"
+I0602 12:28:53.480886       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-authentication/oauth-openshift-59b694b7b6-sjbxm"
+I0602 12:28:53.480922       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-authentication/oauth-openshift-59b694b7b6-xh9b5"
+I0602 12:28:53.480966       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-authentication/oauth-openshift-59b694b7b6-zlcfx"
+I0602 12:28:53.480989       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-catalogd/catalogd-controller-manager-79c4d5879b-lkdxs"
+I0602 12:28:53.481034       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cloud-controller-manager-operator/cluster-cloud-controller-manager-operator-948669f87-7wlk5"
+I0602 12:28:53.481071       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cloud-credential-operator/cloud-credential-operator-fb8cb9f78-lr2hm"
+I0602 12:28:53.481089       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-machine-approver/machine-approver-559fdd6b44-5h4lw"
+I0602 12:28:53.481106       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-node-tuning-operator/cluster-node-tuning-operator-78558b99-zm45c"
+I0602 12:28:53.481116       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-node-tuning-operator/tuned-2rnm7"
+I0602 12:28:53.481137       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-node-tuning-operator/tuned-556d7"
+I0602 12:28:53.481162       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-node-tuning-operator/tuned-dbmrc"
+I0602 12:28:53.481173       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-node-tuning-operator/tuned-fgb89"
+I0602 12:28:53.481186       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-node-tuning-operator/tuned-zqzd9"
+I0602 12:28:53.481200       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-olm-operator/cluster-olm-operator-74f7c4b879-ftvjq"
+I0602 12:28:53.481214       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-samples-operator/cluster-samples-operator-8574fd7488-hb24g"
+I0602 12:28:53.481230       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-storage-operator/cluster-storage-operator-ccd78c64b-62z6q"
+I0602 12:28:53.481249       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-storage-operator/csi-snapshot-controller-78747ff847-8wkb2"
+I0602 12:28:53.481278       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-storage-operator/csi-snapshot-controller-78747ff847-xp7q4"
+I0602 12:28:53.481298       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-storage-operator/csi-snapshot-controller-operator-7c5b79f57-8qt6v"
+I0602 12:28:53.481328       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-cluster-version/cluster-version-operator-78fc6c6cd8-jkwhb"
+I0602 12:28:53.481342       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-config-operator/openshift-config-operator-57c66ccd58-dt9bh"
+I0602 12:28:53.481362       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-console-operator/console-operator-7dd466dcd9-qsxdm"
+I0602 12:28:53.481376       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-console/console-788755f664-nr9pk"
+I0602 12:28:53.481439       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-console/console-788755f664-vjc55"
+I0602 12:28:53.481467       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-console/downloads-57db679fdb-5gncg"
+I0602 12:28:53.481503       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-console/downloads-57db679fdb-vxsgc"
+I0602 12:28:53.481531       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-controller-manager-operator/openshift-controller-manager-operator-c6496fb8-5tfb6"
+I0602 12:28:53.481554       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-controller-manager/controller-manager-68fcf79878-cvshz"
+I0602 12:28:53.481574       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-controller-manager/controller-manager-68fcf79878-f4d7x"
+I0602 12:28:53.481595       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-controller-manager/controller-manager-68fcf79878-svgbl"
+I0602 12:28:53.481611       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-dns-operator/dns-operator-fb7ffbf9-2z9ct"
+I0602 12:28:53.481626       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-dns/dns-default-2kk8h"
+I0602 12:28:53.481637       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-dns/dns-default-499v2"
+I0602 12:28:53.481647       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-dns/dns-default-5fp7d"
+I0602 12:28:53.481692       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-dns/dns-default-68sdp"
+I0602 12:28:53.481707       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-dns/dns-default-rbjxb"
+I0602 12:28:53.481727       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-dns/node-resolver-7c577"
+I0602 12:28:53.481743       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-dns/node-resolver-f446k"
+I0602 12:28:53.481787       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-dns/node-resolver-j2799"
+I0602 12:28:53.481795       1 round_trippers.go:553] GET https://172.30.0.1:443/api/v1/pods?allowWatchBookmarks=true&fieldSelector=status.phase%21%3DSucceeded%2Cstatus.phase%21%3DFailed&resourceVersion=117025&timeout=5m58s&timeoutSeconds=358&watch=true 200 OK in 1 milliseconds
+I0602 12:28:53.481803       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-dns/node-resolver-ltmrj"
+I0602 12:28:53.481871       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-dns/node-resolver-lwsvv"
+I0602 12:28:53.481896       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-etcd-operator/etcd-operator-5c884b5c8f-tlqn6"
+I0602 12:28:53.481908       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-etcd/etcd-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.481928       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-etcd/etcd-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.481944       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-etcd/etcd-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.481973       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-etcd/etcd-guard-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.481983       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-etcd/etcd-guard-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.481995       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-etcd/etcd-guard-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482004       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-image-registry/cluster-image-registry-operator-7c99657f6b-rmdww"
+I0602 12:28:53.482015       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-image-registry/image-registry-96546969d-hxjq6"
+I0602 12:28:53.482026       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-image-registry/node-ca-25pg6"
+I0602 12:28:53.482038       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-image-registry/node-ca-456mp"
+I0602 12:28:53.482047       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-image-registry/node-ca-b9h7x"
+I0602 12:28:53.482058       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-image-registry/node-ca-x96nl"
+I0602 12:28:53.482067       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-image-registry/node-ca-z425p"
+I0602 12:28:53.482078       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-ingress-canary/ingress-canary-mgq5n"
+I0602 12:28:53.482098       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-ingress-canary/ingress-canary-zslns"
+I0602 12:28:53.482114       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-ingress-operator/ingress-operator-fcc7d5dfd-9fmmt"
+I0602 12:28:53.482136       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-ingress/router-default-68f754bbc4-7mqwv"
+I0602 12:28:53.482150       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-ingress/router-default-68f754bbc4-m49sh"
+I0602 12:28:53.482166       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-insights/insights-operator-77c596889d-r94x9"
+I0602 12:28:53.482176       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kni-infra/coredns-cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482192       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kni-infra/coredns-cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482204       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kni-infra/coredns-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482216       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kni-infra/coredns-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482227       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kni-infra/coredns-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482239       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kni-infra/haproxy-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482249       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kni-infra/haproxy-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482257       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kni-infra/haproxy-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482281       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kni-infra/keepalived-cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482304       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kni-infra/keepalived-cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482328       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kni-infra/keepalived-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482352       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kni-infra/keepalived-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482388       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kni-infra/keepalived-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482426       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-apiserver-operator/kube-apiserver-operator-8647584ccc-xh7np"
+I0602 12:28:53.482464       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-apiserver/kube-apiserver-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482486       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-apiserver/kube-apiserver-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482515       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-apiserver/kube-apiserver-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482535       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-apiserver/kube-apiserver-guard-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482569       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-apiserver/kube-apiserver-guard-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482584       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-apiserver/kube-apiserver-guard-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482596       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-controller-manager-operator/kube-controller-manager-operator-57c6f876f6-n5rkj"
+I0602 12:28:53.482612       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-controller-manager/kube-controller-manager-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482626       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-controller-manager/kube-controller-manager-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482643       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-controller-manager/kube-controller-manager-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482654       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-controller-manager/kube-controller-manager-guard-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482675       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-controller-manager/kube-controller-manager-guard-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482699       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-controller-manager/kube-controller-manager-guard-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482712       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-scheduler-operator/openshift-kube-scheduler-operator-7974f545f7-l2frh"
+I0602 12:28:53.482751       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-scheduler/openshift-kube-scheduler-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482783       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-scheduler/openshift-kube-scheduler-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482799       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-scheduler/openshift-kube-scheduler-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482818       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-scheduler/openshift-kube-scheduler-guard-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482855       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-scheduler/openshift-kube-scheduler-guard-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482869       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-scheduler/openshift-kube-scheduler-guard-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.482906       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-storage-version-migrator-operator/kube-storage-version-migrator-operator-5d66b4775d-rwwjd"
+I0602 12:28:53.482921       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-kube-storage-version-migrator/migrator-667b4c75c-qpls5"
+I0602 12:28:53.482946       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-api/cluster-autoscaler-operator-75d9f67f5-bgqwv"
+I0602 12:28:53.482963       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-api/cluster-baremetal-operator-588799d88f-6kwpl"
+I0602 12:28:53.482987       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-api/control-plane-machine-set-operator-68b44f9c6b-9xkhd"
+I0602 12:28:53.483000       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-api/ironic-proxy-cxns9"
+I0602 12:28:53.483021       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-api/ironic-proxy-lg5qf"
+I0602 12:28:53.483033       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-api/ironic-proxy-zwjj2"
+I0602 12:28:53.483054       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-api/machine-api-controllers-765bb75569-zkrdc"
+I0602 12:28:53.483073       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-api/machine-api-operator-5fbbfb8bbd-c4ggd"
+I0602 12:28:53.483090       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-api/metal3-854fd557b9-lkd9c"
+I0602 12:28:53.483109       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-api/metal3-baremetal-operator-657d9d5d5b-877tg"
+I0602 12:28:53.483128       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-api/metal3-image-customization-9cd9c78d6-fjrzn"
+I0602 12:28:53.483147       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/kube-rbac-proxy-crio-cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.483170       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/kube-rbac-proxy-crio-cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.483195       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/kube-rbac-proxy-crio-dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.483212       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/kube-rbac-proxy-crio-dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.483236       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/kube-rbac-proxy-crio-dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:53.483261       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/machine-config-controller-69f9954495-2fjn4"
+I0602 12:28:53.483277       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/machine-config-daemon-7z4cw"
+I0602 12:28:53.483295       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/machine-config-daemon-ghf6q"
+I0602 12:28:53.483312       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/machine-config-daemon-kvf7c"
+I0602 12:28:53.483337       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/machine-config-daemon-x22c7"
+I0602 12:28:53.483358       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/machine-config-daemon-zh5v2"
+I0602 12:28:53.483400       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/machine-config-operator-df7c89dbd-4trzz"
+I0602 12:28:53.483416       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/machine-config-server-8x9bs"
+I0602 12:28:53.483435       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/machine-config-server-gk8s5"
+I0602 12:28:53.483447       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-machine-config-operator/machine-config-server-v55rc"
+I0602 12:28:53.483467       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-marketplace/marketplace-operator-cc4f9bdc5-r2kcf"
+I0602 12:28:53.483479       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/alertmanager-main-0"
+I0602 12:28:53.483550       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/alertmanager-main-1"
+I0602 12:28:53.483600       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/cluster-monitoring-operator-64f8745b4d-j5ffp"
+I0602 12:28:53.483614       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/kube-state-metrics-55f88d76b6-mz7sx"
+I0602 12:28:53.483633       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/metrics-server-d7875bfd9-mjxn9"
+I0602 12:28:53.483725       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/metrics-server-d7875bfd9-wljps"
+I0602 12:28:53.483749       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/monitoring-plugin-fbd747668-59jp9"
+I0602 12:28:53.483787       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/monitoring-plugin-fbd747668-nk4zx"
+I0602 12:28:53.483825       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/node-exporter-26gkh"
+I0602 12:28:53.483850       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/node-exporter-2bth8"
+I0602 12:28:53.483891       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/node-exporter-r62xv"
+I0602 12:28:53.483909       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/node-exporter-sss2k"
+I0602 12:28:53.483929       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/node-exporter-v5zjn"
+I0602 12:28:53.483971       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/openshift-state-metrics-6fbcf6dfdf-nmd82"
+I0602 12:28:53.483989       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/prometheus-k8s-0"
+I0602 12:28:53.484031       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/prometheus-k8s-1"
+I0602 12:28:53.484079       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/prometheus-operator-74d6869c45-6ft55"
+I0602 12:28:53.484116       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/prometheus-operator-admission-webhook-74f8f54f9d-glx4v"
+I0602 12:28:53.484145       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/prometheus-operator-admission-webhook-74f8f54f9d-x9mf8"
+I0602 12:28:53.484169       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/telemeter-client-85496695f9-mns6z"
+I0602 12:28:53.484358       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/thanos-querier-5c8ccdc9bc-gbpxg"
+I0602 12:28:53.484410       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-monitoring/thanos-querier-5c8ccdc9bc-xrlz2"
+I0602 12:28:53.484454       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/multus-additional-cni-plugins-2q6nd"
+I0602 12:28:53.484473       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/multus-additional-cni-plugins-42f5t"
+I0602 12:28:53.484496       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/multus-additional-cni-plugins-8pbjl"
+I0602 12:28:53.484516       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/multus-additional-cni-plugins-fnfr2"
+I0602 12:28:53.484541       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/multus-additional-cni-plugins-lmtlf"
+I0602 12:28:53.484559       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/multus-admission-controller-75d8d4fc85-65p45"
+I0602 12:28:53.484573       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/multus-admission-controller-75d8d4fc85-dss4w"
+I0602 12:28:53.484583       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/multus-lxs66"
+I0602 12:28:53.484594       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/multus-m7cwx"
+I0602 12:28:53.484604       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/multus-p7khf"
+I0602 12:28:53.484615       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/multus-tgkpn"
+I0602 12:28:53.484624       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/multus-zlxzt"
+I0602 12:28:53.484641       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/network-metrics-daemon-7btnt"
+I0602 12:28:53.484655       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/network-metrics-daemon-dnqfd"
+I0602 12:28:53.484673       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/network-metrics-daemon-xjkv4"
+I0602 12:28:53.484682       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/network-metrics-daemon-xv24s"
+I0602 12:28:53.484914       1 shared_informer.go:320] Caches are synced for RequestHeaderAuthRequestController
+I0602 12:28:53.485042       1 shared_informer.go:320] Caches are synced for client-ca::kube-system::extension-apiserver-authentication::client-ca-file
+I0602 12:28:53.486463       1 shared_informer.go:320] Caches are synced for client-ca::kube-system::extension-apiserver-authentication::requestheader-client-ca-file
+I0602 12:28:53.486641       1 tlsconfig.go:178] "Loaded client CA" index=0 certName="client-ca::kube-system::extension-apiserver-authentication::client-ca-file,client-ca::kube-system::extension-apiserver-authentication::requestheader-client-ca-file" certDetail="\"aggregator-signer\" [] issuer=\"<self>\" (2025-06-02 06:14:45 +0000 UTC to 2025-06-03 06:14:45 +0000 UTC (now=2025-06-02 12:28:53.486624301 +0000 UTC))"
+I0602 12:28:53.484692       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-multus/network-metrics-daemon-zf7fw"
+I0602 12:28:53.562921       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-console/networking-console-plugin-55cd55f785-7rg9d"
+I0602 12:28:53.562959       1 tlsconfig.go:200] "Loaded serving cert" certName="Generated self signed cert" certDetail="\"localhost@1748867332\" [serving] validServingFor=[127.0.0.1,localhost,localhost] issuer=\"localhost-ca@1748867332\" (2025-06-02 11:28:51 +0000 UTC to 2026-06-02 11:28:51 +0000 UTC (now=2025-06-02 12:28:53.562935456 +0000 UTC))"
+I0602 12:28:53.562977       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-console/networking-console-plugin-55cd55f785-hm8wr"
+I0602 12:28:53.563002       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-diagnostics/network-check-source-5c6fdc985c-m557k"
+I0602 12:28:53.563019       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-diagnostics/network-check-target-qzhdq"
+I0602 12:28:53.563028       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-diagnostics/network-check-target-rcpff"
+I0602 12:28:53.563040       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-diagnostics/network-check-target-s6l9z"
+I0602 12:28:53.563052       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-diagnostics/network-check-target-x75br"
+I0602 12:28:53.563075       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-diagnostics/network-check-target-xsg2l"
+I0602 12:28:53.563086       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-node-identity/network-node-identity-7zsmb"
+I0602 12:28:53.563117       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-node-identity/network-node-identity-f4n4p"
+I0602 12:28:53.563149       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-node-identity/network-node-identity-gvw9x"
+I0602 12:28:53.563167       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-operator/iptables-alerter-hnc7d"
+I0602 12:28:53.563179       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-operator/iptables-alerter-hwz99"
+I0602 12:28:53.563192       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-operator/iptables-alerter-mzwgq"
+I0602 12:28:53.563205       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-operator/iptables-alerter-plsdp"
+I0602 12:28:53.563113       1 named_certificates.go:53] "Loaded SNI cert" index=0 certName="self-signed loopback" certDetail="\"apiserver-loopback-client@1748867333\" [serving] validServingFor=[apiserver-loopback-client] issuer=\"apiserver-loopback-client-ca@1748867333\" (2025-06-02 11:28:52 +0000 UTC to 2026-06-02 11:28:52 +0000 UTC (now=2025-06-02 12:28:53.563104052 +0000 UTC))"
+I0602 12:28:53.563220       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-operator/iptables-alerter-swvch"
+I0602 12:28:53.563232       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-network-operator/network-operator-96bcc7796-h92hm"
+I0602 12:28:53.563257       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-oauth-apiserver/apiserver-747f96ff4c-dxgdt"
+I0602 12:28:53.563280       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-oauth-apiserver/apiserver-747f96ff4c-ngjlm"
+I0602 12:28:53.563300       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-oauth-apiserver/apiserver-747f96ff4c-r7dpc"
+I0602 12:28:53.563324       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-operator-controller/operator-controller-controller-manager-6cf5f94d45-2bgwp"
+I0602 12:28:53.563336       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-operator-lifecycle-manager/catalog-operator-86b487b575-99bdm"
+I0602 12:28:53.563347       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-operator-lifecycle-manager/olm-operator-58b5dfb699-g4vj2"
+I0602 12:28:53.563358       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-operator-lifecycle-manager/package-server-manager-79bf454588-l4lj8"
+I0602 12:28:53.563363       1 tlsconfig.go:178] "Loaded client CA" index=0 certName="client-ca::kube-system::extension-apiserver-authentication::client-ca-file,client-ca::kube-system::extension-apiserver-authentication::requestheader-client-ca-file" certDetail="\"admin-kubeconfig-signer\" [] issuer=\"<self>\" (2025-06-02 06:14:43 +0000 UTC to 2035-05-31 06:14:43 +0000 UTC (now=2025-06-02 12:28:53.563351188 +0000 UTC))"
+I0602 12:28:53.563418       1 tlsconfig.go:178] "Loaded client CA" index=1 certName="client-ca::kube-system::extension-apiserver-authentication::client-ca-file,client-ca::kube-system::extension-apiserver-authentication::requestheader-client-ca-file" certDetail="\"kubelet-signer\" [] issuer=\"<self>\" (2025-06-02 06:14:46 +0000 UTC to 2025-06-03 06:14:46 +0000 UTC (now=2025-06-02 12:28:53.563388843 +0000 UTC))"
+I0602 12:28:53.563444       1 tlsconfig.go:178] "Loaded client CA" index=2 certName="client-ca::kube-system::extension-apiserver-authentication::client-ca-file,client-ca::kube-system::extension-apiserver-authentication::requestheader-client-ca-file" certDetail="\"kube-control-plane-signer\" [] issuer=\"<self>\" (2025-06-02 06:14:47 +0000 UTC to 2026-06-02 06:14:47 +0000 UTC (now=2025-06-02 12:28:53.563436997 +0000 UTC))"
+I0602 12:28:53.563371       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-operator-lifecycle-manager/packageserver-7966c78d8c-rrgg6"
+I0602 12:28:53.563474       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-operator-lifecycle-manager/packageserver-7966c78d8c-vc7bg"
+I0602 12:28:53.563487       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-ovn-kubernetes/ovnkube-control-plane-7647c5d79c-5s95l"
+I0602 12:28:53.563502       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-ovn-kubernetes/ovnkube-control-plane-7647c5d79c-q7c44"
+I0602 12:28:53.563469       1 tlsconfig.go:178] "Loaded client CA" index=3 certName="client-ca::kube-system::extension-apiserver-authentication::client-ca-file,client-ca::kube-system::extension-apiserver-authentication::requestheader-client-ca-file" certDetail="\"kube-apiserver-to-kubelet-signer\" [] issuer=\"<self>\" (2025-06-02 06:14:47 +0000 UTC to 2026-06-02 06:14:47 +0000 UTC (now=2025-06-02 12:28:53.563461684 +0000 UTC))"
+I0602 12:28:53.563517       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-ovn-kubernetes/ovnkube-node-88rxg"
+I0602 12:28:53.563541       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-ovn-kubernetes/ovnkube-node-nqh8h"
+I0602 12:28:53.563533       1 tlsconfig.go:178] "Loaded client CA" index=4 certName="client-ca::kube-system::extension-apiserver-authentication::client-ca-file,client-ca::kube-system::extension-apiserver-authentication::requestheader-client-ca-file" certDetail="\"kubelet-bootstrap-kubeconfig-signer\" [] issuer=\"<self>\" (2025-06-02 06:14:44 +0000 UTC to 2035-05-31 06:14:44 +0000 UTC (now=2025-06-02 12:28:53.56351932 +0000 UTC))"
+I0602 12:28:53.563559       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-ovn-kubernetes/ovnkube-node-sjmxd"
+I0602 12:28:53.563555       1 tlsconfig.go:178] "Loaded client CA" index=5 certName="client-ca::kube-system::extension-apiserver-authentication::client-ca-file,client-ca::kube-system::extension-apiserver-authentication::requestheader-client-ca-file" certDetail="\"kube-csr-signer_@1748845807\" [] issuer=\"kubelet-signer\" (2025-06-02 06:30:06 +0000 UTC to 2025-06-03 06:14:46 +0000 UTC (now=2025-06-02 12:28:53.563549454 +0000 UTC))"
+I0602 12:28:53.563575       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-ovn-kubernetes/ovnkube-node-t69fz"
+I0602 12:28:53.563589       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-ovn-kubernetes/ovnkube-node-vvqd5"
+I0602 12:28:53.563608       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-route-controller-manager/route-controller-manager-5b8b75467d-9fhnt"
+I0602 12:28:53.563626       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-route-controller-manager/route-controller-manager-5b8b75467d-lvvh5"
+I0602 12:28:53.563644       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-route-controller-manager/route-controller-manager-5b8b75467d-vf4fn"
+I0602 12:28:53.563571       1 tlsconfig.go:178] "Loaded client CA" index=6 certName="client-ca::kube-system::extension-apiserver-authentication::client-ca-file,client-ca::kube-system::extension-apiserver-authentication::requestheader-client-ca-file" certDetail="\"openshift-kube-apiserver-operator_node-system-admin-signer@1748845815\" [] issuer=\"<self>\" (2025-06-02 06:30:14 +0000 UTC to 2026-06-02 06:30:15 +0000 UTC (now=2025-06-02 12:28:53.563566283 +0000 UTC))"
+I0602 12:28:53.563668       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-service-ca-operator/service-ca-operator-556cbf9fdf-gdnhh"
+I0602 12:28:53.563669       1 tlsconfig.go:178] "Loaded client CA" index=7 certName="client-ca::kube-system::extension-apiserver-authentication::client-ca-file,client-ca::kube-system::extension-apiserver-authentication::requestheader-client-ca-file" certDetail="\"aggregator-signer\" [] issuer=\"<self>\" (2025-06-02 06:14:45 +0000 UTC to 2025-06-03 06:14:45 +0000 UTC (now=2025-06-02 12:28:53.563656776 +0000 UTC))"
+I0602 12:28:53.563680       1 eventhandlers.go:202] "Add event for scheduled pod" pod="openshift-service-ca/service-ca-544bbdb6b-jh9cf"
+I0602 12:28:53.563824       1 tlsconfig.go:200] "Loaded serving cert" certName="Generated self signed cert" certDetail="\"localhost@1748867332\" [serving] validServingFor=[127.0.0.1,localhost,localhost] issuer=\"localhost-ca@1748867332\" (2025-06-02 11:28:51 +0000 UTC to 2026-06-02 11:28:51 +0000 UTC (now=2025-06-02 12:28:53.563815716 +0000 UTC))"
+I0602 12:28:53.563954       1 named_certificates.go:53] "Loaded SNI cert" index=0 certName="self-signed loopback" certDetail="\"apiserver-loopback-client@1748867333\" [serving] validServingFor=[apiserver-loopback-client] issuer=\"apiserver-loopback-client-ca@1748867333\" (2025-06-02 11:28:52 +0000 UTC to 2026-06-02 11:28:52 +0000 UTC (now=2025-06-02 12:28:53.563947038 +0000 UTC))"
+I0602 12:28:53.586202       1 server.go:217] "Handlers synced"
+I0602 12:28:57.115757       1 eventhandlers.go:93] "Update event for node" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:58.376176       1 overreserve.go:258] "begin" logger="nrtcache.resync"
+I0602 12:28:58.376289       1 overreserve.go:238] "found dirty nodes" logger="nrtcache.resync" generation=0 foreign=2 discarded=0 configChange=0 total=2
+I0602 12:28:58.379894       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr11.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:28:58.380108       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:28:58.380133       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001fb221eb630d07c01" onlyExclusiveResources=true
+I0602 12:28:58.380144       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr11.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-ppsxf
+	= pfp0v001fb221eb630d07c01
+ >
+I0602 12:28:58.380167       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:58.382495       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:28:58.382700       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:28:58.382727       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001b86270520c9c7f53" onlyExclusiveResources=true
+I0602 12:28:58.382742       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-75xzw
+	= pfp0v001b86270520c9c7f53
+ >
+I0602 12:28:58.382779       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:28:58.382798       1 overreserve.go:341] "end" logger="nrtcache.resync"
+I0602 12:29:03.383176       1 overreserve.go:258] "begin" logger="nrtcache.resync"
+I0602 12:29:03.383199       1 overreserve.go:238] "found dirty nodes" logger="nrtcache.resync" generation=0 foreign=2 discarded=0 configChange=0 total=2
+I0602 12:29:03.387743       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:29:03.387940       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:03.387962       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001b86270520c9c7f53" onlyExclusiveResources=true
+I0602 12:29:03.387973       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-75xzw
+	= pfp0v001b86270520c9c7f53
+ >
+I0602 12:29:03.387994       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:03.390608       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr11.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:29:03.390836       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:03.390878       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001fb221eb630d07c01" onlyExclusiveResources=true
+I0602 12:29:03.390901       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr11.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-ppsxf
+	= pfp0v001fb221eb630d07c01
+ >
+I0602 12:29:03.390939       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:03.390962       1 overreserve.go:341] "end" logger="nrtcache.resync"
+I0602 12:29:07.249619       1 eventhandlers.go:93] "Update event for node" node="dhcp-1-105-178.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:08.397732       1 overreserve.go:258] "begin" logger="nrtcache.resync"
+I0602 12:29:08.397833       1 overreserve.go:238] "found dirty nodes" logger="nrtcache.resync" generation=0 foreign=2 discarded=0 configChange=0 total=2
+I0602 12:29:08.400835       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:29:08.401001       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:08.401022       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001b86270520c9c7f53" onlyExclusiveResources=true
+I0602 12:29:08.401032       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-75xzw
+	= pfp0v001b86270520c9c7f53
+ >
+I0602 12:29:08.401051       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:08.403075       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr11.telco5g.eng.rdu2.redhat.com 200 OK in 1 milliseconds
+I0602 12:29:08.403243       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:08.403264       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001fb221eb630d07c01" onlyExclusiveResources=true
+I0602 12:29:08.403275       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr11.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-ppsxf
+	= pfp0v001fb221eb630d07c01
+ >
+I0602 12:29:08.403303       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:08.403315       1 overreserve.go:341] "end" logger="nrtcache.resync"
+I0602 12:29:09.592432       1 eventhandlers.go:93] "Update event for node" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:13.075603       1 eventhandlers.go:93] "Update event for node" node="dhcp-1-105-44.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:13.403396       1 overreserve.go:258] "begin" logger="nrtcache.resync"
+I0602 12:29:13.403500       1 overreserve.go:238] "found dirty nodes" logger="nrtcache.resync" generation=0 foreign=2 discarded=0 configChange=0 total=2
+I0602 12:29:13.408187       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr11.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:29:13.408430       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:13.408469       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001fb221eb630d07c01" onlyExclusiveResources=true
+I0602 12:29:13.408497       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr11.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-ppsxf
+	= pfp0v001fb221eb630d07c01
+ >
+I0602 12:29:13.408553       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:13.410916       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:29:13.411089       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:13.411127       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001b86270520c9c7f53" onlyExclusiveResources=true
+I0602 12:29:13.411154       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-75xzw
+	= pfp0v001b86270520c9c7f53
+ >
+I0602 12:29:13.411191       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:13.411219       1 overreserve.go:341] "end" logger="nrtcache.resync"
+I0602 12:29:18.411533       1 overreserve.go:258] "begin" logger="nrtcache.resync"
+I0602 12:29:18.411557       1 overreserve.go:238] "found dirty nodes" logger="nrtcache.resync" generation=0 foreign=2 discarded=0 configChange=0 total=2
+I0602 12:29:18.415181       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:29:18.415385       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:18.415420       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001b86270520c9c7f53" onlyExclusiveResources=true
+I0602 12:29:18.415432       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-75xzw
+	= pfp0v001b86270520c9c7f53
+ >
+I0602 12:29:18.415451       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:18.418221       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr11.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:29:18.418511       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:18.418543       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001fb221eb630d07c01" onlyExclusiveResources=true
+I0602 12:29:18.418559       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr11.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-ppsxf
+	= pfp0v001fb221eb630d07c01
+ >
+I0602 12:29:18.418584       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:18.418608       1 overreserve.go:341] "end" logger="nrtcache.resync"
+I0602 12:29:19.706267       1 eventhandlers.go:93] "Update event for node" node="dhcp-1-105-134.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:23.419399       1 overreserve.go:258] "begin" logger="nrtcache.resync"
+I0602 12:29:23.419421       1 overreserve.go:238] "found dirty nodes" logger="nrtcache.resync" generation=0 foreign=2 discarded=0 configChange=0 total=2
+I0602 12:29:23.423919       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:29:23.424133       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:23.424172       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001b86270520c9c7f53" onlyExclusiveResources=true
+I0602 12:29:23.424201       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-75xzw
+	= pfp0v001b86270520c9c7f53
+ >
+I0602 12:29:23.424231       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:23.427308       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr11.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:29:23.427501       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:23.427536       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001fb221eb630d07c01" onlyExclusiveResources=true
+I0602 12:29:23.427557       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr11.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-ppsxf
+	= pfp0v001fb221eb630d07c01
+ >
+I0602 12:29:23.427590       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:23.427610       1 overreserve.go:341] "end" logger="nrtcache.resync"
+I0602 12:29:28.427818       1 overreserve.go:258] "begin" logger="nrtcache.resync"
+I0602 12:29:28.427932       1 overreserve.go:238] "found dirty nodes" logger="nrtcache.resync" generation=0 foreign=2 discarded=0 configChange=0 total=2
+I0602 12:29:28.432077       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:29:28.432307       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:28.432344       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001b86270520c9c7f53" onlyExclusiveResources=true
+I0602 12:29:28.432378       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-75xzw
+	= pfp0v001b86270520c9c7f53
+ >
+I0602 12:29:28.432459       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:28.435137       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr11.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:29:28.435305       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:28.435327       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001fb221eb630d07c01" onlyExclusiveResources=true
+I0602 12:29:28.435341       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr11.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-ppsxf
+	= pfp0v001fb221eb630d07c01
+ >
+I0602 12:29:28.435359       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:28.435369       1 overreserve.go:341] "end" logger="nrtcache.resync"
+I0602 12:29:33.436310       1 overreserve.go:258] "begin" logger="nrtcache.resync"
+I0602 12:29:33.436406       1 overreserve.go:238] "found dirty nodes" logger="nrtcache.resync" generation=0 foreign=2 discarded=0 configChange=0 total=2
+I0602 12:29:33.440899       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:29:33.441113       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:33.441150       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001b86270520c9c7f53" onlyExclusiveResources=true
+I0602 12:29:33.441172       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-75xzw
+	= pfp0v001b86270520c9c7f53
+ >
+I0602 12:29:33.441206       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:33.443577       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr11.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:29:33.443766       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:33.443804       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001fb221eb630d07c01" onlyExclusiveResources=true
+I0602 12:29:33.443816       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr11.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-ppsxf
+	= pfp0v001fb221eb630d07c01
+ >
+I0602 12:29:33.443837       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:33.443849       1 overreserve.go:341] "end" logger="nrtcache.resync"
+I0602 12:29:38.444685       1 overreserve.go:258] "begin" logger="nrtcache.resync"
+I0602 12:29:38.444708       1 overreserve.go:238] "found dirty nodes" logger="nrtcache.resync" generation=0 foreign=2 discarded=0 configChange=0 total=2
+I0602 12:29:38.448094       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:29:38.448285       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:38.448306       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001b86270520c9c7f53" onlyExclusiveResources=true
+I0602 12:29:38.448317       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-75xzw
+	= pfp0v001b86270520c9c7f53
+ >
+I0602 12:29:38.448338       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:38.451015       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr11.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:29:38.451205       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:38.451249       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001fb221eb630d07c01" onlyExclusiveResources=true
+I0602 12:29:38.451271       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr11.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-ppsxf
+	= pfp0v001fb221eb630d07c01
+ >
+I0602 12:29:38.451296       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:38.451317       1 overreserve.go:341] "end" logger="nrtcache.resync"
+I0602 12:29:39.262210       1 eventhandlers.go:93] "Update event for node" node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:43.451638       1 overreserve.go:258] "begin" logger="nrtcache.resync"
+I0602 12:29:43.451660       1 overreserve.go:238] "found dirty nodes" logger="nrtcache.resync" generation=0 foreign=2 discarded=0 configChange=0 total=2
+I0602 12:29:43.456243       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr11.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:29:43.456487       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:43.456535       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001fb221eb630d07c01" onlyExclusiveResources=true
+I0602 12:29:43.456556       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr11.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-ppsxf
+	= pfp0v001fb221eb630d07c01
+ >
+I0602 12:29:43.456589       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:43.459355       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:29:43.459507       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:43.459527       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001b86270520c9c7f53" onlyExclusiveResources=true
+I0602 12:29:43.459537       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-75xzw
+	= pfp0v001b86270520c9c7f53
+ >
+I0602 12:29:43.459553       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:43.459566       1 overreserve.go:341] "end" logger="nrtcache.resync"
+I0602 12:29:48.460581       1 overreserve.go:258] "begin" logger="nrtcache.resync"
+I0602 12:29:48.460603       1 overreserve.go:238] "found dirty nodes" logger="nrtcache.resync" generation=0 foreign=2 discarded=0 configChange=0 total=2
+I0602 12:29:48.465571       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:29:48.465755       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:48.465803       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001b86270520c9c7f53" onlyExclusiveResources=true
+I0602 12:29:48.465814       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-75xzw
+	= pfp0v001b86270520c9c7f53
+ >
+I0602 12:29:48.465835       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr9.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:48.469014       1 round_trippers.go:553] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr11.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:29:48.469223       1 overreserve.go:305] "trying to sync NodeTopology" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" fingerprint="pfp0v001ef46db3751d8e999" onlyExclusiveResources=true
+I0602 12:29:48.469243       1 store.go:244] "podset fingerprint check" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" expected="pfp0v001ef46db3751d8e999" computed="pfp0v001fb221eb630d07c01" onlyExclusiveResources=true
+I0602 12:29:48.469255       1 store.go:245] "podset fingerprint debug" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com" status=<
+	> processing node "cnfdr11.telco5g.eng.rdu2.redhat.com"
+	> processing 1 pods
+	+ nfs/generic-pause-9dgrf-ppsxf
+	= pfp0v001fb221eb630d07c01
+ >
+I0602 12:29:48.469276       1 overreserve.go:310] "NodeTopology podset fingerprint mismatch" logger="nrtcache.resync" generation=0 node="cnfdr11.telco5g.eng.rdu2.redhat.com"
+I0602 12:29:48.469287       1 overreserve.go:341] "end" logger="nrtcache.resync"
+I0602 12:29:49.357778       1 eventhandlers.go:93] "Update event for node" node="cnfdr9.telco5g.eng.rdu2.redhat.com"

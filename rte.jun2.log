@@ -1,0 +1,681 @@
+I0602 12:25:05.764226       1 main.go:51] starting resource-topology-exporter 4.20 b6cd3669 (devel) go1.23.4
+I0602 12:25:05.764382       1 sharedcpuspool.go:74] reference container: //
+I0602 12:25:05.764444       1 cfgfile.go:192] couldn't find configuration in "/etc/resource-topology-exporter/config.yaml"
+I0602 12:25:05.764453       1 cfgfile.go:214] using kubelet topology manager policy: ""
+I0602 12:25:05.764463       1 cfgfile.go:218] using kubelet topology manager scope: ""
+I0602 12:25:05.764511       1 sharedcpuspool.go:74] reference container: numaresources/numaresourcesoperator-worker-bpj5f/shared-pool-container
+I0602 12:25:05.764521       1 main.go:136] Topology Manager scope not set, using default container
+I0602 12:25:05.764525       1 main.go:141] Topology Manager policy not set, defaulting to none
+I0602 12:25:05.764951       1 envvar.go:172] "Feature gate default state" feature="ClientsAllowCBOR" enabled=false
+I0602 12:25:05.764967       1 envvar.go:172] "Feature gate default state" feature="ClientsPreferCBOR" enabled=false
+I0602 12:25:05.764972       1 envvar.go:172] "Feature gate default state" feature="InformerResourceVersion" enabled=false
+I0602 12:25:05.764977       1 envvar.go:172] "Feature gate default state" feature="WatchListClient" enabled=false
+I0602 12:25:05.765579       1 client.go:44] creating a podresources client for endpoint "unix:///host-podresources/kubelet.sock"
+I0602 12:25:05.765589       1 client.go:131] endpoint "unix:///host-podresources/kubelet.sock" -> protocol="unix" path="/host-podresources/kubelet.sock"
+I0602 12:25:05.766010       1 client.go:65] created a podresources client for endpoint "unix:///host-podresources/kubelet.sock"
+I0602 12:25:05.769655       1 resourcetopologyexporter.go:160] using given Topology Manager policy "none" scope "container"
+I0602 12:25:05.769697       1 notification.go:123] added interval every 10s
+I0602 12:25:05.769755       1 resourcemonitor.go:176] resource monitor for "cnfdr9.telco5g.eng.rdu2.redhat.com" starting
+I0602 12:25:05.769760       1 server.go:208] "Starting metrics server" logger="controller-runtime.metrics"
+I0602 12:25:05.769835       1 setup.go:195] "metrics server configuration" client authentication="disabled"
+I0602 12:25:05.770947       1 certwatcher.go:211] "Updated current TLS certificate" logger="controller-runtime.certwatcher"
+I0602 12:25:05.771447       1 certwatcher.go:133] "Starting certificate poll+watcher" logger="controller-runtime.certwatcher" interval="10s"
+I0602 12:25:05.774530       1 server.go:247] "Serving metrics server" logger="controller-runtime.metrics" bindAddress="0.0.0.0:2112" secure=true
+I0602 12:25:05.833323       1 resourcemonitor.go:188] machine topology: {"architecture":"numa","nodes":[{"id":0,"cores":[{"id":0,"total_hardware_threads":2,"total_threads":2,"logical_processors":[0,56]},{"id":16,"total_hardware_threads":2,"total_threads":2,"logical_processors":[10,66]},{"id":11,"total_hardware_threads":2,"total_threads":2,"logical_processors":[100,44]},{"id":25,"total_hardware_threads":2,"total_threads":2,"logical_processors":[102,46]},{"id":12,"total_hardware_threads":2,"total_threads":2,"logical_processors":[104,48]},{"id":26,"total_hardware_threads":2,"total_threads":2,"logical_processors":[106,50]},{"id":13,"total_hardware_threads":2,"total_threads":2,"logical_processors":[108,52]},{"id":27,"total_hardware_threads":2,"total_threads":2,"logical_processors":[110,54]},{"id":3,"total_hardware_threads":2,"total_threads":2,"logical_processors":[12,68]},{"id":17,"total_hardware_threads":2,"total_threads":2,"logical_processors":[14,70]},{"id":4,"total_hardware_threads":2,"total_threads":2,"logical_processors":[16,72]},{"id":18,"total_hardware_threads":2,"total_threads":2,"logical_processors":[18,74]},{"id":14,"total_hardware_threads":2,"total_threads":2,"logical_processors":[2,58]},{"id":5,"total_hardware_threads":2,"total_threads":2,"logical_processors":[20,76]},{"id":19,"total_hardware_threads":2,"total_threads":2,"logical_processors":[22,78]},{"id":6,"total_hardware_threads":2,"total_threads":2,"logical_processors":[24,80]},{"id":20,"total_hardware_threads":2,"total_threads":2,"logical_processors":[26,82]},{"id":7,"total_hardware_threads":2,"total_threads":2,"logical_processors":[28,84]},{"id":21,"total_hardware_threads":2,"total_threads":2,"logical_processors":[30,86]},{"id":8,"total_hardware_threads":2,"total_threads":2,"logical_processors":[32,88]},{"id":22,"total_hardware_threads":2,"total_threads":2,"logical_processors":[34,90]},{"id":9,"total_hardware_threads":2,"total_threads":2,"logical_processors":[36,92]},{"id":23,"total_hardware_threads":2,"total_threads":2,"logical_processors":[38,94]},{"id":1,"total_hardware_threads":2,"total_threads":2,"logical_processors":[4,60]},{"id":10,"total_hardware_threads":2,"total_threads":2,"logical_processors":[40,96]},{"id":24,"total_hardware_threads":2,"total_threads":2,"logical_processors":[42,98]},{"id":15,"total_hardware_threads":2,"total_threads":2,"logical_processors":[6,62]},{"id":2,"total_hardware_threads":2,"total_threads":2,"logical_processors":[64,8]}],"caches":[{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[0,56]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[2,58]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[4,60]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[6,62]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[8,64]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[10,66]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[12,68]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[14,70]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[16,72]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[18,74]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[20,76]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[22,78]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[24,80]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[26,82]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[28,84]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[30,86]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[32,88]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[34,90]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[36,92]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[38,94]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[40,96]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[42,98]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[44,100]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[46,102]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[48,104]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[50,106]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[52,108]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[54,110]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[0,56]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[2,58]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[4,60]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[6,62]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[8,64]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[10,66]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[12,68]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[14,70]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[16,72]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[18,74]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[20,76]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[22,78]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[24,80]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[26,82]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[28,84]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[30,86]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[32,88]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[34,90]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[36,92]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[38,94]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[40,96]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[42,98]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[44,100]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[46,102]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[48,104]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[50,106]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[52,108]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[54,110]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[0,56]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[2,58]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[4,60]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[6,62]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[8,64]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[10,66]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[12,68]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[14,70]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[16,72]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[18,74]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[20,76]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[22,78]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[24,80]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[26,82]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[28,84]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[30,86]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[32,88]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[34,90]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[36,92]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[38,94]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[40,96]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[42,98]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[44,100]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[46,102]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[48,104]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[50,106]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[52,108]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[54,110]},{"level":3,"type":"unified","size_bytes":44040192,"logical_processors":[0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,52,54,56,58,60,62,64,66,68,70,72,74,76,78,80,82,84,86,88,90,92,94,96,98,100,102,104,106,108,110]}],"distances":[10,20],"memory":{"total_physical_bytes":68719476736,"total_usable_bytes":66994520064,"supported_page_sizes":[1073741824,2097152],"default_huge_page_size":2097152,"total_huge_page_bytes":0,"huge_page_amounts_by_size":{"1073741824":{"total":0,"free":0,"surplus":0,"reserved":0},"2097152":{"total":0,"free":0,"surplus":0,"reserved":0}},"modules":null}},{"id":1,"cores":[{"id":0,"total_hardware_threads":2,"total_threads":2,"logical_processors":[1,57]},{"id":11,"total_hardware_threads":2,"total_threads":2,"logical_processors":[101,45]},{"id":25,"total_hardware_threads":2,"total_threads":2,"logical_processors":[103,47]},{"id":12,"total_hardware_threads":2,"total_threads":2,"logical_processors":[105,49]},{"id":26,"total_hardware_threads":2,"total_threads":2,"logical_processors":[107,51]},{"id":13,"total_hardware_threads":2,"total_threads":2,"logical_processors":[109,53]},{"id":16,"total_hardware_threads":2,"total_threads":2,"logical_processors":[11,67]},{"id":27,"total_hardware_threads":2,"total_threads":2,"logical_processors":[111,55]},{"id":3,"total_hardware_threads":2,"total_threads":2,"logical_processors":[13,69]},{"id":17,"total_hardware_threads":2,"total_threads":2,"logical_processors":[15,71]},{"id":4,"total_hardware_threads":2,"total_threads":2,"logical_processors":[17,73]},{"id":18,"total_hardware_threads":2,"total_threads":2,"logical_processors":[19,75]},{"id":5,"total_hardware_threads":2,"total_threads":2,"logical_processors":[21,77]},{"id":19,"total_hardware_threads":2,"total_threads":2,"logical_processors":[23,79]},{"id":6,"total_hardware_threads":2,"total_threads":2,"logical_processors":[25,81]},{"id":20,"total_hardware_threads":2,"total_threads":2,"logical_processors":[27,83]},{"id":7,"total_hardware_threads":2,"total_threads":2,"logical_processors":[29,85]},{"id":14,"total_hardware_threads":2,"total_threads":2,"logical_processors":[3,59]},{"id":21,"total_hardware_threads":2,"total_threads":2,"logical_processors":[31,87]},{"id":8,"total_hardware_threads":2,"total_threads":2,"logical_processors":[33,89]},{"id":22,"total_hardware_threads":2,"total_threads":2,"logical_processors":[35,91]},{"id":9,"total_hardware_threads":2,"total_threads":2,"logical_processors":[37,93]},{"id":23,"total_hardware_threads":2,"total_threads":2,"logical_processors":[39,95]},{"id":10,"total_hardware_threads":2,"total_threads":2,"logical_processors":[41,97]},{"id":24,"total_hardware_threads":2,"total_threads":2,"logical_processors":[43,99]},{"id":1,"total_hardware_threads":2,"total_threads":2,"logical_processors":[5,61]},{"id":15,"total_hardware_threads":2,"total_threads":2,"logical_processors":[63,7]},{"id":2,"total_hardware_threads":2,"total_threads":2,"logical_processors":[65,9]}],"caches":[{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[1,57]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[3,59]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[5,61]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[7,63]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[9,65]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[11,67]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[13,69]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[15,71]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[17,73]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[19,75]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[21,77]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[23,79]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[25,81]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[27,83]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[29,85]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[31,87]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[33,89]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[35,91]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[37,93]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[39,95]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[41,97]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[43,99]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[45,101]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[47,103]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[49,105]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[51,107]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[53,109]},{"level":1,"type":"instruction","size_bytes":32768,"logical_processors":[55,111]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[1,57]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[3,59]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[5,61]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[7,63]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[9,65]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[11,67]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[13,69]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[15,71]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[17,73]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[19,75]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[21,77]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[23,79]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[25,81]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[27,83]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[29,85]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[31,87]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[33,89]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[35,91]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[37,93]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[39,95]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[41,97]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[43,99]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[45,101]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[47,103]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[49,105]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[51,107]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[53,109]},{"level":1,"type":"data","size_bytes":32768,"logical_processors":[55,111]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[1,57]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[3,59]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[5,61]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[7,63]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[9,65]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[11,67]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[13,69]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[15,71]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[17,73]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[19,75]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[21,77]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[23,79]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[25,81]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[27,83]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[29,85]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[31,87]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[33,89]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[35,91]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[37,93]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[39,95]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[41,97]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[43,99]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[45,101]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[47,103]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[49,105]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[51,107]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[53,109]},{"level":2,"type":"unified","size_bytes":1310720,"logical_processors":[55,111]},{"level":3,"type":"unified","size_bytes":44040192,"logical_processors":[1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83,85,87,89,91,93,95,97,99,101,103,105,107,109,111]}],"distances":[20,10],"memory":{"total_physical_bytes":68719476736,"total_usable_bytes":67581374464,"supported_page_sizes":[1073741824,2097152],"default_huge_page_size":2097152,"total_huge_page_bytes":0,"huge_page_amounts_by_size":{"1073741824":{"total":0,"free":0,"surplus":0,"reserved":0},"2097152":{"total":0,"free":0,"surplus":0,"reserved":0}},"modules":null}}]}
+I0602 12:25:05.833409       1 resourcemonitor.go:544] CPU mapping: 105:1 11:1 27:1 76:0 30:0 88:0 67:1 56:0 10:0 46:0 2:0 81:1 41:1 5:1 1:1 57:1 79:1 83:1 31:1 55:1 29:1 97:1 25:1 50:0 98:0 61:1 108:0 94:0 40:0 71:1 0:0 106:0 28:0 47:1 65:1 73:1 23:1 68:0 58:0 32:0 34:0 99:1 70:0 82:0 14:0 22:0 96:0 19:1 69:1 3:1 39:1 100:0 52:0 110:0 107:1 95:1 16:0 86:0 49:1 77:1 43:1 7:1 104:0 6:0 53:1 37:1 80:0 26:0 90:0 4:0 75:1 91:1 62:0 101:1 51:1 44:0 36:0 89:1 42:0 15:1 63:1 9:1 102:0 48:0 18:0 17:1 85:1 33:1 12:0 87:1 93:1 45:1 20:0 21:1 84:0 8:0 111:1 13:1 74:0 92:0 38:0 64:0 109:1 35:1 66:0 54:0 72:0 78:0 24:0 60:0 103:1 59:1 
+I0602 12:25:05.834905       1 resourcemonitor.go:198] tracking node resources
+I0602 12:25:05.835115       1 reflector.go:313] Starting reflector *v1.Node (0s) from k8s.io/client-go/informers/factory.go:160
+I0602 12:25:05.835127       1 reflector.go:349] Listing and watching *v1.Node from k8s.io/client-go/informers/factory.go:160
+I0602 12:25:05.850218       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/nodes?limit=500&resourceVersion=0 200 OK in 14 milliseconds
+I0602 12:25:05.851787       1 reflector.go:376] Caches populated for *v1.Node from k8s.io/client-go/informers/factory.go:160
+I0602 12:25:05.853172       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/nodes?allowWatchBookmarks=true&resourceVersion=115905&timeout=8m45s&timeoutSeconds=525&watch=true 200 OK in 1 milliseconds
+I0602 12:25:05.935612       1 resourcemonitor.go:207] watching all namespaces
+I0602 12:25:05.935692       1 notification.go:75] initial update trigger
+I0602 12:25:05.936975       1 sharedcpuspool.go:93] detected shared pool change: "" -> ""
+I0602 12:25:05.937064       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:25:05.937451       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:25:05.940298       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:25:05.942670       1 conditioninjector.go:63] pod conditions: [{PodReadyToStartContainers False 0001-01-01 00:00:00 +0000 UTC 2025-06-02 12:24:59 +0000 UTC  } {Initialized True 0001-01-01 00:00:00 +0000 UTC 2025-06-02 12:24:59 +0000 UTC  } {Ready False 0001-01-01 00:00:00 +0000 UTC 2025-06-02 12:24:59 +0000 UTC ContainersNotReady containers with unready status: [resource-topology-exporter shared-pool-container]} {ContainersReady False 0001-01-01 00:00:00 +0000 UTC 2025-06-02 12:24:59 +0000 UTC ContainersNotReady containers with unready status: [resource-topology-exporter shared-pool-container]} {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2025-06-02 12:24:59 +0000 UTC  } {PodresourcesFetched True 0001-01-01 00:00:00 +0000 UTC 2025-06-02 12:25:05.937500718 +0000 UTC m=+0.202387602  }]
+I0602 12:25:05.956329       1 round_trippers.go:560] PUT https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f/status 200 OK in 13 milliseconds
+I0602 12:25:05.963370       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 404 Not Found in 20 milliseconds
+I0602 12:25:05.969798       1 round_trippers.go:560] POST https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies 201 Created in 5 milliseconds
+I0602 12:25:05.971864       1 nrtupdater.go:143] nrtupdater created NRT instance: attributes:
+- name: nodeTopologyPodsFingerprint
+  value: pfp0v001ef46db3751d8e999
+- name: nodeTopologyPodsFingerprintMethod
+  value: with-exclusive-resources
+- name: topologyManagerScope
+  value: container
+- name: topologyManagerPolicy
+  value: none
+metadata:
+  annotations:
+    k8stopoawareschedwg/rte-update: reactive
+    topology.node.k8s.io/fingerprint: pfp0v001ef46db3751d8e999
+  creationTimestamp: "2025-06-02T12:25:05Z"
+  generation: 1
+  managedFields:
+  - apiVersion: topology.node.k8s.io/v1alpha2
+    fieldsType: FieldsV1
+    fieldsV1:
+      f:attributes: {}
+      f:metadata:
+        f:annotations:
+          .: {}
+          f:k8stopoawareschedwg/rte-update: {}
+          f:topology.node.k8s.io/fingerprint: {}
+      f:zones: {}
+    manager: resource-topology-exporter
+    operation: Update
+    time: "2025-06-02T12:25:05Z"
+  name: cnfdr9.telco5g.eng.rdu2.redhat.com
+  resourceVersion: "115931"
+  uid: 31553029-bca0-41a3-9306-018abc7e5e2d
+zones:
+- costs:
+  - name: node-0
+    value: 10
+  - name: node-1
+    value: 20
+  name: node-0
+  resources:
+  - allocatable: "0"
+    available: "0"
+    capacity: "56"
+    name: cpu
+  type: Node
+- costs:
+  - name: node-0
+    value: 20
+  - name: node-1
+    value: 10
+  name: node-1
+  resources:
+  - allocatable: "0"
+    available: "0"
+    capacity: "56"
+    name: cpu
+  type: Node
+I0602 12:25:05.974815       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:25:05.975247       1 conditioninjector.go:63] pod conditions: [{PodReadyToStartContainers False 0001-01-01 00:00:00 +0000 UTC 2025-06-02 12:24:59 +0000 UTC  } {Initialized True 0001-01-01 00:00:00 +0000 UTC 2025-06-02 12:24:59 +0000 UTC  } {Ready False 0001-01-01 00:00:00 +0000 UTC 2025-06-02 12:24:59 +0000 UTC ContainersNotReady containers with unready status: [resource-topology-exporter shared-pool-container]} {ContainersReady False 0001-01-01 00:00:00 +0000 UTC 2025-06-02 12:24:59 +0000 UTC ContainersNotReady containers with unready status: [resource-topology-exporter shared-pool-container]} {PodScheduled True 0001-01-01 00:00:00 +0000 UTC 2025-06-02 12:24:59 +0000 UTC  } {PodresourcesFetched True 0001-01-01 00:00:00 +0000 UTC 2025-06-02 12:25:05 +0000 UTC  } {NodeTopologyUpdated True 0001-01-01 00:00:00 +0000 UTC 2025-06-02 12:25:05.971895574 +0000 UTC m=+0.236782447  }]
+I0602 12:25:05.988513       1 round_trippers.go:560] PUT https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f/status 200 OK in 12 milliseconds
+I0602 12:25:15.936210       1 notification.go:93] timer update trigger
+I0602 12:25:15.937568       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:25:15.937884       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:25:15.943097       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:25:15.943405       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:25:15.949370       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:25:15.953593       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:25:25.936799       1 notification.go:93] timer update trigger
+I0602 12:25:25.938469       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:25:25.938745       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:25:25.943258       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:25:25.944053       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:25:25.949482       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:25:25.953948       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:25:35.936560       1 notification.go:93] timer update trigger
+I0602 12:25:35.937949       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:25:35.938219       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:25:35.941766       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:25:35.942209       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:25:35.948172       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:25:35.957067       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:25:45.935763       1 notification.go:93] timer update trigger
+I0602 12:25:45.937294       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:25:45.937574       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:25:45.941210       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:25:45.941748       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:25:45.947437       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:25:45.953132       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:25:55.936381       1 notification.go:93] timer update trigger
+I0602 12:25:55.937808       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:25:55.938120       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:25:55.942168       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:25:55.942575       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:25:55.948053       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:25:55.953537       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:26:05.936369       1 notification.go:93] timer update trigger
+I0602 12:26:05.937876       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:26:05.938142       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:26:05.941491       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:26:05.941766       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:26:05.947389       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:26:05.952324       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:26:15.936396       1 notification.go:93] timer update trigger
+I0602 12:26:15.937936       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:26:15.938195       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:26:15.942667       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:26:15.943007       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:26:15.950314       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 6 milliseconds
+I0602 12:26:15.959034       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 5 milliseconds
+I0602 12:26:25.936164       1 notification.go:93] timer update trigger
+I0602 12:26:25.937938       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:26:25.938232       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:26:25.941653       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:26:25.942235       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:26:25.948858       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:26:25.953337       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:26:35.936196       1 notification.go:93] timer update trigger
+I0602 12:26:35.937494       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:26:35.937757       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:26:35.941958       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:26:35.941980       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:26:35.947662       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:26:35.954360       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 5 milliseconds
+I0602 12:26:45.936541       1 notification.go:93] timer update trigger
+I0602 12:26:45.938186       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:26:45.938448       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:26:45.941848       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:26:45.941870       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:26:45.948496       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:26:45.953144       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:26:55.936547       1 notification.go:93] timer update trigger
+I0602 12:26:55.937968       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:26:55.938257       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:26:55.942955       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:26:55.943373       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:26:55.949123       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:26:55.953367       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:27:05.936442       1 notification.go:93] timer update trigger
+I0602 12:27:05.937733       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:27:05.938034       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:27:05.941236       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:27:05.941938       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:27:05.949024       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 6 milliseconds
+I0602 12:27:05.954232       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:27:15.936871       1 notification.go:93] timer update trigger
+I0602 12:27:15.938550       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:27:15.938816       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:27:15.942768       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:27:15.942876       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:27:15.949218       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:27:15.954018       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:27:25.935948       1 notification.go:93] timer update trigger
+I0602 12:27:25.937423       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:27:25.937670       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:27:25.941167       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:27:25.941202       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:27:25.947229       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:27:25.957155       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:27:35.936077       1 notification.go:93] timer update trigger
+I0602 12:27:35.937522       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:27:35.937811       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:27:35.941233       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:27:35.941519       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:27:35.946038       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:27:35.950127       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:27:45.936470       1 notification.go:93] timer update trigger
+I0602 12:27:45.938071       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:27:45.938343       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:27:45.942980       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:27:45.943196       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:27:45.949990       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 6 milliseconds
+I0602 12:27:45.954785       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:27:55.936512       1 notification.go:93] timer update trigger
+I0602 12:27:55.937974       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:27:55.938245       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:27:55.943090       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:27:55.943978       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:27:55.949885       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:27:55.954963       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:28:05.935795       1 notification.go:93] timer update trigger
+I0602 12:28:05.937259       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:28:05.937529       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:28:05.940709       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:28:05.945155       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:28:05.950252       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:28:05.954460       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:28:15.936382       1 notification.go:93] timer update trigger
+I0602 12:28:15.937810       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:28:15.938113       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:28:15.941478       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:28:15.941485       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:28:15.946061       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:28:15.950672       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:28:25.936470       1 notification.go:93] timer update trigger
+I0602 12:28:25.937849       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:28:25.938133       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:28:25.941528       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:28:25.941575       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:28:25.948173       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:28:25.953666       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:28:35.935775       1 notification.go:93] timer update trigger
+I0602 12:28:35.937210       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:28:35.937470       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:28:35.940717       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:28:35.941199       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:28:35.945805       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:28:35.955246       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:28:45.936629       1 notification.go:93] timer update trigger
+I0602 12:28:45.938231       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:28:45.938527       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:28:45.942041       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:28:45.942413       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:28:45.947232       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:28:45.955510       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 6 milliseconds
+I0602 12:28:55.935883       1 notification.go:93] timer update trigger
+I0602 12:28:55.937285       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:28:55.937554       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:28:55.941616       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:28:55.941981       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:28:55.948060       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:28:55.952170       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:29:05.936321       1 notification.go:93] timer update trigger
+I0602 12:29:05.937818       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:29:05.938106       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:29:05.941334       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:29:05.942664       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:29:05.947368       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:29:05.951455       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:29:15.936691       1 notification.go:93] timer update trigger
+I0602 12:29:15.938044       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:29:15.938308       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:29:15.941509       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:29:15.942211       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:29:15.949252       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 6 milliseconds
+I0602 12:29:15.954005       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:29:25.936612       1 notification.go:93] timer update trigger
+I0602 12:29:25.937979       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:29:25.938238       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:29:25.941120       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:29:25.941728       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:29:25.950961       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 8 milliseconds
+I0602 12:29:25.959965       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:29:35.936349       1 notification.go:93] timer update trigger
+I0602 12:29:35.938081       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:29:35.938386       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:29:35.942213       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:29:35.942296       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:29:35.947210       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:29:35.951980       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:29:45.936315       1 notification.go:93] timer update trigger
+I0602 12:29:45.937756       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:29:45.938041       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:29:45.941649       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:29:45.941863       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:29:45.946952       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:29:45.951227       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:29:55.936537       1 notification.go:93] timer update trigger
+I0602 12:29:55.938088       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:29:55.938362       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:29:55.942865       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:29:55.943042       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:29:55.949610       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:29:55.954086       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:30:05.936426       1 notification.go:93] timer update trigger
+I0602 12:30:05.937951       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:30:05.938217       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:30:05.941332       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:30:05.941987       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:30:05.947380       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:30:05.956336       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:30:15.936422       1 notification.go:93] timer update trigger
+I0602 12:30:15.938038       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:30:15.938339       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:30:15.941889       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:30:15.942358       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:30:15.949394       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 6 milliseconds
+I0602 12:30:15.954743       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:30:25.936655       1 notification.go:93] timer update trigger
+I0602 12:30:25.938034       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:30:25.938298       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:30:25.941562       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:30:25.942373       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:30:25.947425       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:30:25.951406       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:30:35.936378       1 notification.go:93] timer update trigger
+I0602 12:30:35.937791       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:30:35.938076       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:30:35.942472       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:30:35.942541       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:30:35.948765       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:30:35.953879       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:30:45.936314       1 notification.go:93] timer update trigger
+I0602 12:30:45.937802       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:30:45.938103       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:30:45.943583       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 5 milliseconds
+I0602 12:30:45.943614       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:30:45.949130       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:30:45.953848       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:30:55.936428       1 notification.go:93] timer update trigger
+I0602 12:30:55.937963       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:30:55.938239       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:30:55.941730       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:30:55.947840       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 6 milliseconds
+I0602 12:30:55.954045       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:30:55.958647       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:31:05.936086       1 notification.go:93] timer update trigger
+I0602 12:31:05.937754       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:31:05.938054       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:31:05.941289       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:31:05.942103       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:31:05.947688       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:31:05.953032       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:31:15.935948       1 notification.go:93] timer update trigger
+I0602 12:31:15.937468       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:31:15.937746       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:31:15.940769       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:31:15.941286       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:31:15.946473       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:31:15.951094       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:31:25.936525       1 notification.go:93] timer update trigger
+I0602 12:31:25.938027       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:31:25.938325       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:31:25.942317       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:31:25.942402       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:31:25.947364       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:31:25.951172       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:31:35.936531       1 notification.go:93] timer update trigger
+I0602 12:31:35.937985       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:31:35.938297       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:31:35.941931       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:31:35.942220       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:31:35.947817       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:31:35.952096       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:31:45.936530       1 notification.go:93] timer update trigger
+I0602 12:31:45.937899       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:31:45.938094       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:31:45.941334       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:31:45.941784       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:31:45.949070       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 6 milliseconds
+I0602 12:31:45.954292       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:31:55.936604       1 notification.go:93] timer update trigger
+I0602 12:31:55.938111       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:31:55.938382       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:31:55.941916       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:31:55.942292       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:31:55.947520       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:31:55.951576       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:32:05.936534       1 notification.go:93] timer update trigger
+I0602 12:32:05.937901       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:32:05.938184       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:32:05.942406       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:32:05.942461       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:32:05.948193       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:32:05.952976       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:32:15.936577       1 notification.go:93] timer update trigger
+I0602 12:32:15.938009       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:32:15.938311       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:32:15.941745       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:32:15.943254       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:32:15.948085       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:32:15.952884       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:32:25.935965       1 notification.go:93] timer update trigger
+I0602 12:32:25.937516       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:32:25.937784       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:32:25.941179       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:32:25.941850       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:32:25.947566       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:32:25.951726       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:32:35.936276       1 notification.go:93] timer update trigger
+I0602 12:32:35.937582       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:32:35.937874       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:32:35.941032       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:32:35.941339       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:32:35.946331       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:32:35.951890       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:32:45.936627       1 notification.go:93] timer update trigger
+I0602 12:32:45.938178       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:32:45.938475       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:32:45.942095       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:32:45.942144       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:32:45.947227       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:32:45.952785       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:32:55.936642       1 notification.go:93] timer update trigger
+I0602 12:32:55.938053       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:32:55.938316       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:32:55.943229       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:32:55.943283       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:32:55.949246       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:32:55.954632       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:33:05.936925       1 notification.go:93] timer update trigger
+I0602 12:33:05.938283       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:33:05.938556       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:33:05.941550       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:33:05.942050       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:33:05.947062       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:33:05.951158       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:33:15.936353       1 notification.go:93] timer update trigger
+I0602 12:33:15.937795       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:33:15.938105       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:33:15.942477       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:33:15.942770       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:33:15.948768       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:33:15.954079       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:33:25.936663       1 notification.go:93] timer update trigger
+I0602 12:33:25.938068       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:33:25.938381       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:33:25.941868       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:33:25.941927       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:33:25.950439       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:33:25.954618       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:33:35.935972       1 notification.go:93] timer update trigger
+I0602 12:33:35.937620       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:33:35.937913       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:33:35.940801       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:33:35.941265       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:33:35.945662       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:33:35.950471       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:33:45.935805       1 notification.go:93] timer update trigger
+I0602 12:33:45.937227       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:33:45.937489       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:33:45.941421       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:33:45.941711       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:33:45.947336       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:33:45.952759       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:33:50.853907       1 reflector.go:879] k8s.io/client-go/informers/factory.go:160: Watch close - *v1.Node total 126 items received
+I0602 12:33:50.855659       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/nodes?allowWatchBookmarks=true&resourceVersion=118775&timeout=5m39s&timeoutSeconds=339&watch=true 200 OK in 1 milliseconds
+I0602 12:33:55.936275       1 notification.go:93] timer update trigger
+I0602 12:33:55.937763       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:33:55.938059       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:33:55.941657       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:33:55.941687       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:33:55.947448       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:33:55.952134       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:34:05.936554       1 notification.go:93] timer update trigger
+I0602 12:34:05.937960       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:34:05.938230       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:34:05.942390       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:34:05.942471       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:34:05.947975       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:34:05.951914       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:34:15.936408       1 notification.go:93] timer update trigger
+I0602 12:34:15.938000       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:34:15.938295       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:34:15.941511       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:34:15.941904       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:34:15.947136       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:34:15.955415       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:34:25.936434       1 notification.go:93] timer update trigger
+I0602 12:34:25.937862       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:34:25.938147       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:34:25.941194       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:34:25.941697       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:34:25.946704       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:34:25.951974       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:34:35.936497       1 notification.go:93] timer update trigger
+I0602 12:34:35.937882       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:34:35.938157       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:34:35.941926       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:34:35.942026       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:34:35.947987       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:34:35.953223       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:34:45.936685       1 notification.go:93] timer update trigger
+I0602 12:34:45.938225       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:34:45.938496       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:34:45.942043       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:34:45.942358       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:34:45.947224       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:34:45.951574       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:34:55.936725       1 notification.go:93] timer update trigger
+I0602 12:34:55.938308       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:34:55.938578       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:34:55.943357       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:34:55.943407       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:34:55.948763       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:34:55.959137       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 4 milliseconds
+I0602 12:35:05.936647       1 notification.go:93] timer update trigger
+I0602 12:35:05.938294       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:35:05.938575       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:35:05.941590       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:35:05.942417       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:35:05.948540       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 5 milliseconds
+I0602 12:35:05.952498       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:35:15.935876       1 notification.go:93] timer update trigger
+I0602 12:35:15.937276       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:35:15.937537       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:35:15.941487       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:35:15.941566       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:35:15.946910       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:35:15.952473       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:35:25.935942       1 notification.go:93] timer update trigger
+I0602 12:35:25.937181       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:35:25.937456       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:35:25.940672       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:35:25.941349       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 2 milliseconds
+I0602 12:35:25.948053       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 6 milliseconds
+I0602 12:35:25.953006       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:35:35.936953       1 notification.go:93] timer update trigger
+I0602 12:35:35.938310       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:35:35.938579       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:35:35.942133       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:35:35.942440       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:35:35.947688       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 4 milliseconds
+I0602 12:35:35.951555       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
+I0602 12:35:45.935941       1 notification.go:93] timer update trigger
+I0602 12:35:45.938594       1 resourcemonitor.go:262] pfp: > processing node "cnfdr9.telco5g.eng.rdu2.redhat.com"
+> processing 0 pods
+= pfp0v001ef46db3751d8e999
+I0602 12:35:45.938886       1 resourcemonitor.go:350] "error dumping the pfp status" fullPath="/run/pfpstatus/dump.json" statusFile="dump.json" err=null
+I0602 12:35:45.942897       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 3 milliseconds
+I0602 12:35:45.942970       1 round_trippers.go:560] GET https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:35:45.947551       1 round_trippers.go:560] PUT https://172.30.0.1:443/apis/topology.node.k8s.io/v1alpha2/noderesourcetopologies/cnfdr9.telco5g.eng.rdu2.redhat.com 200 OK in 3 milliseconds
+I0602 12:35:45.952150       1 round_trippers.go:560] GET https://172.30.0.1:443/api/v1/namespaces/numaresources/pods/numaresourcesoperator-worker-bpj5f 200 OK in 2 milliseconds
