@@ -65,7 +65,11 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 	})
 
 	Context("using the NUMA-aware scheduler with NRT data", func() {
-		var cpusPerPod int64 = 2 // must be even. Must be >= 2
+		var cpusPerPod int64
+
+		BeforeEach(func() {
+			cpusPerPod = 2 // must be even. Must be >= 2
+		})
 
 		DescribeTable("[node1] against a single node", Label("node1"),
 			// the ourpose of this test is to send a burst of pods towards a node. Each pod must require resources in such a way
@@ -116,7 +120,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 				// CAUTION: still assuming all NUMA zones are equal across all nodes
 				numPods := int(cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
 
-				klog.Infof("creating %d pods consuming %d cpus each (found %d per NUMA zone)", numPods, cpusVal, maxAllocPerNUMAVal)
+				klog.Infof("creating %d pods consuming %d cpus each (found %d per NUMA zone)", numPods, cpusPerPod, maxAllocPerNUMAVal)
 
 				var testPods []*corev1.Pod
 				for idx := 0; idx < numPods; idx++ {
@@ -211,7 +215,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 				cpusVal := (10 * resVal) / 8
 				numPods := int(int64(len(nrts)) * cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
 
-				klog.Infof("creating %d pods consuming %d cpus each (found %d per NUMA zone)", numPods, cpusVal, resVal)
+				klog.Infof("creating %d pods consuming %d cpus each (found %d per NUMA zone)", numPods, cpusPerPod, resVal)
 
 				var testPods []*corev1.Pod
 				for idx := 0; idx < numPods; idx++ {
