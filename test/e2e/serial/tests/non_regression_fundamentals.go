@@ -207,6 +207,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 				resQty := e2enrt.GetMaxAllocatableResourceNumaLevel(*nrtInfo, corev1.ResourceCPU)
 				resVal, ok := resQty.AsInt64()
 				Expect(ok).To(BeTrue(), "cannot convert allocatable CPU resource as int")
+				klog.InfoS("total available CPU", "nodes", len(nrts), "NUMAZonePerNode", len(nrtInfo.Zones), "CPUsPerNode", resVal)
 
 				cpusVal := (10 * resVal) / 8
 				numPods := int(int64(len(nrts)) * cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
