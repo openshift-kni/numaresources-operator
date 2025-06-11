@@ -536,9 +536,11 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 			When("RTE pods are not running yet", func() {
 				var taintedNode *corev1.Node
-				customPolicySupportEnabled := isCustomPolicySupportEnabled(&nroOperObj)
+				var customPolicySupportEnabled bool
 
 				BeforeEach(func(ctx context.Context) {
+					customPolicySupportEnabled = isCustomPolicySupportEnabled(&nroOperObj)
+
 					By("Get list of worker nodes")
 					var err error
 					workers, err = nodes.GetWorkers(fxt.DEnv())
