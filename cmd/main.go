@@ -74,12 +74,13 @@ const (
 )
 
 const (
-	defaultWebhookPort     = 9443
-	defaultMetricsAddr     = ":8080"
-	defaultMetricsSupport  = true
-	defaultProbeAddr       = ":8081"
-	defaultNamespace       = "numaresources-operator"
-	defaultEnableScheduler = true
+	defaultWebhookPort          = 9443
+	defaultMetricsAddr          = ":8080"
+	defaultMetricsSupport       = true
+	defaultProbeAddr            = ":8081"
+	defaultNamespace            = "numaresources-operator"
+	defaultEnableScheduler      = true
+	defaultEnableLeaderElection = true
 )
 
 var (
@@ -134,6 +135,7 @@ func (pa *Params) SetDefaults() {
 	pa.render.Namespace = defaultNamespace
 	pa.enableMetrics = defaultMetricsSupport
 	pa.enableScheduler = defaultEnableScheduler
+	pa.enableLeaderElection = defaultEnableLeaderElection
 }
 
 func (pa *Params) FromFlags() {
