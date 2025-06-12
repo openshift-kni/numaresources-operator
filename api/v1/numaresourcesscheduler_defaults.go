@@ -30,7 +30,7 @@ const (
 	defaultScoringStrategy      = LeastAllocated
 )
 
-func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
+func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec, activePodFGEnabled bool) {
 	if spec.CacheResyncPeriod == nil {
 		spec.CacheResyncPeriod = &metav1.Duration{
 			Duration: defaultCacheResyncPeriod,
@@ -42,6 +42,9 @@ func SetDefaults_NUMAResourcesSchedulerSpec(spec *NUMAResourcesSchedulerSpec) {
 	}
 	if spec.SchedulerInformer == nil {
 		infMode := defaultSchedulerInformer
+		if activePodFGEnabled {
+			infMode = SchedulerInformerShared
+		}
 		spec.SchedulerInformer = &infMode
 	}
 	if spec.CacheResyncDetection == nil {

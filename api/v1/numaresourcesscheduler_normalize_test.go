@@ -44,9 +44,10 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 	}
 
 	type testCase struct {
-		description string
-		current     NUMAResourcesSchedulerSpec
-		expected    NUMAResourcesSchedulerSpec
+		description        string
+		current            NUMAResourcesSchedulerSpec
+		expected           NUMAResourcesSchedulerSpec
+		activePodFGEnabled bool
 	}
 
 	testCases := []testCase{
@@ -299,12 +300,36 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 				Replicas:             ptr.To[int32](5),
 			},
 		},
+		{
+			description: "unset InformerMode and active pods feature gate is enabled",
+			current: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				SchedulerName:  "numa-aware-scheduler",
+			},
+			expected: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				SchedulerName:  "numa-aware-scheduler",
+				SchedulerInformer:    &schedInformerCustom,
+			},
+		},
+		{
+			description: "explicitly set InformerMode  and active pods feature gate is enabled",
+			current: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				SchedulerName:  "numa-aware-scheduler",
+			},
+			expected: NUMAResourcesSchedulerSpec{
+				SchedulerImage: "quay.io/openshift-kni/fake-image-for:test",
+				SchedulerName:  "numa-aware-scheduler",
+				SchedulerInformer:    &schedInformerCustom,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
 			bkp := tc.current.DeepCopy()
-			got := tc.current.Normalize()
+			got := tc.current.Normalize(tc.activePodFGEnabled)
 			if !reflect.DeepEqual(*bkp, tc.current) {
 				t.Errorf("current was mutated val=%s expected %s", toJSON(bkp), toJSON(tc.current))
 			}

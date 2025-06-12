@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -224,7 +226,11 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	klog.V(4).Info("SchedulerSync start")
 	defer klog.V(4).Info("SchedulerSync stop")
 
-	schedSpec := instance.Spec.Normalize()
+	//intentionally define the feature gate here instead of pulling it because some verions may not have it supported at all
+	KubeletPodResourcesListUseActivePods := "KubeletPodResourcesListUseActivePods"
+	useActivePodsOnly := utilfeature.DefaultFeatureGate.Enabled(featuregate.Feature(KubeletPodResourcesListUseActivePods))
+
+	schedSpec := instance.Spec.Normalize(useActivePodsOnly)
 	cacheResyncPeriod := unpackAPIResyncPeriod(schedSpec.CacheResyncPeriod)
 	replicas, err := r.computeSchedulerReplicas(ctx, schedSpec)
 	if err != nil {

@@ -36,6 +36,8 @@ require (
 	sigs.k8s.io/yaml v1.4.0
 )
 
+require k8s.io/apiserver v0.32.3
+
 require (
 	github.com/OneOfOne/xxhash v1.2.9-0.20201014161131-8506fca4db5e // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
