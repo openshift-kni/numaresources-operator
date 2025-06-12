@@ -270,7 +270,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	imgs, pullPolicy := images.Discover(context.Background(), params.image.Exporter)
+	imgs, pullPolicy := images.Discover(ctx, params.image.Exporter)
 
 	rteManifestsRendered, err := renderRTEManifests(rteManifests, namespace, imgs)
 	if err != nil {
