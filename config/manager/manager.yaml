@@ -54,7 +54,6 @@ spec:
         args:
         - -v=4
         - --leader-elect
-        - --enable-scheduler
         ports:
         - containerPort: 8080
           protocol: TCP

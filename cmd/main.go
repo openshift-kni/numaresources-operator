@@ -74,11 +74,12 @@ const (
 )
 
 const (
-	defaultWebhookPort    = 9443
-	defaultMetricsAddr    = ":8080"
-	defaultMetricsSupport = true
-	defaultProbeAddr      = ":8081"
-	defaultNamespace      = "numaresources-operator"
+	defaultWebhookPort     = 9443
+	defaultMetricsAddr     = ":8080"
+	defaultMetricsSupport  = true
+	defaultProbeAddr       = ":8081"
+	defaultNamespace       = "numaresources-operator"
+	defaultEnableScheduler = true
 )
 
 var (
@@ -132,6 +133,7 @@ func (pa *Params) SetDefaults() {
 	pa.probeAddr = defaultProbeAddr
 	pa.render.Namespace = defaultNamespace
 	pa.enableMetrics = defaultMetricsSupport
+	pa.enableScheduler = defaultEnableScheduler
 }
 
 func (pa *Params) FromFlags() {
