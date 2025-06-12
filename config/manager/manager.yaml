@@ -53,7 +53,6 @@ spec:
         - /bin/numaresources-operator
         args:
         - -v=4
-        - --leader-elect
         ports:
         - containerPort: 8080
           protocol: TCP
