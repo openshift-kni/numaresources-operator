@@ -30,7 +30,10 @@ const (
 	Slow Kind = "slow"
 
 	// ReleaseCritical is for tests that are critical for a successful release of the component that is being tested.
-	ReleaseCritical Kind = "release-critical"
+	ReleaseCritical Kind = "release_critical"
+
+	// Reboot indicates that the test involves performing one or more reboots on one or more nodes.
+	Reboot Kind = "reboot_required"
 )
 
 // Tier is a label to classify tests under specific grade/level
