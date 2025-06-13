@@ -28,6 +28,11 @@ BUNDLE_DEFAULT_CHANNEL := --default-channel=$(DEFAULT_CHANNEL)
 endif
 BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
+# Konflux catalog configuration
+PACKAGE_NAME_KONFLUX = numaresources-operator
+CATALOG_TEMPLATE_KONFLUX = .konflux/catalog/catalog-template.in.yaml
+CATALOG_KONFLUX = .konflux/catalog/$(PACKAGE_NAME_KONFLUX)/catalog.yaml
+
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
 #
@@ -64,13 +69,14 @@ OPERATOR_SDK_VERSION="v1.36.1"
 OPERATOR_SDK_BIN="operator-sdk_$(GOOS)_$(GOARCH)"
 OPERATOR_SDK="$(BIN_DIR)/$(OPERATOR_SDK_BIN)"
 
-OPM_VERSION="v1.48.0"
+OPM_VERSION="v1.52.0"
 OPM_BIN="$(GOOS)-$(GOARCH)-opm"
-OPM="$(BIN_DIR)/$(OPM_BIN)"
+OPM ?= "$(BIN_DIR)/$(OPM_BIN)"
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # This is a requirement for 'setup-envtest.sh' in the test target.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
+export PATH := $(PATH):$(PWD)/bin
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
@@ -468,3 +474,55 @@ golangci-lint: pkg/version/_buildinfo.json
 		echo "Using golangci-lint cached at $(GOLANGCI_LINT), current version $(GOLANGCI_LINT_LOCAL_VERSION) expected version: $(GOLANGCI_LINT_VERSION)";\
 	fi
 	$(GOLANGCI_LINT) run --verbose --print-resources-usage -c .golangci.yaml
+
+
+##@ Konflux
+
+.PHONY: yq
+YQ ?= ./bin/yq
+yq: ## download yq if not in the path
+ifeq (,$(wildcard $(YQ)))
+ifeq (,$(shell which yq 2>/dev/null))
+	@{ \
+	set -e ;\
+	mkdir -p $(dir $(YQ)) ;\
+	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
+	curl -sSLo $(YQ) https://github.com/mikefarah/yq/releases/download/v4.45.4/yq_$${OS}_$${ARCH} ;\
+	chmod +x $(YQ) ;\
+	}
+else
+YQ = $(shell which yq)
+endif
+endif
+
+.PHONY: konflux-update-task-refs ## update task images
+konflux-update-task-refs: yq
+	hack/konflux-update-task-refs.sh .tekton/$(PACKAGE_NAME_KONFLUX)-4-18-build.yaml
+
+.PHONY: konflux-validate-catalog-template-bundle ## validate the last bundle entry on the catalog template file
+konflux-validate-catalog-template-bundle: yq operator-sdk
+	@{ \
+	set -e ;\
+	bundle=$(shell $(YQ) ".entries[-1].image" $(CATALOG_TEMPLATE_KONFLUX)) ;\
+	echo "validating the last bundle entry: $${bundle} on catalog template: $(CATALOG_TEMPLATE_KONFLUX)" ;\
+	$(OPERATOR_SDK) bundle validate $${bundle} ;\
+	}
+
+.PHONY: konflux-validate-catalog
+konflux-validate-catalog: opm ## validate the current catalog file
+	@echo "validating catalog: .konflux/catalog/$(PACKAGE_NAME_KONFLUX)"
+	$(OPM) validate .konflux/catalog/$(PACKAGE_NAME_KONFLUX)/
+
+.PHONY: konflux-generate-catalog ## generate a quay.io catalog
+konflux-generate-catalog: yq opm
+	hack/konflux-update-catalog-template.sh --set-catalog-template-file $(CATALOG_TEMPLATE_KONFLUX) --set-bundle-builds-file .konflux/catalog/bundle.builds.in.yaml	
+	$(OPM) alpha render-template basic --output yaml --migrate-level bundle-object-to-csv-metadata $(CATALOG_TEMPLATE_KONFLUX) > $(CATALOG_KONFLUX)
+	$(OPM) validate .konflux/catalog/$(PACKAGE_NAME_KONFLUX)/
+
+.PHONY: konflux-generate-catalog-production ## generate a registry.redhat.io catalog
+konflux-generate-catalog-production: konflux-generate-catalog
+        # overlay the bundle image for production
+	sed -i 's|quay.io/redhat-user-workloads/telco-5g-tenant/$(PACKAGE_NAME_KONFLUX)-bundle-4-18|registry.redhat.io/openshift4/$(PACKAGE_NAME_KONFLUX)-bundle|g' $(CATALOG_KONFLUX)
+        # From now on, all the related images must reference production (registry.redhat.io) exclusively
+	./hack/konflux-validate-related-images-production.sh --set-catalog-file $(CATALOG_KONFLUX)
+	$(OPM) validate .konflux/catalog/$(PACKAGE_NAME_KONFLUX)/
