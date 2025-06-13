@@ -59,7 +59,7 @@ const (
 type eventChecker func(ev corev1.Event) bool
 
 func checkPODEvents(k8sCli *kubernetes.Clientset, podNamespace, podName string, evCheck eventChecker) (bool, error) {
-	By(fmt.Sprintf("checking events for pod %s/%s", podNamespace, podName))
+	klog.Infof("checking events for pod %s/%s", podNamespace, podName)
 	opts := metav1.ListOptions{
 		FieldSelector: fields.SelectorFromSet(map[string]string{
 			"involvedObject.name":      podName,

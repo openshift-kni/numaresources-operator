@@ -65,7 +65,11 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 	})
 
 	Context("using the NUMA-aware scheduler with NRT data", func() {
-		var cpusPerPod int64 = 2 // must be even. Must be >= 2
+		var cpusPerPod int64
+
+		BeforeEach(func() {
+			cpusPerPod = 2 // must be even. Must be >= 2
+		})
 
 		DescribeTable("[node1] against a single node", Label("node1"),
 			// the ourpose of this test is to send a burst of pods towards a node. Each pod must require resources in such a way
@@ -116,7 +120,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 				// CAUTION: still assuming all NUMA zones are equal across all nodes
 				numPods := int(cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
 
-				klog.Infof("creating %d pods consuming %d cpus each (found %d per NUMA zone)", numPods, cpusVal, maxAllocPerNUMAVal)
+				klog.Infof("creating %d pods consuming %d cpus each (found %d per NUMA zone)", numPods, cpusPerPod, maxAllocPerNUMAVal)
 
 				var testPods []*corev1.Pod
 				for idx := 0; idx < numPods; idx++ {
@@ -135,7 +139,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 					testPods = append(testPods, testPod)
 				}
 
-				failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodListAllRunning(context.TODO(), testPods)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodsAllRunning(context.TODO(), testPods)
 
 				for _, failedPod := range failedPods {
 					_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
@@ -207,11 +211,13 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 				resQty := e2enrt.GetMaxAllocatableResourceNumaLevel(*nrtInfo, corev1.ResourceCPU)
 				resVal, ok := resQty.AsInt64()
 				Expect(ok).To(BeTrue(), "cannot convert allocatable CPU resource as int")
+				klog.Infof("total available CPU: %d nodes x %d NUMA zone per node x %d CPUs per node = %dx%dx%d = %d",
+					len(nrts), len(nrtInfo.Zones), resVal, len(nrts), len(nrtInfo.Zones), resVal, len(nrts)*len(nrtInfo.Zones)*int(resVal))
 
 				cpusVal := (10 * resVal) / 8
 				numPods := int(int64(len(nrts)) * cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
 
-				klog.Infof("creating %d pods consuming %d cpus each (found %d per NUMA zone)", numPods, cpusVal, resVal)
+				klog.Infof("creating %d pods consuming %d cpus each total %d CPUs consumed (found %d per NUMA zone)", numPods, cpusPerPod, numPods*int(cpusPerPod), resVal)
 
 				var testPods []*corev1.Pod
 				for idx := 0; idx < numPods; idx++ {
@@ -231,7 +237,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 					testPods = append(testPods, testPod)
 				}
 
-				failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodListAllRunning(context.TODO(), testPods)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodsAllRunning(context.TODO(), testPods)
 
 				for _, failedPod := range failedPods {
 					_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
