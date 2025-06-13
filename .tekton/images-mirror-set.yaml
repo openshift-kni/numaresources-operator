@@ -1,0 +1,13 @@
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageDigestMirrorSet
+metadata:
+  name: numaresources-operator-digest-mirror-set
+spec:
+  imageDigestMirrors:
+  - mirrors:
+    - quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-4-19
+    source: registry.redhat.io/openshift4/numaresources-rhel9-operator
+  - mirrors:
+    - quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-19
+    source: registry.redhat.io/openshift4/numaresources-operator-bundle
+
