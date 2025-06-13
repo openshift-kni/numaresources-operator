@@ -16,9 +16,10 @@
 
 package v1
 
-func (current NUMAResourcesSchedulerSpec) Normalize() NUMAResourcesSchedulerSpec {
+// TODO turn into pointer method
+func (current NUMAResourcesSchedulerSpec) Normalize(activePodFGEnabled bool) NUMAResourcesSchedulerSpec {
 	spec := NUMAResourcesSchedulerSpec{}
 	current.DeepCopyInto(&spec)
-	SetDefaults_NUMAResourcesSchedulerSpec(&spec)
+	SetDefaults_NUMAResourcesSchedulerSpec(&spec, activePodFGEnabled)
 	return spec
 }
