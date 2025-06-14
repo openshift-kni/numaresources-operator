@@ -380,7 +380,7 @@ spec:
         - name: name
           value: fbc-fips-check-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-fbc-fips-check-oci-ta:0.1@sha256:479d93d8ff93e8e40025608fda6fc5049a556c88272e8391ddab39d95d04e307
+          value: quay.io/konflux-ci/tekton-catalog/task-fbc-fips-check-oci-ta:0.1@sha256:5613aa2052e1a7e1e46941a763b1fc487ff88b7d09fc29b9a5191c46174f89f0
         - name: kind
           value: task
         resolver: bundles
