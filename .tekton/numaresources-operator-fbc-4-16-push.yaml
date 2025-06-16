@@ -266,7 +266,7 @@ spec:
         - name: name
           value: build-image-index
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-build-image-index:0.1@sha256:9c95b1fe17db091ae364344ba2006af46648e08486eef1f6fe1b9e3f10866875
+          value: quay.io/konflux-ci/tekton-catalog/task-build-image-index:0.1@sha256:fc55208a5967b42e1bec89f0ffed26fc4f18db92df2a4885a7d2b4d5cfd603e0
         - name: kind
           value: task
         resolver: bundles
@@ -377,7 +377,7 @@ spec:
         - name: name
           value: fbc-fips-check-oci-ta
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-fbc-fips-check-oci-ta:0.1@sha256:479d93d8ff93e8e40025608fda6fc5049a556c88272e8391ddab39d95d04e307
+          value: quay.io/konflux-ci/tekton-catalog/task-fbc-fips-check-oci-ta:0.1@sha256:5613aa2052e1a7e1e46941a763b1fc487ff88b7d09fc29b9a5191c46174f89f0
         - name: kind
           value: task
         resolver: bundles
