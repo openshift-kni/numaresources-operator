@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -138,6 +140,16 @@ func (pa *Params) SetDefaults() {
 	pa.enableLeaderElection = defaultEnableLeaderElection
 }
 
+func (pa *Params) Summarize() string {
+	var sb strings.Builder
+	sb.WriteString("leaderElection=" + strconv.FormatBool(pa.enableLeaderElection))
+	sb.WriteString(" scheduler=" + strconv.FormatBool(pa.enableScheduler))
+	sb.WriteString(" webhooks=" + strconv.FormatBool(pa.enableWebhooks))
+	sb.WriteString(" webhooksHTTP2=" + strconv.FormatBool(pa.enableHTTP2))
+	sb.WriteString(" metrics=" + strconv.FormatBool(pa.enableMetrics))
+	return sb.String()
+}
+
 func (pa *Params) FromFlags() {
 	flag.StringVar(&pa.metricsAddr, "metrics-bind-address", pa.metricsAddr, "The address the metric endpoint binds to.")
 	flag.StringVar(&pa.probeAddr, "health-probe-bind-address", pa.probeAddr, "The address the probe endpoint binds to.")
@@ -195,7 +207,9 @@ func main() {
 	config := textlogger.NewConfig(textlogger.Verbosity(int(klogV)))
 	ctrl.SetLogger(textlogger.NewLogger(config))
 
-	klog.InfoS("starting", "program", version.OperatorProgramName(), "version", bi.Version, "branch", bi.Branch, "gitcommit", bi.Commit, "golang", runtime.Version(), "vl", klogV, "auxv", config.Verbosity().String())
+	klog.InfoS("starting", "program", version.OperatorProgramName(), "version", bi.Version, "branch", bi.Branch, "gitcommit", bi.Commit, "golang", runtime.Version())
+	klog.InfoS("starting", "program", version.OperatorProgramName(), "logVerbosity", klogV, "auxVerbosity", config.Verbosity().String())
+	klog.InfoS("starting", "program", version.OperatorProgramName(), "params", params.Summarize())
 
 	ctx := context.Background()
 
