@@ -71,6 +71,7 @@ type NUMAResourcesSchedulerReconciler struct {
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=*
 //+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
+//+kubebuilder:rbac:groups="",resources=nodes,verbs=list;watch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers/finalizers,verbs=update
