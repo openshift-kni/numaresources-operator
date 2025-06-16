@@ -374,6 +374,7 @@ spec:
           - nodes
           verbs:
           - list
+          - watch
         - apiGroups:
           - ""
           resources:
