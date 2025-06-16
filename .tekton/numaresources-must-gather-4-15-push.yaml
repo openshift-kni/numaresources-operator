@@ -7,8 +7,12 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch
-      == "release-4.15"
+    pipelinesascode.tekton.dev/on-cel-expression: |
+      event == "push" &&
+      target_branch == "release-4.15" &&
+      (".tekton/numaresources-must-gather-4-15-push.yaml".pathChanged() ||
+      ".konflux/must-gather/***".pathChanged() ||
+      "must-gather/***".pathChanged())
   creationTimestamp: null
   labels:
     appstudio.openshift.io/application: numaresources-must-gather-4-15
