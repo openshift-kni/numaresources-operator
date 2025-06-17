@@ -18,11 +18,14 @@ package tests
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
@@ -31,11 +34,13 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/internal/hypershift"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
@@ -64,7 +69,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 	Context("[no_nrt] using the NUMA-aware scheduler without updated NRT data", Label("no_nrt"), func() {
 		var testPod *corev1.Pod
 		nropObjInitial := &nropv1.NUMAResourcesOperator{}
-		initialInfoRefreshPause := *nropv1.DefaultNodeGroupConfig().InfoRefreshPause
+		var initialInfoRefreshPause nropv1.InfoRefreshPauseMode
 		nroKey := objects.NROObjectKey()
 
 		BeforeEach(func() {
@@ -76,17 +81,21 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			if len(nropObjInitial.Spec.NodeGroups) != 1 {
 				Skip("this test doesn't support more than one node group")
 			}
-			// temporary w/a for OCPBUGS-16058
-			if nropObjInitial.Spec.NodeGroups[0].Config != nil && nropObjInitial.Spec.NodeGroups[0].Config.InfoRefreshPause != nil {
-				initialInfoRefreshPause = *nropObjInitial.Spec.NodeGroups[0].Config.InfoRefreshPause
+
+			if hypershift.IsHypershiftCluster() {
+				initialInfoRefreshPause = *nropObjInitial.Status.NodeGroups[0].Config.InfoRefreshPause
+			} else {
+				// keep fetching Status.MachineConfigPools because the Status.NodeGroups is not backward compatible
+				initialInfoRefreshPause = *nropObjInitial.Status.MachineConfigPools[0].Config.InfoRefreshPause
 			}
+
 			infoRefreshPauseMode := nropv1.InfoRefreshPauseEnabled
-			updateInfoRefreshPause(fxt, infoRefreshPauseMode, nropObjInitial)
+			updateInfoRefreshPause(context.TODO(), fxt, infoRefreshPauseMode, nropObjInitial)
 		})
 
 		AfterEach(func() {
 			By("restore infoRefreshPause initial value")
-			updateInfoRefreshPause(fxt, initialInfoRefreshPause, nropObjInitial)
+			updateInfoRefreshPause(context.TODO(), fxt, initialInfoRefreshPause, nropObjInitial)
 		})
 
 		It("should make a best-effort pod running", Label(label.Tier1), func() {
@@ -144,7 +153,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			Expect(err).ToNot(HaveOccurred())
 
 			By("restore NROP configuration by enabling the updates again and verify the pod goes running")
-			updateInfoRefreshPause(fxt, initialInfoRefreshPause, nropObjInitial)
+			updateInfoRefreshPause(context.TODO(), fxt, initialInfoRefreshPause, nropObjInitial)
 
 			By("waiting for the NRT data to settle")
 			e2efixture.MustSettleNRT(fxt)
@@ -157,24 +166,25 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 	})
 })
 
-func updateInfoRefreshPause(fxt *e2efixture.Fixture, newVal nropv1.InfoRefreshPauseMode, objForKey *nropv1.NUMAResourcesOperator) {
+func updateInfoRefreshPause(ctx context.Context, fxt *e2efixture.Fixture, newVal nropv1.InfoRefreshPauseMode, objForKey *nropv1.NUMAResourcesOperator) {
 	klog.Infof("update InfoRefreshPause to %q only if the existing one is different", newVal)
 	nroKey := client.ObjectKeyFromObject(objForKey)
 	currentNrop := &nropv1.NUMAResourcesOperator{}
-	err := fxt.Client.Get(context.TODO(), nroKey, currentNrop)
+	err := fxt.Client.Get(ctx, nroKey, currentNrop)
 	Expect(err).ToNot(HaveOccurred())
-	currentVal := *nropv1.DefaultNodeGroupConfig().InfoRefreshPause
-	// temporary w/a for OCPBUGS-16058
-	if currentNrop.Spec.NodeGroups[0].Config != nil && currentNrop.Spec.NodeGroups[0].Config.InfoRefreshPause != nil {
-		currentVal = *currentNrop.Spec.NodeGroups[0].Config.InfoRefreshPause
-	}
+	currentVal := *currentNrop.Status.MachineConfigPools[0].Config.InfoRefreshPause
 	if currentVal == newVal {
 		klog.Infof("profile already has the updated InfoRefreshPause: %s=%s", currentVal, newVal)
 		return
 	}
 
+	By("list RTE pods before the CR update")
+	dsNsName := currentNrop.Status.DaemonSets[0]
+	rtePods := getPodsOfDaemonSet(ctx, fxt, dsNsName)
+	klog.InfoS("RTE pods before update", "daemonset", currentNrop.Status.DaemonSets[0], "pods", toString(rtePods))
+
 	Eventually(func(g Gomega) {
-		err := fxt.Client.Get(context.TODO(), nroKey, currentNrop)
+		err := fxt.Client.Get(ctx, nroKey, currentNrop)
 		g.Expect(err).ToNot(HaveOccurred())
 
 		if currentNrop.Spec.NodeGroups[0].Config == nil {
@@ -182,33 +192,61 @@ func updateInfoRefreshPause(fxt *e2efixture.Fixture, newVal nropv1.InfoRefreshPa
 		}
 		currentNrop.Spec.NodeGroups[0].Config.InfoRefreshPause = &newVal
 		updated := currentNrop.DeepCopy()
-		err = fxt.Client.Update(context.TODO(), updated)
+		err = fxt.Client.Update(ctx, updated)
 		g.Expect(err).ToNot(HaveOccurred())
 	}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 	klog.Info("wait long enough to verify the NROP object is updated")
 	updatedObj := &nropv1.NUMAResourcesOperator{}
+	var currentMode nropv1.InfoRefreshPauseMode
 	Eventually(func() bool {
-		err = fxt.Client.Get(context.TODO(), nroKey, updatedObj)
+		err = fxt.Client.Get(ctx, nroKey, updatedObj)
 		Expect(err).ToNot(HaveOccurred())
 
-		// TODO replace with updatedObj.Status.MachineConfigPools[0].Config.InfoRefreshPause when OCPBUGS-16058 is resolved.
-		// currently the functionality of the new flag works bt is matter of not reflecting it in resources status. also we
-		// wait for the respective ds to get ready with the new pods so we should be safe
-		if *updatedObj.Spec.NodeGroups[0].Config.InfoRefreshPause != newVal {
-			klog.Warningf("resource status is not updated yet: expected %q found %q", newVal, *updatedObj.Spec.NodeGroups[0].Config.InfoRefreshPause)
+		if hypershift.IsHypershiftCluster() {
+			currentMode = *updatedObj.Status.NodeGroups[0].Config.InfoRefreshPause
+		} else {
+			// keep fetching Status.MachineConfigPools because the Status.NodeGroups is not backward compatible
+			currentMode = *updatedObj.Status.MachineConfigPools[0].Config.InfoRefreshPause
+		}
+		if currentMode != newVal {
+			klog.Warningf("resource status is not updated yet: expected %q found %q", newVal, currentMode)
 			return false
 		}
+
 		return true
 	}).WithTimeout(2*time.Minute).WithPolling(9*time.Second).Should(BeTrue(), "Status of NROP failed to get updated")
 
-	dsKey := wait.ObjectKey{
-		Namespace: updatedObj.Status.DaemonSets[0].Namespace,
-		Name:      updatedObj.Status.DaemonSets[0].Name,
+	By("ensure that RTE pods are recreated and DS is ready")
+	waitForDaemonSetUpdate(ctx, fxt, dsNsName, rtePods)
+}
+
+func waitForDaemonSetUpdate(ctx context.Context, fxt *e2efixture.Fixture, dsNsName nropv1.NamespacedName, rtePods []corev1.Pod) {
+	klog.Infof(fmt.Sprintf("ensure old RTE pods of ds %q are deleted", dsNsName))
+	err := wait.With(fxt.Client).Interval(30*time.Second).Timeout(5*time.Minute).ForPodListAllDeleted(ctx, rtePods)
+	Expect(err).ToNot(HaveOccurred(), "Expected old RTE pods owned by the DaemonSet to be deleted within the timeout")
+
+	klog.Info("waiting for DaemonSet to be ready with the new data")
+	_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonsetPodsCreation(ctx, wait.ObjectKey(dsNsName), len(rtePods))
+	Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %q", dsNsName)
+	_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, wait.ObjectKey(dsNsName))
+	Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %q", dsNsName)
+}
+
+func getPodsOfDaemonSet(ctx context.Context, fxt *e2efixture.Fixture, dsNsName nropv1.NamespacedName) []corev1.Pod {
+	var ds appv1.DaemonSet
+	Expect(fxt.Client.Get(ctx, client.ObjectKey(dsNsName), &ds)).To(Succeed())
+
+	rtePods, err := podlist.With(fxt.Client).ByDaemonset(ctx, ds)
+	Expect(err).ToNot(HaveOccurred(), "unable to get daemonset %q", dsNsName)
+	Expect(rtePods).ToNot(BeEmpty(), "cannot find any pods for daemonset %q", dsNsName)
+	return rtePods
+}
+
+func toString(pods []corev1.Pod) string {
+	var b strings.Builder
+	for _, pod := range pods {
+		b.WriteString(fmt.Sprintf("%s/%s ", pod.Namespace, pod.Name))
 	}
-	klog.Info("waiting for DaemonSet to be ready")
-	_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetUpdateByKey(context.TODO(), dsKey)
-	Expect(err).ToNot(HaveOccurred(), "daemonset %s did not start updated: %v", dsKey.String(), err)
-	_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(context.TODO(), dsKey)
-	Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+	return b.String()
 }
