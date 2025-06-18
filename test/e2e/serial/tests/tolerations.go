@@ -630,7 +630,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					}
 				})
 
-				It("[test_id:72854] should add tolerations in-place while RTEs are running", Label("reboot_required", label.Slow, label.Tier2), func(ctx context.Context) {
+				It("[test_id:72854] should add tolerations in-place while RTEs are running", Label(label.Reboot, label.Slow, label.Tier2), func(ctx context.Context) {
 					if customPolicySupportEnabled {
 						fxt.IsRebootTest = true
 					}
@@ -674,7 +674,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					Expect(found).To(BeTrue(), "no RTE pod was found on node %q", taintedNode.Name)
 				})
 
-				It("[test_id:72855] should tolerate node taint on NROP CR creation", Label("reboot_required", label.Slow, label.Tier2), func(ctx context.Context) {
+				It("[test_id:72855] should tolerate node taint on NROP CR creation", Label(label.Reboot, label.Slow, label.Tier2), func(ctx context.Context) {
 					if customPolicySupportEnabled {
 						fxt.IsRebootTest = true
 					}
