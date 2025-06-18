@@ -1,0 +1,1866 @@
+---
+defaultChannel: "4.17"
+icon:
+  base64data: iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAYNJREFUWIXt1T9rlEEQx/HPnecJGoKJhY+NEgW5VrCxSZpr0oWUKcRgYSoLGwv1RfgWfAnWFlZWKQIRJE00V6XwTxQsdSwygWV5DEeaS/EMLDPP/Gaf/e7swz49hBlaf5aLdwAdQAfQAZwfgLa7OP4TT6tPMw/6TQaPK+EAcxhlXNs3NDngaaUvpx8XuRv4g+clAOzjBRZaFprGPuN1ldtoqXuEXWzWAEdYwvczAiylH6W/iCctdZt4hit4UAJcwDAT984IsYVPGa+26CsY4D3e4MOJ0BA7x99GjIkgesQXYo4YZawaX4nrRJNzFoi9nBvE/fTjrI8ciDvEEXGZGJSU79I/xN+Mf2Gx2s0lzOMnrmbuB+4Wu98u6ufxGxPsZG6A9boDiJtJOskOILYL+n7Gb/O5KbQ14iPxqtj1mNgqaqg6UgMgXqZ4AnArn/fzOIK41gIwzKO5XQEEsVqtMSQOj49MBHpVm+tcfYHUWu+UuO39tT4zOx//gg6gA+gAOoBZ2j82IbSJZWt9tAAAAABJRU5ErkJggg==
+  mediatype: image/png
+name: numaresources-operator
+schema: olm.package
+---
+entries:
+- name: numaresources-operator.v4.17.0
+  skipRange: '>=4.16.0 <4.17.0'
+- name: numaresources-operator.v4.17.1
+  replaces: numaresources-operator.v4.17.0
+  skipRange: '>=4.16.0 <4.17.1'
+- name: numaresources-operator.v4.17.2
+  replaces: numaresources-operator.v4.17.1
+  skipRange: '>=4.16.0 <4.17.2'
+- name: numaresources-operator.v4.17.3
+  replaces: numaresources-operator.v4.17.2
+  skipRange: '>=4.16.0 <4.17.3'
+- name: numaresources-operator.v4.17.4
+  replaces: numaresources-operator.v4.17.3
+  skipRange: '>=4.16.0 <4.17.4'
+name: "4.17"
+package: numaresources-operator
+schema: olm.channel
+---
+image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:e517bfda2cce6b9bbf9d4fd86bca358bd0901bf921a8822872dba3a518a0692b
+name: numaresources-operator.v4.17.0
+package: numaresources-operator
+properties:
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesOperator
+    version: v1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesOperator
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesScheduler
+    version: v1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesScheduler
+    version: v1alpha1
+- type: olm.package
+  value:
+    packageName: numaresources-operator
+    version: 4.17.0
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "nodetopology.openshift.io/v1alpha1",
+            "kind": "NUMAResourcesOperator",
+            "metadata": {
+              "name": "numaresourcesoperator"
+            },
+            "spec": {
+              "nodeGroups": [
+                {
+                  "machineConfigPoolSelector": {
+                    "matchLabels": {
+                      "pools.operator.machineconfiguration.openshift.io/worker": ""
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "apiVersion": "nodetopology.openshift.io/v1alpha1",
+            "kind": "NUMAResourcesScheduler",
+            "metadata": {
+              "name": "numaresourcesscheduler"
+            },
+            "spec": {
+              "imageSpec": "URL_OF_SCHEDULER_IMAGE_FROM_REDHAT_REGISTRY",
+              "logLevel": "Normal",
+              "schedulerName": "topo-aware-scheduler"
+            }
+          }
+        ]
+      capabilities: Basic Install
+      features.operators.openshift.io/cnf: "true"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "false"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "true"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.16.0 <4.17.0'
+      operators.openshift.io/valid-subscription: "[\n\t\"OpenShift Kubernetes Engine\",\n\t\"OpenShift
+        Container Platform\",\n\t\"OpenShift Platform Plus\"\n]"
+      operators.operatorframework.io/builder: operator-sdk-v1.25.0
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
+          API
+        displayName: NUMA Resources Operator
+        kind: NUMAResourcesOperator
+        name: numaresourcesoperators.nodetopology.openshift.io
+        resources:
+        - kind: DaemonSet
+          name: ""
+          version: v1
+        specDescriptors:
+        - description: Optional Resource Topology Exporter image URL
+          displayName: Optional RTE image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: RTE log verbosity
+          path: logLevel
+        - description: Group of Nodes to enable RTE on
+          displayName: Group of nodes to enable RTE on
+          path: nodeGroups
+        - description: InfoRefreshMode sets the mechanism which will be used to refresh
+            the topology info.
+          displayName: Topology info mechanism setting
+          path: nodeGroups[0].config.infoRefreshMode
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPause defines if updates to NRTs are paused for
+            the machines belonging to this group
+          displayName: Enable or disable the RTE pause setting
+          path: nodeGroups[0].config.infoRefreshPause
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPeriod sets the topology info refresh period. Use
+            explicit 0 to disable.
+          displayName: Topology info refresh period setting
+          path: nodeGroups[0].config.infoRefreshPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: PodsFingerprinting defines if pod fingerprint should be reported
+            for the machines belonging to this group
+          displayName: Enable or disable the pods fingerprinting setting
+          path: nodeGroups[0].config.podsFingerprinting
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Tolerations overrides tolerations to be set into RTE daemonsets
+            for this NodeGroup. If not empty, the tolerations will be the one set
+            here. Leave empty to make the system use the default tolerations.
+          displayName: Extra tolerations for the topology updater daemonset
+          path: nodeGroups[0].config.tolerations
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Optional Namespace/Name glob patterns of pod to ignore at node
+            level
+          displayName: Optional ignore pod namespace/name glob patterns
+          path: podExcludes
+        statusDescriptors:
+        - description: Conditions show the current state of the NUMAResourcesOperator
+            Operator
+          displayName: Condition reported
+          path: conditions
+        - description: DaemonSets of the configured RTEs, one per node group
+          displayName: RTE DaemonSets
+          path: daemonsets
+        - description: MachineConfigPools resolved from configured node groups
+          displayName: RTE MCPs from node groups
+          path: machineconfigpools
+        - description: Conditions represents the latest available observations of
+            MachineConfigPool current state.
+          displayName: Optional conditions reported for this NodeGroup
+          path: machineconfigpools[0].conditions
+        - description: NodeGroupConfig represents the latest available configuration
+            applied to this MachineConfigPool
+          displayName: Optional configuration enforced on this NodeGroup
+          path: machineconfigpools[0].config
+        - description: RelatedObjects list of objects of interest for this operator
+          displayName: Related Objects
+          path: relatedObjects
+        version: v1
+      - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
+          API
+        displayName: NUMA Resources Operator
+        kind: NUMAResourcesOperator
+        name: numaresourcesoperators.nodetopology.openshift.io
+        resources:
+        - kind: DaemonSet
+          name: ""
+          version: v1
+        specDescriptors:
+        - description: Optional Resource Topology Exporter image URL
+          displayName: Optional RTE image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: RTE log verbosity
+          path: logLevel
+        - description: Group of Nodes to enable RTE on
+          displayName: Group of nodes to enable RTE on
+          path: nodeGroups
+        - description: InfoRefreshMode sets the mechanism which will be used to refresh
+            the topology info.
+          displayName: Topology info mechanism setting
+          path: nodeGroups[0].config.infoRefreshMode
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPeriod sets the topology info refresh period. Use
+            explicit 0 to disable.
+          displayName: Topology info refresh period setting
+          path: nodeGroups[0].config.infoRefreshPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: PodsFingerprinting defines if pod fingerprint should be reported
+            for the machines belonging to this group
+          displayName: Enable or disable the pods fingerprinting setting
+          path: nodeGroups[0].config.podsFingerprinting
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Optional Namespace/Name glob patterns of pod to ignore at node
+            level
+          displayName: Optional ignore pod namespace/name glob patterns
+          path: podExcludes
+        statusDescriptors:
+        - description: Conditions show the current state of the NUMAResourcesOperator
+            Operator
+          displayName: Condition reported
+          path: conditions
+        - description: DaemonSets of the configured RTEs, one per node group
+          displayName: RTE DaemonSets
+          path: daemonsets
+        - description: MachineConfigPools resolved from configured node groups
+          displayName: RTE MCPs from node groups
+          path: machineconfigpools
+        - description: Conditions represents the latest available observations of
+            MachineConfigPool current state.
+          displayName: Optional conditions reported for this NodeGroup
+          path: machineconfigpools[0].conditions
+        - description: NodeGroupConfig represents the latest available configuration
+            applied to this MachineConfigPool
+          displayName: Optional configuration enforced on this NodeGroup
+          path: machineconfigpools[0].config
+        version: v1alpha1
+      - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
+          API
+        displayName: NUMA Aware Scheduler
+        kind: NUMAResourcesScheduler
+        name: numaresourcesschedulers.nodetopology.openshift.io
+        resources:
+        - kind: Deployment
+          name: secondary-scheduler-deployment
+          version: v1
+        specDescriptors:
+        - description: Set the cache resync debug options. Defaults to disable.
+          displayName: Scheduler cache resync debug setting
+          path: cacheResyncDebug
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Set the cache resync detection mode. Default is to trigger
+            resyncs only when detected guaranteed QoS pods which require NUMA-specific
+            resources.
+          displayName: Scheduler cache resync detection setting
+          path: cacheResyncDetection
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Set the cache resync period. Use explicit 0 to disable.
+          displayName: Scheduler cache resync period setting
+          path: cacheResyncPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler container image URL
+          displayName: Scheduler container image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: Scheduler log verbosity
+          path: logLevel
+        - description: Replicas control how many scheduler pods must be configured
+            for High Availability (HA)
+          displayName: Scheduler replicas
+          path: replicas
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:int
+        - description: Set the informer type to be used by the scheduler to connect
+            to the apiserver. Defaults to dedicated.
+          displayName: Scheduler cache apiserver informer setting
+          path: schedulerInformer
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: ScoringStrategy a scoring model that determine how the plugin
+            will score the nodes. Defaults to LeastAllocated.
+          displayName: Scheduler scoring strategy setting
+          path: scoringStrategy
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        statusDescriptors:
+        - description: CacheResyncPeriod shows the current cache resync period
+          displayName: Scheduler cache resync period
+          path: cacheResyncPeriod
+        - description: Deployment of the secondary scheduler, namespaced name
+          displayName: Scheduler deployment
+          path: deployment
+        - description: RelatedObjects list of objects of interest for this operator
+          displayName: Related Objects
+          path: relatedObjects
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+        version: v1
+      - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
+          API
+        displayName: NUMA Aware Scheduler
+        kind: NUMAResourcesScheduler
+        name: numaresourcesschedulers.nodetopology.openshift.io
+        resources:
+        - kind: Deployment
+          name: secondary-scheduler-deployment
+          version: v1
+        specDescriptors:
+        - description: Set the cache resync period. Use explicit 0 to disable.
+          displayName: Scheduler cache resync period setting
+          path: cacheResyncPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler container image URL
+          displayName: Scheduler container image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: Scheduler log verbosity
+          path: logLevel
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        statusDescriptors:
+        - description: Deployment of the secondary scheduler, namespaced name
+          displayName: Scheduler deployment
+          path: deployment
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+        version: v1alpha1
+    description: NUMA resources exporter operator
+    displayName: numaresources-operator
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - RTE
+    - NUMA
+    links:
+    - name: Numaresources Operator
+      url: https://github.com/openshift-kni/numaresources-operator
+    maintainers:
+    - email: fromani@redhat.com
+      name: fromani
+    maturity: stable
+    minKubeVersion: 1.23.0
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:e517bfda2cce6b9bbf9d4fd86bca358bd0901bf921a8822872dba3a518a0692b
+  name: ""
+- image: registry.redhat.io/openshift4/numaresources-rhel9-operator@sha256:b0646426b9872a69dde8b130688f7ba85d09c0220511ea374ee96ed41c593307
+  name: manager
+schema: olm.bundle
+---
+image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:b91d83f7a8d3e231ebb22e6a439d36b133bb98e84921d43561f33c74b4639824
+name: numaresources-operator.v4.17.1
+package: numaresources-operator
+properties:
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesOperator
+    version: v1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesOperator
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesScheduler
+    version: v1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesScheduler
+    version: v1alpha1
+- type: olm.package
+  value:
+    packageName: numaresources-operator
+    version: 4.17.1
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "nodetopology.openshift.io/v1alpha1",
+            "kind": "NUMAResourcesOperator",
+            "metadata": {
+              "name": "numaresourcesoperator"
+            },
+            "spec": {
+              "nodeGroups": [
+                {
+                  "machineConfigPoolSelector": {
+                    "matchLabels": {
+                      "pools.operator.machineconfiguration.openshift.io/worker": ""
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "apiVersion": "nodetopology.openshift.io/v1alpha1",
+            "kind": "NUMAResourcesScheduler",
+            "metadata": {
+              "name": "numaresourcesscheduler"
+            },
+            "spec": {
+              "imageSpec": "URL_OF_SCHEDULER_IMAGE_FROM_REDHAT_REGISTRY",
+              "logLevel": "Normal",
+              "schedulerName": "topo-aware-scheduler"
+            }
+          }
+        ]
+      capabilities: Basic Install
+      features.operators.openshift.io/cnf: "true"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "false"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "true"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.16.0 <4.17.1'
+      operators.openshift.io/valid-subscription: "[\n\t\"OpenShift Kubernetes Engine\",\n\t\"OpenShift
+        Container Platform\",\n\t\"OpenShift Platform Plus\"\n]"
+      operators.operatorframework.io/builder: operator-sdk-v1.25.0
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
+          API
+        displayName: NUMA Resources Operator
+        kind: NUMAResourcesOperator
+        name: numaresourcesoperators.nodetopology.openshift.io
+        resources:
+        - kind: DaemonSet
+          name: ""
+          version: v1
+        specDescriptors:
+        - description: Optional Resource Topology Exporter image URL
+          displayName: Optional RTE image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: RTE log verbosity
+          path: logLevel
+        - description: Group of Nodes to enable RTE on
+          displayName: Group of nodes to enable RTE on
+          path: nodeGroups
+        - description: InfoRefreshMode sets the mechanism which will be used to refresh
+            the topology info.
+          displayName: Topology info mechanism setting
+          path: nodeGroups[0].config.infoRefreshMode
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPause defines if updates to NRTs are paused for
+            the machines belonging to this group
+          displayName: Enable or disable the RTE pause setting
+          path: nodeGroups[0].config.infoRefreshPause
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPeriod sets the topology info refresh period. Use
+            explicit 0 to disable.
+          displayName: Topology info refresh period setting
+          path: nodeGroups[0].config.infoRefreshPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: PodsFingerprinting defines if pod fingerprint should be reported
+            for the machines belonging to this group
+          displayName: Enable or disable the pods fingerprinting setting
+          path: nodeGroups[0].config.podsFingerprinting
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Tolerations overrides tolerations to be set into RTE daemonsets
+            for this NodeGroup. If not empty, the tolerations will be the one set
+            here. Leave empty to make the system use the default tolerations.
+          displayName: Extra tolerations for the topology updater daemonset
+          path: nodeGroups[0].config.tolerations
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Optional Namespace/Name glob patterns of pod to ignore at node
+            level
+          displayName: Optional ignore pod namespace/name glob patterns
+          path: podExcludes
+        statusDescriptors:
+        - description: Conditions show the current state of the NUMAResourcesOperator
+            Operator
+          displayName: Condition reported
+          path: conditions
+        - description: DaemonSets of the configured RTEs, one per node group
+          displayName: RTE DaemonSets
+          path: daemonsets
+        - description: MachineConfigPools resolved from configured node groups
+          displayName: RTE MCPs from node groups
+          path: machineconfigpools
+        - description: Conditions represents the latest available observations of
+            MachineConfigPool current state.
+          displayName: Optional conditions reported for this NodeGroup
+          path: machineconfigpools[0].conditions
+        - description: NodeGroupConfig represents the latest available configuration
+            applied to this MachineConfigPool
+          displayName: Optional configuration enforced on this NodeGroup
+          path: machineconfigpools[0].config
+        - description: RelatedObjects list of objects of interest for this operator
+          displayName: Related Objects
+          path: relatedObjects
+        version: v1
+      - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
+          API
+        displayName: NUMA Resources Operator
+        kind: NUMAResourcesOperator
+        name: numaresourcesoperators.nodetopology.openshift.io
+        resources:
+        - kind: DaemonSet
+          name: ""
+          version: v1
+        specDescriptors:
+        - description: Optional Resource Topology Exporter image URL
+          displayName: Optional RTE image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: RTE log verbosity
+          path: logLevel
+        - description: Group of Nodes to enable RTE on
+          displayName: Group of nodes to enable RTE on
+          path: nodeGroups
+        - description: InfoRefreshMode sets the mechanism which will be used to refresh
+            the topology info.
+          displayName: Topology info mechanism setting
+          path: nodeGroups[0].config.infoRefreshMode
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPeriod sets the topology info refresh period. Use
+            explicit 0 to disable.
+          displayName: Topology info refresh period setting
+          path: nodeGroups[0].config.infoRefreshPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: PodsFingerprinting defines if pod fingerprint should be reported
+            for the machines belonging to this group
+          displayName: Enable or disable the pods fingerprinting setting
+          path: nodeGroups[0].config.podsFingerprinting
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Optional Namespace/Name glob patterns of pod to ignore at node
+            level
+          displayName: Optional ignore pod namespace/name glob patterns
+          path: podExcludes
+        statusDescriptors:
+        - description: Conditions show the current state of the NUMAResourcesOperator
+            Operator
+          displayName: Condition reported
+          path: conditions
+        - description: DaemonSets of the configured RTEs, one per node group
+          displayName: RTE DaemonSets
+          path: daemonsets
+        - description: MachineConfigPools resolved from configured node groups
+          displayName: RTE MCPs from node groups
+          path: machineconfigpools
+        - description: Conditions represents the latest available observations of
+            MachineConfigPool current state.
+          displayName: Optional conditions reported for this NodeGroup
+          path: machineconfigpools[0].conditions
+        - description: NodeGroupConfig represents the latest available configuration
+            applied to this MachineConfigPool
+          displayName: Optional configuration enforced on this NodeGroup
+          path: machineconfigpools[0].config
+        version: v1alpha1
+      - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
+          API
+        displayName: NUMA Aware Scheduler
+        kind: NUMAResourcesScheduler
+        name: numaresourcesschedulers.nodetopology.openshift.io
+        resources:
+        - kind: Deployment
+          name: secondary-scheduler-deployment
+          version: v1
+        specDescriptors:
+        - description: Set the cache resync debug options. Defaults to disable.
+          displayName: Scheduler cache resync debug setting
+          path: cacheResyncDebug
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Set the cache resync detection mode. Default is to trigger
+            resyncs only when detected guaranteed QoS pods which require NUMA-specific
+            resources.
+          displayName: Scheduler cache resync detection setting
+          path: cacheResyncDetection
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Set the cache resync period. Use explicit 0 to disable.
+          displayName: Scheduler cache resync period setting
+          path: cacheResyncPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler container image URL
+          displayName: Scheduler container image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: Scheduler log verbosity
+          path: logLevel
+        - description: Replicas control how many scheduler pods must be configured
+            for High Availability (HA)
+          displayName: Scheduler replicas
+          path: replicas
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:int
+        - description: Set the informer type to be used by the scheduler to connect
+            to the apiserver. Defaults to dedicated.
+          displayName: Scheduler cache apiserver informer setting
+          path: schedulerInformer
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: ScoringStrategy a scoring model that determine how the plugin
+            will score the nodes. Defaults to LeastAllocated.
+          displayName: Scheduler scoring strategy setting
+          path: scoringStrategy
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        statusDescriptors:
+        - description: CacheResyncPeriod shows the current cache resync period
+          displayName: Scheduler cache resync period
+          path: cacheResyncPeriod
+        - description: Deployment of the secondary scheduler, namespaced name
+          displayName: Scheduler deployment
+          path: deployment
+        - description: RelatedObjects list of objects of interest for this operator
+          displayName: Related Objects
+          path: relatedObjects
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+        version: v1
+      - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
+          API
+        displayName: NUMA Aware Scheduler
+        kind: NUMAResourcesScheduler
+        name: numaresourcesschedulers.nodetopology.openshift.io
+        resources:
+        - kind: Deployment
+          name: secondary-scheduler-deployment
+          version: v1
+        specDescriptors:
+        - description: Set the cache resync period. Use explicit 0 to disable.
+          displayName: Scheduler cache resync period setting
+          path: cacheResyncPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler container image URL
+          displayName: Scheduler container image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: Scheduler log verbosity
+          path: logLevel
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        statusDescriptors:
+        - description: Deployment of the secondary scheduler, namespaced name
+          displayName: Scheduler deployment
+          path: deployment
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+        version: v1alpha1
+    description: NUMA resources exporter operator
+    displayName: numaresources-operator
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - RTE
+    - NUMA
+    links:
+    - name: Numaresources Operator
+      url: https://github.com/openshift-kni/numaresources-operator
+    maintainers:
+    - email: fromani@redhat.com
+      name: fromani
+    maturity: stable
+    minKubeVersion: 1.23.0
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:b91d83f7a8d3e231ebb22e6a439d36b133bb98e84921d43561f33c74b4639824
+  name: ""
+- image: registry.redhat.io/openshift4/numaresources-rhel9-operator@sha256:e0d4722e0501ab8b3aad81e33539af17d65b949bf54579b272ee98fae58b8fbb
+  name: manager
+schema: olm.bundle
+---
+image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:19a5b9ce176cb44e63c82800655109270ec02eefbc37143d004797a3e3ba7f24
+name: numaresources-operator.v4.17.2
+package: numaresources-operator
+properties:
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesOperator
+    version: v1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesOperator
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesScheduler
+    version: v1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesScheduler
+    version: v1alpha1
+- type: olm.package
+  value:
+    packageName: numaresources-operator
+    version: 4.17.2
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "nodetopology.openshift.io/v1alpha1",
+            "kind": "NUMAResourcesOperator",
+            "metadata": {
+              "name": "numaresourcesoperator"
+            },
+            "spec": {
+              "nodeGroups": [
+                {
+                  "machineConfigPoolSelector": {
+                    "matchLabels": {
+                      "pools.operator.machineconfiguration.openshift.io/worker": ""
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "apiVersion": "nodetopology.openshift.io/v1alpha1",
+            "kind": "NUMAResourcesScheduler",
+            "metadata": {
+              "name": "numaresourcesscheduler"
+            },
+            "spec": {
+              "imageSpec": "URL_OF_SCHEDULER_IMAGE_FROM_REDHAT_REGISTRY",
+              "logLevel": "Normal",
+              "schedulerName": "topo-aware-scheduler"
+            }
+          }
+        ]
+      capabilities: Basic Install
+      features.operators.openshift.io/cnf: "true"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "false"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "true"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.16.0 <4.17.2'
+      operators.openshift.io/valid-subscription: "[\n\t\"OpenShift Kubernetes Engine\",\n\t\"OpenShift
+        Container Platform\",\n\t\"OpenShift Platform Plus\"\n]"
+      operators.operatorframework.io/builder: operator-sdk-v1.25.0
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
+          API
+        displayName: NUMA Resources Operator
+        kind: NUMAResourcesOperator
+        name: numaresourcesoperators.nodetopology.openshift.io
+        resources:
+        - kind: DaemonSet
+          name: ""
+          version: v1
+        specDescriptors:
+        - description: Optional Resource Topology Exporter image URL
+          displayName: Optional RTE image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: RTE log verbosity
+          path: logLevel
+        - description: Group of Nodes to enable RTE on
+          displayName: Group of nodes to enable RTE on
+          path: nodeGroups
+        - description: InfoRefreshMode sets the mechanism which will be used to refresh
+            the topology info.
+          displayName: Topology info mechanism setting
+          path: nodeGroups[0].config.infoRefreshMode
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPause defines if updates to NRTs are paused for
+            the machines belonging to this group
+          displayName: Enable or disable the RTE pause setting
+          path: nodeGroups[0].config.infoRefreshPause
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPeriod sets the topology info refresh period. Use
+            explicit 0 to disable.
+          displayName: Topology info refresh period setting
+          path: nodeGroups[0].config.infoRefreshPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: PodsFingerprinting defines if pod fingerprint should be reported
+            for the machines belonging to this group
+          displayName: Enable or disable the pods fingerprinting setting
+          path: nodeGroups[0].config.podsFingerprinting
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Tolerations overrides tolerations to be set into RTE daemonsets
+            for this NodeGroup. If not empty, the tolerations will be the one set
+            here. Leave empty to make the system use the default tolerations.
+          displayName: Extra tolerations for the topology updater daemonset
+          path: nodeGroups[0].config.tolerations
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Optional Namespace/Name glob patterns of pod to ignore at node
+            level
+          displayName: Optional ignore pod namespace/name glob patterns
+          path: podExcludes
+        statusDescriptors:
+        - description: Conditions show the current state of the NUMAResourcesOperator
+            Operator
+          displayName: Condition reported
+          path: conditions
+        - description: DaemonSets of the configured RTEs, one per node group
+          displayName: RTE DaemonSets
+          path: daemonsets
+        - description: MachineConfigPools resolved from configured node groups
+          displayName: RTE MCPs from node groups
+          path: machineconfigpools
+        - description: Conditions represents the latest available observations of
+            MachineConfigPool current state.
+          displayName: Optional conditions reported for this NodeGroup
+          path: machineconfigpools[0].conditions
+        - description: NodeGroupConfig represents the latest available configuration
+            applied to this MachineConfigPool
+          displayName: Optional configuration enforced on this NodeGroup
+          path: machineconfigpools[0].config
+        - description: RelatedObjects list of objects of interest for this operator
+          displayName: Related Objects
+          path: relatedObjects
+        version: v1
+      - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
+          API
+        displayName: NUMA Resources Operator
+        kind: NUMAResourcesOperator
+        name: numaresourcesoperators.nodetopology.openshift.io
+        resources:
+        - kind: DaemonSet
+          name: ""
+          version: v1
+        specDescriptors:
+        - description: Optional Resource Topology Exporter image URL
+          displayName: Optional RTE image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: RTE log verbosity
+          path: logLevel
+        - description: Group of Nodes to enable RTE on
+          displayName: Group of nodes to enable RTE on
+          path: nodeGroups
+        - description: InfoRefreshMode sets the mechanism which will be used to refresh
+            the topology info.
+          displayName: Topology info mechanism setting
+          path: nodeGroups[0].config.infoRefreshMode
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPeriod sets the topology info refresh period. Use
+            explicit 0 to disable.
+          displayName: Topology info refresh period setting
+          path: nodeGroups[0].config.infoRefreshPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: PodsFingerprinting defines if pod fingerprint should be reported
+            for the machines belonging to this group
+          displayName: Enable or disable the pods fingerprinting setting
+          path: nodeGroups[0].config.podsFingerprinting
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Optional Namespace/Name glob patterns of pod to ignore at node
+            level
+          displayName: Optional ignore pod namespace/name glob patterns
+          path: podExcludes
+        statusDescriptors:
+        - description: Conditions show the current state of the NUMAResourcesOperator
+            Operator
+          displayName: Condition reported
+          path: conditions
+        - description: DaemonSets of the configured RTEs, one per node group
+          displayName: RTE DaemonSets
+          path: daemonsets
+        - description: MachineConfigPools resolved from configured node groups
+          displayName: RTE MCPs from node groups
+          path: machineconfigpools
+        - description: Conditions represents the latest available observations of
+            MachineConfigPool current state.
+          displayName: Optional conditions reported for this NodeGroup
+          path: machineconfigpools[0].conditions
+        - description: NodeGroupConfig represents the latest available configuration
+            applied to this MachineConfigPool
+          displayName: Optional configuration enforced on this NodeGroup
+          path: machineconfigpools[0].config
+        version: v1alpha1
+      - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
+          API
+        displayName: NUMA Aware Scheduler
+        kind: NUMAResourcesScheduler
+        name: numaresourcesschedulers.nodetopology.openshift.io
+        resources:
+        - kind: Deployment
+          name: secondary-scheduler-deployment
+          version: v1
+        specDescriptors:
+        - description: Set the cache resync debug options. Defaults to disable.
+          displayName: Scheduler cache resync debug setting
+          path: cacheResyncDebug
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Set the cache resync detection mode. Default is to trigger
+            resyncs only when detected guaranteed QoS pods which require NUMA-specific
+            resources.
+          displayName: Scheduler cache resync detection setting
+          path: cacheResyncDetection
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Set the cache resync period. Use explicit 0 to disable.
+          displayName: Scheduler cache resync period setting
+          path: cacheResyncPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler container image URL
+          displayName: Scheduler container image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: Scheduler log verbosity
+          path: logLevel
+        - description: Replicas control how many scheduler pods must be configured
+            for High Availability (HA)
+          displayName: Scheduler replicas
+          path: replicas
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:int
+        - description: Set the informer type to be used by the scheduler to connect
+            to the apiserver. Defaults to dedicated.
+          displayName: Scheduler cache apiserver informer setting
+          path: schedulerInformer
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: ScoringStrategy a scoring model that determine how the plugin
+            will score the nodes. Defaults to LeastAllocated.
+          displayName: Scheduler scoring strategy setting
+          path: scoringStrategy
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        statusDescriptors:
+        - description: CacheResyncPeriod shows the current cache resync period
+          displayName: Scheduler cache resync period
+          path: cacheResyncPeriod
+        - description: Deployment of the secondary scheduler, namespaced name
+          displayName: Scheduler deployment
+          path: deployment
+        - description: RelatedObjects list of objects of interest for this operator
+          displayName: Related Objects
+          path: relatedObjects
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+        version: v1
+      - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
+          API
+        displayName: NUMA Aware Scheduler
+        kind: NUMAResourcesScheduler
+        name: numaresourcesschedulers.nodetopology.openshift.io
+        resources:
+        - kind: Deployment
+          name: secondary-scheduler-deployment
+          version: v1
+        specDescriptors:
+        - description: Set the cache resync period. Use explicit 0 to disable.
+          displayName: Scheduler cache resync period setting
+          path: cacheResyncPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler container image URL
+          displayName: Scheduler container image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: Scheduler log verbosity
+          path: logLevel
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        statusDescriptors:
+        - description: Deployment of the secondary scheduler, namespaced name
+          displayName: Scheduler deployment
+          path: deployment
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+        version: v1alpha1
+    description: NUMA resources exporter operator
+    displayName: numaresources-operator
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - RTE
+    - NUMA
+    links:
+    - name: Numaresources Operator
+      url: https://github.com/openshift-kni/numaresources-operator
+    maintainers:
+    - email: fromani@redhat.com
+      name: fromani
+    maturity: stable
+    minKubeVersion: 1.23.0
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:19a5b9ce176cb44e63c82800655109270ec02eefbc37143d004797a3e3ba7f24
+  name: ""
+- image: registry.redhat.io/openshift4/numaresources-rhel9-operator@sha256:0850afb6bb135b95b30f8445499b6004af9cf6f91a0e5f69378d5d76c6c47829
+  name: manager
+schema: olm.bundle
+---
+image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:c377bd8e31873197655e031d90dede966f0296fdeeca7e0310d5ff67f26c7878
+name: numaresources-operator.v4.17.3
+package: numaresources-operator
+properties:
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesOperator
+    version: v1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesOperator
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesScheduler
+    version: v1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesScheduler
+    version: v1alpha1
+- type: olm.package
+  value:
+    packageName: numaresources-operator
+    version: 4.17.3
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "nodetopology.openshift.io/v1alpha1",
+            "kind": "NUMAResourcesOperator",
+            "metadata": {
+              "name": "numaresourcesoperator"
+            },
+            "spec": {
+              "nodeGroups": [
+                {
+                  "machineConfigPoolSelector": {
+                    "matchLabels": {
+                      "pools.operator.machineconfiguration.openshift.io/worker": ""
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "apiVersion": "nodetopology.openshift.io/v1alpha1",
+            "kind": "NUMAResourcesScheduler",
+            "metadata": {
+              "name": "numaresourcesscheduler"
+            },
+            "spec": {
+              "imageSpec": "URL_OF_SCHEDULER_IMAGE_FROM_REDHAT_REGISTRY",
+              "logLevel": "Normal",
+              "schedulerName": "topo-aware-scheduler"
+            }
+          }
+        ]
+      capabilities: Basic Install
+      features.operators.openshift.io/cnf: "true"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "false"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "true"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.16.0 <4.17.3'
+      operators.openshift.io/valid-subscription: "[\n\t\"OpenShift Kubernetes Engine\",\n\t\"OpenShift
+        Container Platform\",\n\t\"OpenShift Platform Plus\"\n]"
+      operators.operatorframework.io/builder: operator-sdk-v1.25.0
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
+          API
+        displayName: NUMA Resources Operator
+        kind: NUMAResourcesOperator
+        name: numaresourcesoperators.nodetopology.openshift.io
+        resources:
+        - kind: DaemonSet
+          name: ""
+          version: v1
+        specDescriptors:
+        - description: Optional Resource Topology Exporter image URL
+          displayName: Optional RTE image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: RTE log verbosity
+          path: logLevel
+        - description: Group of Nodes to enable RTE on
+          displayName: Group of nodes to enable RTE on
+          path: nodeGroups
+        - description: InfoRefreshMode sets the mechanism which will be used to refresh
+            the topology info.
+          displayName: Topology info mechanism setting
+          path: nodeGroups[0].config.infoRefreshMode
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPause defines if updates to NRTs are paused for
+            the machines belonging to this group
+          displayName: Enable or disable the RTE pause setting
+          path: nodeGroups[0].config.infoRefreshPause
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPeriod sets the topology info refresh period. Use
+            explicit 0 to disable.
+          displayName: Topology info refresh period setting
+          path: nodeGroups[0].config.infoRefreshPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: PodsFingerprinting defines if pod fingerprint should be reported
+            for the machines belonging to this group
+          displayName: Enable or disable the pods fingerprinting setting
+          path: nodeGroups[0].config.podsFingerprinting
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Tolerations overrides tolerations to be set into RTE daemonsets
+            for this NodeGroup. If not empty, the tolerations will be the one set
+            here. Leave empty to make the system use the default tolerations.
+          displayName: Extra tolerations for the topology updater daemonset
+          path: nodeGroups[0].config.tolerations
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Optional Namespace/Name glob patterns of pod to ignore at node
+            level
+          displayName: Optional ignore pod namespace/name glob patterns
+          path: podExcludes
+        statusDescriptors:
+        - description: Conditions show the current state of the NUMAResourcesOperator
+            Operator
+          displayName: Condition reported
+          path: conditions
+        - description: DaemonSets of the configured RTEs, one per node group
+          displayName: RTE DaemonSets
+          path: daemonsets
+        - description: MachineConfigPools resolved from configured node groups
+          displayName: RTE MCPs from node groups
+          path: machineconfigpools
+        - description: Conditions represents the latest available observations of
+            MachineConfigPool current state.
+          displayName: Optional conditions reported for this NodeGroup
+          path: machineconfigpools[0].conditions
+        - description: NodeGroupConfig represents the latest available configuration
+            applied to this MachineConfigPool
+          displayName: Optional configuration enforced on this NodeGroup
+          path: machineconfigpools[0].config
+        - description: RelatedObjects list of objects of interest for this operator
+          displayName: Related Objects
+          path: relatedObjects
+        version: v1
+      - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
+          API
+        displayName: NUMA Resources Operator
+        kind: NUMAResourcesOperator
+        name: numaresourcesoperators.nodetopology.openshift.io
+        resources:
+        - kind: DaemonSet
+          name: ""
+          version: v1
+        specDescriptors:
+        - description: Optional Resource Topology Exporter image URL
+          displayName: Optional RTE image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: RTE log verbosity
+          path: logLevel
+        - description: Group of Nodes to enable RTE on
+          displayName: Group of nodes to enable RTE on
+          path: nodeGroups
+        - description: InfoRefreshMode sets the mechanism which will be used to refresh
+            the topology info.
+          displayName: Topology info mechanism setting
+          path: nodeGroups[0].config.infoRefreshMode
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPeriod sets the topology info refresh period. Use
+            explicit 0 to disable.
+          displayName: Topology info refresh period setting
+          path: nodeGroups[0].config.infoRefreshPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: PodsFingerprinting defines if pod fingerprint should be reported
+            for the machines belonging to this group
+          displayName: Enable or disable the pods fingerprinting setting
+          path: nodeGroups[0].config.podsFingerprinting
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Optional Namespace/Name glob patterns of pod to ignore at node
+            level
+          displayName: Optional ignore pod namespace/name glob patterns
+          path: podExcludes
+        statusDescriptors:
+        - description: Conditions show the current state of the NUMAResourcesOperator
+            Operator
+          displayName: Condition reported
+          path: conditions
+        - description: DaemonSets of the configured RTEs, one per node group
+          displayName: RTE DaemonSets
+          path: daemonsets
+        - description: MachineConfigPools resolved from configured node groups
+          displayName: RTE MCPs from node groups
+          path: machineconfigpools
+        - description: Conditions represents the latest available observations of
+            MachineConfigPool current state.
+          displayName: Optional conditions reported for this NodeGroup
+          path: machineconfigpools[0].conditions
+        - description: NodeGroupConfig represents the latest available configuration
+            applied to this MachineConfigPool
+          displayName: Optional configuration enforced on this NodeGroup
+          path: machineconfigpools[0].config
+        version: v1alpha1
+      - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
+          API
+        displayName: NUMA Aware Scheduler
+        kind: NUMAResourcesScheduler
+        name: numaresourcesschedulers.nodetopology.openshift.io
+        resources:
+        - kind: Deployment
+          name: secondary-scheduler-deployment
+          version: v1
+        specDescriptors:
+        - description: Set the cache resync debug options. Defaults to disable.
+          displayName: Scheduler cache resync debug setting
+          path: cacheResyncDebug
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Set the cache resync detection mode. Default is to trigger
+            resyncs only when detected guaranteed QoS pods which require NUMA-specific
+            resources.
+          displayName: Scheduler cache resync detection setting
+          path: cacheResyncDetection
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Set the cache resync period. Use explicit 0 to disable.
+          displayName: Scheduler cache resync period setting
+          path: cacheResyncPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler container image URL
+          displayName: Scheduler container image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: Scheduler log verbosity
+          path: logLevel
+        - description: Replicas control how many scheduler pods must be configured
+            for High Availability (HA)
+          displayName: Scheduler replicas
+          path: replicas
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:int
+        - description: Set the informer type to be used by the scheduler to connect
+            to the apiserver. Defaults to dedicated.
+          displayName: Scheduler cache apiserver informer setting
+          path: schedulerInformer
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: ScoringStrategy a scoring model that determine how the plugin
+            will score the nodes. Defaults to LeastAllocated.
+          displayName: Scheduler scoring strategy setting
+          path: scoringStrategy
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        statusDescriptors:
+        - description: CacheResyncPeriod shows the current cache resync period
+          displayName: Scheduler cache resync period
+          path: cacheResyncPeriod
+        - description: Deployment of the secondary scheduler, namespaced name
+          displayName: Scheduler deployment
+          path: deployment
+        - description: RelatedObjects list of objects of interest for this operator
+          displayName: Related Objects
+          path: relatedObjects
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+        version: v1
+      - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
+          API
+        displayName: NUMA Aware Scheduler
+        kind: NUMAResourcesScheduler
+        name: numaresourcesschedulers.nodetopology.openshift.io
+        resources:
+        - kind: Deployment
+          name: secondary-scheduler-deployment
+          version: v1
+        specDescriptors:
+        - description: Set the cache resync period. Use explicit 0 to disable.
+          displayName: Scheduler cache resync period setting
+          path: cacheResyncPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler container image URL
+          displayName: Scheduler container image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: Scheduler log verbosity
+          path: logLevel
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        statusDescriptors:
+        - description: Deployment of the secondary scheduler, namespaced name
+          displayName: Scheduler deployment
+          path: deployment
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+        version: v1alpha1
+    description: NUMA resources exporter operator
+    displayName: numaresources-operator
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - RTE
+    - NUMA
+    links:
+    - name: Numaresources Operator
+      url: https://github.com/openshift-kni/numaresources-operator
+    maintainers:
+    - email: fromani@redhat.com
+      name: fromani
+    maturity: stable
+    minKubeVersion: 1.23.0
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:c377bd8e31873197655e031d90dede966f0296fdeeca7e0310d5ff67f26c7878
+  name: ""
+- image: registry.redhat.io/openshift4/numaresources-rhel9-operator@sha256:9a482352cf951b2a32142f9f12a7e7aebbbaf13ceb105e4217ad7727e37b79f1
+  name: manager
+schema: olm.bundle
+---
+image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:6c2c9610ba42e05399cce872652fe67723da5d29acd2329f176cd08dd7fafb7d
+name: numaresources-operator.v4.17.4
+package: numaresources-operator
+properties:
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesOperator
+    version: v1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesOperator
+    version: v1alpha1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesScheduler
+    version: v1
+- type: olm.gvk
+  value:
+    group: nodetopology.openshift.io
+    kind: NUMAResourcesScheduler
+    version: v1alpha1
+- type: olm.package
+  value:
+    packageName: numaresources-operator
+    version: 4.17.4
+- type: olm.csv.metadata
+  value:
+    annotations:
+      alm-examples: |-
+        [
+          {
+            "apiVersion": "nodetopology.openshift.io/v1alpha1",
+            "kind": "NUMAResourcesOperator",
+            "metadata": {
+              "name": "numaresourcesoperator"
+            },
+            "spec": {
+              "nodeGroups": [
+                {
+                  "machineConfigPoolSelector": {
+                    "matchLabels": {
+                      "pools.operator.machineconfiguration.openshift.io/worker": ""
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "apiVersion": "nodetopology.openshift.io/v1alpha1",
+            "kind": "NUMAResourcesScheduler",
+            "metadata": {
+              "name": "numaresourcesscheduler"
+            },
+            "spec": {
+              "imageSpec": "URL_OF_SCHEDULER_IMAGE_FROM_REDHAT_REGISTRY",
+              "logLevel": "Normal",
+              "schedulerName": "topo-aware-scheduler"
+            }
+          }
+        ]
+      capabilities: Basic Install
+      features.operators.openshift.io/cnf: "true"
+      features.operators.openshift.io/cni: "false"
+      features.operators.openshift.io/csi: "false"
+      features.operators.openshift.io/disconnected: "true"
+      features.operators.openshift.io/fips-compliant: "true"
+      features.operators.openshift.io/proxy-aware: "false"
+      features.operators.openshift.io/tls-profiles: "false"
+      features.operators.openshift.io/token-auth-aws: "false"
+      features.operators.openshift.io/token-auth-azure: "false"
+      features.operators.openshift.io/token-auth-gcp: "false"
+      olm.skipRange: '>=4.16.0 <4.17.4'
+      operators.openshift.io/valid-subscription: "[\n\t\"OpenShift Kubernetes Engine\",\n\t\"OpenShift
+        Container Platform\",\n\t\"OpenShift Platform Plus\"\n]"
+      operators.operatorframework.io/builder: operator-sdk-v1.25.0
+      operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
+    apiServiceDefinitions: {}
+    crdDescriptions:
+      owned:
+      - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
+          API
+        displayName: NUMA Resources Operator
+        kind: NUMAResourcesOperator
+        name: numaresourcesoperators.nodetopology.openshift.io
+        resources:
+        - kind: DaemonSet
+          name: ""
+          version: v1
+        specDescriptors:
+        - description: Optional Resource Topology Exporter image URL
+          displayName: Optional RTE image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: RTE log verbosity
+          path: logLevel
+        - description: Group of Nodes to enable RTE on
+          displayName: Group of nodes to enable RTE on
+          path: nodeGroups
+        - description: InfoRefreshMode sets the mechanism which will be used to refresh
+            the topology info.
+          displayName: Topology info mechanism setting
+          path: nodeGroups[0].config.infoRefreshMode
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPause defines if updates to NRTs are paused for
+            the machines belonging to this group
+          displayName: Enable or disable the RTE pause setting
+          path: nodeGroups[0].config.infoRefreshPause
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPeriod sets the topology info refresh period. Use
+            explicit 0 to disable.
+          displayName: Topology info refresh period setting
+          path: nodeGroups[0].config.infoRefreshPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: PodsFingerprinting defines if pod fingerprint should be reported
+            for the machines belonging to this group
+          displayName: Enable or disable the pods fingerprinting setting
+          path: nodeGroups[0].config.podsFingerprinting
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Tolerations overrides tolerations to be set into RTE daemonsets
+            for this NodeGroup. If not empty, the tolerations will be the one set
+            here. Leave empty to make the system use the default tolerations.
+          displayName: Extra tolerations for the topology updater daemonset
+          path: nodeGroups[0].config.tolerations
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Optional Namespace/Name glob patterns of pod to ignore at node
+            level
+          displayName: Optional ignore pod namespace/name glob patterns
+          path: podExcludes
+        statusDescriptors:
+        - description: Conditions show the current state of the NUMAResourcesOperator
+            Operator
+          displayName: Condition reported
+          path: conditions
+        - description: DaemonSets of the configured RTEs, one per node group
+          displayName: RTE DaemonSets
+          path: daemonsets
+        - description: MachineConfigPools resolved from configured node groups
+          displayName: RTE MCPs from node groups
+          path: machineconfigpools
+        - description: Conditions represents the latest available observations of
+            MachineConfigPool current state.
+          displayName: Optional conditions reported for this NodeGroup
+          path: machineconfigpools[0].conditions
+        - description: NodeGroupConfig represents the latest available configuration
+            applied to this MachineConfigPool
+          displayName: Optional configuration enforced on this NodeGroup
+          path: machineconfigpools[0].config
+        - description: RelatedObjects list of objects of interest for this operator
+          displayName: Related Objects
+          path: relatedObjects
+        version: v1
+      - description: NUMAResourcesOperator is the Schema for the numaresourcesoperators
+          API
+        displayName: NUMA Resources Operator
+        kind: NUMAResourcesOperator
+        name: numaresourcesoperators.nodetopology.openshift.io
+        resources:
+        - kind: DaemonSet
+          name: ""
+          version: v1
+        specDescriptors:
+        - description: Optional Resource Topology Exporter image URL
+          displayName: Optional RTE image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: RTE log verbosity
+          path: logLevel
+        - description: Group of Nodes to enable RTE on
+          displayName: Group of nodes to enable RTE on
+          path: nodeGroups
+        - description: InfoRefreshMode sets the mechanism which will be used to refresh
+            the topology info.
+          displayName: Topology info mechanism setting
+          path: nodeGroups[0].config.infoRefreshMode
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: InfoRefreshPeriod sets the topology info refresh period. Use
+            explicit 0 to disable.
+          displayName: Topology info refresh period setting
+          path: nodeGroups[0].config.infoRefreshPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: PodsFingerprinting defines if pod fingerprint should be reported
+            for the machines belonging to this group
+          displayName: Enable or disable the pods fingerprinting setting
+          path: nodeGroups[0].config.podsFingerprinting
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Optional Namespace/Name glob patterns of pod to ignore at node
+            level
+          displayName: Optional ignore pod namespace/name glob patterns
+          path: podExcludes
+        statusDescriptors:
+        - description: Conditions show the current state of the NUMAResourcesOperator
+            Operator
+          displayName: Condition reported
+          path: conditions
+        - description: DaemonSets of the configured RTEs, one per node group
+          displayName: RTE DaemonSets
+          path: daemonsets
+        - description: MachineConfigPools resolved from configured node groups
+          displayName: RTE MCPs from node groups
+          path: machineconfigpools
+        - description: Conditions represents the latest available observations of
+            MachineConfigPool current state.
+          displayName: Optional conditions reported for this NodeGroup
+          path: machineconfigpools[0].conditions
+        - description: NodeGroupConfig represents the latest available configuration
+            applied to this MachineConfigPool
+          displayName: Optional configuration enforced on this NodeGroup
+          path: machineconfigpools[0].config
+        version: v1alpha1
+      - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
+          API
+        displayName: NUMA Aware Scheduler
+        kind: NUMAResourcesScheduler
+        name: numaresourcesschedulers.nodetopology.openshift.io
+        resources:
+        - kind: Deployment
+          name: secondary-scheduler-deployment
+          version: v1
+        specDescriptors:
+        - description: Set the cache resync debug options. Defaults to disable.
+          displayName: Scheduler cache resync debug setting
+          path: cacheResyncDebug
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Set the cache resync detection mode. Default is to trigger
+            resyncs only when detected guaranteed QoS pods which require NUMA-specific
+            resources.
+          displayName: Scheduler cache resync detection setting
+          path: cacheResyncDetection
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Set the cache resync period. Use explicit 0 to disable.
+          displayName: Scheduler cache resync period setting
+          path: cacheResyncPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler container image URL
+          displayName: Scheduler container image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: Scheduler log verbosity
+          path: logLevel
+        - description: Replicas control how many scheduler pods must be configured
+            for High Availability (HA)
+          displayName: Scheduler replicas
+          path: replicas
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:int
+        - description: Set the informer type to be used by the scheduler to connect
+            to the apiserver. Defaults to dedicated.
+          displayName: Scheduler cache apiserver informer setting
+          path: schedulerInformer
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: ScoringStrategy a scoring model that determine how the plugin
+            will score the nodes. Defaults to LeastAllocated.
+          displayName: Scheduler scoring strategy setting
+          path: scoringStrategy
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        statusDescriptors:
+        - description: CacheResyncPeriod shows the current cache resync period
+          displayName: Scheduler cache resync period
+          path: cacheResyncPeriod
+        - description: Deployment of the secondary scheduler, namespaced name
+          displayName: Scheduler deployment
+          path: deployment
+        - description: RelatedObjects list of objects of interest for this operator
+          displayName: Related Objects
+          path: relatedObjects
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+        version: v1
+      - description: NUMAResourcesScheduler is the Schema for the numaresourcesschedulers
+          API
+        displayName: NUMA Aware Scheduler
+        kind: NUMAResourcesScheduler
+        name: numaresourcesschedulers.nodetopology.openshift.io
+        resources:
+        - kind: Deployment
+          name: secondary-scheduler-deployment
+          version: v1
+        specDescriptors:
+        - description: Set the cache resync period. Use explicit 0 to disable.
+          displayName: Scheduler cache resync period setting
+          path: cacheResyncPeriod
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: Scheduler container image URL
+          displayName: Scheduler container image URL
+          path: imageSpec
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        - description: 'Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+            Defaults to "Normal".'
+          displayName: Scheduler log verbosity
+          path: logLevel
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+          x-descriptors:
+          - urn:alm:descriptor:com.tectonic.ui:text
+        statusDescriptors:
+        - description: Deployment of the secondary scheduler, namespaced name
+          displayName: Scheduler deployment
+          path: deployment
+        - description: Scheduler name to be used in pod templates
+          displayName: Scheduler name
+          path: schedulerName
+        version: v1alpha1
+    description: NUMA resources exporter operator
+    displayName: numaresources-operator
+    installModes:
+    - supported: true
+      type: OwnNamespace
+    - supported: true
+      type: SingleNamespace
+    - supported: false
+      type: MultiNamespace
+    - supported: false
+      type: AllNamespaces
+    keywords:
+    - RTE
+    - NUMA
+    links:
+    - name: Numaresources Operator
+      url: https://github.com/openshift-kni/numaresources-operator
+    maintainers:
+    - email: fromani@redhat.com
+      name: fromani
+    maturity: stable
+    minKubeVersion: 1.23.0
+    provider:
+      name: Red Hat
+relatedImages:
+- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:6c2c9610ba42e05399cce872652fe67723da5d29acd2329f176cd08dd7fafb7d
+  name: ""
+- image: registry.redhat.io/openshift4/numaresources-rhel9-operator@sha256:cc3d365e05109a8abf533522a5a0029666cd99a8045467bea1419a9f67caa293
+  name: manager
+schema: olm.bundle
