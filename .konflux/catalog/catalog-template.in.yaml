@@ -57,5 +57,5 @@ entries:
 # The url for this last entry (which is for the next release) is updated by hack/konflux-update-catalog-template.sh automatically
 # It takes the input data from bundle.builds.in.yaml
 # When we are ready for the next release then uncomment this section so the final bundle url is updated correctly
-# - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-16@sha256:6480efdef2d4f4ad24f9fe1e0613f869a2fdd28fafc3de171b7a4437b0e0d920
+# - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-16@sha256:9542d494cd5a3d97b1a4d3504bf0fcb5155ebaabbbd964465790cc0d6f2deb9f
 #   schema: olm.bundle
