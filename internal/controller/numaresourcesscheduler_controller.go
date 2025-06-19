@@ -29,6 +29,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	k8swgrbacupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rbac"
 
@@ -54,6 +57,17 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 )
 
+const (
+	// ActivePodsResourcesSupportSince defines the OCP version which started to support the fixed kubelet
+	// in which the PodResourcesAPI lists the active pods by default
+	activePodsResourcesSupportSince = "4.19.999"
+)
+
+type PlatformInfo struct {
+	Platform platform.Platform
+	Version  platform.Version
+}
+
 // NUMAResourcesSchedulerReconciler reconciles a NUMAResourcesScheduler object
 type NUMAResourcesSchedulerReconciler struct {
 	client.Client
@@ -61,6 +75,7 @@ type NUMAResourcesSchedulerReconciler struct {
 	SchedulerManifests schedmanifests.Manifests
 	Namespace          string
 	AutodetectReplicas int
+	PlatformInfo       PlatformInfo
 }
 
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
@@ -184,6 +199,8 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	klog.V(4).Info("SchedulerSync start")
 	defer klog.V(4).Info("SchedulerSync stop")
 
+	platformNormalize(&instance.Spec, r.PlatformInfo)
+
 	schedSpec := instance.Spec.Normalize()
 	cacheResyncPeriod := unpackAPIResyncPeriod(schedSpec.CacheResyncPeriod)
 	params := configParamsFromSchedSpec(schedSpec, cacheResyncPeriod, r.Namespace)
@@ -246,6 +263,27 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	return schedStatus, nil
 }
 
+func platformNormalize(spec *nropv1.NUMAResourcesSchedulerSpec, platInfo PlatformInfo) {
+	if platInfo.Platform != platform.OpenShift && platInfo.Platform != platform.HyperShift {
+		return
+	}
+
+	parsedVersion, _ := platform.ParseVersion(activePodsResourcesSupportSince)
+	ok, err := platInfo.Version.AtLeast(parsedVersion)
+	if err != nil {
+		klog.Infof("failed to compare version %v with %v, err %v", parsedVersion, platInfo.Version, err)
+		return
+	}
+
+	if !ok {
+		return
+	}
+
+	if spec.SchedulerInformer == nil {
+		spec.SchedulerInformer = ptr.To(nropv1.SchedulerInformerShared)
+		klog.V(4).InfoS("SchedulerInformer default is overridden", "Platform", platInfo.Platform, "PlatformVersion", platInfo.Version.String(), "SchedulerInformer", &spec.SchedulerInformer)
+	}
+}
 func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
 	sched.Status.Conditions, _ = status.UpdateConditions(sched.Status.Conditions, condition, reason, message)
 	if err := r.Client.Status().Update(ctx, sched); err != nil {

@@ -329,7 +329,14 @@ func main() {
 			Scheme:             mgr.GetScheme(),
 			SchedulerManifests: schedMf,
 			Namespace:          namespace,
+<<<<<<< HEAD
 			AutodetectReplicas: info.NodeCount,
+=======
+			PlatformInfo: controller.PlatformInfo{
+				Platform: clusterPlatform,
+				Version:  clusterPlatformVersion,
+			},
+>>>>>>> 6a568405 (controller: sched: conditionally enable Shared informer by default)
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
 			os.Exit(1)
