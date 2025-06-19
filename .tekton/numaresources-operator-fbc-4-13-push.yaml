@@ -289,7 +289,7 @@ spec:
         - name: name
           value: deprecated-image-check
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-deprecated-image-check:0.5@sha256:ecd33669676b3a193ff4c2c6223cb912cc1b0cf5cc36e080eaec7718500272cf
+          value: quay.io/konflux-ci/tekton-catalog/task-deprecated-image-check:0.5@sha256:270a79138a98e43c366d3722978cb5940d2bcb822ba6b60377330f863b7a1e62
         - name: kind
           value: task
         resolver: bundles
@@ -328,7 +328,7 @@ spec:
         - name: name
           value: validate-fbc
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-validate-fbc:0.1@sha256:30a5df9773eb9cab3efd808206370761302d4dc59dc5aa14e56b571c7daf9ee9
+          value: quay.io/konflux-ci/tekton-catalog/task-validate-fbc:0.1@sha256:cf1e41bc38f6e7ae7094b2a2501eedca374f7e1d8a4c49a2fd027c2a6277e1c0
         - name: kind
           value: task
         resolver: bundles
@@ -354,7 +354,7 @@ spec:
         - name: name
           value: fbc-target-index-pruning-check
         - name: bundle
-          value: quay.io/konflux-ci/tekton-catalog/task-fbc-target-index-pruning-check:0.1@sha256:016d0fa117dd2aa36420ebe74f938dda6cacb28d193d71775f6141dbab976cc6
+          value: quay.io/konflux-ci/tekton-catalog/task-fbc-target-index-pruning-check:0.1@sha256:8c248084b0329fbde6f0acbaf2f0f9f78e2f45ec02e5dcdfdf674e6e98594254
         - name: kind
           value: task
         resolver: bundles
