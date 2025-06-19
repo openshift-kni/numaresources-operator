@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  generateName: chk-pod-
+spec:
+  schedulerName: topo-aware-scheduler
+  containers:
+  - name: ctrreschk-main
+    image: quay.io/fromani/ctrreschk:v0.0.3
+    imagePullPolicy: Always
+    command: ["/usr/local/bin/ctrreschk", "-S", "align"]
+    resources:
+      limits:
+        cpu: 5
+        memory: 6Gi
+      requests:
+        cpu: 5
+        memory: 6Gi
+  - name: ctrreschk-sidecar-0
+    image: quay.io/fromani/ctrreschk:v0.0.3
+    imagePullPolicy: Always
+    command: ["/usr/local/bin/ctrreschk", "-S", "align"]
+    resources:
+      limits:
+        cpu: 600m
+        memory: 512Mi
+      requests:
+        cpu: 600m
+        memory: 512Mi
+  - name: ctrreschk-sidecar-1
+    image: quay.io/fromani/ctrreschk:v0.0.3
+    imagePullPolicy: Always
+    command: ["/usr/local/bin/ctrreschk", "-S", "align"]
+    resources:
+      limits:
+        cpu: 395m
+        memory: 512Mi
+      requests:
+        cpu: 395m
+        memory: 512Mi
