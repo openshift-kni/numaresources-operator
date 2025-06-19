@@ -297,6 +297,10 @@ func main() {
 			SchedulerManifests: schedMf,
 			Namespace:          namespace,
 			AutodetectReplicas: info.NodeCount,
+			PlatformInfo: controllers.PlatformInfo{
+				Platform: clusterPlatform,
+				Version:  clusterPlatformVersion,
+			},
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
 			os.Exit(1)
