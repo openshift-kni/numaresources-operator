@@ -39,8 +39,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	depmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
@@ -629,6 +631,88 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			dp := &appsv1.Deployment{}
 			gomega.Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(gomega.Succeed())
 			gomega.Expect(*dp.Spec.Replicas).To(gomega.Equal(int32(numOfMasters)), "number of replicas is different than number of control-planes nodes; want=%d got=%d", numOfMasters, *dp.Spec.Replicas)
+		})
+	})
+
+	ginkgo.Context("with kubelet PodResourcesAPI listing active pods by default", func() {
+		var nrs *nropv1.NUMAResourcesScheduler
+		var reconciler *NUMAResourcesSchedulerReconciler
+		numOfMasters := 3
+
+		ginkgo.When("kubelet fix is enabled", func() {
+			fixedVersion, _ := platform.ParseVersion(nropv1.ActivePodsResourcesSupportSince)
+			reconcilerPlatInfo := PlatformInfo{
+				Platform: platform.OpenShift,
+				Version:  fixedVersion,
+			}
+
+			ginkgo.It("should configure by default the informerMode to be Shared when field is not set", func() {
+				var err error
+				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				initObjects := []runtime.Object{nrs}
+				initObjects = append(initObjects, fakeNodes(numOfMasters, 3)...)
+				reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				reconciler.PlatformInfo = reconcilerPlatInfo
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, depmanifests.CacheInformerShared)
+			})
+
+			ginkgo.It("should preserve informerMode value if set", func() {
+				var err error
+				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				infMode := nropv1.SchedulerInformerDedicated
+				nrs.Spec.SchedulerInformer = &infMode
+				initObjects := []runtime.Object{nrs}
+				initObjects = append(initObjects, fakeNodes(numOfMasters, 3)...)
+				reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				reconciler.PlatformInfo = reconcilerPlatInfo
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(infMode))
+			})
+
+			ginkgo.It("should allow to update the informerMode to be Dedicated after an overridden default", func() {
+				var err error
+				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				initObjects := []runtime.Object{nrs}
+				initObjects = append(initObjects, fakeNodes(numOfMasters, 3)...)
+				reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				reconciler.PlatformInfo = reconcilerPlatInfo
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// should query the object after reconcile because the defaults are overridden
+				gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(gomega.HaveOccurred())
+
+				nrsUpdated := nrs.DeepCopy()
+				informerMode := nropv1.SchedulerInformerDedicated
+				nrsUpdated.Spec.SchedulerInformer = &informerMode
+				gomega.Eventually(func() bool {
+					if err := reconciler.Client.Update(context.TODO(), nrsUpdated); err != nil {
+						klog.Warningf("failed to update the scheduler object; err: %v", err)
+						return false
+					}
+					return true
+				}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(informerMode))
+			})
 		})
 	})
 })
