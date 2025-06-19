@@ -29,6 +29,7 @@ const (
 	ActivePodsResourcesSupportSince = "4.20.999"
 )
 
+//TODO use pointer method instead
 func (current NUMAResourcesSchedulerSpec) Normalize() NUMAResourcesSchedulerSpec {
 	spec := NUMAResourcesSchedulerSpec{}
 	current.DeepCopyInto(&spec)
