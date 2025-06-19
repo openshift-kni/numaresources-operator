@@ -38,10 +38,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	depmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
@@ -695,6 +697,157 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			dp := &appsv1.Deployment{}
 			gomega.Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(gomega.Succeed())
 			gomega.Expect(dp).To(HaveTheSameResourceRequirements(expectedRR))
+		})
+	})
+
+	ginkgo.Context("with kubelet PodResourcesAPI listing active pods by default", func() {
+		var nrs *nropv1.NUMAResourcesScheduler
+		var reconciler *NUMAResourcesSchedulerReconciler
+
+		ginkgo.When("kubelet fix is enabled", func() {
+			fixedVersion, _ := platform.ParseVersion(activePodsResourcesSupportSince)
+
+			ginkgo.DescribeTable("should configure by default the informerMode to the expected when field is not set", func(reconcilerPlatInfo PlatformInfo, expectedInformer string) {
+				var err error
+				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(nrs)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				reconciler.PlatformInfo = reconcilerPlatInfo
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, expectedInformer)
+			},
+				ginkgo.Entry("with fixed Openshift the default informer is Shared", PlatformInfo{
+					Platform: platform.OpenShift,
+					Version:  fixedVersion,
+				}, depmanifests.CacheInformerShared),
+				ginkgo.Entry("with fixed Hypershift the default informer is Shared", PlatformInfo{
+					Platform: platform.HyperShift,
+					Version:  fixedVersion,
+				}, depmanifests.CacheInformerShared),
+				ginkgo.Entry("with unknown platform the default informer is Dedicated (unchanged)", PlatformInfo{}, depmanifests.CacheInformerDedicated))
+
+			ginkgo.DescribeTable("should preserve informerMode value if set", func(reconcilerPlatInfo PlatformInfo) {
+				var err error
+				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				infMode := nropv1.SchedulerInformerDedicated
+				nrs.Spec.SchedulerInformer = &infMode
+				reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(nrs)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				reconciler.PlatformInfo = reconcilerPlatInfo
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(infMode))
+			},
+				ginkgo.Entry("with Openshift", PlatformInfo{
+					Platform: platform.OpenShift,
+					Version:  fixedVersion,
+				}),
+				ginkgo.Entry("with Hypershift", PlatformInfo{
+					Platform: platform.HyperShift,
+					Version:  fixedVersion,
+				}),
+				ginkgo.Entry("with unknown platform", PlatformInfo{}))
+
+			ginkgo.DescribeTable("should allow to update the informerMode to be Dedicated after an overridden default", func(reconcilerPlatInfo PlatformInfo) {
+				var err error
+				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(nrs)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				reconciler.PlatformInfo = reconcilerPlatInfo
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// intentionally skip checking default value
+
+				// should query the object after reconcile because the defaults are overridden
+				gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(gomega.HaveOccurred())
+
+				nrsUpdated := nrs.DeepCopy()
+				informerMode := nropv1.SchedulerInformerDedicated
+				nrsUpdated.Spec.SchedulerInformer = &informerMode
+				gomega.Eventually(func() bool {
+					if err := reconciler.Client.Update(context.TODO(), nrsUpdated); err != nil {
+						klog.Warningf("failed to update the scheduler object; err: %v", err)
+						return false
+					}
+					return true
+				}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(informerMode))
+			},
+				ginkgo.Entry("with Openshift", PlatformInfo{
+					Platform: platform.OpenShift,
+					Version:  fixedVersion,
+				}),
+				ginkgo.Entry("with Hypershift", PlatformInfo{
+					Platform: platform.HyperShift,
+					Version:  fixedVersion,
+				}))
+		})
+	})
+})
+
+var _ = ginkgo.Describe("Test scheduler spec platformNormalize", func() {
+	ginkgo.When("Spec.SchedulerInformer is not set by the user", func() {
+		ginkgo.It("should override default informer to Shared if kubelet is fixed - first supported zstream version", func() {
+			v, _ := platform.ParseVersion(activePodsResourcesSupportSince)
+			spec := nropv1.NUMAResourcesSchedulerSpec{}
+			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
+			gomega.Expect(*spec.SchedulerInformer).To(gomega.Equal(nropv1.SchedulerInformerShared))
+		})
+
+		ginkgo.It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (zstream)", func() {
+			v, _ := platform.ParseVersion("4.19.11")
+			spec := nropv1.NUMAResourcesSchedulerSpec{}
+			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
+			gomega.Expect(*spec.SchedulerInformer).To(gomega.Equal(nropv1.SchedulerInformerShared))
+		})
+
+		ginkgo.It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (ystream)", func() {
+			v, _ := platform.ParseVersion("4.20.0")
+			spec := nropv1.NUMAResourcesSchedulerSpec{}
+			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
+			gomega.Expect(*spec.SchedulerInformer).To(gomega.Equal(nropv1.SchedulerInformerShared))
+		})
+
+		ginkgo.It("should not override default informer if kubelet is not fixed - version is less than first supported (zstream)", func() {
+			// this is only for testing purposes as there is plan to backport the fix to older minor versions
+			// will need to remove this test if the fix is supported starting the first zstream of the release
+			v, _ := platform.ParseVersion("4.19.8")
+			spec := nropv1.NUMAResourcesSchedulerSpec{}
+			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
+			gomega.Expect(spec.SchedulerInformer).To(gomega.BeNil())
+		})
+
+		ginkgo.It("should not override default informer if kubelet is not fixed - version is less than first supported (ystream)", func() {
+			v, _ := platform.ParseVersion("4.13.0")
+			spec := nropv1.NUMAResourcesSchedulerSpec{}
+			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
+			gomega.Expect(spec.SchedulerInformer).To(gomega.BeNil())
+		})
+	})
+	ginkgo.When("Spec.SchedulerInformer is set by the user", func() {
+		ginkgo.It("should preserve informer value set by the user even if kubelet is fixed", func() {
+			v, _ := platform.ParseVersion(activePodsResourcesSupportSince)
+			spec := nropv1.NUMAResourcesSchedulerSpec{
+				SchedulerInformer: ptr.To(nropv1.SchedulerInformerDedicated),
+			}
+			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
+			gomega.Expect(*spec.SchedulerInformer).To(gomega.Equal(nropv1.SchedulerInformerDedicated))
 		})
 	})
 })
