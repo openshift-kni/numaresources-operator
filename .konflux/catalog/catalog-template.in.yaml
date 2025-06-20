@@ -1,0 +1,28 @@
+---
+schema: olm.template.basic
+entries:
+  # Default data
+  - defaultChannel: "4.20"
+    icon:
+      base64data: iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAYNJREFUWIXt1T9rlEEQx/HPnecJGoKJhY+NEgW5VrCxSZpr0oWUKcRgYSoLGwv1RfgWfAnWFlZWKQIRJE00V6XwTxQsdSwygWV5DEeaS/EMLDPP/Gaf/e7swz49hBlaf5aLdwAdQAfQAZwfgLa7OP4TT6tPMw/6TQaPK+EAcxhlXNs3NDngaaUvpx8XuRv4g+clAOzjBRZaFprGPuN1ldtoqXuEXWzWAEdYwvczAiylH6W/iCctdZt4hit4UAJcwDAT984IsYVPGa+26CsY4D3e4MOJ0BA7x99GjIkgesQXYo4YZawaX4nrRJNzFoi9nBvE/fTjrI8ciDvEEXGZGJSU79I/xN+Mf2Gx2s0lzOMnrmbuB+4Wu98u6ufxGxPsZG6A9boDiJtJOskOILYL+n7Gb/O5KbQ14iPxqtj1mNgqaqg6UgMgXqZ4AnArn/fzOIK41gIwzKO5XQEEsVqtMSQOj49MBHpVm+tcfYHUWu+UuO39tT4zOx//gg6gA+gAOoBZ2j82IbSJZWt9tAAAAABJRU5ErkJggg==
+      mediatype: image/png
+    name: numaresources-operator
+    schema: olm.package
+  # Channel entries should contain all the releases
+  - entries:
+      - name: numaresources-operator.v4.20.0
+        skipRange: '>=4.19.0 <4.20.0'
+        # After 4.20.0 is released, add 4.20.1 back using the quay nudged bundle      
+        # - name: numaresources-operator.v4.20.1
+        #   replaces: numaresources-operator.v4.20.0
+        #   skipRange: '>=4.19.0 <4.20.1'
+    name: "4.20"
+    package: numaresources-operator
+    schema: olm.channel
+    # v4.19.0 bundle
+    # - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:placeholder-update-me-after-release
+    #  schema: olm.bundle
+  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-20:9e221802d01f35006ba4af01bdab5c9e9e74ace0
+    # The url for this last entry is updated by hack/konflux-update-catalog-template.sh automatically
+
+    schema: olm.bundle
