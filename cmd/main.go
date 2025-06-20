@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -74,11 +76,13 @@ const (
 )
 
 const (
-	defaultWebhookPort    = 9443
-	defaultMetricsAddr    = ":8080"
-	defaultMetricsSupport = true
-	defaultProbeAddr      = ":8081"
-	defaultNamespace      = "numaresources-operator"
+	defaultWebhookPort          = 9443
+	defaultMetricsAddr          = ":8080"
+	defaultMetricsSupport       = true
+	defaultProbeAddr            = ":8081"
+	defaultNamespace            = "numaresources-operator"
+	defaultEnableScheduler      = true
+	defaultEnableLeaderElection = true
 )
 
 var (
@@ -125,15 +129,25 @@ type Params struct {
 	enableMCPCondsForward bool
 	image                 ImageParams
 	inspectFeatures       bool
-	enableReplicasDetect  bool
 }
 
 func (pa *Params) SetDefaults() {
 	pa.metricsAddr = defaultMetricsAddr
 	pa.probeAddr = defaultProbeAddr
 	pa.render.Namespace = defaultNamespace
-	pa.enableReplicasDetect = true
 	pa.enableMetrics = defaultMetricsSupport
+	pa.enableScheduler = defaultEnableScheduler
+	pa.enableLeaderElection = defaultEnableLeaderElection
+}
+
+func (pa *Params) Summarize() string {
+	var sb strings.Builder
+	sb.WriteString("leaderElection=" + strconv.FormatBool(pa.enableLeaderElection))
+	sb.WriteString(" scheduler=" + strconv.FormatBool(pa.enableScheduler))
+	sb.WriteString(" webhooks=" + strconv.FormatBool(pa.enableWebhooks))
+	sb.WriteString(" webhooksHTTP2=" + strconv.FormatBool(pa.enableHTTP2))
+	sb.WriteString(" metrics=" + strconv.FormatBool(pa.enableMetrics))
+	return sb.String()
 }
 
 func (pa *Params) FromFlags() {
@@ -158,7 +172,6 @@ func (pa *Params) FromFlags() {
 	flag.BoolVar(&pa.enableMCPCondsForward, "enable-mcp-conds-fwd", pa.enableMCPCondsForward, "enable MCP Status Condition forwarding")
 	flag.StringVar(&pa.image.Exporter, "image-exporter", pa.image.Exporter, "use this image as default for the RTE")
 	flag.StringVar(&pa.image.Scheduler, "image-scheduler", pa.image.Scheduler, "use this image as default for the scheduler")
-	flag.BoolVar(&pa.enableReplicasDetect, "detect-replicas", pa.enableReplicasDetect, "autodetect optimal replica count.(DEPRECATED) autodetect enabled by default and should be configured from the NUMAResourcesScheduler CR")
 
 	flag.Parse()
 
@@ -194,7 +207,9 @@ func main() {
 	config := textlogger.NewConfig(textlogger.Verbosity(int(klogV)))
 	ctrl.SetLogger(textlogger.NewLogger(config))
 
-	klog.InfoS("starting", "program", version.OperatorProgramName(), "version", bi.Version, "branch", bi.Branch, "gitcommit", bi.Commit, "golang", runtime.Version(), "vl", klogV, "auxv", config.Verbosity().String())
+	klog.InfoS("starting", "program", version.OperatorProgramName(), "version", bi.Version, "branch", bi.Branch, "gitcommit", bi.Commit, "golang", runtime.Version())
+	klog.InfoS("starting", "program", version.OperatorProgramName(), "logVerbosity", klogV, "auxVerbosity", config.Verbosity().String())
+	klog.InfoS("starting", "program", version.OperatorProgramName(), "params", params.Summarize())
 
 	ctx := context.Background()
 

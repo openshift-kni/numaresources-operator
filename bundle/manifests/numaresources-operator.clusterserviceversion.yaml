@@ -518,8 +518,6 @@ spec:
               containers:
               - args:
                 - -v=4
-                - --leader-elect
-                - --enable-scheduler
                 command:
                 - /bin/numaresources-operator
                 env:
