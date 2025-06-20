@@ -43,7 +43,7 @@ func (em *ExistingManifests) State(mf apimanifests.Manifests) []objectstate.Obje
 			Error:    em.CrdError,
 			Desired:  mf.Crd.DeepCopy(),
 			Compare:  compare.Object,
-			Merge:    merge.MetadataForUpdate,
+			Merge:    merge.ObjectForUpdate,
 		},
 	}
 }
