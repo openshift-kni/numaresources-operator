@@ -33,25 +33,25 @@ entries:
   name: "4.12"
   package: numaresources-operator
   schema: olm.channel
-    # v4.12.0 bundle
+    # v4.12.6 bundle
 - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:e2015a2343c1abe89db244376f3b7ff69e1c1260319380f9fb94543db608ea71
   schema: olm.bundle
-    # v4.12.1 bundle  
+    # v4.12.8 bundle  
 - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:83c9d7dd270e76fac2ae90769ba4dbab4a463c9e11126f0351ebf33abdd088b6
   schema: olm.bundle
-    # v4.12.2 bundle  
+    # v4.12.9 bundle  
 - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:fbe3a73849afb38d1d473a4282cd5ad66f47029e0ba94fdfaa7bdd75ee8e6864
   schema: olm.bundle
-    # v4.12.3 bundle
+    # v4.12.11 bundle
 - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:eb4f5c076b96d96b0c1d53849c40dd68ef9da1437c2353c92c510caf7affcb6e
   schema: olm.bundle
-    # v4.12.4 bundle
+    # v4.12.12 bundle
 - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:d058f59dbc21e6b015de06bad2d42e2cec078cbbc80a76fe2f914d641caaef7b
   schema: olm.bundle
-    # v4.12.5 bundle
+    # v4.12.13 bundle
 - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:d50a87f4b8bb430065aa2be56a3391bc20e94ce5a622d029d3f34316dc0cdeec
   schema: olm.bundle
-    # v4.12.6 bundle
+    # v4.12.14 bundle
 - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:f3993c2e6cd60f526e1a1053b64a6ee85072869a7b3970205bc3e77836bddacd
   schema: olm.bundle
 # The url for this last entry (which is for the next release) is updated by hack/konflux-update-catalog-template.sh automatically
