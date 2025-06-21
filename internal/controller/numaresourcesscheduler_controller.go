@@ -41,6 +41,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	k8swgrbacupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rbac"
 
@@ -58,12 +59,18 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 )
 
+type PlatformInfo struct {
+	Platform platform.Platform
+	Version  platform.Version
+}
+
 // NUMAResourcesSchedulerReconciler reconciles a NUMAResourcesScheduler object
 type NUMAResourcesSchedulerReconciler struct {
 	client.Client
 	Scheme             *runtime.Scheme
 	SchedulerManifests schedmanifests.Manifests
 	Namespace          string
+	PlatformInfo       PlatformInfo
 }
 
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
@@ -224,6 +231,10 @@ func (r *NUMAResourcesSchedulerReconciler) computeSchedulerReplicas(ctx context.
 func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (nropv1.NUMAResourcesSchedulerStatus, error) {
 	klog.V(4).Info("SchedulerSync start")
 	defer klog.V(4).Info("SchedulerSync stop")
+
+	if r.PlatformInfo.Platform == platform.OpenShift {
+		instance.Spec.PreNormalize(r.PlatformInfo.Version)
+	}
 
 	schedSpec := instance.Spec.Normalize()
 	cacheResyncPeriod := unpackAPIResyncPeriod(schedSpec.CacheResyncPeriod)

@@ -24,6 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+
 	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
@@ -310,6 +312,63 @@ func TestNUMAResourcesSchedulerSpecNormalize(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tc.expected) {
 				t.Errorf("got=%s expected %s", toJSON(got), toJSON(tc.expected))
+			}
+		})
+	}
+}
+
+func TestNUMAResourcesSchedulerSpec_PreNormalize(t *testing.T) {
+	schedInformer := defaultSchedulerInformer
+
+	schedInformerCustom := SchedulerInformerShared
+
+	greaterVersion, _ := platform.ParseVersion("4.20.1000")
+	equalVersion, _ := platform.ParseVersion(ActivePodsResourcesSupportSince)
+	lessVersion, _ := platform.ParseVersion("4.20.0")
+
+	type testCase struct {
+		description string
+		current     NUMAResourcesSchedulerSpec
+		version     platform.Version
+		expected    NUMAResourcesSchedulerSpec
+	}
+
+	tests := []testCase{
+		{
+			description: "unset InformerMode and kubelet is fixed - equal version",
+			version:     equalVersion,
+			expected: NUMAResourcesSchedulerSpec{
+				SchedulerInformer: &schedInformerCustom,
+			},
+		},
+		{
+			description: "unset InformerMode and kubelet is fixed - greater version",
+			version:     greaterVersion,
+			expected: NUMAResourcesSchedulerSpec{
+				SchedulerInformer: &schedInformerCustom,
+			},
+		},
+		{
+			description: "unset InformerMode and kubelet is fixed - less version",
+			version:     lessVersion,
+		},
+		{
+			description: "set InformerMode and kubelet is fixed - no change expected",
+			version:     equalVersion,
+			current: NUMAResourcesSchedulerSpec{
+				SchedulerInformer: &schedInformer,
+			},
+			expected: NUMAResourcesSchedulerSpec{
+				SchedulerInformer: &schedInformer,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.description, func(t *testing.T) {
+			tt.current.PreNormalize(tt.version)
+			if !reflect.DeepEqual(tt.current, tt.expected) {
+				t.Errorf("got %#v, want %#v", tt.current, tt.expected)
 			}
 		})
 	}
