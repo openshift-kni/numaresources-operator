@@ -435,6 +435,7 @@ konflux-validate-catalog: opm ## validate the current catalog file
 .PHONY: konflux-generate-catalog ## generate a quay.io catalog
 konflux-generate-catalog: yq opm
 	hack/konflux-update-catalog-template.sh --set-catalog-template-file $(CATALOG_TEMPLATE_KONFLUX) --set-bundle-builds-file .konflux/catalog/bundle.builds.in.yaml	
+	touch $(CATALOG_KONFLUX)
 	$(OPM) alpha render-template basic --output yaml $(CATALOG_TEMPLATE_KONFLUX) > $(CATALOG_KONFLUX)
 	$(OPM) validate .konflux/catalog/$(PACKAGE_NAME_KONFLUX)/
 

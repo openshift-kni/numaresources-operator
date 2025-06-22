@@ -2,72 +2,74 @@
 schema: olm.template.basic
 entries:
   # Default data
-- defaultChannel: "4.14"
-  icon:
-    base64data: iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAYNJREFUWIXt1T9rlEEQx/HPnecJGoKJhY+NEgW5VrCxSZpr0oWUKcRgYSoLGwv1RfgWfAnWFlZWKQIRJE00V6XwTxQsdSwygWV5DEeaS/EMLDPP/Gaf/e7swz49hBlaf5aLdwAdQAfQAZwfgLa7OP4TT6tPMw/6TQaPK+EAcxhlXNs3NDngaaUvpx8XuRv4g+clAOzjBRZaFprGPuN1ldtoqXuEXWzWAEdYwvczAiylH6W/iCctdZt4hit4UAJcwDAT984IsYVPGa+26CsY4D3e4MOJ0BA7x99GjIkgesQXYo4YZawaX4nrRJNzFoi9nBvE/fTjrI8ciDvEEXGZGJSU79I/xN+Mf2Gx2s0lzOMnrmbuB+4Wu98u6ufxGxPsZG6A9boDiJtJOskOILYL+n7Gb/O5KbQ14iPxqtj1mNgqaqg6UgMgXqZ4AnArn/fzOIK41gIwzKO5XQEEsVqtMSQOj49MBHpVm+tcfYHUWu+UuO39tT4zOx//gg6gA+gAOoBZ2j82IbSJZWt9tAAAAABJRU5ErkJggg==
-    mediatype: image/png
-  name: numaresources-operator
-  schema: olm.package
-  # Channel entries should contain all the releases
-- entries:
-  - name: numaresources-operator.v4.14.1
-    skipRange: '>=4.13.0 <4.14.1'
-  - name: numaresources-operator.v4.14.2
-    replaces: numaresources-operator.v4.14.1
-    skipRange: '>=4.13.0 <4.14.2'
-  - name: numaresources-operator.v4.14.3
-    replaces: numaresources-operator.v4.14.2
-    skipRange: '>=4.13.0 <4.14.3'
-  - name: numaresources-operator.v4.14.4
-    replaces: numaresources-operator.v4.14.3
-    skipRange: '>=4.13.0 <4.14.4'
-  - name: numaresources-operator.v4.14.5
-    replaces: numaresources-operator.v4.14.4
-    skipRange: '>=4.13.0 <4.14.5'
-  - name: numaresources-operator.v4.14.6
-    replaces: numaresources-operator.v4.14.5
-    skipRange: '>=4.13.0 <4.14.6'
-  - name: numaresources-operator.v4.14.7
-    replaces: numaresources-operator.v4.14.6
-    skipRange: '>=4.13.0 <4.14.7'
-  - name: numaresources-operator.v4.14.8
-    replaces: numaresources-operator.v4.14.7
-    skipRange: '>=4.13.0 <4.14.8'
-  - name: numaresources-operator.v4.14.9
-    replaces: numaresources-operator.v4.14.8
-    skipRange: '>=4.13.0 <4.14.9'
-  name: "4.14"
-  package: numaresources-operator
-  schema: olm.channel
-    # v4.14.0 bundle
-- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:d19ce035cfa4908335d1470d2c6bcdf6cf9e22f430f388731738cffeb7e6a7bd
-  schema: olm.bundle
-    # v4.14.1 bundle
-- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:154927308a380f85ead9e8c1d78c80a33f3c548fe764feb57727aaf4bb7c5892
-  schema: olm.bundle
-    # v4.14.2 bundle
-- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:ced49845d0a750ca0851ed00b2883553796b46493859f368da77485b55e4faa6
-  schema: olm.bundle
-    # v4.14.3 bundle
-- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:12822e70ff548e9336f3bc6900603c3e395bd952f21368127bf3789a9fc7a2ad
-  schema: olm.bundle
-    # v4.14.4 bundle
-- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:5adde965fa7373097b473ace76052ddd38592841c23c48f0ff114260b8dcf6bc
-  schema: olm.bundle
-    # v4.14.5 bundle
-- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:c8524cf9416a08d189c3607a13942de1f80afd0a035d6d4fdb5b49c1c056c7ab
-  schema: olm.bundle
-    # v4.14.6 bundle
-- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:81c6b9051f44286135cdeef0aafcc260d3771e43356adc0f80ce1f0449f3b02c
-  schema: olm.bundle
-    # v4.14.7 bundle
-- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:c8281af2678a091165203ea354566c3e167d02331cd74381af765d1253ce418e
-  schema: olm.bundle
-    # v4.14.8 bundle
-- image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:7224b5e0911de0b0dae2569e4d11e1f4c09dae07c3dc4c162fce08e0d85f0dc5
-  schema: olm.bundle
-# The url for this last entry (which is for the next release) is updated by hack/konflux-update-catalog-template.sh automatically
-# It takes the input data from bundle.builds.in.yaml
-# When we are ready for the next release then uncomment this section so the final bundle url is updated correctly
-# - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-14@sha256:baddaeda121150c70f1d849c491a61328e6648a9dc5a7dd3fa272c54c5aaaa05
-#   schema: olm.bundle
+  - defaultChannel: "4.14"
+    icon:
+      base64data: iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAYNJREFUWIXt1T9rlEEQx/HPnecJGoKJhY+NEgW5VrCxSZpr0oWUKcRgYSoLGwv1RfgWfAnWFlZWKQIRJE00V6XwTxQsdSwygWV5DEeaS/EMLDPP/Gaf/e7swz49hBlaf5aLdwAdQAfQAZwfgLa7OP4TT6tPMw/6TQaPK+EAcxhlXNs3NDngaaUvpx8XuRv4g+clAOzjBRZaFprGPuN1ldtoqXuEXWzWAEdYwvczAiylH6W/iCctdZt4hit4UAJcwDAT984IsYVPGa+26CsY4D3e4MOJ0BA7x99GjIkgesQXYo4YZawaX4nrRJNzFoi9nBvE/fTjrI8ciDvEEXGZGJSU79I/xN+Mf2Gx2s0lzOMnrmbuB+4Wu98u6ufxGxPsZG6A9boDiJtJOskOILYL+n7Gb/O5KbQ14iPxqtj1mNgqaqg6UgMgXqZ4AnArn/fzOIK41gIwzKO5XQEEsVqtMSQOj49MBHpVm+tcfYHUWu+UuO39tT4zOx//gg6gA+gAOoBZ2j82IbSJZWt9tAAAAABJRU5ErkJggg==
+      mediatype: image/png
+    name: numaresources-operator
+    schema: olm.package
+    # Channel entries should contain all the releases
+  - entries:
+      - name: numaresources-operator.v4.14.1
+        skipRange: '>=4.13.0 <4.14.1'
+      - name: numaresources-operator.v4.14.2
+        replaces: numaresources-operator.v4.14.1
+        skipRange: '>=4.13.0 <4.14.2'
+      - name: numaresources-operator.v4.14.3
+        replaces: numaresources-operator.v4.14.2
+        skipRange: '>=4.13.0 <4.14.3'
+      - name: numaresources-operator.v4.14.4
+        replaces: numaresources-operator.v4.14.3
+        skipRange: '>=4.13.0 <4.14.4'
+      - name: numaresources-operator.v4.14.5
+        replaces: numaresources-operator.v4.14.4
+        skipRange: '>=4.13.0 <4.14.5'
+      - name: numaresources-operator.v4.14.6
+        replaces: numaresources-operator.v4.14.5
+        skipRange: '>=4.13.0 <4.14.6'
+      - name: numaresources-operator.v4.14.7
+        replaces: numaresources-operator.v4.14.6
+        skipRange: '>=4.13.0 <4.14.7'
+      - name: numaresources-operator.v4.14.8
+        replaces: numaresources-operator.v4.14.7
+        skipRange: '>=4.13.0 <4.14.8'
+      - name: numaresources-operator.v4.14.9
+        replaces: numaresources-operator.v4.14.8
+        skipRange: '>=4.13.0 <4.14.9'
+      - name: numaresources-operator.v4.14.10
+        replaces: numaresources-operator.v4.14.9
+        skipRange: '>=4.13.0 <4.14.10'
+    name: "4.14"
+    package: numaresources-operator
+    schema: olm.channel
+  # v4.14.1 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:d19ce035cfa4908335d1470d2c6bcdf6cf9e22f430f388731738cffeb7e6a7bd
+    schema: olm.bundle
+  # v4.14.2 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:154927308a380f85ead9e8c1d78c80a33f3c548fe764feb57727aaf4bb7c5892
+    schema: olm.bundle
+  # v4.14.3 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:ced49845d0a750ca0851ed00b2883553796b46493859f368da77485b55e4faa6
+    schema: olm.bundle
+  # v4.14.4 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:12822e70ff548e9336f3bc6900603c3e395bd952f21368127bf3789a9fc7a2ad
+    schema: olm.bundle
+  # v4.14.5 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:5adde965fa7373097b473ace76052ddd38592841c23c48f0ff114260b8dcf6bc
+    schema: olm.bundle
+  # v4.14.6 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:c8524cf9416a08d189c3607a13942de1f80afd0a035d6d4fdb5b49c1c056c7ab
+    schema: olm.bundle
+  # v4.14.7 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:81c6b9051f44286135cdeef0aafcc260d3771e43356adc0f80ce1f0449f3b02c
+    schema: olm.bundle
+  # v4.14.8 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:c8281af2678a091165203ea354566c3e167d02331cd74381af765d1253ce418e
+    schema: olm.bundle
+  # v4.14.9 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:7224b5e0911de0b0dae2569e4d11e1f4c09dae07c3dc4c162fce08e0d85f0dc5
+    schema: olm.bundle
+  # v4.14.10 bundle  
+  # The url for this last entry is updated by hack/konflux-update-catalog-template.sh automatically
+  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-14:d163ec7931561cb69b11c36e10e82aa4fd8c8649
+    schema: olm.bundle
