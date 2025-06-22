@@ -84,8 +84,7 @@ entries:
     # v4.12.14 bundle
   - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:eb4f5c076b96d96b0c1d53849c40dd68ef9da1437c2353c92c510caf7affcb6e
     schema: olm.bundle
-# The url for this last entry (which is for the next release) is updated by hack/konflux-update-catalog-template.sh automatically
-# It takes the input data from bundle.builds.in.yaml
-# When we are ready for the next release then uncomment this section so the final bundle url is updated correctly
-# - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-12@sha256:8a56ff97d6a199223fd12f7ee166b7004ab040970f06063dd84a6bddfc42b15c
-#   schema: olm.bundle
+    # v4.12.15 bundle
+    # The url for this last entry is updated by hack/konflux-update-catalog-template.sh automatically
+  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-12:ce485b8905d599f5118571b8b8bb4c3dcaa19e91
+    schema: olm.bundle
