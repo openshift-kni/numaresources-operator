@@ -15,10 +15,9 @@ entries:
       - name: numaresources-operator.v4.18.1
         replaces: numaresources-operator.v4.18.0
         skipRange: '>=4.17.0 <4.18.1'
-    # Until we release the first build on Konflux, we just want the existing released images
-    # - name: numaresources-operator.v4.18.2
-    #   replaces: numaresources-operator.v4.18.1
-    #   skipRange: '>=4.17.0 <4.18.12'
+      - name: numaresources-operator.v4.18.2
+        replaces: numaresources-operator.v4.18.1
+        skipRange: '>=4.17.0 <4.18.2'
     name: "4.18"
     package: numaresources-operator
     schema: olm.channel
@@ -28,8 +27,7 @@ entries:
     # v4.18.1 bundle
   - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:a372f2b3b61c0012618837e349d389f9f300ccd2ae0fa005e9cd7d379b8569a1
     schema: olm.bundle
-# The url for this last entry (which is for the next release) is updated by hack/konflux-update-catalog-template.sh automatically
-# It takes the input data from bundle.builds.in.yaml
-# When we are ready for the next release then uncomment this section so the final bundle url is updated correctly
-# - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-18:f76866529ad85af58d44dc7bda62a784ef0a185e
-#   schema: olm.bundle
+    # v4.18.2 bundle
+    # The url for this last entry is updated by hack/konflux-update-catalog-template.sh automatically
+  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-18:0cb44a401e64bb2b50e89ee985197e0de72b0a93
+    schema: olm.bundle
