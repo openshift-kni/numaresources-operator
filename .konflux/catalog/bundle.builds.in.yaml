@@ -1,3 +1,3 @@
 ---
 # When we are ready to ship the first Konflux release, replace this with the nudge to the quay build
-quay: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:8cdcec0348831715981ea6a458b58821540176c73021dc51e67f3581045490d0
+quay: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:a372f2b3b61c0012618837e349d389f9f300ccd2ae0fa005e9cd7d379b8569a1

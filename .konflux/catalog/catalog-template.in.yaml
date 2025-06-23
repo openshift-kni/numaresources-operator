@@ -10,11 +10,11 @@ entries:
     schema: olm.package
   # Channel entries should contain all the releases
   - entries:
-    - name: numaresources-operator.v4.18.0
-      skipRange: '>=4.17.0 <4.18.0'
-    - name: numaresources-operator.v4.18.1
-      replaces: numaresources-operator.v4.18.0
-      skipRange: '>=4.17.0 <4.18.1'
+      - name: numaresources-operator.v4.18.0
+        skipRange: '>=4.17.0 <4.18.0'
+      - name: numaresources-operator.v4.18.1
+        replaces: numaresources-operator.v4.18.0
+        skipRange: '>=4.17.0 <4.18.1'
     # Until we release the first build on Konflux, we just want the existing released images
     # - name: numaresources-operator.v4.18.2
     #   replaces: numaresources-operator.v4.18.1
