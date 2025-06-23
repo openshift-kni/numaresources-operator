@@ -37,11 +37,18 @@ type ExistingManifests struct {
 }
 
 func (em *ExistingManifests) State(mf apimanifests.Manifests) []objectstate.ObjectState {
+	desired := mf.Crd.DeepCopy()
+	// Use the existing object as a base when available so we preserve
+	// defaults applied by the API server (e.g. Conversion strategy)
+	o := objectstate.ObjectState{Error: em.CrdError}
+	if !o.IsNotFoundError() && em.Existing.Crd != nil {
+		desired.Spec.Conversion = em.Existing.Crd.Spec.Conversion
+	}
 	return []objectstate.ObjectState{
 		{
 			Existing: em.Existing.Crd,
 			Error:    em.CrdError,
-			Desired:  mf.Crd.DeepCopy(),
+			Desired:  desired,
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
 		},
