@@ -20,7 +20,7 @@ entries:
     package: numaresources-operator
     schema: olm.channel
   # v4.19.0 bundle
-  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:a1d46f3a1e45c3c414f2d9a0fd2992513fee8d795bb3efd173472c004a406747
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:2e6024d88c3751cd68f43999f2eeccf2aca0c127ee6be20bca2fc3673374d59e
     schema: olm.bundle
 # The url for this last entry is updated by hack/konflux-update-catalog-template.sh automatically
 #  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-19@sha256:a1c0c79c2ebb9e39ebb0fe298302c1cfbe2d952323b086f3b67a6bb84c13bfb8
