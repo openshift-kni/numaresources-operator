@@ -228,10 +228,12 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 }
 
 func DaemonSetTolerations(ds *appsv1.DaemonSet, userTolerations []corev1.Toleration) {
+	podSpec := &ds.Spec.Template.Spec // shortcut
+	// cleanup undesired toleration
+	podSpec.Tolerations = []corev1.Toleration{}
 	if len(userTolerations) == 0 {
 		return
 	}
-	podSpec := &ds.Spec.Template.Spec // shortcut
 	podSpec.Tolerations = nropv1.CloneTolerations(userTolerations)
 }
 
@@ -243,7 +245,6 @@ func ContainerConfig(ds *appsv1.DaemonSet, name string) error {
 	k8swgrteupdate.ContainerConfig(&ds.Spec.Template.Spec, cnt, name)
 	return nil
 }
-
 func AllContainersTerminationMessagePolicy(ds *appsv1.DaemonSet) {
 	for idx := range ds.Spec.Template.Spec.Containers {
 		cnt := &ds.Spec.Template.Spec.Containers[idx]
@@ -253,16 +254,32 @@ func AllContainersTerminationMessagePolicy(ds *appsv1.DaemonSet) {
 	}
 }
 
+// hasVolumeMount checks if a container already has a volume mount with the given name
+func hasVolumeMount(cnt *corev1.Container, volumeName string) bool {
+	for _, vm := range cnt.VolumeMounts {
+		if vm.Name == volumeName {
+			return true
+		}
+	}
+	return false
+}
+
+// hasVolume checks if a pod spec already has a volume with the given name
+func hasVolume(podSpec *corev1.PodSpec, volumeName string) bool {
+	for _, v := range podSpec.Volumes {
+		if v.Name == volumeName {
+			return true
+		}
+	}
+	return false
+}
+
 func AddVolumeMountMemory(podSpec *corev1.PodSpec, cnt *corev1.Container, mountName, dirName string, sizeMiB int64) {
+	// Add the requested memory volume mount
 	cnt.VolumeMounts = append(cnt.VolumeMounts,
 		corev1.VolumeMount{
 			Name:      mountName,
 			MountPath: dirName,
-		},
-		corev1.VolumeMount{
-			MountPath: "/etc/secrets/rte/",
-			Name:      "rte-metrics-service-cert",
-			ReadOnly:  true,
 		},
 	)
 	podSpec.Volumes = append(podSpec.Volumes,
@@ -275,15 +292,32 @@ func AddVolumeMountMemory(podSpec *corev1.PodSpec, cnt *corev1.Container, mountN
 				},
 			},
 		},
-		corev1.Volume{
-			Name: "rte-metrics-service-cert",
-			VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName: "rte-metrics-service-cert",
+	)
+
+	// Add the metrics certificate volume mount only if it doesn't already exist
+	metricsVolumeName := "rte-metrics-service-cert"
+	if !hasVolumeMount(cnt, metricsVolumeName) {
+		cnt.VolumeMounts = append(cnt.VolumeMounts,
+			corev1.VolumeMount{
+				MountPath: "/etc/secrets/rte/",
+				Name:      metricsVolumeName,
+				ReadOnly:  true,
+			},
+		)
+	}
+
+	if !hasVolume(podSpec, metricsVolumeName) {
+		podSpec.Volumes = append(podSpec.Volumes,
+			corev1.Volume{
+				Name: metricsVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					Secret: &corev1.SecretVolumeSource{
+						SecretName: metricsVolumeName,
+					},
 				},
 			},
-		},
-	)
+		)
+	}
 }
 
 func SecurityContextConstraint(scc *securityv1.SecurityContextConstraints, legacyRTEContext bool) {
