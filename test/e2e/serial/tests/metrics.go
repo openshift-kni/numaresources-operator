@@ -100,7 +100,7 @@ func fetchMetricsFromPod(ctx context.Context, pod *corev1.Pod, metricsAddress, m
 		"-k",
 		fmt.Sprintf("https://%s/metrics", endpoint),
 	}
-	klog.V(2).Infof("executing cmd: %s on pod %q", cmd, key.String())
+	klog.V(2).InfoS("executing command", "args", cmd, "pod", key.String())
 	stdout, stderr, err := remoteexec.CommandOnPod(ctx, e2eclient.K8sClient, pod, cmd...)
 	Expect(err).ToNot(HaveOccurred(), "failed exec command on pod. pod=%q; cmd=%q; err=%v; stderr=%q", key.String(), cmd, err, stderr)
 	Expect(stdout).NotTo(BeEmpty(), stdout)
