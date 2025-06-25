@@ -64,7 +64,7 @@ var _ = Describe("[tools][mkginkgolabelfilter] Auxiliary tools", Label("tools", 
 			}
 			expectExecutableExists(cmdline[0])
 			for _, tc := range testcases {
-				klog.Infof("running %q\n", tc.name)
+				klog.InfoS("running", "testCase", tc.name)
 				buffer := bytes.Buffer{}
 				toolCmd := exec.Command(cmdline[0])
 				_, err := buffer.Write(append([]byte(tc.input), "\n"...))
