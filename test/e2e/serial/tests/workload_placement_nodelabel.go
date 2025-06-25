@@ -190,7 +190,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			defer func() {
 				err := unlabelTarget()
 				if err != nil {
-					klog.Errorf("Error while trying to unlabel node %q. %v", targetNodeName, err)
+					klog.ErrorS(err, "Error while trying to unlabel node", "node", targetNodeName)
 				}
 			}()
 
@@ -199,7 +199,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			defer func() {
 				err := unlabelAlternative()
 				if err != nil {
-					klog.Errorf("Error while trying to unlabel node %q. %v", alternativeNodeName, err)
+					klog.ErrorS(err, "Error while trying to unlabel node", "node", alternativeNodeName)
 				}
 			}()
 			By("Scheduling the testing pod")
@@ -269,11 +269,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					*/
 					err := unlabelTarget()
 					if err != nil {
-						klog.Errorf("Error while trying to unlabel node %q. %v", targetNodeName, err)
+						klog.ErrorS(err, "Error while trying to unlabel node", "node", targetNodeName)
 					}
 					err = unlabelAlternative()
 					if err != nil {
-						klog.Errorf("Error while trying to unlabel node %q. %v", alternativeNodeName, err)
+						klog.ErrorS(err, "Error while trying to unlabel node", "node", alternativeNodeName)
 					}
 				}
 			})
@@ -333,12 +333,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					//if at least one of the unlabeling failed, set nodesUnlabeled to false to try again in afterEach
 					if err != nil {
 						nodesUnlabeled = false
-						klog.Errorf("Error while trying to unlabel node %q. %v", targetNodeName, err)
+						klog.ErrorS(err, "Error while trying to unlabel node", "node", targetNodeName)
 					}
 					err = unlabelAlternative()
 					if err != nil {
 						nodesUnlabeled = false
-						klog.Errorf("Error while trying to unlabel node %q. %v", alternativeNodeName, err)
+						klog.ErrorS(err, "Error while trying to unlabel node", "node", alternativeNodeName)
 					}
 
 					//check that it didn't stop running for some time

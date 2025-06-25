@@ -1411,12 +1411,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() bool {
 				events, err := objects.GetEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				if err != nil {
-					klog.Errorf("failed to get events for pod %s/%s; error: %v", pod.Namespace, pod.Name, err)
+					klog.ErrorS(err, "failed to get events for pod", "namespace", pod.Namespace, "name", pod.Name)
 				}
 				for _, e := range events {
 					ok, err := regexp.MatchString(errMsg, e.Message)
 					if err != nil {
-						klog.Errorf("bad message regex %s", errMsg)
+						klog.ErrorS(err, "bad message regex", "pattern", errMsg, "eventMessage", e.Message)
 					}
 					if e.Reason == "FailedScheduling" && ok {
 						return true
