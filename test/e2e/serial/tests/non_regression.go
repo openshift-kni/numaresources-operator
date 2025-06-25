@@ -83,7 +83,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		if len(nrtCandidates) < 2 {
 			e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
 		}
-		klog.Infof("Found node with 2 NUMA zones: %d", len(nrtCandidates))
+		klog.InfoS("Found node with 2 NUMA zones", "count", len(nrtCandidates))
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
@@ -91,7 +91,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		if len(nrts) < 2 {
 			e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 		}
-		klog.Infof("Found node with 2 NUMA zones: %d", len(nrts))
+		klog.InfoS("Found node with 2 NUMA zones", "count", len(nrts))
 
 		// Note that this test, being part of "serial", expects NO OTHER POD being scheduled
 		// in between, so we consider this information current and valid when the It()s run.
@@ -277,7 +277,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(schedOK).To(BeFalse(), "pod %s/%s not assigned to a specific node without a scheduler %s", updatedPod.Namespace, updatedPod.Name, nonExistingSchedulerName)
 
 			rl := e2ereslist.FromGuaranteedPod(updatedPod)
-			klog.Infof("post-create pod resource list: spec=[%s] updated=[%s]", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), e2ereslist.ToString(rl))
+			// TODO: multi-line value in structured log
+			klog.InfoS("post-create pod resource list", "spec", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), "updated", e2ereslist.ToString(rl))
 
 			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -342,10 +343,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				//calculate base load on the node
 				baseload, err := baseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
-				klog.Infof("computed base load: %s", baseload)
+				// TODO: multi-line value in structured log
+				klog.InfoS("computed base load", "value", baseload)
 
 				//get nrt info of the node
-				klog.Infof("preparing node %q to fit the test case", nodeName)
+				klog.InfoS("preparing node to fit the test case", "nodeName", nodeName)
 				nrtInfo, err := e2enrt.FindFromList(nrts, nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", nodeName)
 
@@ -505,7 +507,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 				if !schedOK {
 					errorPods += 1
-					klog.Infof("pod %s/%s was NOT scheduled with %q", pod.Namespace, pod.Name, schedulerName)
+					klog.InfoS("pod was NOT scheduled with scheduler", "podNamespace", pod.Namespace, "podName", pod.Name, "schedulerName", schedulerName)
 					continue
 				}
 			}
@@ -519,7 +521,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				if err != nil {
 					return err
 				}
-				klog.Infof("upscaling replicas: %v -> %v", *dp.Spec.Replicas, replicas)
+				klog.InfoS("upscaling replicas", "current", *dp.Spec.Replicas, "desired", replicas)
 				dp.Spec.Replicas = &replicas
 				return fxt.Client.Update(ctx, dp)
 			}).WithPolling(1*time.Second).WithTimeout(1*time.Minute).Should(Succeed(), "cannot downsize the test deployment %q", dp.Name)

@@ -54,13 +54,13 @@ func TeardownInfra(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopo
 }
 
 func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, nrtList nrtv1alpha2.NodeResourceTopologyList, timeout time.Duration) {
-	klog.Infof("e2e infra setup begin")
+	klog.InfoS("e2e infra setup begin")
 
 	Expect(nodeGroups).ToNot(BeEmpty(), "cannot autodetect the TAS node groups from the cluster")
 
 	poolNames, err := nodegroups.GetPoolNamesFrom(context.TODO(), fxt.Client, nodeGroups)
 	Expect(err).ToNot(HaveOccurred())
-	klog.Infof("setting e2e infra for %d pools", len(poolNames))
+	klog.InfoS("setting e2e infra for pools", "poolCount", len(poolNames))
 
 	sa := numacellmanifests.ServiceAccount(fxt.Namespace.Name, numacellmanifests.Prefix)
 	err = fxt.Client.Create(context.TODO(), sa)
@@ -77,7 +77,7 @@ func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, nrtLi
 	var dss []*appsv1.DaemonSet
 	for _, poolName := range poolNames {
 		dsName := objectnames.GetComponentName(numacellmanifests.Prefix, poolName)
-		klog.Infof("setting e2e infra for %q: daemonset %q", poolName, dsName)
+		klog.InfoS("setting e2e infra for pool", "poolName", poolName, "daemonsetName", dsName)
 
 		pullSpec := GetNUMACellDevicePluginPullSpec()
 		labels, err := nodegroups.NodeSelectorFromPoolName(context.TODO(), fxt.Client, poolName)
@@ -89,15 +89,15 @@ func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, nrtLi
 		dss = append(dss, ds)
 	}
 
-	klog.Infof("daemonsets created (%d)", len(dss))
+	klog.InfoS("daemonsets created", "count", len(dss))
 
 	waitAllDSReady(fxt, dss, timeout)
-	klog.Infof("daemonsets ready (%d)", len(dss))
+	klog.InfoS("daemonsets ready", "count", len(dss))
 
 	waitResourcesAvailable(fxt, nrtList, timeout)
-	klog.Infof("resources available (%d)", len(nrtList.Items))
+	klog.InfoS("resources available", "count", len(nrtList.Items))
 
-	klog.Infof("e2e infra setup completed")
+	klog.InfoS("e2e infra setup completed")
 }
 
 func waitAllDSReady(fxt *e2efixture.Fixture, dss []*appsv1.DaemonSet, timeout time.Duration) {
@@ -108,7 +108,7 @@ func waitAllDSReady(fxt *e2efixture.Fixture, dss []*appsv1.DaemonSet, timeout ti
 			defer GinkgoRecover()
 			defer wg.Done()
 
-			klog.Infof("waiting for daemonset %q to be ready", ds.Name)
+			klog.InfoS("waiting for daemonset to be ready", "daemonsetName", ds.Name)
 
 			// TODO: what if timeout < period?
 			ds, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(timeout).ForDaemonSetReady(context.TODO(), ds)
@@ -126,7 +126,7 @@ func waitResourcesAvailable(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeRes
 			defer GinkgoRecover()
 			defer wg.Done()
 
-			klog.Infof("waiting for numacell resources to be reported on NRT %q", nrtName)
+			klog.InfoS("waiting for numacell resources to be reported on NRT", "nrtName", nrtName)
 
 			_, err := wait.With(fxt.Client).Interval(11*time.Second).Timeout(timeout).ForNodeResourceTopologyToHave(context.TODO(), nrtName, func(resInfo nrtv1alpha2.ResourceInfo) bool {
 				// TODO: check available qty > 0?
@@ -140,7 +140,7 @@ func waitResourcesAvailable(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeRes
 
 func GetNUMACellDevicePluginPullSpec() string {
 	pullSpec := getNUMACellDevicePluginPullSpec()
-	klog.Infof("using NUMACell image: %q", pullSpec)
+	klog.InfoS("using NUMACell", "image", pullSpec)
 	return pullSpec
 }
 
@@ -190,7 +190,7 @@ func labelNodeByName(cli client.Client, nodeName, labelValue string) {
 		g.Expect(err).ToNot(HaveOccurred())
 		node.Labels[MultiNUMALabel] = labelValue
 
-		klog.Infof("labeling node %q with %s: %s", nodeName, MultiNUMALabel, labelValue)
+		klog.InfoS("adding labels", "nodeName", nodeName, "label", MultiNUMALabel, "value", labelValue)
 		// TODO: this should be retried
 		err = cli.Update(context.TODO(), &node)
 		g.Expect(err).ToNot(HaveOccurred())
@@ -205,7 +205,7 @@ func unlabelNodeByName(cli client.Client, nodeName string) {
 		err = cli.Get(context.TODO(), client.ObjectKey{Name: nodeName}, &node)
 		g.Expect(err).ToNot(HaveOccurred())
 
-		klog.Infof("unlabeling node %q removing label %s", nodeName, MultiNUMALabel)
+		klog.InfoS("removing labels", "nodeName", nodeName, "label", MultiNUMALabel)
 		delete(node.Labels, MultiNUMALabel)
 		err = cli.Update(context.TODO(), &node)
 		g.Expect(err).ToNot(HaveOccurred())

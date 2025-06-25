@@ -75,7 +75,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 					return false
 				}
 				if len(rteDss) == 0 {
-					klog.Infof("expect the numaresourcesoperator to own at least one DaemonSet")
+					klog.InfoS("expect the numaresourcesoperator to own at least one DaemonSet")
 					return false
 				}
 
@@ -85,11 +85,11 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
-						klog.Infof("-v flag doesn't exist in container %q args managed by DaemonSet: %q", rteCnt.Name, ds.Name)
+						klog.InfoS("-v flag doesn't exist in container args managed by DaemonSet", "containerName", rteCnt.Name, "daemonsetName", ds.Name)
 						return false
 					}
 					if !match {
-						klog.Infof("LogLevel %s doesn't match the existing -v flag in container: %q under DaemonSet: %q", nropObj.Spec.LogLevel, rteCnt.Name, ds.Name)
+						klog.InfoS("LogLevel doesn't match the existing -v flag in container under DaemonSet", "logLevel", nropObj.Spec.LogLevel, "containerName", rteCnt.Name, "daemonsetName", ds.Name)
 						return false
 					}
 				}
@@ -114,7 +114,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 					return false
 				}
 				if len(rteDss) == 0 {
-					klog.Infof("expect the numaresourcesoperator to own at least one DaemonSet")
+					klog.InfoS("expect the numaresourcesoperator to own at least one DaemonSet")
 					return false
 				}
 
@@ -124,12 +124,12 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
-						klog.Infof("-v flag doesn't exist in container %q args under DaemonSet: %q", rteCnt.Name, ds.Name)
+						klog.InfoS("-v flag doesn't exist in container args under DaemonSet", "containerName", rteCnt.Name, "daemonsetName", ds.Name)
 						return false
 					}
 
 					if !match {
-						klog.Infof("LogLevel %s doesn't match the existing -v flag in container: %q managed by DaemonSet: %q", nropObj.Spec.LogLevel, rteCnt.Name, ds.Name)
+						klog.InfoS("LogLevel doesn't match the existing -v flag in container managed by DaemonSet", "logLevel", nropObj.Spec.LogLevel, "containerName", rteCnt.Name, "daemonsetName", ds.Name)
 						return false
 					}
 				}
@@ -147,17 +147,17 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			gomega.Expect(nropObj.Status.DaemonSets).ToNot(gomega.BeEmpty())
 			dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
 			gomega.Expect(reflect.DeepEqual(nropObj.Status.DaemonSets, dssFromNodeGroupStatus)).To(gomega.BeTrue())
-			klog.Infof("NRO %q", nropObj.Name)
+			klog.InfoS("using NRO instance", "name", nropObj.Name)
 
 			// NROP guarantees all the daemonsets are in the same namespace,
 			// so we pick the first for the sake of brevity
 			namespace := nropObj.Status.DaemonSets[0].Namespace
-			klog.Infof("namespace %q", namespace)
+			klog.InfoS("Using NRO namespace", "namespace", namespace)
 
 			mcpList := &mcov1.MachineConfigPoolList{}
 			err = clients.Client.List(context.TODO(), mcpList)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			klog.Infof("MCPs count: %d", len(mcpList.Items))
+			klog.InfoS("detected MCPs", "count", len(mcpList.Items))
 
 			mcoKcList := &mcov1.KubeletConfigList{}
 			err = clients.Client.List(context.TODO(), mcoKcList)
@@ -176,12 +176,12 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				generatedName := objectnames.GetComponentName(nropObj.Name, mcp.Name)
-				klog.Infof("generated config map name: %q", generatedName)
+				klog.InfoS("generated config map", "name", generatedName)
 				cm, err := clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				rc, err := rteConfigMapToRTEConfig(cm)
-				klog.Infof("RTE config: %#v", rc)
+				klog.InfoS("Using RTE", "config", rc)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				gomega.Expect(rc.Kubelet.TopologyManagerPolicy).To(gomega.Equal(kc.TopologyManagerPolicy), "TopologyManager Policy mismatch")
@@ -196,17 +196,17 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			gomega.Expect(nropObj.Status.DaemonSets).ToNot(gomega.BeEmpty())
 			dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
 			gomega.Expect(reflect.DeepEqual(nropObj.Status.DaemonSets, dssFromNodeGroupStatus)).To(gomega.BeTrue())
-			klog.Infof("NRO %q", nropObj.Name)
+			klog.InfoS("Using NRO instance", "name", nropObj.Name)
 
 			// NROP guarantees all the daemonsets are in the same namespace,
 			// so we pick the first for the sake of brevity
 			namespace := nropObj.Status.DaemonSets[0].Namespace
-			klog.Infof("namespace %q", namespace)
+			klog.InfoS("Using NRO namespace", "namespace", namespace)
 
 			mcpList := &mcov1.MachineConfigPoolList{}
 			err = clients.Client.List(context.TODO(), mcpList)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			klog.Infof("MCPs count: %d", len(mcpList.Items))
+			klog.InfoS("detected MCPs", "count", len(mcpList.Items))
 
 			mcoKcList := &mcov1.KubeletConfigList{}
 			err = clients.Client.List(context.TODO(), mcoKcList)
@@ -224,7 +224,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			generatedName := objectnames.GetComponentName(nropObj.Name, mcp.Name)
-			klog.Infof("generated config map name: %q", generatedName)
+			klog.InfoS("generated config map", "name", generatedName)
 			cm, err := clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
@@ -242,7 +242,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				if !reflect.DeepEqual(cm.Data, desiredMapState) {
-					klog.Infof("ConfigMap %q data is not in it's desired state, waiting for controller to update it", cm.Name)
+					klog.InfoS("ConfigMap data is not in it's desired state, waiting for controller to update it", "configMapName", cm.Name)
 					return false
 				}
 				return true
@@ -298,7 +298,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				err = json.Unmarshal(stdout, &st)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
-				klog.Infof("got status from %s/%s/%s -> %q (%d pods)", rtePod.Namespace, rtePod.Name, rteCnt.Name, st.FingerprintComputed, len(st.Pods))
+				klog.InfoS("got status", "podNamespace", rtePod.Namespace, "podName", rtePod.Name, "containerName", rteCnt.Name, "fingerprintComputed", st.FingerprintComputed, "podCount", len(st.Pods))
 
 				gomega.Expect(st.FingerprintComputed).ToNot(gomega.BeEmpty(), "missing fingerprint - should always be reported")
 				gomega.Expect(st.Pods).ToNot(gomega.BeEmpty(), "missing pods - at least RTE itself should be there")

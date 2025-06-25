@@ -292,7 +292,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 					deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 					deployment.Spec.Template.Spec.Affinity = affinity
-					klog.Infof("create the test deployment with requests %s", e2ereslist.ToString(requiredRes))
+					// TODO: multi-line value in structured log
+					klog.InfoS("create the test deployment with requests", "requests", e2ereslist.ToString(requiredRes))
 					err := fxt.Client.Create(context.TODO(), deployment)
 					Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 

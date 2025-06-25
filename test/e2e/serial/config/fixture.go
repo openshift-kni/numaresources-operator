@@ -56,7 +56,8 @@ func (cfg *E2EConfig) RecordNRTReference() error {
 	if err != nil {
 		return err
 	}
-	klog.Infof("recorded reference NRT data:\n%s", intnrt.ListToString(cfg.NRTList.Items, " reference"))
+	// TODO: multi-line value in structured log
+	klog.InfoS("recorded reference NRT data", "data", intnrt.ListToString(cfg.NRTList.Items, " reference"))
 	return nil
 }
 
@@ -100,7 +101,7 @@ func NewFixtureWithOptions(nsName string, options e2efixture.Options) (*E2EConfi
 	}
 
 	cfg.SchedulerName = cfg.NROSchedObj.Status.SchedulerName
-	klog.Infof("detected scheduler name: %q", cfg.SchedulerName)
+	klog.InfoS("detected scheduler name", "schedulerName", cfg.SchedulerName)
 
 	return &cfg, nil
 }

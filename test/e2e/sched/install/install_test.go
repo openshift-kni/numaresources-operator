@@ -67,12 +67,11 @@ var _ = Describe("[Scheduler] install", func() {
 
 				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
 				if cond == nil {
-					klog.Infof("missing conditions in %v", updatedNROObj)
+					klog.InfoS("missing conditions", "nroObj", updatedNROObj)
 					return false
 				}
 
-				klog.Infof("condition: %v", cond)
-				klog.Infof("conditions: %v", updatedNROObj.Status.Conditions)
+				klog.InfoS("scheduler status", "availableCondition", cond, "conditions", updatedNROObj.Status.Conditions)
 
 				return cond.Status == metav1.ConditionTrue
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "NRO Scheduler condition did not become available")
@@ -90,7 +89,7 @@ var _ = Describe("[Scheduler] install", func() {
 				}
 
 				if deployment.Status.ReadyReplicas != *deployment.Spec.Replicas {
-					klog.Infof("Invalid number of ready replicas: desired: %d, actual: %d", *deployment.Spec.Replicas, deployment.Status.ReadyReplicas)
+					klog.InfoS("Invalid number of ready replicas", "current", deployment.Status.ReadyReplicas, "desired", *deployment.Spec.Replicas)
 					return false
 				}
 				return true

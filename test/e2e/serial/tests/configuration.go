@@ -311,7 +311,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			seenStatusConf := false
 			immediate := true
 			err = k8swait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, immediate, func(ctx context.Context) (bool, error) {
-				klog.Infof("getting: %q", nroKey.String())
+				klog.InfoS("getting NRO object", "key", nroKey.String())
 
 				// getting the same object twice is awkward, but still it seems better better than skipping inside a loop.
 				err := fxt.Client.Get(ctx, nroKey, &nroOperObj)
@@ -328,7 +328,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						len(nroOperObj.Status.NodeGroups), len(nroOperObj.Spec.NodeGroups),
 					)
 				}
-				klog.Infof("fetched NRO Object %q", nroKey.String())
+				klog.InfoS("fetched NRO Object", "key", nroKey.String())
 
 				// the assumption here is that the configured node group selector will be targeting one mcp
 				Expect(nroOperObj.Status.MachineConfigPools[0].Name).To(Equal(nroOperObj.Status.NodeGroups[0].PoolName))
@@ -357,8 +357,10 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				// the operator may take nonzero time to populate the status, and this is still fine.\
 				// NOTE HERE: we need to match the types as well (ptr and ptr)
 				matchFromMCP := cmp.Equal(statusConfFromMCP, &specConf)
+				// TODO: multi-line value in structured log
 				klog.InfoS("result of checking the status from MachineConfigPools", "NRO Object", nroKey.String(), "status", toJSON(statusConfFromMCP), "spec", toJSON(specConf), "match", matchFromMCP)
 				matchFromGroupStatus := cmp.Equal(statusConfFromGroupStatus, specConf)
+				// TODO: multi-line value in structured log
 				klog.InfoS("result of checking the status from NodeGroupStatus", "NRO Object", nroKey.String(), "status", toJSON(statusConfFromGroupStatus), "spec", toJSON(specConf), "match", matchFromGroupStatus)
 
 				return matchFromMCP && matchFromGroupStatus, nil
@@ -426,7 +428,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			kcCmsPre, err := getKubeletConfigMapsSoftOwnedBy(ctx, fxt.Client, nroOperObj.Name)
 			Expect(err).ToNot(HaveOccurred(), "cannot list KubeletConfig ConfigMaps in the cluster (PRE)")
 			kcCmNamesPre := sets.List[string](accumulateKubeletConfigNames(kcCmsPre))
-			klog.Infof("initial set of configmaps from kubeletconfigs: %v", strings.Join(kcCmNamesPre, ","))
+			klog.InfoS("initial set of configmaps from kubeletconfigs", "configmaps", strings.Join(kcCmNamesPre, ","))
 
 			By("creating extra ctrplane kubeletconfig")
 			ctrlPlaneKc := intobjs.NewKubeletConfigAutoresizeControlPlane()
@@ -445,7 +447,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				kcCmsCur, err := getKubeletConfigMapsSoftOwnedBy(ctx, fxt.Client, nroOperObj.Name)
 				Expect(err).ToNot(HaveOccurred(), "cannot list KubeletConfig ConfigMaps in the cluster (current)")
 				kcCmNamesCur := sets.List[string](accumulateKubeletConfigNames(kcCmsCur))
-				klog.Infof("current set of configmaps from kubeletconfigs: %v", strings.Join(kcCmNamesCur, ","))
+				klog.InfoS("current set of configmaps from kubeletconfigs", "configmaps", strings.Join(kcCmNamesCur, ","))
 				return kcCmNamesCur
 			}).WithContext(ctx).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Equal(kcCmNamesPre))
 		})
@@ -558,7 +560,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 				origNodeGroups := nodegroup.CloneList(initialOperObj.Spec.NodeGroups)
 
-				klog.InfoS("the new node group to add", "node group", ng.ToString())
+				klog.InfoS("the new node group to add", "name", ng.ToString())
 				newNodeGroups := append(nodegroup.CloneList(initialOperObj.Spec.NodeGroups), ng)
 				var updatedNRO nropv1.NUMAResourcesOperator
 				Eventually(func(g Gomega) {
@@ -606,7 +608,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					PoolName: &mcp.Name,
 					Config:   &conf,
 				}
-				klog.InfoS("the updated node group to apply", "node group", ng.ToString())
+				klog.InfoS("the updated node group to apply", "name", ng.ToString())
 				newNodeGroups = append(nodegroup.CloneList(initialOperObj.Spec.NodeGroups), ng)
 
 				Eventually(func(g Gomega) {
@@ -783,13 +785,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					Expect(err).ToNot(HaveOccurred())
 
 					if len(updatedConfigMaps.Items) == 0 {
-						klog.Infof("expected at least 1 RTE configmap, got: %d", len(updatedConfigMaps.Items))
+						klog.InfoS("RTE configmap mismatch ", "current", len(updatedConfigMaps.Items), "desired", 1)
 						return false
 					}
 					// choose the first one arbitrary
 					rteConfigMap = &updatedConfigMaps.Items[0]
 					return true
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
+				// TODO: multi-line value in structured log
 				klog.InfoS("found RTE configmap", "rteConfigMap", rteConfigMap)
 
 				poolName := rteConfigMap.Labels[rteconfig.LabelNodeGroupName+"/"+rteconfig.LabelNodeGroupKindMachineConfigPool]
@@ -813,7 +816,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 						matchingErr := configuration.CheckTopologyManagerConfigMatching(updatedNrtObj, &cfg)
 						if matchingErr != "" {
-							klog.Infof("NRT %q doesn't match topologyManager configuration: %s", updatedNrtObj.Name, matchingErr)
+							klog.InfoS("NRT doesn't match topologyManager configuration", "nrtName", updatedNrtObj.Name, "problem", matchingErr)
 							return false
 						}
 						return true
@@ -897,7 +900,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					waitForMCPUpdateFunc(targetedMCP)
 				}()
 
-				klog.InfoS("adding nodeGroup with poolName", "poolName", mcp.Name)
+				klog.InfoS("adding nodeGroup", "poolName", mcp.Name)
 				testNG := nropv1.NodeGroup{
 					PoolName: ptr.To(mcp.Name),
 				}
@@ -932,7 +935,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					err := e2eclient.Client.Get(ctx, client.ObjectKey{Namespace: ns, Name: dsName}, updatedConfigMap)
 					if err != nil {
 						if errors.IsNotFound(err) {
-							klog.Infof("expected RTE ConfigMap map to be found %q", key)
+							klog.InfoS("expected RTE ConfigMap to be found", "key", key)
 							return false
 						}
 						Expect(err).ToNot(HaveOccurred())
@@ -940,6 +943,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					rteConfigMap = updatedConfigMap
 					return true
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
+				// TODO: multi-line value in structured log
 				klog.InfoS("found RTE configmap", "rteConfigMap", rteConfigMap)
 
 				poolName := rteConfigMap.Labels[rteconfig.LabelNodeGroupName+"/"+rteconfig.LabelNodeGroupKindMachineConfigPool]
@@ -960,14 +964,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						updatedNrtObj := &nrtv1alpha2.NodeResourceTopology{}
 						if err := e2eclient.Client.Get(ctx, client.ObjectKey{Name: node.Name}, updatedNrtObj); err != nil {
 							if errors.IsNotFound(err) {
-								klog.Infof("NRT %q was not found, waiting for its creation", updatedNrtObj.Name)
+								klog.InfoS("NRT was not found, waiting for its creation", "nrtName", node.Name)
 								return false
 							}
 							Expect(err).ToNot(HaveOccurred())
 						}
 						matchingErr := configuration.CheckTopologyManagerConfigMatching(updatedNrtObj, &cfg)
 						if matchingErr != "" {
-							klog.Infof("NRT %q doesn't match topologyManager configuration: %s", updatedNrtObj.Name, matchingErr)
+							klog.InfoS("NRT doesn't match topologyManager configuration", "nrtName", updatedNrtObj.Name, "problem", matchingErr)
 							return false
 						}
 						return true
@@ -1076,8 +1080,10 @@ func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.Objec
 	// the operator may take nonzero time to populate the status, and this is still fine.\
 	// NOTE HERE: we need to match the types as well (ptr and ptr)
 	matchFromMCP := cmp.Equal(statusConfFromMCP, &expectedConf)
+	// TODO: multi-line value in structured log
 	klog.InfoS("result of checking the status from MachineConfigPools", "NRO Object", key.String(), "status", toJSON(statusConfFromMCP), "spec", toJSON(expectedConf), "match", matchFromMCP)
 	matchFromGroupStatus := cmp.Equal(statusFromNodeGroups.Config, expectedConf)
+	// TODO: multi-line value in structured log
 	klog.InfoS("result of checking the status from NodeGroupStatus", "NRO Object", key.String(), "status", toJSON(statusFromNodeGroups), "spec", toJSON(expectedConf), "match", matchFromGroupStatus)
 	Expect(matchFromMCP && matchFromGroupStatus).To(BeTrue(), "config status mismatch")
 }

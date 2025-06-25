@@ -104,7 +104,8 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				}
 				Expect(err).NotTo(HaveOccurred(), "Pod %q not up&running after %v", pod.Name, time.Minute)
 
-				klog.Infof("pod %s/%s resources: %s", updatedPod.Namespace, updatedPod.Name, intreslist.ToString(intreslist.FromContainerRequests(pod.Spec.Containers)))
+				// TODO: multi-line value in structured log
+				klog.InfoS("pod resources", "namespace", updatedPod.Namespace, "name", updatedPod.Name, "resources", intreslist.ToString(intreslist.FromContainerRequests(pod.Spec.Containers)))
 				Expect(updatedPod.Status.QOSClass).To(Equal(expectedQOS), "pod QOS mismatch")
 
 				By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
@@ -122,7 +123,8 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				if expectedQOS == corev1.PodQOSGuaranteed {
 					accumulatedRes = intreslist.Accumulate(requiredRes, intreslist.FilterExclusive)
 				}
-				klog.Infof("expected required resources to reflect in NRT: %+v", accumulatedRes)
+				// TODO: multi-line value in structured log
+				klog.InfoS("expected required resources to reflect in NRT", "resources", accumulatedRes)
 				expectNRTConsumedResources(fxt, *targetNrtInitial, accumulatedRes, updatedPod)
 			},
 			Entry("[qos:gu] with ephemeral storage, single-container",
@@ -300,7 +302,8 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 						corev1.ResourceEphemeralStorage: *storageEphemeralQty,
 					}
 
-					klog.Infof("pad node %s with:\n%s", nodeName, intreslist.ToString(paddingResources))
+					// TODO: multi-line value in structured log
+					klog.InfoS("pad node with", "node", nodeName, "resources", intreslist.ToString(paddingResources))
 					pod := newPaddingPod(nodeName, "all", fxt.Namespace.Name, paddingResources)
 					pod.Spec.NodeName = nodeName // TODO: pinPodToNode?
 
@@ -336,7 +339,8 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				}
 				Expect(err).NotTo(HaveOccurred(), "Pod %s/%s was found in state %q while expected to be Pending", updatedPod.Namespace, updatedPod.Name, updatedPod.Status.Phase)
 
-				klog.Infof("pod %s/%s resources: %s", updatedPod.Namespace, updatedPod.Name, intreslist.ToString(intreslist.FromContainerRequests(pod.Spec.Containers)))
+				// TODO: multi-line value in structured log
+				klog.InfoS("pod resources", "namespace", updatedPod.Namespace, "name", updatedPod.Name, "resources", intreslist.ToString(intreslist.FromContainerRequests(pod.Spec.Containers)))
 				Expect(updatedPod.Status.QOSClass).To(Equal(expectedQOS), "pod QoS mismatch")
 				By(fmt.Sprintf("checking the pod is handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
 				isFailed, err := nrosched.CheckPodSchedulingFailedWithMsg(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName, fmt.Sprintf("%d Insufficient ephemeral-storage", len(candidateNodeNames)))

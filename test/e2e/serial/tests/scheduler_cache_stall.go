@@ -112,7 +112,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 			}
 			refreshPeriod = conf.InfoRefreshPeriod.Duration
 
-			klog.Infof("using MCP %q - refresh period %v", mcpName, refreshPeriod)
+			klog.InfoS("using MCP", "name", mcpName, "refreshPeriod", refreshPeriod)
 		})
 
 		When("there are jobs in the cluster", Label("job", "generic", label.Tier0), func() {
@@ -132,7 +132,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
 				}
-				klog.Infof("Found %d nodes with %d NUMA zones", len(nrtCandidates), NUMAZonesRequired)
+				klog.InfoS("Found nodes with NUMA zones", "nodeCount", len(nrtCandidates), "numaZones", NUMAZonesRequired)
 			})
 
 			DescribeTable("should be able to schedule pods with no stalls",
@@ -210,7 +210,8 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					// but it's not the behavior we expect. A conforming scheduler is expected to send first two pods,
 					// wait for reconciliation, then send the missing two.
 
-					klog.Infof("Creating %d pods each requiring %q", desiredPods, e2ereslist.ToString(podRequiredRes))
+					// TODO: multi-line value in structured log
+					klog.InfoS("Creating pods each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
 					for _, testPod := range testPods {
 						err := fxt.Client.Create(ctx, testPod)
 						Expect(err).ToNot(HaveOccurred())
@@ -222,7 +223,8 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodListAllRunning(ctx, testPods)
 					if len(failedPods) > 0 {
 						nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
-						klog.Infof("%s", intnrt.ListToString(nrtListFailed.Items, "post failure"))
+						// TODO: multi-line value in structured log
+						klog.InfoS("NRT list", "content", intnrt.ListToString(nrtListFailed.Items, "post failure"))
 
 						for _, failedPod := range failedPods {
 							_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
@@ -237,7 +239,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					}
 				},
 				Entry("vs best-effort pods", Label(label.Tier1), func(job *batchv1.Job) {
-					klog.Infof("Creating a job whose containers have requests=none")
+					klog.InfoS("Creating a job whose containers have requests=none")
 				}),
 				Entry("vs burstable pods", Label(label.Tier1), func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
@@ -250,7 +252,8 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 							Requests: jobRequiredRes,
 						}
 					}
-					klog.Infof("Creating a job whose containers have requests=%q", e2ereslist.ToString(jobRequiredRes))
+					// TODO: multi-line value in structured log
+					klog.InfoS("Creating a job whose containers have requests", "resources", e2ereslist.ToString(jobRequiredRes))
 				}),
 				// GAP: pinnable cpu (but not memory)
 				// however with the recommended config, we can't have pinnable CPUs without pinnable memory;
@@ -266,7 +269,8 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 							Limits: jobRequiredRes,
 						}
 					}
-					klog.Infof("Creating a job whose containers have limits=%q", e2ereslist.ToString(jobRequiredRes))
+					// TODO: multi-line value in structured log
+					klog.InfoS("Creating a job whose containers have limits", "resources", e2ereslist.ToString(jobRequiredRes))
 				}),
 				Entry("vs guaranteed pods with pinnable memory and CPU", Label(label.Tier1), func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
@@ -279,7 +283,8 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 							Limits: jobRequiredRes,
 						}
 					}
-					klog.Infof("Creating a job whose containers have limits=%q", e2ereslist.ToString(jobRequiredRes))
+					// TODO: multi-line value in structured log
+					klog.InfoS("Creating a job whose containers have limits", "resources", e2ereslist.ToString(jobRequiredRes))
 				}),
 			)
 
@@ -297,7 +302,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					e2efixture.MustSettleNRT(fxt)
 
 					timeout := nroSchedObj.Status.CacheResyncPeriod.Round(time.Second) * 10
-					klog.Infof("pod running timeout: %v", timeout)
+					klog.InfoS("pod running timeout", "timeout", timeout)
 
 					nrts := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
 					if len(nrts) < 1 {
@@ -310,7 +315,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					referenceNodeName, ok := e2efixture.PopNodeName(nodesNames)
 					Expect(ok).To(BeTrue())
 
-					klog.Infof("selected reference node name: %q", referenceNodeName)
+					klog.InfoS("selected reference node name", "nodeName", referenceNodeName)
 
 					nrtInfo, err := e2enrt.FindFromList(nrts, referenceNodeName)
 					Expect(err).ToNot(HaveOccurred())
@@ -332,7 +337,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					cpusVal := (10 * resVal) / 8
 					numPods := int(int64(len(nrts)) * cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
 
-					klog.Infof("creating %d pods consuming %d cpus each (found %d per NUMA zone)", numPods, cpusVal, resVal)
+					klog.InfoS("creating pods consuming cpus each", "podCount", numPods, "cpusPerPod", cpusVal, "cpusPerNUMAZone", resVal)
 
 					var testPods []*corev1.Pod
 					for idx := 0; idx < numPods; idx++ {
@@ -387,7 +392,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 
 func makeIdleJob(jobNamespace string, expectedJobPodsPerNode, numWorkerNodes int) *batchv1.Job {
 	idleJobParallelism := int32(numWorkerNodes * expectedJobPodsPerNode)
-	klog.Infof("Using job parallelism=%d (with %d candidate nodes)", idleJobParallelism, numWorkerNodes)
+	klog.InfoS("Using job parallelism", "parallelism", idleJobParallelism, "candidateNodes", numWorkerNodes)
 
 	idleJobLabels := map[string]string{
 		"app": "idle-job-sched-stall",
