@@ -301,7 +301,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				if len(pods) != 1 {
-					klog.Warningf("%d pods are exists under deployment %q", len(pods), namespacedDpName)
+					klog.Infof("%d pods are exists under deployment %q", len(pods), namespacedDpName)
 					return false
 				}
 				return true
@@ -410,7 +410,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				if len(pods) != 1 {
-					klog.Warningf("%d pods are exists under deployment %q", len(pods), namespacedDpName)
+					klog.Infof("%d pods are exists under deployment %q", len(pods), namespacedDpName)
 					return false
 				}
 				return true
@@ -672,7 +672,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				if len(pods) != 2 {
-					klog.Warningf("%d pods are exists under deployment %q", len(pods), namespacedDpName)
+					klog.Infof("%d pods are exists under deployment %q", len(pods), namespacedDpName)
 					return false
 				}
 				return true
@@ -846,7 +846,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				if len(pods) != int(replicaNumber) {
-					klog.Warningf("%d pods are exists under replicaset %q", len(pods), namespacedRsName.String())
+					klog.Infof("%d pods are exists under replicaset %q", len(pods), namespacedRsName.String())
 					return false
 				}
 				return true
@@ -944,7 +944,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				if len(pods) != int(replicaNumber) {
-					klog.Warningf("%d pods are exists under replicaset %q", len(pods), namespacedRsName.String())
+					klog.Infof("%d pods are exists under replicaset %q", len(pods), namespacedRsName.String())
 					return false
 				}
 				return true

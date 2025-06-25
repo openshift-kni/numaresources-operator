@@ -75,7 +75,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 					return false
 				}
 				if len(rteDss) == 0 {
-					klog.Warningf("expect the numaresourcesoperator to own at least one DaemonSet")
+					klog.Infof("expect the numaresourcesoperator to own at least one DaemonSet")
 					return false
 				}
 
@@ -85,11 +85,11 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
-						klog.Warningf("-v flag doesn't exist in container %q args managed by DaemonSet: %q", rteCnt.Name, ds.Name)
+						klog.Infof("-v flag doesn't exist in container %q args managed by DaemonSet: %q", rteCnt.Name, ds.Name)
 						return false
 					}
 					if !match {
-						klog.Warningf("LogLevel %s doesn't match the existing -v flag in container: %q under DaemonSet: %q", nropObj.Spec.LogLevel, rteCnt.Name, ds.Name)
+						klog.Infof("LogLevel %s doesn't match the existing -v flag in container: %q under DaemonSet: %q", nropObj.Spec.LogLevel, rteCnt.Name, ds.Name)
 						return false
 					}
 				}
@@ -114,7 +114,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 					return false
 				}
 				if len(rteDss) == 0 {
-					klog.Warningf("expect the numaresourcesoperator to own at least one DaemonSet")
+					klog.Infof("expect the numaresourcesoperator to own at least one DaemonSet")
 					return false
 				}
 
@@ -124,12 +124,12 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
-						klog.Warningf("-v flag doesn't exist in container %q args under DaemonSet: %q", rteCnt.Name, ds.Name)
+						klog.Infof("-v flag doesn't exist in container %q args under DaemonSet: %q", rteCnt.Name, ds.Name)
 						return false
 					}
 
 					if !match {
-						klog.Warningf("LogLevel %s doesn't match the existing -v flag in container: %q managed by DaemonSet: %q", nropObj.Spec.LogLevel, rteCnt.Name, ds.Name)
+						klog.Infof("LogLevel %s doesn't match the existing -v flag in container: %q managed by DaemonSet: %q", nropObj.Spec.LogLevel, rteCnt.Name, ds.Name)
 						return false
 					}
 				}
@@ -242,7 +242,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				if !reflect.DeepEqual(cm.Data, desiredMapState) {
-					klog.Warningf("ConfigMap %q data is not in it's desired state, waiting for controller to update it", cm.Name)
+					klog.Infof("ConfigMap %q data is not in it's desired state, waiting for controller to update it", cm.Name)
 					return false
 				}
 				return true

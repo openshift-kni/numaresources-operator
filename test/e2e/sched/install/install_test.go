@@ -66,7 +66,7 @@ var _ = Describe("[Scheduler] install", func() {
 
 				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
 				if cond == nil {
-					klog.Warningf("missing conditions in %v", updatedNROObj)
+					klog.Infof("missing conditions in %v", updatedNROObj)
 					return false
 				}
 
@@ -89,7 +89,7 @@ var _ = Describe("[Scheduler] install", func() {
 				}
 
 				if deployment.Status.ReadyReplicas != *deployment.Spec.Replicas {
-					klog.Warningf("Invalid number of ready replicas: desired: %d, actual: %d", *deployment.Spec.Replicas, deployment.Status.ReadyReplicas)
+					klog.Infof("Invalid number of ready replicas: desired: %d, actual: %d", *deployment.Spec.Replicas, deployment.Status.ReadyReplicas)
 					return false
 				}
 				return true
