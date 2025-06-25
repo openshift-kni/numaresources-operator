@@ -211,7 +211,7 @@ func updateInfoRefreshPause(ctx context.Context, fxt *e2efixture.Fixture, newVal
 			currentMode = *updatedObj.Status.MachineConfigPools[0].Config.InfoRefreshPause
 		}
 		if currentMode != newVal {
-			klog.Warningf("resource status is not updated yet: expected %q found %q", newVal, currentMode)
+			klog.Infof("resource status is not updated yet: expected %q found %q", newVal, currentMode)
 			return false
 		}
 

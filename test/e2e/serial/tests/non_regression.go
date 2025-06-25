@@ -505,7 +505,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred())
 				if !schedOK {
 					errorPods += 1
-					klog.Warningf("pod %s/%s was NOT scheduled with %q", pod.Namespace, pod.Name, schedulerName)
+					klog.Infof("pod %s/%s was NOT scheduled with %q", pod.Namespace, pod.Name, schedulerName)
 					continue
 				}
 			}

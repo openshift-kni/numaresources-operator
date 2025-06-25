@@ -776,7 +776,7 @@ func checkNRTConsumedResources(fxt *e2efixture.Fixture, targetNrtInitial nrtv1al
 	match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(targetNrtInitial, targetNrtCurrent, requiredRes, corev1qos.GetPodQOS(updatedPod))
 	Expect(err).ToNot(HaveOccurred())
 	if match == "" {
-		klog.Warningf("inconsistent accounting: no resources consumed by the running pod,\nNRT before: %s \nNRT after: %s \npod resources: %v", intnrt.ToString(targetNrtInitial), intnrt.ToString(targetNrtCurrent), e2ereslist.ToString(requiredRes))
+		klog.Infof("inconsistent accounting: no resources consumed by the running pod,\nNRT before: %s \nNRT after: %s \npod resources: %v", intnrt.ToString(targetNrtInitial), intnrt.ToString(targetNrtCurrent), e2ereslist.ToString(requiredRes))
 	}
 	return targetNrtCurrent, match
 }

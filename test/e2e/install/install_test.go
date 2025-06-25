@@ -93,7 +93,7 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 
 				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
 				if cond == nil {
-					klog.Warningf("missing conditions in %v", updatedNROObj)
+					klog.Infof("missing conditions in %v", updatedNROObj)
 					return false, err
 				}
 
@@ -122,7 +122,7 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 				}
 
 				if ds.Status.NumberMisscheduled != 0 {
-					klog.Warningf(" Misscheduled: There are %d nodes that should not be running Daemon pod but are", ds.Status.NumberMisscheduled)
+					klog.Infof(" Misscheduled: There are %d nodes that should not be running Daemon pod but are", ds.Status.NumberMisscheduled)
 					return false
 				}
 
@@ -182,7 +182,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 
 				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionDegraded)
 				if cond == nil {
-					klog.Warningf("missing conditions in %v", updatedNROObj)
+					klog.Infof("missing conditions in %v", updatedNROObj)
 					return false
 				}
 
@@ -219,7 +219,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 					return false, err
 				}
 				if len(nroObj.Status.DaemonSets) != 1 {
-					klog.Warningf("unsupported daemonsets (/MCP) count: %d", len(nroObj.Status.DaemonSets))
+					klog.Infof("unsupported daemonsets (/MCP) count: %d", len(nroObj.Status.DaemonSets))
 					return false, nil
 				}
 				return true, nil
@@ -258,7 +258,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 				}
 
 				if !nrowait.AreDaemonSetPodsReady(&updatedDs.Status) {
-					klog.Warningf("daemonset %s desired %d scheduled %d ready %d",
+					klog.Infof("daemonset %s desired %d scheduled %d ready %d",
 						dsKey.String(),
 						updatedDs.Status.DesiredNumberScheduled,
 						updatedDs.Status.CurrentNumberScheduled,
@@ -268,7 +268,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 
 				klog.Infof("daemonset %s ready", dsKey.String())
 
-				klog.Warningf("daemonset Generation observed %v current %v", updatedDs.Status.ObservedGeneration, ds.Generation)
+				klog.Infof("daemonset Generation observed %v current %v", updatedDs.Status.ObservedGeneration, ds.Generation)
 				isUpdated := updatedDs.Status.ObservedGeneration > ds.Generation
 				if !isUpdated {
 					return false
@@ -315,7 +315,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 					key := client.ObjectKeyFromObject(obj)
 					if err := e2eclient.Client.Get(context.TODO(), key, obj); !errors.IsNotFound(err) {
 						if err == nil {
-							klog.Warningf("obj %s still exists", key.String())
+							klog.Infof("obj %s still exists", key.String())
 						} else {
 							klog.ErrorS(err, "obj return with error", "key", key.String())
 						}
@@ -369,7 +369,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				if len(updatedConfigMaps.Items) != 1 {
-					klog.Warningf("expected exactly 1 RTE configmap, got: %d", len(updatedConfigMaps.Items))
+					klog.Infof("expected exactly 1 RTE configmap, got: %d", len(updatedConfigMaps.Items))
 					return false
 				}
 				rteConfigMap = &updatedConfigMaps.Items[0]
@@ -451,7 +451,7 @@ func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {
 func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context.Context, nroObj *nropv1.NUMAResourcesOperator, reason string) {
 	dss, err := objects.GetDaemonSetsOwnedBy(cli, nroObj.ObjectMeta)
 	if err != nil {
-		klog.Warningf("no DaemonSets for %s (%s)", nroObj.Name, nroObj.GetUID())
+		klog.Infof("no DaemonSets for %s (%s)", nroObj.Name, nroObj.GetUID())
 		return
 	}
 

@@ -76,12 +76,12 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			if err := e2eclient.Client.Delete(context.TODO(), nroObj); err != nil {
-				klog.Warningf("failed to delete the numaresourcesoperators %q", nroObj.Name)
+				klog.Infof("failed to delete the numaresourcesoperators %q", nroObj.Name)
 				return
 			}
 
 			if err := e2eclient.Client.Delete(context.TODO(), kcObj); err != nil && !errors.IsNotFound(err) {
-				klog.Warningf("failed to delete the kubeletconfigs %q", kcObj.Name)
+				klog.Infof("failed to delete the kubeletconfigs %q", kcObj.Name)
 			}
 
 			timeout := configuration.MachineConfigPoolUpdateTimeout   // shortcut
@@ -91,7 +91,7 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 			if configuration.Plat == platform.Kubernetes {
 				mcpObj := objects.TestMCP()
 				if err := e2eclient.Client.Delete(context.TODO(), mcpObj); err != nil {
-					klog.Warningf("failed to delete the machine config pool %q", mcpObj.Name)
+					klog.Infof("failed to delete the machine config pool %q", mcpObj.Name)
 				}
 			}
 

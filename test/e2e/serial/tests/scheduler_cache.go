@@ -691,11 +691,11 @@ func filterAnyZoneProvidingResourcesAtMost(nrts []nrtv1alpha2.NodeResourceTopolo
 			matches++
 		}
 		if matches == 0 {
-			klog.Warningf("SKIP: node %q does NOT provide %q at all!", nrt.Name, resourceName)
+			klog.Infof("SKIP: node %q does NOT provide %q at all!", nrt.Name, resourceName)
 			continue
 		}
 		if matches > maxZones {
-			klog.Warningf("SKIP: node %q provides %q on %d zones (looking max=%d)", nrt.Name, resourceName, matches, maxZones)
+			klog.Infof("SKIP: node %q provides %q on %d zones (looking max=%d)", nrt.Name, resourceName, matches, maxZones)
 			continue
 		}
 		klog.Infof(" ADD: node %q provides %q on %d/%d zones", nrt.Name, resourceName, matches, len(nrt.Zones))

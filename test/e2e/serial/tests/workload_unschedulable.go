@@ -717,7 +717,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				Expect(err).ToNot(HaveOccurred())
 				if !isFailed {
 					succeededPods += 1
-					klog.Warningf("pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, schedulerName)
+					klog.Infof("pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, schedulerName)
 					continue
 				}
 			}

@@ -66,7 +66,7 @@ var _ = Describe("[Scheduler] uninstall", func() {
 					key := client.ObjectKeyFromObject(obj)
 					if err := e2eclient.Client.Get(context.TODO(), key, obj); !errors.IsNotFound(err) {
 						if err == nil {
-							klog.Warningf("obj %s still exists", key.String())
+							klog.Infof("obj %s still exists", key.String())
 						} else {
 							klog.ErrorS(err, "obj return with error", "key", key.String())
 						}

@@ -783,7 +783,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					Expect(err).ToNot(HaveOccurred())
 
 					if len(updatedConfigMaps.Items) == 0 {
-						klog.Warningf("expected at least 1 RTE configmap, got: %d", len(updatedConfigMaps.Items))
+						klog.Infof("expected at least 1 RTE configmap, got: %d", len(updatedConfigMaps.Items))
 						return false
 					}
 					// choose the first one arbitrary
@@ -813,7 +813,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 						matchingErr := configuration.CheckTopologyManagerConfigMatching(updatedNrtObj, &cfg)
 						if matchingErr != "" {
-							klog.Warningf("NRT %q doesn't match topologyManager configuration: %s", updatedNrtObj.Name, matchingErr)
+							klog.Infof("NRT %q doesn't match topologyManager configuration: %s", updatedNrtObj.Name, matchingErr)
 							return false
 						}
 						return true
@@ -932,7 +932,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					err := e2eclient.Client.Get(ctx, client.ObjectKey{Namespace: ns, Name: dsName}, updatedConfigMap)
 					if err != nil {
 						if errors.IsNotFound(err) {
-							klog.Warningf("expected RTE ConfigMap map to be found %q", key)
+							klog.Infof("expected RTE ConfigMap map to be found %q", key)
 							return false
 						}
 						Expect(err).ToNot(HaveOccurred())
@@ -960,14 +960,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						updatedNrtObj := &nrtv1alpha2.NodeResourceTopology{}
 						if err := e2eclient.Client.Get(ctx, client.ObjectKey{Name: node.Name}, updatedNrtObj); err != nil {
 							if errors.IsNotFound(err) {
-								klog.Warningf("NRT %q was not found, waiting for its creation", updatedNrtObj.Name)
+								klog.Infof("NRT %q was not found, waiting for its creation", updatedNrtObj.Name)
 								return false
 							}
 							Expect(err).ToNot(HaveOccurred())
 						}
 						matchingErr := configuration.CheckTopologyManagerConfigMatching(updatedNrtObj, &cfg)
 						if matchingErr != "" {
-							klog.Warningf("NRT %q doesn't match topologyManager configuration: %s", updatedNrtObj.Name, matchingErr)
+							klog.Infof("NRT %q doesn't match topologyManager configuration: %s", updatedNrtObj.Name, matchingErr)
 							return false
 						}
 						return true

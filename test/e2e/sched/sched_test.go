@@ -159,7 +159,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 					}
 				}
 				if nroCM == nil {
-					klog.Warningf("cannot match ConfigMap")
+					klog.Infof("cannot match ConfigMap")
 					return false
 				}
 
@@ -183,7 +183,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 				}
 
 				if diff := cmp.Diff(nroCM.Data, initialCM.Data); diff != "" {
-					klog.Warningf("updated ConfigMap data is not equal to the expected: %v", diff)
+					klog.Infof("updated ConfigMap data is not equal to the expected: %v", diff)
 					return false
 				}
 				return true
@@ -216,7 +216,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 				}
 
 				if diff := cmp.Diff(dp.Spec.Template.Spec, initialDP.Spec.Template.Spec); diff != "" {
-					klog.Warningf("updated Deployment is not equal to the expected: %v", diff)
+					klog.Infof("updated Deployment is not equal to the expected: %v", diff)
 					return false
 				}
 				return true
