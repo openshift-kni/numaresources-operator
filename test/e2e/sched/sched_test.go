@@ -157,7 +157,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 					}
 				}
 				if nroCM == nil {
-					klog.Infof("cannot match ConfigMap")
+					klog.InfoS("cannot match ConfigMap affecting scheduler", "schedulerName", nroSchedObj.Spec.SchedulerName, "schedulerImage", nroSchedObj.Spec.SchedulerImage)
 					return false
 				}
 
@@ -181,7 +181,8 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 				}
 
 				if diff := cmp.Diff(nroCM.Data, initialCM.Data); diff != "" {
-					klog.Infof("updated ConfigMap data is not equal to the expected: %v", diff)
+					// TODO: multi-line value in structured log
+					klog.InfoS("updated ConfigMap data is not equal to the expected", "diff", diff)
 					return false
 				}
 				return true
@@ -214,7 +215,8 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 				}
 
 				if diff := cmp.Diff(dp.Spec.Template.Spec, initialDP.Spec.Template.Spec); diff != "" {
-					klog.Infof("updated Deployment is not equal to the expected: %v", diff)
+					// TODO: multi-line value in structured log
+					klog.InfoS("updated Deployment is not equal to the expected", "diff", diff)
 					return false
 				}
 				return true
