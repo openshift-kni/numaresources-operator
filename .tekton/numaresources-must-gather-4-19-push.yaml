@@ -87,12 +87,20 @@ spec:
       name: skip-checks
       type: string
     - default: "false"
+      description: Skip the ecosystem preflight checks (bundles should skip)
+      name: skip-preflight
+      type: string
+    - default: "false"
       description: Execute the build with network isolation
       name: hermetic
       type: string
     - default: ""
       description: Build dependencies to be prefetched by Cachi2
       name: prefetch-input
+      type: string
+    - default: "false"
+      description: Enable dev-package-manager within prefetching task
+      name: dev-package-managers
       type: string
     - default: ""
       description: Image tag expiration time, time values could be something like
@@ -195,6 +203,8 @@ spec:
         value: $(params.output-image).prefetch
       - name: ociArtifactExpiresAfter
         value: $(params.image-expires-after)
+      - name: dev-package-managers
+        value: $(params.dev-package-managers)
       runAfter:
       - clone-repository
       taskRef:
@@ -379,6 +389,10 @@ spec:
         resolver: bundles
       when:
       - input: $(params.skip-checks)
+        operator: in
+        values:
+        - "false"
+      - input: $(params.skip-preflight)
         operator: in
         values:
         - "false"
