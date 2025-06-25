@@ -87,7 +87,7 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 			err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, immediate, func(ctx context.Context) (bool, error) {
 				err := e2eclient.Client.Get(ctx, nname, updatedNROObj)
 				if err != nil {
-					klog.Warningf("failed to get the NRO resource: %v", err)
+					klog.ErrorS(err, "failed to get the NRO resource")
 					return false, err
 				}
 
@@ -117,7 +117,7 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 			Eventually(func() bool {
 				ds, err := getDaemonSetByOwnerReference(updatedNROObj.UID)
 				if err != nil {
-					klog.Warningf("unable to get Daemonset  %v", err)
+					klog.ErrorS(err, "unable to get Daemonset")
 					return false
 				}
 
@@ -176,7 +176,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 				updatedNROObj := &nropv1.NUMAResourcesOperator{}
 				err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), updatedNROObj)
 				if err != nil {
-					klog.Warningf("failed to get the  NUMAResourcesOperator CR: %v", err)
+					klog.ErrorS(err, "failed to get the  NUMAResourcesOperator CR")
 					return false
 				}
 
@@ -253,7 +253,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 				updatedDs := &appsv1.DaemonSet{}
 				err := e2eclient.Client.Get(context.TODO(), dsKey.AsKey(), updatedDs)
 				if err != nil {
-					klog.Warningf("failed to get the daemonset %s: %v", dsKey.String(), err)
+					klog.ErrorS(err, "failed to get the daemonset", "key", dsKey.String())
 					return false
 				}
 
@@ -317,7 +317,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 						if err == nil {
 							klog.Warningf("obj %s still exists", key.String())
 						} else {
-							klog.Warningf("obj %s return with error: %v", key.String(), err)
+							klog.ErrorS(err, "obj return with error", "key", key.String())
 						}
 						return false
 					}
@@ -352,8 +352,8 @@ var _ = Describe("[Install] durability", Serial, func() {
 
 				ds, err := getDaemonSetByOwnerReference(updatedNroObj.GetUID())
 				if err != nil {
-					klog.Warningf("failed to get the RTE DaemonSet: %v", err)
-					klog.Warningf("NRO:\n%s\n", objects.ToYAML(updatedNroObj))
+					// TODO: multi-line value in structured log
+					klog.ErrorS(err, "failed to get the RTE DaemonSet", "nroYAML", objects.ToYAML(updatedNroObj))
 					return false
 				}
 
@@ -392,7 +392,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 					// the same configuration should apply to all NRT objects
 					matchingErr := configuration.CheckTopologyManagerConfigMatching(nrt, &cfg)
 					if matchingErr != "" {
-						klog.Warningf("NRT %q doesn't match topologyManager configuration: %s", nrt.Name, matchingErr)
+						klog.InfoS("NRT doesn't match topologyManager configuration", "name", nrt.Name, "problem", matchingErr)
 						return false
 					}
 				}
@@ -462,7 +462,7 @@ func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context
 
 		labSel, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 		if err != nil {
-			klog.Warningf("cannot use DaemonSet label selector as selector: %v", err)
+			klog.ErrorS(err, "cannot use DaemonSet label selector as selector")
 			continue
 		}
 
@@ -472,14 +472,14 @@ func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context
 			LabelSelector: labSel,
 		})
 		if err != nil {
-			klog.Warningf("cannot get Pods by DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
+			klog.ErrorS(err, "cannot get Pods by DaemonSet", "namespace", ds.Namespace, "name", ds.Name)
 			continue
 		}
 
 		for _, pod := range podList.Items {
 			logs, err := objects.GetLogsForPod(k8sCli, pod.Namespace, pod.Name, containerNameRTE)
 			if err != nil {
-				klog.Warningf("DaemonSet %s/%s -> Pod %s/%s -> error getting logs: %v", ds.Namespace, ds.Name, pod.Namespace, pod.Name, err)
+				klog.ErrorS(err, "cannot fetch logs", "dsNamespace", ds.Namespace, "dsName", ds.Name, "podNamespace", pod.Namespace, "podName", pod.Name)
 				continue
 			}
 			klog.Infof("DaemonSet %s/%s -> Pod %s/%s -> logs:\n%s\n-----\n", ds.Namespace, ds.Name, pod.Namespace, pod.Name, logs)

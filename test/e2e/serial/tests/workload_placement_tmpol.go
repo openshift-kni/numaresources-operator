@@ -1422,7 +1422,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 						return true
 					}
 				}
-				klog.Warningf("failed to find the expected event with Reason=\"FailedScheduling\" and Message contains: %q", errMsg)
+				klog.InfoS("failed to find the expected event with Reason=\"FailedScheduling\" and Message contains", "expected", errMsg)
 				if !loggedEvents {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 					loggedEvents = true

@@ -91,7 +91,7 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 			}
 			err := os.RemoveAll(destDir)
 			if err != nil {
-				klog.Warningf("unable to remove temporary directory %q: %v", destDir, err)
+				klog.ErrorS(err, "unable to remove temporary directory", "path", destDir)
 			}
 		})
 

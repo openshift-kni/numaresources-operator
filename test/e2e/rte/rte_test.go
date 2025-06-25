@@ -71,7 +71,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			gomega.Eventually(func() bool {
 				rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
 				if err != nil {
-					klog.Warningf("failed to get the owned DaemonSets: %v", err)
+					klog.ErrorS(err, "failed to get the owned DaemonSets")
 					return false
 				}
 				if len(rteDss) == 0 {
@@ -110,7 +110,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			gomega.Eventually(func() bool {
 				rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
 				if err != nil {
-					klog.Warningf("failed to get the owned DaemonSets: %v", err)
+					klog.ErrorS(err, "failed to get the owned DaemonSets")
 					return false
 				}
 				if len(rteDss) == 0 {

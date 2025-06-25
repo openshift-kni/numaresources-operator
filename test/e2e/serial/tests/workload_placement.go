@@ -293,7 +293,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() bool {
 				pods, err = podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 				if err != nil {
-					klog.Warningf("failed to list the pods of deployment: %q error: %v", namespacedDpName, err)
+					klog.ErrorS(err, "failed to list the pods of deployment", "deployment", namespacedDpName)
 					return false
 				}
 				if len(pods) != 1 {
@@ -402,7 +402,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() bool {
 				pods, err = podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 				if err != nil {
-					klog.Warningf("failed to list the pods of deployment: %q error: %v", namespacedDpName, err)
+					klog.ErrorS(err, "failed to list the pods of deployment", "deployment", namespacedDpName)
 					return false
 				}
 				if len(pods) != 1 {
@@ -664,7 +664,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() bool {
 				pods, err = podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 				if err != nil {
-					klog.Warningf("failed to list the pods of deployment: %q error: %v", namespacedDpName, err)
+					klog.ErrorS(err, "failed to list the pods of deployment", "deployment", namespacedDpName)
 					return false
 				}
 				if len(pods) != 2 {
@@ -838,7 +838,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() bool {
 				pods, err = podlist.With(fxt.Client).ByReplicaSet(context.TODO(), *rs)
 				if err != nil {
-					klog.Warningf("failed to list the pods of replicaset: %q error: %v", namespacedRsName.String(), err)
+					klog.ErrorS(err, "failed to list the pods of replicaset", "replicaset", namespacedRsName.String())
 					return false
 				}
 				if len(pods) != int(replicaNumber) {
@@ -936,7 +936,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() bool {
 				pods, err = podlist.With(fxt.Client).ByReplicaSet(context.TODO(), *rs)
 				if err != nil {
-					klog.Warningf("failed to list the pods of replicaset: %q error: %v", namespacedRsName.String(), err)
+					klog.ErrorS(err, "failed to list the pods of replicaset", "replicaset", namespacedRsName.String())
 					return false
 				}
 				if len(pods) != int(replicaNumber) {

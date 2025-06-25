@@ -61,7 +61,7 @@ var _ = Describe("[Scheduler] install", func() {
 				updatedNROObj := &nropv1.NUMAResourcesScheduler{}
 				err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), updatedNROObj)
 				if err != nil {
-					klog.Warningf("failed to get the NRO Scheduler resource: %v", err)
+					klog.ErrorS(err, "failed to get the NRO Scheduler resource")
 					return false
 				}
 
@@ -85,7 +85,7 @@ var _ = Describe("[Scheduler] install", func() {
 			Eventually(func() bool {
 				deployment, err = podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.UID)
 				if err != nil {
-					klog.Warningf("unable to get deployment by owner reference: %v", err)
+					klog.ErrorS(err, "unable to get deployment by owner reference")
 					return false
 				}
 
