@@ -18,5 +18,12 @@ arches:
     name: rsync
     evr: 3.2.3-19.el9
     sourcerpm: rsync-3.2.3-19.el9.src.rpm
+  - url: https://cdn.redhat.com/content/dist/rhel9/9.4/x86_64/baseos/os/Packages/t/tar-1.34-6.el9_4.1.x86_64.rpm
+    repoid: rhel-9-for-x86_64-baseos-rpms
+    size: 910343
+    checksum: sha256:76f2f5fd1f37153d51a697659db31bd2a672a1a4536b42ce020cf9602ea3cde7
+    name: tar
+    evr: 2:1.34-6.el9_4.1
+    sourcerpm: tar-1.34-6.el9_4.1.src.rpm
   source: []
   module_metadata: []
