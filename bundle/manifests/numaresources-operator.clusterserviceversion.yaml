@@ -610,6 +610,12 @@ spec:
           - services
           verbs:
           - '*'
+        - apiGroups:
+          - networking.k8s.io
+          resources:
+          - networkpolicies
+          verbs:
+          - '*'
         serviceAccountName: numaresources-controller-manager
     strategy: deployment
   installModes:
