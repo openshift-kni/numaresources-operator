@@ -188,10 +188,12 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 }
 
 func DaemonSetTolerations(ds *appsv1.DaemonSet, userTolerations []corev1.Toleration) {
+	podSpec := &ds.Spec.Template.Spec // shortcut
+	// cleanup undesired toleration
+	podSpec.Tolerations = []corev1.Toleration{}
 	if len(userTolerations) == 0 {
 		return
 	}
-	podSpec := &ds.Spec.Template.Spec // shortcut
 	podSpec.Tolerations = nropv1.CloneTolerations(userTolerations)
 }
 
