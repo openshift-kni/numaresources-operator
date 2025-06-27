@@ -85,7 +85,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 					e2efixture.Skip(fxt, "Scheduler cache not enabled")
 				}
 				timeout := nroSchedObj.Status.CacheResyncPeriod.Round(time.Second) * 10
-				klog.Infof("pod running timeout: %v", timeout)
+				klog.InfoS("pod running timeout", "timeout", timeout)
 
 				nrts := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
 				if len(nrts) < 1 {
@@ -96,7 +96,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 				targetNodeName, ok := e2efixture.PopNodeName(nodesNames)
 				Expect(ok).To(BeTrue())
 
-				klog.Infof("selected target node name: %q", targetNodeName)
+				klog.InfoS("selected target node name", "nodeName", targetNodeName)
 
 				nrtInfo, err := e2enrt.FindFromList(nrts, targetNodeName)
 				Expect(err).ToNot(HaveOccurred())
@@ -116,7 +116,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 				// CAUTION: still assuming all NUMA zones are equal across all nodes
 				numPods := int(cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
 
-				klog.Infof("creating %d pods consuming %d cpus each (found %d per NUMA zone)", numPods, cpusVal, maxAllocPerNUMAVal)
+				klog.InfoS("creating pods", "numPods", numPods, "cpusPerPod", cpusVal, "maxAllocPerNUMAZone", maxAllocPerNUMAVal)
 
 				var testPods []*corev1.Pod
 				for idx := 0; idx < numPods; idx++ {
@@ -180,7 +180,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 					e2efixture.Skip(fxt, "Scheduler cache not enabled")
 				}
 				timeout := nroSchedObj.Status.CacheResyncPeriod.Round(time.Second) * 10
-				klog.Infof("pod running timeout: %v", timeout)
+				klog.InfoS("pod running timeout", "timeout", timeout)
 
 				nrts := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
 				if len(nrts) < 1 {
@@ -193,7 +193,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 				referenceNodeName, ok := e2efixture.PopNodeName(nodesNames)
 				Expect(ok).To(BeTrue())
 
-				klog.Infof("selected reference node name: %q", referenceNodeName)
+				klog.InfoS("selected reference node name", "nodeName", referenceNodeName)
 
 				nrtInfo, err := e2enrt.FindFromList(nrts, referenceNodeName)
 				Expect(err).ToNot(HaveOccurred())
@@ -211,7 +211,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 				cpusVal := (10 * resVal) / 8
 				numPods := int(int64(len(nrts)) * cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
 
-				klog.Infof("creating %d pods consuming %d cpus each (found %d per NUMA zone)", numPods, cpusVal, resVal)
+				klog.InfoS("creating pods", "numPods", numPods, "cpusPerPod", cpusVal, "resPerNUMAZone", resVal)
 
 				var testPods []*corev1.Pod
 				for idx := 0; idx < numPods; idx++ {

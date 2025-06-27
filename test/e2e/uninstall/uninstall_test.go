@@ -67,7 +67,7 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 			// failed to get the NRO object, nothing else we can do
 			if err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj); err != nil {
 				if !errors.IsNotFound(err) {
-					klog.Warningf("failed to get the NUMA resource operator %q: %v", nroObj.Name, err)
+					klog.ErrorS(err, "failed to get the NUMA resource operator", "name", nroObj.Name)
 				}
 
 				return
@@ -77,12 +77,12 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			if err := e2eclient.Client.Delete(context.TODO(), nroObj); err != nil {
-				klog.Warningf("failed to delete the numaresourcesoperators %q", nroObj.Name)
+				klog.InfoS("failed to delete the numaresourcesoperators", "name", nroObj.Name)
 				return
 			}
 
 			if err := e2eclient.Client.Delete(context.TODO(), kcObj); err != nil && !errors.IsNotFound(err) {
-				klog.Warningf("failed to delete the kubeletconfigs %q", kcObj.Name)
+				klog.InfoS("failed to delete the kubeletconfigs", "name", kcObj.Name)
 			}
 
 			timeout := configuration.MachineConfigPoolUpdateTimeout   // shortcut
@@ -92,7 +92,7 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 			if configuration.Plat == platform.Kubernetes {
 				mcpObj := objects.TestMCP()
 				if err := e2eclient.Client.Delete(context.TODO(), mcpObj); err != nil {
-					klog.Warningf("failed to delete the machine config pool %q", mcpObj.Name)
+					klog.InfoS("failed to delete the machine config pool", "name", mcpObj.Name)
 				}
 			}
 
@@ -100,7 +100,7 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 				Eventually(func() bool {
 					mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
 					if err != nil {
-						klog.Warningf("failed to get machine config pools: %v", err)
+						klog.ErrorS(err, "failed to get machine config pools")
 						return false
 					}
 

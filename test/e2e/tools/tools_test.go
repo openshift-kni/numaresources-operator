@@ -75,7 +75,8 @@ var _ = Describe("[tools] Auxiliary tools", Label("tools"), func() {
 			var tp features.TopicInfo
 			err = json.Unmarshal(out, &tp)
 			Expect(err).ToNot(HaveOccurred())
-			klog.Infof("active features from the deployed operator:\n%s", string(out))
+			// TODO: multi-line value in structured log
+			klog.InfoS("active features from the deployed operator", "features", string(out))
 
 			By("validate api output vs the expected")
 			// set the version to pass Validate()
