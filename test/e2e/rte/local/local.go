@@ -21,13 +21,14 @@ import (
 	"os/exec"
 	"strings"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	"sigs.k8s.io/yaml"
 
 	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"
+
 	"github.com/openshift-kni/numaresources-operator/test/internal/runtime"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var binaryPath string

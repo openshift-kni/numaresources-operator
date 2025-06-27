@@ -21,14 +21,14 @@ import (
 	"os"
 	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
-	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	_ "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
 	_ "github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
-	_ "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
+	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var setupExecuted = false
