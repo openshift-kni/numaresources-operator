@@ -24,13 +24,15 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 )
 
 const (

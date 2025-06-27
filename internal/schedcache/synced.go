@@ -29,15 +29,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/podfingerprint"
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	"github.com/openshift-kni/numaresources-operator/pkg/status"
 )
 
 const (

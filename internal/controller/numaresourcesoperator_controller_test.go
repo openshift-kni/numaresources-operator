@@ -22,8 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	igntypes "github.com/coreos/ignition/v2/config/v3_2/types"
 	"github.com/onsi/gomega/gcustom"
 	gomegatypes "github.com/onsi/gomega/types"
 
@@ -36,19 +35,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-
-	igntypes "github.com/coreos/ignition/v2/config/v3_2/types"
-
 	configv1 "github.com/openshift/api/config/v1"
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
+
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
+	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
@@ -61,6 +59,9 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 const (
