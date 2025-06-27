@@ -201,7 +201,7 @@ var _ = Describe("[Scheduler] CR configuration management", func() {
 			podList, err := podlist.With(e2eclient.Client).ByDeployment(context.TODO(), *deployment)
 			Expect(err).NotTo(HaveOccurred())
 			// TODO support with multiple replicas
-			Expect(podList).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
+			Expect(podList).To(HaveLen(1), "cannot find correct amount of pods for DP %s/%s", deployment.Namespace, deployment.Name)
 			uid := podList[0].UID
 
 			var t time.Duration
@@ -266,10 +266,8 @@ var _ = Describe("[Scheduler] CR configuration management", func() {
 
 			podList, err = podlist.With(e2eclient.Client).ByDeployment(context.TODO(), *dp)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(podList).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", dp.Namespace, dp.Name)
-			for _, pod := range podList {
-				Expect(pod.UID).ToNot(Equal(uid), "new scheduler pod has not been created")
-			}
+			Expect(podList).To(HaveLen(1), "cannot find correct amount of pods for DP %s/%s", dp.Namespace, dp.Name)
+			Expect(podList[0].UID).ToNot(Equal(uid), "new scheduler pod has not been created")
 		})
 	})
 })
