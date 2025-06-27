@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
-
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	mcov1 "github.com/openshift/api/machineconfiguration/v1"
