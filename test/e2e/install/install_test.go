@@ -21,9 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -33,13 +30,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
-
-	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
@@ -54,6 +52,9 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
 	e2eimages "github.com/openshift-kni/numaresources-operator/test/internal/images"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 // tests here are not interruptible, so they should not accept contexts.

@@ -23,8 +23,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )
 
 func TestDaemonSetNamespacedNameFromObject(t *testing.T) {

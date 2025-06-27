@@ -23,12 +23,13 @@ import (
 	"os"
 	"strings"
 
-	"k8s.io/klog/v2"
-	"sigs.k8s.io/yaml"
-
 	"github.com/jaypipes/ghw/pkg/option"
 	"github.com/jaypipes/ghw/pkg/topology"
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
+
+	"k8s.io/klog/v2"
+
+	"sigs.k8s.io/yaml"
 
 	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"

@@ -22,13 +22,14 @@ import (
 	"fmt"
 	"time"
 
-	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/client-go/kubernetes/scheme"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )

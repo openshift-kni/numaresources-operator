@@ -19,13 +19,13 @@ package validator
 import (
 	"context"
 
-	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 )
 
 const (

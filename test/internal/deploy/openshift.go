@@ -7,24 +7,23 @@ import (
 	"sync"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
-
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 	e2epause "github.com/openshift-kni/numaresources-operator/test/internal/objects/pause"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ Deployer = &OpenShiftNRO{}

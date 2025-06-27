@@ -16,7 +16,11 @@ issues:
   exclude-rules:
     - path: "api/*"
       linters:
+        - gci
         - lll
+    - path: "cmd/*"
+      linters:
+        - gci
     - path: "internal/*"
       linters:
         - dupl
@@ -36,6 +40,7 @@ linters:
     - bodyclose
     - copyloopvar
     - depguard
+    - gci
     - ginkgolinter
     - gosimple
     - govet
@@ -53,6 +58,18 @@ linters:
     - gocritic
     - stylecheck
 linters-settings:
+  gci:
+    sections:
+      - standard
+      - blank
+      - default
+      - prefix(k8s.io)
+      - prefix(sigs.k8s.io)
+      - prefix(github.com/openshift)
+      - prefix(github.com/k8stopologyawareschedwg)
+      - prefix(github.com/openshift-kni)
+      - dot
+    custom-order: true
   revive:
     rules:
       - name: comment-spacings

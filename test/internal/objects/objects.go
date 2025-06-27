@@ -21,19 +21,20 @@ import (
 	"fmt"
 	"time"
 
-	"sigs.k8s.io/yaml"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
+
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
-	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
 func EmptyMatchLabels() map[string]string {

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"k8s.io/klog/v2"
+
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"

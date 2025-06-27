@@ -26,14 +26,15 @@ import (
 	"regexp"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/yaml"
 
+	mcov1 "github.com/openshift/api/machineconfiguration/v1"
+
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/hypershift/consts"
@@ -42,7 +43,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 
-	mcov1 "github.com/openshift/api/machineconfiguration/v1"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("[must-gather] NRO data collected", func() {

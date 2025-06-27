@@ -24,12 +24,12 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
 	nrovalidator "github.com/openshift-kni/numaresources-operator/nrovalidate/validator"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 // nrovalidate is complex enough to deserve its own separate tests

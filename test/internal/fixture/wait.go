@@ -26,7 +26,6 @@ import (
 
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
-
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 

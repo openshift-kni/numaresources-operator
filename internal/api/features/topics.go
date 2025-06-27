@@ -17,8 +17,9 @@
 package features
 
 import (
-	_ "embed"
 	"encoding/json"
+
+	_ "embed"
 )
 
 //go:embed _topics.json

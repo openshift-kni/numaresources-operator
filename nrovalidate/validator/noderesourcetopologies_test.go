@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
-
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 )
 

@@ -20,8 +20,9 @@ import (
 	"errors"
 	"testing"
 
-	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+
+	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 )
 
 func TestMissingPayloadMCOKubeletConfToKubeletConf(t *testing.T) {

@@ -28,12 +28,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/version"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
-
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"

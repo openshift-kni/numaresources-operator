@@ -21,19 +21,18 @@ import (
 	"encoding/json"
 	"path/filepath"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"k8s.io/klog/v2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	"github.com/openshift-kni/numaresources-operator/pkg/version"
-
 	"github.com/openshift-kni/numaresources-operator/internal/api/buildinfo"
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
-
+	"github.com/openshift-kni/numaresources-operator/pkg/version"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("[serial] numaresources version", Serial, Label("feature:config"), func() {

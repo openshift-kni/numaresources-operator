@@ -22,10 +22,10 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"k8s.io/klog/v2"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"k8s.io/klog/v2"
 )
 
 var _ = Describe("[tools][mkginkgolabelfilter] Auxiliary tools", Label("tools", "mkginkgolabelfilter"), func() {
