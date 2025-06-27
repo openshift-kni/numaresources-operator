@@ -19,6 +19,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -46,6 +47,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/internal/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
+
+type makePodFunc func(ns string, idx int) *corev1.Pod
 
 type setupJobFunc func(job *batchv1.Job)
 
@@ -112,6 +115,335 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 			refreshPeriod = conf.InfoRefreshPeriod.Duration
 
 			klog.Infof("using MCP %q - refresh period %v", mcpName, refreshPeriod)
+		})
+
+		When("there are non-restartable pods in the cluster", Label("generic", "restartPolicy", label.Tier1), func() {
+			var expectedPodsPerNode int
+			var hostsRequired int
+			var NUMAZonesRequired int
+			var cpusPerPod int64
+			var noisePods []*corev1.Pod
+
+			BeforeEach(func(ctx context.Context) {
+				hostsRequired = 2
+				NUMAZonesRequired = 2
+				cpusPerPod = 2 // must be even. Must be >= 2
+
+				By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
+				nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
+				if len(nrtCandidates) < hostsRequired {
+					e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
+				}
+				klog.Infof("Found %d nodes with %d NUMA zones", len(nrtCandidates), NUMAZonesRequired)
+
+				noisePods = []*corev1.Pod{}
+			})
+
+			AfterEach(func(ctx context.Context) {
+				Expect(wait.With(fxt.Client).Interval(3*time.Second).Timeout(30*time.Second).ForPodsAllDeleted(ctx, noisePods)).To(Succeed())
+			})
+
+			DescribeTable("should be able to schedule pods with no stalls", Label("nodeAll"),
+				// like non-regression tests, but with jobs present
+				func(ctx context.Context, makeNoisePod makePodFunc) {
+					expectedPodsPerNode = 2 // anything >= 1 should be fine
+					for nidx, nrt := range nrtCandidates {
+						for idx := range expectedPodsPerNode {
+							nPod := makeNoisePod(fxt.Namespace.Name, nidx*1000+idx)
+							nPod.Spec.NodeName = nrt.Name
+							Expect(fxt.Client.Create(ctx, nPod)).To(Succeed()) // will be removed by the fixture
+							dumpPodResources(nPod)
+							noisePods = append(noisePods, nPod)
+						}
+					}
+					var failedNoisePods []*corev1.Pod
+					failedNoisePods, noisePods = wait.With(fxt.Client).Timeout(3*time.Minute).ForPodsAllRunning(ctx, noisePods)
+					Expect(failedNoisePods).To(BeEmpty(), "pods failed to go running: %s", accumulatePodNamespacedNames(failedNoisePods))
+					// ensure foreign pods are reported
+					e2efixture.MustSettleNRT(fxt)
+
+					timeout := nroSchedObj.Status.CacheResyncPeriod.Round(time.Second) * 10
+					klog.Infof("pod running timeout: %v", timeout)
+
+					nrts := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
+					if len(nrts) < 1 {
+						e2efixture.Skip(fxt, "Not enough nodes found with at least 2 NUMA zones")
+					}
+
+					// CAUTION here: we assume all worker node are identical, so to estimate
+					// the available resources we pick one at random and we use it as reference
+					nodesNames := e2enrt.AccumulateNames(nrts)
+					referenceNodeName, ok := e2efixture.PopNodeName(nodesNames)
+					Expect(ok).To(BeTrue())
+
+					klog.Infof("selected reference node name: %q", referenceNodeName)
+
+					nrtInfo, err := e2enrt.FindFromList(nrts, referenceNodeName)
+					Expect(err).ToNot(HaveOccurred())
+
+					// we still are in the serial suite, so we assume;
+					// - even number of CPUs per NUMA zone
+					// - unloaded node - so available == allocatable
+					// - identical NUMA zones
+					// - at most 1/4 of the node resources took by baseload (!!!)
+					// we use cpus as unit because it's the easiest thing to consider
+					resQty := e2enrt.GetMaxAllocatableResourceNumaLevel(*nrtInfo, corev1.ResourceCPU)
+					resVal, ok := resQty.AsInt64()
+					Expect(ok).To(BeTrue(), "cannot convert allocatable CPU resource as int")
+
+					// this is "a little more" than the max allocatable quantity, to make sure we saturate a NUMA zone,
+					// triggering the pessimistic overallocation and making sure the scheduler will have to wait.
+					// the actual ratio is not that important (could have been 11/10 possibly) as long as it triggers
+					// this condition.
+					klog.Infof("total available CPU: %d nodes x %d NUMA zone per node x %d CPUs per node = %dx%dx%d = %d",
+						len(nrts), len(nrtInfo.Zones), resVal, len(nrts), len(nrtInfo.Zones), resVal, len(nrts)*len(nrtInfo.Zones)*int(resVal))
+
+					cpusVal := (10 * resVal) / 8
+					numPods := int(int64(len(nrts)) * cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
+
+					By("running the test workload pods")
+					klog.Infof("creating %d pods consuming %d cpus each total %d CPUs consumed (found %d per NUMA zone)", numPods, cpusPerPod, numPods*int(cpusPerPod), resVal)
+
+					var testPods []*corev1.Pod
+					for idx := 0; idx < numPods; idx++ {
+						testPod := objects.NewTestPodPause(fxt.Namespace.Name, fmt.Sprintf("testpod-schedstall-%d", idx))
+						testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
+						testPod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
+							corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
+							corev1.ResourceMemory: resource.MustParse("64Mi"),
+						}
+
+						testPod.Spec.NodeSelector = map[string]string{
+							serialconfig.MultiNUMALabel: "2",
+						}
+
+						klog.Infof("creating pod %s/%s", testPod.Namespace, testPod.Name)
+						err = fxt.Client.Create(ctx, testPod)
+						Expect(err).ToNot(HaveOccurred())
+
+						dumpPodResources(testPod)
+						testPods = append(testPods, testPod)
+					}
+
+					By("ensuring the test workload pods are running")
+					failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodsAllRunning(ctx, testPods)
+
+					for _, failedPod := range failedPods {
+						_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
+					}
+					Expect(failedPods).To(BeEmpty(), "pods failed to go running: %s", accumulatePodNamespacedNames(failedPods))
+
+					By("ensuring the test workload pods are scheduled as expected")
+					for _, updatedPod := range updatedPods {
+						schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+						Expect(err).ToNot(HaveOccurred())
+						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+					}
+				},
+				Entry("with non-restartable pods with guaranteed init and app containers", context.TODO(), func(podNamespace string, idx int) *corev1.Pod {
+					return &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace:    podNamespace,
+							GenerateName: "generic-pause-pod-",
+							Labels: map[string]string{
+								"test-pod-index": strconv.FormatInt(int64(idx), 10),
+							},
+						},
+						Spec: corev1.PodSpec{
+							InitContainers: []corev1.Container{
+								{
+									Name:    "generic-init-cnt",
+									Image:   images.GetPauseImage(),
+									Command: []string{"/bin/sleep"},
+									Args:    []string{"1s"},
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+							Containers: []corev1.Container{
+								{
+									Name:    "generic-main-cnt",
+									Image:   images.GetPauseImage(),
+									Command: []string{"/bin/sleep"},
+									Args:    []string{"1s"},
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+							RestartPolicy: corev1.RestartPolicyNever,
+						},
+					}
+				}),
+				Entry("with non-restartable pods with guaranteed init and long running app containers", context.TODO(), func(podNamespace string, idx int) *corev1.Pod {
+					return &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace:    podNamespace,
+							GenerateName: "generic-pause-pod-",
+							Labels: map[string]string{
+								"test-pod-index": strconv.FormatInt(int64(idx), 10),
+							},
+						},
+						Spec: corev1.PodSpec{
+							InitContainers: []corev1.Container{
+								{
+									Name:    "generic-init-cnt",
+									Image:   images.GetPauseImage(),
+									Command: []string{"/bin/sleep"},
+									Args:    []string{"1s"},
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+							Containers: []corev1.Container{
+								{
+									Name:    "generic-main-cnt",
+									Image:   images.GetPauseImage(),
+									Command: []string{"/bin/sleep"},
+									Args:    []string{"42d"}, // "forever" in our test timescale
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+							RestartPolicy: corev1.RestartPolicyNever,
+						},
+					}
+				}),
+				Entry("with non-restartable pods with guaranteed pod with partially terminated app containers", context.TODO(), func(podNamespace string, idx int) *corev1.Pod {
+					return &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace:    podNamespace,
+							GenerateName: "generic-pause-pod-",
+							Labels: map[string]string{
+								"test-pod-index": strconv.FormatInt(int64(idx), 10),
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    "generic-main-cnt-run-1",
+									Image:   images.GetPauseImage(),
+									Command: []string{"/bin/sleep"},
+									Args:    []string{"42d"}, // "forever" in our test timescale
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+								{
+									Name:    "generic-main-cnt-run-2",
+									Image:   images.GetPauseImage(),
+									Command: []string{"/bin/sleep"},
+									Args:    []string{"1s"},
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+							RestartPolicy: corev1.RestartPolicyNever,
+						},
+					}
+				}),
+				Entry("with non-restartable pods with guaranteed pod with partially terminated app containers", context.TODO(), func(podNamespace string, idx int) *corev1.Pod {
+					return &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace:    podNamespace,
+							GenerateName: "generic-pause-pod-",
+							Labels: map[string]string{
+								"test-pod-index": strconv.FormatInt(int64(idx), 10),
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    "generic-main-cnt-run-1",
+									Image:   images.GetPauseImage(),
+									Command: []string{"/bin/sleep"},
+									Args:    []string{"42d"}, // "forever" in our test timescale
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+								{
+									Name:    "generic-main-cnt-run-2",
+									Image:   images.GetPauseImage(),
+									Command: []string{"/bin/sleep"},
+									Args:    []string{"1s"},
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+							RestartPolicy: corev1.RestartPolicyNever,
+						},
+					}
+				}),
+				Entry("with restartable pods with guaranteed pod with partially terminated app containers", context.TODO(), func(podNamespace string, idx int) *corev1.Pod {
+					return &corev1.Pod{
+						ObjectMeta: metav1.ObjectMeta{
+							Namespace:    podNamespace,
+							GenerateName: "generic-pause-pod-",
+							Labels: map[string]string{
+								"test-pod-index": strconv.FormatInt(int64(idx), 10),
+							},
+						},
+						Spec: corev1.PodSpec{
+							Containers: []corev1.Container{
+								{
+									Name:    "generic-main-cnt-run-1",
+									Image:   images.GetPauseImage(),
+									Command: []string{"/bin/sleep"},
+									Args:    []string{"42d"}, // "forever" in our test timescale
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+								{
+									Name:    "generic-main-cnt-run-2",
+									Image:   images.GetPauseImage(),
+									Command: []string{"/bin/sleep"},
+									Args:    []string{"1s"},
+									Resources: corev1.ResourceRequirements{
+										Limits: corev1.ResourceList{
+											corev1.ResourceCPU:    resource.MustParse("100m"),
+											corev1.ResourceMemory: resource.MustParse("256Mi"),
+										},
+									},
+								},
+							},
+						},
+					}
+				}),
+			)
 		})
 
 		When("there are jobs in the cluster", Label("job", "generic", label.Tier0), func() {
@@ -218,7 +550,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 
 					// very generous timeout here. It's hard and racy to check we had 2 pods pending (expected phased scheduling),
 					// but that would be the most correct and stricter testing.
-					failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodListAllRunning(ctx, testPods)
+					failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodsAllRunning(ctx, testPods)
 					if len(failedPods) > 0 {
 						nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
 						klog.Infof("%s", intnrt.ListToString(nrtListFailed.Items, "post failure"))
@@ -235,10 +567,10 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					}
 				},
-				Entry("vs best-effort pods", Label(label.Tier1), func(job *batchv1.Job) {
+				Entry("vs best-effort pods", func(job *batchv1.Job) {
 					klog.Infof("Creating a job whose containers have requests=none")
 				}),
-				Entry("vs burstable pods", Label(label.Tier1), func(job *batchv1.Job) {
+				Entry("vs burstable pods", func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("100m"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
@@ -254,7 +586,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 				// GAP: pinnable cpu (but not memory)
 				// however with the recommended config, we can't have pinnable CPUs without pinnable memory;
 				// we would need cpumanager policy=static and memorymanager policy=none, which we don't recommend.
-				Entry("vs guaranteed pods with pinnable memory", Label(label.Tier1), func(job *batchv1.Job) {
+				Entry("vs guaranteed pods with pinnable memory", func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("100m"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
@@ -267,7 +599,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					}
 					klog.Infof("Creating a job whose containers have limits=%q", e2ereslist.ToString(jobRequiredRes))
 				}),
-				Entry("vs guaranteed pods with pinnable memory and CPU", Label(label.Tier1), func(job *batchv1.Job) {
+				Entry("vs guaranteed pods with pinnable memory and CPU", func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("1"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
@@ -289,9 +621,12 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					idleJob = makeIdleJob(fxt.Namespace.Name, expectedJobPodsPerNode, len(nrtCandidates))
 
 					ctx := context.TODO()
+					By("creating the noisy job")
 					Expect(fxt.Client.Create(ctx, idleJob)).To(Succeed()) // will be removed by the fixture
 					_, err := wait.With(fxt.Client).Interval(3*time.Second).Timeout(30*time.Second).ForJobCompleted(ctx, namespacedname.FromObject(idleJob))
 					Expect(err).ToNot(HaveOccurred())
+
+					By("ensuring the foreign pods are noticed")
 					// ensure foreign pods are reported
 					e2efixture.MustSettleNRT(fxt)
 
@@ -303,8 +638,9 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						e2efixture.Skip(fxt, "Not enough nodes found with at least 2 NUMA zones")
 					}
 
-					// CAUTION here: we assume all worker node identicals, so to estimate the available
-					// resources we pick one at random and we use it as reference
+					By("computing the test workload resources")
+					// CAUTION here: we assume all worker node are identical, so to estimate
+					// the available resources we pick one at random and we use it as reference
 					nodesNames := e2enrt.AccumulateNames(nrts)
 					referenceNodeName, ok := e2efixture.PopNodeName(nodesNames)
 					Expect(ok).To(BeTrue())
@@ -328,10 +664,14 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					// triggering the pessimistic overallocation and making sure the scheduler will have to wait.
 					// the actual ratio is not that important (could have been 11/10 possibly) as long as it triggers
 					// this condition.
+					klog.Infof("total available CPU: %d nodes x %d NUMA zone per node x %d CPUs per node = %dx%dx%d = %d",
+						len(nrts), len(nrtInfo.Zones), resVal, len(nrts), len(nrtInfo.Zones), resVal, len(nrts)*len(nrtInfo.Zones)*int(resVal))
+
 					cpusVal := (10 * resVal) / 8
 					numPods := int(int64(len(nrts)) * cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
 
-					klog.Infof("creating %d pods consuming %d cpus each (found %d per NUMA zone)", numPods, cpusVal, resVal)
+					By("running the test workload pods")
+					klog.Infof("creating %d pods consuming %d cpus each total %d CPUs consumed (found %d per NUMA zone)", numPods, cpusPerPod, numPods*int(cpusPerPod), resVal)
 
 					var testPods []*corev1.Pod
 					for idx := 0; idx < numPods; idx++ {
@@ -348,10 +688,12 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						err = fxt.Client.Create(ctx, testPod)
 						Expect(err).ToNot(HaveOccurred())
 
+						dumpPodResources(testPod)
 						testPods = append(testPods, testPod)
 					}
 
-					failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodListAllRunning(ctx, testPods)
+					By("checking the test workload status")
+					failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodsAllRunning(ctx, testPods)
 
 					for _, failedPod := range failedPods {
 						_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
@@ -364,13 +706,13 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					}
 				},
-				Entry("should handle a burst of qos=guaranteed pods", Label(label.Tier0), func(pod *corev1.Pod) {
+				Entry("should handle a burst of qos=guaranteed pods", func(pod *corev1.Pod) {
 					pod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 						corev1.ResourceMemory: resource.MustParse("64Mi"),
 					}
 				}),
-				Entry("should handle a burst of qos=burstable pods", Label(label.Tier0), func(pod *corev1.Pod) {
+				Entry("should handle a burst of qos=burstable pods", func(pod *corev1.Pod) {
 					pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 						corev1.ResourceMemory: resource.MustParse("64Mi"),
@@ -383,6 +725,19 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 		// job mid-test?
 	})
 })
+
+func dumpPodResources(pod *corev1.Pod) {
+	for _, ctr := range pod.Spec.InitContainers {
+		klog.Infof("pod %s/%s init container %s on %s requiring requests=%s/limits=%s",
+			pod.Namespace, pod.Name, ctr.Name, pod.Spec.NodeName,
+			e2ereslist.ToString(ctr.Resources.Requests), e2ereslist.ToString(ctr.Resources.Limits))
+	}
+	for _, ctr := range pod.Spec.Containers {
+		klog.Infof("pod %s/%s app container %s on %s requiring requests=%s/limits=%s",
+			pod.Namespace, pod.Name, ctr.Name, pod.Spec.NodeName,
+			e2ereslist.ToString(ctr.Resources.Requests), e2ereslist.ToString(ctr.Resources.Limits))
+	}
+}
 
 func makeIdleJob(jobNamespace string, expectedJobPodsPerNode, numWorkerNodes int) *batchv1.Job {
 	idleJobParallelism := int32(numWorkerNodes * expectedJobPodsPerNode)
