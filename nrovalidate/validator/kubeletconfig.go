@@ -24,14 +24,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
+
 	hypershiftconsts "github.com/openshift-kni/numaresources-operator/internal/hypershift/consts"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
-	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 )
 
 const (

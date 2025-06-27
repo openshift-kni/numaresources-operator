@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/klog"
+
 	"sigs.k8s.io/yaml"
 )
 
