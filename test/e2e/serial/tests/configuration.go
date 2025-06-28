@@ -38,6 +38,7 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
 
 	"github.com/google/go-cmp/cmp"
 	depnodes "github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
@@ -71,6 +72,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
+	"github.com/openshift-kni/numaresources-operator/test/internal/hypershift"
+	"github.com/openshift-kni/numaresources-operator/test/internal/nodepools"
 )
 
 /*
@@ -90,6 +93,14 @@ type mcpInfo struct {
 	mcpObj        *machineconfigv1.MachineConfigPool
 	initialConfig string
 	sampleNode    corev1.Node
+}
+
+type Tuning struct {
+	Profile struct {
+		CPU struct {
+			TopologyManagerPolicy string `yaml:"topologyManagerPolicy"`
+		} `yaml:"cpu"`
+	} `yaml:"profile"`
 }
 
 func (i mcpInfo) ToString() string {
@@ -292,6 +303,153 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
+		})
+
+		It("[test_id:80821] Verify Performance Profile updates on management cluster reflect in NRT resources", Label("reboot_required", label.Slow, label.HyperShift), func() {
+			fxt.IsRebootTest = true
+
+			By("fetching the initial TM policy set in NRT")
+			initialNrtList := nrtv1alpha2.NodeResourceTopologyList{}
+			initialNrtList, err := e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
+			Expect(err).ToNot(HaveOccurred(), "cannot get any NodeResourceTopology object from the cluster")
+			Expect(initialNrtList.Items).ToNot(BeEmpty(), "no NodeResourceTopology items found")
+
+			initialNrt := initialNrtList.Items[0]
+			var initialTMPolicy string
+			for _, attr := range initialNrt.Attributes {
+				if attr.Name == "topologyManagerPolicy" {
+					initialTMPolicy = attr.Value
+					break
+				}
+			}
+			Expect(initialTMPolicy).ToNot(BeEmpty(), "topologyManagerPolicy not found in initial NRT")
+			newTMPolicy := getNewTopologyManagerPolicyValue(initialTMPolicy)
+			Expect(initialTMPolicy).ToNot(Equal(newTMPolicy), "new TM policy should differ from the initial one")
+
+			By("retrieving the NodePool from the management cluster")
+			hostedClusterName, err := hypershift.GetHostedClusterName()
+			Expect(err).ToNot(HaveOccurred())
+			nodePool, err := nodepools.GetByClusterName(context.TODO(), e2eclient.MNGClient, hostedClusterName)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("determining whether to update tuningConfig or kubeletConfig")
+			isTuningConfig := len(nodePool.Spec.TuningConfig) > 0
+			isKubeletConfig := len(nodePool.Spec.Config) > 0
+
+			Expect(isTuningConfig || isKubeletConfig).To(BeTrue(), "Neither tuningConfig nor kubeletConfig is defined in the NodePool")
+
+			switch {
+			case isTuningConfig:
+				By("updating topologyManagerPolicy in tuningConfig")
+				tuningConfigName := nodePool.Spec.TuningConfig[0].Name
+				Expect(tuningConfigName).ToNot(BeEmpty(), "NodePool tuningConfig name is empty")
+
+				cmList := &corev1.ConfigMapList{}
+				err = e2eclient.MNGClient.List(context.TODO(), cmList, &client.ListOptions{
+					Namespace: "clusters",
+				})
+				Expect(err).ToNot(HaveOccurred(), "failed to list ConfigMaps in namespace: clusters")
+
+				var targetCM *corev1.ConfigMap
+				for i := range cmList.Items {
+					if cmList.Items[i].Name == tuningConfigName {
+						targetCM = &cmList.Items[i]
+						break
+					}
+				}
+				Expect(targetCM).ToNot(BeNil(), fmt.Sprintf("ConfigMap %q not found in namespace: clusters", tuningConfigName))
+
+				By("updating the ConfigMap with the new TM policy")
+				yamlData := targetCM.Data["tuning"]
+				Expect(yamlData).ToNot(BeEmpty(), "tuning section not found in ConfigMap")
+
+				var tuning Tuning
+				err = yaml.Unmarshal([]byte(yamlData), &tuning)
+				Expect(err).ToNot(HaveOccurred(), "failed to unmarshal ConfigMap tuning YAML")
+				Expect(tuning.Profile.CPU.TopologyManagerPolicy).To(Equal(initialTMPolicy), "unexpected initial TM policy in parsed YAML")
+
+				tuning.Profile.CPU.TopologyManagerPolicy = newTMPolicy
+
+				modifiedYamlBytes, err := yaml.Marshal(&tuning)
+				Expect(err).ToNot(HaveOccurred(), "failed to marshal modified tuning YAML")
+				targetCM.Data["tuning"] = string(modifiedYamlBytes)
+				err = e2eclient.MNGClient.Update(context.TODO(), targetCM)
+				Expect(err).ToNot(HaveOccurred(), "failed to update the ConfigMap with new TM policy")
+
+			case isKubeletConfig:
+				By("updating topologyManagerPolicy in kubeletConfig")
+
+				var kubeletConfigCM *corev1.ConfigMap
+				cmList := &corev1.ConfigMapList{}
+				err = e2eclient.MNGClient.List(context.TODO(), cmList, &client.ListOptions{
+					Namespace: "clusters",
+				})
+				Expect(err).ToNot(HaveOccurred(), "failed to list ConfigMaps in namespace: clusters")
+
+				for _, cfgRef := range nodePool.Spec.Config {
+					for i := range cmList.Items {
+						if cmList.Items[i].Name == cfgRef.Name {
+							kubeletConfigCM = &cmList.Items[i]
+							break
+						}
+					}
+					if kubeletConfigCM != nil {
+						break
+					}
+				}
+				Expect(kubeletConfigCM).ToNot(BeNil(), "kubeletConfig ConfigMap referenced by NodePool not found")
+
+				kubeletYaml := kubeletConfigCM.Data["config"]
+				Expect(kubeletYaml).ToNot(BeEmpty(), "kubeletConfig 'config' data is empty in ConfigMap")
+
+				var kubeletConfig map[string]interface{}
+				err = yaml.Unmarshal([]byte(kubeletYaml), &kubeletConfig)
+				Expect(err).ToNot(HaveOccurred(), "failed to unmarshal kubelet config YAML")
+
+				spec, ok := kubeletConfig["spec"].(map[string]interface{})
+				Expect(ok).To(BeTrue(), "spec section not found in kubelet config")
+
+				kubeletSpec, ok := spec["kubeletConfig"].(map[string]interface{})
+				Expect(ok).To(BeTrue(), "kubeletConfig section not found in spec")
+
+				tmPolicy, ok := kubeletSpec["topologyManagerPolicy"].(string)
+				Expect(ok).To(BeTrue(), "topologyManagerPolicy not found in kubeletConfig")
+				Expect(tmPolicy).To(Equal(initialTMPolicy), "unexpected initial TM policy in kubeletConfig")
+
+				kubeletSpec["topologyManagerPolicy"] = newTMPolicy
+
+				modifiedYamlBytes, err := yaml.Marshal(kubeletConfig)
+				Expect(err).ToNot(HaveOccurred(), "failed to marshal modified kubelet config")
+				kubeletConfigCM.Data["config"] = string(modifiedYamlBytes)
+
+				err = e2eclient.MNGClient.Update(context.TODO(), kubeletConfigCM)
+				Expect(err).ToNot(HaveOccurred(), "failed to update kubeletConfig ConfigMap with new TM policy")
+			}
+
+			By("Waiting for the node pool configuration to start updating")
+			err = nodepools.WaitForUpdatingConfig(context.TODO(), e2eclient.MNGClient, nodePool.Name, nodePool.Namespace)
+			Expect(err).ToNot(HaveOccurred(), "NodePool did not enter UpdatingConfig condition")
+
+			By("Waiting for the node pool configuration to be ready")
+			err = nodepools.WaitForConfigToBeReady(context.TODO(), e2eclient.MNGClient, nodePool.Name, nodePool.Namespace)
+			Expect(err).ToNot(HaveOccurred(), "NodePool did not exit UpdatingConfig condition")
+
+			By("waiting for the NRT to reflect the new TM policy")
+			Eventually(func(g Gomega) {
+				updatedNrtList := nrtv1alpha2.NodeResourceTopologyList{}
+				updatedNrtList, err = e2enrt.GetUpdated(fxt.Client, updatedNrtList, timeout)
+				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(updatedNrtList.Items).ToNot(BeEmpty())
+
+				var updatedTM string
+				for _, attr := range updatedNrtList.Items[0].Attributes {
+					if attr.Name == "topologyManagerPolicy" {
+						updatedTM = attr.Value
+						break
+					}
+				}
+				g.Expect(updatedTM).To(Equal(newTMPolicy), "Expected updated TM policy %q, but got %q", newTMPolicy, updatedTM)
+			}, 10*time.Minute, 25*time.Second).Should(Succeed(), "NRT did not reflect updated TM policy in time")
 		})
 
 		It("should report the NodeGroupConfig in the status", Label("tier2", "openshift"), func() {
@@ -1105,6 +1263,14 @@ func objRefListToStringList(objRefs []configv1.ObjectReference) []string {
 	}
 	sort.Strings(ret)
 	return ret
+}
+
+func getNewTopologyManagerPolicyValue(oldTopologyManagerPolicyValue string) string {
+	newTopologyManagerPolicyValue := "best-effort"
+	if oldTopologyManagerPolicyValue == newTopologyManagerPolicyValue || oldTopologyManagerPolicyValue == "" {
+		newTopologyManagerPolicyValue = "single-numa-node"
+	}
+	return newTopologyManagerPolicyValue
 }
 
 func toJSON(obj interface{}) string {
