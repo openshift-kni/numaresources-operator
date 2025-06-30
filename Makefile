@@ -148,6 +148,18 @@ test-upgrade-e2e: build-e2e-all
 test-must-gather-e2e: build-must-gather-e2e
 	hack/run-test-must-gather-e2e.sh
 
+# intentional left out:
+#   api/, because autogeneration
+#   cmd/, because kubebuilder scaffolding
+.PHONY:
+sort-imports:
+	@hack/sort-imports.py -v ./test/
+	@hack/sort-imports.py -v ./internal/
+	@hack/sort-imports.py -v ./pkg/
+	@hack/sort-imports.py -v ./rte/
+	@hack/sort-imports.py -v ./tools/
+	@hack/sort-imports.py -v ./nrovalidate/
+
 .PHONY: lint
 lint: update-buildinfo golangci-lint ## Run golangci-lint linter
 	$(GOLANGCI_LINT) --verbose run --print-resources-usage --exclude-dirs test/internal/k8simported
