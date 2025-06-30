@@ -23,11 +23,14 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/klog/v2"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
@@ -51,6 +54,14 @@ var (
 	MachineConfigPoolUpdateTimeout  time.Duration
 	MachineConfigPoolUpdateInterval time.Duration
 )
+
+// ConfigLegacy is the legacy config.yaml format which is used by the RTE until v4.18.0.
+type ConfigLegacy struct {
+	ExcludeList           map[string][]string `json:"excludeList,omitempty"`
+	TopologyManagerPolicy string              `json:"topologyManagerPolicy,omitempty"`
+	TopologyManagerScope  string              `json:"topologyManagerScope,omitempty"`
+	PodExcludes           map[string]string   `json:"podExcludes"`
+}
 
 func init() {
 	var err error
@@ -86,8 +97,12 @@ func ValidateAndExtractRTEConfigData(cm *corev1.ConfigMap) (rteconfig.Config, er
 		return cfg, fmt.Errorf("config.yaml not found in ConfigMap %s/%s", cm.Namespace, cm.Name)
 	}
 
-	if err := yaml.Unmarshal([]byte(raw), &cfg); err != nil {
-		return cfg, fmt.Errorf("failed to unmarshal config.yaml: %w", err)
+	if err := yaml.UnmarshalStrict([]byte(raw), &cfg); err != nil {
+		klog.ErrorS(err, "failed to unmarshal config.yaml; falling back to legacy config", "configMap", client.ObjectKeyFromObject(cm))
+		cfg, err = rteConfigFromConfigLegacy(raw)
+		if err != nil {
+			return cfg, err
+		}
 	}
 
 	if cfg.Kubelet.TopologyManagerPolicy != "single-numa-node" {
@@ -108,4 +123,28 @@ func CheckTopologyManagerConfigMatching(nrt *nrtv1alpha2.NodeResourceTopology, c
 		}
 	}
 	return matchingErr
+}
+
+func rteConfigFromConfigLegacy(raw string) (rteconfig.Config, error) {
+	var cfg rteconfig.Config
+	var cfgLegacy ConfigLegacy
+
+	if err := yaml.UnmarshalStrict([]byte(raw), &cfgLegacy); err != nil {
+		return cfg, fmt.Errorf("failed to unmarshal legacy config.yaml: %w", err)
+	}
+
+	cfg.Kubelet = rteconfig.KubeletParams{
+		TopologyManagerPolicy: cfgLegacy.TopologyManagerPolicy,
+		TopologyManagerScope:  cfgLegacy.TopologyManagerScope,
+	}
+	cfg.ResourceExclude = cfgLegacy.ExcludeList
+	cfg.PodExclude = make(podexclude.List, 0, len(cfgLegacy.PodExcludes))
+	for namespace, name := range cfgLegacy.PodExcludes {
+		cfg.PodExclude = append(cfg.PodExclude, podexclude.Item{
+			NamespacePattern: namespace,
+			NamePattern:      name,
+		})
+	}
+
+	return cfg, nil
 }
