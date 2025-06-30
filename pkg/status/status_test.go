@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -266,6 +267,110 @@ func TestMessageFromError(t *testing.T) {
 			got := MessageFromError(tcase.err)
 			if got != tcase.expected {
 				t.Errorf("failure getting message from error: got=%q expected=%q", got, tcase.expected)
+			}
+		})
+	}
+}
+
+func TestCheckSchedulerConditionsNeedsUpdate(t *testing.T) {
+	type input struct {
+		current             []metav1.Condition
+		desired             []metav1.Condition
+		reconcilerCondition string
+		reason              string
+		message             string
+	}
+	type expectedResult struct {
+		needsUpdate bool
+		conditions  []metav1.Condition
+	}
+
+	conditionsWithAvailableAndDedicated := NewSchedulerBaseConditions()
+	conditionsWithAvailableAndDedicated[0].Status = metav1.ConditionTrue
+	conditionsWithAvailableAndDedicated[0].Reason = ReasonAsExpected
+	conditionsWithAvailableAndDedicated[0].Message = ReasonAsExpected
+	conditionsWithAvailableAndDedicated[1].Status = metav1.ConditionTrue
+	conditionsWithAvailableAndDedicated[4].Status = metav1.ConditionTrue
+
+	conditionsWithAvailableAndShared := CloneConditions(conditionsWithAvailableAndDedicated)
+	conditionsWithAvailableAndShared[4].Status = metav1.ConditionFalse
+
+	conditionsWithDegradedAndDedicatedUnknown := NewSchedulerBaseConditions()
+	conditionsWithDegradedAndDedicatedUnknown[3].Status = metav1.ConditionTrue
+	conditionsWithDegradedAndDedicatedUnknown[3].Reason = ConditionDegraded
+
+	tests := []struct {
+		name     string
+		input    input
+		expected expectedResult
+	}{
+		{
+			name: "first reconcile iteration with available condition",
+			input: input{
+				desired: []metav1.Condition{ // it is impossible not to initialize the informer condition if reconcilerCondition is Available
+					{
+						Type:   ConditionDedicatedInformerActive,
+						Status: metav1.ConditionTrue,
+						Reason: ConditionDedicatedInformerActive,
+					},
+				},
+				reconcilerCondition: ConditionAvailable,
+				reason:              ReasonAsExpected,
+				message:             ReasonAsExpected,
+			},
+			expected: expectedResult{
+				needsUpdate: true,
+				conditions:  conditionsWithAvailableAndDedicated,
+			},
+		},
+		{
+			name: "first reconcile iteration with degraded condition",
+			input: input{
+				reconcilerCondition: ConditionDegraded,
+				reason:              ConditionDegraded,
+			},
+			expected: expectedResult{
+				needsUpdate: true,
+				conditions:  conditionsWithDegradedAndDedicatedUnknown,
+			},
+		},
+		{
+			name: "non-empty current conditions with different desired informer",
+			input: input{
+				current: conditionsWithDegradedAndDedicatedUnknown,
+				desired: []metav1.Condition{
+					{
+						Type:   ConditionDedicatedInformerActive,
+						Status: metav1.ConditionFalse,
+						Reason: ConditionDedicatedInformerActive,
+					},
+				},
+				reconcilerCondition: ConditionAvailable,
+				reason:              ReasonAsExpected,
+				message:             ReasonAsExpected,
+			},
+			expected: expectedResult{
+				needsUpdate: true,
+				conditions:  conditionsWithAvailableAndShared,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotConditions, shouldUpdate := CheckSchedulerConditionsNeedsUpdate(tt.input.current, tt.input.desired, tt.input.reconcilerCondition, tt.input.reason, tt.input.message)
+			if shouldUpdate != tt.expected.needsUpdate {
+				t.Errorf("mismatching results: got=%t expected=%t", shouldUpdate, tt.expected.needsUpdate)
+			}
+
+			if !shouldUpdate {
+				return
+			}
+
+			resetIncomparableConditionFields(tt.expected.conditions)
+			resetIncomparableConditionFields(gotConditions)
+
+			if !reflect.DeepEqual(gotConditions, tt.expected.conditions) {
+				t.Errorf("Conditions do not match: got\n%v\nexpected\n%v\n", gotConditions, tt.expected.conditions)
 			}
 		})
 	}

@@ -115,9 +115,10 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 		return ctrl.Result{}, err
 	}
 
+	initialStatus := *instance.Status.DeepCopy()
 	if req.Name != objectnames.DefaultNUMAResourcesSchedulerCrName {
 		message := fmt.Sprintf("incorrect NUMAResourcesScheduler resource name: %s", instance.Name)
-		return ctrl.Result{}, r.updateStatus(ctx, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
+		return ctrl.Result{}, r.updateStatus(ctx, initialStatus, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
 	}
 
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
@@ -126,7 +127,7 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	}
 
 	result, condition, err := r.reconcileResource(ctx, instance)
-	if err := r.updateStatus(ctx, instance, condition, status.ReasonFromError(err), status.MessageFromError(err)); err != nil {
+	if err := r.updateStatus(ctx, initialStatus, instance, condition, status.ReasonFromError(err), status.MessageFromError(err)); err != nil {
 		klog.InfoS("Failed to update numaresourcesscheduler status", "Desired condition", condition, "error", err)
 	}
 
@@ -191,7 +192,7 @@ func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context
 	instance.Status = schedStatus
 	instance.Status.RelatedObjects = relatedobjects.Scheduler(r.Namespace, instance.Status.Deployment)
 
-	ok, err := isDeploymentRunning(ctx, r.Client, schedStatus.Deployment)
+	ok, err := isDeploymentRunning(ctx, r.Client, instance.Status.Deployment)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, err
 	}
@@ -262,10 +263,26 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	}
 
 	schedStatus := *instance.Status.DeepCopy()
+
 	schedStatus.SchedulerName = schedSpec.SchedulerName
 	schedStatus.CacheResyncPeriod = &metav1.Duration{
 		Duration: cacheResyncPeriod,
 	}
+
+	informerCondition := buildDedicatedInformerCondition(*instance, schedSpec)
+
+	conditions := []metav1.Condition{informerCondition}
+	if len(schedStatus.Conditions) != 0 {
+		conditions = status.CloneConditions(schedStatus.Conditions)
+		for idx, cond := range schedStatus.Conditions {
+			if cond.Type == status.ConditionDedicatedInformerActive {
+				conditions[idx] = informerCondition
+				break
+			}
+		}
+	}
+
+	schedStatus.Conditions = conditions
 
 	r.SchedulerManifests.Deployment.Spec.Replicas = schedSpec.Replicas
 	klog.V(4).InfoS("using scheduler replicas", "replicas", *r.SchedulerManifests.Deployment.Spec.Replicas)
@@ -328,10 +345,34 @@ func platformNormalize(spec *nropv1.NUMAResourcesSchedulerSpec, platInfo Platfor
 		klog.V(4).InfoS("SchedulerInformer default is overridden", "Platform", platInfo.Platform, "PlatformVersion", platInfo.Version.String(), "SchedulerInformer", &spec.SchedulerInformer)
 	}
 }
-func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
-	sched.Status.Conditions, _ = status.UpdateConditions(sched.Status.Conditions, condition, reason, message)
-	if err := r.Client.Status().Update(ctx, sched); err != nil {
-		return fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(sched), err)
+
+func buildDedicatedInformerCondition(instance nropv1.NUMAResourcesScheduler, normalized nropv1.NUMAResourcesSchedulerSpec) metav1.Condition {
+	condStatus := metav1.ConditionTrue
+	if *normalized.SchedulerInformer == nropv1.SchedulerInformerShared {
+		condStatus = metav1.ConditionFalse
+	}
+
+	condition := metav1.Condition{
+		Type:               status.ConditionDedicatedInformerActive,
+		Status:             condStatus,
+		ObservedGeneration: instance.ObjectMeta.Generation,
+		Reason:             status.ConditionDedicatedInformerActive,
+	}
+	return condition
+}
+
+func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesSchedulerStatus, desiredSched *nropv1.NUMAResourcesScheduler, reconcilerCondition string, reason string, message string) error {
+	initialConditions := initialStatus.Conditions
+	desiredConditions := status.CloneConditions(desiredSched.Status.Conditions)
+
+	updatedConditions, needsUpdate := status.CheckSchedulerConditionsNeedsUpdate(initialConditions, desiredConditions, reconcilerCondition, reason, message)
+
+	if needsUpdate {
+		desiredSched.Status.Conditions = updatedConditions
+	}
+
+	if err := r.Client.Status().Update(ctx, desiredSched); err != nil {
+		return fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(desiredSched), err)
 	}
 	return nil
 }
