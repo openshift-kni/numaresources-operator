@@ -98,6 +98,10 @@ spec:
       set of values is determined by the configuration of the multi-platform-controller.
     name: build-platforms
     type: array
+  - default: "false"
+    description: Skip the sast coverity check
+    name: skip-sast-coverity
+    type: string
   results:
   - description: ""
     name: IMAGE_URL
@@ -451,6 +455,10 @@ spec:
       resolver: bundles
     when:
     - input: $(params.skip-checks)
+      operator: in
+      values:
+      - "false"
+    - input: $(params.skip-sast-coverity)
       operator: in
       values:
       - "false"
