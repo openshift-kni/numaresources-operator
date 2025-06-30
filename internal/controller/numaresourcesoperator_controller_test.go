@@ -2189,8 +2189,10 @@ func checkSELinuxPolicyProcessing(ctx context.Context, nro *nropv1.NUMAResources
 }
 
 func getConditionByType(conditions []metav1.Condition, conditionType string) *metav1.Condition {
+	fmt.Println("condition")
 	for i := range conditions {
 		c := &conditions[i]
+		fmt.Printf("condition %d: %v", i, c)
 		if c.Type == conditionType {
 			return c
 		}
