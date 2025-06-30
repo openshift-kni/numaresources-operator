@@ -19,14 +19,16 @@ package configuration
 import (
 	"context"
 	"fmt"
-	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"os"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+
 	"sigs.k8s.io/yaml"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 )

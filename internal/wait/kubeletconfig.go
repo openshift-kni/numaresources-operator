@@ -19,8 +19,9 @@ package wait
 import (
 	"context"
 
-	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
+
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 )
 
 func (wt Waiter) ForMCOKubeletConfigDeleted(ctx context.Context, kcName string) error {

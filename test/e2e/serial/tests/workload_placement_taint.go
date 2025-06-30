@@ -21,27 +21,24 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
-
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/k8simported/taints"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
@@ -49,7 +46,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/internal/padder"
 
-	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering taints", Serial, Label("disruptive", "scheduler"), Label("feature:wlplacement", "feature:taint"), func() {

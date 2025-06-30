@@ -23,6 +23,7 @@ import (
 
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"

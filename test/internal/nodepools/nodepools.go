@@ -5,10 +5,12 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openshift-kni/numaresources-operator/test/internal/hypershift"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
+
+	"github.com/openshift-kni/numaresources-operator/test/internal/hypershift"
 )
 
 func GetByClusterName(ctx context.Context, c client.Client, hostedClusterName string) (*hypershiftv1beta1.NodePool, error) {

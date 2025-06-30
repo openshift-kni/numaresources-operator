@@ -22,13 +22,14 @@ import (
 
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	nrtv1alpha2attr "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
+
+	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 )
 
 type PFPCount struct {

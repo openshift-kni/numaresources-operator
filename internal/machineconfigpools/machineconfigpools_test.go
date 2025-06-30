@@ -21,8 +21,9 @@ import (
 	"reflect"
 	"testing"
 
-	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 )
 
 func TestFindBySelector(t *testing.T) {

@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/klog/v2"
-	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
-
 	"github.com/jaypipes/ghw/pkg/topology"
 	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
+
+	"k8s.io/klog/v2"
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 )

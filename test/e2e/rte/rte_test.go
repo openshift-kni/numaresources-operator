@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"sigs.k8s.io/yaml"
-
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
@@ -37,12 +35,16 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/yaml"
+
+	mcov1 "github.com/openshift/api/machineconfiguration/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
-
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
@@ -55,8 +57,6 @@ import (
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
-	mcov1 "github.com/openshift/api/machineconfiguration/v1"
-	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
 var _ = ginkgo.Describe("with a running cluster with all the components", func() {

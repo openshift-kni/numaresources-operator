@@ -21,15 +21,14 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	intreslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -39,6 +38,9 @@ import (
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/internal/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("[serial][hostlevel] numaresources host-level resources", Serial, Label("hostlevel"), Label("feature:hostlevel"), func() {

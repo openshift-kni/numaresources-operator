@@ -34,7 +34,6 @@ import (
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 )
 

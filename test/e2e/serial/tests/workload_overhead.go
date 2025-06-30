@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -39,8 +37,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
-
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
@@ -48,7 +46,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 	e2epadder "github.com/openshift-kni/numaresources-operator/test/internal/padder"
 
-	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhead", Serial, Label("disruptive", "scheduler"), Label("feature:overhead"), func() {

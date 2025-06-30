@@ -22,9 +22,6 @@ import (
 	"strings"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -37,6 +34,9 @@ import (
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 const (

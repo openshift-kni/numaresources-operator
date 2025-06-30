@@ -17,10 +17,11 @@
 package version
 
 import (
-	_ "embed"
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	_ "embed"
 
 	"github.com/openshift-kni/numaresources-operator/internal/api/buildinfo"
 )

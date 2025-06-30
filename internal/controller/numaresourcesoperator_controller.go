@@ -50,11 +50,13 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/internal/dangling"
+	intreconcile "github.com/openshift-kni/numaresources-operator/internal/reconcile"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
@@ -67,8 +69,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/status/conditioninfo"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/config"
-
-	intreconcile "github.com/openshift-kni/numaresources-operator/internal/reconcile"
 )
 
 const numaResourcesRetryPeriod = 1 * time.Minute

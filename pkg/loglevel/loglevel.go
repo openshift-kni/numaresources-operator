@@ -22,9 +22,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
+	operatorv1 "github.com/openshift/api/operator/v1"
+
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
-	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
 // ToKlog converts LogLevel value into klog verboseness level according to operator/v1.LogLevel documentation
