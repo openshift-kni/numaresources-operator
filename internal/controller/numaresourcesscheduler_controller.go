@@ -261,11 +261,10 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		return nropv1.NUMAResourcesSchedulerStatus{}, err
 	}
 
-	schedStatus := nropv1.NUMAResourcesSchedulerStatus{
-		SchedulerName: schedSpec.SchedulerName,
-		CacheResyncPeriod: &metav1.Duration{
-			Duration: cacheResyncPeriod,
-		},
+	schedStatus := *instance.Status.DeepCopy()
+	schedStatus.SchedulerName = schedSpec.SchedulerName
+	schedStatus.CacheResyncPeriod = &metav1.Duration{
+		Duration: cacheResyncPeriod,
 	}
 
 	r.SchedulerManifests.Deployment.Spec.Replicas = schedSpec.Replicas
