@@ -24,7 +24,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog/v2"
 	corev1qos "k8s.io/kubectl/pkg/util/qos"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -334,13 +333,11 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			// TODO: just use nrtList?
 			err = fxt.Client.List(context.TODO(), &targetNrtListInitial)
 			Expect(err).ToNot(HaveOccurred())
-			// TODO: multi-line value in structured log
-			klog.InfoS("initial NRT List", "list", intnrt.ListToString(targetNrtListInitial.Items, " initial list"))
+			fxt.Dump.Infof(intnrt.ListToString(targetNrtListInitial.Items, " initial list"), "inital NRT List")
 
 			targetNrtInitial, err = e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
-			// TODO: multi-line value in structured log
-			klog.InfoS("initial NRT target", "nrt", intnrt.ToString(*targetNrtInitial))
+			fxt.Dump.Infof(intnrt.ToString(*targetNrtInitial), "initial NRT Target")
 
 			//calculate base load on the target node
 			baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), targetNodeName)
@@ -369,11 +366,10 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 				//calculate base load on the node
 				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
-				// TODO: multi-line value in structured log
-				klog.InfoS("computed base load", "value", baseload)
+				fxt.Dump.Infof(baseload.String(), "computed base load")
 
 				//get nrt info of the node
-				klog.InfoS("preparing node to fit the test case", "node", nodeName)
+				fxt.Log.Info("preparing node to fit the test case", "node", nodeName)
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", nodeName)
 
@@ -403,13 +399,11 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			By("Getting the reference NRT list post padding")
 			targetNrtListReference, err = e2enrt.GetUpdated(fxt.Client, targetNrtListInitial, 1*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
-			// TODO: multi-line value in structured log
-			klog.InfoS("reference NRT List", "list", intnrt.ListToString(targetNrtListReference.Items, " reference list"))
+			fxt.Dump.Infof(intnrt.ListToString(targetNrtListReference.Items, " reference list"), "reference NRT List")
 
 			targetNrtReference, err = e2enrt.FindFromList(targetNrtListReference.Items, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
-			// TODO: multi-line value in structured log
-			klog.InfoS("reference NRT target", "nrt", intnrt.ToString(*targetNrtReference))
+			fxt.Dump.Infof(intnrt.ToString(*targetNrtReference), "reference NRT target")
 		})
 
 		It("[test_id:48685] should properly schedule a best-effort pod with no changes in NRTs", Label(label.Tier1), func() {
@@ -486,8 +480,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			// make it burstable
 			deployment.Spec.Template.Spec.Containers[0].Resources.Requests = reqResources
 
-			// TODO: multi-line value in structured log
-			klog.InfoS("create the bustable test deployment with requests", "requests", e2ereslist.ToString(reqResources))
+			fxt.Dump.Infof(e2ereslist.ToString(reqResources), "create the bustable test deployment with requests")
 			err = fxt.Client.Create(context.TODO(), deployment)
 			Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 
@@ -525,8 +518,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			//calculate base load on the target node
 			baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
-			// TODO: multi-line value in structured log
-			klog.InfoS("computed base load", "value", baseload)
+			fxt.Dump.Infof(baseload.String(), "computed base load")
 
 			var reqResPerNUMA []corev1.ResourceList
 			for _, zone := range targetNrtInitial.Zones {
@@ -565,8 +557,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			err = fxt.Client.Create(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
-			// TODO: multi-line value in structured log
-			klog.InfoS("create the burstable test pod with requests", "requests", e2ereslist.ToString(reqResources))
+			fxt.Dump.Infof(e2ereslist.ToString(reqResources), "create the burstable test pod with requests")
 
 			By("waiting for the pod to be scheduled")
 			// 3 minutes is plenty, should never timeout
@@ -685,8 +676,8 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(err).ToNot(HaveOccurred())
 
 			rl := e2ereslist.FromGuaranteedPod(*updatedPod2)
-			// TODO: multi-line value in structured log
-			klog.InfoS("post-create pod resource list", "spec", e2ereslist.ToString(e2ereslist.FromContainerLimits(podGuanranteed.Spec.Containers)), "updated", e2ereslist.ToString(rl))
+			fxt.Dump.Infof(e2ereslist.ToString(e2ereslist.FromContainerLimits(podGuanranteed.Spec.Containers)), "post-create pod resource list")
+			fxt.Dump.Infof(e2ereslist.ToString(rl), "updated pod resource list")
 
 			scope, ok := attribute.Get(targetNrtInitial.Attributes, intnrt.TopologyManagerScopeAttribute)
 			Expect(ok).To(BeTrue(), fmt.Sprintf("Unable to find required attribute %q on NRT %q", intnrt.TopologyManagerScopeAttribute, targetNrtInitial.Name))
@@ -742,8 +733,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			// make it burstable
 			ds.Spec.Template.Spec.Containers[0].Resources.Requests = reqResources
 
-			// TODO: multi-line value in structured log
-			klog.InfoS("create the bustable test daemonset with requests", "requests", e2ereslist.ToString(reqResources))
+			fxt.Dump.Infof(e2ereslist.ToString(reqResources), "create the bustable test daemonset with requests")
 			err = fxt.Client.Create(context.TODO(), ds)
 			Expect(err).NotTo(HaveOccurred(), "unable to create daemonset %q", ds.Name)
 
@@ -786,8 +776,9 @@ func checkNRTConsumedResources(fxt *e2efixture.Fixture, targetNrtInitial nrtv1al
 	match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(targetNrtInitial, targetNrtCurrent, requiredRes, corev1qos.GetPodQOS(updatedPod))
 	Expect(err).ToNot(HaveOccurred())
 	if match == "" {
-		// TODO: multi-line value in structured log
-		klog.InfoS("inconsistent accounting: no resources consumed by the running pod", "nrtBefore", intnrt.ToString(targetNrtInitial), "nrtAfter", intnrt.ToString(targetNrtCurrent), "podResources", e2ereslist.ToString(requiredRes))
+		fxt.Dump.Infof(intnrt.ToString(targetNrtInitial), "inconsistent accounting: no resources consumed by the running pod. nrtBefore")
+		fxt.Dump.Infof(intnrt.ToString(targetNrtCurrent), "inconsistent accounting: no resources consumed by the running pod. nrtAfter")
+		fxt.Dump.Infof(e2ereslist.ToString(requiredRes), "inconsistent accounting: no resources consumed by the running pod. podResources")
 	}
 	return targetNrtCurrent, match
 }
