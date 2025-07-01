@@ -137,7 +137,7 @@ func validateTopologyManagerConfiguration(kconfigs map[string]*kubeletconfigv1be
 		}
 		kconfTMPolicy := kconfig.TopologyManagerPolicy
 		if kconfTMPolicy == "" {
-			klog.Infof("Topology Manager Policy not set in kubeletconfig, fixing to %q", tmPolicyDefault)
+			klog.InfoS("Topology Manager Policy not set in kubeletconfig, fixing", "policy", tmPolicyDefault)
 			kconfTMPolicy = tmPolicyDefault
 		}
 		if nrtTMPolicy.Value != kconfTMPolicy {
@@ -152,7 +152,7 @@ func validateTopologyManagerConfiguration(kconfigs map[string]*kubeletconfigv1be
 		}
 		kconfTMScope := kconfig.TopologyManagerScope
 		if kconfTMScope == "" {
-			klog.Infof("Topology Manager Scope not set in kubeletconfig, fixing to %q", tmScopeDefault)
+			klog.InfoS("Topology Manager Scope not set in kubeletconfig, fixing", "scope", tmScopeDefault)
 			kconfTMScope = tmScopeDefault
 		}
 		if nrtTMScope.Value != kconfTMScope {

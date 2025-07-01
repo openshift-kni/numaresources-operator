@@ -168,14 +168,14 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 })
 
 func updateInfoRefreshPause(ctx context.Context, fxt *e2efixture.Fixture, newVal nropv1.InfoRefreshPauseMode, objForKey *nropv1.NUMAResourcesOperator) {
-	klog.Infof("update InfoRefreshPause to %q only if the existing one is different", newVal)
+	klog.InfoS("update InfoRefreshPause only if the existing one is different", "newValue", newVal)
 	nroKey := client.ObjectKeyFromObject(objForKey)
 	currentNrop := &nropv1.NUMAResourcesOperator{}
 	err := fxt.Client.Get(ctx, nroKey, currentNrop)
 	Expect(err).ToNot(HaveOccurred())
 	currentVal := *currentNrop.Status.MachineConfigPools[0].Config.InfoRefreshPause
 	if currentVal == newVal {
-		klog.Infof("profile already has the updated InfoRefreshPause: %s=%s", currentVal, newVal)
+		klog.InfoS("profile already has the updated InfoRefreshPause", "currentValue", currentVal, "newValue", newVal)
 		return
 	}
 
@@ -211,7 +211,7 @@ func updateInfoRefreshPause(ctx context.Context, fxt *e2efixture.Fixture, newVal
 			currentMode = *updatedObj.Status.MachineConfigPools[0].Config.InfoRefreshPause
 		}
 		if currentMode != newVal {
-			klog.Warningf("resource status is not updated yet: expected %q found %q", newVal, currentMode)
+			klog.InfoS("resource status is not updated yet", "expected", newVal, "found", currentMode)
 			return false
 		}
 
@@ -223,7 +223,7 @@ func updateInfoRefreshPause(ctx context.Context, fxt *e2efixture.Fixture, newVal
 }
 
 func waitForDaemonSetUpdate(ctx context.Context, fxt *e2efixture.Fixture, dsNsName nropv1.NamespacedName, rtePods []corev1.Pod) {
-	klog.Infof(fmt.Sprintf("ensure old RTE pods of ds %q are deleted", dsNsName))
+	klog.InfoS("ensure old RTE pods of ds are deleted", "daemonset", dsNsName)
 	err := wait.With(fxt.Client).Interval(30*time.Second).Timeout(5*time.Minute).ForPodListAllDeleted(ctx, rtePods)
 	Expect(err).ToNot(HaveOccurred(), "Expected old RTE pods owned by the DaemonSet to be deleted within the timeout")
 

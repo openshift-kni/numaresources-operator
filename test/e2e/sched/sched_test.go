@@ -59,14 +59,14 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			Eventually(func() bool {
 				err := e2eclient.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
 				if err != nil {
-					klog.Warningf("failed to get NUMAResourcesScheduler %s; err: %v", nroSchedObj.Name, err)
+					klog.ErrorS(err, "failed to get NUMAResourcesScheduler", "name", nroSchedObj.Name)
 					return false
 				}
 
 				nroSchedObj.Spec = objects.TestNROScheduler().Spec
 				err = e2eclient.Client.Update(context.TODO(), nroSchedObj)
 				if err != nil {
-					klog.Warningf("failed to update NUMAResourcesScheduler %s; err: %v", nroSchedObj.Name, err)
+					klog.ErrorS(err, "failed to update NUMAResourcesScheduler", "name", nroSchedObj.Name)
 					return false
 				}
 				return true
@@ -88,12 +88,12 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			By(fmt.Sprintf("switching the NROS image to %s", e2eimages.SchedTestImageCI))
 			Eventually(func() bool {
 				if err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj); err != nil {
-					klog.Warningf("failed to get NUMAResourcesScheduler %s; err: %v", nroSchedObj.Name, err)
+					klog.ErrorS(err, "failed to get NUMAResourcesScheduler", "name", nroSchedObj.Name)
 					return false
 				}
 				nroSchedObj.Spec.SchedulerImage = e2eimages.SchedTestImageCI
 				if err := e2eclient.Client.Update(context.TODO(), nroSchedObj); err != nil {
-					klog.Warningf("failed to update NUMAResourcesScheduler %s; err: %v", nroSchedObj.Name, err)
+					klog.ErrorS(err, "failed to update NUMAResourcesScheduler", "name", nroSchedObj.Name)
 					return false
 				}
 				uid = nroSchedObj.GetUID()
@@ -108,7 +108,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 				// find deployment by the ownerReference
 				deploy, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), uid)
 				if err != nil {
-					klog.Warningf("deployment pod listing failed: %v", err)
+					klog.ErrorS(err, "deployment pod listing failed")
 					return false
 				}
 				return deploy.Spec.Template.Spec.Containers[0].Image == e2eimages.SchedTestImageCI
@@ -117,12 +117,12 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			By("reverting NROS changes")
 			Eventually(func() bool {
 				if err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj); err != nil {
-					klog.Warningf("failed to get NUMAResourcesScheduler %s; err: %v", nroSchedObj.Name, err)
+					klog.ErrorS(err, "failed to get NUMAResourcesScheduler", "name", nroSchedObj.Name)
 					return false
 				}
 				nroSchedObj.Spec = objects.TestNROScheduler().Spec
 				if err = e2eclient.Client.Update(context.TODO(), nroSchedObj); err != nil {
-					klog.Warningf("failed to update NUMAResourcesScheduler %s; err: %v", nroSchedObj.Name, err)
+					klog.ErrorS(err, "failed to update NUMAResourcesScheduler", "name", nroSchedObj.Name)
 					return false
 				}
 				return true
@@ -149,7 +149,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			Eventually(func() bool {
 				cmList := &corev1.ConfigMapList{}
 				if err := e2eclient.Client.List(context.TODO(), cmList); err != nil {
-					klog.Warningf("failed to list ConfigMaps: %v", err)
+					klog.ErrorS(err, "failed to list ConfigMaps")
 					return false
 				}
 
@@ -159,7 +159,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 					}
 				}
 				if nroCM == nil {
-					klog.Warningf("cannot match ConfigMap")
+					klog.InfoS("cannot match ConfigMap affecting scheduler", "schedulerName", nroSchedObj.Spec.SchedulerName, "schedulerImage", nroSchedObj.Spec.SchedulerImage)
 					return false
 				}
 
@@ -168,7 +168,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 
 				err = e2eclient.Client.Update(context.TODO(), nroCM)
 				if err != nil {
-					klog.Warningf("failed to update ConfigMap %s/%s; err: %v", nroCM.Namespace, nroCM.Name, err)
+					klog.ErrorS(err, "failed to update ConfigMap", "namespace", nroCM.Namespace, "name", nroCM.Name)
 					return false
 				}
 				return true
@@ -178,12 +178,13 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			Eventually(func() bool {
 				err = e2eclient.Client.Get(context.TODO(), key, nroCM)
 				if err != nil {
-					klog.Warningf("failed to obtain ConfigMap; err: %v", err)
+					klog.ErrorS(err, "failed to obtain ConfigMap")
 					return false
 				}
 
 				if diff := cmp.Diff(nroCM.Data, initialCM.Data); diff != "" {
-					klog.Warningf("updated ConfigMap data is not equal to the expected: %v", diff)
+					// TODO: multi-line value in structured log
+					klog.InfoS("updated ConfigMap data is not equal to the expected", "diff", diff)
 					return false
 				}
 				return true
@@ -200,7 +201,7 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 
 			Eventually(func() bool {
 				if err = e2eclient.Client.Update(context.TODO(), dp); err != nil {
-					klog.Warningf("failed to update Deployment %s/%s; err: %v", dp.Namespace, dp.Name, err)
+					klog.ErrorS(err, "failed to update Deployment", "namespace", dp.Namespace, "name", dp.Name)
 					return false
 				}
 				return true
@@ -211,12 +212,13 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			Eventually(func() bool {
 				err = e2eclient.Client.Get(context.TODO(), key, dp)
 				if err != nil {
-					klog.Warningf("failed to obtain ConfigMap; err: %v", err)
+					klog.ErrorS(err, "failed to obtain ConfigMap")
 					return false
 				}
 
 				if diff := cmp.Diff(dp.Spec.Template.Spec, initialDP.Spec.Template.Spec); diff != "" {
-					klog.Warningf("updated Deployment is not equal to the expected: %v", diff)
+					// TODO: multi-line value in structured log
+					klog.InfoS("updated Deployment is not equal to the expected", "diff", diff)
 					return false
 				}
 				return true
@@ -242,14 +244,14 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			Eventually(func() bool {
 				err := e2eclient.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
 				if err != nil {
-					klog.Warningf("failed to get %q", nroSchedKey)
+					klog.ErrorS(err, "failed to get", "key", nroSchedKey)
 					return false
 				}
 				nroSchedObj.Spec.CacheResyncPeriod = &metav1.Duration{Duration: t}
 
 				err = e2eclient.Client.Update(context.TODO(), nroSchedObj)
 				if err != nil {
-					klog.Warningf("failed to update %q", nroSchedKey)
+					klog.ErrorS(err, "failed to update", "key", nroSchedKey)
 					return false
 				}
 				return true

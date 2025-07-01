@@ -61,18 +61,17 @@ var _ = Describe("[Scheduler] install", func() {
 				updatedNROObj := &nropv1.NUMAResourcesScheduler{}
 				err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), updatedNROObj)
 				if err != nil {
-					klog.Warningf("failed to get the NRO Scheduler resource: %v", err)
+					klog.ErrorS(err, "failed to get the NRO Scheduler resource")
 					return false
 				}
 
 				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
 				if cond == nil {
-					klog.Warningf("missing conditions in %v", updatedNROObj)
+					klog.InfoS("missing conditions", "nroObj", updatedNROObj)
 					return false
 				}
 
-				klog.Infof("condition: %v", cond)
-				klog.Infof("conditions: %v", updatedNROObj.Status.Conditions)
+				klog.InfoS("scheduler status", "availableCondition", cond, "conditions", updatedNROObj.Status.Conditions)
 
 				return cond.Status == metav1.ConditionTrue
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "NRO Scheduler condition did not become available")
@@ -85,12 +84,12 @@ var _ = Describe("[Scheduler] install", func() {
 			Eventually(func() bool {
 				deployment, err = podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.UID)
 				if err != nil {
-					klog.Warningf("unable to get deployment by owner reference: %v", err)
+					klog.ErrorS(err, "unable to get deployment by owner reference")
 					return false
 				}
 
 				if deployment.Status.ReadyReplicas != *deployment.Spec.Replicas {
-					klog.Warningf("Invalid number of ready replicas: desired: %d, actual: %d", *deployment.Spec.Replicas, deployment.Status.ReadyReplicas)
+					klog.InfoS("Invalid number of ready replicas", "current", deployment.Status.ReadyReplicas, "desired", *deployment.Spec.Replicas)
 					return false
 				}
 				return true

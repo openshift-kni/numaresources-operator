@@ -43,7 +43,7 @@ var _ = Describe("[Scheduler] uninstall", func() {
 			// failed to get the NROScheduler object, nothing else we can do
 			if err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj); err != nil {
 				if !errors.IsNotFound(err) {
-					klog.Warningf("failed to get the NUMA resource scheduler %q: %v", nroSchedObj.Name, err)
+					klog.ErrorS(err, "failed to get the NUMA resource scheduler", "name", nroSchedObj.Name)
 				}
 				return
 			}
@@ -66,9 +66,9 @@ var _ = Describe("[Scheduler] uninstall", func() {
 					key := client.ObjectKeyFromObject(obj)
 					if err := e2eclient.Client.Get(context.TODO(), key, obj); !errors.IsNotFound(err) {
 						if err == nil {
-							klog.Warningf("obj %s still exists", key.String())
+							klog.InfoS("obj still exists", "key", key.String())
 						} else {
-							klog.Warningf("obj %s return with error: %v", key.String(), err)
+							klog.ErrorS(err, "obj return with error", "key", key.String())
 						}
 						return false
 					}

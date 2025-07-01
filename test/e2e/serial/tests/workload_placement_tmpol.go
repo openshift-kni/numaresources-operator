@@ -150,7 +150,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				//calculate a base load on the node
 				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
-				klog.Infof("computed base load: %s", baseload)
+				// TODO: multi-line value in structured log
+				klog.InfoS("computed base load", "value", baseload)
 				baseload.Apply(paddingRes)
 				for zIdx, zone := range nrtInfo.Zones {
 					podName := fmt.Sprintf("padding-%d-%d", nIdx, zIdx)
@@ -1411,18 +1412,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() bool {
 				events, err := objects.GetEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				if err != nil {
-					klog.Errorf("failed to get events for pod %s/%s; error: %v", pod.Namespace, pod.Name, err)
+					klog.ErrorS(err, "failed to get events for pod", "namespace", pod.Namespace, "name", pod.Name)
 				}
 				for _, e := range events {
 					ok, err := regexp.MatchString(errMsg, e.Message)
 					if err != nil {
-						klog.Errorf("bad message regex %s", errMsg)
+						klog.ErrorS(err, "bad message regex", "pattern", errMsg, "eventMessage", e.Message)
 					}
 					if e.Reason == "FailedScheduling" && ok {
 						return true
 					}
 				}
-				klog.Warningf("failed to find the expected event with Reason=\"FailedScheduling\" and Message contains: %q", errMsg)
+				klog.InfoS("failed to find the expected event with Reason=\"FailedScheduling\" and Message contains", "expected", errMsg)
 				if !loggedEvents {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 					loggedEvents = true

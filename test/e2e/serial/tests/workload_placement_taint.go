@@ -75,7 +75,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		if len(nrtCandidates) < 2 {
 			e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
 		}
-		klog.Infof("Found node with 2 NUMA zones: %d", len(nrtCandidates))
+		klog.InfoS("Found node with 2 NUMA zones", "count", len(nrtCandidates))
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
@@ -83,7 +83,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		if len(nrts) < 2 {
 			e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 		}
-		klog.Infof("Found node with 2 NUMA zones: %d", len(nrts))
+		klog.InfoS("Found node with 2 NUMA zones", "count", len(nrts))
 
 		// Note that this test, being part of "serial", expects NO OTHER POD being scheduled
 		// in between, so we consider this information current and valid when the It()s run.
@@ -175,7 +175,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
 
-			klog.Infof("target node will be %q", targetNodeName)
+			klog.InfoS("target node will be", "node", targetNodeName)
 
 			var nrtInitial nrtv1alpha2.NodeResourceTopology
 			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: targetNodeName}, &nrtInitial)
@@ -291,7 +291,7 @@ func untaintNodes(cli client.Client, taintedNodeNames []string, taint *corev1.Ta
 				return nil
 			}
 
-			klog.Infof("removing taint: %q from node: %q", taint.String(), updatedNode.Name)
+			klog.InfoS("removing taint from node", "taint", taint.String(), "node", updatedNode.Name)
 			err = cli.Update(context.TODO(), updatedNode)
 			if err != nil {
 				return err
@@ -342,12 +342,12 @@ func applyTaintToNode(ctx context.Context, cli client.Client, targetNode *corev1
 			return nil
 		}
 
-		klog.Infof("adding taint: %q to node: %q", tnt.String(), updatedNode.Name)
+		klog.InfoS("adding taint to node", "taint", tnt.String(), "node", updatedNode.Name)
 		err = cli.Update(ctx, updatedNode)
 		if err != nil {
 			return err
 		}
-		klog.Infof("added taint: %q to node: %q", tnt.String(), updatedNode.Name)
+		klog.InfoS("added taint to node", "taint", tnt.String(), "node", updatedNode.Name)
 		return nil
 	}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(Succeed())
 	return updatedNode

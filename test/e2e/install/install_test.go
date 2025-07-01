@@ -87,17 +87,17 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 			err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, immediate, func(ctx context.Context) (bool, error) {
 				err := e2eclient.Client.Get(ctx, nname, updatedNROObj)
 				if err != nil {
-					klog.Warningf("failed to get the NRO resource: %v", err)
+					klog.ErrorS(err, "failed to get the NRO resource")
 					return false, err
 				}
 
 				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
 				if cond == nil {
-					klog.Warningf("missing conditions in %v", updatedNROObj)
+					klog.InfoS("missing conditions", "nroObj", updatedNROObj)
 					return false, err
 				}
 
-				klog.Infof("condition for %s: %v", nname.Name, cond)
+				klog.InfoS("condition", "name", nname.Name, "condition", cond)
 				return cond.Status == metav1.ConditionTrue, nil
 			})
 			if err != nil {
@@ -117,27 +117,27 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 			Eventually(func() bool {
 				ds, err := getDaemonSetByOwnerReference(updatedNROObj.UID)
 				if err != nil {
-					klog.Warningf("unable to get Daemonset  %v", err)
+					klog.ErrorS(err, "unable to get Daemonset")
 					return false
 				}
 
 				if ds.Status.NumberMisscheduled != 0 {
-					klog.Warningf(" Misscheduled: There are %d nodes that should not be running Daemon pod but are", ds.Status.NumberMisscheduled)
+					klog.InfoS("Misscheduled: There are nodes that should not be running Daemon pod, but they are", "count", ds.Status.NumberMisscheduled)
 					return false
 				}
 
 				if ds.Status.NumberUnavailable != 0 {
-					klog.Infof(" NumberUnavailable %d (should be 0)", ds.Status.NumberUnavailable)
+					klog.InfoS("NumberUnavailable mismatch", "current", ds.Status.NumberUnavailable, "desired", 0)
 					return false
 				}
 
 				if ds.Status.CurrentNumberScheduled != ds.Status.DesiredNumberScheduled {
-					klog.Infof(" CurrentNumberScheduled %d (should be %d)", ds.Status.CurrentNumberScheduled, ds.Status.DesiredNumberScheduled)
+					klog.InfoS("CurrentNumberScheduled mismatch", "current", ds.Status.CurrentNumberScheduled, "desired", ds.Status.DesiredNumberScheduled)
 					return false
 				}
 
 				if ds.Status.NumberReady != ds.Status.DesiredNumberScheduled {
-					klog.Infof(" NumberReady %d (should be %d)", ds.Status.CurrentNumberScheduled, ds.Status.DesiredNumberScheduled)
+					klog.InfoS("NumberReady mismatch", "current", ds.Status.NumberReady, "desired", ds.Status.DesiredNumberScheduled)
 					return false
 				}
 				return true
@@ -176,17 +176,17 @@ var _ = Describe("[Install] durability", Serial, func() {
 				updatedNROObj := &nropv1.NUMAResourcesOperator{}
 				err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), updatedNROObj)
 				if err != nil {
-					klog.Warningf("failed to get the  NUMAResourcesOperator CR: %v", err)
+					klog.ErrorS(err, "failed to get the  NUMAResourcesOperator CR")
 					return false
 				}
 
 				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionDegraded)
 				if cond == nil {
-					klog.Warningf("missing conditions in %v", updatedNROObj)
+					klog.InfoS("missing conditions", "nroObj", updatedNROObj)
 					return false
 				}
 
-				klog.Infof("condition: %v", cond)
+				klog.InfoS("condition", "condition", cond)
 
 				return cond.Status == metav1.ConditionTrue
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "NUMAResourcesOperator condition did not become degraded")
@@ -219,7 +219,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 					return false, err
 				}
 				if len(nroObj.Status.DaemonSets) != 1 {
-					klog.Warningf("unsupported daemonsets (/MCP) count: %d", len(nroObj.Status.DaemonSets))
+					klog.InfoS("unsupported daemonsets (/MCP)", "count", len(nroObj.Status.DaemonSets))
 					return false, nil
 				}
 				return true, nil
@@ -253,22 +253,18 @@ var _ = Describe("[Install] durability", Serial, func() {
 				updatedDs := &appsv1.DaemonSet{}
 				err := e2eclient.Client.Get(context.TODO(), dsKey.AsKey(), updatedDs)
 				if err != nil {
-					klog.Warningf("failed to get the daemonset %s: %v", dsKey.String(), err)
+					klog.ErrorS(err, "failed to get the daemonset", "key", dsKey.String())
 					return false
 				}
 
 				if !nrowait.AreDaemonSetPodsReady(&updatedDs.Status) {
-					klog.Warningf("daemonset %s desired %d scheduled %d ready %d",
-						dsKey.String(),
-						updatedDs.Status.DesiredNumberScheduled,
-						updatedDs.Status.CurrentNumberScheduled,
-						updatedDs.Status.NumberReady)
+					klog.InfoS("daemonset not ready", "key", dsKey.String(), "desired", updatedDs.Status.DesiredNumberScheduled, "scheduled", updatedDs.Status.CurrentNumberScheduled, "ready", updatedDs.Status.NumberReady)
 					return false
 				}
 
-				klog.Infof("daemonset %s ready", dsKey.String())
+				klog.InfoS("daemonset ready", "key", dsKey.String())
 
-				klog.Warningf("daemonset Generation observed %v current %v", updatedDs.Status.ObservedGeneration, ds.Generation)
+				klog.InfoS("daemonset Generation", "observedGeneration", updatedDs.Status.ObservedGeneration, "currentGeneration", ds.Generation)
 				isUpdated := updatedDs.Status.ObservedGeneration > ds.Generation
 				if !isUpdated {
 					return false
@@ -315,9 +311,9 @@ var _ = Describe("[Install] durability", Serial, func() {
 					key := client.ObjectKeyFromObject(obj)
 					if err := e2eclient.Client.Get(context.TODO(), key, obj); !errors.IsNotFound(err) {
 						if err == nil {
-							klog.Warningf("obj %s still exists", key.String())
+							klog.InfoS("obj still exists", "key", key.String())
 						} else {
-							klog.Warningf("obj %s return with error: %v", key.String(), err)
+							klog.ErrorS(err, "obj return with error", "key", key.String())
 						}
 						return false
 					}
@@ -352,8 +348,8 @@ var _ = Describe("[Install] durability", Serial, func() {
 
 				ds, err := getDaemonSetByOwnerReference(updatedNroObj.GetUID())
 				if err != nil {
-					klog.Warningf("failed to get the RTE DaemonSet: %v", err)
-					klog.Warningf("NRO:\n%s\n", objects.ToYAML(updatedNroObj))
+					// TODO: multi-line value in structured log
+					klog.ErrorS(err, "failed to get the RTE DaemonSet", "nroYAML", objects.ToYAML(updatedNroObj))
 					return false
 				}
 
@@ -369,12 +365,13 @@ var _ = Describe("[Install] durability", Serial, func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				if len(updatedConfigMaps.Items) != 1 {
-					klog.Warningf("expected exactly 1 RTE configmap, got: %d", len(updatedConfigMaps.Items))
+					klog.InfoS("expected exactly configmap", "current", len(updatedConfigMaps.Items), "desired", 1)
 					return false
 				}
 				rteConfigMap = &updatedConfigMaps.Items[0]
 				return true
 			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
+			// TODO: multi-line value in structured log
 			klog.InfoS("found RTE configmap", "rteConfigMap", rteConfigMap)
 
 			cfg, err := configuration.ValidateAndExtractRTEConfigData(rteConfigMap)
@@ -392,7 +389,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 					// the same configuration should apply to all NRT objects
 					matchingErr := configuration.CheckTopologyManagerConfigMatching(nrt, &cfg)
 					if matchingErr != "" {
-						klog.Warningf("NRT %q doesn't match topologyManager configuration: %s", nrt.Name, matchingErr)
+						klog.InfoS("NRT doesn't match topologyManager configuration", "name", nrt.Name, "problem", matchingErr)
 						return false
 					}
 				}
@@ -451,18 +448,18 @@ func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {
 func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context.Context, nroObj *nropv1.NUMAResourcesOperator, reason string) {
 	dss, err := objects.GetDaemonSetsOwnedBy(cli, nroObj.ObjectMeta)
 	if err != nil {
-		klog.Warningf("no DaemonSets for %s (%s)", nroObj.Name, nroObj.GetUID())
+		klog.InfoS("no DaemonSets", "nroName", nroObj.Name, "nroUID", nroObj.GetUID())
 		return
 	}
 
-	klog.Infof("%s (%d DaemonSet)", reason, len(dss))
+	klog.InfoS("logging RTE pods", "reason", reason, "daemonsetCount", len(dss))
 
 	for _, ds := range dss {
-		klog.Infof("daemonset %s/%s desired %d scheduled %d ready %d", ds.Namespace, ds.Name, ds.Status.DesiredNumberScheduled, ds.Status.CurrentNumberScheduled, ds.Status.NumberReady)
+		klog.InfoS("daemonset status", "namespace", ds.Namespace, "name", ds.Name, "desired", ds.Status.DesiredNumberScheduled, "scheduled", ds.Status.CurrentNumberScheduled, "ready", ds.Status.NumberReady)
 
 		labSel, err := metav1.LabelSelectorAsSelector(ds.Spec.Selector)
 		if err != nil {
-			klog.Warningf("cannot use DaemonSet label selector as selector: %v", err)
+			klog.ErrorS(err, "cannot use DaemonSet label selector as selector")
 			continue
 		}
 
@@ -472,17 +469,18 @@ func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context
 			LabelSelector: labSel,
 		})
 		if err != nil {
-			klog.Warningf("cannot get Pods by DaemonSet %s/%s: %v", ds.Namespace, ds.Name, err)
+			klog.ErrorS(err, "cannot get Pods by DaemonSet", "namespace", ds.Namespace, "name", ds.Name)
 			continue
 		}
 
 		for _, pod := range podList.Items {
 			logs, err := objects.GetLogsForPod(k8sCli, pod.Namespace, pod.Name, containerNameRTE)
 			if err != nil {
-				klog.Warningf("DaemonSet %s/%s -> Pod %s/%s -> error getting logs: %v", ds.Namespace, ds.Name, pod.Namespace, pod.Name, err)
+				klog.ErrorS(err, "cannot fetch logs", "dsNamespace", ds.Namespace, "dsName", ds.Name, "podNamespace", pod.Namespace, "podName", pod.Name)
 				continue
 			}
-			klog.Infof("DaemonSet %s/%s -> Pod %s/%s -> logs:\n%s\n-----\n", ds.Namespace, ds.Name, pod.Namespace, pod.Name, logs)
+			// TODO: multi-line value in structured log
+			klog.InfoS("fetched logs", "dsNamespace", ds.Namespace, "dsName", ds.Name, "podNamespace", pod.Namespace, "podName", pod.Name, "logs", logs)
 		}
 	}
 }
