@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/klog/v2"
 	corev1qos "k8s.io/kubectl/pkg/util/qos"
 	"k8s.io/utils/ptr"
 
@@ -629,20 +628,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrts), neededNodes)
 			}
 
-			// TODO: multi-line value in structured log
-			klog.InfoS("reference NRT", "zone", intnrt.ZoneToString(nrts[0].Zones[0]))
+			fxt.Dump.Infof(intnrt.ZoneToString(nrts[0].Zones[0]), "reference NRT")
 
 			ress := make([]corev1.ResourceList, 0, len(nrts))
 			for idx := range nrts {
 				nodeName := nrts[idx].Name
 				bl, err := intbaseload.ForNode(fxt.Client, ctx, nodeName)
 				Expect(err).ToNot(HaveOccurred(), "computing baseload for %q", nodeName)
-				klog.InfoS("base load", "value", bl.String())
+				fxt.Log.Info("base load", "value", bl.String())
 				ress = append(ress, bl.Resources)
 			}
 			xload := resourcelist.Highest(ress...)
-			// TODO: multi-line value in structured log
-			klog.InfoS("highest base load resource cost", "resources", resourcelist.ToString(xload))
+			fxt.Dump.Infof(resourcelist.ToString(xload), "highest base load resource cost")
 
 			labSel, err := labels.Parse(fmt.Sprintf("%s=%d", serialconfig.MultiNUMALabel, requiredNUMAZones))
 			Expect(err).ToNot(HaveOccurred())
@@ -651,16 +648,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			// note about the factors. We need to use prime numbers and we need to avoid exact multiples.
 			// other than that, we use the smallest meaningful prime numbers
 			numaLevelFreeRes := resourcelist.ScaleCoreResources(xload, 7, 3)
-			// TODO: multi-line value in structured log
-			klog.InfoS("available resources", "resources", resourcelist.ToString(numaLevelFreeRes))
+			fxt.Dump.Infof(resourcelist.ToString(numaLevelFreeRes), "available resources")
 
 			numaLevelFitRequiredRes := resourcelist.ScaleCoreResources(xload, 5, 3)
-			// TODO: multi-line value in structured log
-			klog.InfoS("target resources", "resources", resourcelist.ToString(numaLevelFitRequiredRes))
+			fxt.Dump.Infof(resourcelist.ToString(numaLevelFitRequiredRes), "target resources")
 
 			unfitRequiredRes := resourcelist.ScaleCoreResources(xload, 11, 3) // numaLevelFreeRes 5 3
-			// TODO: multi-line value in structured log
-			klog.InfoS("blocked resources", "resources", resourcelist.ToString(unfitRequiredRes))
+			fxt.Dump.Infof(resourcelist.ToString(unfitRequiredRes), "blocked resources")
 
 			By("padding all the nodes")
 			Expect(padder.Nodes(len(nrts)).UntilAvailableIsResourceListPerZone(numaLevelFreeRes).Pad(time.Minute*2, e2epadder.PaddingOptions{LabelSelector: labSel})).To(Succeed())
@@ -722,7 +716,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				Expect(err).ToNot(HaveOccurred())
 				if !isFailed {
 					succeededPods += 1
-					klog.InfoS("pod with scheduler did NOT fail", "namespace", pod.Namespace, "name", pod.Name, "scheduler", schedulerName)
+					fxt.Log.Info("pod with scheduler did NOT fail", "namespace", pod.Namespace, "name", pod.Name, "scheduler", schedulerName)
 					continue
 				}
 			}
@@ -742,7 +736,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				if err != nil {
 					return err
 				}
-				klog.InfoS("setting replicas", "replicas", 0)
+				fxt.Log.Info("setting replicas", "replicas", 0)
 				updatedDp.Spec.Replicas = ptr.To[int32](0)
 				return fxt.Client.Update(ctx, &updatedDp)
 			}).WithPolling(1*time.Second).WithTimeout(1*time.Minute).Should(Succeed(), "cannot scale down the test deployment %s/%s", dp.Namespace, dp.Name)
@@ -773,7 +767,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				}
 
 				if updateAttempt%5 == 0 { // log every 5 attempts
-					klog.InfoS("expecting replicas to be running", "expected", expectedReadyReplicas, "total", replicas)
+					fxt.Log.Info("expecting replicas to be running", "expected", expectedReadyReplicas, "total", replicas)
 				}
 				updateAttempt += 1
 
@@ -791,7 +785,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				if err != nil {
 					return err
 				}
-				klog.InfoS("restoring replicas", "value", replicas)
+				fxt.Log.Info("restoring replicas", "value", replicas)
 				updatedDp.Spec.Replicas = ptr.To[int32](replicas)
 				return fxt.Client.Update(ctx, &updatedDp)
 			}).WithPolling(1*time.Second).WithTimeout(1*time.Minute).Should(Succeed(), "cannot scale down the test deployment %s/%s", dp.Namespace, dp.Name)
@@ -807,7 +801,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			podQoS := corev1qos.GetPodQOS(&(pods[0]))
 			for _, initialNrt := range nrtInitialList.Items {
 				if !nodesNameSet.Has(initialNrt.Name) {
-					klog.InfoS("skipping", "node", initialNrt.Name, "reason", "unpadded")
+					fxt.Log.Info("skipping", "node", initialNrt.Name, "reason", "unpadded")
 					continue
 				}
 
@@ -859,11 +853,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				//calculate base load on the node
 				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
-				// TODO: multi-line value in structured log
-				klog.InfoS("computed base load", "value", baseload)
+				fxt.Dump.Infof(baseload.String(), "computed base load")
 
 				//get nrt info of the node
-				klog.InfoS("preparing node to fit the test case", "node", nodeName)
+				fxt.Log.Info("preparing node to fit the test case", "node", nodeName)
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", nodeName)
 
