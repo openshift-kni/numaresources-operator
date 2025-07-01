@@ -44,6 +44,7 @@ import (
 	intwait "github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/fixture/dumpr"
 	"github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
 
 	. "github.com/onsi/gomega"
@@ -58,6 +59,8 @@ type Fixture struct {
 	InitialNRTList nrtv1alpha2.NodeResourceTopologyList
 	Skipped        bool
 	IsRebootTest   bool
+	Log            logr.Logger
+	Dump           dumpr.Dumper
 	avoidCooldown  bool
 }
 
@@ -139,6 +142,8 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 		Namespace:      ns,
 		InitialNRTList: nrtList,
 		avoidCooldown:  avoidCooldown,
+		Log:            ginkgo.GinkgoLogr,
+		Dump:           dumpr.NewFormatter(ginkgo.GinkgoWriter),
 	}, nil
 }
 
