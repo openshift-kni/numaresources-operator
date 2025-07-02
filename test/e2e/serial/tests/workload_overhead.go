@@ -25,7 +25,6 @@ import (
 	nodev1 "k8s.io/api/node/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 	corev1qos "k8s.io/kubectl/pkg/util/qos"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -154,23 +153,20 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				// need a zone with resources for overhead, pod and a little bit more to avoid zone saturation
-				// TODO: multi-line value in structured log
-				klog.InfoS("kubernetes pod fixed overhead", "overhead", resourcelist.ToString(rtClass.Overhead.PodFixed))
+				fxt.Dump.Infof(resourcelist.ToString(rtClass.Overhead.PodFixed), "kubernetes pod fixed overhead")
 				podFixedOverheadCPU, podFixedOverheadMem := resourcelist.RoundUpCoreResources(*rtClass.Overhead.PodFixed.Cpu(), *rtClass.Overhead.PodFixed.Memory())
 				podFixedOverhead := corev1.ResourceList{
 					corev1.ResourceCPU:    podFixedOverheadCPU,
 					corev1.ResourceMemory: podFixedOverheadMem,
 				}
-				// TODO: multi-line value in structured log
-				klog.InfoS("kubernetes pod fixed overhead rounded to", "overhead", resourcelist.ToString(podFixedOverhead))
+				fxt.Dump.Infof(resourcelist.ToString(podFixedOverhead), "kubernetes pod fixed overhead rounded to")
 
 				zoneRequiredResources := podResources.DeepCopy()
 				resourcelist.AddInPlace(zoneRequiredResources, podFixedOverhead)
 				resourcelist.AddInPlace(zoneRequiredResources, minRes)
 
 				resStr := resourcelist.ToString(zoneRequiredResources)
-				// TODO: multi-line value in structured log
-				klog.InfoS("kubernetes final zone required resources", "resources", resStr)
+				fxt.Dump.Infof(resStr, "kubernetes final zone required resources")
 
 				nrtCandidates := e2enrt.FilterAnyZoneMatchingResources(nrtTwoZoneCandidates, zoneRequiredResources)
 				minCandidates := 1
@@ -198,10 +194,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 							baseload.Apply(zoneRes)
 						}
 
-						padPod, err := makePaddingPod(fxt.Namespace.Name, nodeName, zone, zoneRes)
+						padPod, err := makePaddingPod(fxt.Dump, fxt.Namespace.Name, nodeName, zone, zoneRes)
 						Expect(err).NotTo(HaveOccurred())
 
-						pinnedPadPod, err := pinPodTo(padPod, nodeName, zone.Name)
+						pinnedPadPod, err := pinPodTo(fxt.Log, padPod, nodeName, zone.Name)
 						Expect(err).NotTo(HaveOccurred())
 
 						err = fxt.Client.Create(context.TODO(), pinnedPadPod)
@@ -296,8 +292,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				// need a zone with resources for overhead, pod and a little bit more to avoid zone saturation
-				// TODO: multi-line value in structured log
-				klog.InfoS("kubernetes pod fixed overhead", "overhead", resourcelist.ToString(rtClass.Overhead.PodFixed))
+				fxt.Dump.Infof(resourcelist.ToString(rtClass.Overhead.PodFixed), "kubernetes pod fixed overhead")
 
 				candidateNodeNames := e2enrt.AccumulateNames(nrtTwoZoneCandidates)
 
@@ -328,16 +323,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					corev1.ResourceCPU:    podFixedOverheadCPU,
 					corev1.ResourceMemory: podFixedOverheadMem,
 				}
-				// TODO: multi-line value in structured log
-				klog.InfoS("kubernetes pod fixed overhead rounded to", "overhead", resourcelist.ToString(podFixedOverhead))
+				fxt.Dump.Infof(resourcelist.ToString(podFixedOverhead), "kubernetes pod fixed overhead rounded to")
 
 				zoneRequiredResources := podResources.DeepCopy()
 				resourcelist.AddInPlace(zoneRequiredResources, podFixedOverhead)
 				resourcelist.AddInPlace(zoneRequiredResources, minRes)
 
 				resStr := resourcelist.ToString(zoneRequiredResources)
-				// TODO: multi-line value in structured log
-				klog.InfoS("kubernetes final zone required resources", "resources", resStr)
+				fxt.Dump.Infof(resStr, "kubernetes final zone required resources")
 
 				By("padding non-target nodes")
 				var paddingPods []*corev1.Pod
@@ -355,10 +348,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 							baseload.Apply(zoneRes)
 						}
 
-						padPod, err := makePaddingPod(fxt.Namespace.Name, nodeName, zone, baseload.Resources)
+						padPod, err := makePaddingPod(fxt.Dump, fxt.Namespace.Name, nodeName, zone, baseload.Resources)
 						Expect(err).NotTo(HaveOccurred())
 
-						pinnedPadPod, err := pinPodTo(padPod, nodeName, zone.Name)
+						pinnedPadPod, err := pinPodTo(fxt.Log, padPod, nodeName, zone.Name)
 						Expect(err).NotTo(HaveOccurred())
 
 						err = fxt.Client.Create(context.TODO(), pinnedPadPod)
@@ -384,10 +377,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					if zIdx == 0 {               // any zone is fine
 						baseload.Apply(zoneRes)
 
-						padPod, err := makePaddingPod(fxt.Namespace.Name, targetNodeName, zone, baseload.Resources)
+						padPod, err := makePaddingPod(fxt.Dump, fxt.Namespace.Name, targetNodeName, zone, baseload.Resources)
 						Expect(err).NotTo(HaveOccurred())
 
-						pinnedPadPod, err := pinPodTo(padPod, targetNodeName, zone.Name)
+						pinnedPadPod, err := pinPodTo(fxt.Log, padPod, targetNodeName, zone.Name)
 						Expect(err).NotTo(HaveOccurred())
 
 						err = fxt.Client.Create(context.TODO(), pinnedPadPod)

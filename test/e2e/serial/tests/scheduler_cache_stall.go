@@ -21,11 +21,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/go-logr/logr"
+
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -141,7 +142,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 
 					expectedJobPodsPerNode = 2 // anything >= 1 should be fine
 
-					idleJob = makeIdleJob(fxt.Namespace.Name, expectedJobPodsPerNode, len(nrtCandidates))
+					idleJob = makeIdleJob(fxt.Log, fxt.Namespace.Name, expectedJobPodsPerNode, len(nrtCandidates))
 					setupJob(idleJob)
 
 					Expect(fxt.Client.Create(ctx, idleJob)).To(Succeed()) // will be removed by the fixture
@@ -210,8 +211,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					// but it's not the behavior we expect. A conforming scheduler is expected to send first two pods,
 					// wait for reconciliation, then send the missing two.
 
-					// TODO: multi-line value in structured log
-					klog.InfoS("Creating pods each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
+					fxt.Dump.Infof(e2ereslist.ToString(podRequiredRes), "Creating %d pods each requiring", desiredPods)
 					for _, testPod := range testPods {
 						err := fxt.Client.Create(ctx, testPod)
 						Expect(err).ToNot(HaveOccurred())
@@ -223,8 +223,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodListAllRunning(ctx, testPods)
 					if len(failedPods) > 0 {
 						nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
-						// TODO: multi-line value in structured log
-						klog.InfoS("NRT list", "content", intnrt.ListToString(nrtListFailed.Items, "post failure"))
+						fxt.Dump.Infof(intnrt.ListToString(nrtListFailed.Items, "post failure"), "NRT list content")
 
 						for _, failedPod := range failedPods {
 							_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
@@ -252,8 +251,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 							Requests: jobRequiredRes,
 						}
 					}
-					// TODO: multi-line value in structured log
-					klog.InfoS("Creating a job whose containers have requests", "resources", e2ereslist.ToString(jobRequiredRes))
+					fxt.Dump.Infof(e2ereslist.ToString(jobRequiredRes), "Creating a job whose containers have requests")
 				}),
 				// GAP: pinnable cpu (but not memory)
 				// however with the recommended config, we can't have pinnable CPUs without pinnable memory;
@@ -269,8 +267,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 							Limits: jobRequiredRes,
 						}
 					}
-					// TODO: multi-line value in structured log
-					klog.InfoS("Creating a job whose containers have limits", "resources", e2ereslist.ToString(jobRequiredRes))
+					fxt.Dump.Infof(e2ereslist.ToString(jobRequiredRes), "Creating a job whose containers have limits")
 				}),
 				Entry("vs guaranteed pods with pinnable memory and CPU", Label(label.Tier1), func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
@@ -283,8 +280,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 							Limits: jobRequiredRes,
 						}
 					}
-					// TODO: multi-line value in structured log
-					klog.InfoS("Creating a job whose containers have limits", "resources", e2ereslist.ToString(jobRequiredRes))
+					fxt.Dump.Infof(e2ereslist.ToString(jobRequiredRes), "Creating a job whose containers have limits")
 				}),
 			)
 
@@ -292,7 +288,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 				// like non-regression tests, but with jobs present
 				func(setupPod setupPodFunc) {
 					expectedJobPodsPerNode = 2 // anything >= 1 should be fine
-					idleJob = makeIdleJob(fxt.Namespace.Name, expectedJobPodsPerNode, len(nrtCandidates))
+					idleJob = makeIdleJob(fxt.Log, fxt.Namespace.Name, expectedJobPodsPerNode, len(nrtCandidates))
 
 					ctx := context.TODO()
 					Expect(fxt.Client.Create(ctx, idleJob)).To(Succeed()) // will be removed by the fixture
@@ -390,9 +386,9 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 	})
 })
 
-func makeIdleJob(jobNamespace string, expectedJobPodsPerNode, numWorkerNodes int) *batchv1.Job {
+func makeIdleJob(lh logr.Logger, jobNamespace string, expectedJobPodsPerNode, numWorkerNodes int) *batchv1.Job {
 	idleJobParallelism := int32(numWorkerNodes * expectedJobPodsPerNode)
-	klog.InfoS("Using job parallelism", "parallelism", idleJobParallelism, "candidateNodes", numWorkerNodes)
+	lh.Info("Using job parallelism", "parallelism", idleJobParallelism, "candidateNodes", numWorkerNodes)
 
 	idleJobLabels := map[string]string{
 		"app": "idle-job-sched-stall",

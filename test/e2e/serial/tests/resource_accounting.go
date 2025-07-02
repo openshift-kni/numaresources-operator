@@ -147,10 +147,10 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 
 			for _, zone := range nrtInfo.Zones {
 				By(fmt.Sprintf("padding node %q zone %q", nrtInfo.Name, zone.Name))
-				padPod, err := makePaddingPod(fxt.Namespace.Name, "target", zone, requiredRes)
+				padPod, err := makePaddingPod(fxt.Dump, fxt.Namespace.Name, "target", zone, requiredRes)
 				Expect(err).ToNot(HaveOccurred())
 
-				padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
+				padPod, err = pinPodTo(fxt.Log, padPod, nrtInfo.Name, zone.Name)
 				Expect(err).ToNot(HaveOccurred())
 
 				err = fxt.Client.Create(context.TODO(), padPod)
@@ -186,7 +186,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 					corev1.ResourceMemory: resource.MustParse("1Gi"),
 				}
 
-				targetedPaddingPod, err = pinPodTo(targetedPaddingPod, nrtInfo.Name, zone.Name)
+				targetedPaddingPod, err = pinPodTo(fxt.Log, targetedPaddingPod, nrtInfo.Name, zone.Name)
 				Expect(err).ToNot(HaveOccurred())
 
 				err = fxt.Client.Create(context.TODO(), targetedPaddingPod)
@@ -209,10 +209,10 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 				for _, zone := range nrtInfo.Zones {
 					name := fmt.Sprintf("unsuitable%d", idx)
 					By(fmt.Sprintf("saturating node %q -> %q zone %q", nrtInfo.Name, name, zone.Name))
-					padPod, err := makePaddingPod(fxt.Namespace.Name, name, zone, unsuitableFreeRes)
+					padPod, err := makePaddingPod(fxt.Dump, fxt.Namespace.Name, name, zone, unsuitableFreeRes)
 					Expect(err).ToNot(HaveOccurred())
 
-					padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
+					padPod, err = pinPodTo(fxt.Log, padPod, nrtInfo.Name, zone.Name)
 					Expect(err).ToNot(HaveOccurred())
 
 					err = fxt.Client.Create(context.TODO(), padPod)
@@ -232,9 +232,9 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			e2efixture.MustSettleNRT(fxt)
 
 			for _, unsuitableNodeName := range unsuitableNodeNames {
-				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
+				dumpNRTForNode(fxt, context.TODO(), unsuitableNodeName, "unsuitable")
 			}
-			dumpNRTForNode(fxt.Client, targetNodeName, "targeted")
+			dumpNRTForNode(fxt, context.TODO(), targetNodeName, "targeted")
 
 			By(fmt.Sprintf("running the test pod requiring: %s", e2ereslist.ToString(requiredRes)))
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
@@ -333,7 +333,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			// TODO: just use nrtList?
 			err = fxt.Client.List(context.TODO(), &targetNrtListInitial)
 			Expect(err).ToNot(HaveOccurred())
-			fxt.Dump.Infof(intnrt.ListToString(targetNrtListInitial.Items, " initial list"), "inital NRT List")
+			fxt.Dump.Infof(intnrt.ListToString(targetNrtListInitial.Items, " initial list"), "initial NRT List")
 
 			targetNrtInitial, err = e2enrt.FindFromList(targetNrtListInitial.Items, targetNodeName)
 			Expect(err).NotTo(HaveOccurred())
@@ -380,7 +380,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 					By(fmt.Sprintf("fully padding node %q zone %q ", nrtInfo.Name, zone.Name))
 					padPod := newPaddingPod(nrtInfo.Name, zone.Name, fxt.Namespace.Name, paddingRes[zone.Name])
 
-					padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
+					padPod, err = pinPodTo(fxt.Log, padPod, nrtInfo.Name, zone.Name)
 					Expect(err).ToNot(HaveOccurred(), "unable to pin pod %q to zone %q", padPod.Name, zone.Name)
 
 					err = fxt.Client.Create(context.TODO(), padPod)

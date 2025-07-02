@@ -54,14 +54,16 @@ type Fixture struct {
 	// Client defines the API client to run CRUD operations, that will be used for testing
 	Client client.Client
 	// K8sClient defines k8s client to run subresource operations, for example you should use it to get pod logs
-	K8sClient      *kubernetes.Clientset
-	Namespace      corev1.Namespace
-	InitialNRTList nrtv1alpha2.NodeResourceTopologyList
-	Skipped        bool
-	IsRebootTest   bool
-	Log            logr.Logger
-	Dump           dumpr.Dumper
-	avoidCooldown  bool
+	K8sClient         *kubernetes.Clientset
+	Namespace         corev1.Namespace
+	InitialNRTList    nrtv1alpha2.NodeResourceTopologyList
+	Skipped           bool
+	IsRebootTest      bool
+	Log               logr.Logger
+	Dump              dumpr.Dumper
+	avoidCooldown     bool
+	randomizeName     bool
+	staticClusterData bool
 }
 
 const (
@@ -72,14 +74,37 @@ const (
 	defaultCooldownThreshold = 5
 )
 
-type Options uint
+type Option func(*Fixture)
 
-const (
-	OptionNone              = 0
-	OptionRandomizeName     = 1 << iota
-	OptionAvoidCooldown     = 2 << iota
-	OptionStaticClusterData = 4 << iota
-)
+func WithRandomizeName() Option {
+	return func(fxt *Fixture) {
+		fxt.randomizeName = true
+	}
+}
+
+func WithAvoidCooldown() Option {
+	return func(fxt *Fixture) {
+		fxt.avoidCooldown = true
+	}
+}
+
+func WithStaticClusterData() Option {
+	return func(fxt *Fixture) {
+		fxt.staticClusterData = true
+	}
+}
+
+func WithLogger(lh logr.Logger) Option {
+	return func(fxt *Fixture) {
+		fxt.Log = lh
+	}
+}
+
+func WithDumper(dr dumpr.Dumper) Option {
+	return func(fxt *Fixture) {
+		fxt.Dump = dr
+	}
+}
 
 var (
 	teardownTime      time.Duration
@@ -97,22 +122,34 @@ func init() {
 	cooldownThreshold = getCooldownThresholdFromEnvVar()
 }
 
-func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList, options Options) (*Fixture, error) {
+func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList, options ...Option) (*Fixture, error) {
 	ctx := context.Background()
 	if !e2eclient.ClientsEnabled {
 		return nil, fmt.Errorf("clients not enabled")
 	}
-	randomizeName := (options & OptionRandomizeName) == OptionRandomizeName
-	avoidCooldown := (options & OptionAvoidCooldown) == OptionAvoidCooldown
-	staticClusterData := (options & OptionStaticClusterData) == OptionStaticClusterData
+
+	fxt := Fixture{
+		Client:    e2eclient.Client,
+		K8sClient: e2eclient.K8sClient,
+		Log:       ginkgo.GinkgoLogr,
+		Dump:      dumpr.NewFormatter(ginkgo.GinkgoWriter),
+	}
+
+	// Apply all the functional options to configure the client.
+	for _, opt := range options {
+		opt(&fxt)
+	}
+
 	ginkgo.By("set up the test namespace")
-	ns, err := setupNamespace(e2eclient.Client, name, randomizeName)
+	ns, err := setupNamespace(e2eclient.Client, name, fxt.randomizeName)
 	if err != nil {
 		klog.Errorf("cannot setup namespace %q: %v", name, err)
 		return nil, err
 	}
 	klog.Infof("test namespace %q was set up successfully", ns.Name)
-	if !staticClusterData {
+	fxt.Namespace = ns
+
+	if !fxt.staticClusterData {
 		ginkgo.By("pull NRT data before test starts")
 		var nrtAtTestSetup nrtv1alpha2.NodeResourceTopologyList
 		immediate := true
@@ -135,20 +172,13 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 		nrtList = nrtAtTestSetup
 	}
 	klog.Infof("set up the fixture reference NRT List: %s", intnrt.ListToString(nrtList.Items, " fixture initial"))
+	fxt.InitialNRTList = nrtList
 
-	return &Fixture{
-		Client:         e2eclient.Client,
-		K8sClient:      e2eclient.K8sClient,
-		Namespace:      ns,
-		InitialNRTList: nrtList,
-		avoidCooldown:  avoidCooldown,
-		Log:            ginkgo.GinkgoLogr,
-		Dump:           dumpr.NewFormatter(ginkgo.GinkgoWriter),
-	}, nil
+	return &fxt, nil
 }
 
 func Setup(baseName string, nrtList nrtv1alpha2.NodeResourceTopologyList) (*Fixture, error) {
-	return SetupWithOptions(baseName, nrtList, OptionRandomizeName)
+	return SetupWithOptions(baseName, nrtList, WithRandomizeName())
 }
 
 func Teardown(ft *Fixture) error {
