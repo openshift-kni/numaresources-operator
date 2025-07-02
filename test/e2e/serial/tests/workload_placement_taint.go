@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -132,7 +131,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			var updatedNodeNames []string
 			for i := range nodes {
 				refNode := &nodes[i]
-				applyTaintToNode(context.TODO(), fxt.Client, refNode, tnt)
+				applyTaintToNode(context.TODO(), fxt, refNode, tnt)
 				updatedNodeNames = append(updatedNodeNames, refNode.Name)
 			}
 			taintedNodeNames = updatedNodeNames
@@ -143,7 +142,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		AfterEach(func() {
 			tnt := &appliedTaints[0] // shortcut
 			// first untaint the nodes we know we tainted
-			untaintedNodeNames := untaintNodes(fxt.Client, taintedNodeNames, tnt)
+			untaintedNodeNames := untaintNodes(fxt, taintedNodeNames, tnt)
 			By(fmt.Sprintf("cleaned taint %q from the nodes %v", tnt.String(), untaintedNodeNames))
 
 			// leaking taints is especially bad AND we had some bugs in the pass, so let's try our very bes
@@ -152,7 +151,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			nodeNames := objectnames.Nodes(nodes)
-			doubleCheckedNodeNames := untaintNodes(fxt.Client, nodeNames, tnt)
+			doubleCheckedNodeNames := untaintNodes(fxt, nodeNames, tnt)
 			By(fmt.Sprintf("cleaned taint %q from the nodes %v", tnt.String(), doubleCheckedNodeNames))
 
 			By("unpadding the nodes after test finish")
@@ -273,7 +272,7 @@ func testToleration() []corev1.Toleration {
 	}
 }
 
-func untaintNodes(cli client.Client, taintedNodeNames []string, taint *corev1.Taint) []string {
+func untaintNodes(fxt *e2efixture.Fixture, taintedNodeNames []string, taint *corev1.Taint) []string {
 	GinkgoHelper()
 
 	var untaintedNodeNames []string
@@ -282,7 +281,7 @@ func untaintNodes(cli client.Client, taintedNodeNames []string, taint *corev1.Ta
 		Eventually(func() error {
 			var err error
 			node := &corev1.Node{}
-			err = cli.Get(context.TODO(), client.ObjectKey{Name: taintedNodeName}, node)
+			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: taintedNodeName}, node)
 			Expect(err).ToNot(HaveOccurred())
 
 			updatedNode, updated, err := taints.RemoveTaint(node, taint)
@@ -291,8 +290,8 @@ func untaintNodes(cli client.Client, taintedNodeNames []string, taint *corev1.Ta
 				return nil
 			}
 
-			klog.InfoS("removing taint from node", "taint", taint.String(), "node", updatedNode.Name)
-			err = cli.Update(context.TODO(), updatedNode)
+			fxt.Log.Info("removing taint from node", "taint", taint.String(), "node", updatedNode.Name)
+			err = fxt.Client.Update(context.TODO(), updatedNode)
 			if err != nil {
 				return err
 			}
@@ -322,13 +321,13 @@ func checkNodesUntainted(cli client.Client, nodeNames []string) {
 	}
 }
 
-func applyTaintToNode(ctx context.Context, cli client.Client, targetNode *corev1.Node, tnt *corev1.Taint) *corev1.Node {
+func applyTaintToNode(ctx context.Context, fxt *e2efixture.Fixture, targetNode *corev1.Node, tnt *corev1.Taint) *corev1.Node {
 	GinkgoHelper()
 	var updatedNode *corev1.Node
 	Eventually(func() error {
 		var err error
 		node := &corev1.Node{}
-		err = cli.Get(ctx, client.ObjectKeyFromObject(targetNode), node)
+		err = fxt.Client.Get(ctx, client.ObjectKeyFromObject(targetNode), node)
 		if err != nil {
 			return err
 		}
@@ -342,12 +341,12 @@ func applyTaintToNode(ctx context.Context, cli client.Client, targetNode *corev1
 			return nil
 		}
 
-		klog.InfoS("adding taint to node", "taint", tnt.String(), "node", updatedNode.Name)
-		err = cli.Update(ctx, updatedNode)
+		fxt.Log.Info("adding taint to node", "taint", tnt.String(), "node", updatedNode.Name)
+		err = fxt.Client.Update(ctx, updatedNode)
 		if err != nil {
 			return err
 		}
-		klog.InfoS("added taint to node", "taint", tnt.String(), "node", updatedNode.Name)
+		fxt.Log.Info("added taint to node", "taint", tnt.String(), "node", updatedNode.Name)
 		return nil
 	}).WithPolling(1 * time.Second).WithTimeout(1 * time.Minute).Should(Succeed())
 	return updatedNode

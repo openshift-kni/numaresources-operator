@@ -24,6 +24,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/labels"
+	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	corev1qos "k8s.io/kubectl/pkg/util/qos"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -158,10 +160,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					}
 
 					podName := fmt.Sprintf("padding%d-%d", nIdx, zIdx)
-					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, zoneRes)
+					padPod, err := makePaddingPod(fxt.Dump, fxt.Namespace.Name, podName, zone, zoneRes)
 					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
 
-					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
+					padPod, err = pinPodTo(fxt.Log, padPod, nodeName, zone.Name)
 					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
 
 					err = fxt.Client.Create(context.TODO(), padPod)
@@ -184,7 +186,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		It("[test_id:47598] should place the pod in the node with available resources in one NUMA zone and fulfilling node selector", Label(label.Tier2), func() {
 			By(fmt.Sprintf("Labeling nodes %q and %q with label %q:%q", targetNodeName, alternativeNodeName, labelName, labelValueMedium))
 
-			unlabelTarget, err := labelNodeWithValue(fxt.Client, labelName, labelValueMedium, targetNodeName)
+			unlabelTarget, err := labelNodeWithValue(fxt, labelName, labelValueMedium, targetNodeName)
 			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", targetNodeName)
 			defer func() {
 				err := unlabelTarget()
@@ -193,7 +195,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				}
 			}()
 
-			unlabelAlternative, err := labelNodeWithValue(fxt.Client, labelName, labelValueMedium, alternativeNodeName)
+			unlabelAlternative, err := labelNodeWithValue(fxt, labelName, labelValueMedium, alternativeNodeName)
 			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", alternativeNodeName)
 			defer func() {
 				err := unlabelAlternative()
@@ -251,10 +253,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				By(fmt.Sprintf("Labeling target node %q with label %q:%q and the alternative node %q with label %q:%q", targetNodeName, labelName, labelValueLarge, alternativeNodeName, labelName, labelValueMedium))
 
 				var err error
-				unlabelTarget, err = labelNodeWithValue(fxt.Client, labelName, labelValueLarge, targetNodeName)
+				unlabelTarget, err = labelNodeWithValue(fxt, labelName, labelValueLarge, targetNodeName)
 				Expect(err).NotTo(HaveOccurred(), "unable to label node %q", targetNodeName)
 
-				unlabelAlternative, err = labelNodeWithValue(fxt.Client, labelName, labelValueMedium, alternativeNodeName)
+				unlabelAlternative, err = labelNodeWithValue(fxt, labelName, labelValueMedium, alternativeNodeName)
 				Expect(err).NotTo(HaveOccurred(), "unable to label node %q", alternativeNodeName)
 			})
 
@@ -401,4 +403,47 @@ func createNodeAffinityPreferredDuringSchedulingIgnoredDuringExecution(labelName
 		},
 	}
 	return aff
+}
+
+func labelNodeWithValue(fxt *e2efixture.Fixture, key, val, nodeName string) (func() error, error) {
+	GinkgoHelper()
+	immediate := true
+
+	unlabelFunc := func() error {
+		GinkgoHelper()
+		nodeObj := corev1.Node{}
+		nodeKey := client.ObjectKey{Name: nodeName}
+		return k8swait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, immediate, func(ctx context.Context) (bool, error) {
+			if err := fxt.Client.Get(context.TODO(), nodeKey, &nodeObj); err != nil {
+				return false, nil
+			}
+			delete(nodeObj.Labels, key)
+			fxt.Log.Info("removing label", "label", key, "nodeName", nodeName)
+			if err := fxt.Client.Update(context.TODO(), &nodeObj); err != nil {
+				return false, nil
+			}
+			return true, nil
+		})
+	}
+
+	nodeObj := corev1.Node{}
+	nodeKey := client.ObjectKey{Name: nodeName}
+	err := k8swait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, immediate, func(ctx context.Context) (bool, error) {
+		if err := fxt.Client.Get(context.TODO(), nodeKey, &nodeObj); err != nil {
+			return false, nil
+		}
+
+		sel, err := labels.Parse(key + "=" + val)
+		if err != nil {
+			return false, nil
+		}
+
+		nodeObj.Labels[key] = val
+		fxt.Log.Info("adding label", "label", sel.String(), "nodeName", nodeName)
+		if err := fxt.Client.Update(context.TODO(), &nodeObj); err != nil {
+			return false, nil
+		}
+		return true, nil
+	})
+	return unlabelFunc, err
 }

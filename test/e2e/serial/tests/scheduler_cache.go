@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -370,7 +369,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 				NUMAZonesWithDevice := 1
 				By(fmt.Sprintf("filtering available nodes which provide %q on exactly %d zones", deviceName, NUMAZonesWithDevice))
-				nrtCandidates = filterAnyZoneProvidingResourcesAtMost(nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
+				nrtCandidates = filterAnyZoneProvidingResourcesAtMost(fxt, nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with at most %d NUMA Zones offering %q: found %d", NUMAZonesWithDevice, deviceName, len(nrtCandidates))
 				}
@@ -490,7 +489,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 				NUMAZonesWithDevice := 1
 				By(fmt.Sprintf("filtering available nodes which provide %q on exactly %d zones", deviceName, NUMAZonesWithDevice))
-				nrtCandidates = filterAnyZoneProvidingResourcesAtMost(nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
+				nrtCandidates = filterAnyZoneProvidingResourcesAtMost(fxt, nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with at most %d NUMA Zones offering %q: found %d", NUMAZonesWithDevice, deviceName, len(nrtCandidates))
 				}
@@ -611,7 +610,7 @@ func dumpFailedPodInfo(fxt *e2efixture.Fixture, failedPods []*corev1.Pod) {
 		return // not much to do here
 	}
 	nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
-	klog.InfoS("NRT list", "content", e2enrtint.ListToString(nrtListFailed.Items, "post failure"))
+	fxt.Dump.Infof(e2enrtint.ListToString(nrtListFailed.Items, "post failure"), "NRT list")
 
 	for _, failedPod := range failedPods {
 		_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
@@ -678,27 +677,27 @@ func podQOSClassToTag(qos corev1.PodQOSClass) string {
 // filter out nodes, represented as NRT, which do NOT have
 // - up to (at most) maxZones Zones which in turn provide
 // - resourceAmount or more (at least) resourceNames.
-func filterAnyZoneProvidingResourcesAtMost(nrts []nrtv1alpha2.NodeResourceTopology, resourceName string, resourceAmount int64, maxZones int) []nrtv1alpha2.NodeResourceTopology {
+func filterAnyZoneProvidingResourcesAtMost(fxt *e2efixture.Fixture, nrts []nrtv1alpha2.NodeResourceTopology, resourceName string, resourceAmount int64, maxZones int) []nrtv1alpha2.NodeResourceTopology {
 	resQty := *resource.NewQuantity(resourceAmount, resource.DecimalSI)
 	ret := []nrtv1alpha2.NodeResourceTopology{}
 	for _, nrt := range nrts {
 		matches := 0
 		for _, zone := range nrt.Zones {
-			klog.InfoS("evaluating", "node", nrt.Name, "zone", zone.Name, "provide", e2ereslist.ToString(e2enrt.AvailableFromZone(zone)), "resource", resourceName)
+			fxt.Dump.Infof(e2ereslist.ToString(e2enrt.AvailableFromZone(zone)), "evaluating node %v zone %v resource %q", nrt.Name, zone.Name, resourceName)
 			if !e2enrt.ResourceInfoProviding(zone.Resources, resourceName, resQty, true) {
 				continue
 			}
 			matches++
 		}
 		if matches == 0 {
-			klog.InfoS("SKIP", "node", nrt.Name, "resource", resourceName, "reason", "missingResource")
+			fxt.Log.Info("SKIP", "node", nrt.Name, "resource", resourceName, "reason", "missingResource")
 			continue
 		}
 		if matches > maxZones {
-			klog.InfoS("SKIP", "node", nrt.Name, "resource", resourceName, "matchCount", matches, "matchMax", maxZones, "reason", "excessZones")
+			fxt.Log.Info("SKIP", "node", nrt.Name, "resource", resourceName, "matchCount", matches, "matchMax", maxZones, "reason", "excessZones")
 			continue
 		}
-		klog.InfoS("GOOD", "node", nrt.Name, "resource", resourceName, "matchCount", matches, "zoneCount", len(nrt.Zones))
+		fxt.Log.Info("GOOD", "node", nrt.Name, "resource", resourceName, "matchCount", matches, "zoneCount", len(nrt.Zones))
 		ret = append(ret, nrt)
 	}
 	return ret

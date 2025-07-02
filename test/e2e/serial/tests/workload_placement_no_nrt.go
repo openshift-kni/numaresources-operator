@@ -25,7 +25,6 @@ import (
 	appv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -197,7 +196,7 @@ func updateInfoRefreshPause(ctx context.Context, fxt *e2efixture.Fixture, newVal
 		g.Expect(err).ToNot(HaveOccurred())
 	}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-	klog.Info("wait long enough to verify the NROP object is updated")
+	fxt.Log.Info("wait long enough to verify the NROP object is updated")
 	updatedObj := &nropv1.NUMAResourcesOperator{}
 	var currentMode nropv1.InfoRefreshPauseMode
 	Eventually(func() bool {
@@ -227,7 +226,7 @@ func waitForDaemonSetUpdate(ctx context.Context, fxt *e2efixture.Fixture, dsNsNa
 	err := wait.With(fxt.Client).Interval(30*time.Second).Timeout(5*time.Minute).ForPodListAllDeleted(ctx, rtePods)
 	Expect(err).ToNot(HaveOccurred(), "Expected old RTE pods owned by the DaemonSet to be deleted within the timeout")
 
-	klog.Info("waiting for DaemonSet to be ready with the new data")
+	fxt.Log.Info("waiting for DaemonSet to be ready with the new data")
 	_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonsetPodsCreation(ctx, wait.ObjectKey(dsNsName), len(rtePods))
 	Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %q", dsNsName)
 	_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, wait.ObjectKey(dsNsName))

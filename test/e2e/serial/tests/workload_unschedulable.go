@@ -153,10 +153,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					}
 
 					podName := fmt.Sprintf("padding%s-%d", nodeName, idx)
-					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, zoneRes)
+					padPod, err := makePaddingPod(fxt.Dump, fxt.Namespace.Name, podName, zone, zoneRes)
 					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone", podName, zone.Name)
 
-					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
+					padPod, err = pinPodTo(fxt.Log, padPod, nodeName, zone.Name)
 					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone", podName, zone.Name)
 
 					err = fxt.Client.Create(context.TODO(), padPod)
@@ -364,10 +364,10 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					}
 
 					podName := fmt.Sprintf("padding%d-%d", nodeIdx, zoneIdx)
-					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, zoneRes)
+					padPod, err := makePaddingPod(fxt.Dump, fxt.Namespace.Name, podName, zone, zoneRes)
 					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone", podName, zone.Name)
 
-					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
+					padPod, err = pinPodTo(fxt.Log, padPod, nodeName, zone.Name)
 					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone", podName, zone.Name)
 
 					err = fxt.Client.Create(context.TODO(), padPod)
@@ -510,7 +510,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					podName := fmt.Sprintf("padding%d-%d", nodeIdx, zoneIdx)
 					padPod := newPaddingPod(nodeName, zone.Name, fxt.Namespace.Name, paddingResources[zone.Name])
 
-					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
+					padPod, err = pinPodTo(fxt.Log, padPod, nodeName, zone.Name)
 					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
 
 					err = fxt.Client.Create(context.TODO(), padPod)
@@ -549,7 +549,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				podName := fmt.Sprintf("padding-tgt-%d", zoneIdx)
 				padPod := newPaddingPod(targetNodeName, zone.Name, fxt.Namespace.Name, paddingRes)
 
-				padPod, err = pinPodTo(padPod, targetNodeName, zone.Name)
+				padPod, err = pinPodTo(fxt.Log, padPod, targetNodeName, zone.Name)
 				Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
 
 				err = fxt.Client.Create(context.TODO(), padPod)
@@ -867,7 +867,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					By(fmt.Sprintf("fully padding node %q zone %q ", nrtInfo.Name, zone.Name))
 					padPod := newPaddingPod(nrtInfo.Name, zone.Name, fxt.Namespace.Name, paddingRes[zone.Name])
 
-					padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
+					padPod, err = pinPodTo(fxt.Log, padPod, nrtInfo.Name, zone.Name)
 					Expect(err).ToNot(HaveOccurred(), "unable to pin pod %q to zone %q", padPod.Name, zone.Name)
 
 					err = fxt.Client.Create(context.TODO(), padPod)
