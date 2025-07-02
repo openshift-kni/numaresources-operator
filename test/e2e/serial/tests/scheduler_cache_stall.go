@@ -112,7 +112,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 			}
 			refreshPeriod = conf.InfoRefreshPeriod.Duration
 
-			klog.InfoS("using MCP", "name", mcpName, "refreshPeriod", refreshPeriod)
+			fxt.Log.Info("using MCP", "name", mcpName, "refreshPeriod", refreshPeriod)
 		})
 
 		When("there are jobs in the cluster", Label("job", "generic", label.Tier0), func() {
@@ -132,7 +132,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
 				}
-				klog.InfoS("Found nodes with NUMA zones", "nodeCount", len(nrtCandidates), "numaZones", NUMAZonesRequired)
+				fxt.Log.Info("Found nodes with NUMA zones", "nodeCount", len(nrtCandidates), "numaZones", NUMAZonesRequired)
 			})
 
 			DescribeTable("should be able to schedule pods with no stalls",
@@ -239,7 +239,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					}
 				},
 				Entry("vs best-effort pods", Label(label.Tier1), func(job *batchv1.Job) {
-					klog.InfoS("Creating a job whose containers have requests=none")
+					fxt.Log.Info("Creating a job whose containers have requests=none")
 				}),
 				Entry("vs burstable pods", Label(label.Tier1), func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
@@ -302,7 +302,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					e2efixture.MustSettleNRT(fxt)
 
 					timeout := nroSchedObj.Status.CacheResyncPeriod.Round(time.Second) * 10
-					klog.InfoS("pod running timeout", "timeout", timeout)
+					fxt.Log.Info("pod running timeout", "timeout", timeout)
 
 					nrts := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
 					if len(nrts) < 1 {
@@ -315,7 +315,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					referenceNodeName, ok := e2efixture.PopNodeName(nodesNames)
 					Expect(ok).To(BeTrue())
 
-					klog.InfoS("selected reference node name", "nodeName", referenceNodeName)
+					fxt.Log.Info("selected reference node name", "nodeName", referenceNodeName)
 
 					nrtInfo, err := e2enrt.FindFromList(nrts, referenceNodeName)
 					Expect(err).ToNot(HaveOccurred())
@@ -337,7 +337,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					cpusVal := (10 * resVal) / 8
 					numPods := int(int64(len(nrts)) * cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
 
-					klog.InfoS("creating pods consuming cpus each", "podCount", numPods, "cpusPerPod", cpusVal, "cpusPerNUMAZone", resVal)
+					fxt.Log.Info("creating pods consuming cpus each", "podCount", numPods, "cpusPerPod", cpusVal, "cpusPerNUMAZone", resVal)
 
 					var testPods []*corev1.Pod
 					for idx := 0; idx < numPods; idx++ {

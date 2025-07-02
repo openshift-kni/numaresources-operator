@@ -324,7 +324,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			seenStatusConf := false
 			immediate := true
 			err = k8swait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, immediate, func(ctx context.Context) (bool, error) {
-				klog.InfoS("getting NRO object", "key", nroKey.String())
+				fxt.Log.Info("getting NRO object", "key", nroKey.String())
 
 				// getting the same object twice is awkward, but still it seems better better than skipping inside a loop.
 				err := fxt.Client.Get(ctx, nroKey, &nroOperObj)
@@ -341,7 +341,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						len(nroOperObj.Status.NodeGroups), len(nroOperObj.Spec.NodeGroups),
 					)
 				}
-				klog.InfoS("fetched NRO Object", "key", nroKey.String())
+				fxt.Log.Info("fetched NRO Object", "key", nroKey.String())
 
 				// the assumption here is that the configured node group selector will be targeting one mcp
 				Expect(nroOperObj.Status.MachineConfigPools[0].Name).To(Equal(nroOperObj.Status.NodeGroups[0].PoolName))
@@ -441,7 +441,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			kcCmsPre, err := getKubeletConfigMapsSoftOwnedBy(ctx, fxt.Client, nroOperObj.Name)
 			Expect(err).ToNot(HaveOccurred(), "cannot list KubeletConfig ConfigMaps in the cluster (PRE)")
 			kcCmNamesPre := sets.List[string](accumulateKubeletConfigNames(kcCmsPre))
-			klog.InfoS("initial set of configmaps from kubeletconfigs", "configmaps", strings.Join(kcCmNamesPre, ","))
+			fxt.Log.Info("initial set of configmaps from kubeletconfigs", "configmaps", strings.Join(kcCmNamesPre, ","))
 
 			By("creating extra ctrplane kubeletconfig")
 			ctrlPlaneKc := intobjs.NewKubeletConfigAutoresizeControlPlane()
@@ -460,7 +460,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				kcCmsCur, err := getKubeletConfigMapsSoftOwnedBy(ctx, fxt.Client, nroOperObj.Name)
 				Expect(err).ToNot(HaveOccurred(), "cannot list KubeletConfig ConfigMaps in the cluster (current)")
 				kcCmNamesCur := sets.List[string](accumulateKubeletConfigNames(kcCmsCur))
-				klog.InfoS("current set of configmaps from kubeletconfigs", "configmaps", strings.Join(kcCmNamesCur, ","))
+				fxt.Log.Info("current set of configmaps from kubeletconfigs", "configmaps", strings.Join(kcCmNamesCur, ","))
 				return kcCmNamesCur
 			}).WithContext(ctx).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Equal(kcCmNamesPre))
 		})
@@ -1056,7 +1056,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 				origNodeGroups := nodegroup.CloneList(initialOperObj.Spec.NodeGroups)
 
-				klog.InfoS("the new node group to add", "name", ng.ToString())
+				fxt.Log.Info("the new node group to add", "name", ng.ToString())
 				newNodeGroups := append(nodegroup.CloneList(initialOperObj.Spec.NodeGroups), ng)
 				var updatedNRO nropv1.NUMAResourcesOperator
 				Eventually(func(g Gomega) {
@@ -1104,7 +1104,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					PoolName: &mcp.Name,
 					Config:   &conf,
 				}
-				klog.InfoS("the updated node group to apply", "name", ng.ToString())
+				fxt.Log.Info("the updated node group to apply", "name", ng.ToString())
 				newNodeGroups = append(nodegroup.CloneList(initialOperObj.Spec.NodeGroups), ng)
 
 				Eventually(func(g Gomega) {
@@ -1372,7 +1372,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				waitForMCPUpdateFunc(mcp)
 
 				defer func() {
-					klog.InfoS("reverting node back to its initial state", "nodeName", targetNodeInitial.Name)
+					fxt.Log.Info("reverting node back to its initial state", "nodeName", targetNodeInitial.Name)
 					baseTargetNode := targetNode.DeepCopy()
 					targetNode.Labels = targetNodeInitial.Labels
 					Expect(fxt.Client.Patch(ctx, targetNode, client.MergeFrom(baseTargetNode))).To(Succeed())
@@ -1396,7 +1396,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					waitForMCPUpdateFunc(targetedMCP)
 				}()
 
-				klog.InfoS("adding nodeGroup", "poolName", mcp.Name)
+				fxt.Log.Info("adding nodeGroup", "poolName", mcp.Name)
 				testNG := nropv1.NodeGroup{
 					PoolName: ptr.To(mcp.Name),
 				}

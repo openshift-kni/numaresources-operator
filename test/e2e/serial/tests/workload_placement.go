@@ -113,13 +113,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			if len(nrtCandidates) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
 			}
-			klog.InfoS("Found node with 2 NUMA zones", "count", len(nrtCandidates))
+			fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrtCandidates))
 
 			nrts = e2enrt.FilterByTopologyManagerPolicy(nrtCandidates, intnrt.SingleNUMANode)
 			if len(nrts) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 			}
-			klog.InfoS("Found node with 2 NUMA zones", "count", len(nrts))
+			fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrts))
 
 			numOfNodeToBePadded := len(nrts) - 1
 
@@ -159,7 +159,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
 
-			klog.InfoS("picking target", "nodeName", targetNodeName)
+			fxt.Log.Info("picking target", "nodeName", targetNodeName)
 
 			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
@@ -281,7 +281,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() int {
 				r, err := podlist.With(fxt.Client).ReplicaSetByDeployment(context.TODO(), *updatedDp)
 				Expect(err).ToNot(HaveOccurred())
-				klog.InfoS("number of replicasets under deployment", "deployment", namespacedDpName, "count", len(r))
+				fxt.Log.Info("number of replicasets under deployment", "deployment", namespacedDpName, "count", len(r))
 				return len(r)
 			}).WithTimeout(10*time.Second).WithPolling(1*time.Second).Should(Equal(len(dpReplicas)+1), "deployment %q replicasets were not increased by 1", namespacedDpName)
 
@@ -298,7 +298,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				if len(pods) != 1 {
-					klog.InfoS("pods are exists under deployment", "count", len(pods), "deployment", namespacedDpName)
+					fxt.Log.Info("pods are exists under deployment", "count", len(pods), "deployment", namespacedDpName)
 					return false
 				}
 				return true
@@ -393,7 +393,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() int {
 				r, err := podlist.With(fxt.Client).ReplicaSetByDeployment(context.TODO(), *updatedDp)
 				Expect(err).ToNot(HaveOccurred())
-				klog.InfoS("number of replicasets under deployment", "deployment", namespacedDpName, "count", len(r))
+				fxt.Log.Info("number of replicasets under deployment", "deployment", namespacedDpName, "count", len(r))
 				return len(r)
 			}).WithTimeout(10*time.Second).WithPolling(1*time.Second).Should(Equal(len(dpReplicas)+1), "deployment %q replicasets were not increased by 1", namespacedDpName)
 
@@ -408,7 +408,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				if len(pods) != 1 {
-					klog.InfoS("pods are exists under deployment", "count", len(pods), "deployment", namespacedDpName)
+					fxt.Log.Info("pods are exists under deployment", "count", len(pods), "deployment", namespacedDpName)
 					return false
 				}
 				return true
@@ -504,13 +504,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			if len(nrtCandidates) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
 			}
-			klog.InfoS("Found node with 2 NUMA zones", "count", len(nrtCandidates))
+			fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrtCandidates))
 
 			nrts = e2enrt.FilterByTopologyManagerPolicy(nrtCandidates, intnrt.SingleNUMANode)
 			if len(nrts) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 			}
-			klog.InfoS("Found node with 2 NUMA zones", "count", len(nrts))
+			fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrts))
 
 			numOfNodeToBePadded := len(nrts) - 1
 
@@ -550,7 +550,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
 
-			klog.InfoS("picking target", "nodeName", targetNodeName)
+			fxt.Log.Info("picking target", "nodeName", targetNodeName)
 
 			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
@@ -672,7 +672,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				if len(pods) != 2 {
-					klog.InfoS("pods are exists under deployment", "count", len(pods), "deployment", namespacedDpName)
+					fxt.Log.Info("pods are exists under deployment", "count", len(pods), "deployment", namespacedDpName)
 					return false
 				}
 				return true
@@ -744,13 +744,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			if len(nrtCandidates) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
 			}
-			klog.InfoS("Found node with 2 NUMA zones", "count", len(nrtCandidates))
+			fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrtCandidates))
 
 			nrts = e2enrt.FilterByTopologyManagerPolicy(nrtCandidates, intnrt.SingleNUMANode)
 			if len(nrts) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 			}
-			klog.InfoS("Found node with 2 NUMA zones", "count", len(nrts))
+			fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrts))
 
 			numOfNodeToBePadded := len(nrts) - 1
 
@@ -783,7 +783,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
 			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
-			klog.InfoS("picking target", "nodeName", targetNodeName)
+			fxt.Log.Info("picking target", "nodeName", targetNodeName)
 
 			nrtInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, timeout)
 			Expect(err).ToNot(HaveOccurred())
@@ -846,7 +846,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				if len(pods) != int(replicaNumber) {
-					klog.InfoS("pods belonging to replicaset", "count", len(pods), "replicaset", namespacedRsName.String())
+					fxt.Log.Info("pods belonging to replicaset", "count", len(pods), "replicaset", namespacedRsName.String())
 					return false
 				}
 				return true
@@ -894,7 +894,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			By("verify replicaset's pods are deleted")
 			for _, pod := range pods {
-				klog.InfoS("waiting for pod to get deleted", "namespace", pod.Namespace, "name", pod.Name)
+				fxt.Log.Info("waiting for pod to get deleted", "namespace", pod.Namespace, "name", pod.Name)
 				err := wait.With(fxt.Client).Timeout(2*time.Minute).ForPodDeleted(context.TODO(), pod.Namespace, pod.Name)
 				Expect(err).ToNot(HaveOccurred(), "pod %s/%s still exists", pod.Namespace, pod.Name)
 			}
@@ -944,7 +944,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					return false
 				}
 				if len(pods) != int(replicaNumber) {
-					klog.InfoS("pods belonging to replicaset", "count", len(pods), "replicaset", namespacedRsName.String())
+					fxt.Log.Info("pods belonging to replicaset", "count", len(pods), "replicaset", namespacedRsName.String())
 					return false
 				}
 				return true

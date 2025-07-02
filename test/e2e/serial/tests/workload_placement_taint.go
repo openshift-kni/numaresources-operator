@@ -75,7 +75,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		if len(nrtCandidates) < 2 {
 			e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
 		}
-		klog.InfoS("Found node with 2 NUMA zones", "count", len(nrtCandidates))
+		fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrtCandidates))
 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
@@ -83,7 +83,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		if len(nrts) < 2 {
 			e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 		}
-		klog.InfoS("Found node with 2 NUMA zones", "count", len(nrts))
+		fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrts))
 
 		// Note that this test, being part of "serial", expects NO OTHER POD being scheduled
 		// in between, so we consider this information current and valid when the It()s run.
@@ -175,7 +175,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
 
-			klog.InfoS("target node will be", "node", targetNodeName)
+			fxt.Log.Info("target node will be", "node", targetNodeName)
 
 			var nrtInitial nrtv1alpha2.NodeResourceTopology
 			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: targetNodeName}, &nrtInitial)

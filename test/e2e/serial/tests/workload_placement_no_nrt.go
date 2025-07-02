@@ -168,21 +168,21 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 })
 
 func updateInfoRefreshPause(ctx context.Context, fxt *e2efixture.Fixture, newVal nropv1.InfoRefreshPauseMode, objForKey *nropv1.NUMAResourcesOperator) {
-	klog.InfoS("update InfoRefreshPause only if the existing one is different", "newValue", newVal)
+	fxt.Log.Info("update InfoRefreshPause only if the existing one is different", "newValue", newVal)
 	nroKey := client.ObjectKeyFromObject(objForKey)
 	currentNrop := &nropv1.NUMAResourcesOperator{}
 	err := fxt.Client.Get(ctx, nroKey, currentNrop)
 	Expect(err).ToNot(HaveOccurred())
 	currentVal := *currentNrop.Status.MachineConfigPools[0].Config.InfoRefreshPause
 	if currentVal == newVal {
-		klog.InfoS("profile already has the updated InfoRefreshPause", "currentValue", currentVal, "newValue", newVal)
+		fxt.Log.Info("profile already has the updated InfoRefreshPause", "currentValue", currentVal, "newValue", newVal)
 		return
 	}
 
 	By("list RTE pods before the CR update")
 	dsNsName := currentNrop.Status.DaemonSets[0]
 	rtePods := getPodsOfDaemonSet(ctx, fxt, dsNsName)
-	klog.InfoS("RTE pods before update", "daemonset", currentNrop.Status.DaemonSets[0], "pods", toString(rtePods))
+	fxt.Log.Info("RTE pods before update", "daemonset", currentNrop.Status.DaemonSets[0], "pods", toString(rtePods))
 
 	Eventually(func(g Gomega) {
 		err := fxt.Client.Get(ctx, nroKey, currentNrop)
@@ -211,7 +211,7 @@ func updateInfoRefreshPause(ctx context.Context, fxt *e2efixture.Fixture, newVal
 			currentMode = *updatedObj.Status.MachineConfigPools[0].Config.InfoRefreshPause
 		}
 		if currentMode != newVal {
-			klog.InfoS("resource status is not updated yet", "expected", newVal, "found", currentMode)
+			fxt.Log.Info("resource status is not updated yet", "expected", newVal, "found", currentMode)
 			return false
 		}
 
@@ -223,7 +223,7 @@ func updateInfoRefreshPause(ctx context.Context, fxt *e2efixture.Fixture, newVal
 }
 
 func waitForDaemonSetUpdate(ctx context.Context, fxt *e2efixture.Fixture, dsNsName nropv1.NamespacedName, rtePods []corev1.Pod) {
-	klog.InfoS("ensure old RTE pods of ds are deleted", "daemonset", dsNsName)
+	fxt.Log.Info("ensure old RTE pods of ds are deleted", "daemonset", dsNsName)
 	err := wait.With(fxt.Client).Interval(30*time.Second).Timeout(5*time.Minute).ForPodListAllDeleted(ctx, rtePods)
 	Expect(err).ToNot(HaveOccurred(), "Expected old RTE pods owned by the DaemonSet to be deleted within the timeout")
 
