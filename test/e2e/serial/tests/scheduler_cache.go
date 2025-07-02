@@ -115,7 +115,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 			}
 			refreshPeriod = conf.InfoRefreshPeriod.Duration
 
-			klog.InfoS("using MCP", "name", mcpName, "refreshPeriod", refreshPeriod)
+			fxt.Log.Info("using MCP", "name", mcpName, "refreshPeriod", refreshPeriod)
 		})
 
 		When("[podburst] handling a burst of pods", Label("podburst"), func() {
@@ -137,7 +137,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
 				}
-				klog.InfoS("Found nodes with NUMA zones", "nodeCount", len(nrtCandidates), "numaZones", NUMAZonesRequired)
+				fxt.Log.Info("Found nodes with NUMA zones", "nodeCount", len(nrtCandidates), "numaZones", NUMAZonesRequired)
 
 				// we can assume now all the zones from all the nodes are equal from cpu/memory resource perspective
 				referenceNode := nrtCandidates[0]
@@ -192,7 +192,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				// but it's not the behavior we expect. A conforming scheduler is expected to send first two pods,
 				// wait for reconciliation, the send the missing two.
 
-				klog.InfoS("Creating pods each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
+				fxt.Log.Info("Creating pods each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
 				for _, testPod := range testPods {
 					err := fxt.Client.Create(context.TODO(), testPod)
 					Expect(err).ToNot(HaveOccurred())
@@ -231,7 +231,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 					if len(nrtCandidates) < hostsRequired {
 						e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
 					}
-					klog.InfoS("Found nodes with NUMA zones", "nodeCount", len(nrtCandidates), "numaZones", NUMAZonesRequired)
+					fxt.Log.Info("Found nodes with NUMA zones", "nodeCount", len(nrtCandidates), "numaZones", NUMAZonesRequired)
 
 					By("computing the pod resources to trigger the test conditions")
 					// loadFactor: anything that consumes > 50% (because overreserve over 2 NUMA zones) is fine
@@ -241,7 +241,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 						return int64(float64(totalCPUs)*mdesc.loadFactor) * int64(mdesc.coresPerCPU) // but k8s reasons in cores, so convert it back
 					})
 
-					klog.InfoS("using pods total each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
+					fxt.Log.Info("using pods total each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
 
 					tag := podQOSClassToTag(interference.qos)
 
@@ -275,11 +275,11 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 							} else {
 								pod.Spec.Containers[0].Resources.Requests = podRequiredRes
 							}
-							klog.InfoS("pod -> interference", "name", pod.Name)
+							fxt.Log.Info("pod -> interference", "name", pod.Name)
 						} else {
 							pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
 							pod.Spec.Containers[0].Resources.Limits = podRequiredRes
-							klog.InfoS("pod -> payload", "name", pod.Name)
+							fxt.Log.Info("pod -> payload", "name", pod.Name)
 						}
 						testPods = append(testPods, pod)
 					}
@@ -299,7 +299,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 					failedPods, updatedPods := wait.With(fxt.Client).Interval(5*time.Second).Timeout(5*time.Minute).ForPodListAllRunning(context.TODO(), testPods)
 					dumpFailedPodInfo(fxt, failedPods)
 					elapsed := time.Since(startTime)
-					klog.InfoS("test pods (payload + interference) gone running", "elapsed", elapsed)
+					fxt.Log.Info("test pods (payload + interference) gone running", "elapsed", elapsed)
 					Expect(failedPods).To(BeEmpty(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
 
 					By("checking the test pods once running")
@@ -357,7 +357,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				Expect(desiredPods).To(BeNumerically(">", hostsRequired)) // this is more like a C assert. Should never ever fail.
 
 				expectedPending := desiredPods - hostsRequired
-				klog.InfoS("hosts required desired pods expected pending", "hostsRequired", hostsRequired, "desiredPods", desiredPods, "expectedPending", expectedPending)
+				fxt.Log.Info("hosts required desired pods expected pending", "hostsRequired", hostsRequired, "desiredPods", desiredPods, "expectedPending", expectedPending)
 
 				// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
 				// TODO: when we support NUMA zones > 2, switch to FilterZoneCountAtLeast
@@ -366,7 +366,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
 				}
-				klog.InfoS("Found nodes", "count", len(nrtCandidates), "NUMAZoneCount", NUMAZonesRequired)
+				fxt.Log.Info("Found nodes", "count", len(nrtCandidates), "NUMAZoneCount", NUMAZonesRequired)
 
 				NUMAZonesWithDevice := 1
 				By(fmt.Sprintf("filtering available nodes which provide %q on exactly %d zones", deviceName, NUMAZonesWithDevice))
@@ -374,7 +374,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with at most %d NUMA Zones offering %q: found %d", NUMAZonesWithDevice, deviceName, len(nrtCandidates))
 				}
-				klog.InfoS("Found nodes", "count", len(nrtCandidates), "NUMAZonesUpToCount", NUMAZonesWithDevice, "device", deviceName)
+				fxt.Log.Info("Found nodes", "count", len(nrtCandidates), "NUMAZonesUpToCount", NUMAZonesWithDevice, "device", deviceName)
 
 				// we can assume now all the zones from all the nodes are equal from cpu/memory resource perspective
 				referenceNode := nrtCandidates[0]
@@ -420,7 +420,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 					testPods = append(testPods, pod)
 				}
 
-				klog.InfoS("Creating pods each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
+				fxt.Log.Info("Creating pods each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
 				for _, testPod := range testPods {
 					err := fxt.Client.Create(context.TODO(), testPod)
 					Expect(err).ToNot(HaveOccurred())
@@ -443,7 +443,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 					Expect(usedNodes).ToNot(ContainElement(updatedPod.Spec.NodeName), "pod %s/%s not uniquely placed (on %q)", updatedPod.Namespace, updatedPod.Name, updatedPod.Spec.NodeName)
 
-					klog.InfoS("pod running on", "namespace", updatedPod.Namespace, "name", updatedPod.Name, "nodeName", updatedPod.Spec.NodeName)
+					fxt.Log.Info("pod running on", "namespace", updatedPod.Namespace, "name", updatedPod.Name, "nodeName", updatedPod.Spec.NodeName)
 					usedNodes = append(usedNodes, updatedPod.Spec.NodeName)
 				}
 
@@ -486,7 +486,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
 				}
-				klog.InfoS("Found nodes", "count", len(nrtCandidates), "NUMAZoneCount", NUMAZonesRequired)
+				fxt.Log.Info("Found nodes", "count", len(nrtCandidates), "NUMAZoneCount", NUMAZonesRequired)
 
 				NUMAZonesWithDevice := 1
 				By(fmt.Sprintf("filtering available nodes which provide %q on exactly %d zones", deviceName, NUMAZonesWithDevice))
@@ -494,7 +494,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with at most %d NUMA Zones offering %q: found %d", NUMAZonesWithDevice, deviceName, len(nrtCandidates))
 				}
-				klog.InfoS("Found nodes", "count", len(nrtCandidates), "NUMAZonesUpToCount", NUMAZonesWithDevice, "device", deviceName)
+				fxt.Log.Info("Found nodes", "count", len(nrtCandidates), "NUMAZonesUpToCount", NUMAZonesWithDevice, "device", deviceName)
 
 				// we can assume now all the zones from all the nodes are equal from cpu/memory resource perspective
 				referenceNode := nrtCandidates[0]
@@ -540,7 +540,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 					testPods = append(testPods, pod)
 				}
 
-				klog.InfoS("Creating pods each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
+				fxt.Log.Info("Creating pods each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
 				for _, testPod := range testPods {
 					err := fxt.Client.Create(context.TODO(), testPod)
 					Expect(err).ToNot(HaveOccurred())
@@ -562,7 +562,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 					Expect(usedNodes).ToNot(ContainElement(updatedPod.Spec.NodeName), "pod %s/%s not uniquely placed (on %q)", updatedPod.Namespace, updatedPod.Name, updatedPod.Spec.NodeName)
 
-					klog.InfoS("checking pod", "namespace", updatedPod.Namespace, "name", updatedPod.Name, "nodeName", updatedPod.Spec.NodeName)
+					fxt.Log.Info("checking pod", "namespace", updatedPod.Namespace, "name", updatedPod.Name, "nodeName", updatedPod.Spec.NodeName)
 					usedNodes = append(usedNodes, updatedPod.Spec.NodeName)
 				}
 
@@ -576,7 +576,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 				// pick random running pod
 				targetPod := updatedPods[rand.Intn(len(updatedPods))]
-				klog.InfoS("Picked random running pod to delete", "namespace", targetPod.Namespace, "name", targetPod.Name)
+				fxt.Log.Info("Picked random running pod to delete", "namespace", targetPod.Namespace, "name", targetPod.Name)
 
 				expectedRunningPods := []*corev1.Pod{failedPod}
 				for _, updatedPod := range updatedPods {
@@ -587,7 +587,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				}
 
 				// all set, trigger the final step
-				klog.InfoS("Deleting pod", "namespace", targetPod.Namespace, "name", targetPod.Name)
+				fxt.Log.Info("Deleting pod", "namespace", targetPod.Namespace, "name", targetPod.Name)
 				err := fxt.Client.Delete(context.TODO(), targetPod)
 				Expect(err).ToNot(HaveOccurred())
 				// VERY generous timeout, we expect the delete to be much faster
