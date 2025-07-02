@@ -24,7 +24,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog/v2"
 	corev1qos "k8s.io/kubectl/pkg/util/qos"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -190,7 +189,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			defer func() {
 				err := unlabelTarget()
 				if err != nil {
-					klog.ErrorS(err, "Error while trying to unlabel node", "node", targetNodeName)
+					fxt.Log.Error(err, "Error while trying to unlabel node", "node", targetNodeName)
 				}
 			}()
 
@@ -199,7 +198,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			defer func() {
 				err := unlabelAlternative()
 				if err != nil {
-					klog.ErrorS(err, "Error while trying to unlabel node", "node", alternativeNodeName)
+					fxt.Log.Error(err, "Error while trying to unlabel node", "node", alternativeNodeName)
 				}
 			}()
 			By("Scheduling the testing pod")
@@ -269,11 +268,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					*/
 					err := unlabelTarget()
 					if err != nil {
-						klog.ErrorS(err, "Error while trying to unlabel node", "node", targetNodeName)
+						fxt.Log.Error(err, "Error while trying to unlabel node", "node", targetNodeName)
 					}
 					err = unlabelAlternative()
 					if err != nil {
-						klog.ErrorS(err, "Error while trying to unlabel node", "node", alternativeNodeName)
+						fxt.Log.Error(err, "Error while trying to unlabel node", "node", alternativeNodeName)
 					}
 				}
 			})
@@ -333,12 +332,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					//if at least one of the unlabeling failed, set nodesUnlabeled to false to try again in afterEach
 					if err != nil {
 						nodesUnlabeled = false
-						klog.ErrorS(err, "Error while trying to unlabel node", "node", targetNodeName)
+						fxt.Log.Error(err, "Error while trying to unlabel node", "node", targetNodeName)
 					}
 					err = unlabelAlternative()
 					if err != nil {
 						nodesUnlabeled = false
-						klog.ErrorS(err, "Error while trying to unlabel node", "node", alternativeNodeName)
+						fxt.Log.Error(err, "Error while trying to unlabel node", "node", alternativeNodeName)
 					}
 
 					//check that it didn't stop running for some time

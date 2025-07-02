@@ -133,7 +133,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				if rtClass != nil {
 					err := fxt.Client.Delete(context.TODO(), rtClass)
 					if err != nil {
-						klog.ErrorS(err, "Unable to delete RuntimeClass", "name", rtClass.Name)
+						fxt.Log.Error(err, "Unable to delete RuntimeClass", "name", rtClass.Name)
 					}
 				}
 			})
