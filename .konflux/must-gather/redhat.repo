@@ -1,0 +1,13 @@
+[rhel-9-for-$basearch-baseos-eus-rpms]
+name = Red Hat Enterprise Linux 9 for $basearch - BaseOS - Extended Update Support (RPMs)
+baseurl = https://cdn.redhat.com/content/eus/rhel9/9.4/$basearch/baseos/os
+enabled = 1
+gpgcheck = 1
+gpgkey = file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+sslverify = 1
+sslcacert = /etc/rhsm/ca/redhat-uep.pem
+sslclientkey = /etc/pki/entitlement/7511773722896751421-key.pem
+sslclientcert = /etc/pki/entitlement/7511773722896751421.pem
+sslverifystatus = 1
+metadata_expire = 86400
+enabled_metadata = 1
