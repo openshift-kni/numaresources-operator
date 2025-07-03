@@ -107,19 +107,6 @@ func Teardown() {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func GetVerbosity() int {
-	rawLevel, ok := os.LookupEnv("E2E_NROP_VERBOSE")
-	if !ok {
-		return DefaultVerbosity
-	}
-	level, err := strconv.Atoi(rawLevel)
-	if err != nil {
-		// TODO: log how?
-		return DefaultVerbosity
-	}
-	return level
-}
-
 func GetRteCiImage() string {
 	if pullSpec, ok := os.LookupEnv("E2E_RTE_CI_IMAGE"); ok {
 		return pullSpec
