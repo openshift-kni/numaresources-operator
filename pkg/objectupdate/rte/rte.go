@@ -22,7 +22,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 
 	securityv1 "github.com/openshift/api/security/v1"
@@ -35,6 +34,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/volume"
 )
 
 // these should be provided by a deployer API
@@ -177,7 +177,9 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 		podSpec := &ds.Spec.Template.Spec
 		// TODO: this doesn't really belong here, but OTOH adding the status file without having set
 		// the volume doesn't work either. We need a deeper refactoring in this area.
-		AddVolumeMountMemory(podSpec, cnt, pfpStatusMountName, pfpStatusDir, 8*_MiB)
+		if err := AddVolumeMountMemory(podSpec, cnt, pfpStatusMountName, pfpStatusDir, 8*_MiB); err != nil {
+			return fmt.Errorf("failed to add volume mount memory: %w", err)
+		}
 	}
 
 	flags.SetOption("--add-nrt-owner", "false")
@@ -189,7 +191,7 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 func DaemonSetTolerations(ds *appsv1.DaemonSet, userTolerations []corev1.Toleration) {
 	podSpec := &ds.Spec.Template.Spec // shortcut
 	// cleanup undesired toleration
-	podSpec.Tolerations = []corev1.Toleration{}
+	podSpec.Tolerations = nil
 	if len(userTolerations) == 0 {
 		return
 	}
@@ -225,50 +227,31 @@ func hasVolume(podSpec *corev1.PodSpec, volumeName string) bool {
 	return false
 }
 
-func AddVolumeMountMemory(podSpec *corev1.PodSpec, cnt *corev1.Container, mountName, dirName string, sizeMiB int64) {
+func AddVolumeMountMemory(podSpec *corev1.PodSpec, cnt *corev1.Container, mountName, dirName string, sizeMiB int64) error {
 	// Add the requested memory volume mount
-	cnt.VolumeMounts = append(cnt.VolumeMounts,
-		corev1.VolumeMount{
-			Name:      mountName,
-			MountPath: dirName,
-		},
-	)
-	podSpec.Volumes = append(podSpec.Volumes,
-		corev1.Volume{
-			Name: mountName,
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{
-					Medium:    corev1.StorageMediumMemory,
-					SizeLimit: resource.NewQuantity(sizeMiB, resource.BinarySI),
-				},
-			},
-		},
-	)
+	volume.AddMemoryVolume(podSpec, cnt, mountName, dirName, sizeMiB)
 
 	// Add the metrics certificate volume mount only if it doesn't already exist
 	metricsVolumeName := "rte-metrics-service-cert"
-	if !hasVolumeMount(cnt, metricsVolumeName) {
-		cnt.VolumeMounts = append(cnt.VolumeMounts,
-			corev1.VolumeMount{
-				MountPath: "/etc/secrets/rte/",
-				Name:      metricsVolumeName,
-				ReadOnly:  true,
-			},
-		)
+	if !hasVolumeMount(cnt, metricsVolumeName) && !hasVolume(podSpec, metricsVolumeName) {
+		volume.AddSecret(podSpec, cnt, metricsVolumeName, "/etc/secrets/rte/", metricsVolumeName, volume.DefaultMode, false, true)
 	}
 
-	if !hasVolume(podSpec, metricsVolumeName) {
-		podSpec.Volumes = append(podSpec.Volumes,
-			corev1.Volume{
-				Name: metricsVolumeName,
-				VolumeSource: corev1.VolumeSource{
-					Secret: &corev1.SecretVolumeSource{
-						SecretName: metricsVolumeName,
-					},
-				},
-			},
-		)
+	// Add host-sys volume
+	rteSysVolumeName := "host-sys"
+	if !hasVolume(podSpec, rteSysVolumeName) && !hasVolumeMount(cnt, rteSysVolumeName) {
+		hostPathType := corev1.HostPathDirectory
+		volume.AddHostPath(podSpec, cnt, rteSysVolumeName, "/host-sys", "/sys", &hostPathType, true)
 	}
+
+	// Add host-podresources volume
+	hostPodresourcesName := "host-podresources"
+	if !hasVolume(podSpec, hostPodresourcesName) && !hasVolumeMount(cnt, hostPodresourcesName) {
+		hostPathType := corev1.HostPathDirectory
+		volume.AddHostPath(podSpec, cnt, hostPodresourcesName, "/host-podresources", "/var/lib/kubelet/pod-resources", &hostPathType, false)
+	}
+
+	return nil
 }
 
 func SecurityContextConstraint(scc *securityv1.SecurityContextConstraints, legacyRTEContext bool) {
