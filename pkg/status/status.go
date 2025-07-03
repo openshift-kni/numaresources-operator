@@ -28,10 +28,11 @@ import (
 
 // TODO: are we duping these?
 const (
-	ConditionAvailable   = "Available"
-	ConditionProgressing = "Progressing"
-	ConditionDegraded    = "Degraded"
-	ConditionUpgradeable = "Upgradeable"
+	ConditionAvailable           = "Available"
+	ConditionProgressing         = "Progressing"
+	ConditionDegraded            = "Degraded"
+	ConditionUpgradeable         = "Upgradeable"
+	ConditionSharedInformerBased = "SharedInformerBased"
 )
 
 // TODO: are we duping these?
@@ -46,6 +47,11 @@ const (
 
 const (
 	ConditionTypeIncorrectNUMAResourcesSchedulerResourceName = "IncorrectNUMAResourcesSchedulerResourceName"
+)
+
+const (
+	ReasonDefaults       = "Defaults"
+	ReasonSyncedWithSpec = "SyncedWithSpec"
 )
 
 func IsUpdatedNUMAResourcesOperator(oldStatus, newStatus *nropv1.NUMAResourcesOperatorStatus) bool {
@@ -64,8 +70,8 @@ func IsUpdatedNUMAResourcesOperator(oldStatus, newStatus *nropv1.NUMAResourcesOp
 func UpdateConditions(currentConditions []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
 	conditions := NewConditions(condition, reason, message)
 
-	cond := clone(conditions)
-	curCond := clone(currentConditions)
+	cond := CloneConditions(conditions)
+	curCond := CloneConditions(currentConditions)
 
 	resetIncomparableConditionFields(cond)
 	resetIncomparableConditionFields(curCond)
@@ -134,6 +140,94 @@ func newBaseConditions() []metav1.Condition {
 	}
 }
 
+func mergeSchedulerConditions(current []metav1.Condition, updated []metav1.Condition) []metav1.Condition {
+	if len(current) == 0 {
+		current = NewSchedulerBaseConditions()
+	}
+
+	for _, newCondition := range updated {
+		for idx, condition := range current {
+			if condition.Type == newCondition.Type {
+				current[idx] = newCondition
+				current[idx].LastTransitionTime = metav1.Now()
+			}
+		}
+	}
+	return current
+}
+
+func updateConditionInList(current []metav1.Condition, condition string, reason string, message string) {
+	var upgradableIdx int
+	if condition == ConditionAvailable {
+		for idx, cond := range current {
+			if cond.Type == ConditionUpgradeable {
+				upgradableIdx = idx
+			}
+		}
+	}
+
+	for idx, cond := range current {
+		if cond.Type == condition {
+			if cond.Type == ConditionAvailable {
+				current[upgradableIdx].Status = metav1.ConditionTrue
+			}
+			current[idx].Status = metav1.ConditionTrue
+			current[idx].Reason = reason
+			current[idx].Message = message
+		}
+	}
+}
+
+func CheckSchedulerConditionsNeedsUpdate(current []metav1.Condition, desired []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
+	updatedCurrent := CloneConditions(current)
+
+	updatedCurrent = mergeSchedulerConditions(updatedCurrent, desired)
+
+	updateConditionInList(updatedCurrent, condition, reason, message)
+
+	updatedClone := CloneConditions(updatedCurrent)
+	resetIncomparableConditionFields(current)
+	resetIncomparableConditionFields(updatedClone)
+
+	return updatedCurrent, !reflect.DeepEqual(current, updatedClone)
+}
+
+func NewSchedulerBaseConditions() []metav1.Condition {
+	now := time.Now()
+	return []metav1.Condition{
+		{
+			Type:               ConditionAvailable,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Time{Time: now},
+			Reason:             ConditionAvailable,
+		},
+		{
+			Type:               ConditionUpgradeable,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Time{Time: now},
+			Reason:             ConditionUpgradeable,
+		},
+		{
+			Type:               ConditionProgressing,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Time{Time: now},
+			Reason:             ConditionProgressing,
+		},
+		{
+			Type:               ConditionDegraded,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Time{Time: now},
+			Reason:             ConditionDegraded,
+		},
+		{
+			Type:               ConditionSharedInformerBased,
+			Status:             metav1.ConditionUnknown,
+			LastTransitionTime: metav1.Time{Time: now},
+			Reason:             ReasonDefaults,
+		},
+	}
+}
+
 func ReasonFromError(err error) string {
 	if err == nil {
 		return ReasonAsExpected
@@ -159,7 +253,7 @@ func resetIncomparableConditionFields(conditions []metav1.Condition) {
 	}
 }
 
-func clone(conditions []metav1.Condition) []metav1.Condition {
+func CloneConditions(conditions []metav1.Condition) []metav1.Condition {
 	var c = make([]metav1.Condition, len(conditions))
 	copy(c, conditions)
 	return c

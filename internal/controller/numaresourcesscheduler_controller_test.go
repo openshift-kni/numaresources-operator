@@ -215,6 +215,70 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(nrs.Status.CacheResyncPeriod.Seconds()).To(gomega.Equal(resyncPeriod.Seconds()))
 		})
 
+		ginkgo.Context("should reflect SharedInformerBased in status conditions", func() {
+			ginkgo.It("with default values", func() {
+				key := client.ObjectKeyFromObject(nrs)
+				_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(gomega.HaveOccurred())
+
+				c := getConditionByType(nrs.Status.Conditions, status.ConditionSharedInformerBased)
+
+				gomega.Expect(c).ToNot(gomega.BeNil())
+				gomega.Expect(c.Status).To(gomega.Equal(metav1.ConditionUnknown))
+				gomega.Expect(c.Reason).To(gomega.Equal(status.ReasonDefaults))
+			})
+
+			ginkgo.It("with updated values - explicitly configured to Dedicated", func() {
+				nrs := nrs.DeepCopy()
+				nrs.Spec.SchedulerInformer = ptr.To(nropv1.SchedulerInformerDedicated)
+
+				gomega.Eventually(func() bool {
+					if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+						klog.Warningf("failed to update the scheduler object; err: %v", err)
+						return false
+					}
+					return true
+				}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(gomega.HaveOccurred())
+
+				c := getConditionByType(nrs.Status.Conditions, status.ConditionSharedInformerBased)
+
+				gomega.Expect(c).ToNot(gomega.BeNil())
+				gomega.Expect(c.Status).To(gomega.Equal(metav1.ConditionFalse))
+				gomega.Expect(c.Reason).To(gomega.Equal(status.ReasonSyncedWithSpec))
+			})
+
+			ginkgo.It("with updated values - explicitly configured to Shared", func() {
+				nrs := nrs.DeepCopy()
+				nrs.Spec.SchedulerInformer = ptr.To(nropv1.SchedulerInformerShared)
+
+				gomega.Eventually(func() bool {
+					if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+						klog.Warningf("failed to update the scheduler object; err: %v", err)
+						return false
+					}
+					return true
+				}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(gomega.HaveOccurred())
+
+				c := getConditionByType(nrs.Status.Conditions, status.ConditionSharedInformerBased)
+
+				gomega.Expect(c).ToNot(gomega.BeNil())
+				gomega.Expect(c.Status).To(gomega.Equal(metav1.ConditionTrue))
+				gomega.Expect(c.Reason).To(gomega.Equal(status.ReasonSyncedWithSpec))
+			})
+		})
+
 		ginkgo.It("should have the correct priority class", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
