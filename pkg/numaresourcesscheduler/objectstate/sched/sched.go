@@ -34,6 +34,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/volume"
 )
 
 const (
@@ -197,14 +198,13 @@ func SchedulerNameFromObject(obj client.Object) (string, bool) {
 }
 
 func NewSchedConfigVolume(schedVolumeConfigName, configMapName string) corev1.Volume {
-	return corev1.Volume{
-		Name: schedVolumeConfigName,
-		VolumeSource: corev1.VolumeSource{
-			ConfigMap: &corev1.ConfigMapVolumeSource{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: configMapName,
-				},
-			},
-		},
-	}
+	// Create a temporary pod spec and container to use the volume package
+	podSpec := &corev1.PodSpec{}
+	container := &corev1.Container{}
+
+	// Use the volume package to create the ConfigMap volume
+	volume.AddConfigMap(podSpec, container, schedVolumeConfigName, "/tmp", configMapName, volume.DefaultMode, false, false)
+
+	// Return just the volume part (we don't need the mount)
+	return podSpec.Volumes[0]
 }

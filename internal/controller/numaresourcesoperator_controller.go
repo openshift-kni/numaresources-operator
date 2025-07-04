@@ -525,22 +525,31 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 
 	// using a slice of poolDaemonSet instead of a map because Go maps assignment order is not consistent and non-deterministic
 	dsPoolPairs := []poolDaemonSet{}
-	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.Core.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
+	// mutatedManifests are rendered manifests which their base derives from the existing resources
+	// found on the cluster.
+	// those manifests were mutated by the API server and other controllers running on the cluster, hence the name.
+	// this way it minimizes the diffs between the desired and existing state only to the fields we care about.
+	// in case the manifest/resource was not found on the cluster (should be created)
+	// it uses the local stored manifest.
+	mutatedManifests, err := rtestate.MutatedFromExisting(existing, r.RTEManifests, r.Namespace)
+	if err != nil {
+		return dsPoolPairs, err
+	}
+	err = rteupdate.DaemonSetUserImageSettings(mutatedManifests.Core.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
 	if err != nil {
 		return dsPoolPairs, err
 	}
 
-	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.Core.DaemonSet)
+	err = rteupdate.DaemonSetPauseContainerSettings(mutatedManifests.Core.DaemonSet)
 	if err != nil {
 		return dsPoolPairs, err
 	}
 
-	err = loglevel.UpdatePodSpec(&r.RTEManifests.Core.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
+	err = loglevel.UpdatePodSpec(&mutatedManifests.Core.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
 	if err != nil {
 		return dsPoolPairs, err
 	}
-
-	rteupdate.SecurityContextConstraint(r.RTEManifests.Core.SecurityContextConstraint, true) // force to legacy context
+	rteupdate.SecurityContextConstraint(mutatedManifests.Core.SecurityContextConstraint, true) // force to legacy context
 	// SCC v2 needs no updates
 
 	existing = existing.WithManifestsUpdater(func(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
@@ -552,7 +561,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		return nil
 	})
 
-	for _, objState := range existing.State(r.RTEManifests) {
+	for _, objState := range existing.State(mutatedManifests) {
 		if objState.Error != nil {
 			// We are likely in the bootstrap scenario. In this case, which is expected once, everything is fine.
 			// If it happens past bootstrap, still carry on. We know what to do, and we do want to enforce the desired state.
