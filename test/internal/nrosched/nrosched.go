@@ -155,13 +155,13 @@ func CheckPODWasScheduledWith(k8sCli *kubernetes.Clientset, podNamespace, podNam
 	return checkPODEvents(k8sCli, podNamespace, podName, isScheduledWith)
 }
 
-func CheckNROSchedulerAvailable(ctx context.Context, cli client.Client, schedObjName string) *nropv1.NUMAResourcesScheduler {
+func CheckNROSchedulerAvailable(ctx context.Context, cli client.Client, schedObjName string) nropv1.NUMAResourcesScheduler {
 	GinkgoHelper()
 
-	nroSchedObj := &nropv1.NUMAResourcesScheduler{}
+	var nroSchedObj nropv1.NUMAResourcesScheduler
 	Eventually(func() error {
 		By(fmt.Sprintf("checking %q for the condition Available=true", schedObjName))
-		err := cli.Get(context.TODO(), objects.NROSchedObjectKey(), nroSchedObj)
+		err := cli.Get(ctx, objects.NROSchedObjectKey(), &nroSchedObj)
 		if err != nil {
 			return fmt.Errorf("failed to get the scheduler resource: %v", err)
 		}
