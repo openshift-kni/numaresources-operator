@@ -44,7 +44,7 @@ import (
 
 var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources scheduler removal on a live cluster", Serial, Label("disruptive", "scheduler", "schedrst"), Label("feature:schedrst"), func() {
 	var fxt *e2efixture.Fixture
-	var nroSchedObj *nropv1.NUMAResourcesScheduler
+	var nroSchedObj nropv1.NUMAResourcesScheduler
 	var config *textlogger.Config
 	var dpNName nropv1.NamespacedName
 
@@ -59,7 +59,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
 		nroSchedObj = nrosched.CheckNROSchedulerAvailable(context.TODO(), fxt.Client, serialconfig.Config.NROSchedObj.Name)
-		Expect(nroSchedObj).ToNot(BeNil())
+		Expect(nroSchedObj).ToNot(Equal(nropv1.NUMAResourcesScheduler{}))
 		dpNName = nroSchedObj.Status.Deployment
 	})
 
@@ -72,7 +72,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 		AfterEach(func() {
 			restoreScheduler(fxt, serialconfig.Config.NROSchedObj)
 			nroSchedObj = nrosched.CheckNROSchedulerAvailable(context.TODO(), fxt.Client, serialconfig.Config.NROSchedObj.Name)
-			Expect(nroSchedObj).ToNot(BeNil())
+			Expect(nroSchedObj).ToNot(Equal(nropv1.NUMAResourcesScheduler{}))
 		})
 
 		It("[case:1][test_id:47593] should keep existing workloads running", Label(label.Tier1), func() {
@@ -137,7 +137,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 			ctx := context.TODO()
 
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", nroSchedObj.Name))
-			err = fxt.Client.Delete(ctx, nroSchedObj)
+			err = fxt.Client.Delete(ctx, &nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			// make sure scheduler deployment is gone
@@ -159,9 +159,9 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 				Expect(wait.IsDeploymentComplete(dp, &updatedDp.Status)).To(BeFalse(), "deployment %q become ready", dp.Name)
 			}
 
-			restoreScheduler(fxt, nroSchedObj)
+			restoreScheduler(fxt, &nroSchedObj)
 			nroSchedObj = nrosched.CheckNROSchedulerAvailable(ctx, fxt.Client, nroSchedObj.Name)
-			Expect(nroSchedObj).ToNot(BeNil())
+			Expect(nroSchedObj).ToNot(Equal(nropv1.NUMAResourcesScheduler{}))
 
 			By(fmt.Sprintf("waiting for the test deployment %q to become complete and ready", updatedDp.Name))
 			_, err = wait.With(fxt.Client).Interval(2*time.Second).Interval(30*time.Second).ForDeploymentComplete(ctx, updatedDp)
