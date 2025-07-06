@@ -9,6 +9,18 @@
         {
             "matchUpdateTypes": ["minor"],
             "enabled": false
+        },
+        {
+            "addLabels": ["approved", "lgtm"],
+            "autoApprove": true,
+            "automerge": true,
+            "enabled": true,
+            "ignoreTests": false,
+            "matchDatasources": ["docker"],
+            "matchManagers": ["dockerfile"],
+            "matchPaths": [".konflux/**"],
+            "matchUpdateTypes": ["digest"],
+            "platformAutomerge": true
         }
     ],    
     "prConcurrentLimit": 0,
