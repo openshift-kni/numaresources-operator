@@ -171,7 +171,7 @@ github.com/josharian/intern
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
-# github.com/k8stopologyawareschedwg/deployer v0.22.0
+# github.com/k8stopologyawareschedwg/deployer v0.23.0
 ## explicit; go 1.23.0
 github.com/k8stopologyawareschedwg/deployer/pkg/assets/rte
 github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux

@@ -9,7 +9,7 @@ require (
 	github.com/go-logr/logr v1.4.2
 	github.com/google/go-cmp v0.6.0
 	github.com/jaypipes/ghw v0.16.0
-	github.com/k8stopologyawareschedwg/deployer v0.22.0
+	github.com/k8stopologyawareschedwg/deployer v0.23.0
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2
 	github.com/k8stopologyawareschedwg/podfingerprint v0.2.2
 	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.0

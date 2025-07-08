@@ -22,6 +22,7 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -39,13 +40,16 @@ const (
 )
 
 type Manifests struct {
-	ServiceAccount     *corev1.ServiceAccount
-	Role               *rbacv1.Role
-	RoleBinding        *rbacv1.RoleBinding
-	ClusterRole        *rbacv1.ClusterRole
-	ClusterRoleBinding *rbacv1.ClusterRoleBinding
-	ConfigMap          *corev1.ConfigMap
-	DaemonSet          *appsv1.DaemonSet
+	ServiceAccount             *corev1.ServiceAccount
+	Role                       *rbacv1.Role
+	RoleBinding                *rbacv1.RoleBinding
+	ClusterRole                *rbacv1.ClusterRole
+	ClusterRoleBinding         *rbacv1.ClusterRoleBinding
+	ConfigMap                  *corev1.ConfigMap
+	DaemonSet                  *appsv1.DaemonSet
+	DefaultNetworkPolicy       *networkingv1.NetworkPolicy
+	APIServerNetworkPolicy     *networkingv1.NetworkPolicy
+	MetricsServerNetworkPolicy *networkingv1.NetworkPolicy
 
 	// OpenShift related components
 	MachineConfig               *machineconfigv1.MachineConfig
@@ -60,13 +64,16 @@ func (mf Manifests) Clone() Manifests {
 	ret := Manifests{
 		plat: mf.plat,
 		// objects
-		Role:               mf.Role.DeepCopy(),
-		RoleBinding:        mf.RoleBinding.DeepCopy(),
-		ClusterRole:        mf.ClusterRole.DeepCopy(),
-		ClusterRoleBinding: mf.ClusterRoleBinding.DeepCopy(),
-		DaemonSet:          mf.DaemonSet.DeepCopy(),
-		ServiceAccount:     mf.ServiceAccount.DeepCopy(),
-		ConfigMap:          mf.ConfigMap.DeepCopy(),
+		Role:                       mf.Role.DeepCopy(),
+		RoleBinding:                mf.RoleBinding.DeepCopy(),
+		ClusterRole:                mf.ClusterRole.DeepCopy(),
+		ClusterRoleBinding:         mf.ClusterRoleBinding.DeepCopy(),
+		DaemonSet:                  mf.DaemonSet.DeepCopy(),
+		ServiceAccount:             mf.ServiceAccount.DeepCopy(),
+		ConfigMap:                  mf.ConfigMap.DeepCopy(),
+		DefaultNetworkPolicy:       mf.DefaultNetworkPolicy.DeepCopy(),
+		APIServerNetworkPolicy:     mf.APIServerNetworkPolicy.DeepCopy(),
+		MetricsServerNetworkPolicy: mf.MetricsServerNetworkPolicy.DeepCopy(),
 	}
 
 	if mf.plat == platform.OpenShift || mf.plat == platform.HyperShift {
@@ -96,6 +103,9 @@ func (mf Manifests) Render(opts options.UpdaterDaemon) (Manifests, error) {
 		ret.DaemonSet.Name = opts.Name
 		ret.ClusterRole.Name = opts.Name
 		ret.ClusterRoleBinding.Name = opts.Name
+		ret.DefaultNetworkPolicy.Name = opts.Name
+		ret.APIServerNetworkPolicy.Name = opts.Name
+		ret.MetricsServerNetworkPolicy.Name = opts.Name
 	}
 
 	rbacupdate.RoleBinding(ret.RoleBinding, mf.ServiceAccount.Name, ret.ServiceAccount.Namespace)
@@ -187,6 +197,9 @@ func (mf Manifests) ToObjects() []client.Object {
 		mf.ClusterRoleBinding,
 		mf.DaemonSet,
 		mf.ServiceAccount,
+		mf.DefaultNetworkPolicy,
+		mf.APIServerNetworkPolicy,
+		mf.MetricsServerNetworkPolicy,
 	)
 }
 
@@ -240,6 +253,18 @@ func NewWithOptions(opts options.Render) (Manifests, error) {
 		return mf, err
 	}
 	mf.DaemonSet, err = manifests.DaemonSet(manifests.ComponentResourceTopologyExporter, "", opts.Namespace)
+	if err != nil {
+		return mf, err
+	}
+	mf.DefaultNetworkPolicy, err = manifests.NetworkPolicy(manifests.ComponentResourceTopologyExporter, "", manifests.DefaultNetworkPolicy, opts.Namespace)
+	if err != nil {
+		return mf, err
+	}
+	mf.APIServerNetworkPolicy, err = manifests.NetworkPolicy(manifests.ComponentResourceTopologyExporter, "", manifests.APIServerNetworkPolicy, opts.Namespace)
+	if err != nil {
+		return mf, err
+	}
+	mf.MetricsServerNetworkPolicy, err = manifests.NetworkPolicy(manifests.ComponentResourceTopologyExporter, "", manifests.MetricsServerNetworkPolicy, opts.Namespace)
 	if err != nil {
 		return mf, err
 	}
