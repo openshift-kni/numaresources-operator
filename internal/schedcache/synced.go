@@ -78,8 +78,11 @@ func HasSynced(env *Env, nodeNames []string) (bool, map[string]sets.Set[string],
 
 	unsynced := make(map[string]sets.Set[string])
 
-	//nolint: ineffassign,staticcheck,wastedassign
 	podList, err := podlist.With(env.Cli).ByDeployment(env.Ctx, *dp)
+	if err != nil {
+		return false, nil, err
+	}
+
 	for idx := range podList {
 		pod := &podList[idx]
 
