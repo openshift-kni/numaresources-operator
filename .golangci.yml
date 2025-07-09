@@ -1,117 +1,118 @@
+version: "2"
 run:
   concurrency: 4
-  timeout: 5m
-  tests: true
   modules-download-mode: vendor
-issues:
-  exclude-dirs:
-    - vendor
-    - test/utils/k8simported
-    - pkg/version
-  # don't skip warning about doc comments
-  # don't exclude the default set of lint
-  exclude-use-default: false
-  # restore some of the defaults
-  # (fill in the rest as needed)
-  exclude-rules:
-    - path: "api/*"
-      linters:
-        - gci
-        - lll
-    - path: "cmd/*"
-      linters:
-        - gci
-    - path: "internal/*"
-      linters:
-        - dupl
-        - lll
-    - path: "test/e2e/serial/*"
-      linters:
-        - dupl
-        - lll
-    - path: "test/utils/*"
-      linters:
-        - dupl
-        - lll
+  tests: true
 linters:
-  disable-all: true
+  default: none
   enable:
-    - errcheck
     - bodyclose
     - copyloopvar
     - depguard
-    - gci
+    - errcheck
     - ginkgolinter
-    - gosimple
+    - gocritic
     - govet
     - ineffassign
     - misspell
     - nolintlint
     - nosprintfhostport
     - staticcheck
-    - typecheck
     - unconvert
     - unused
     - usetesting
     - wastedassign
     - whitespace
-    - gocritic
-    - stylecheck
-linters-settings:
-  gci:
-    sections:
-      - standard
-      - blank
-      - default
-      - prefix(k8s.io)
-      - prefix(sigs.k8s.io)
-      - prefix(github.com/openshift)
-      - prefix(github.com/k8stopologyawareschedwg)
-      - prefix(github.com/openshift-kni)
-      - dot
-    custom-order: true
-  revive:
+  settings:
+    depguard:
+      rules:
+        main:
+          list-mode: original
+          files:
+            - $all
+            - '!$test'
+          deny:
+            - pkg: k8s.io/kubernetes
+              desc: Importing k8s.io/kubernetes as library is not supported
+        test:
+          list-mode: lax
+          files:
+            - $test
+          deny:
+            - pkg: k8s.io/kubernetes
+              desc: Importing k8s.io/kubernetes as library is not supported
+    errcheck:
+      exclude-functions:
+        - fmt.Fprintf
+    ginkgolinter:
+      forbid-focus-container: true
+    gocritic:
+      disabled-checks:
+        - commentFormatting
+    misspell:
+      locale: US
+      ignore-rules:
+        - NRO
+        - nro
+        - numaresource
+        - numa
+        - NUMA
+    revive:
+      rules:
+        - name: comment-spacings
+    staticcheck:
+      checks:
+        - ST1008
+        - ST1019
+  exclusions:
+    generated: lax
     rules:
-      - name: comment-spacings
-  misspell:
-    locale: US
-    ignore-words:
-      - NRO
-      - nro
-      - numaresource
-      - numa
-      - NUMA
-  depguard:
-    rules:
-      main:
-        list-mode: original
-        files:
-          - $all
-          - "!$test"
-        deny:
-          - pkg: "k8s.io/kubernetes"
-            desc: Importing k8s.io/kubernetes as library is not supported
-      test:
-        list-mode: lax
-        files:
-          - $test
-        deny:
-          - pkg: "k8s.io/kubernetes"
-            desc: Importing k8s.io/kubernetes as library is not supported
-  ginkgolinter:
-    # Trigger warning for ginkgo focus containers like `FDescribe`, `FContext`, `FWhen` or `FIt`
-    forbid-focus-container: true
-  errcheck:
-    exclude-functions:
-      - fmt.Fprintf
-  gocritic:
-    disabled-checks:
-      - commentFormatting
-  stylecheck:
-    checks:
-      # A function's error value should be its last return value.
-      # https://staticcheck.dev/docs/checks/#ST1008
-      - ST1008
-      # Importing the same package multiple times.
-      # https://staticcheck.dev/docs/checks/#ST1019
-      - ST1019
+      - linters:
+          - lll
+        path: api/*
+      - linters:
+          - dupl
+          - lll
+        path: internal/*
+      - linters:
+          - dupl
+          - lll
+        path: test/e2e/serial/*
+      - linters:
+          - dupl
+          - lll
+        path: test/utils/*
+    paths:
+      - vendor
+      - test/utils/k8simported
+      - pkg/version
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gci
+  settings:
+    gci:
+      sections:
+        - standard
+        - blank
+        - default
+        - prefix(k8s.io)
+        - prefix(sigs.k8s.io)
+        - prefix(github.com/openshift)
+        - prefix(github.com/k8stopologyawareschedwg)
+        - prefix(github.com/openshift-kni)
+        - dot
+      custom-order: true
+  exclusions:
+    generated: lax
+    paths:
+      - vendor
+      - test/utils/k8simported
+      - pkg/version
+      - third_party$
+      - builtin$
+      - examples$
+      - api/*
+      - cmd/*

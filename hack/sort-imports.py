@@ -11,7 +11,7 @@ def make_gci_commandline(tree, ciconfig=".golangci.yml"):
     with open(ciconfig) as src:
         cfg = yaml.safe_load(src)
     try:
-        sections = cfg['linters-settings']['gci']['sections']
+        sections = cfg['formatters']['settings']['gci']['sections']
     except KeyError:
         sys.stderr.write("cannot find gci configuration on %s\n" % ciconfig)
         sys.exit(2)

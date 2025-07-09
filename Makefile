@@ -162,11 +162,11 @@ sort-imports:
 
 .PHONY: lint
 lint: update-buildinfo golangci-lint ## Run golangci-lint linter
-	$(GOLANGCI_LINT) --verbose run --print-resources-usage --exclude-dirs test/internal/k8simported
+	$(GOLANGCI_LINT) --verbose run
 
 .PHONY: lint-fix
 lint-fix: update-buildinfo golangci-lint ## Run golangci-lint linter and perform fixes
-	$(GOLANGCI_LINT) --verbose run --print-resources-usage --fix
+	$(GOLANGCI_LINT) --verbose run --fix
 
 .PHONY: lint-config
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
@@ -494,7 +494,7 @@ OPM_VERSION ?= 1.52.0
 OPM_BIN = "$(GOOS)-$(GOARCH)-opm"
 OPM = "$(LOCALBIN)/$(OPM_BIN)"
 
-GOLANGCI_LINT_VERSION ?= 1.64.6
+GOLANGCI_LINT_VERSION ?= 2.2.1
 GOLANGCI_LINT_NAME = golangci-lint-$(GOLANGCI_LINT_VERSION)-$(GOOS)-$(GOARCH)
 GOLANGCI_LINT_ARTIFACT_FILE = $(GOLANGCI_LINT_NAME).tar.gz
 GOLANGCI_LINT_EXEC_NAME = golangci-lint
