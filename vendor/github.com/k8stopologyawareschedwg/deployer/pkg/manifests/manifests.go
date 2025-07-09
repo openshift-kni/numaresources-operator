@@ -31,6 +31,7 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -77,6 +78,12 @@ const (
 	templateSELinuxPolicyDst     = "selinuxPolicyDst"
 	templateNotifierBinaryDst    = "notifierScriptPath"
 	templateNotifierFilePath     = "notifierFilePath"
+)
+
+const (
+	DefaultNetworkPolicy       = "default"
+	APIServerNetworkPolicy     = "apiserver"
+	MetricsServerNetworkPolicy = "metrics"
 )
 
 //go:embed yaml
@@ -336,6 +343,30 @@ func MachineConfig(component string, ver platform.Version, withCRIHooks bool) (*
 
 	mc.Spec.Config = runtime.RawExtension{Raw: ignitionConfig}
 	return mc, nil
+}
+
+func NetworkPolicy(component, subComponent, policyType, namespace string) (*networkingv1.NetworkPolicy, error) {
+	var fileName string
+
+	if policyType == "" || policyType == DefaultNetworkPolicy {
+		fileName = "networkpolicy.yaml"
+	} else {
+		fileName = fmt.Sprintf("networkpolicy.%s.yaml", policyType)
+	}
+
+	obj, err := loadObject(filepath.Join("yaml", component, subComponent, fileName))
+	if err != nil {
+		return nil, err
+	}
+
+	np, ok := obj.(*networkingv1.NetworkPolicy)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type, got %t", obj)
+	}
+	if namespace != "" {
+		np.Namespace = namespace
+	}
+	return np, nil
 }
 
 func makeIgnitionConfig(ver platform.Version, withCRIHooks bool) ([]byte, error) {
