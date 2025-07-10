@@ -19,6 +19,7 @@ package sched
 import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,14 +30,16 @@ import (
 )
 
 type Manifests struct {
-	ServiceAccount        *corev1.ServiceAccount
-	ConfigMap             *corev1.ConfigMap
-	ClusterRole           *rbacv1.ClusterRole
-	ClusterRoleBindingK8S *rbacv1.ClusterRoleBinding
-	ClusterRoleBindingNRT *rbacv1.ClusterRoleBinding
-	Role                  *rbacv1.Role
-	RoleBinding           *rbacv1.RoleBinding
-	Deployment            *appsv1.Deployment
+	ServiceAccount         *corev1.ServiceAccount
+	ConfigMap              *corev1.ConfigMap
+	ClusterRole            *rbacv1.ClusterRole
+	ClusterRoleBindingK8S  *rbacv1.ClusterRoleBinding
+	ClusterRoleBindingNRT  *rbacv1.ClusterRoleBinding
+	Role                   *rbacv1.Role
+	RoleBinding            *rbacv1.RoleBinding
+	Deployment             *appsv1.Deployment
+	DefaultNetworkPolicy   *networkingv1.NetworkPolicy
+	APIserverNetworkPolicy *networkingv1.NetworkPolicy
 }
 
 func (mf Manifests) ToObjects() []client.Object {
@@ -49,19 +52,23 @@ func (mf Manifests) ToObjects() []client.Object {
 		mf.Role,
 		mf.RoleBinding,
 		mf.Deployment,
+		mf.DefaultNetworkPolicy,
+		mf.APIserverNetworkPolicy,
 	}
 }
 
 func (mf Manifests) Clone() Manifests {
 	return Manifests{
-		ServiceAccount:        mf.ServiceAccount.DeepCopy(),
-		ConfigMap:             mf.ConfigMap.DeepCopy(),
-		ClusterRole:           mf.ClusterRole.DeepCopy(),
-		ClusterRoleBindingK8S: mf.ClusterRoleBindingK8S.DeepCopy(),
-		ClusterRoleBindingNRT: mf.ClusterRoleBindingNRT.DeepCopy(),
-		Role:                  mf.Role.DeepCopy(),
-		RoleBinding:           mf.RoleBinding.DeepCopy(),
-		Deployment:            mf.Deployment.DeepCopy(),
+		ServiceAccount:         mf.ServiceAccount.DeepCopy(),
+		ConfigMap:              mf.ConfigMap.DeepCopy(),
+		ClusterRole:            mf.ClusterRole.DeepCopy(),
+		ClusterRoleBindingK8S:  mf.ClusterRoleBindingK8S.DeepCopy(),
+		ClusterRoleBindingNRT:  mf.ClusterRoleBindingNRT.DeepCopy(),
+		Role:                   mf.Role.DeepCopy(),
+		RoleBinding:            mf.RoleBinding.DeepCopy(),
+		Deployment:             mf.Deployment.DeepCopy(),
+		DefaultNetworkPolicy:   mf.DefaultNetworkPolicy.DeepCopy(),
+		APIserverNetworkPolicy: mf.APIserverNetworkPolicy.DeepCopy(),
 	}
 }
 
@@ -104,6 +111,16 @@ func GetManifests(namespace string) (Manifests, error) {
 	}
 
 	mf.Deployment, err = manifests.Deployment(namespace)
+	if err != nil {
+		return mf, err
+	}
+
+	mf.DefaultNetworkPolicy, err = manifests.NetworkPolicy("default", namespace)
+	if err != nil {
+		return mf, err
+	}
+
+	mf.APIserverNetworkPolicy, err = manifests.NetworkPolicy("apiserver", namespace)
 	if err != nil {
 		return mf, err
 	}
