@@ -2207,7 +2207,6 @@ func getConditionByType(conditions []metav1.Condition, conditionType string) *me
 			return c
 		}
 	}
-
 	return nil
 }
 

@@ -115,9 +115,10 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 		return ctrl.Result{}, err
 	}
 
+	initialStatus := *instance.Status.DeepCopy()
 	if req.Name != objectnames.DefaultNUMAResourcesSchedulerCrName {
 		message := fmt.Sprintf("incorrect NUMAResourcesScheduler resource name: %s", instance.Name)
-		return ctrl.Result{}, r.updateStatus(ctx, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
+		return ctrl.Result{}, r.updateStatus(ctx, initialStatus, instance, status.ConditionDegraded, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
 	}
 
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
@@ -126,7 +127,7 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	}
 
 	result, condition, err := r.reconcileResource(ctx, instance)
-	if err := r.updateStatus(ctx, instance, condition, status.ReasonFromError(err), status.MessageFromError(err)); err != nil {
+	if err := r.updateStatus(ctx, initialStatus, instance, condition, status.ReasonFromError(err), status.MessageFromError(err)); err != nil {
 		klog.InfoS("Failed to update numaresourcesscheduler status", "Desired condition", condition, "error", err)
 	}
 
@@ -183,15 +184,13 @@ func (r *NUMAResourcesSchedulerReconciler) nodeToNUMAResourcesScheduler(ctx cont
 }
 
 func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (reconcile.Result, string, error) {
-	schedStatus, err := r.syncNUMASchedulerResources(ctx, instance)
+	err := r.syncNUMASchedulerResources(ctx, instance)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, fmt.Errorf("FailedSchedulerSync: %w", err)
 	}
-
-	instance.Status = schedStatus
 	instance.Status.RelatedObjects = relatedobjects.Scheduler(r.Namespace, instance.Status.Deployment)
 
-	ok, err := isDeploymentRunning(ctx, r.Client, schedStatus.Deployment)
+	ok, err := isDeploymentRunning(ctx, r.Client, instance.Status.Deployment)
 	if err != nil {
 		return ctrl.Result{}, status.ConditionDegraded, err
 	}
@@ -234,7 +233,7 @@ func (r *NUMAResourcesSchedulerReconciler) computeSchedulerReplicas(ctx context.
 	return replicas, nil
 }
 
-func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (nropv1.NUMAResourcesSchedulerStatus, error) {
+func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) error {
 	klog.V(4).Info("SchedulerSync start")
 	defer klog.V(4).Info("SchedulerSync stop")
 
@@ -244,7 +243,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	cacheResyncPeriod := unpackAPIResyncPeriod(schedSpec.CacheResyncPeriod)
 	replicas, err := r.computeSchedulerReplicas(ctx, schedSpec)
 	if err != nil {
-		return nropv1.NUMAResourcesSchedulerStatus{}, fmt.Errorf("failed to compute scheduler replicas: %w", err)
+		return fmt.Errorf("failed to compute scheduler replicas: %w", err)
 	}
 	schedSpec.Replicas = replicas
 	params := configParamsFromSchedSpec(schedSpec, cacheResyncPeriod, r.Namespace)
@@ -253,19 +252,30 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	if !ok {
 		err := fmt.Errorf("missing scheduler name in builtin config map")
 		klog.V(2).ErrorS(err, "cannot find the scheduler profile name")
-		return nropv1.NUMAResourcesSchedulerStatus{}, err
+		return err
 	}
 	klog.V(4).InfoS("detected scheduler profile", "profileName", schedName)
 
 	if err := schedupdate.SchedulerConfig(r.SchedulerManifests.ConfigMap, schedName, &params); err != nil {
-		return nropv1.NUMAResourcesSchedulerStatus{}, err
+		return err
 	}
 
-	schedStatus := nropv1.NUMAResourcesSchedulerStatus{
-		SchedulerName: schedSpec.SchedulerName,
-		CacheResyncPeriod: &metav1.Duration{
-			Duration: cacheResyncPeriod,
-		},
+	instance.Status.SchedulerName = schedSpec.SchedulerName
+	instance.Status.CacheResyncPeriod = &metav1.Duration{
+		Duration: cacheResyncPeriod,
+	}
+
+	informerCondition := buildInformerCondition(instance, schedSpec)
+
+	if instance.Status.Conditions == nil {
+		fmt.Println("nil status conditions")
+		instance.Status.Conditions = []metav1.Condition{informerCondition}
+	} else {
+		for idx, cond := range instance.Status.Conditions {
+			if cond.Type == status.ConditionSharedInformerBased {
+				instance.Status.Conditions[idx] = informerCondition
+			}
+		}
 	}
 
 	r.SchedulerManifests.Deployment.Spec.Replicas = schedSpec.Replicas
@@ -280,7 +290,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
 	schedupdate.DeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
 	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, "", schedSpec.LogLevel); err != nil {
-		return schedStatus, err
+		return err
 	}
 
 	schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec)
@@ -291,21 +301,21 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
 	for _, objState := range existing.State(r.SchedulerManifests) {
 		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
-			return schedStatus, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+			return fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 		obj, _, err := apply.ApplyObject(ctx, r.Client, objState)
 		if err != nil {
-			return schedStatus, fmt.Errorf("could not apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+			return fmt.Errorf("could not apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
 		}
 
 		if nname, ok := schedstate.DeploymentNamespacedNameFromObject(obj); ok {
-			schedStatus.Deployment = nname
+			instance.Status.Deployment = nname
 		}
 		if schedName, ok := schedstate.SchedulerNameFromObject(obj); ok {
-			schedStatus.SchedulerName = schedName
+			instance.Status.SchedulerName = schedName
 		}
 	}
-	return schedStatus, nil
+	return nil
 }
 
 func platformNormalize(spec *nropv1.NUMAResourcesSchedulerSpec, platInfo PlatformInfo) {
@@ -329,10 +339,49 @@ func platformNormalize(spec *nropv1.NUMAResourcesSchedulerSpec, platInfo Platfor
 		klog.V(4).InfoS("SchedulerInformer default is overridden", "Platform", platInfo.Platform, "PlatformVersion", platInfo.Version.String(), "SchedulerInformer", &spec.SchedulerInformer)
 	}
 }
-func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
-	sched.Status.Conditions, _ = status.UpdateConditions(sched.Status.Conditions, condition, reason, message)
-	if err := r.Client.Status().Update(ctx, sched); err != nil {
-		return fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(sched), err)
+
+func buildInformerCondition(original *nropv1.NUMAResourcesScheduler, normalized nropv1.NUMAResourcesSchedulerSpec) metav1.Condition {
+	originalSpec := original.Spec
+
+	condReason := status.ReasonDefaults
+	condStatus := metav1.ConditionUnknown
+
+	if originalSpec.SchedulerInformer == nil {
+		if *normalized.SchedulerInformer == nropv1.SchedulerInformerShared {
+			condStatus = metav1.ConditionTrue
+		}
+	}
+
+	if originalSpec.SchedulerInformer != nil {
+		if *normalized.SchedulerInformer == nropv1.SchedulerInformerShared {
+			condStatus = metav1.ConditionTrue
+		} else {
+			condStatus = metav1.ConditionFalse
+		}
+
+		condReason = status.ReasonSyncedWithSpec
+	}
+
+	condition := metav1.Condition{
+		Type:               status.ConditionSharedInformerBased,
+		Status:             condStatus,
+		ObservedGeneration: original.ObjectMeta.Generation,
+		Reason:             condReason,
+	}
+	return condition
+}
+
+func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesSchedulerStatus, desiredSched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
+	updatedConditions := status.CloneConditions(desiredSched.Status.Conditions)
+
+	updatedConditions, needsUpdate := status.CheckSchedulerConditionsNeedsUpdate(initialStatus.Conditions, updatedConditions, condition, reason, message)
+
+	if needsUpdate {
+		desiredSched.Status.Conditions = updatedConditions
+	}
+
+	if err := r.Client.Status().Update(ctx, desiredSched); err != nil {
+		return fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(desiredSched), err)
 	}
 	return nil
 }
