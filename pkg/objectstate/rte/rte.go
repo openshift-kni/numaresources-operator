@@ -18,6 +18,7 @@ package rte
 
 import (
 	"context"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +34,7 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/options"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
@@ -163,6 +165,86 @@ type GenerateDesiredManifestUpdater func(mcpName string, gdm *GeneratedDesiredMa
 
 func SkipManifestUpdate(mcpName string, gdm *GeneratedDesiredManifest) error {
 	return nil
+}
+
+func MutatedFromExisting(existingMF *ExistingManifests, defaultManifests Manifests, namespace string) (Manifests, error) {
+	mf := Manifests{
+		Core:    existingMF.existing.Core.Clone(),
+		Metrics: existingMF.existing.Metrics.Clone(),
+	}
+
+	o := objectstate.ObjectState{Error: existingMF.errs.Core.ClusterRole}
+	if o.IsNotFoundError() {
+		mf.Core.ClusterRole = defaultManifests.Core.ClusterRole.DeepCopy()
+	}
+
+	o = objectstate.ObjectState{Error: existingMF.errs.Core.ClusterRoleBinding}
+	if o.IsNotFoundError() {
+		mf.Core.ClusterRoleBinding = defaultManifests.Core.ClusterRoleBinding.DeepCopy()
+	}
+
+	o = objectstate.ObjectState{Error: existingMF.errs.Core.Role}
+	if o.IsNotFoundError() {
+		mf.Core.Role = defaultManifests.Core.Role.DeepCopy()
+	}
+
+	o = objectstate.ObjectState{Error: existingMF.errs.Core.RoleBinding}
+	if o.IsNotFoundError() {
+		mf.Core.RoleBinding = defaultManifests.Core.RoleBinding.DeepCopy()
+	}
+
+	o = objectstate.ObjectState{Error: existingMF.errs.Core.ServiceAccount}
+	if o.IsNotFoundError() {
+		mf.Core.ServiceAccount = defaultManifests.Core.ServiceAccount.DeepCopy()
+	}
+
+	if defaultManifests.Core.SecurityContextConstraint != nil {
+		o = objectstate.ObjectState{Error: existingMF.errs.Core.SCC}
+		if o.IsNotFoundError() {
+			mf.Core.SecurityContextConstraint = defaultManifests.Core.SecurityContextConstraint.DeepCopy()
+		}
+	}
+
+	if defaultManifests.Core.SecurityContextConstraintV2 != nil {
+		o = objectstate.ObjectState{Error: existingMF.errs.Core.SCCv2}
+		if o.IsNotFoundError() {
+			mf.Core.SecurityContextConstraintV2 = defaultManifests.Core.SecurityContextConstraintV2.DeepCopy()
+		}
+	}
+
+	// there are multiple resources of DaemonSets
+	// (one per nodeGroup), so we should use a default manifest + existing/mutated spec,
+	// and the rest will be updated later
+	mf.Core.DaemonSet = defaultManifests.Core.DaemonSet.DeepCopy()
+	for _, ds := range existingMF.daemonSets {
+		if ds.daemonSetError == nil {
+			// use the spec from one of the existing so we won't end up with
+			// diffs that derives from default values applied by the API server
+			mf.Core.DaemonSet.Spec = *ds.daemonSet.Spec.DeepCopy()
+		}
+	}
+	// Clear volumes and volume mounts before rendering to avoid duplicates
+	// The Render() function will add them back based on the configuration
+	clearVolumesAndVolumeMounts(mf.Core.DaemonSet)
+
+	o = objectstate.ObjectState{Error: existingMF.errs.Metrics.Service}
+	if o.IsNotFoundError() {
+		mf.Metrics.Service = defaultManifests.Metrics.Service.DeepCopy()
+	}
+
+	var err error
+	mf.Core, err = mf.Core.Render(options.UpdaterDaemon{
+		Namespace: namespace,
+		DaemonSet: options.DaemonSet{
+			Verbose:            2,
+			NotificationEnable: true,
+			UpdateInterval:     10 * time.Second,
+		},
+	})
+	if err != nil {
+		return mf, err
+	}
+	return mf, err
 }
 
 func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
@@ -335,4 +417,12 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 func getObject(ctx context.Context, cli client.Client, key client.ObjectKey, obj client.Object, err *error) bool {
 	*err = cli.Get(ctx, key, obj)
 	return *err == nil
+}
+
+func clearVolumesAndVolumeMounts(ds *appsv1.DaemonSet) {
+	podSpec := &ds.Spec.Template.Spec
+	podSpec.Volumes = nil
+	for i := range podSpec.Containers {
+		podSpec.Containers[i].VolumeMounts = nil
+	}
 }
