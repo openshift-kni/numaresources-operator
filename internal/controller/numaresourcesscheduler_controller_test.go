@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -44,6 +45,7 @@ import (
 	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
@@ -630,6 +632,34 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			dp := &appsv1.Deployment{}
 			gomega.Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(gomega.Succeed())
 			gomega.Expect(*dp.Spec.Replicas).To(gomega.Equal(int32(numOfMasters)), "number of replicas is different than number of control-planes nodes; want=%d got=%d", numOfMasters, *dp.Spec.Replicas)
+		})
+
+		ginkgo.It("should be able to modify scheduler CacheResyncDebug", func() {
+			nrs := nrs.DeepCopy()
+			newValue := nropv1.CacheResyncDebugDisabled
+			var expectedEnvVars []corev1.EnvVar
+			if nrs.Spec.CacheResyncDebug != nil && reflect.DeepEqual(*nrs.Spec.CacheResyncDebug, newValue) {
+				newValue = nropv1.CacheResyncDebugDumpJSONFile
+				expectedEnvVars = []corev1.EnvVar{
+					{
+						Name:  "PFP_STATUS_DUMP",
+						Value: "/run/pfpstatus",
+					},
+				}
+			}
+			nrs.Spec.CacheResyncDebug = &newValue
+			gomega.Eventually(reconciler.Client.Update).WithArguments(context.TODO(), nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(gomega.Succeed())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(gomega.HaveOccurred())
+
+			dp := &appsv1.Deployment{}
+			gomega.Expect(reconciler.Client.Get(context.TODO(), namespacedname.AsObjectKey(nrs.Status.Deployment), dp)).ToNot(gomega.HaveOccurred())
+			gomega.Expect(*nrs.Spec.CacheResyncDebug).To(gomega.Equal(newValue))
+			gomega.Expect(dp.Spec.Template.Spec.Containers[0].Env).To(gomega.Equal(expectedEnvVars))
 		})
 	})
 })
