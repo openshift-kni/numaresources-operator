@@ -116,7 +116,6 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
 	var nrts []nrtv1alpha2.NodeResourceTopology
-	var dynamicClient dynamic.Interface
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
@@ -125,12 +124,6 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 		var err error
 		fxt, err = e2efixture.Setup("e2e-test-configuration", serialconfig.Config.NRTList)
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
-
-		cfg, err := config.GetConfig()
-		Expect(err).ToNot(HaveOccurred(), "unable to get kubeconfig")
-
-		dynamicClient, err = dynamic.NewForConfig(cfg)
-		Expect(err).ToNot(HaveOccurred(), "unable to create dynamic client")
 
 		err = fxt.Client.List(context.TODO(), &nrtList)
 		Expect(err).ToNot(HaveOccurred())
@@ -544,7 +537,6 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			By("verify owner reference of kubeletconfig")
 			Expect(numTargetedKCOwnerReferences).To(BeNumerically("<", 2)) // so 0 or 1
 
-			// Using unstructured object to modify the Topology Manager Policy through performance profile throughout the test
 			if initialTopologyManagerPolicy != v1beta1.NoneTopologyManagerPolicy {
 				if numTargetedKCOwnerReferences == 0 {
 					By("modifying Topology Manager Policy to 'none' under kubeletconfig")
@@ -573,8 +565,8 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					By("modifying Topology Manager Policy to 'none' under performance profile using dynamic client")
 					klog.InfoS("update Topology Manager Policy to 'none' via the kubeletconfig owner", "kind", ref.Kind, "name", ref.Name)
 
-					err = updatePerformanceProfileFieldUnstructured(ctx, dynamicClient, ref.Name, v1beta1.NoneTopologyManagerPolicy, "spec", "numa", "topologyPolicy")
-					Expect(err).ToNot(HaveOccurred())
+					// using unstructured object to modify the Topology Manager Policy through performance profile
+					updatePerformanceProfileFieldUnstructured(ctx, ref.Name, v1beta1.NoneTopologyManagerPolicy, "spec", "numa", "topologyPolicy")
 				}
 			}
 
@@ -617,8 +609,8 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						By("reverting kubeletconfig changes to the initial state under performance profile using dynamic client")
 						klog.Infof("reverting configuration via the kubeletconfig owner %s/%s", ref.Kind, ref.Name)
 
-						err = updatePerformanceProfileFieldUnstructured(ctx, dynamicClient, ref.Name, v1beta1.NoneTopologyManagerPolicy, "spec", "numa", "topologyPolicy")
-						Expect(err).ToNot(HaveOccurred())
+						// using unstructured object to modify the Topology Manager Policy through performance profile
+						updatePerformanceProfileFieldUnstructured(ctx, ref.Name, v1beta1.NoneTopologyManagerPolicy, "spec", "numa", "topologyPolicy")
 					}
 
 					By("waiting for mcp to update")
@@ -686,8 +678,8 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				By("modifying Topology Manager Policy to 'single-numa-node' under performance profile using dynamic client")
 				klog.InfoS("update Topology Manager Policy to 'single-numa-node' via the kubeletconfig owner", "kind", ref.Kind, "name", ref.Name)
 
-				err = updatePerformanceProfileFieldUnstructured(ctx, dynamicClient, ref.Name, v1beta1.SingleNumaNodeTopologyManagerPolicy, "spec", "numa", "topologyPolicy")
-				Expect(err).ToNot(HaveOccurred())
+				// using unstructured object to modify the Topology Manager Policy through performance profile
+				updatePerformanceProfileFieldUnstructured(ctx, ref.Name, v1beta1.SingleNumaNodeTopologyManagerPolicy, "spec", "numa", "topologyPolicy")
 			}
 
 			By("waiting for mcp to update")
@@ -1485,20 +1477,49 @@ func createTAEDeployment(fxt *e2efixture.Fixture, ctx context.Context, name, sch
 
 // updatePerformanceProfileFieldUnstructured updates a specific field in a PerformanceProfile using the dynamic client.
 // It takes the field path as variadic string arguments and updates the field with the provided value.
-func updatePerformanceProfileFieldUnstructured(ctx context.Context, dynamicClient dynamic.Interface, name string, value interface{}, fieldPath ...string) error {
+func updatePerformanceProfileFieldUnstructured(ctx context.Context, name string, value interface{}, fieldPath ...string) {
+	cfg, err := config.GetConfig()
+	Expect(err).ToNot(HaveOccurred())
+
+	dynamicClient, err := dynamic.NewForConfig(cfg)
+	Expect(err).ToNot(HaveOccurred())
+
 	performanceProfileGVR := schema.GroupVersionResource{
 		Group:    "performance.openshift.io",
 		Version:  "v2",
 		Resource: "performanceprofiles",
 	}
+
+	By("getting the performance profile using the dynamic client")
 	profile, err := dynamicClient.Resource(performanceProfileGVR).Get(ctx, name, metav1.GetOptions{})
-	if err != nil {
-		return err
+	Expect(err).ToNot(HaveOccurred(), "Failed to fetch PerformanceProfile using the dynamic client: %v", err)
+
+	By(fmt.Sprintf("checking if the field path %v exists in PerformanceProfile %s", fieldPath, name))
+	lenFieldPath := len(fieldPath)
+	fieldToUpdate := fieldPath[lenFieldPath-1]
+	current := profile.Object
+	for _, key := range fieldPath[:lenFieldPath-1] {
+		next, found, _ := unstructured.NestedMap(current, key)
+		if !found {
+			Expect(found).To(BeTrue(), "Path %v does not exist in PerformanceProfile %s", fieldPath, name)
+		}
+		current = next
 	}
-	err = unstructured.SetNestedField(profile.Object, value, fieldPath...)
-	if err != nil {
-		return err
+	_, found, _ := unstructured.NestedFieldNoCopy(current, fieldToUpdate)
+	if !found {
+		Expect(found).To(BeTrue(), fmt.Sprintf("Final field '%s' in path %v does not exist in PerformanceProfile %s. Current object: %v", fieldToUpdate, fieldPath, name, current))
 	}
-	_, err = dynamicClient.Resource(performanceProfileGVR).Update(ctx, profile, metav1.UpdateOptions{})
-	return err
+
+	By(fmt.Sprintf("updating field %v in PerformanceProfile %s", fieldPath, name))
+	Eventually(func(g Gomega) {
+		profile, err := dynamicClient.Resource(performanceProfileGVR).Get(ctx, name, metav1.GetOptions{})
+		Expect(err).ToNot(HaveOccurred(), "Failed to fetch PerformanceProfile using the dynamic client: %v", err)
+
+		err = unstructured.SetNestedField(profile.Object, value, fieldPath...)
+		Expect(err).ToNot(HaveOccurred(), "Failed to set field %v in PerformanceProfile %s: %v", fieldPath, name, err)
+
+		_, err = dynamicClient.Resource(performanceProfileGVR).Update(ctx, profile, metav1.UpdateOptions{})
+		Expect(err).ToNot(HaveOccurred())
+	}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+	return
 }
