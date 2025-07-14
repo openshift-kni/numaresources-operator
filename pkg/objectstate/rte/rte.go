@@ -88,17 +88,19 @@ func (mf Manifests) securityContextOptions(legacyMode bool) k8swgrteupdate.Secur
 
 type Errors struct {
 	Core struct {
-		SCC                error
-		SCCv2              error
-		ServiceAccount     error
-		Role               error
-		RoleBinding        error
-		ClusterRole        error
-		ClusterRoleBinding error
+		SCC                        error
+		SCCv2                      error
+		ServiceAccount             error
+		Role                       error
+		RoleBinding                error
+		ClusterRole                error
+		ClusterRoleBinding         error
+		MetricsServerNetworkPolicy error
+		APIServerNetworkPolicy     error
+		DefaultNetworkPolicy       error
 	}
 	Metrics struct {
-		Service       error
-		NetworkPolicy error
+		Service error
 	}
 }
 
@@ -204,6 +206,20 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 			Compare:  compare.Object,
 			Merge:    merge.ObjectForUpdate,
 		},
+		{
+			Existing: em.existing.Core.APIServerNetworkPolicy,
+			Error:    em.errs.Core.APIServerNetworkPolicy,
+			Desired:  mf.Core.APIServerNetworkPolicy.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.ObjectForUpdate,
+		},
+		{
+			Existing: em.existing.Core.MetricsServerNetworkPolicy,
+			Error:    em.errs.Core.MetricsServerNetworkPolicy,
+			Desired:  mf.Core.MetricsServerNetworkPolicy.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.ObjectForUpdate,
+		},
 	}
 
 	if mf.Core.SecurityContextConstraint != nil {
@@ -240,15 +256,6 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 		Compare:  compare.Object,
 		Merge:    merge.ServiceForUpdate,
 	})
-
-	ret = append(ret, objectstate.ObjectState{
-		Existing: em.existing.Metrics.NetworkPolicy,
-		Error:    em.errs.Metrics.NetworkPolicy,
-		Desired:  mf.Metrics.NetworkPolicy.DeepCopy(),
-		Compare:  compare.Object,
-		Merge:    merge.MetadataForUpdate,
-	})
-
 	return ret
 }
 
@@ -339,10 +346,17 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 	}
 
 	networkPolicy := &networkingv1.NetworkPolicy{}
-	if ok := getObject(ctx, cli, keyFor(mf.Metrics.NetworkPolicy), networkPolicy, &ret.errs.Metrics.NetworkPolicy); ok {
-		ret.existing.Metrics.NetworkPolicy = networkPolicy
+	if ok := getObject(ctx, cli, keyFor(mf.Core.MetricsServerNetworkPolicy), networkPolicy, &ret.errs.Core.MetricsServerNetworkPolicy); ok {
+		ret.existing.Core.MetricsServerNetworkPolicy = networkPolicy
 	}
-
+	networkPolicy = &networkingv1.NetworkPolicy{}
+	if ok := getObject(ctx, cli, keyFor(mf.Core.APIServerNetworkPolicy), networkPolicy, &ret.errs.Core.APIServerNetworkPolicy); ok {
+		ret.existing.Core.APIServerNetworkPolicy = networkPolicy
+	}
+	networkPolicy = &networkingv1.NetworkPolicy{}
+	if ok := getObject(ctx, cli, keyFor(mf.Core.DefaultNetworkPolicy), networkPolicy, &ret.errs.Core.DefaultNetworkPolicy); ok {
+		ret.existing.Core.DefaultNetworkPolicy = networkPolicy
+	}
 	return &ret
 }
 

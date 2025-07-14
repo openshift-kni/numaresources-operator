@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -45,22 +44,6 @@ func Service(namespace string) (*corev1.Service, error) {
 		service.Namespace = namespace
 	}
 	return service, nil
-}
-
-func NetworkPolicy(namespace string) (*networkingv1.NetworkPolicy, error) {
-	obj, err := loadObject(filepath.Join("yaml", "networkpolicy.yaml"))
-	if err != nil {
-		return nil, err
-	}
-
-	np, ok := obj.(*networkingv1.NetworkPolicy)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type, got %t", obj)
-	}
-	if namespace != "" {
-		np.Namespace = namespace
-	}
-	return np, nil
 }
 
 func deserializeObjectFromData(data []byte) (runtime.Object, error) {
