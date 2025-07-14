@@ -79,19 +79,20 @@ func render(w io.Writer) int {
 func Execute() {
 	klog.InitFlags(nil)
 
-	var renderManifest bool
+	var discoverMode bool
+	var renderMode bool
 	var sysfsPath string
 	var deviceCount int
-	flag.BoolVar(&renderManifest, "render", false, "render daemonset manifest and exit")
+	flag.BoolVar(&discoverMode, "discover", false, "discover NUMA resources and exit")
+	flag.BoolVar(&renderMode, "render", false, "render daemonset manifest and exit")
 	flag.StringVar(&sysfsPath, "sysfs", "/sys", "mount path of sysfs")
 	flag.IntVar(&deviceCount, "devices", api.NUMACellDefaultDeviceCount, "amount of devices to expose (will not be decremented anyway)")
 	flag.Parse()
 
-	if renderManifest {
+	if renderMode {
 		os.Exit(render(os.Stdout))
 	}
 
-	klog.InfoS("scanning sysfs", "mountPath", sysfsPath)
 	topoInfo, err := topology.New(option.WithPathOverrides(option.PathOverrides{
 		"/sys": sysfsPath,
 	}))
@@ -99,6 +100,12 @@ func Execute() {
 		klog.ErrorS(err, "error getting topology info from sysfs", "mountPath", sysfsPath)
 	}
 
+	if discoverMode {
+		fmt.Printf("%s", summarize(topoInfo))
+		os.Exit(0)
+	}
+
+	klog.InfoS("NUMACell device plugin starting ", "sysfs", sysfsPath)
 	logSummary(topoInfo)
 
 	manager := dpm.NewManager(plugin.NewNUMACellLister(topoInfo, deviceCount))
