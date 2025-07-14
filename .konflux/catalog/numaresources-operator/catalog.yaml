@@ -97,7 +97,7 @@ properties:
           "OpenShift Container Platform",
           "OpenShift Platform Plus"
         ]
-      operators.operatorframework.io/builder: operator-sdk-v1.36.1
+      operators.operatorframework.io/builder: operator-sdk-v1.40.0
       operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     apiServiceDefinitions: {}
     crdDescriptions:
