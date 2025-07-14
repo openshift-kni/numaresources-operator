@@ -1,13 +1,13 @@
 package dpm
 
 import (
+	"context"
 	"net"
 	"os"
 	"path"
 	"sync"
 	"time"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 
 	"k8s.io/klog/v2"
