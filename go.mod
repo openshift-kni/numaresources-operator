@@ -8,7 +8,6 @@ require (
 	github.com/drone/envsubst v1.0.3
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/go-logr/logr v1.4.2
-	github.com/golang/glog v1.2.4
 	github.com/google/go-cmp v0.6.0
 	github.com/jaypipes/ghw v0.16.0
 	github.com/k8stopologyawareschedwg/deployer v0.23.0
