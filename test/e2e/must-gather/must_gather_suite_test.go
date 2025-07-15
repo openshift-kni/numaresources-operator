@@ -23,14 +23,14 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 const (
@@ -53,7 +53,7 @@ var (
 )
 
 func TestMustGather(t *testing.T) {
-	gomega.RegisterFailHandler(Fail)
+	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "NROP must-gather test")
 }
@@ -71,7 +71,7 @@ var _ = BeforeSuite(func() {
 		// assume cluster is set up correctly, so just fetch what we have already;
 		// fail loudly if we can't get, this means the assumption was wrong
 		nroSchedObj = &nropv1.NUMAResourcesScheduler{}
-		gomega.Expect(e2eclient.Client.Get(ctx, objects.NROSchedObjectKey(), nroSchedObj)).To(gomega.Succeed())
+		Expect(e2eclient.Client.Get(ctx, objects.NROSchedObjectKey(), nroSchedObj)).To(Succeed())
 		return
 	}
 

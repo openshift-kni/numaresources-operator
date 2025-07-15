@@ -26,7 +26,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,6 +45,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
+
+	. "github.com/onsi/gomega"
 )
 
 type Fixture struct {
@@ -215,7 +216,7 @@ func MustSettleNRT(fxt *Fixture) nrtv1alpha2.NodeResourceTopologyList {
 	ginkgo.GinkgoHelper()
 	klog.Infof("cooldown by verifying NRTs data is settled (interval=%v timeout=%v)", settleInterval, settleTimeout)
 	nrtList, err := intwait.With(fxt.Client).Interval(settleInterval).Timeout(settleTimeout).ForNodeResourceTopologiesSettled(context.Background(), cooldownThreshold, intwait.NRTIgnoreNothing)
-	gomega.Expect(err).ToNot(gomega.HaveOccurred(), "NRTs have not settled during the provided cooldown time: %v", err)
+	Expect(err).ToNot(HaveOccurred(), "NRTs have not settled during the provided cooldown time: %v", err)
 	return nrtList
 }
 
