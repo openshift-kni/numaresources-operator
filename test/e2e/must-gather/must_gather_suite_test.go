@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
@@ -53,20 +53,20 @@ var (
 )
 
 func TestMustGather(t *testing.T) {
-	gomega.RegisterFailHandler(ginkgo.Fail)
+	gomega.RegisterFailHandler(Fail)
 
-	ginkgo.RunSpecs(t, "NROP must-gather test")
+	RunSpecs(t, "NROP must-gather test")
 }
 
-var _ = ginkgo.BeforeSuite(func() {
+var _ = BeforeSuite(func() {
 	mustGatherImage = getStringValueFromEnv(envVarMustGatherImage, defaultMustGatherImage)
 	mustGatherTag = getStringValueFromEnv(envVarMustGatherTag, defaultMustGatherTag)
-	ginkgo.By(fmt.Sprintf("Using must-gather image %q tag %q", mustGatherImage, mustGatherTag))
+	By(fmt.Sprintf("Using must-gather image %q tag %q", mustGatherImage, mustGatherTag))
 
 	ctx := context.Background()
 
 	if _, ok := os.LookupEnv("E2E_NROP_INFRA_SETUP_SKIP"); ok {
-		ginkgo.By("Fetching up cluster data")
+		By("Fetching up cluster data")
 
 		// assume cluster is set up correctly, so just fetch what we have already;
 		// fail loudly if we can't get, this means the assumption was wrong
@@ -75,19 +75,19 @@ var _ = ginkgo.BeforeSuite(func() {
 		return
 	}
 
-	ginkgo.By("Setting up the cluster")
+	By("Setting up the cluster")
 
 	deployment = deploy.NewForPlatform(configuration.Plat)
 	_ = deployment.Deploy(ctx, configuration.MachineConfigPoolUpdateTimeout) // we don't care about the nrop instance
 	nroSchedObj = deploy.DeployNROScheduler(ctx, nroSchedTimeout)
 })
 
-var _ = ginkgo.AfterSuite(func() {
+var _ = AfterSuite(func() {
 	// TODO: unify and generalize
 	if _, ok := os.LookupEnv("E2E_NROP_INFRA_TEARDOWN_SKIP"); ok {
 		return
 	}
-	ginkgo.By("tearing down the cluster")
+	By("tearing down the cluster")
 	ctx := context.Background()
 	deploy.TeardownNROScheduler(ctx, nroSchedObj, nroSchedTimeout)
 	deployment.Teardown(ctx, 5*time.Minute)

@@ -24,7 +24,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -59,11 +59,11 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
-var _ = ginkgo.Describe("with a running cluster with all the components", func() {
-	ginkgo.When("[config][rte] NRO CR configured with LogLevel", func() {
+var _ = Describe("with a running cluster with all the components", func() {
+	When("[config][rte] NRO CR configured with LogLevel", func() {
 		timeout := 30 * time.Second
 		interval := 5 * time.Second
-		ginkgo.It("should have the corresponding klog under RTE container", func() {
+		It("should have the corresponding klog under RTE container", func() {
 			nropObj := &nropv1.NUMAResourcesOperator{}
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -98,7 +98,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			}).WithTimeout(timeout).WithPolling(interval).Should(gomega.BeTrue())
 		})
 
-		ginkgo.It("can modify the LogLevel in NRO CR and klog under RTE container should change respectively", func() {
+		It("can modify the LogLevel in NRO CR and klog under RTE container should change respectively", func() {
 			nropObj := &nropv1.NUMAResourcesOperator{}
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -139,8 +139,8 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		})
 	})
 
-	ginkgo.When("[config][kubelet][rte] Kubelet Config includes reservations", func() {
-		ginkgo.It("should configure RTE accordingly", func() {
+	When("[config][kubelet][rte] Kubelet Config includes reservations", func() {
+		It("should configure RTE accordingly", func() {
 			nropObj := &nropv1.NUMAResourcesOperator{}
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -163,7 +163,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			err = clients.Client.List(context.TODO(), mcoKcList)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			for _, mcoKc := range mcoKcList.Items {
-				ginkgo.By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
+				By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
 
 				kc, err := mcoKubeletConfToKubeletConf(&mcoKc)
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -172,7 +172,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
-				ginkgo.By(fmt.Sprintf("Considering MCP %q", mcp.Name))
+				By(fmt.Sprintf("Considering MCP %q", mcp.Name))
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 				generatedName := objectnames.GetComponentName(nropObj.Name, mcp.Name)
@@ -189,7 +189,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 			}
 		})
 
-		ginkgo.It("should keep the ConfigMap aligned with the KubeletConfig info", func() {
+		It("should keep the ConfigMap aligned with the KubeletConfig info", func() {
 			nropObj := &nropv1.NUMAResourcesOperator{}
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -214,13 +214,13 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 			// pick the first for the sake of brevity
 			mcoKc := mcoKcList.Items[0]
-			ginkgo.By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
+			By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
 
 			mcps, err := nodegroupv1.FindMachineConfigPools(mcpList, nropObj.Spec.NodeGroups)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
-			ginkgo.By(fmt.Sprintf("Considering MCP %q", mcp.Name))
+			By(fmt.Sprintf("Considering MCP %q", mcp.Name))
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 
 			generatedName := objectnames.GetComponentName(nropObj.Name, mcp.Name)
@@ -250,7 +250,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		})
 	})
 
-	ginkgo.It("[rte][podfingerprint] should expose the pod set fingerprint in NRT objects", func() {
+	It("[rte][podfingerprint] should expose the pod set fingerprint in NRT objects", func() {
 		nrtList := &nrtv1alpha2.NodeResourceTopologyList{}
 		err := clients.Client.List(context.TODO(), nrtList)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -264,7 +264,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		}
 	})
 
-	ginkgo.It("[rte][podfingerprint] should expose the pod set fingerprint status on each worker", func() {
+	It("[rte][podfingerprint] should expose the pod set fingerprint status on each worker", func() {
 		nropObj := &nropv1.NUMAResourcesOperator{}
 		err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -274,14 +274,14 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 		gomega.Expect(rteDss).ToNot(gomega.BeEmpty(), "no RTE DS found")
 
 		for _, rteDs := range rteDss {
-			ginkgo.By(fmt.Sprintf("checking DS: %s/%s status=[%v]", rteDs.Namespace, rteDs.Name, toJSON(rteDs.Status)))
+			By(fmt.Sprintf("checking DS: %s/%s status=[%v]", rteDs.Namespace, rteDs.Name, toJSON(rteDs.Status)))
 
 			rtePods, err := podlist.With(clients.Client).ByDaemonset(context.TODO(), rteDs)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			gomega.Expect(rtePods).ToNot(gomega.BeEmpty(), "no RTE pods found for %s/%s", rteDs.Namespace, rteDs.Name)
 
 			for _, rtePod := range rtePods {
-				ginkgo.By(fmt.Sprintf("checking DS: %s/%s POD %s/%s (node=%s)", rteDs.Namespace, rteDs.Name, rtePod.Namespace, rtePod.Name, rtePod.Spec.NodeName))
+				By(fmt.Sprintf("checking DS: %s/%s POD %s/%s (node=%s)", rteDs.Namespace, rteDs.Name, rtePod.Namespace, rtePod.Name, rtePod.Spec.NodeName))
 
 				rteCnt := k8swgobjupdate.FindContainerByName(rtePod.Spec.Containers, rteupdate.MainContainerName)
 				gomega.Expect(rteCnt).ToNot(gomega.BeNil())

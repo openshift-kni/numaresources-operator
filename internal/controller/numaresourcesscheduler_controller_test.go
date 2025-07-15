@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -71,7 +71,7 @@ func NewFakeNUMAResourcesSchedulerReconciler(initObjects ...runtime.Object) (*NU
 	}, nil
 }
 
-var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
+var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 	verifyDegradedCondition := func(nrs *nropv1.NUMAResourcesScheduler, reason string) {
 		reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nrs)
 		gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -87,19 +87,19 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 		gomega.Expect(degradedCondition.Reason).To(gomega.Equal(reason))
 	}
 
-	ginkgo.Context("with unexpected NRS CR name", func() {
-		ginkgo.It("should updated the CR condition to degraded", func() {
+	Context("with unexpected NRS CR name", func() {
+		It("should updated the CR condition to degraded", func() {
 			nrs := testobjs.NewNUMAResourcesScheduler("test", "some/url:latest", testSchedulerName, 9*time.Second)
 			verifyDegradedCondition(nrs, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName)
 		})
 	})
 
-	ginkgo.Context("with correct NRS CR", func() {
+	Context("with correct NRS CR", func() {
 		var nrs *nropv1.NUMAResourcesScheduler
 		var reconciler *NUMAResourcesSchedulerReconciler
 		numOfMasters := 3
 
-		ginkgo.BeforeEach(func() {
+		BeforeEach(func() {
 			var err error
 			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
 			initObjects := []runtime.Object{nrs}
@@ -108,7 +108,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 		})
 
-		ginkgo.It("should create all components", func() {
+		It("should create all components", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -139,7 +139,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(reconciler.Client.Get(context.TODO(), key, dp)).ToNot(gomega.HaveOccurred())
 		})
 
-		ginkgo.It("should have the correct schedulerName", func() {
+		It("should have the correct schedulerName", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -157,7 +157,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(name).To(gomega.BeEquivalentTo(testSchedulerName), "found scheduler %q expected %q", name, testSchedulerName)
 		})
 
-		ginkgo.It("should expose the resync period in status", func() {
+		It("should expose the resync period in status", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -167,7 +167,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(*nrs.Status.CacheResyncPeriod).To(gomega.Equal(*nrs.Spec.CacheResyncPeriod))
 		})
 
-		ginkgo.It("should expose relatedObjects in status", func() {
+		It("should expose relatedObjects in status", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -192,7 +192,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(nrs.Status.RelatedObjects).To(gomega.ContainElements(expected))
 		})
 
-		ginkgo.It("should update the resync period in status", func() {
+		It("should update the resync period in status", func() {
 			resyncPeriod := 7 * time.Second
 			nrs := nrs.DeepCopy()
 			nrs.Spec.CacheResyncPeriod = &metav1.Duration{
@@ -216,7 +216,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(nrs.Status.CacheResyncPeriod.Seconds()).To(gomega.Equal(resyncPeriod.Seconds()))
 		})
 
-		ginkgo.It("should have the correct priority class", func() {
+		It("should have the correct priority class", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -232,7 +232,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(dp.Spec.Template.Spec.PriorityClassName).To(gomega.BeEquivalentTo(nrosched.SchedulerPriorityClassName))
 		})
 
-		ginkgo.It("should have a config hash annotation under deployment", func() {
+		It("should have a config hash annotation under deployment", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -250,7 +250,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(val).ToNot(gomega.BeEmpty())
 		})
 
-		ginkgo.It("should react to owned objects changes", func() {
+		It("should react to owned objects changes", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -313,7 +313,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(dp.Spec.Template.Spec).To(gomega.Equal(initialDP.Spec.Template.Spec))
 		})
 
-		ginkgo.It("should allow to disable the resync period in the configmap", func() {
+		It("should allow to disable the resync period in the configmap", func() {
 			resyncPeriod := 0 * time.Second
 			nrs := nrs.DeepCopy()
 			nrs.Spec.CacheResyncPeriod = &metav1.Duration{
@@ -344,7 +344,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(conf).ToNot(gomega.ContainSubstring("cacheResyncPeriodSeconds"))
 		})
 
-		ginkgo.It("should expose the KNI customization environment variables in the deployment", func() {
+		It("should expose the KNI customization environment variables in the deployment", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -373,7 +373,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			}
 		})
 
-		ginkgo.It("should allow to disable the KNI customization environment variables in the deployment", func() {
+		It("should allow to disable the KNI customization environment variables in the deployment", func() {
 			debugDisabled := nropv1.CacheResyncDebugDisabled
 			informerShared := nropv1.SchedulerInformerShared
 			nrs := nrs.DeepCopy()
@@ -414,7 +414,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			}
 		})
 
-		ginkgo.It("should configure by default the relaxed resync detection mode in configmap", func() {
+		It("should configure by default the relaxed resync detection mode in configmap", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -422,7 +422,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectOnlyExclusiveResources, depmanifests.CacheInformerDedicated)
 		})
 
-		ginkgo.It("should allow to set aggressive resync detection mode in configmap", func() {
+		It("should allow to set aggressive resync detection mode in configmap", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			nrsUpdated := &nropv1.NUMAResourcesScheduler{}
 			gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrsUpdated)).To(gomega.Succeed())
@@ -437,14 +437,14 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectAll, depmanifests.CacheInformerDedicated)
 		})
 
-		ginkgo.It("should configure by default the informerMode to be Dedicated", func() {
+		It("should configure by default the informerMode to be Dedicated", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, depmanifests.CacheInformerDedicated)
 		})
 
-		ginkgo.It("should allow to change the informerMode to Shared", func() {
+		It("should allow to change the informerMode to Shared", func() {
 			nrs := nrs.DeepCopy()
 			informerMode := nropv1.SchedulerInformerShared
 			nrs.Spec.SchedulerInformer = &informerMode
@@ -463,7 +463,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, depmanifests.CacheInformerShared)
 		})
 
-		ginkgo.It("should allow to change the informerMode to Dedicated", func() {
+		It("should allow to change the informerMode to Dedicated", func() {
 			nrs := nrs.DeepCopy()
 			informerMode := nropv1.SchedulerInformerDedicated
 			nrs.Spec.SchedulerInformer = &informerMode
@@ -482,7 +482,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, depmanifests.CacheInformerDedicated)
 		})
 
-		ginkgo.It("should configure by default the ScoringStrategy to be LeastAllocated", func() {
+		It("should configure by default the ScoringStrategy to be LeastAllocated", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -491,7 +491,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 		})
 
-		ginkgo.It("should allow to change the ScoringStrategy resources", func() {
+		It("should allow to change the ScoringStrategy resources", func() {
 			nrs := nrs.DeepCopy()
 			nrs.Spec.ScoringStrategy = &nropv1.ScoringStrategyParams{}
 			ResourceSpecParams := []nropv1.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
@@ -511,7 +511,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyLeastAllocated, resources)
 		})
 
-		ginkgo.It("should allow to change the ScoringStrategy to BalancedAllocation", func() {
+		It("should allow to change the ScoringStrategy to BalancedAllocation", func() {
 			nrs := nrs.DeepCopy()
 			nrs.Spec.ScoringStrategy = &nropv1.ScoringStrategyParams{}
 			nrs.Spec.ScoringStrategy.Type = nropv1.BalancedAllocation
@@ -530,7 +530,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyBalancedAllocation, resources)
 		})
 
-		ginkgo.It("should allow to change the ScoringStrategy to MostAllocated", func() {
+		It("should allow to change the ScoringStrategy to MostAllocated", func() {
 			nrs := nrs.DeepCopy()
 			nrs.Spec.ScoringStrategy = &nropv1.ScoringStrategyParams{}
 			nrs.Spec.ScoringStrategy.Type = nropv1.MostAllocated
@@ -549,7 +549,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyMostAllocated, resources)
 		})
 
-		ginkgo.It("should allow to change the ScoringStrategy to BalancedAllocation with resources", func() {
+		It("should allow to change the ScoringStrategy to BalancedAllocation with resources", func() {
 			nrs := nrs.DeepCopy()
 			nrs.Spec.ScoringStrategy = &nropv1.ScoringStrategyParams{}
 			nrs.Spec.ScoringStrategy.Type = nropv1.BalancedAllocation
@@ -570,7 +570,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyBalancedAllocation, resources)
 		})
 
-		ginkgo.It("should allow to change the ScoringStrategy to MostAllocated with resources", func() {
+		It("should allow to change the ScoringStrategy to MostAllocated with resources", func() {
 			nrs := nrs.DeepCopy()
 			nrs.Spec.ScoringStrategy = &nropv1.ScoringStrategyParams{}
 			nrs.Spec.ScoringStrategy.Type = nropv1.MostAllocated
@@ -591,7 +591,7 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyMostAllocated, resources)
 		})
 
-		ginkgo.It("should set the leader election resource parameters by default", func() {
+		It("should set the leader election resource parameters by default", func() {
 			nrs := nrs.DeepCopy()
 			nrs.Spec.Replicas = ptr.To(int32(1))
 			gomega.Eventually(reconciler.Client.Update).WithArguments(context.TODO(), nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(gomega.Succeed())
@@ -601,14 +601,14 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			expectLeaderElectParams(reconciler.Client, false, testNamespace, nrosched.LeaderElectionResourceName)
 		})
 
-		ginkgo.It("should set the leader election resource parameters to true default", func() {
+		It("should set the leader election resource parameters to true default", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			expectLeaderElectParams(reconciler.Client, true, testNamespace, nrosched.LeaderElectionResourceName)
 		})
 
-		ginkgo.DescribeTable("should set the leader election resource parameters depending on replica count", func(replicas int32, expectedEnabled bool) {
+		DescribeTable("should set the leader election resource parameters depending on replica count", func(replicas int32, expectedEnabled bool) {
 			nrs := nrs.DeepCopy()
 			nrs.Spec.Replicas = &replicas
 			gomega.Eventually(reconciler.Client.Update).WithArguments(context.TODO(), nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(gomega.Succeed())
@@ -618,12 +618,12 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
 			expectLeaderElectParams(reconciler.Client, expectedEnabled, testNamespace, nrosched.LeaderElectionResourceName)
 		},
-			ginkgo.Entry("replicas=0", int32(0), false),
-			ginkgo.Entry("replicas=1", int32(1), false),
-			ginkgo.Entry("replicas=3", int32(3), true),
+			Entry("replicas=0", int32(0), false),
+			Entry("replicas=1", int32(1), false),
+			Entry("replicas=3", int32(3), true),
 		)
 
-		ginkgo.It("should detect replicas number by default when spec.Replicas is unset", func() {
+		It("should detect replicas number by default when spec.Replicas is unset", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -634,15 +634,15 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 		})
 	})
 
-	ginkgo.Context("with kubelet PodResourcesAPI listing active pods by default", func() {
+	Context("with kubelet PodResourcesAPI listing active pods by default", func() {
 		var nrs *nropv1.NUMAResourcesScheduler
 		var reconciler *NUMAResourcesSchedulerReconciler
 		numOfMasters := 3
 
-		ginkgo.When("kubelet fix is enabled", func() {
+		When("kubelet fix is enabled", func() {
 			fixedVersion, _ := platform.ParseVersion(activePodsResourcesSupportSince)
 
-			ginkgo.DescribeTable("should configure by default the informerMode to the expected when field is not set", func(reconcilerPlatInfo PlatformInfo, expectedInformer string) {
+			DescribeTable("should configure by default the informerMode to the expected when field is not set", func(reconcilerPlatInfo PlatformInfo, expectedInformer string) {
 				var err error
 				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
 				initObjects := []runtime.Object{nrs}
@@ -658,17 +658,17 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, expectedInformer)
 			},
-				ginkgo.Entry("with fixed Openshift the default informer is Shared", PlatformInfo{
+				Entry("with fixed Openshift the default informer is Shared", PlatformInfo{
 					Platform: platform.OpenShift,
 					Version:  fixedVersion,
 				}, depmanifests.CacheInformerShared),
-				ginkgo.Entry("with fixed Hypershift the default informer is Shared", PlatformInfo{
+				Entry("with fixed Hypershift the default informer is Shared", PlatformInfo{
 					Platform: platform.HyperShift,
 					Version:  fixedVersion,
 				}, depmanifests.CacheInformerShared),
-				ginkgo.Entry("with unknown platform the default informer is Dedicated (unchanged)", PlatformInfo{}, depmanifests.CacheInformerDedicated))
+				Entry("with unknown platform the default informer is Dedicated (unchanged)", PlatformInfo{}, depmanifests.CacheInformerDedicated))
 
-			ginkgo.DescribeTable("should preserve informerMode value if set", func(reconcilerPlatInfo PlatformInfo) {
+			DescribeTable("should preserve informerMode value if set", func(reconcilerPlatInfo PlatformInfo) {
 				var err error
 				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
 				infMode := nropv1.SchedulerInformerDedicated
@@ -685,17 +685,17 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(infMode))
 			},
-				ginkgo.Entry("with Openshift", PlatformInfo{
+				Entry("with Openshift", PlatformInfo{
 					Platform: platform.OpenShift,
 					Version:  fixedVersion,
 				}),
-				ginkgo.Entry("with Hypershift", PlatformInfo{
+				Entry("with Hypershift", PlatformInfo{
 					Platform: platform.HyperShift,
 					Version:  fixedVersion,
 				}),
-				ginkgo.Entry("with unknown platform", PlatformInfo{}))
+				Entry("with unknown platform", PlatformInfo{}))
 
-			ginkgo.DescribeTable("should allow to update the informerMode to be Dedicated after an overridden default", func(reconcilerPlatInfo PlatformInfo) {
+			DescribeTable("should allow to update the informerMode to be Dedicated after an overridden default", func(reconcilerPlatInfo PlatformInfo) {
 				var err error
 				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
 				initObjects := []runtime.Object{nrs}
@@ -730,11 +730,11 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(informerMode))
 			},
-				ginkgo.Entry("with Openshift", PlatformInfo{
+				Entry("with Openshift", PlatformInfo{
 					Platform: platform.OpenShift,
 					Version:  fixedVersion,
 				}),
-				ginkgo.Entry("with Hypershift", PlatformInfo{
+				Entry("with Hypershift", PlatformInfo{
 					Platform: platform.HyperShift,
 					Version:  fixedVersion,
 				}))
@@ -742,30 +742,30 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 	})
 })
 
-var _ = ginkgo.Describe("Test scheduler spec PreNormalize", func() {
-	ginkgo.When("Spec.SchedulerInformer is not set by the user", func() {
-		ginkgo.It("should override default informer to Shared if kubelet is fixed - first supported zstream version", func() {
+var _ = Describe("Test scheduler spec PreNormalize", func() {
+	When("Spec.SchedulerInformer is not set by the user", func() {
+		It("should override default informer to Shared if kubelet is fixed - first supported zstream version", func() {
 			v, _ := platform.ParseVersion(activePodsResourcesSupportSince)
 			spec := nropv1.NUMAResourcesSchedulerSpec{}
 			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
 			gomega.Expect(*spec.SchedulerInformer).To(gomega.Equal(nropv1.SchedulerInformerShared))
 		})
 
-		ginkgo.It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (zstream)", func() {
+		It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (zstream)", func() {
 			v, _ := platform.ParseVersion("4.20.1000")
 			spec := nropv1.NUMAResourcesSchedulerSpec{}
 			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
 			gomega.Expect(*spec.SchedulerInformer).To(gomega.Equal(nropv1.SchedulerInformerShared))
 		})
 
-		ginkgo.It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (ystream)", func() {
+		It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (ystream)", func() {
 			v, _ := platform.ParseVersion("4.21.0")
 			spec := nropv1.NUMAResourcesSchedulerSpec{}
 			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
 			gomega.Expect(*spec.SchedulerInformer).To(gomega.Equal(nropv1.SchedulerInformerShared))
 		})
 
-		ginkgo.It("should not override default informer if kubelet is not fixed - version is less than first supported (zstream)", func() {
+		It("should not override default informer if kubelet is not fixed - version is less than first supported (zstream)", func() {
 			// this is only for testing purposes as there is plan to backport the fix to older minor versions
 			// will need to remove this test if the fix is supported starting the first zstream of the release
 			v, _ := platform.ParseVersion("4.20.0")
@@ -774,15 +774,15 @@ var _ = ginkgo.Describe("Test scheduler spec PreNormalize", func() {
 			gomega.Expect(spec.SchedulerInformer).To(gomega.BeNil())
 		})
 
-		ginkgo.It("should not override default informer if kubelet is not fixed - version is less than first supported (ystream)", func() {
+		It("should not override default informer if kubelet is not fixed - version is less than first supported (ystream)", func() {
 			v, _ := platform.ParseVersion("4.13.0")
 			spec := nropv1.NUMAResourcesSchedulerSpec{}
 			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
 			gomega.Expect(spec.SchedulerInformer).To(gomega.BeNil())
 		})
 	})
-	ginkgo.When("Spec.SchedulerInformer is set by the user", func() {
-		ginkgo.It("should preserve informer value set by the user even if kubelet is fixed", func() {
+	When("Spec.SchedulerInformer is set by the user", func() {
+		It("should preserve informer value set by the user even if kubelet is fixed", func() {
 			v, _ := platform.ParseVersion(activePodsResourcesSupportSince)
 			spec := nropv1.NUMAResourcesSchedulerSpec{
 				SchedulerInformer: ptr.To(nropv1.SchedulerInformerDedicated),
@@ -812,7 +812,7 @@ func diffYAML(want, got string) (string, error) {
 }
 
 func expectCacheParams(cli client.Client, resyncMethod, foreignPodsDetect string, informerMode string) {
-	ginkgo.GinkgoHelper()
+	GinkgoHelper()
 
 	key := client.ObjectKey{
 		Name:      "topo-aware-scheduler-config",
@@ -839,7 +839,7 @@ func expectCacheParams(cli client.Client, resyncMethod, foreignPodsDetect string
 }
 
 func expectScoringStrategyParams(cli client.Client, scoringStrategyType string, resources []depmanifests.ResourceSpecParams) {
-	ginkgo.GinkgoHelper()
+	GinkgoHelper()
 
 	key := client.ObjectKey{
 		Name:      "topo-aware-scheduler-config",
@@ -860,7 +860,7 @@ func expectScoringStrategyParams(cli client.Client, scoringStrategyType string, 
 }
 
 func expectLeaderElectParams(cli client.Client, enabled bool, resourceNamespace, resourceName string) {
-	ginkgo.GinkgoHelper()
+	GinkgoHelper()
 
 	key := client.ObjectKey{
 		Name:      "topo-aware-scheduler-config",
