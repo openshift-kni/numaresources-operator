@@ -181,7 +181,7 @@ func TestUpdateDaemonSetTolerations(t *testing.T) {
 		{
 			name:         "defaults",
 			conf:         nropv1.NodeGroupConfig{},
-			expectedTols: []corev1.Toleration{},
+			expectedTols: nil,
 		},
 		{
 			name: "add tolerations",
