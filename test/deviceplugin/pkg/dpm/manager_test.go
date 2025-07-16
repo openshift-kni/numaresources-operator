@@ -1,11 +1,14 @@
 package dpm_test
 
 import (
+	"golang.org/x/net/context"
+
+	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
+
+	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/dpm"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/dpm"
-	"golang.org/x/net/context"
-	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 )
 
 // define a fake device plugin
