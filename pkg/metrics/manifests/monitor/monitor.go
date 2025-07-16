@@ -48,6 +48,5 @@ func GetManifests(namespace string) (Manifests, error) {
 	if err != nil {
 		return mf, err
 	}
-
 	return mf, nil
 }
