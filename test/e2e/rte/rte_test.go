@@ -24,9 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,18 +54,21 @@ import (
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
-var _ = ginkgo.Describe("with a running cluster with all the components", func() {
-	ginkgo.When("[config][rte] NRO CR configured with LogLevel", func() {
+var _ = Describe("with a running cluster with all the components", func() {
+	When("[config][rte] NRO CR configured with LogLevel", func() {
 		timeout := 30 * time.Second
 		interval := 5 * time.Second
-		ginkgo.It("should have the corresponding klog under RTE container", func() {
+		It("should have the corresponding klog under RTE container", func() {
 			nropObj := &nropv1.NUMAResourcesOperator{}
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
 				if err != nil {
 					klog.ErrorS(err, "failed to get the owned DaemonSets")
@@ -81,7 +81,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 				for _, ds := range rteDss {
 					rteCnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, rteupdate.MainContainerName)
-					gomega.Expect(rteCnt).ToNot(gomega.BeNil())
+					Expect(rteCnt).ToNot(BeNil())
 
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
@@ -95,19 +95,19 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				}
 				return true
 
-			}).WithTimeout(timeout).WithPolling(interval).Should(gomega.BeTrue())
+			}).WithTimeout(timeout).WithPolling(interval).Should(BeTrue())
 		})
 
-		ginkgo.It("can modify the LogLevel in NRO CR and klog under RTE container should change respectively", func() {
+		It("can modify the LogLevel in NRO CR and klog under RTE container should change respectively", func() {
 			nropObj := &nropv1.NUMAResourcesOperator{}
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			nropObj.Spec.LogLevel = operatorv1.Trace
 			err = clients.Client.Update(context.TODO(), nropObj)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
 				if err != nil {
 					klog.ErrorS(err, "failed to get the owned DaemonSets")
@@ -120,7 +120,7 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 				for _, ds := range rteDss {
 					rteCnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, rteupdate.MainContainerName)
-					gomega.Expect(rteCnt).ToNot(gomega.BeNil())
+					Expect(rteCnt).ToNot(BeNil())
 
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
@@ -135,18 +135,18 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				}
 				return true
 
-			}).WithTimeout(timeout).WithPolling(interval).Should(gomega.BeTrue())
+			}).WithTimeout(timeout).WithPolling(interval).Should(BeTrue())
 		})
 	})
 
-	ginkgo.When("[config][kubelet][rte] Kubelet Config includes reservations", func() {
-		ginkgo.It("should configure RTE accordingly", func() {
+	When("[config][kubelet][rte] Kubelet Config includes reservations", func() {
+		It("should configure RTE accordingly", func() {
 			nropObj := &nropv1.NUMAResourcesOperator{}
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(nropObj.Status.DaemonSets).ToNot(gomega.BeEmpty())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(nropObj.Status.DaemonSets).ToNot(BeEmpty())
 			dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
-			gomega.Expect(reflect.DeepEqual(nropObj.Status.DaemonSets, dssFromNodeGroupStatus)).To(gomega.BeTrue())
+			Expect(reflect.DeepEqual(nropObj.Status.DaemonSets, dssFromNodeGroupStatus)).To(BeTrue())
 			klog.InfoS("using NRO instance", "name", nropObj.Name)
 
 			// NROP guarantees all the daemonsets are in the same namespace,
@@ -156,46 +156,46 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 			mcpList := &mcov1.MachineConfigPoolList{}
 			err = clients.Client.List(context.TODO(), mcpList)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			klog.InfoS("detected MCPs", "count", len(mcpList.Items))
 
 			mcoKcList := &mcov1.KubeletConfigList{}
 			err = clients.Client.List(context.TODO(), mcoKcList)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			for _, mcoKc := range mcoKcList.Items {
-				ginkgo.By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
+				By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
 
 				kc, err := mcoKubeletConfToKubeletConf(&mcoKc)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				mcps, err := nodegroupv1.FindMachineConfigPools(mcpList, nropObj.Spec.NodeGroups)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
-				ginkgo.By(fmt.Sprintf("Considering MCP %q", mcp.Name))
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				By(fmt.Sprintf("Considering MCP %q", mcp.Name))
+				Expect(err).ToNot(HaveOccurred())
 
 				generatedName := objectnames.GetComponentName(nropObj.Name, mcp.Name)
 				klog.InfoS("generated config map", "name", generatedName)
 				cm, err := clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				rc, err := rteConfigMapToRTEConfig(cm)
 				klog.InfoS("Using RTE", "config", rc)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
-				gomega.Expect(rc.Kubelet.TopologyManagerPolicy).To(gomega.Equal(kc.TopologyManagerPolicy), "TopologyManager Policy mismatch")
-				gomega.Expect(rc.Kubelet.TopologyManagerScope).To(gomega.Equal(kc.TopologyManagerScope), "TopologyManager Scope mismatch")
+				Expect(rc.Kubelet.TopologyManagerPolicy).To(Equal(kc.TopologyManagerPolicy), "TopologyManager Policy mismatch")
+				Expect(rc.Kubelet.TopologyManagerScope).To(Equal(kc.TopologyManagerScope), "TopologyManager Scope mismatch")
 			}
 		})
 
-		ginkgo.It("should keep the ConfigMap aligned with the KubeletConfig info", func() {
+		It("should keep the ConfigMap aligned with the KubeletConfig info", func() {
 			nropObj := &nropv1.NUMAResourcesOperator{}
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(nropObj.Status.DaemonSets).ToNot(gomega.BeEmpty())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(nropObj.Status.DaemonSets).ToNot(BeEmpty())
 			dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
-			gomega.Expect(reflect.DeepEqual(nropObj.Status.DaemonSets, dssFromNodeGroupStatus)).To(gomega.BeTrue())
+			Expect(reflect.DeepEqual(nropObj.Status.DaemonSets, dssFromNodeGroupStatus)).To(BeTrue())
 			klog.InfoS("Using NRO instance", "name", nropObj.Name)
 
 			// NROP guarantees all the daemonsets are in the same namespace,
@@ -205,28 +205,28 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 			mcpList := &mcov1.MachineConfigPoolList{}
 			err = clients.Client.List(context.TODO(), mcpList)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 			klog.InfoS("detected MCPs", "count", len(mcpList.Items))
 
 			mcoKcList := &mcov1.KubeletConfigList{}
 			err = clients.Client.List(context.TODO(), mcoKcList)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			// pick the first for the sake of brevity
 			mcoKc := mcoKcList.Items[0]
-			ginkgo.By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
+			By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
 
 			mcps, err := nodegroupv1.FindMachineConfigPools(mcpList, nropObj.Spec.NodeGroups)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
-			ginkgo.By(fmt.Sprintf("Considering MCP %q", mcp.Name))
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			By(fmt.Sprintf("Considering MCP %q", mcp.Name))
+			Expect(err).ToNot(HaveOccurred())
 
 			generatedName := objectnames.GetComponentName(nropObj.Name, mcp.Name)
 			klog.InfoS("generated config map", "name", generatedName)
 			cm, err := clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
 			desiredMapState := make(map[string]string)
 			for k, v := range cm.Data {
@@ -235,56 +235,56 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 
 			cm.Data = nil
 			cm, err = clients.K8sClient.CoreV1().ConfigMaps(namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+			Expect(err).ToNot(HaveOccurred())
 
-			gomega.Eventually(func() bool {
+			Eventually(func() bool {
 				cm, err = clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				if !reflect.DeepEqual(cm.Data, desiredMapState) {
 					klog.InfoS("ConfigMap data is not in it's desired state, waiting for controller to update it", "configMapName", cm.Name)
 					return false
 				}
 				return true
-			}).WithTimeout(time.Minute * 5).WithPolling(time.Second * 30).Should(gomega.BeTrue())
+			}).WithTimeout(time.Minute * 5).WithPolling(time.Second * 30).Should(BeTrue())
 		})
 	})
 
-	ginkgo.It("[rte][podfingerprint] should expose the pod set fingerprint in NRT objects", func() {
+	It("[rte][podfingerprint] should expose the pod set fingerprint in NRT objects", func() {
 		nrtList := &nrtv1alpha2.NodeResourceTopologyList{}
 		err := clients.Client.List(context.TODO(), nrtList)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		for _, nrt := range nrtList.Items {
 			pfp, ok := nrt.Annotations[podfingerprint.Annotation]
-			gomega.Expect(ok).To(gomega.BeTrue(), "missing podfingerprint annotation %q from NRT %q", podfingerprint.Annotation, nrt.Name)
+			Expect(ok).To(BeTrue(), "missing podfingerprint annotation %q from NRT %q", podfingerprint.Annotation, nrt.Name)
 
 			seemsValid := strings.HasPrefix(pfp, podfingerprint.Prefix)
-			gomega.Expect(seemsValid).To(gomega.BeTrue(), "malformed podfingerprint %q from NRT %q", pfp, nrt.Name)
+			Expect(seemsValid).To(BeTrue(), "malformed podfingerprint %q from NRT %q", pfp, nrt.Name)
 		}
 	})
 
-	ginkgo.It("[rte][podfingerprint] should expose the pod set fingerprint status on each worker", func() {
+	It("[rte][podfingerprint] should expose the pod set fingerprint status on each worker", func() {
 		nropObj := &nropv1.NUMAResourcesOperator{}
 		err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		Expect(err).ToNot(HaveOccurred())
 
 		rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
-		gomega.Expect(err).ToNot(gomega.HaveOccurred())
-		gomega.Expect(rteDss).ToNot(gomega.BeEmpty(), "no RTE DS found")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(rteDss).ToNot(BeEmpty(), "no RTE DS found")
 
 		for _, rteDs := range rteDss {
-			ginkgo.By(fmt.Sprintf("checking DS: %s/%s status=[%v]", rteDs.Namespace, rteDs.Name, toJSON(rteDs.Status)))
+			By(fmt.Sprintf("checking DS: %s/%s status=[%v]", rteDs.Namespace, rteDs.Name, toJSON(rteDs.Status)))
 
 			rtePods, err := podlist.With(clients.Client).ByDaemonset(context.TODO(), rteDs)
-			gomega.Expect(err).ToNot(gomega.HaveOccurred())
-			gomega.Expect(rtePods).ToNot(gomega.BeEmpty(), "no RTE pods found for %s/%s", rteDs.Namespace, rteDs.Name)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(rtePods).ToNot(BeEmpty(), "no RTE pods found for %s/%s", rteDs.Namespace, rteDs.Name)
 
 			for _, rtePod := range rtePods {
-				ginkgo.By(fmt.Sprintf("checking DS: %s/%s POD %s/%s (node=%s)", rteDs.Namespace, rteDs.Name, rtePod.Namespace, rtePod.Name, rtePod.Spec.NodeName))
+				By(fmt.Sprintf("checking DS: %s/%s POD %s/%s (node=%s)", rteDs.Namespace, rteDs.Name, rtePod.Namespace, rtePod.Name, rtePod.Spec.NodeName))
 
 				rteCnt := k8swgobjupdate.FindContainerByName(rtePod.Spec.Containers, rteupdate.MainContainerName)
-				gomega.Expect(rteCnt).ToNot(gomega.BeNil())
+				Expect(rteCnt).ToNot(BeNil())
 
 				// TODO: hardcoded path. Any smarter option?
 				cmd := []string{"/bin/cat", "/run/pfpstatus/dump.json"}
@@ -292,16 +292,16 @@ var _ = ginkgo.Describe("with a running cluster with all the components", func()
 				if err != nil {
 					_ = objects.LogEventsForPod(clients.K8sClient, rtePod.Namespace, rtePod.Name)
 				}
-				gomega.Expect(err).ToNot(gomega.HaveOccurred(), "err=%v stderr=%s", err, stderr)
+				Expect(err).ToNot(HaveOccurred(), "err=%v stderr=%s", err, stderr)
 
 				var st podfingerprint.Status
 				err = json.Unmarshal(stdout, &st)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				Expect(err).ToNot(HaveOccurred())
 
 				klog.InfoS("got status", "podNamespace", rtePod.Namespace, "podName", rtePod.Name, "containerName", rteCnt.Name, "fingerprintComputed", st.FingerprintComputed, "podCount", len(st.Pods))
 
-				gomega.Expect(st.FingerprintComputed).ToNot(gomega.BeEmpty(), "missing fingerprint - should always be reported")
-				gomega.Expect(st.Pods).ToNot(gomega.BeEmpty(), "missing pods - at least RTE itself should be there")
+				Expect(st.FingerprintComputed).ToNot(BeEmpty(), "missing fingerprint - should always be reported")
+				Expect(st.Pods).ToNot(BeEmpty(), "missing pods - at least RTE itself should be there")
 			}
 		}
 	})
