@@ -51,7 +51,7 @@ func (dpm *Manager) Run() {
 	// device plugin directory.
 	glog.V(3).Info("Registering for notifications of filesystem changes in device plugin directory")
 	fsWatcher, _ := fsnotify.NewWatcher()
-	defer fsWatcher.Close()
+	defer fsWatcher.Close() //nolint:errcheck
 	fsWatcher.Add(pluginapi.DevicePluginPath)
 
 	// Create list of running plugins and start Discover method of given lister. This method is
@@ -207,14 +207,15 @@ func startPluginServer(pluginLastName string, plugin devicePlugin) {
 		err := plugin.StartServer()
 		if err == nil {
 			return
-		} else if i == startPluginServerRetries {
+		}
+		if i == startPluginServerRetries {
 			glog.V(3).Infof("Failed to start plugin's \"%s\" server, within given %d tries: %s",
 				pluginLastName, startPluginServerRetries, err)
-		} else {
-			glog.Errorf("Failed to start plugin's \"%s\" server, atempt %d ouf of %d waiting %d before next try: %s",
-				pluginLastName, i, startPluginServerRetries, startPluginServerRetryWait, err)
-			time.Sleep(startPluginServerRetryWait)
+			return
 		}
+		glog.Errorf("Failed to start plugin's \"%s\" server, attempt %d out of %d waiting %d before next try: %s",
+			pluginLastName, i, startPluginServerRetries, startPluginServerRetryWait, err)
+		time.Sleep(startPluginServerRetryWait)
 	}
 }
 

@@ -24,7 +24,7 @@ type PluginInterface interface {
 
 // PluginInterfaceStart is an optional interface that could be implemented by plugin. If case Start
 // is implemented, it will be executed by Manager after plugin instantiation and before its
-// registartion to kubelet. This method could be used to prepare resources before they are offered
+// registrartion to kubelet. This method could be used to prepare resources before they are offered
 // to Kubernetes.
 type PluginInterfaceStart interface {
 	Start() error
@@ -81,7 +81,7 @@ func (dpi *devicePlugin) StartServer() error {
 
 	err = dpi.register()
 	if err != nil {
-		dpi.StopServer()
+		dpi.StopServer() //nolint:errcheck
 		return err
 	}
 	dpi.Running = true
@@ -108,7 +108,7 @@ func (dpi *devicePlugin) serve() error {
 	dpi.Server = grpc.NewServer([]grpc.ServerOption{}...)
 	pluginapi.RegisterDevicePluginServer(dpi.Server, dpi.DevicePluginImpl)
 
-	go dpi.Server.Serve(sock)
+	go dpi.Server.Serve(sock) //nolint:errcheck
 	glog.V(3).Infof("%s: Serving requests...", dpi.Name)
 	// Wait till grpc server is ready.
 	for i := 0; i < 10; i++ {
@@ -131,7 +131,7 @@ func (dpi *devicePlugin) register() error {
 		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
 			return net.DialTimeout("unix", addr, timeout)
 		}))
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck
 	if err != nil {
 		glog.Errorf("%s: Could not dial gRPC: %s", dpi.Name, err)
 		return err
