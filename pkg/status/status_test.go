@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -108,6 +109,48 @@ func TestUpdateConditions(t *testing.T) {
 	_, ok = UpdateConditions(nro.Status.Conditions, ConditionProgressing, "testReason", "test message")
 	if ok {
 		t.Errorf("Update did change status, but it should not")
+	}
+}
+
+func TestCheckSchedulerConditionsNeedsUpdate(t *testing.T) {
+	// #1: defaults
+	got, needsUpdate := CheckSchedulerConditionsNeedsUpdate(nil, nil, ConditionAvailable, "testReason", "test message")
+	if !needsUpdate {
+		t.Errorf("conditions need to be updated, but it didn't report so")
+	}
+	expected := NewSchedulerBaseConditions()
+	expected[0].Status = metav1.ConditionTrue
+	expected[0].Reason = "testReason"
+	expected[0].Message = "test message"
+	expected[1].Status = metav1.ConditionTrue
+
+	resetIncomparableConditionFields(expected)
+	resetIncomparableConditionFields(got)
+
+	if !reflect.DeepEqual(expected, got) {
+		t.Errorf("Conditions do not match: got=%v expected=%v", got, expected)
+	}
+
+	// #2: informer is in the updated list
+	sharedInformerCond := metav1.Condition{
+		Type:   ConditionSharedInformerBased,
+		Status: metav1.ConditionTrue,
+		Reason: ReasonSyncedWithSpec,
+	}
+
+	got, needsUpdate = CheckSchedulerConditionsNeedsUpdate(nil, []metav1.Condition{sharedInformerCond}, ConditionAvailable, "testReason", "test message")
+	if !needsUpdate {
+		t.Errorf("conditions need to be updated, but it didn't report so")
+	}
+	for _, cond := range got {
+		if cond.Type == ConditionSharedInformerBased {
+			if cond.Status != metav1.ConditionTrue {
+				t.Errorf("Conditions do not match in status: got=%v expected=%v", cond.Status, sharedInformerCond.Status)
+			}
+			if cond.Reason != ReasonSyncedWithSpec {
+				t.Errorf("Conditions do not match in reason: got=%v expected=%v", cond.Reason, sharedInformerCond.Reason)
+			}
+		}
 	}
 }
 
