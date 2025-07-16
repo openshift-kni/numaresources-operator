@@ -36,7 +36,7 @@ export E2E_TOPOLOGY_MANAGER_SCOPE="${E2E_TOPOLOGY_MANAGER_SCOPE}"
 # --flake-attempts: rerun the test if it fails
 # -requireSuite: fail if tests are not executed because of missing suite
 echo "TM config policy=[${E2E_TOPOLOGY_MANAGER_POLICY}] scope=[${E2E_TOPOLOGY_MANAGER_SCOPE}]"
-${BIN_DIR}/e2e-nrop-rte.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.fail-fast --ginkgo.flake-attempts=2 --ginkgo.junit-report=${REPORT_DIR}/e2e.xml --ginkgo.skip='\[Disruptive\]|\[StateDirectories\]|\[NodeRefresh\]|\[local\]' --ginkgo.focus='\[release\]'
+${BIN_DIR}/e2e-nrop-rte.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.flake-attempts=2 --ginkgo.junit-report=${REPORT_DIR}/e2e.xml --ginkgo.skip='\[Disruptive\]|\[StateDirectories\]|\[NodeRefresh\]|\[local\]' --ginkgo.focus='\[release\]'
 
 if [ "$ENABLE_SCHED_TESTS" = true ]; then
   # Run install test suite
@@ -50,7 +50,7 @@ if [ "$ENABLE_SCHED_TESTS" = true ]; then
   # --fail-fast: ginkgo will stop the suite right after the first spec failure
   # --flake-attempts: rerun the test if it fails
   # -requireSuite: fail if tests are not executed because of missing suite
-  ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.fail-fast --ginkgo.flake-attempts=2 --ginkgo.junit-report=${REPORT_DIR}/e2e-sched.xml
+  ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.flake-attempts=2 --ginkgo.junit-report=${REPORT_DIR}/e2e-sched.xml
 
   if [ "$ENABLE_CLEANUP" = true ]; then
     echo "Running NROScheduler uninstall test suite";
