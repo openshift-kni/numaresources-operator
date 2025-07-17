@@ -14,4 +14,4 @@ setupreport
 
 # Run must-gather test suite
 echo "Running NRO must-gather test suite"
-${BIN_DIR}/e2e-nrop-must-gather.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.fail-fast --ginkgo.junit-report=${REPORT_DIR}/must-gather.xml --ginkgo.focus='\[must-gather\]'
+${BIN_DIR}/e2e-nrop-must-gather.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.junit-report=${REPORT_DIR}/must-gather.xml --ginkgo.focus='\[must-gather\]'
