@@ -229,10 +229,10 @@ func createPaddingPod(fxt *e2efixture.Fixture, ctx context.Context, podName, nod
 	GinkgoHelper()
 	By(fmt.Sprintf("creating padding pod %q for node %q zone %q with resource target %s", podName, nodeName, zone.Name, e2ereslist.ToString(expectedFreeRes)))
 
-	padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, expectedFreeRes)
+	padPod, err := makePaddingPod(fxt.Dump, fxt.Namespace.Name, podName, zone, expectedFreeRes)
 	Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
 
-	padPod, err = pinPodTo(padPod, nodeName, zone.Name)
+	padPod, err = pinPodTo(fxt.Log, padPod, nodeName, zone.Name)
 	Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
 
 	err = fxt.Client.Create(ctx, padPod)
