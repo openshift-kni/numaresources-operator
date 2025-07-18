@@ -17,7 +17,10 @@ if [[ -z "$UPSTREAM_COMMIT" ]]; then
 	# CI=true is set by prow as a way to detect we are running under the ci
 	if [[ -n "$CI" ]]; then
 		echo "upstream commit: autodetecting (CI=yes method=github API)"
-		latest_upstream_commit=$(curl -s -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/openshift-kni/numaresources-operator/commits?per_page=1 | jq -r '.[0].sha')
+		curl -s -o commits.json -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/openshift-kni/numaresources-operator/commits?per_page=1
+		echo "got $( wc -l commits.json ) commit info lines from the API"
+		head -n 100 commits.json
+		latest_upstream_commit=$(jq -r '.[0].sha' < commits.json)
 	else
 		echo "upstream commit: autodetecting (CI=no method=local git tree)"
 		if [[ -z "$UPSTREAM_BRANCH" ]]; then
