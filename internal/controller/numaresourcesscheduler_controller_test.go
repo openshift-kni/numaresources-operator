@@ -420,6 +420,60 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			}
 		})
 
+		It("should have scheduler CacheResyncDebug by default as DumpJSONFile", func() {
+			expectedEnvVar := corev1.EnvVar{
+				Name:  schedupdate.PFPStatusDumpEnvVar,
+				Value: schedupdate.PFPStatusDir,
+			}
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			dp := &appsv1.Deployment{}
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
+
+			gotEv := schedupdate.FindEnvVarByName(dp.Spec.Template.Spec.Containers[0].Env, expectedEnvVar.Name)
+			Expect(gotEv).To(HaveValue(Equal(expectedEnvVar)))
+		})
+
+		It("should be able to modify scheduler CacheResyncDebug explicitly to DumpJSONFile after Disabled value", func() {
+			nrs := nrs.DeepCopy()
+
+			debugDisabled := nropv1.CacheResyncDebugDisabled
+			nrs.Spec.CacheResyncDebug = &debugDisabled
+			Eventually(reconciler.Client.Update).WithArguments(context.TODO(), nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(Succeed())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			// no need to double verify Disabled is configured
+			Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(Succeed())
+
+			dumpJSONFile := nropv1.CacheResyncDebugDumpJSONFile
+			expectedEnvVar := corev1.EnvVar{
+				Name:  schedupdate.PFPStatusDumpEnvVar,
+				Value: schedupdate.PFPStatusDir,
+			}
+
+			nrs.Spec.CacheResyncDebug = &dumpJSONFile
+			Eventually(reconciler.Client.Update).WithArguments(context.TODO(), nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(Succeed())
+
+			key = client.ObjectKeyFromObject(nrs)
+			_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(Succeed())
+
+			dp := &appsv1.Deployment{}
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
+
+			Expect(*nrs.Spec.CacheResyncDebug).To(Equal(dumpJSONFile))
+
+			gotEv := schedupdate.FindEnvVarByName(dp.Spec.Template.Spec.Containers[0].Env, expectedEnvVar.Name)
+			Expect(gotEv).To(HaveValue(Equal(expectedEnvVar)))
+		})
+
 		It("should configure by default the relaxed resync detection mode in configmap", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
