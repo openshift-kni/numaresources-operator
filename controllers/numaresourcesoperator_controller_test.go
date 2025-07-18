@@ -57,6 +57,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
+	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -279,6 +280,17 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					conf := nropv1.DefaultNodeGroupConfig()
 					Expect(nro.Status.NodeGroups[0].Config).To(Equal(conf), "default node group config for %q was not updated in the operator status", nro.Status.NodeGroups[0].PoolName)
 					Expect(nro.Status.NodeGroups[1].Config).To(Equal(conf), "default node group config for %q was not updated in the operator status", nro.Status.NodeGroups[1].PoolName)
+				})
+
+				It("RTE ds should have the correct priority class", func() {
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn1),
+						Namespace: testNamespace,
+					}
+					ds := &appsv1.DaemonSet{}
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
+
+					Expect(ds.Spec.Template.Spec.PriorityClassName).To(Equal(nrosched.SchedulerPriorityClassName))
 				})
 
 				It("should update node group statuses with the updated configuration", func() {

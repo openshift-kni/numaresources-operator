@@ -46,7 +46,6 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
@@ -786,13 +785,8 @@ func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest) e
 		return err
 	}
 	if gdm.ClusterPlatform != platform.Kubernetes {
-		if gdm.IsCustomPolicyEnabled && gdm.ClusterPlatform == platform.OpenShift {
-			k8swgrteupdate.SecurityContext(gdm.DaemonSet, selinux.RTEContextTypeLegacy)
-			klog.V(5).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextTypeLegacy)
-		} else {
-			k8swgrteupdate.SecurityContext(gdm.DaemonSet, selinux.RTEContextType)
-			klog.V(5).InfoS("DaemonSet update: selinux options", "container", manifests.ContainerNameRTE, "context", selinux.RTEContextType)
-		}
+		klog.V(4).InfoS("DaemonSet update: selinux options", "contextType", gdm.SecOpts.SELinuxContextType, "contextName", gdm.SecOpts.SecurityContextName)
+		k8swgrteupdate.SecurityContextWithOpts(gdm.DaemonSet, gdm.SecOpts)
 	}
 	// it's possible that the hash will be empty if kubelet controller hasn't created a configmap
 	rteupdate.DaemonSetHashAnnotation(gdm.DaemonSet, gdm.RTEConfigHash)
