@@ -45,6 +45,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"sigs.k8s.io/yaml"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
@@ -65,6 +66,7 @@ import (
 	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
+	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
@@ -461,6 +463,217 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				klog.InfoS("current set of configmaps from kubeletconfigs", "configmaps", strings.Join(kcCmNamesCur, ","))
 				return kcCmNamesCur
 			}).WithContext(ctx).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Equal(kcCmNamesPre))
+		})
+		It("[test_id:47585] can change kubeletconfig and controller should adapt", Label(label.Reboot, label.Slow, label.Tier2, label.OpenShift), func(ctx context.Context) {
+			fxt.IsRebootTest = true
+
+			By("initializing dynamic client for performance profile operations")
+			dynamicClient := newDynamicClient()
+
+			var targetedKC *machineconfigv1.KubeletConfig
+
+			nroOperObj := &nropv1.NUMAResourcesOperator{}
+			nroKey := objects.NROObjectKey()
+			err := fxt.Client.Get(context.TODO(), nroKey, nroOperObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
+
+			initialNrtList := nrtv1alpha2.NodeResourceTopologyList{}
+			initialNrtList, err = e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
+			Expect(err).ToNot(HaveOccurred(), "cannot get any NodeResourceTopology object from the cluster")
+
+			mcpsInfo, err := buildMCPsInfo(fxt.Client, context.TODO(), *nroOperObj)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(mcpsInfo).ToNot(BeEmpty())
+
+			mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), fxt.Client, nroOperObj.Spec.NodeGroups)
+			Expect(err).ToNot(HaveOccurred(), "cannot get MCPs associated with NUMAResourcesOperator %q", nroOperObj.Name)
+
+			kcList := &machineconfigv1.KubeletConfigList{}
+			err = fxt.Client.List(context.TODO(), kcList)
+			Expect(err).ToNot(HaveOccurred())
+
+			for _, mcp := range mcps {
+				for i := 0; i < len(kcList.Items); i++ {
+					kc := &kcList.Items[i]
+					kcMcpSel, err := metav1.LabelSelectorAsSelector(kc.Spec.MachineConfigPoolSelector)
+					Expect(err).ToNot(HaveOccurred())
+
+					if kcMcpSel.Matches(labels.Set(mcp.Labels)) {
+						// pick the first one you find
+						targetedKC = kc
+					}
+				}
+			}
+			Expect(targetedKC).ToNot(BeNil(), "there should be at least one kubeletconfig.machineconfiguration object")
+
+			//save initial Topology Manager scope to use it when restoring kc
+			kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
+			Expect(err).ToNot(HaveOccurred())
+			initialTMScope := kcObj.TopologyManagerScope
+			newTMScope := getNewTopologyManagerScopeValue(kcObj.TopologyManagerScope)
+			Expect(initialTMScope).ToNot(Equal(newTMScope))
+
+			By("verify owner reference of kubeletconfig")
+			Expect(len(targetedKC.OwnerReferences)).To(BeNumerically("<", 2)) //so 0 or 1
+			if len(targetedKC.OwnerReferences) == 0 {
+				By("modifying Topology Manager Scope under kubeletconfig")
+				Eventually(func(g Gomega) {
+					err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), targetedKC)
+					Expect(err).ToNot(HaveOccurred())
+
+					kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
+					Expect(err).ToNot(HaveOccurred())
+
+					kcObj.TopologyManagerScope = newTMScope
+					err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, targetedKC)
+					Expect(err).ToNot(HaveOccurred())
+
+					err = fxt.Client.Update(context.TODO(), targetedKC)
+					Expect(err).ToNot(HaveOccurred())
+				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+			}
+			if len(targetedKC.OwnerReferences) == 1 {
+				ref := targetedKC.OwnerReferences[0]
+				if ref.Kind != "PerformanceProfile" {
+					Skip(fmt.Sprintf("owner object %q is not supported in this test", ref.Kind))
+				}
+
+				// update kubeletconfig via the performanceprofile using dynamic client
+				klog.Infof("update configuration via the kubeletconfig owner %s/%s", ref.Kind, ref.Name)
+				tmScopeAnn := fmt.Sprintf("{\"topologyManagerScope\": %q, \"cpuManagerPolicyOptions\": {\"full-pcpus-only\": \"false\"}}", newTMScope)
+				updatePerformanceProfileFieldUnstructured(dynamicClient, ctx, ref.Name, tmScopeAnn, "metadata", "annotations", "kubeletconfig.experimental")
+			}
+
+			defer func() {
+				By("restore kubeletconfig settings")
+				var mcoKC machineconfigv1.KubeletConfig
+				err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), &mcoKC)
+				Expect(err).ToNot(HaveOccurred())
+
+				kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(&mcoKC)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(len(mcoKC.OwnerReferences)).To(BeNumerically("<", 2))
+
+				currentTMScope := kcObj.TopologyManagerScope
+
+				mcpsInfo, err := buildMCPsInfo(fxt.Client, context.TODO(), *nroOperObj)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(mcpsInfo).ToNot(BeEmpty())
+
+				if currentTMScope != initialTMScope {
+					if len(mcoKC.OwnerReferences) == 0 {
+						Eventually(func(g Gomega) {
+							err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), &mcoKC)
+							Expect(err).ToNot(HaveOccurred())
+
+							kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(&mcoKC)
+							Expect(err).ToNot(HaveOccurred())
+
+							kcObj.TopologyManagerScope = initialTMScope
+							err = kubeletconfig.KubeletConfToMCKubeletConf(kcObj, &mcoKC)
+							Expect(err).ToNot(HaveOccurred())
+
+							err = fxt.Client.Update(context.TODO(), &mcoKC)
+							Expect(err).ToNot(HaveOccurred())
+						}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+					}
+					if len(targetedKC.OwnerReferences) == 1 {
+						ref := targetedKC.OwnerReferences[0]
+						if ref.Kind != "PerformanceProfile" {
+							Skip(fmt.Sprintf("owner object %q is not supported in this test", ref.Kind))
+						}
+						tmScopeAnn := fmt.Sprintf("{\"topologyManagerScope\": %q, \"cpuManagerPolicyOptions\": {\"full-pcpus-only\": \"false\"}}", initialTMScope)
+						updatePerformanceProfileFieldUnstructured(dynamicClient, ctx, ref.Name, tmScopeAnn, "metadata", "annotations", "kubeletconfig.experimental")
+					}
+					By("waiting for mcp to update")
+					waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, time.Now().String(), mcpsInfo...)
+				}
+			}()
+
+			By("waiting for mcp to update")
+			waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, time.Now().String(), mcpsInfo...)
+
+			By("checking that NUMAResourcesOperator's ConfigMap has changed")
+			cmList := &corev1.ConfigMapList{}
+			err = fxt.Client.List(context.TODO(), cmList)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(targetedKC), targetedKC)
+			Expect(err).ToNot(HaveOccurred())
+
+			var nropCm *corev1.ConfigMap
+			for i := 0; i < len(cmList.Items); i++ {
+				// the owner should be the KubeletConfig object and not the NUMAResourcesOperator CR
+				// so when KubeletConfig gets deleted, the ConfigMap gets deleted as well
+				if objects.IsOwnedBy(cmList.Items[i].ObjectMeta, targetedKC.ObjectMeta) {
+					nropCm = &cmList.Items[i]
+					break
+				}
+			}
+			Expect(nropCm).ToNot(BeNil(), "NUMAResourcesOperator %q should have a ConfigMap owned by KubeletConfig %q", nroOperObj.Name, targetedKC.Name)
+
+			cmKey := client.ObjectKeyFromObject(nropCm)
+			Eventually(func() bool {
+				err = fxt.Client.Get(context.TODO(), cmKey, nropCm)
+				Expect(err).ToNot(HaveOccurred())
+
+				data, ok := nropCm.Data["config.yaml"]
+				Expect(ok).To(BeTrue(), "failed to obtain config.yaml key from ConfigMap %q data", cmKey.String())
+
+				conf, err := rteConfigFrom(data)
+				Expect(err).ToNot(HaveOccurred(), "failed to obtain rteConfig from ConfigMap %q error: %v", cmKey.String(), err)
+
+				if conf.Kubelet.TopologyManagerScope == initialTMScope {
+					klog.Warningf("ConfigMap %q has not been updated with new TopologyManagerScope after kubeletconfig modification", cmKey.String())
+					return false
+				}
+				return true
+			}).WithTimeout(timeout).WithPolling(time.Second * 30).Should(BeTrue())
+
+			By("schedule another workload requesting resources")
+			nroSchedObj := &nropv1.NUMAResourcesScheduler{}
+			nroSchedKey := objects.NROSchedObjectKey()
+			err = fxt.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
+			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
+			schedulerName := nroSchedObj.Status.SchedulerName
+
+			nrtPreCreatePodList, err := e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
+			Expect(err).ToNot(HaveOccurred())
+
+			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomizeName("testpod"))
+			testPod.Spec.SchedulerName = schedulerName
+			rl := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("1"),
+				corev1.ResourceMemory: resource.MustParse("100M"),
+			}
+			testPod.Spec.Containers[0].Resources.Limits = rl
+			testPod.Spec.Containers[0].Resources.Requests = rl
+
+			err = fxt.Client.Create(context.TODO(), testPod)
+			Expect(err).ToNot(HaveOccurred())
+
+			testPod, err = wait.With(fxt.Client).Timeout(timeout).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
+			if err != nil {
+				_ = objects.LogEventsForPod(fxt.K8sClient, testPod.Namespace, testPod.Name)
+			}
+			Expect(err).ToNot(HaveOccurred())
+
+			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
+			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, testPod.Namespace, testPod.Name, schedulerName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", testPod.Namespace, testPod.Name, schedulerName)
+
+			rl = e2ereslist.FromGuaranteedPod(*testPod)
+
+			nrtPreCreate, err := e2enrt.FindFromList(nrtPreCreatePodList.Items, testPod.Spec.NodeName)
+			Expect(err).ToNot(HaveOccurred())
+
+			By("Waiting for the NRT data to stabilize")
+			e2efixture.MustSettleNRT(fxt)
+
+			By(fmt.Sprintf("checking NRT for target node %q updated correctly", testPod.Spec.NodeName))
+			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
+			expectNRTConsumedResources(fxt, *nrtPreCreate, rl, testPod)
 		})
 
 		It("[test_id:75354] should be able to correctly identify topology manager policy without scheduler restarting", Label(label.Reboot, label.Slow, "unsched", "schedrst", label.Tier2, label.OpenShift), Label("feature:schedattrwatch", "feature:schedrst"), func(ctx context.Context) {
@@ -1528,4 +1741,32 @@ func newDynamicClient() dynamic.Interface {
 	Expect(err).ToNot(HaveOccurred())
 
 	return dynamicClient
+}
+
+// each KubeletConfig has a field for TopologyManagerScope
+// since we don't care about the value itself, and we just want to trigger a machine-config change, we just pick some random value.
+// the current TopologyManagerScope value is unknown in runtime, hence there are two options here:
+// 1. the current value is equal to the random value we choose.
+// 2. the current value is not equal to the random value we choose.
+// in option number 2 we are good to go, but if happened, and we land on option number 1,
+// it won't trigger a machine-config change (because the value has left the same) so we just pick another value,
+// which now we are certain that it is different from the existing one.
+// in conclusion, the maximum attempts is 2.
+func getNewTopologyManagerScopeValue(oldTopologyManagerScopeValue string) string {
+	newTopologyManagerScopeValue := "container"
+	// if it happens to be the same, pick something else
+	if oldTopologyManagerScopeValue == newTopologyManagerScopeValue || oldTopologyManagerScopeValue == "" {
+		newTopologyManagerScopeValue = "pod"
+	}
+	return newTopologyManagerScopeValue
+}
+
+func rteConfigFrom(data string) (*rteconfig.Config, error) {
+	conf := &rteconfig.Config{}
+
+	err := yaml.Unmarshal([]byte(data), conf)
+	if err != nil {
+		return nil, err
+	}
+	return conf, nil
 }
