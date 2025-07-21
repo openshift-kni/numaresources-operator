@@ -63,6 +63,9 @@ const (
 	// ActivePodsResourcesSupportSince defines the OCP version which started to support the fixed kubelet
 	// in which the PodResourcesAPI lists the active pods by default
 	activePodsResourcesSupportSince = "4.20.999"
+
+	// MaxSchedulerReplicas is the maximum number of scheduler replicas that can be deployed
+	MaxSchedulerReplicas = 3
 )
 
 type PlatformInfo struct {
@@ -221,17 +224,52 @@ func (r *NUMAResourcesSchedulerReconciler) computeSchedulerReplicas(ctx context.
 	if schedSpec.Replicas != nil {
 		return schedSpec.Replicas, nil
 	}
+
+	var labelSelector map[string]string
+	var nodeRoleDescription string
+
+	// select appropriate nodes based on platform
+	if r.PlatformInfo.Platform == platform.HyperShift {
+		// on HyperShift, use worker nodes
+		labelSelector = map[string]string{
+			"node-role.kubernetes.io/worker": "",
+		}
+		nodeRoleDescription = "worker"
+	} else {
+		// on OpenShift and other platforms, use control-plane nodes
+		labelSelector = map[string]string{
+			"node-role.kubernetes.io/control-plane": "",
+		}
+		nodeRoleDescription = "control-plane"
+	}
+
 	nodeList := &corev1.NodeList{}
 	if err := r.Client.List(ctx, nodeList, &client.ListOptions{
-		LabelSelector: labels.SelectorFromSet(map[string]string{
-			"node-role.kubernetes.io/control-plane": "",
-		}),
+		LabelSelector: labels.SelectorFromSet(labelSelector),
 	}); err != nil {
 		return schedSpec.Replicas, err
 	}
-	replicas := ptr.To(int32(len(nodeList.Items)))
-	klog.InfoS("autodetect scheduler replicas", "replicas", *replicas)
-	return replicas, nil
+
+	replicaCount := int32(len(nodeList.Items))
+
+	// check if no nodes are found for the target role
+	if replicaCount == 0 {
+		return nil, fmt.Errorf("failed to compute scheduler replicas: no %s nodes found for platform %s", nodeRoleDescription, r.PlatformInfo.Platform)
+	}
+
+	// prefer odd-sized replica counts to avoid split-brain scenarios
+	// cap replicas at 3 for both OpenShift and HyperShift
+	if replicaCount > MaxSchedulerReplicas {
+		replicaCount = MaxSchedulerReplicas
+		klog.V(4).InfoS("capping scheduler replicas", "platform", r.PlatformInfo.Platform, "nodeRole", nodeRoleDescription, "detectedNodes", len(nodeList.Items), "cappedReplicas", replicaCount)
+	} else if replicaCount < MaxSchedulerReplicas {
+		replicaCount = 1
+		klog.V(4).InfoS("setting scheduler replicas to prefer odd size", "platform", r.PlatformInfo.Platform, "nodeRole", nodeRoleDescription, "detectedNodes", len(nodeList.Items), "setReplicas", replicaCount)
+	}
+
+	klog.V(2).InfoS("final scheduler replicas", "platform", r.PlatformInfo.Platform, "nodeRole", nodeRoleDescription, "replicas", replicaCount)
+
+	return ptr.To(replicaCount), nil
 }
 
 func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx context.Context, instance *nropv1.NUMAResourcesScheduler) (nropv1.NUMAResourcesSchedulerStatus, error) {

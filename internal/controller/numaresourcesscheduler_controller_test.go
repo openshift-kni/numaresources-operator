@@ -743,6 +743,112 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 	})
 })
 
+var _ = Describe("Test computeSchedulerReplicas", func() {
+	var reconciler *NUMAResourcesSchedulerReconciler
+
+	BeforeEach(func() {
+		var err error
+		reconciler, err = NewFakeNUMAResourcesSchedulerReconciler()
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	DescribeTable("should compute replicas correctly for different platforms and node counts",
+		func(platform platform.Platform, numControlPlane, numWorker int, expectedReplicas *int32, expectError bool) {
+			// setup reconciler with platform info
+			reconciler.PlatformInfo = PlatformInfo{
+				Platform: platform,
+				Version:  "v4.14.0",
+			}
+
+			// create nodes based on test scenario
+			var nodes []runtime.Object
+			if numControlPlane > 0 {
+				nodes = append(nodes, fakeNodes(numControlPlane, 0)...)
+			}
+			if numWorker > 0 {
+				nodes = append(nodes, fakeNodes(0, numWorker)...)
+			}
+
+			// recreate reconciler with nodes
+			reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nodes...)
+			Expect(err).ToNot(HaveOccurred())
+			reconciler.PlatformInfo = PlatformInfo{
+				Platform: platform,
+				Version:  "v4.14.0",
+			}
+
+			// create test scheduler spec with no replicas set (auto-detect)
+			schedSpec := nropv1.NUMAResourcesSchedulerSpec{
+				Replicas: nil, // force auto-detection
+			}
+
+			// call the function under test
+			result, err := reconciler.computeSchedulerReplicas(context.TODO(), schedSpec)
+
+			if expectError {
+				Expect(err).To(HaveOccurred())
+				Expect(result).To(BeNil())
+			} else {
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).ToNot(BeNil())
+				Expect(*result).To(Equal(*expectedReplicas))
+			}
+		},
+		// OpenShift platform tests (uses control-plane nodes)
+		Entry("OpenShift: no control-plane nodes should return error", platform.OpenShift, 0, 5, nil, true),
+		Entry("OpenShift: 1 control-plane node should return 1 replica", platform.OpenShift, 1, 0, ptr.To(int32(1)), false),
+		Entry("OpenShift: 2 control-plane nodes should return 1 replica", platform.OpenShift, 2, 0, ptr.To(int32(1)), false),
+		Entry("OpenShift: 3 control-plane nodes should return 3 replicas", platform.OpenShift, 3, 0, ptr.To(int32(3)), false),
+		Entry("OpenShift: 4 control-plane nodes should be capped at 3 replicas", platform.OpenShift, 4, 0, ptr.To(int32(3)), false),
+		Entry("OpenShift: 5 control-plane nodes should be capped at 3 replicas", platform.OpenShift, 5, 0, ptr.To(int32(3)), false),
+
+		// HyperShift platform tests (uses worker nodes)
+		Entry("HyperShift: no worker nodes should return error", platform.HyperShift, 3, 0, nil, true),
+		Entry("HyperShift: 1 worker node should return 1 replica", platform.HyperShift, 0, 1, ptr.To(int32(1)), false),
+		Entry("HyperShift: 2 worker nodes should return 1 replica", platform.HyperShift, 0, 2, ptr.To(int32(1)), false),
+		Entry("HyperShift: 3 worker nodes should return 3 replicas", platform.HyperShift, 0, 3, ptr.To(int32(3)), false),
+		Entry("HyperShift: 4 worker nodes should be capped at 3 replicas", platform.HyperShift, 0, 4, ptr.To(int32(3)), false),
+		Entry("HyperShift: 10 worker nodes should be capped at 3 replicas", platform.HyperShift, 0, 10, ptr.To(int32(3)), false),
+
+		// mixed scenarios to ensure platform-specific node selection works
+		Entry("OpenShift: 3 control-plane + 5 worker should return 3 replicas (uses control-plane)", platform.OpenShift, 3, 5, ptr.To(int32(3)), false),
+		Entry("HyperShift: 3 control-plane + 5 worker should return 3 replicas (uses worker)", platform.HyperShift, 3, 5, ptr.To(int32(3)), false),
+	)
+
+	Context("when replicas are explicitly set", func() {
+		It("should return the explicitly set replicas without checking nodes", func() {
+			// setup reconciler with HyperShift platform (uses worker nodes)
+			reconciler.PlatformInfo = PlatformInfo{
+				Platform: platform.HyperShift,
+				Version:  "v4.14.0",
+			}
+
+			// create scenario with no worker nodes but explicit replicas
+			nodes := fakeNodes(3, 0) // only control-plane nodes
+			reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nodes...)
+			Expect(err).ToNot(HaveOccurred())
+			reconciler.PlatformInfo = PlatformInfo{
+				Platform: platform.HyperShift,
+				Version:  "v4.14.0",
+			}
+
+			// create test scheduler spec with explicit replicas
+			explicitReplicas := int32(5)
+			schedSpec := nropv1.NUMAResourcesSchedulerSpec{
+				Replicas: &explicitReplicas,
+			}
+
+			// call the function under test
+			result, err := reconciler.computeSchedulerReplicas(context.TODO(), schedSpec)
+
+			// should return the explicit value without error
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).ToNot(BeNil())
+			Expect(*result).To(Equal(explicitReplicas))
+		})
+	})
+})
+
 var _ = Describe("Test scheduler spec PreNormalize", func() {
 	When("Spec.SchedulerInformer is not set by the user", func() {
 		It("should override default informer to Shared if kubelet is fixed - first supported zstream version", func() {
