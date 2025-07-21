@@ -58,7 +58,7 @@ var _ = Describe("network policies are applied", Ordered, Label("feature:network
 	var operatorPod, schedulerPod, rteWorkerPod, prometheusPod *corev1.Pod
 
 	BeforeAll(func() {
-		ctx := context.Background()
+		ctx = context.Background()
 		nropObj = objects.TestNRO()
 		Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(nropObj), nropObj)).To(Succeed())
 
