@@ -125,7 +125,13 @@ func (mf Manifests) Render(opts options.UpdaterDaemon) (Manifests, error) {
 		}
 		ocpupdate.SecurityContextConstraint(ret.SecurityContextConstraint, ret.ServiceAccount)
 		ocpupdate.SecurityContextConstraint(ret.SecurityContextConstraintV2, ret.ServiceAccount)
-		rteupdate.SecurityContext(ret.DaemonSet, selinuxTypeFromSCCVersion(opts.DaemonSet.SCCVersion, (mf.MachineConfig != nil)))
+		rteupdate.SecurityContextWithOpts(
+			ret.DaemonSet,
+			rteupdate.SecurityContextOptions{
+				SELinuxContextType:  selinuxTypeFromSCCVersion(opts.DaemonSet.SCCVersion, (mf.MachineConfig != nil)),
+				SecurityContextName: mf.SecurityContextConstraint.Name,
+			},
+		)
 	}
 
 	return ret, nil

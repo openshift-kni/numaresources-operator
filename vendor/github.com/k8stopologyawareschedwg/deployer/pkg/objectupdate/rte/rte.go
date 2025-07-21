@@ -46,6 +46,7 @@ const (
 	rteKubeletDirVolumeName      = "host-var-lib-kubelet"
 	rteNotifierFileName          = "notify"
 	hostNotifierDir              = "/run/rte"
+	sccAnnotation                = "openshift.io/required-scc"
 )
 
 func ContainerConfig(podSpec *corev1.PodSpec, cnt *corev1.Container, configMapName string) {
@@ -188,6 +189,37 @@ func SecurityContext(ds *appsv1.DaemonSet, selinuxContextType string) {
 	cntSpec.SecurityContext.SELinuxOptions = &corev1.SELinuxOptions{
 		Type:  selinuxContextType,
 		Level: selinuxassets.RTEContextLevel,
+	}
+}
+
+type SecurityContextOptions struct {
+	SELinuxContextType  string
+	SecurityContextName string
+}
+
+func SecurityContextWithOpts(ds *appsv1.DaemonSet, opts SecurityContextOptions) {
+	cntSpec := objectupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, manifests.ContainerNameRTE)
+	if cntSpec == nil {
+		return
+	}
+
+	// this is needed to put watches in the kubelet state dirs AND
+	// to open the podresources socket in R/W mode
+	if cntSpec.SecurityContext == nil {
+		cntSpec.SecurityContext = &corev1.SecurityContext{}
+	}
+	if opts.SELinuxContextType != "" {
+		cntSpec.SecurityContext.SELinuxOptions = &corev1.SELinuxOptions{
+			Type:  opts.SELinuxContextType,
+			Level: selinuxassets.RTEContextLevel,
+		}
+	}
+
+	if ds.Spec.Template.ObjectMeta.Annotations == nil {
+		ds.Spec.Template.ObjectMeta.Annotations = make(map[string]string)
+	}
+	if opts.SecurityContextName != "" {
+		ds.Spec.Template.ObjectMeta.Annotations[sccAnnotation] = opts.SecurityContextName
 	}
 }
 
