@@ -19,6 +19,7 @@ package buildinfo
 import (
 	"bufio"
 	"bytes"
+	"io"
 	"os"
 	"strings"
 
@@ -43,7 +44,12 @@ func ParseVersionFromFile(srcFile string) string {
 	if err != nil {
 		return ""
 	}
-	scanner := bufio.NewScanner(bytes.NewReader(data))
+	return ParseVersionFromReader(bytes.NewReader(data))
+}
+
+// ParseVersionFromReader intentionally swallows any error
+func ParseVersionFromReader(r io.Reader) string {
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if !strings.HasPrefix(line, versionTagPrefix) {
