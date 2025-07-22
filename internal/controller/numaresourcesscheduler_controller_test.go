@@ -217,6 +217,67 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			Expect(nrs.Status.CacheResyncPeriod.Seconds()).To(Equal(resyncPeriod.Seconds()))
 		})
 
+		Context("should reflect DedicatedInformerActive in status conditions", func() {
+			It("with default values", func() {
+				key := client.ObjectKeyFromObject(nrs)
+				_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(Succeed())
+
+				c := getConditionByType(nrs.Status.Conditions, status.ConditionDedicatedInformerActive)
+
+				Expect(c).ToNot(BeNil())
+				Expect(c.Status).To(Equal(metav1.ConditionTrue))
+			})
+
+			It("with updated values - explicitly configured to Dedicated", func() {
+				nrs := nrs.DeepCopy()
+				nrs.Spec.SchedulerInformer = ptr.To(nropv1.SchedulerInformerDedicated)
+
+				Eventually(func() bool {
+					if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+						klog.Warningf("failed to update the scheduler object; err: %v", err)
+						return false
+					}
+					return true
+				}, 30*time.Second, 5*time.Second).Should(BeTrue())
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(Succeed())
+
+				c := getConditionByType(nrs.Status.Conditions, status.ConditionDedicatedInformerActive)
+
+				Expect(c).ToNot(BeNil())
+				Expect(c.Status).To(Equal(metav1.ConditionTrue))
+			})
+
+			It("with updated values - explicitly configured to Shared", func() {
+				nrs := nrs.DeepCopy()
+				nrs.Spec.SchedulerInformer = ptr.To(nropv1.SchedulerInformerShared)
+
+				Eventually(func() bool {
+					if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+						klog.Warningf("failed to update the scheduler object; err: %v", err)
+						return false
+					}
+					return true
+				}, 30*time.Second, 5*time.Second).Should(BeTrue())
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(Succeed())
+
+				c := getConditionByType(nrs.Status.Conditions, status.ConditionDedicatedInformerActive)
+
+				Expect(c).ToNot(BeNil())
+				Expect(c.Status).To(Equal(metav1.ConditionFalse))
+			})
+		})
+
 		It("should have the correct priority class", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
@@ -658,6 +719,17 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				Expect(err).ToNot(HaveOccurred())
 
 				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, expectedInformer)
+
+				expectedDedicatedActiveStatus := metav1.ConditionTrue
+				if expectedInformer == depmanifests.CacheInformerShared {
+					expectedDedicatedActiveStatus = metav1.ConditionFalse
+				}
+
+				Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(Succeed())
+				c := getConditionByType(nrs.Status.Conditions, status.ConditionDedicatedInformerActive)
+
+				Expect(c).ToNot(BeNil())
+				Expect(c.Status).To(Equal(expectedDedicatedActiveStatus))
 			},
 				Entry("with fixed Openshift the default informer is Shared", PlatformInfo{
 					Platform: platform.OpenShift,
