@@ -22,13 +22,17 @@ import (
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	mcov1 "github.com/openshift/api/machineconfiguration/v1"
+
+	v1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
@@ -195,10 +199,17 @@ func TestDeleteUnusedDaemonSets(t *testing.T) {
 		t.Errorf("failed to find RTE daemonsets: %v", err)
 	}
 
-	err = DeleteUnusedDaemonSets(fakeClient, context.TODO(), &nro, trees)
+	activeDSs, err := DeleteUnusedDaemonSets(fakeClient, context.TODO(), &nro, trees)
 	if err != nil {
 		t.Errorf("failed to delete unused dangling daemonsets: %v", err)
 		return
+	}
+	if len(activeDSs) != 1 {
+		t.Errorf("expected 1 active daemonsets, got %d", len(activeDSs))
+	}
+
+	if activeDSs[0].Name != dss[0].Name {
+		t.Errorf("expected active daemonsets %s , got %v", dss[0].Name, activeDSs[0].Name)
 	}
 
 	err = isDaemonSetFound(fakeClient, context.TODO(), dss[0], dss[2])
@@ -209,6 +220,135 @@ func TestDeleteUnusedDaemonSets(t *testing.T) {
 	if err == nil {
 		t.Errorf("found dangling daemonset %s/%s from fake client which was expected to be deleted", dss[1].Namespace, dss[1].Name)
 	}
+}
+
+func TestDeleteUnusedNodeResourceTopologies(t *testing.T) {
+	nodeSelectorPool1 := map[string]string{
+		"name": "pool1",
+	}
+	nodeSelectorPool2 := map[string]string{
+		"name": "pool2",
+	}
+
+	activeDSs := []appsv1.DaemonSet{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      objectnames.GetComponentName(nroName, "pool-1"),
+				Namespace: nroNs,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						UID: nrouid,
+					},
+				},
+			},
+			Spec: appsv1.DaemonSetSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						NodeSelector: nodeSelectorPool1,
+					},
+				},
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      objectnames.GetComponentName(nroName, "pool-2"),
+				Namespace: nroNs,
+				OwnerReferences: []metav1.OwnerReference{
+					{
+						UID: nrouid,
+					},
+				},
+			},
+			Spec: appsv1.DaemonSetSpec{
+				Template: corev1.PodTemplateSpec{
+					Spec: corev1.PodSpec{
+						NodeSelector: nodeSelectorPool2,
+					},
+				},
+			},
+		},
+	}
+
+	targetNodes := []corev1.Node{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "pool1-node1",
+				Labels: nodeSelectorPool1,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   "pool2-node1",
+				Labels: nodeSelectorPool2,
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "irrelevant-node1",
+			},
+		},
+	}
+
+	nrts := []v1alpha2.NodeResourceTopology{
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pool2-node1",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pool1-node1",
+			},
+		},
+		{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "irrelevant-node1",
+			},
+		},
+	}
+
+	objs := make([]client.Object, len(activeDSs)+len(targetNodes)+len(nrts))
+	for idx, ds := range activeDSs {
+		objs[idx] = &ds
+	}
+	nextIdx := len(activeDSs)
+	for idx, node := range targetNodes {
+		objs[nextIdx+idx] = &node
+	}
+	nextIdx = len(activeDSs) + len(targetNodes)
+	for idx, nrt := range nrts {
+		objs[nextIdx+idx] = &nrt
+	}
+	_ = v1alpha2.AddToScheme(scheme.Scheme)
+	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(objs...).Build()
+
+	err := DeleteUnusedNodeResourcesTopologies(fakeClient, context.TODO(), activeDSs)
+	if err != nil {
+		t.Errorf("failed to delete unused dangling nrts: %v", err)
+		return
+	}
+
+	found := isNodeResourceTopologyFound(fakeClient, context.TODO(), nrts[0], nrts[1])
+	if !found {
+		t.Errorf("used noderesourcetopologies were removed while expected to keep them")
+	}
+
+	found = isNodeResourceTopologyFound(fakeClient, context.TODO(), nrts[2])
+	if found {
+		t.Errorf("dangling noderesourcetopology %s is not deleted while expected to be removed", nrts[2].Name)
+	}
+}
+
+func isNodeResourceTopologyFound(cli client.Client, ctx context.Context, objs ...v1alpha2.NodeResourceTopology) bool {
+	var nrt v1alpha2.NodeResourceTopology
+	for _, obj := range objs {
+		err := cli.Get(ctx, client.ObjectKeyFromObject(&obj), &nrt)
+		if err != nil {
+			klog.Infof("failed to get noderesourcetopology object %s from fake client: %v", obj.Name, err)
+			return false
+		}
+	}
+	return true
 }
 
 func isMachineConfigFound(cli client.Client, ctx context.Context, objs ...mcov1.MachineConfig) error {

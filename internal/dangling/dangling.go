@@ -27,6 +27,7 @@ import (
 	"errors"
 
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -35,23 +36,26 @@ import (
 
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
+	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 
-func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) error {
+func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) ([]appsv1.DaemonSet, error) {
 	klog.V(3).Info("Delete dangling Daemonsets start")
 	defer klog.V(3).Info("Delete dangling Daemonsets end")
 
 	var daemonSetList appsv1.DaemonSetList
 	if err := cli.List(ctx, &daemonSetList, &client.ListOptions{Namespace: instance.Namespace}); err != nil {
 		klog.ErrorS(err, "error while getting Daemonset list")
-		return err
+		return nil, err
 	}
 
 	expectedDaemonSetNames := buildDaemonSetNames(instance, trees)
 
+	var activeDaemonSets []appsv1.DaemonSet
 	var errs error
 	deleted := 0
 	for _, ds := range daemonSetList.Items {
@@ -59,6 +63,7 @@ func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nr
 			continue
 		}
 		if expectedDaemonSetNames.Has(ds.Name) {
+			activeDaemonSets = append(activeDaemonSets, ds)
 			continue
 		}
 		if err := cli.Delete(ctx, &ds); err != nil {
@@ -72,7 +77,7 @@ func DeleteUnusedDaemonSets(cli client.Client, ctx context.Context, instance *nr
 	if deleted > 0 {
 		klog.V(2).InfoS("Delete dangling Daemonsets", "deletedCount", deleted)
 	}
-	return errs
+	return activeDaemonSets, errs
 }
 
 func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) error {
@@ -110,6 +115,65 @@ func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance
 	}
 	if deleted > 0 {
 		klog.V(2).InfoS("Delete dangling Machineconfigs", "deletedCount", deleted)
+	}
+	return errs
+}
+
+func DeleteUnusedNodeResourcesTopologies(cli client.Client, ctx context.Context, activeDaemonSets []appsv1.DaemonSet) error {
+	klog.V(3).Info("Delete dangling NodeResourcesTopologies start")
+	defer klog.V(3).Info("Delete dangling NodeResourcesTopologies end")
+
+	var nodeResourcesTopologiesList v1alpha2.NodeResourceTopologyList
+	if err := cli.List(ctx, &nodeResourcesTopologiesList); err != nil {
+		klog.ErrorS(err, "error while getting NodeResourcesTopologies list")
+		return err
+	}
+
+	nrtsToDelete := nodeResourcesTopologiesList.DeepCopy().Items
+	if len(activeDaemonSets) != 0 {
+		nrtsToDelete = []v1alpha2.NodeResourceTopology{}
+		var targetNodes []v1.Node
+		for _, ds := range activeDaemonSets {
+			var dsNodes v1.NodeList
+			labelSelector := metav1.LabelSelector{MatchLabels: ds.Spec.Template.Spec.NodeSelector}
+			sel, err := metav1.LabelSelectorAsSelector(&labelSelector)
+			if err != nil {
+				klog.ErrorS(err, "failed to parse label selector", "daemonset", ds.Name)
+				return err
+			}
+
+			if err := cli.List(ctx, &dsNodes, &client.ListOptions{LabelSelector: sel}); err != nil {
+				klog.ErrorS(err, "error while getting nodes list that are targeted by RTE DaemonSet")
+				return err
+			}
+			targetNodes = append(targetNodes, dsNodes.Items...)
+		}
+
+		targetNodeNames := sets.New[string]()
+		for _, node := range targetNodes {
+			targetNodeNames = targetNodeNames.Insert(node.Name)
+		}
+
+		for _, nrt := range nodeResourcesTopologiesList.Items {
+			if !targetNodeNames.Has(nrt.Name) {
+				nrtsToDelete = append(nrtsToDelete, nrt)
+			}
+		}
+	}
+
+	var errs error
+	deleted := 0
+	for _, nrt := range nrtsToDelete {
+		if err := cli.Delete(ctx, &nrt); err != nil {
+			klog.ErrorS(err, "error while deleting dangling noderesourcetopology", "NodeResourcesTopology", nrt.Name)
+			errs = errors.Join(errs, err)
+			continue
+		}
+		klog.V(3).InfoS("dangling noderesourcetopology deleted", "name", nrt.Name)
+		deleted += 1
+	}
+	if deleted > 0 {
+		klog.V(2).InfoS("Delete dangling noderesourcetopologies", "deletedCount", deleted)
 	}
 	return errs
 }
