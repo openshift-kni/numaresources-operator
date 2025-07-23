@@ -43,8 +43,8 @@ spec:
           image: ${IMAGE}
           resources:
             requests:
-              cpu: "600m"
-              memory: "1200Mi"
+              cpu: "150m"
+              memory: "500Mi"
           command:
             - /bin/kube-scheduler
           args:
