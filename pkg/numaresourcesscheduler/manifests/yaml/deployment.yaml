@@ -42,9 +42,6 @@ spec:
               drop: ["ALL"]
           image: ${IMAGE}
           resources:
-            limits:
-              cpu: "600m"
-              memory: "1200Mi"
             requests:
               cpu: "600m"
               memory: "1200Mi"
