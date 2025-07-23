@@ -82,6 +82,10 @@ type NUMAResourcesSchedulerReconciler struct {
 	PlatformInfo       PlatformInfo
 }
 
+// Namespace Scoped
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=*,namespace="numaresources"
+
+// Cluster Scoped
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=*
