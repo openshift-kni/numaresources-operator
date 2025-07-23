@@ -18,6 +18,8 @@ package controller
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -25,10 +27,13 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/gomega/gcustom"
+	"github.com/onsi/gomega/types"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -40,14 +45,14 @@ import (
 	depmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
-
-	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
 const testSchedulerName = "testSchedulerName"
@@ -606,7 +611,104 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			ginkgo.Entry("replicas=3", int32(3), true),
 		)
 	})
+
+	ginkgo.When("setting the scheduler pod resource requests", func() {
+		var nrs *nropv1.NUMAResourcesScheduler
+		var reconciler *NUMAResourcesSchedulerReconciler
+		numOfMasters := 3
+
+		ginkgo.BeforeEach(func() {
+			var err error
+			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+			initObjects := []runtime.Object{nrs}
+			initObjects = append(initObjects, fakeNodes(numOfMasters, 3)...)
+			reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should keep setting the legacy guaranteed values by default", func(ctx context.Context) {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			expectedRR := corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource("600m"),
+					corev1.ResourceMemory: mustParseResource("1200Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource("600m"),
+					corev1.ResourceMemory: mustParseResource("1200Mi"),
+				},
+			}
+
+			dp := &appsv1.Deployment{}
+			gomega.Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(gomega.Succeed())
+			gomega.Expect(dp).To(HaveTheSameResourceRequirements(expectedRR))
+		})
+
+		ginkgo.It("should keep setting the legacy guaranteed values explicitly", func(ctx context.Context) {
+			nrs := nrs.DeepCopy()
+			nrs.Annotations = map[string]string{
+				annotations.SchedulerQOSRequestAnnotation: "guaranteed",
+			}
+			gomega.Eventually(reconciler.Client.Update).WithArguments(ctx, nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(gomega.Succeed())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			expectedRR := corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource("600m"),
+					corev1.ResourceMemory: mustParseResource("1200Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource("600m"),
+					corev1.ResourceMemory: mustParseResource("1200Mi"),
+				},
+			}
+
+			dp := &appsv1.Deployment{}
+			gomega.Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(gomega.Succeed())
+			gomega.Expect(dp).To(HaveTheSameResourceRequirements(expectedRR))
+		})
+
+		ginkgo.It("should setting the burstable values only if requested", func(ctx context.Context) {
+			nrs := nrs.DeepCopy()
+			nrs.Annotations = map[string]string{
+				annotations.SchedulerQOSRequestAnnotation: annotations.SchedulerQOSRequestBurstable,
+			}
+			gomega.Eventually(reconciler.Client.Update).WithArguments(ctx, nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(gomega.Succeed())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+			expectedRR := corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource("150m"),
+					corev1.ResourceMemory: mustParseResource("500Mi"),
+				},
+			}
+
+			dp := &appsv1.Deployment{}
+			gomega.Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(gomega.Succeed())
+			gomega.Expect(dp).To(HaveTheSameResourceRequirements(expectedRR))
+		})
+	})
 })
+
+func HaveTheSameResourceRequirements(expectedRR corev1.ResourceRequirements) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(actual *appsv1.Deployment) (bool, error) {
+		cntName := schedupdate.MainContainerName // shortcut
+		cnt := depobjupdate.FindContainerByName(actual.Spec.Template.Spec.Containers, cntName)
+		if cnt == nil {
+			return false, fmt.Errorf("cannot find container %q", cntName)
+		}
+		return reflect.DeepEqual(cnt.Resources, expectedRR), nil
+	}).WithTemplate("Deployment {{.Actual.Namespace}}/{{.Actual.Name}} resources request mismatch")
+}
 
 func pop(m map[string]string, k string) string {
 	v := m[k]
@@ -694,4 +796,38 @@ func expectLeaderElectParams(cli client.Client, enabled bool, resourceNamespace,
 	gomega.Expect(cfg.LeaderElection.LeaderElect).To(gomega.Equal(enabled))
 	gomega.Expect(cfg.LeaderElection.ResourceNamespace).To(gomega.Equal(resourceNamespace))
 	gomega.Expect(cfg.LeaderElection.ResourceName).To(gomega.Equal(resourceName))
+}
+
+func fakeNodes(numOfMasters, numOfWorkers int) []runtime.Object {
+	var nodes []runtime.Object
+	for i := range numOfMasters {
+		nodes = append(nodes, &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("master-node-%d", i+1),
+				Labels: map[string]string{
+					"node-role.kubernetes.io/control-plane": "",
+				},
+			},
+		})
+	}
+	for i := range numOfWorkers {
+		nodes = append(nodes, &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: fmt.Sprintf("worker-node-%d", i+1),
+				Labels: map[string]string{
+					"node-role.kubernetes.io/worker": "",
+				},
+			},
+		})
+	}
+	return nodes
+}
+
+func mustParseResource(v string) resource.Quantity {
+	ginkgo.GinkgoHelper()
+	qty, err := resource.ParseQuantity(v)
+	if err != nil {
+		ginkgo.Fail(fmt.Sprintf("cannot parse %q: %v", v, err))
+	}
+	return qty
 }
