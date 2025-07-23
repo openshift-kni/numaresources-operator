@@ -17,16 +17,25 @@ limitations under the License.
 package annotations
 
 const (
+	// introduced in: 4.18
+	// remove in: 4.24 (tentative) or when 4.18 becomes the last supported version
 	SELinuxPolicyConfigAnnotation = "config.node.openshift-kni.io/selinux-policy"
 	SELinuxPolicyCustom           = "custom"
+
+	// introduced in: 4.18
+	// remove in: 4.22 (or 4.24?)
 	// MultiplePoolsPerTreeAnnotation an annotation used to re-enable the support of multiple node pools per tree; starting 4.18 it is disabled by default
 	// the annotation is on when it's set to "enabled", every other value is equivalent to disabled
 	MultiplePoolsPerTreeAnnotation = "config.node.openshift-kni.io/multiple-pools-per-tree"
 	MultiplePoolsPerTreeEnabled    = "enabled"
 
+	// introduced in: 4.18
+	// remove in: never
 	PauseReconciliationAnnotation        = "config.numa-operator.openshift.io/pause-reconciliation"
 	PauseReconciliationAnnotationEnabled = "enabled"
 
+	// introduced in: 4.19
+	// remove in: never (?)
 	NRTAPIDefinitionAnnotation = "config.numa-operator.openshift.io/nrt-api-definition"
 	NRTAPIFromCluster          = "cluster" // trust whatever it is already in the cluster, if at all
 )
