@@ -524,6 +524,22 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		}
 	}
 
+	r.RTEManifests.Core.DaemonSet.Spec.Template.Spec.Affinity = &corev1.Affinity{
+		PodAntiAffinity: &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: r.RTEManifests.Core.DaemonSet.Spec.Template.Labels,
+						//MatchLabels: map[string]string{
+						//	"name": "resource-topology",// must be the same as spec.template.metadata.labels
+						//},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			},
+		},
+	}
+
 	// using a slice of poolDaemonSet instead of a map because Go maps assignment order is not consistent and non-deterministic
 	dsPoolPairs := []poolDaemonSet{}
 	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.Core.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
