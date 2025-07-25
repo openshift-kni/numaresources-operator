@@ -19,13 +19,17 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/onsi/gomega/gcustom"
+	"github.com/onsi/gomega/types"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -43,6 +47,7 @@ import (
 	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
@@ -635,6 +640,92 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 		})
 	})
 
+	When("setting the scheduler pod resource requests", func() {
+		var nrs *nropv1.NUMAResourcesScheduler
+		var reconciler *NUMAResourcesSchedulerReconciler
+		numOfMasters := 3
+
+		BeforeEach(func() {
+			var err error
+			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+			initObjects := []runtime.Object{nrs}
+			initObjects = append(initObjects, fakeNodes(numOfMasters, 3)...)
+			reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("should keep setting the legacy guaranteed values by default", func(ctx context.Context) {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			expectedRR := corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource("600m"),
+					corev1.ResourceMemory: mustParseResource("1200Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource("600m"),
+					corev1.ResourceMemory: mustParseResource("1200Mi"),
+				},
+			}
+
+			dp := &appsv1.Deployment{}
+			Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
+			Expect(dp).To(HaveTheSameResourceRequirements(expectedRR))
+		})
+
+		It("should keep setting the legacy guaranteed values explicitly", func(ctx context.Context) {
+			nrs := nrs.DeepCopy()
+			nrs.Annotations = map[string]string{
+				annotations.SchedulerQOSRequestAnnotation: "guaranteed",
+			}
+			Eventually(reconciler.Client.Update).WithArguments(ctx, nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(Succeed())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			expectedRR := corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource("600m"),
+					corev1.ResourceMemory: mustParseResource("1200Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource("600m"),
+					corev1.ResourceMemory: mustParseResource("1200Mi"),
+				},
+			}
+
+			dp := &appsv1.Deployment{}
+			Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
+			Expect(dp).To(HaveTheSameResourceRequirements(expectedRR))
+		})
+
+		It("should setting the burstable values only if requested", func(ctx context.Context) {
+			nrs := nrs.DeepCopy()
+			nrs.Annotations = map[string]string{
+				annotations.SchedulerQOSRequestAnnotation: annotations.SchedulerQOSRequestBurstable,
+			}
+			Eventually(reconciler.Client.Update).WithArguments(ctx, nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(Succeed())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			expectedRR := corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource("150m"),
+					corev1.ResourceMemory: mustParseResource("500Mi"),
+				},
+			}
+
+			dp := &appsv1.Deployment{}
+			Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
+			Expect(dp).To(HaveTheSameResourceRequirements(expectedRR))
+		})
+	})
+
 	Context("with kubelet PodResourcesAPI listing active pods by default", func() {
 		var nrs *nropv1.NUMAResourcesScheduler
 		var reconciler *NUMAResourcesSchedulerReconciler
@@ -794,6 +885,17 @@ var _ = Describe("Test scheduler spec PreNormalize", func() {
 	})
 })
 
+func HaveTheSameResourceRequirements(expectedRR corev1.ResourceRequirements) types.GomegaMatcher {
+	return gcustom.MakeMatcher(func(actual *appsv1.Deployment) (bool, error) {
+		cntName := schedupdate.MainContainerName // shortcut
+		cnt := depobjupdate.FindContainerByName(actual.Spec.Template.Spec.Containers, cntName)
+		if cnt == nil {
+			return false, fmt.Errorf("cannot find container %q", cntName)
+		}
+		return reflect.DeepEqual(cnt.Resources, expectedRR), nil
+	}).WithTemplate("Deployment {{.Actual.Namespace}}/{{.Actual.Name}} resources request mismatch")
+}
+
 func pop(m map[string]string, k string) string {
 	v := m[k]
 	delete(m, k)
@@ -905,4 +1007,13 @@ func fakeNodes(numOfMasters, numOfWorkers int) []runtime.Object {
 		})
 	}
 	return nodes
+}
+
+func mustParseResource(v string) resource.Quantity {
+	GinkgoHelper()
+	qty, err := resource.ParseQuantity(v)
+	if err != nil {
+		Fail(fmt.Sprintf("cannot parse %q: %v", v, err))
+	}
+	return qty
 }
