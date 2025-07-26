@@ -19,6 +19,7 @@ package objects
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -42,7 +43,11 @@ func EmptyMatchLabels() map[string]string {
 }
 
 func OpenshiftMatchLabels() map[string]string {
-	return map[string]string{"pools.operator.machineconfiguration.openshift.io/worker": ""}
+	label := "pools.operator.machineconfiguration.openshift.io"
+	if nodeRole, ok := os.LookupEnv("E2E_NODE_ROLE"); ok {
+		return map[string]string{fmt.Sprintf("%s/%s", label, nodeRole): ""}
+	}
+	return map[string]string{"pools.operator.machineconfiguration.openshift.io/master": ""} // temporary, change to worker
 }
 
 func TestNROScheduler() *nropv1.NUMAResourcesScheduler {
