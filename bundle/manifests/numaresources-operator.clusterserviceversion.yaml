@@ -62,7 +62,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-07-15T16:26:43Z"
+    createdAt: "2025-07-23T11:36:11Z"
     olm.skipRange: '>=4.19.0 <4.20.0'
     operatorframework.io/cluster-monitoring: "true"
     operators.operatorframework.io/builder: operator-sdk-v1.40.0
@@ -615,11 +615,7 @@ spec:
           resources:
           - networkpolicies
           verbs:
-          - create
-          - delete
-          - get
-          - list
-          - update
+          - '*'
         serviceAccountName: numaresources-controller-manager
     strategy: deployment
   installModes:

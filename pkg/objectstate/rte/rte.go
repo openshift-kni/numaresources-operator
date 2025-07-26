@@ -211,14 +211,21 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 			Error:    em.errs.Core.APIServerNetworkPolicy,
 			Desired:  mf.Core.APIServerNetworkPolicy.DeepCopy(),
 			Compare:  compare.Object,
-			Merge:    merge.ObjectForUpdate,
+			Merge:    merge.MetadataForUpdate,
 		},
 		{
 			Existing: em.existing.Core.MetricsServerNetworkPolicy,
 			Error:    em.errs.Core.MetricsServerNetworkPolicy,
 			Desired:  mf.Core.MetricsServerNetworkPolicy.DeepCopy(),
 			Compare:  compare.Object,
-			Merge:    merge.ObjectForUpdate,
+			Merge:    merge.MetadataForUpdate,
+		},
+		{
+			Existing: em.existing.Core.DefaultNetworkPolicy,
+			Error:    em.errs.Core.DefaultNetworkPolicy,
+			Desired:  mf.Core.DefaultNetworkPolicy.DeepCopy(),
+			Compare:  compare.Object,
+			Merge:    merge.MetadataForUpdate,
 		},
 	}
 

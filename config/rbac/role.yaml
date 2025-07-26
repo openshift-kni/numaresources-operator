@@ -156,8 +156,4 @@ rules:
   resources:
   - networkpolicies
   verbs:
-  - create
-  - delete
-  - get
-  - list
-  - update
+  - '*'
