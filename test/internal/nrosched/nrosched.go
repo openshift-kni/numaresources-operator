@@ -155,13 +155,16 @@ func CheckPODWasScheduledWith(k8sCli *kubernetes.Clientset, podNamespace, podNam
 	return checkPODEvents(k8sCli, podNamespace, podName, isScheduledWith)
 }
 
+// CheckNROSchedulerAvailable finds the NUMA-aware scheduler by name, verifies its
+// status confirms a deployment and returns a pointer to it. The calling test will
+// fail if any verification is unsuccessful.
 func CheckNROSchedulerAvailable(ctx context.Context, cli client.Client, schedObjName string) *nropv1.NUMAResourcesScheduler {
 	GinkgoHelper()
 
 	nroSchedObj := &nropv1.NUMAResourcesScheduler{}
 	Eventually(func() error {
 		By(fmt.Sprintf("checking %q for the condition Available=true", schedObjName))
-		err := cli.Get(context.TODO(), objects.NROSchedObjectKey(), nroSchedObj)
+		err := cli.Get(ctx, objects.NROSchedObjectKey(), nroSchedObj)
 		if err != nil {
 			return fmt.Errorf("failed to get the scheduler resource: %v", err)
 		}

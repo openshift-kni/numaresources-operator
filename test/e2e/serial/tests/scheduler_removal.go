@@ -59,7 +59,6 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
 		nroSchedObj = nrosched.CheckNROSchedulerAvailable(context.TODO(), fxt.Client, serialconfig.Config.NROSchedObj.Name)
-		Expect(nroSchedObj).ToNot(BeNil())
 		dpNName = nroSchedObj.Status.Deployment
 	})
 
@@ -72,7 +71,6 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 		AfterEach(func() {
 			restoreScheduler(fxt, serialconfig.Config.NROSchedObj)
 			nroSchedObj = nrosched.CheckNROSchedulerAvailable(context.TODO(), fxt.Client, serialconfig.Config.NROSchedObj.Name)
-			Expect(nroSchedObj).ToNot(BeNil())
 		})
 
 		It("[case:1][test_id:47593] should keep existing workloads running", Label(label.Tier1), func() {
@@ -161,7 +159,6 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 
 			restoreScheduler(fxt, nroSchedObj)
 			nroSchedObj = nrosched.CheckNROSchedulerAvailable(ctx, fxt.Client, nroSchedObj.Name)
-			Expect(nroSchedObj).ToNot(BeNil())
 
 			By(fmt.Sprintf("waiting for the test deployment %q to become complete and ready", updatedDp.Name))
 			_, err = wait.With(fxt.Client).Interval(2*time.Second).Interval(30*time.Second).ForDeploymentComplete(ctx, updatedDp)
