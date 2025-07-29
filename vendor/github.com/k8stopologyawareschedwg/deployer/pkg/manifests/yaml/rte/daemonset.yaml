@@ -15,6 +15,7 @@ spec:
       - conditionType: "PodresourcesFetched"
       - conditionType: "NodeTopologyUpdated"
       serviceAccountName: rte
+      priorityClassName: system-node-critical
       containers:
       - name: resource-topology-exporter
         image: quay.io/k8stopologyawareschedwg/resource-topology-exporter:latest
