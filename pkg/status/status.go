@@ -18,6 +18,7 @@ package status
 
 import (
 	"errors"
+	"reflect"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -57,6 +58,16 @@ func IsUpdatedNUMAResourcesOperator(oldStatus, newStatus *nropv1.NUMAResourcesOp
 	}
 
 	return !cmp.Equal(newStatus, oldStatus, options...)
+}
+
+func NUMAResourcesSchedulerNeedsUpdate(oldStatus, newStatus nropv1.NUMAResourcesSchedulerStatus) bool {
+	os := oldStatus.DeepCopy()
+	ns := newStatus.DeepCopy()
+
+	resetIncomparableConditionFields(os.Conditions)
+	resetIncomparableConditionFields(ns.Conditions)
+
+	return !reflect.DeepEqual(os, ns)
 }
 
 // UpdateConditions compute new conditions based on arguments, and then compare with given current conditions.
