@@ -17,12 +17,12 @@ limitations under the License.
 package status
 
 import (
+	"reflect"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
 // TODO: are we duping these?
@@ -37,15 +37,29 @@ const (
 	ConditionTypeIncorrectNUMAResourcesOperatorResourceName = "IncorrectNUMAResourcesOperatorResourceName"
 )
 
-func GetUpdatedConditions(currentConditions []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
+func NUMAResourcesSchedulerNeedsUpdate(oldStatus, newStatus nropv1.NUMAResourcesSchedulerStatus) bool {
+	os := oldStatus.DeepCopy()
+	ns := newStatus.DeepCopy()
+
+	resetIncomparableConditionFields(os.Conditions)
+	resetIncomparableConditionFields(ns.Conditions)
+
+	return !reflect.DeepEqual(os, ns)
+}
+
+// UpdateConditions compute new conditions based on arguments, and then compare with given current conditions.
+// Returns the conditions to use, either current or newly computed, and a boolean flag which is `true` if conditions need
+// update - so if they are updated since the current conditions.
+func UpdateConditions(currentConditions []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
 	conditions := NewConditions(condition, reason, message)
 
-	options := []cmp.Option{
-		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime"),
-		cmpopts.IgnoreFields(metav1.Condition{}, "ObservedGeneration"),
-	}
+	cond := CloneConditions(conditions)
+	curCond := CloneConditions(currentConditions)
 
-	if cmp.Equal(conditions, currentConditions, options...) {
+	resetIncomparableConditionFields(cond)
+	resetIncomparableConditionFields(curCond)
+
+	if reflect.DeepEqual(cond, curCond) {
 		return currentConditions, false
 	}
 	return conditions, true
@@ -115,4 +129,17 @@ type ErrResourcesNotReady struct {
 
 func (e ErrResourcesNotReady) Error() string {
 	return e.Message
+}
+
+func resetIncomparableConditionFields(conditions []metav1.Condition) {
+	for idx := range conditions {
+		conditions[idx].LastTransitionTime = metav1.Time{}
+		conditions[idx].ObservedGeneration = 0
+	}
+}
+
+func CloneConditions(conditions []metav1.Condition) []metav1.Condition {
+	var c = make([]metav1.Condition, len(conditions))
+	copy(c, conditions)
+	return c
 }
