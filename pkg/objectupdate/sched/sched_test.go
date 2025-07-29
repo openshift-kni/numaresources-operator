@@ -25,11 +25,13 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 )
@@ -413,6 +415,114 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSchedulerResourcesRequest(t *testing.T) {
+	type testCase struct {
+		name       string
+		inst       nropv1.NUMAResourcesScheduler
+		initialDp  *appsv1.Deployment
+		expectedRR corev1.ResourceRequirements
+	}
+
+	testCases := []testCase{
+		{
+			name:      "defaults with nil annotations",
+			inst:      nropv1.NUMAResourcesScheduler{},
+			initialDp: dpMinimal,
+			expectedRR: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource(t, "600m"),
+					corev1.ResourceMemory: mustParseResource(t, "1200Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource(t, "600m"),
+					corev1.ResourceMemory: mustParseResource(t, "1200Mi"),
+				},
+			},
+		},
+		{
+			name: "defaults with empty annotations",
+			inst: nropv1.NUMAResourcesScheduler{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{},
+				},
+			},
+			initialDp: dpMinimal,
+			expectedRR: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource(t, "600m"),
+					corev1.ResourceMemory: mustParseResource(t, "1200Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource(t, "600m"),
+					corev1.ResourceMemory: mustParseResource(t, "1200Mi"),
+				},
+			},
+		},
+		{
+			name: "defaults with explicit guarantees",
+			inst: nropv1.NUMAResourcesScheduler{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotations.SchedulerQOSRequestAnnotation: "guaranteed",
+					},
+				},
+			},
+			initialDp: dpMinimal,
+			expectedRR: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource(t, "600m"),
+					corev1.ResourceMemory: mustParseResource(t, "1200Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource(t, "600m"),
+					corev1.ResourceMemory: mustParseResource(t, "1200Mi"),
+				},
+			},
+		},
+		{
+			name: "request burstable QoS explicitly",
+			inst: nropv1.NUMAResourcesScheduler{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotations.SchedulerQOSRequestAnnotation: "burstable",
+					},
+				},
+			},
+			initialDp: dpMinimal,
+			expectedRR: corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource(t, "150m"),
+					corev1.ResourceMemory: mustParseResource(t, "500Mi"),
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dp := tc.initialDp.DeepCopy()
+			err := SchedulerResourcesRequest(dp, &tc.inst)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			rr := dp.Spec.Template.Spec.Containers[0].Resources // shortcut
+			// TODO: don't assume the container ordering
+			if !reflect.DeepEqual(rr, tc.expectedRR) {
+				t.Errorf("got=%s expected %s", toJSON(rr), toJSON(tc.expectedRR))
+			}
+		})
+	}
+}
+
+func mustParseResource(t *testing.T, v string) resource.Quantity {
+	t.Helper()
+	qty, err := resource.ParseQuantity(v)
+	if err != nil {
+		t.Fatalf("cannot parse %q: %v", v, err)
+	}
+	return qty
 }
 
 func toJSON(obj interface{}) string {
