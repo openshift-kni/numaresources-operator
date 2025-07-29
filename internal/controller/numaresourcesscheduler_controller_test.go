@@ -825,8 +825,6 @@ var _ = ginkgo.Describe("Test scheduler spec platformNormalize", func() {
 		})
 
 		ginkgo.It("should not override default informer if kubelet is not fixed - version is less than first supported (zstream)", func() {
-			// this is only for testing purposes as there is plan to backport the fix to older minor versions
-			// will need to remove this test if the fix is supported starting the first zstream of the release
 			v, _ := platform.ParseVersion("4.19.8")
 			spec := nropv1.NUMAResourcesSchedulerSpec{}
 			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
