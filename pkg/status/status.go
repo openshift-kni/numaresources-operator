@@ -58,6 +58,16 @@ func NUMAResourceOperatorNeedsUpdate(oldStatus, newStatus *nropv1.NUMAResourcesO
 	return !reflect.DeepEqual(os, ns)
 }
 
+func NUMAResourcesSchedulerNeedsUpdate(oldStatus, newStatus nropv1.NUMAResourcesSchedulerStatus) bool {
+	os := oldStatus.DeepCopy()
+	ns := newStatus.DeepCopy()
+
+	resetIncomparableConditionFields(os.Conditions)
+	resetIncomparableConditionFields(ns.Conditions)
+
+	return !reflect.DeepEqual(os, ns)
+}
+
 // UpdateConditions compute new conditions based on arguments, and then compare with given current conditions.
 // Returns the conditions to use, either current or newly computed, and a boolean flag which is `true` if conditions need
 // update - so if they are updated since the current conditions.
