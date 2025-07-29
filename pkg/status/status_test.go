@@ -111,7 +111,7 @@ func TestUpdateConditions(t *testing.T) {
 	}
 }
 
-func TestIsUpdatedNUMAResourcesOperator(t *testing.T) {
+func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 	type testCase struct {
 		name            string
 		oldStatus       *nropv1.NUMAResourcesOperatorStatus
@@ -183,7 +183,7 @@ func TestIsUpdatedNUMAResourcesOperator(t *testing.T) {
 			oldStatus := tc.oldStatus.DeepCopy()
 			newStatus := tc.oldStatus.DeepCopy()
 			tc.updaterFunc(newStatus)
-			got := IsUpdatedNUMAResourcesOperator(oldStatus, newStatus)
+			got := NUMAResourceOperatorNeedsUpdate(oldStatus, newStatus)
 			if got != tc.expectedUpdated {
 				t.Errorf("isUpdated %v expected %v", got, tc.expectedUpdated)
 			}
