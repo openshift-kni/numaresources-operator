@@ -818,14 +818,14 @@ var _ = ginkgo.Describe("Test scheduler spec PreNormalize", func() {
 		})
 
 		ginkgo.It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (zstream)", func() {
-			v, _ := platform.ParseVersion("4.20.1000")
+			v, _ := platform.ParseVersion("4.19.1000")
 			spec := nropv1.NUMAResourcesSchedulerSpec{}
 			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
 			gomega.Expect(*spec.SchedulerInformer).To(gomega.Equal(nropv1.SchedulerInformerShared))
 		})
 
 		ginkgo.It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (ystream)", func() {
-			v, _ := platform.ParseVersion("4.21.0")
+			v, _ := platform.ParseVersion("4.20.0")
 			spec := nropv1.NUMAResourcesSchedulerSpec{}
 			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
 			gomega.Expect(*spec.SchedulerInformer).To(gomega.Equal(nropv1.SchedulerInformerShared))
@@ -834,7 +834,7 @@ var _ = ginkgo.Describe("Test scheduler spec PreNormalize", func() {
 		ginkgo.It("should not override default informer if kubelet is not fixed - version is less than first supported (zstream)", func() {
 			// this is only for testing purposes as there is plan to backport the fix to older minor versions
 			// will need to remove this test if the fix is supported starting the first zstream of the release
-			v, _ := platform.ParseVersion("4.20.0")
+			v, _ := platform.ParseVersion("4.19.0")
 			spec := nropv1.NUMAResourcesSchedulerSpec{}
 			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
 			gomega.Expect(spec.SchedulerInformer).To(gomega.BeNil())
