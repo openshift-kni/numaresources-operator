@@ -50,6 +50,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
+	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -226,6 +227,18 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(ok).To(BeTrue())
 			Expect(annot).To(BeEquivalentTo(hash.ConfigMapData(cm2)), "plain text data: %s", cm2.Data)
 		})
+
+		It("RTE ds should have the correct priority class", func() {
+			dsKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
+
+			Expect(ds.Spec.Template.Spec.PriorityClassName).To(Equal(nrosched.SchedulerPriorityClassName))
+		})
+
 		When("a NodeGroup is deleted", func() {
 			BeforeEach(func() {
 				// check we have at least two NodeGroups
