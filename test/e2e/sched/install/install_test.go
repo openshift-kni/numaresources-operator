@@ -110,7 +110,7 @@ var _ = Describe("[Scheduler] install", func() {
 			}
 
 			By("checking the NumaResourcesScheduler CRD is deployed")
-			_, err = crds.GetByName(e2eclient.Client, crds.CrdNROSName)
+			_, err = crds.GetNRS(context.TODO(), e2eclient.Client)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking deployment has number of replicas equal to number of control plane nodes")

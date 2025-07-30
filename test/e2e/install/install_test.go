@@ -106,11 +106,11 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 			Expect(err).ToNot(HaveOccurred(), "NRO never reported available")
 
 			By("checking the NRT CRD is deployed")
-			_, err = crds.GetByName(e2eclient.Client, crds.CrdNRTName)
+			_, err = crds.GetNRT(ctx, e2eclient.Client)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("checking the NRO CRD is deployed")
-			_, err = crds.GetByName(e2eclient.Client, crds.CrdNROName)
+			_, err = crds.GetNRO(ctx, e2eclient.Client)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("checking Daemonset is up&running")

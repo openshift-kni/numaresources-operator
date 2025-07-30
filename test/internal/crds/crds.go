@@ -25,16 +25,25 @@ import (
 )
 
 const (
-	CrdNRTName  = "noderesourcetopologies.topology.node.k8s.io"
-	CrdNROName  = "numaresourcesoperators.nodetopology.openshift.io"
-	CrdNROSName = "numaresourcesschedulers.nodetopology.openshift.io"
+	NRTName = "noderesourcetopologies.topology.node.k8s.io"
+	NROName = "numaresourcesoperators.nodetopology.openshift.io"
+	NRSName = "numaresourcesschedulers.nodetopology.openshift.io"
 )
 
-func GetByName(aclient client.Client, crdName string) (*apiextensionv1.CustomResourceDefinition, error) {
-	crd := &apiextensionv1.CustomResourceDefinition{}
-	key := client.ObjectKey{
-		Name: crdName,
-	}
-	err := aclient.Get(context.TODO(), key, crd)
-	return crd, err
+func GetNRT(ctx context.Context, cli client.Client) (*apiextensionv1.CustomResourceDefinition, error) {
+	return getByName(ctx, cli, NRTName)
+}
+
+func GetNRO(ctx context.Context, cli client.Client) (*apiextensionv1.CustomResourceDefinition, error) {
+	return getByName(ctx, cli, NROName)
+}
+
+func GetNRS(ctx context.Context, cli client.Client) (*apiextensionv1.CustomResourceDefinition, error) {
+	return getByName(ctx, cli, NRSName)
+}
+
+func getByName(ctx context.Context, cli client.Client, crdName string) (*apiextensionv1.CustomResourceDefinition, error) {
+	crd := apiextensionv1.CustomResourceDefinition{}
+	err := cli.Get(ctx, client.ObjectKey{Name: crdName}, &crd)
+	return &crd, err
 }
