@@ -59,7 +59,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("with a running cluster with all the components", func() {
+var _ = Describe("[nrop] with a running cluster with all the components", func() {
 	When("[config][rte] NRO CR configured with LogLevel", func() {
 		timeout := 30 * time.Second
 		interval := 5 * time.Second
