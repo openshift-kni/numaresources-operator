@@ -71,8 +71,7 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 
 		It("should have the corresponding klog under RTE container", func(ctx context.Context) {
 			nropObj := &nropv1.NUMAResourcesOperator{}
-			err := clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)).Should(Succeed())
 
 			Eventually(func() bool {
 				rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
@@ -106,12 +105,10 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 
 		It("can modify the LogLevel in NRO CR and klog under RTE container should change respectively", func(ctx context.Context) {
 			nropObj := &nropv1.NUMAResourcesOperator{}
-			err := clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)).Should(Succeed())
 
 			nropObj.Spec.LogLevel = operatorv1.Trace
-			err = clients.Client.Update(ctx, nropObj)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(clients.Client.Update(ctx, nropObj)).Should(Succeed())
 
 			Eventually(func() bool {
 				rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
@@ -148,8 +145,7 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 	When("[config][kubelet][rte] Kubelet Config includes reservations", func() {
 		It("should configure RTE accordingly", func(ctx context.Context) {
 			nropObj := &nropv1.NUMAResourcesOperator{}
-			err := clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)).Should(Succeed())
 			Expect(nropObj.Status.DaemonSets).ToNot(BeEmpty())
 			dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
 			Expect(reflect.DeepEqual(nropObj.Status.DaemonSets, dssFromNodeGroupStatus)).To(BeTrue())
@@ -161,13 +157,11 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 			klog.InfoS("Using NRO namespace", "namespace", namespace)
 
 			mcpList := &mcov1.MachineConfigPoolList{}
-			err = clients.Client.List(ctx, mcpList)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(clients.Client.List(ctx, mcpList)).Should(Succeed())
 			klog.InfoS("detected MCPs", "count", len(mcpList.Items))
 
 			mcoKcList := &mcov1.KubeletConfigList{}
-			err = clients.Client.List(ctx, mcoKcList)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(clients.Client.List(ctx, mcoKcList)).Should(Succeed())
 			for _, mcoKc := range mcoKcList.Items {
 				By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
 
@@ -197,8 +191,7 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 
 		It("should keep the ConfigMap aligned with the KubeletConfig info", func(ctx context.Context) {
 			nropObj := &nropv1.NUMAResourcesOperator{}
-			err := clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)).Should(Succeed())
 			Expect(nropObj.Status.DaemonSets).ToNot(BeEmpty())
 			dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
 			Expect(reflect.DeepEqual(nropObj.Status.DaemonSets, dssFromNodeGroupStatus)).To(BeTrue())
@@ -210,13 +203,11 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 			klog.InfoS("Using NRO namespace", "namespace", namespace)
 
 			mcpList := &mcov1.MachineConfigPoolList{}
-			err = clients.Client.List(ctx, mcpList)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(clients.Client.List(ctx, mcpList)).Should(Succeed())
 			klog.InfoS("detected MCPs", "count", len(mcpList.Items))
 
 			mcoKcList := &mcov1.KubeletConfigList{}
-			err = clients.Client.List(ctx, mcoKcList)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(clients.Client.List(ctx, mcoKcList)).Should(Succeed())
 
 			// pick the first for the sake of brevity
 			mcoKc := mcoKcList.Items[0]
@@ -258,8 +249,7 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 
 	It("[rte][podfingerprint] should expose the pod set fingerprint in NRT objects", func(ctx context.Context) {
 		nrtList := &nrtv1alpha2.NodeResourceTopologyList{}
-		err := clients.Client.List(ctx, nrtList)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(clients.Client.List(ctx, nrtList)).Should(Succeed())
 
 		for _, nrt := range nrtList.Items {
 			pfp, ok := nrt.Annotations[podfingerprint.Annotation]
@@ -272,8 +262,7 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 
 	It("[rte][podfingerprint] should expose the pod set fingerprint status on each worker", func(ctx context.Context) {
 		nropObj := &nropv1.NUMAResourcesOperator{}
-		err := clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
-		Expect(err).ToNot(HaveOccurred())
+		Expect(clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)).Should(Succeed())
 
 		rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
 		Expect(err).ToNot(HaveOccurred())
@@ -301,8 +290,7 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 				Expect(err).ToNot(HaveOccurred(), "err=%v stderr=%s", err, stderr)
 
 				var st podfingerprint.Status
-				err = json.Unmarshal(stdout, &st)
-				Expect(err).ToNot(HaveOccurred())
+				Expect(json.Unmarshal(stdout, &st)).Should(Succeed())
 
 				klog.InfoS("got status", "podNamespace", rtePod.Namespace, "podName", rtePod.Name, "containerName", rteCnt.Name, "fingerprintComputed", st.FingerprintComputed, "podCount", len(st.Pods))
 
