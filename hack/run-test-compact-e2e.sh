@@ -27,6 +27,18 @@ rte/hack/check-ds.sh oc sampledevices device-plugin-a-ds
 echo "Running Functional Tests: ${GINKGO_SUITS}"
 ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.flake-attempts=2 --ginkgo.junit-report=${REPORT_DIR}/e2e-sched.xml
 
+echo "Running RTE tests"
+export E2E_TOPOLOGY_MANAGER_POLICY="${E2E_TOPOLOGY_MANAGER_POLICY}"
+export E2E_TOPOLOGY_MANAGER_SCOPE="${E2E_TOPOLOGY_MANAGER_SCOPE}"
+# -v: print out the text and location for each spec before running it and flush output to stdout in realtime
+# -timeout: exit the suite after the specified time
+# -r: run suites recursively
+# --fail-fast: ginkgo will stop the suite right after the first spec failure
+# --flake-attempts: rerun the test if it fails
+# -requireSuite: fail if tests are not executed because of missing suite
+echo "TM config policy=[${E2E_TOPOLOGY_MANAGER_POLICY}] scope=[${E2E_TOPOLOGY_MANAGER_SCOPE}]"
+${BIN_DIR}/e2e-nrop-rte.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.flake-attempts=2 --ginkgo.junit-report=${REPORT_DIR}/e2e.xml --ginkgo.skip='\[Disruptive\]|\[StateDirectories\]|\[NodeRefresh\]|\[local\]' --ginkgo.focus='\[release\]\[nrop\]'
+
 if [ "$ENABLE_CLEANUP" = true ]; then
   echo "Undeploying sample devices for RTE tests"
   rte/hack/undeploy-devices.sh
