@@ -61,8 +61,14 @@ import (
 
 var _ = Describe("[nrop] with a running cluster with all the components", func() {
 	When("[config][rte] NRO CR configured with LogLevel", func() {
-		timeout := 30 * time.Second
-		interval := 5 * time.Second
+		var timeout time.Duration
+		var interval time.Duration
+
+		BeforeEach(func() {
+			timeout = 30 * time.Second
+			interval = 5 * time.Second
+		})
+
 		It("should have the corresponding klog under RTE container", func() {
 			nropObj := &nropv1.NUMAResourcesOperator{}
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
