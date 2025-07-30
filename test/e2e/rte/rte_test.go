@@ -69,9 +69,9 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 			interval = 5 * time.Second
 		})
 
-		It("should have the corresponding klog under RTE container", func() {
+		It("should have the corresponding klog under RTE container", func(ctx context.Context) {
 			nropObj := &nropv1.NUMAResourcesOperator{}
-			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
+			err := clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() bool {
@@ -104,13 +104,13 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 			}).WithTimeout(timeout).WithPolling(interval).Should(BeTrue())
 		})
 
-		It("can modify the LogLevel in NRO CR and klog under RTE container should change respectively", func() {
+		It("can modify the LogLevel in NRO CR and klog under RTE container should change respectively", func(ctx context.Context) {
 			nropObj := &nropv1.NUMAResourcesOperator{}
-			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
+			err := clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			nropObj.Spec.LogLevel = operatorv1.Trace
-			err = clients.Client.Update(context.TODO(), nropObj)
+			err = clients.Client.Update(ctx, nropObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() bool {
@@ -146,9 +146,9 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 	})
 
 	When("[config][kubelet][rte] Kubelet Config includes reservations", func() {
-		It("should configure RTE accordingly", func() {
+		It("should configure RTE accordingly", func(ctx context.Context) {
 			nropObj := &nropv1.NUMAResourcesOperator{}
-			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
+			err := clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(nropObj.Status.DaemonSets).ToNot(BeEmpty())
 			dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
@@ -161,12 +161,12 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 			klog.InfoS("Using NRO namespace", "namespace", namespace)
 
 			mcpList := &mcov1.MachineConfigPoolList{}
-			err = clients.Client.List(context.TODO(), mcpList)
+			err = clients.Client.List(ctx, mcpList)
 			Expect(err).ToNot(HaveOccurred())
 			klog.InfoS("detected MCPs", "count", len(mcpList.Items))
 
 			mcoKcList := &mcov1.KubeletConfigList{}
-			err = clients.Client.List(context.TODO(), mcoKcList)
+			err = clients.Client.List(ctx, mcoKcList)
 			Expect(err).ToNot(HaveOccurred())
 			for _, mcoKc := range mcoKcList.Items {
 				By(fmt.Sprintf("Considering MCO KubeletConfig %q", mcoKc.Name))
@@ -183,7 +183,7 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 
 				generatedName := objectnames.GetComponentName(nropObj.Name, mcp.Name)
 				klog.InfoS("generated config map", "name", generatedName)
-				cm, err := clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
+				cm, err := clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(ctx, generatedName, metav1.GetOptions{})
 				Expect(err).ToNot(HaveOccurred())
 
 				rc, err := rteConfigMapToRTEConfig(cm)
@@ -195,9 +195,9 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 			}
 		})
 
-		It("should keep the ConfigMap aligned with the KubeletConfig info", func() {
+		It("should keep the ConfigMap aligned with the KubeletConfig info", func(ctx context.Context) {
 			nropObj := &nropv1.NUMAResourcesOperator{}
-			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
+			err := clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(nropObj.Status.DaemonSets).ToNot(BeEmpty())
 			dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
@@ -210,12 +210,12 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 			klog.InfoS("Using NRO namespace", "namespace", namespace)
 
 			mcpList := &mcov1.MachineConfigPoolList{}
-			err = clients.Client.List(context.TODO(), mcpList)
+			err = clients.Client.List(ctx, mcpList)
 			Expect(err).ToNot(HaveOccurred())
 			klog.InfoS("detected MCPs", "count", len(mcpList.Items))
 
 			mcoKcList := &mcov1.KubeletConfigList{}
-			err = clients.Client.List(context.TODO(), mcoKcList)
+			err = clients.Client.List(ctx, mcoKcList)
 			Expect(err).ToNot(HaveOccurred())
 
 			// pick the first for the sake of brevity
@@ -231,7 +231,7 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 
 			generatedName := objectnames.GetComponentName(nropObj.Name, mcp.Name)
 			klog.InfoS("generated config map", "name", generatedName)
-			cm, err := clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
+			cm, err := clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(ctx, generatedName, metav1.GetOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			desiredMapState := make(map[string]string)
@@ -240,11 +240,11 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 			}
 
 			cm.Data = nil
-			cm, err = clients.K8sClient.CoreV1().ConfigMaps(namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
+			cm, err = clients.K8sClient.CoreV1().ConfigMaps(namespace).Update(ctx, cm, metav1.UpdateOptions{})
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() bool {
-				cm, err = clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
+				cm, err = clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(ctx, generatedName, metav1.GetOptions{})
 				Expect(err).ToNot(HaveOccurred())
 
 				if !reflect.DeepEqual(cm.Data, desiredMapState) {
@@ -256,9 +256,9 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 		})
 	})
 
-	It("[rte][podfingerprint] should expose the pod set fingerprint in NRT objects", func() {
+	It("[rte][podfingerprint] should expose the pod set fingerprint in NRT objects", func(ctx context.Context) {
 		nrtList := &nrtv1alpha2.NodeResourceTopologyList{}
-		err := clients.Client.List(context.TODO(), nrtList)
+		err := clients.Client.List(ctx, nrtList)
 		Expect(err).ToNot(HaveOccurred())
 
 		for _, nrt := range nrtList.Items {
@@ -270,9 +270,9 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 		}
 	})
 
-	It("[rte][podfingerprint] should expose the pod set fingerprint status on each worker", func() {
+	It("[rte][podfingerprint] should expose the pod set fingerprint status on each worker", func(ctx context.Context) {
 		nropObj := &nropv1.NUMAResourcesOperator{}
-		err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
+		err := clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 		Expect(err).ToNot(HaveOccurred())
 
 		rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
@@ -282,7 +282,7 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 		for _, rteDs := range rteDss {
 			By(fmt.Sprintf("checking DS: %s/%s status=[%v]", rteDs.Namespace, rteDs.Name, toJSON(rteDs.Status)))
 
-			rtePods, err := podlist.With(clients.Client).ByDaemonset(context.TODO(), rteDs)
+			rtePods, err := podlist.With(clients.Client).ByDaemonset(ctx, rteDs)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(rtePods).ToNot(BeEmpty(), "no RTE pods found for %s/%s", rteDs.Namespace, rteDs.Name)
 
@@ -294,7 +294,7 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 
 				// TODO: hardcoded path. Any smarter option?
 				cmd := []string{"/bin/cat", "/run/pfpstatus/dump.json"}
-				stdout, stderr, err := remoteexec.CommandOnPod(context.Background(), clients.K8sClient, &rtePod, cmd...)
+				stdout, stderr, err := remoteexec.CommandOnPod(ctx, clients.K8sClient, &rtePod, cmd...)
 				if err != nil {
 					_ = objects.LogEventsForPod(clients.K8sClient, rtePod.Namespace, rtePod.Name)
 				}
