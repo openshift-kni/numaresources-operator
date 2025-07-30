@@ -24,10 +24,8 @@ import (
 	"strings"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
@@ -74,7 +72,7 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 			Expect(clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)).Should(Succeed())
 
 			Eventually(func() bool {
-				rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
+				rteDss, err := objects.GetDaemonSetsOwnedBy(clients.Client, nropObj.ObjectMeta)
 				if err != nil {
 					klog.ErrorS(err, "failed to get the owned DaemonSets")
 					return false
@@ -111,7 +109,7 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 			Expect(clients.Client.Update(ctx, nropObj)).Should(Succeed())
 
 			Eventually(func() bool {
-				rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
+				rteDss, err := objects.GetDaemonSetsOwnedBy(clients.Client, nropObj.ObjectMeta)
 				if err != nil {
 					klog.ErrorS(err, "failed to get the owned DaemonSets")
 					return false
@@ -264,14 +262,14 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 		nropObj := &nropv1.NUMAResourcesOperator{}
 		Expect(clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)).Should(Succeed())
 
-		rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
+		rteDss, err := objects.GetDaemonSetsOwnedBy(clients.Client, nropObj.ObjectMeta)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(rteDss).ToNot(BeEmpty(), "no RTE DS found")
 
 		for _, rteDs := range rteDss {
 			By(fmt.Sprintf("checking DS: %s/%s status=[%v]", rteDs.Namespace, rteDs.Name, toJSON(rteDs.Status)))
 
-			rtePods, err := podlist.With(clients.Client).ByDaemonset(ctx, rteDs)
+			rtePods, err := podlist.With(clients.Client).ByDaemonset(ctx, *rteDs)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(rtePods).ToNot(BeEmpty(), "no RTE pods found for %s/%s", rteDs.Namespace, rteDs.Name)
 
@@ -300,22 +298,6 @@ var _ = Describe("[nrop] with a running cluster with all the components", func()
 		}
 	})
 })
-
-func getOwnedDss(cs kubernetes.Interface, owner metav1.ObjectMeta) ([]appsv1.DaemonSet, error) {
-	dss, err := cs.AppsV1().DaemonSets("").List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	// multiple DaemonSets in case of multiple nodeGroups
-	var rteDss []appsv1.DaemonSet
-	for _, ds := range dss.Items {
-		if objects.IsOwnedBy(ds.ObjectMeta, owner) {
-			rteDss = append(rteDss, ds)
-		}
-	}
-	return rteDss, nil
-}
 
 func matchLogLevelToKlog(cnt *corev1.Container, level operatorv1.LogLevel) (bool, bool) {
 	rteFlags := flagcodec.ParseArgvKeyValue(cnt.Args, flagcodec.WithFlagNormalization)
