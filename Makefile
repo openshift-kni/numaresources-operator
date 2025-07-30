@@ -136,6 +136,9 @@ test-controllers: envtest generate-source
 test-e2e: build-e2e-all
 	ENABLE_SCHED_TESTS=true hack/run-test-e2e.sh
 
+test-compact-e2e: build-e2e-all
+	hack/run-test-compact-e2e.sh
+
 test-install-e2e: build-e2e-all
 	hack/run-test-install-e2e.sh
 
