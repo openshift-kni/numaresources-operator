@@ -74,18 +74,18 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 		initialized = true
 	})
 
-	Context("with a running cluster with all the components", func() {
+	Context("with a running cluster with all the components", func(ctx context.Context) {
 		It("[test_id:47574] should perform overall deployment and verify the condition is reported as available", Label(label.Tier0), func() {
 			deployer := deploy.NewForPlatform(configuration.Plat)
-			nroObj := deployer.Deploy(context.TODO(), configuration.MachineConfigPoolUpdateTimeout)
+			nroObj := deployer.Deploy(ctx, configuration.MachineConfigPoolUpdateTimeout)
 			nname := client.ObjectKeyFromObject(nroObj)
 			Expect(nname.Name).ToNot(BeEmpty())
 
 			By("checking that the condition Available=true")
 			updatedNROObj := &nropv1.NUMAResourcesOperator{}
 			immediate := true
-			err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, immediate, func(ctx context.Context) (bool, error) {
-				err := e2eclient.Client.Get(ctx, nname, updatedNROObj)
+			err := wait.PollUntilContextTimeout(ctx, 10*time.Second, 5*time.Minute, immediate, func(ctx2 context.Context) (bool, error) {
+				err := e2eclient.Client.Get(ctx2, nname, updatedNROObj)
 				if err != nil {
 					klog.ErrorS(err, "failed to get the NRO resource")
 					return false, err
@@ -101,7 +101,7 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 				return cond.Status == metav1.ConditionTrue, nil
 			})
 			if err != nil {
-				logRTEPodsLogs(e2eclient.Client, e2eclient.K8sClient, context.TODO(), updatedNROObj, "NRO never reported available")
+				logRTEPodsLogs(e2eclient.Client, e2eclient.K8sClient, ctx, updatedNROObj, "NRO never reported available")
 			}
 			Expect(err).ToNot(HaveOccurred(), "NRO never reported available")
 
