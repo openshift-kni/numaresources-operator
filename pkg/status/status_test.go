@@ -25,6 +25,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -111,7 +112,7 @@ func TestUpdateConditions(t *testing.T) {
 	}
 }
 
-func TestIsUpdatedNUMAResourcesOperator(t *testing.T) {
+func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 	type testCase struct {
 		name            string
 		oldStatus       *nropv1.NUMAResourcesOperatorStatus
@@ -183,7 +184,59 @@ func TestIsUpdatedNUMAResourcesOperator(t *testing.T) {
 			oldStatus := tc.oldStatus.DeepCopy()
 			newStatus := tc.oldStatus.DeepCopy()
 			tc.updaterFunc(newStatus)
-			got := IsUpdatedNUMAResourcesOperator(oldStatus, newStatus)
+			got := NUMAResourceOperatorNeedsUpdate(oldStatus, newStatus)
+			if got != tc.expectedUpdated {
+				t.Errorf("isUpdated %v expected %v", got, tc.expectedUpdated)
+			}
+		})
+	}
+}
+
+func TestNUMAResourcesSchedulerNeedsUpdate(t *testing.T) {
+	type testCase struct {
+		name            string
+		oldStatus       nropv1.NUMAResourcesSchedulerStatus
+		updaterFunc     func(*nropv1.NUMAResourcesSchedulerStatus)
+		expectedUpdated bool
+	}
+	testCases := []testCase{
+		{
+			name:            "empty status, no change",
+			oldStatus:       nropv1.NUMAResourcesSchedulerStatus{},
+			updaterFunc:     func(st *nropv1.NUMAResourcesSchedulerStatus) {},
+			expectedUpdated: false,
+		},
+		{
+			name: "status, conditions, updated only time",
+			oldStatus: nropv1.NUMAResourcesSchedulerStatus{
+				Conditions: NewConditions(ConditionAvailable, "test all good", "testing info"),
+			},
+			updaterFunc: func(st *nropv1.NUMAResourcesSchedulerStatus) {
+				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
+				st.Conditions = NewConditions(ConditionAvailable, "test all good", "testing info")
+			},
+			expectedUpdated: false,
+		},
+		{
+			name: "status, conditions, updated only time, other fields changed",
+			oldStatus: nropv1.NUMAResourcesSchedulerStatus{
+				Conditions: NewConditions(ConditionAvailable, "test all good", "testing info"),
+			},
+			updaterFunc: func(st *nropv1.NUMAResourcesSchedulerStatus) {
+				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
+				st.Conditions = NewConditions(ConditionAvailable, "test all good", "testing info")
+				st.CacheResyncPeriod = ptr.To(metav1.Duration{Duration: 42 * time.Second})
+			},
+			expectedUpdated: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			oldStatus := *tc.oldStatus.DeepCopy()
+			newStatus := *tc.oldStatus.DeepCopy()
+			tc.updaterFunc(&newStatus)
+			got := NUMAResourcesSchedulerNeedsUpdate(oldStatus, newStatus)
 			if got != tc.expectedUpdated {
 				t.Errorf("isUpdated %v expected %v", got, tc.expectedUpdated)
 			}

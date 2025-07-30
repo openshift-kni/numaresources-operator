@@ -179,7 +179,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.degradeStatus(ctx, instance, tolerable.Reason, tolerable.Error)
 	}
 
-	if !status.IsUpdatedNUMAResourcesOperator(curStatus, &instance.Status) {
+	if !status.NUMAResourceOperatorNeedsUpdate(curStatus, &instance.Status) {
 		return step.Result, step.Error
 	}
 
