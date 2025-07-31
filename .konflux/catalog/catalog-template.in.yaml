@@ -45,6 +45,9 @@ entries:
       - name: numaresources-operator.v4.12.14
         replaces: numaresources-operator.v4.12.13
         skipRange: '>=4.11.0 <4.12.14'
+      - name: numaresources-operator.v4.12.15
+        replaces: numaresources-operator.v4.12.14
+        skipRange: '>=4.11.0 <4.12.15'
     name: "4.12"
     package: numaresources-operator
     schema: olm.channel
@@ -86,5 +89,5 @@ entries:
     schema: olm.bundle
     # v4.12.15 bundle
     # The url for this last entry is updated by hack/konflux-update-catalog-template.sh automatically
-  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-12:ce485b8905d599f5118571b8b8bb4c3dcaa19e91
+  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-12@sha256:4097cb4e203a4a128f98dcff2c86547d68854a3d52cec7700926520896bb340c
     schema: olm.bundle
