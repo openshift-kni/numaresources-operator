@@ -45,6 +45,9 @@ entries:
       - name: numaresources-operator.v4.12.14
         replaces: numaresources-operator.v4.12.13
         skipRange: '>=4.11.0 <4.12.14'
+      - name: numaresources-operator.v4.12.15
+        replaces: numaresources-operator.v4.12.14
+        skipRange: '>=4.11.0 <4.12.15'
     name: "4.12"
     package: numaresources-operator
     schema: olm.channel
