@@ -14,7 +14,7 @@ metadata:
         '.tekton/fbc-pipeline.yaml'.pathChanged() ||
         '.tekton/images-mirror-set.yaml'.pathChanged() ||
         '.tekton/numaresources-operator-fbc-4-12-push.yaml'.pathChanged() ||
-        '.konflux/catalog/***.conf'.pathChanged() ||
+        '.konflux/catalog/bundle.builds.in.yaml'.pathChanged() ||
         '.konflux/Dockerfile.catalog'.pathChanged()
       )
   creationTimestamp: null
