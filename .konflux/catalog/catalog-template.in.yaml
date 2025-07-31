@@ -29,5 +29,5 @@ entries:
     schema: olm.bundle
     # v4.18.2 bundle
     # The url for this last entry is updated by hack/konflux-update-catalog-template.sh automatically
-  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-18:0cb44a401e64bb2b50e89ee985197e0de72b0a93
+  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-18@sha256:cefa88c416f5a38c560a35ed1df5335d887e4b1833719647a069e0f51a30b4d2
     schema: olm.bundle
