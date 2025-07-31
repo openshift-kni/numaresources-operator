@@ -1,2 +1,2 @@
 ---
-quay: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-15:e7a7dc36c473b2fbe5d53093ec12949fc82bc078
+quay: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-15@sha256:57ce286d05f91d73a477729abe15c89e0a8244116bf0d382bcb7c1e48055aedf
