@@ -512,9 +512,14 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	klog.V(4).InfoS("RTESync start", "trees", len(trees))
 	defer klog.V(4).Info("RTESync stop")
 
-	err := dangling.DeleteUnusedDaemonSets(r.Client, ctx, instance, trees)
+	activeDaemonSets, err := dangling.DeleteUnusedDaemonSets(r.Client, ctx, instance, trees)
 	if err != nil {
 		klog.ErrorS(err, "failed to deleted unused daemonsets")
+	}
+
+	err = dangling.DeleteUnusedNodeResourcesTopologies(r.Client, ctx, activeDaemonSets)
+	if err != nil {
+		klog.ErrorS(err, "failed to deleted unused noderesourcestopologies")
 	}
 
 	if r.Platform == platform.OpenShift {
