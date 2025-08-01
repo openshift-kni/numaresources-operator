@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"time"
 
 	igntypes "github.com/coreos/ignition/v2/config/v3_2/types"
@@ -1322,6 +1323,146 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			})
 		})
 
+		Context("with overlapping node pools", func() {
+			var nro *nropv1.NUMAResourcesOperator
+			var reconciler *NUMAResourcesOperatorReconciler
+			pn1 := "pool-1"
+			pn2 := "pool-2"
+
+			BeforeEach(func() {
+				label2 := map[string]string{
+					pn2: pn2,
+				}
+				label1 := map[string]string{
+					pn1: pn1,
+				}
+
+				mcp1Selector := &metav1.LabelSelector{
+					MatchLabels: label1,
+				}
+				mcp2Selector := &metav1.LabelSelector{
+					MatchLabels: label2,
+				}
+
+				ng1 := nropv1.NodeGroup{
+					PoolName: &pn1,
+				}
+
+				nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1)
+				nroKey := client.ObjectKeyFromObject(nro)
+
+				// would be used only if the platform supports MCP
+				mcp1 := testobjs.NewMachineConfigPool(pn1, mcp1Selector.MatchLabels, mcp1Selector, mcp1Selector)
+				mcp2 := testobjs.NewMachineConfigPool(pn2, mcp2Selector.MatchLabels, mcp2Selector, mcp2Selector)
+
+				cm1 := testobjs.NewRTEConfigMap(objectnames.GetComponentName(nro.Name, mcp1.Name), testNamespace, "single-numa-node", "pod")
+				cm2 := testobjs.NewRTEConfigMap(objectnames.GetComponentName(nro.Name, mcp2.Name), testNamespace, "single-numa-node", "container")
+
+				node1 := &corev1.Node{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Node",
+						APIVersion: corev1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node1",
+						Labels: label1,
+					},
+				}
+
+				node3 := &corev1.Node{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Node",
+						APIVersion: corev1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node3",
+						Labels: label2,
+					},
+				}
+
+				bothLabels := maps.Clone(label1)
+				maps.Copy(bothLabels, label2)
+				node2 := &corev1.Node{
+					TypeMeta: metav1.TypeMeta{
+						Kind:       "Node",
+						APIVersion: corev1.SchemeGroupVersion.String(),
+					},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "node2",
+						Labels: bothLabels,
+					},
+				}
+
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platf, defaultOCPVersion, nro, mcp1, mcp2, cm1, cm2, node1, node2, node3)
+				Expect(err).ToNot(HaveOccurred())
+
+				// on the first iteration with the default RTE SELinux policy we expect immediate update, thus the reconciliation result is empty
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
+
+				ng2 := nropv1.NodeGroup{
+					PoolName: &pn2,
+				}
+				ngs := []nropv1.NodeGroup{ng1, ng2}
+				nroUpdated := &nropv1.NUMAResourcesOperator{}
+				Eventually(func() error {
+					Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).NotTo(HaveOccurred())
+					nroUpdated.Spec.NodeGroups = ngs
+					return reconciler.Client.Update(context.TODO(), nroUpdated)
+				}).WithPolling(1 * time.Second).WithTimeout(30 * time.Second).ShouldNot(HaveOccurred())
+
+				//  immediate update
+				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
+
+				Expect(reconciler.Client.Get(context.TODO(), nroKey, nroUpdated)).ToNot(HaveOccurred())
+
+				availableCondition := getConditionByType(nroUpdated.Status.Conditions, status.ConditionAvailable)
+				Expect(availableCondition).ToNot(BeNil())
+				Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
+			})
+
+			It("should have PodAntiAffinity for RTE Daeamonset", func() {
+				dsKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, pn1),
+					Namespace: testNamespace,
+				}
+				ds := &appsv1.DaemonSet{}
+				Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
+				Expect(ds.Spec.Template.Labels).ToNot(BeEmpty())
+
+				expected := corev1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: ds.Spec.Template.Labels,
+							},
+							TopologyKey: "kubernetes.io/hostname",
+						},
+					},
+				}
+
+				Expect(ds.Spec.Template.Spec.Affinity).ToNot(BeNil())
+				Expect(ds.Spec.Template.Spec.Affinity.PodAntiAffinity).ToNot(BeNil())
+				Expect(ds.Spec.Template.Spec.Affinity.PodAntiAffinity).To(BeEquivalentTo(expected))
+			})
+
+			It("should keep doubled RTE pods pending", func() {
+				dsKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, pn1),
+					Namespace: testNamespace,
+				}
+				ds := &appsv1.DaemonSet{}
+				Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
+
+				LabelSelector := &metav1.LabelSelector{
+					MatchLabels: ds.Spec.Template.Labels,
+				}
+				selector, err := metav1.LabelSelectorAsSelector(LabelSelector)
+				Expect(err).ToNot(HaveOccurred())
+
+				var rtePods corev1.PodList
+				reconciler.Client.List(context.TODO(), &rtePods, &client.ListOptions{LabelSelector: selector})
+			})
+		})
 	},
 		Entry("Openshift Platform", platform.OpenShift),
 		Entry("Hypershift Platform", platform.HyperShift),
