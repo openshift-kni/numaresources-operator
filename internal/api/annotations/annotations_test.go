@@ -157,3 +157,38 @@ func TestIsNRTAPIDefinitionCluster(t *testing.T) {
 		})
 	}
 }
+
+func TestIsSchedulerQOSRequestBurstable(t *testing.T) {
+	testcases := []struct {
+		description string
+		annotations map[string]string
+		expected    bool
+	}{
+		{
+			description: "empty map",
+			annotations: map[string]string{},
+			expected:    false,
+		},
+		{
+			description: "annotation set to anything but not \"burstable\" means the requested QoS is guaranteed",
+			annotations: map[string]string{
+				SchedulerQOSRequestAnnotation: "guaranteed",
+			},
+			expected: false,
+		},
+		{
+			description: "request burstable QoS",
+			annotations: map[string]string{
+				SchedulerQOSRequestAnnotation: SchedulerQOSRequestBurstable,
+			},
+			expected: true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			if got := IsSchedulerQOSRequestBurstable(tc.annotations); got != tc.expected {
+				t.Errorf("expected %v got %v", tc.expected, got)
+			}
+		})
+	}
+}
