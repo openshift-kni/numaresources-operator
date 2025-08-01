@@ -311,6 +311,9 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		Duration: cacheResyncPeriod,
 	}
 
+	informerCondition := buildDedicatedInformerCondition(*instance, schedSpec)
+	schedStatus.Conditions = status.GetUpdatedSchedulerConditions(schedStatus.Conditions, informerCondition)
+
 	r.SchedulerManifests.Deployment.Spec.Replicas = schedSpec.Replicas
 	klog.V(4).InfoS("using scheduler replicas", "replicas", *r.SchedulerManifests.Deployment.Spec.Replicas)
 	// TODO: if replicas doesn't make sense (autodetect disabled and user set impossible value) then we
@@ -377,15 +380,39 @@ func platformNormalize(spec *nropv1.NUMAResourcesSchedulerSpec, platInfo Platfor
 		klog.V(4).InfoS("SchedulerInformer default is overridden", "Platform", platInfo.Platform, "PlatformVersion", platInfo.Version.String(), "SchedulerInformer", &spec.SchedulerInformer)
 	}
 }
-func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesSchedulerStatus, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
-	updatedStatus := *sched.Status.DeepCopy()
 
-	updatedStatus.Conditions, _ = status.UpdateConditions(sched.Status.Conditions, condition, reason, message)
-	if !status.NUMAResourcesSchedulerNeedsUpdate(initialStatus, updatedStatus) {
+func buildDedicatedInformerCondition(instance nropv1.NUMAResourcesScheduler, normalized nropv1.NUMAResourcesSchedulerSpec) metav1.Condition {
+	condition := metav1.Condition{
+		Type:               status.ConditionDedicatedInformerActive,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: instance.ObjectMeta.Generation,
+		Reason:             status.ConditionDedicatedInformerActive,
+	}
+
+	if *normalized.SchedulerInformer == nropv1.SchedulerInformerShared {
+		condition.Status = metav1.ConditionFalse
+	}
+
+	return condition
+}
+
+func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesSchedulerStatus, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
+	c := metav1.Condition{
+		Type:    condition,
+		Status:  metav1.ConditionTrue,
+		Reason:  reason,
+		Message: message,
+	}
+	sched.Status.Conditions = status.GetUpdatedSchedulerConditions(sched.Status.Conditions, c)
+
+	if !status.NUMAResourcesSchedulerNeedsUpdate(initialStatus, sched.Status) {
 		return nil
 	}
 
-	sched.Status.Conditions = updatedStatus.Conditions
+	if status.EqualConditions(initialStatus.Conditions, sched.Status.Conditions) {
+		sched.Status.Conditions = initialStatus.Conditions
+	}
+
 	if err := r.Client.Status().Update(ctx, sched); err != nil {
 		return fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(sched), err)
 	}
