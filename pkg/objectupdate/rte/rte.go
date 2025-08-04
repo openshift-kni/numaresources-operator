@@ -23,6 +23,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
 	securityv1 "github.com/openshift/api/security/v1"
@@ -95,6 +96,26 @@ func DaemonSetPauseContainerSettings(ds *appsv1.DaemonSet) error {
 	}
 	cnt.Args = []string{
 		"while true; do sleep 30s; done",
+	}
+	return nil
+}
+
+func DaemonSetAffinitySettings(ds *appsv1.DaemonSet, labels map[string]string) error {
+	if len(labels) == 0 {
+		return fmt.Errorf("no labels provided for PodAffinity")
+	}
+
+	ds.Spec.Template.Spec.Affinity = &corev1.Affinity{
+		PodAntiAffinity: &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: labels,
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			},
+		},
 	}
 	return nil
 }
