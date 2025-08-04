@@ -60,17 +60,14 @@ import (
 )
 
 const (
-	// ActivePodsResourcesSupportSince defines the OCP version which started to support the fixed kubelet
-	// in which the PodResourcesAPI lists the active pods by default
-	activePodsResourcesSupportSince = "4.20.999"
-
 	// MaxSchedulerReplicas is the maximum number of scheduler replicas that can be deployed
 	MaxSchedulerReplicas = 3
 )
 
 type PlatformInfo struct {
-	Platform platform.Platform
-	Version  platform.Version
+	Platform                     platform.Platform
+	Version                      platform.Version
+	KubeletSupportsActivePodList bool
 }
 
 // NUMAResourcesSchedulerReconciler reconciles a NUMAResourcesScheduler object
@@ -357,18 +354,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 }
 
 func platformNormalize(spec *nropv1.NUMAResourcesSchedulerSpec, platInfo PlatformInfo) {
-	if platInfo.Platform != platform.OpenShift && platInfo.Platform != platform.HyperShift {
-		return
-	}
-
-	parsedVersion, _ := platform.ParseVersion(activePodsResourcesSupportSince)
-	ok, err := platInfo.Version.AtLeast(parsedVersion)
-	if err != nil {
-		klog.Infof("failed to compare version %v with %v, err %v", parsedVersion, platInfo.Version, err)
-		return
-	}
-
-	if !ok {
+	if !platInfo.KubeletSupportsActivePodList {
 		return
 	}
 
@@ -377,6 +363,7 @@ func platformNormalize(spec *nropv1.NUMAResourcesSchedulerSpec, platInfo Platfor
 		klog.V(4).InfoS("SchedulerInformer default is overridden", "Platform", platInfo.Platform, "PlatformVersion", platInfo.Version.String(), "SchedulerInformer", &spec.SchedulerInformer)
 	}
 }
+
 func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesSchedulerStatus, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
 	updatedStatus := *sched.Status.DeepCopy()
 
