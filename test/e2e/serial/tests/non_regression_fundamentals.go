@@ -24,7 +24,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog/v2"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
@@ -85,7 +84,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 					e2efixture.Skip(fxt, "Scheduler cache not enabled")
 				}
 				timeout := nroSchedObj.Status.CacheResyncPeriod.Round(time.Second) * 10
-				klog.InfoS("pod running timeout", "timeout", timeout)
+				fxt.Log.Info("pod running timeout", "timeout", timeout)
 
 				nrts := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
 				if len(nrts) < 1 {
@@ -96,7 +95,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 				targetNodeName, ok := e2efixture.PopNodeName(nodesNames)
 				Expect(ok).To(BeTrue())
 
-				klog.InfoS("selected target node name", "nodeName", targetNodeName)
+				fxt.Log.Info("selected target node name", "nodeName", targetNodeName)
 
 				nrtInfo, err := e2enrt.FindFromList(nrts, targetNodeName)
 				Expect(err).ToNot(HaveOccurred())
@@ -116,7 +115,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 				// CAUTION: still assuming all NUMA zones are equal across all nodes
 				numPods := int(cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
 
-				klog.InfoS("creating pods", "numPods", numPods, "cpusPerPod", cpusVal, "maxAllocPerNUMAZone", maxAllocPerNUMAVal)
+				fxt.Log.Info("creating pods", "numPods", numPods, "cpusPerPod", cpusVal, "maxAllocPerNUMAZone", maxAllocPerNUMAVal)
 
 				var testPods []*corev1.Pod
 				for idx := 0; idx < numPods; idx++ {
@@ -125,8 +124,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 
 					setupPod(testPod)
 
-					_, err := pinPodToNode(testPod, targetNodeName)
-					Expect(err).ToNot(HaveOccurred())
+					pinPodToNode(fxt.Log, testPod, targetNodeName)
 
 					By(fmt.Sprintf("creating pod %s/%s", testPod.Namespace, testPod.Name))
 					err = fxt.Client.Create(context.TODO(), testPod)
@@ -180,7 +178,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 					e2efixture.Skip(fxt, "Scheduler cache not enabled")
 				}
 				timeout := nroSchedObj.Status.CacheResyncPeriod.Round(time.Second) * 10
-				klog.InfoS("pod running timeout", "timeout", timeout)
+				fxt.Log.Info("pod running timeout", "timeout", timeout)
 
 				nrts := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
 				if len(nrts) < 1 {
@@ -193,7 +191,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 				referenceNodeName, ok := e2efixture.PopNodeName(nodesNames)
 				Expect(ok).To(BeTrue())
 
-				klog.InfoS("selected reference node name", "nodeName", referenceNodeName)
+				fxt.Log.Info("selected reference node name", "nodeName", referenceNodeName)
 
 				nrtInfo, err := e2enrt.FindFromList(nrts, referenceNodeName)
 				Expect(err).ToNot(HaveOccurred())
@@ -211,7 +209,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 				cpusVal := (10 * resVal) / 8
 				numPods := int(int64(len(nrts)) * cpusVal / cpusPerPod) // unlikely we will need more than a billion pods (!!)
 
-				klog.InfoS("creating pods", "numPods", numPods, "cpusPerPod", cpusVal, "resPerNUMAZone", resVal)
+				fxt.Log.Info("creating pods", "numPods", numPods, "cpusPerPod", cpusVal, "resPerNUMAZone", resVal)
 
 				var testPods []*corev1.Pod
 				for idx := 0; idx < numPods; idx++ {
