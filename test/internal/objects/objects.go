@@ -19,6 +19,7 @@ package objects
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -37,12 +38,21 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 
+const (
+	e2eNodeRole        = "E2E_NODE_ROLE"
+	machineConfigLabel = "pools.operator.machineconfiguration.openshift.io"
+	workerLabel        = "worker"
+)
+
 func EmptyMatchLabels() map[string]string {
 	return map[string]string{}
 }
 
 func OpenshiftMatchLabels() map[string]string {
-	return map[string]string{"pools.operator.machineconfiguration.openshift.io/worker": ""}
+	if nodeRole, ok := os.LookupEnv(e2eNodeRole); ok {
+		return map[string]string{machineConfigLabel + "/" + nodeRole: ""}
+	}
+	return map[string]string{machineConfigLabel + "/" + workerLabel: ""}
 }
 
 func TestNROScheduler() *nropv1.NUMAResourcesScheduler {
