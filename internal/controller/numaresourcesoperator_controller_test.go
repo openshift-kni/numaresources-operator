@@ -294,6 +294,31 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(ds.Spec.Template.Spec.PriorityClassName).To(Equal(nrosched.SchedulerPriorityClassName))
 				})
 
+				It("RTE Daeamonset should have PodAntiAffinity", func() {
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn1),
+						Namespace: testNamespace,
+					}
+					var ds appsv1.DaemonSet
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, &ds)).To(Succeed())
+					Expect(ds.Spec.Template.Labels).ToNot(BeEmpty())
+
+					expected := corev1.PodAntiAffinity{
+						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+							{
+								LabelSelector: &metav1.LabelSelector{
+									MatchLabels: ds.Spec.Template.Labels,
+								},
+								TopologyKey: "kubernetes.io/hostname",
+							},
+						},
+					}
+
+					Expect(ds.Spec.Template.Spec.Affinity).ToNot(BeNil())
+					Expect(ds.Spec.Template.Spec.Affinity.PodAntiAffinity).ToNot(BeNil())
+					Expect(*ds.Spec.Template.Spec.Affinity.PodAntiAffinity).To(Equal(expected))
+				})
+
 				It("should update node group statuses with the updated configuration", func() {
 					defaultConf := nropv1.DefaultNodeGroupConfig()
 
@@ -1321,7 +1346,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(reconciler.Client.Get(context.TODO(), crdKey, &crd)).To(Succeed())
 			})
 		})
-
 	},
 		Entry("Openshift Platform", platform.OpenShift),
 		Entry("Hypershift Platform", platform.HyperShift),
