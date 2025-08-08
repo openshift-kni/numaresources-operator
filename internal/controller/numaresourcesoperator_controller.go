@@ -96,6 +96,7 @@ type NUMAResourcesOperatorReconciler struct {
 // Namespace Scoped
 //+kubebuilder:rbac:groups="",resources=services,verbs=*,namespace="numaresources"
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=*,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*,namespace="numaresources"
 
 // Cluster Scoped
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=list
@@ -110,7 +111,6 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=*
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
-//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=list
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=get;list;watch
