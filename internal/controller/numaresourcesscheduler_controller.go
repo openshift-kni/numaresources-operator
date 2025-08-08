@@ -84,15 +84,16 @@ type NUMAResourcesSchedulerReconciler struct {
 }
 
 // Namespace Scoped
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=*,namespace="numaresources"
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=*,namespace="numaresources"
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=*,namespace="numaresources"
 
 // Cluster Scoped
+//+kubebuilder:rbac:groups="",resources=nodes,verbs=list;watch
+//+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
-//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=*
-//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
-//+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
-//+kubebuilder:rbac:groups="",resources=nodes,verbs=list;watch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers,verbs=get;list;watch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers/finalizers,verbs=update

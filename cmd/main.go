@@ -36,14 +36,12 @@ import (
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/textlogger"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -261,13 +259,10 @@ func main() {
 
 	klog.InfoS("metrics server", "enabled", params.enableMetrics, "addr", params.metricsAddr)
 
+	lm := controller.NewLocalManager(namespace)
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Cache: cache.Options{
-			DefaultNamespaces: map[string]cache.Config{
-				namespace:            {},
-				metav1.NamespaceNone: {},
-			},
-		},
+		Cache:  lm.CacheOptions(),
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
 			BindAddress:   params.metricsAddr,
