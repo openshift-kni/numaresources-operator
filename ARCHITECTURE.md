@@ -1,15 +1,43 @@
 # NUMA Resources Operator architecture
 
-## concepts
+## overview
 
-The NUMA Resources Operator is a pilot operator to deploy all the components needed for the out-of-tree NUMA aware scheduler:
+The NUMA Resources Operator manages all the components needed for the out-of-tree NUMA aware scheduler:
 1. NodeResourceTopology API (out-of-tree CRD-based API)
 2. ResourceTopologyExporter (RTE) as topology info provider
 3. The out-of-tree secondary scheduler with the NodeResourceTopologyMatch plugins enabled
 
 In addition, the operator repo includes a extensive e2e test suite (so-called "serial suite")
 
-## building blocks
+## integration in a kubernetes cluster and RBAC model
+
+The operator manages cluster-wide resources through components which are namespaced for isolation purposes.
+This operator augments the cluster adding a numa-aware scheduler, which is a cluster capabilty user never directly interact with.
+Users consume the facilities of the numaresources operator by selecting the scheduler profile using `pod.Spec.SchedulerName`,
+always mediated by apiserver access.
+
+To feed the scheduler the data it needs to perform, an additional cluster-wide resource is needed: NodeResourceTopology objects,
+which are also cluster-wide resources users should never interact to. Conceptually, these are extensions of node objects.
+
+Finally, in order to provide these services, we need daemonsets (logically extending kubelet) and deployment to run the secondary scheduler
+(mirroring the main scheduler). These pods and all the necessary configmaps and RBAC settings are namespaced for maximum isolation.
+
+| entity | namespace | dependencies | notes |
+| --- | --- | --- | --- |
+| NodeResourceTopology CRD | cluster-wide | N/A | N/A |
+| Scheduler profile | cluster-wide | secondary-scheduler deployment | accessed indirectly through `pod.Spec.SchedulerName` |
+| Scheduler profile | numaresources | NodeResourceTopology CRD (read only) | data to base scheduling decisions upon |
+| Scheduler profile | numaresources | node-topology-updater | cluster actor to keep the NodeResourceTopology CRD current and accurate |
+| secondary-scheduler deployment | numaresources | N/A | required for self-healing and HA |
+| node-topology-updater | numaresources | resource-topology-exporter daemonset | implementation of cluster actor |
+| resource-topology-exporter daemonset | numaresources | NodeResourceTopology CRD (write access) | data provider |
+
+in RBAC terms, this operator needs cluster roles to access the NodeResourceTopology data and to enable the secondary scheduler to
+manage pods like the main scheduler; everything else is namespaced to minimize privileges and maximize isolation.
+
+## key operator  concepts
+
+### building blocks
 
 The operator is built on top of two main community-based projects: [the deployer toolkit](https://github.com/k8stopologyawareschedwg/deployer)
 and [the resource topology exporter](https://github.com/k8stopologyawareschedwg/resource-topology-exporter).
@@ -23,7 +51,7 @@ replacing the main entry point.
 Logically, the operator manages three operands (API, RTE, scheduler) but it depends on just a single artifact for the operand (the scheduler),
 while the other two operands (API, RTE) are bundled in the same operator image.
 
-## bundled operand (`./rte/...`)
+### bundled operand (`./rte/...`)
 
 Instead of consuming a separate image like we do for the secondary scheduler, we bundle the RTE operand adding the binary in the operator image,
 which has multiple entry points.
@@ -34,7 +62,9 @@ We foresee RTE as the first operand to be replaced, and in general is the easies
 and a supported component. On the other hand, the secondary scheduler is likely to stick around for a while more - and that's also easier to
 support because secondary schedulers are not uncommon in the kubernetes ecosystem.
 
-## controllers (`./internal/controller/...`)
+## operator design details
+
+### controllers (`./internal/controller/...`)
 
 The operator has three controllers and three control loops.
 Likewise well-formed controllers, they are independent from each other and will reconcile the cluster state towards a functional NUMA-aware
@@ -52,9 +82,9 @@ scheduler installation.
    the least critical controller this can perhaps replaced in the future. This functionality should be subsumed by the operator
    managing the RTE replacement.
 
-## packages and tree breakdown
+### packages and tree breakdown
 
-### API (`./api`)
+#### API (`./api`)
 
 The api package holds the definition of the public API types, from which the API schema
 is derived by the controller-gen/operator-sdk/kubebuilder tooling.
@@ -75,26 +105,26 @@ We add helper packages which build on top of api packages and provide utilities:
 NOTE: helper packages can depend on top-level api packages, but top-level api packages **must not**
 depend on helpers. Keep the top-level dependencies minimal and controlled!
 
-#### `./api/...` vs `./internal/api/...`
+##### `./api/...` vs `./internal/api/...`
 
 Similarly to `pkg vs internal` (see below), `api` are public APIs we are committed to support and we provide
 stability guarantees about. `internal/api` holds api between internal tooling (e.g. operator vs e2e tests)
 which we best-effort promise to keep stable and usable, but which have much less guarantees and that
 *noone outside the operator* must be using. If they do, they're on their own, and they probably should stop ASAP.
 
-#### stability guarantees: `./api/...` vs `./pkg/...`
+##### stability guarantees: `./api/...` vs `./pkg/...`
 
 The kubernetes/openshift stability guarantees is about API endpoints and types. golang packages (`pkg/...`) are
 NOT covered by the same guarantee. Nevertheless, the intention is to keep the same stability promises.
 The takeaway is that packages in `pkg/...` must be updated carefully and they must be backward compatible.
 
-### guideline: adding a new package: `pkg` vs `internal` vs `test/internal`
+#### guideline: adding a new package: `pkg` vs `internal` vs `test/internal`
 
 - `pkg`: code consumable by external parties. We try the hardest to ensure API stability, testability, documentation.
 - `internal`: code meant to be used everywhere in the operator tree. Default to add here if unsure.
 - `test/internal`: code meant to be used only by test code. Lowest bar, but also smallest scope.
 
-### `pkg/...` vs `internal/...`
+#### `pkg/...` vs `internal/...`
 
 TL:DR: if unsure, put your package in `./internal/`
 
@@ -107,7 +137,7 @@ stability and backward compatibility guarantees.
 
 Code in the `internal` tree is guaranteed compatible *only within the same Z-stream*.
 
-### `internal/...` vs `test/internal/...`
+#### `internal/...` vs `test/internal/...`
 
 We take testing seriously and our testsuite is pretty big and complex (~15k LOCs and counting).
 Because of that, it includes quite some helper packages, which we place in `test/internal/...`. Packages in this
@@ -118,12 +148,12 @@ If you want to add a package, it is recommended to evaluate carefully if it shou
 with a bias toward the former. Putting new code in `test/internal/...` do minimizes the scope, but the sword is double
 edged as it reduces also the scrutiny and tends to have the lowest bar.
 
-### `./tools/...`: internal tooling
+##### `./tools/...`: internal tooling
 
 We have ere tools we have to support the project sit in `tools/...`. This includes build process helpers and general utilities.
 These tools are not covered by support/stability guarantees, but we best-effort try to keep them stable (and working of course)
 
-### `./nrovalidate/...`: validation tool
+##### `./nrovalidate/...`: validation tool
 
 A special tool is `nrovalidate` which is shaping up to be promoted a top-level, supported tool like the operator proper
 and the operand exporter, **but is not there yet**. It is meant to scan the cluster on which the operator is deployed
