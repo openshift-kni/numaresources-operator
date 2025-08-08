@@ -62,7 +62,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-08-08T10:00:31Z"
+    createdAt: "2025-08-08T10:00:51Z"
     olm.skipRange: '>=4.19.0 <4.20.0'
     operatorframework.io/cluster-monitoring: "true"
     operators.operatorframework.io/builder: operator-sdk-v1.40.0
@@ -434,8 +434,11 @@ spec:
           - nodetopology.openshift.io
           resources:
           - numaresourcesoperators
+          - numaresourcesschedulers
           verbs:
-          - '*'
+          - get
+          - list
+          - watch
         - apiGroups:
           - nodetopology.openshift.io
           resources:
@@ -452,18 +455,6 @@ spec:
           - get
           - patch
           - update
-        - apiGroups:
-          - nodetopology.openshift.io
-          resources:
-          - numaresourcesschedulers
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
         - apiGroups:
           - rbac.authorization.k8s.io
           resources:
