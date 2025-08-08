@@ -7,20 +7,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - configmaps
-  - serviceaccounts
-  verbs:
-  - '*'
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - patch
-- apiGroups:
-  - ""
-  resources:
   - nodes
   verbs:
   - list
@@ -37,13 +23,6 @@ rules:
   - apiextensions.k8s.io
   resources:
   - customresourcedefinitions
-  verbs:
-  - '*'
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  - deployments
   verbs:
   - '*'
 - apiGroups:
@@ -139,7 +118,23 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
+  - serviceaccounts
   - services
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  - deployments
   verbs:
   - '*'
 - apiGroups:

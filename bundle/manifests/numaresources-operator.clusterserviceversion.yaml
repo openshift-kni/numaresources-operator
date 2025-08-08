@@ -62,7 +62,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-08-08T10:00:51Z"
+    createdAt: "2025-08-08T12:01:20Z"
     olm.skipRange: '>=4.19.0 <4.20.0'
     operatorframework.io/cluster-monitoring: "true"
     operators.operatorframework.io/builder: operator-sdk-v1.40.0
@@ -357,20 +357,6 @@ spec:
         - apiGroups:
           - ""
           resources:
-          - configmaps
-          - serviceaccounts
-          verbs:
-          - '*'
-        - apiGroups:
-          - ""
-          resources:
-          - events
-          verbs:
-          - create
-          - patch
-        - apiGroups:
-          - ""
-          resources:
           - nodes
           verbs:
           - list
@@ -387,13 +373,6 @@ spec:
           - apiextensions.k8s.io
           resources:
           - customresourcedefinitions
-          verbs:
-          - '*'
-        - apiGroups:
-          - apps
-          resources:
-          - daemonsets
-          - deployments
           verbs:
           - '*'
         - apiGroups:
@@ -598,7 +577,23 @@ spec:
         - apiGroups:
           - ""
           resources:
+          - configmaps
+          - serviceaccounts
           - services
+          verbs:
+          - '*'
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        - apiGroups:
+          - apps
+          resources:
+          - daemonsets
+          - deployments
           verbs:
           - '*'
         - apiGroups:

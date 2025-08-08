@@ -35,6 +35,7 @@ import (
 
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -265,7 +266,33 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Cache: cache.Options{
 			ByObject: map[client.Object]cache.ByObject{
+				&corev1.Service{}: {
+					Namespaces: map[string]cache.Config{
+						namespace: {},
+					},
+				},
 				&corev1.ServiceAccount{}: {
+					Namespaces: map[string]cache.Config{
+						namespace: {},
+					},
+				},
+				&corev1.ConfigMap{}: {
+					Namespaces: map[string]cache.Config{
+						namespace: {},
+					},
+				},
+				&corev1.Event{}: {
+					Namespaces: map[string]cache.Config{
+						namespace: {},
+						"default": {}, // TODO: why?
+					},
+				},
+				&appsv1.Deployment{}: {
+					Namespaces: map[string]cache.Config{
+						namespace: {},
+					},
+				},
+				&appsv1.DaemonSet{}: {
 					Namespaces: map[string]cache.Config{
 						namespace: {},
 					},
