@@ -49,6 +49,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
+	"github.com/openshift-kni/numaresources-operator/internal/platform/activepodresources"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
@@ -732,7 +733,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 		numOfMasters := 3
 
 		When("kubelet fix is enabled", func() {
-			fixedVersion, _ := platform.ParseVersion(activePodsResourcesSupportSince)
+			fixedVersion, _ := platform.ParseVersion(activepodresources.NightlySupportSince)
 
 			DescribeTable("should configure by default the informerMode to the expected when field is not set", func(reconcilerPlatInfo PlatformInfo, expectedInformer string) {
 				var err error
@@ -751,12 +752,14 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, expectedInformer)
 			},
 				Entry("with fixed Openshift the default informer is Shared", PlatformInfo{
-					Platform: platform.OpenShift,
-					Version:  fixedVersion,
+					Platform:                     platform.OpenShift,
+					Version:                      fixedVersion,
+					KubeletSupportsActivePodList: true,
 				}, depmanifests.CacheInformerShared),
 				Entry("with fixed Hypershift the default informer is Shared", PlatformInfo{
-					Platform: platform.HyperShift,
-					Version:  fixedVersion,
+					Platform:                     platform.HyperShift,
+					Version:                      fixedVersion,
+					KubeletSupportsActivePodList: true,
 				}, depmanifests.CacheInformerShared),
 				Entry("with unknown platform the default informer is Dedicated (unchanged)", PlatformInfo{}, depmanifests.CacheInformerDedicated))
 
@@ -778,12 +781,14 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(infMode))
 			},
 				Entry("with Openshift", PlatformInfo{
-					Platform: platform.OpenShift,
-					Version:  fixedVersion,
+					Platform:                     platform.OpenShift,
+					Version:                      fixedVersion,
+					KubeletSupportsActivePodList: true,
 				}),
 				Entry("with Hypershift", PlatformInfo{
-					Platform: platform.HyperShift,
-					Version:  fixedVersion,
+					Platform:                     platform.HyperShift,
+					Version:                      fixedVersion,
+					KubeletSupportsActivePodList: true,
 				}),
 				Entry("with unknown platform", PlatformInfo{}))
 
@@ -823,12 +828,14 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(informerMode))
 			},
 				Entry("with Openshift", PlatformInfo{
-					Platform: platform.OpenShift,
-					Version:  fixedVersion,
+					Platform:                     platform.OpenShift,
+					Version:                      fixedVersion,
+					KubeletSupportsActivePodList: true,
 				}),
 				Entry("with Hypershift", PlatformInfo{
-					Platform: platform.HyperShift,
-					Version:  fixedVersion,
+					Platform:                     platform.HyperShift,
+					Version:                      fixedVersion,
+					KubeletSupportsActivePodList: true,
 				}))
 		})
 	})
@@ -940,52 +947,41 @@ var _ = Describe("Test computeSchedulerReplicas", func() {
 	})
 })
 
-var _ = Describe("Test scheduler spec PreNormalize", func() {
+var _ = Describe("Test platformNormalize", func() {
 	When("Spec.SchedulerInformer is not set by the user", func() {
-		It("should override default informer to Shared if kubelet is fixed - first supported zstream version", func() {
-			v, _ := platform.ParseVersion(activePodsResourcesSupportSince)
+		It("should not update informer if kubelet is not fixed", func() {
 			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			Expect(*spec.SchedulerInformer).To(Equal(nropv1.SchedulerInformerShared))
-		})
-
-		It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (zstream)", func() {
-			v, _ := platform.ParseVersion("4.20.1000")
-			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			Expect(*spec.SchedulerInformer).To(Equal(nropv1.SchedulerInformerShared))
-		})
-
-		It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (ystream)", func() {
-			v, _ := platform.ParseVersion("4.21.0")
-			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			Expect(*spec.SchedulerInformer).To(Equal(nropv1.SchedulerInformerShared))
-		})
-
-		It("should not override default informer if kubelet is not fixed - version is less than first supported (zstream)", func() {
-			// this is only for testing purposes as there is plan to backport the fix to older minor versions
-			// will need to remove this test if the fix is supported starting the first zstream of the release
-			v, _ := platform.ParseVersion("4.20.0")
-			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
+			platformNormalize(&spec, PlatformInfo{
+				KubeletSupportsActivePodList: false,
+			})
 			Expect(spec.SchedulerInformer).To(BeNil())
 		})
-
-		It("should not override default informer if kubelet is not fixed - version is less than first supported (ystream)", func() {
-			v, _ := platform.ParseVersion("4.13.0")
+		It("should override default informer to Shared if kubelet is fixed", func() {
 			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			Expect(spec.SchedulerInformer).To(BeNil())
+			platformNormalize(&spec, PlatformInfo{
+				KubeletSupportsActivePodList: true,
+			})
+			Expect(*spec.SchedulerInformer).To(Equal(nropv1.SchedulerInformerShared))
 		})
 	})
+
 	When("Spec.SchedulerInformer is set by the user", func() {
-		It("should preserve informer value set by the user even if kubelet is fixed", func() {
-			v, _ := platform.ParseVersion(activePodsResourcesSupportSince)
+		It("should not update informer even if kubelet is fixed", func() {
 			spec := nropv1.NUMAResourcesSchedulerSpec{
 				SchedulerInformer: ptr.To(nropv1.SchedulerInformerDedicated),
 			}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
+			platformNormalize(&spec, PlatformInfo{
+				KubeletSupportsActivePodList: true,
+			})
+			Expect(*spec.SchedulerInformer).To(Equal(nropv1.SchedulerInformerDedicated))
+		})
+		It("should not update informer if kubelet is fixed", func() {
+			spec := nropv1.NUMAResourcesSchedulerSpec{
+				SchedulerInformer: ptr.To(nropv1.SchedulerInformerDedicated),
+			}
+			platformNormalize(&spec, PlatformInfo{
+				KubeletSupportsActivePodList: false,
+			})
 			Expect(*spec.SchedulerInformer).To(Equal(nropv1.SchedulerInformerDedicated))
 		})
 	})
