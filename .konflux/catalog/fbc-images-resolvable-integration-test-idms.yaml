@@ -1,5 +1,5 @@
 # We use this IDMS to check if the images in the FBC are resolvable using the staging or production catalog.
-apiVersion: operator.openshift.io/v1alpha1
+apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
 metadata:
   name: fbc-images-resolvable-integration-test-idms
