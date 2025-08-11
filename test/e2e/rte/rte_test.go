@@ -305,6 +305,42 @@ var _ = Describe("with a running cluster with all the components", func() {
 			}
 		}
 	})
+
+	It("should set NRT object OwnerReference to RTE DaemonSet by default", func() {
+		nrtList := &nrtv1alpha2.NodeResourceTopologyList{}
+		Expect(clients.Client.List(context.TODO(), nrtList)).To(Succeed())
+
+		nropObj := &nropv1.NUMAResourcesOperator{}
+		Expect(clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)).To(Succeed())
+
+		rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
+		Expect(err).ToNot(HaveOccurred())
+
+		found := false
+		var dsReference metav1.OwnerReference
+		var rteDS appsv1.DaemonSet
+		for _, nrt := range nrtList.Items {
+			for _, owner := range nrt.OwnerReferences {
+				if owner.Kind == "DaemonSet" {
+					found = true
+					dsReference = owner
+					break
+				}
+			}
+			Expect(found).To(BeTrue(), "missing DaemonSet OwnerReference from NRT %q", nrt.Name)
+
+			found = false
+			for _, ds := range rteDss {
+				if ds.Name == dsReference.Name {
+					found = true
+					rteDS = ds
+					break
+				}
+			}
+			Expect(found).To(BeTrue(), "DaemonSet %q was not found in the active RTE DaemonSets", dsReference.Name)
+			Expect(dsReference.UID).To(Equal(rteDS.UID))
+		}
+	})
 })
 
 func getOwnedDss(cs kubernetes.Interface, owner metav1.ObjectMeta) ([]appsv1.DaemonSet, error) {
