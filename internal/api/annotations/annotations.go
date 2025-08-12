@@ -29,6 +29,11 @@ const (
 
 	NRTAPIDefinitionAnnotation = "config.numa-operator.openshift.io/nrt-api-definition"
 	NRTAPIFromCluster          = "cluster" // trust whatever it is already in the cluster, if at all
+
+	// introduced in: 4.20
+	// remove in: 4.22 (tentative)
+	SchedulerQOSRequestAnnotation = "config.numa-operator.openshift.io/scheduler-qos-request"
+	SchedulerQOSRequestBurstable  = "burstable"
 )
 
 func IsCustomPolicyEnabled(annot map[string]string) bool {
@@ -54,6 +59,13 @@ func IsPauseReconciliationEnabled(annot map[string]string) bool {
 
 func IsNRTAPIDefinitionCluster(annot map[string]string) bool {
 	if v, ok := annot[NRTAPIDefinitionAnnotation]; ok && v == NRTAPIFromCluster {
+		return true
+	}
+	return false
+}
+
+func IsSchedulerQOSRequestBurstable(annot map[string]string) bool {
+	if v, ok := annot[SchedulerQOSRequestAnnotation]; ok && v == SchedulerQOSRequestBurstable {
 		return true
 	}
 	return false
