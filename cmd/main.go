@@ -60,6 +60,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/api/features"
 	"github.com/openshift-kni/numaresources-operator/internal/controller"
 	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
+	"github.com/openshift-kni/numaresources-operator/internal/platform/activepodresources"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
@@ -339,8 +340,9 @@ func main() {
 			SchedulerManifests: schedMf,
 			Namespace:          namespace,
 			PlatformInfo: controller.PlatformInfo{
-				Platform: clusterPlatform,
-				Version:  clusterPlatformVersion,
+				Platform:                     clusterPlatform,
+				Version:                      clusterPlatformVersion,
+				KubeletSupportsActivePodList: activepodresources.IsVersionFixed(clusterPlatform, clusterPlatformVersion),
 			},
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
