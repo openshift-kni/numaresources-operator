@@ -31,9 +31,9 @@ if [ -n "${E2E_SERIAL_TIER_UPTO}" ]; then
 	fi
 	TIER_UPTOS="tier0"
 	for tier in $(seq 1 ${E2E_SERIAL_TIER_UPTO}); do
-		TIER_UPTOS="${TIER_UPTOS}|tier${tier}"
+		TIER_UPTOS="${TIER_UPTOS} || tier${tier}"
 	done
-	FOCUS="-ginkgo.focus='${TIER_UPTOS}'"
+	LABEL_FILTER="-ginkgo.label-filter='${TIER_UPTOS}'"
 fi
 if [ -n "${E2E_SERIAL_SKIP}" ]; then
 	SKIP="-ginkgo.skip=${E2E_SERIAL_SKIP}"
@@ -77,9 +77,9 @@ while [[ $# -gt 0 ]]; do
 			fi
 			TIER_UPTOS="tier0"
 			for tier in $(seq 1 $2); do
-				TIER_UPTOS="${TIER_UPTOS}|tier${tier}"
+				TIER_UPTOS="${TIER_UPTOS} || tier${tier}"
 			done
-			FOCUS="-ginkgo.focus='${TIER_UPTOS}'"
+			LABEL_FILTER="-ginkgo.label-filter='${TIER_UPTOS}'"
 			shift
 			shift
 			;;
