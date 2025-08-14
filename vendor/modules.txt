@@ -207,7 +207,7 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/client
 # github.com/k8stopologyawareschedwg/podfingerprint v0.2.2
 ## explicit; go 1.17
 github.com/k8stopologyawareschedwg/podfingerprint
-# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.2
+# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.2 => github.com/shajmakh/resource-topology-exporter v0.0.0-20250811092508-282332b8621c
 ## explicit; go 1.23.0
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/dump
@@ -1209,3 +1209,4 @@ sigs.k8s.io/yaml/goyaml.v2
 # k8s.io/mount-utils => k8s.io/mount-utils v0.32.3
 # k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.32.3
 # k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.32.3
+# github.com/k8stopologyawareschedwg/resource-topology-exporter => github.com/shajmakh/resource-topology-exporter v0.0.0-20250811092508-282332b8621c
