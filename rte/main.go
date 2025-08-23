@@ -47,6 +47,11 @@ const (
 	defaultTopologyManagerScope = "container"
 )
 
+// Namespace Scoped
+
+// Cluster Scoped
+//+kubebuilder:rbac:groups=topology.node.k8s.io,resources=noderesourcetopologies,verbs=get;list;create;update
+
 func main() {
 	bi := version.GetBuildInfo()
 	klog.Infof("starting %s %s %s\n", version.ExporterProgramName(), bi.String(), runtime.Version())
