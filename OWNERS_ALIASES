@@ -1,17 +1,25 @@
+---
 # See the OWNERS docs at https://go.k8s.io/owners
 
 aliases:
-  numaresources-reviewers:
-    - ffromani
+  konflux-approvers:
+    - abraham2512
+    - fontivan
+    - rauhersu
+    - sabbir-47
     - shajmakh
-    - swatisehgal
-    - Tal-or
+    - yanirq
+  konflux-reviewers:
+    - shajmakh
+    - yanirq
   numaresources-approvers:
     - ffromani
     - shajmakh
     - swatisehgal
     - Tal-or
     - yanirq
-  konflux-approvers:
-    - yanirq
+  numaresources-reviewers:
+    - ffromani
     - shajmakh
+    - swatisehgal
+    - Tal-or
