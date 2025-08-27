@@ -1,8 +1,29 @@
+---
 # See the OWNERS docs at https://go.k8s.io/owners
 
 filters:
   ".*":
-    reviewers:
-      - numaresources-reviewers
     approvers:
       - numaresources-approvers
+    reviewers:
+      - numaresources-reviewers
+  ".konflux/*":
+    approvers:
+      - konflux-approvers
+    reviewers:
+      - konflux-reviewers
+  ".tekton/*":
+    approvers:
+      - konflux-approvers
+    reviewers:
+      - konflux-reviewers
+  "renovate.json":
+    approvers:
+      - konflux-approvers
+    reviewers:
+      - konflux-reviewers
+  "telco5g-konflux/":
+    approvers:
+      - konflux-approvers
+    reviewers:
+      - konflux-reviewers
