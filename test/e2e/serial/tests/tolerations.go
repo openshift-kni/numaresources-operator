@@ -110,7 +110,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 		})
 
 		When("invalid tolerations are submitted ", Label(label.Tier2), func() {
-			It("should handle invalid field: operator", func(ctx context.Context) {
+			It("[test_id:84302] should handle invalid field: operator", func(ctx context.Context) {
 				By("adding extra invalid tolerations with wrong operator field")
 				_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{
 					{
@@ -169,7 +169,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 			})
 		})
 
-		It("should enable to change tolerations in the RTE daemonsets", Label(label.Tier3), func(ctx context.Context) {
+		It("[test_id:84303] should enable to change tolerations in the RTE daemonsets", Label(label.Tier3), func(ctx context.Context) {
 			By("getting RTE manifests object")
 			// TODO: this is similar but not quite what the main operator does
 			rteManifests, err := rtemanifests.GetManifests(configuration.Plat, configuration.PlatVersion, "", true, true)
@@ -290,7 +290,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 			})
 
-			It("should evict running RTE pod if taint-toleration matching criteria is shaken - NROP CR toleration update", Label(label.Tier3, label.Slow), func(ctx context.Context) {
+			It("[test_id:84304] should evict running RTE pod if taint-toleration matching criteria is shaken - NROP CR toleration update", Label(label.Tier3, label.Slow), func(ctx context.Context) {
 				By("add toleration with value to the NROP CR")
 				tolerateVal := corev1.Toleration{
 					Key:      testKey,
@@ -345,7 +345,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				Expect(err).ToNot(HaveOccurred(), "pod %s/%s still exists", podOnNode.Namespace, podOnNode.Name)
 			})
 
-			It("should evict running RTE pod if taint-tolartion matching criteria is shaken - node taints update", Label(label.Tier3, label.Slow), func(ctx context.Context) {
+			It("[test_id:84305] should evict running RTE pod if taint-tolartion matching criteria is shaken - node taints update", Label(label.Tier3, label.Slow), func(ctx context.Context) {
 				By("taint one node with taint value and NoExecute effect")
 				var err error
 				workers, err = nodes.GetWorkers(fxt.DEnv())
@@ -711,7 +711,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				})
 			})
 
-			It("should evict RTE pod on tainted node with NoExecute effect and restore it when taint is removed", Label(label.Tier3), func(ctx context.Context) {
+			It("[test_id:84306] should evict RTE pod on tainted node with NoExecute effect and restore it when taint is removed", Label(label.Tier3), func(ctx context.Context) {
 				By("taint one worker node with NoExecute effect")
 				var err error
 				workers, err = nodes.GetWorkers(fxt.DEnv())
