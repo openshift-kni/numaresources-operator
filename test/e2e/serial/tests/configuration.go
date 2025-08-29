@@ -308,7 +308,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
 		})
 
-		It("should report the NodeGroupConfig in the status", Label("tier2", "openshift"), func() {
+		It("[test_id:84307] should report the NodeGroupConfig in the status", Label("tier2", "openshift"), func() {
 			nroKey := objects.NROObjectKey()
 			nroOperObj := nropv1.NUMAResourcesOperator{}
 
@@ -384,7 +384,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(err).ToNot(HaveOccurred(), "failed to check the NodeGroupConfig status for %q", nroKey.String())
 		})
 
-		It("should report relatedObjects in the status", Label("related_objects"), func(ctx context.Context) {
+		It("[test_id:84309] should report relatedObjects in the status", Label("related_objects"), func(ctx context.Context) {
 			By("getting NROP object")
 			nroKey := objects.NROObjectKey()
 			nroOperObj := nropv1.NUMAResourcesOperator{}
@@ -430,7 +430,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(nrsGot).To(Equal(nrsExpected), "mismatching related objects for NUMAResourcesScheduler")
 		})
 
-		It("ignores non-matching kubeletconfigs", Label(label.Slow, label.Tier1, label.OpenShift), func(ctx context.Context) {
+		It("[test_id:84310] ignores non-matching kubeletconfigs", Label(label.Slow, label.Tier1, label.OpenShift), func(ctx context.Context) {
 			By("getting the NROP object")
 			nroOperObj := &nropv1.NUMAResourcesOperator{}
 			nroKey := objects.NROObjectKey()
@@ -958,7 +958,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
 			})
 
-			It("should not allow configuring PoolName and MCP selector on same node group", Label(label.Tier2), func(ctx context.Context) {
+			It("[test_id:84311] should not allow configuring PoolName and MCP selector on same node group", Label(label.Tier2), func(ctx context.Context) {
 				labelSel := &metav1.LabelSelector{
 					MatchLabels: map[string]string{
 						"test2": "test2",
@@ -1004,7 +1004,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			})
 
-			It("should report the NodeGroupConfig in the NodeGroupStatus with NodePool set and allow updates", Label(label.Tier1, label.OpenShift), func(ctx context.Context) {
+			It("[test_id:84312] should report the NodeGroupConfig in the NodeGroupStatus with NodePool set and allow updates", Label(label.Tier1, label.OpenShift), func(ctx context.Context) {
 				mcp := objects.TestMCP()
 				By(fmt.Sprintf("create new MCP %q", mcp.Name))
 				// we rely on the fact that RTE DS will be created for a valid MCP even with machine count 0, that will
@@ -1270,7 +1270,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Expect(fxt.Client.Get(ctx, nroKey, nroObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
 			})
 
-			It("should reflect correct TM configuration in the NRT object attributes", Label(label.Tier0), func(ctx context.Context) {
+			It("[test_id:84315] should reflect correct TM configuration in the NRT object attributes", Label(label.Tier0), func(ctx context.Context) {
 				rteConfigMap := &corev1.ConfigMap{}
 				Eventually(func() bool {
 					updatedConfigMaps := &corev1.ConfigMapList{}
@@ -1320,7 +1320,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}
 			})
 
-			It("should change NRT attributes correctly when RTE is pointing to a different nodeGroup", Label(label.OpenShift, label.Slow, label.Tier2, label.Reboot), func(ctx context.Context) {
+			It("[test_id:84316] should change NRT attributes correctly when RTE is pointing to a different nodeGroup", Label(label.OpenShift, label.Slow, label.Tier2, label.Reboot), func(ctx context.Context) {
 				fxt.IsRebootTest = true
 				waitForMCPUpdateFunc := func(mcp *machineconfigv1.MachineConfigPool) {
 					_ = wait.With(fxt.Client).
