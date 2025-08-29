@@ -62,7 +62,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-07-23T11:36:11Z"
+    createdAt: "2025-08-13T11:15:13Z"
     olm.skipRange: '>=4.19.0 <4.20.0'
     operatorframework.io/cluster-monitoring: "true"
     operators.operatorframework.io/builder: operator-sdk-v1.40.0
@@ -357,13 +357,6 @@ spec:
         - apiGroups:
           - ""
           resources:
-          - configmaps
-          - serviceaccounts
-          verbs:
-          - '*'
-        - apiGroups:
-          - ""
-          resources:
           - events
           verbs:
           - create
@@ -376,24 +369,9 @@ spec:
           - list
           - watch
         - apiGroups:
-          - ""
-          resources:
-          - pods
-          verbs:
-          - get
-          - list
-          - watch
-        - apiGroups:
           - apiextensions.k8s.io
           resources:
           - customresourcedefinitions
-          verbs:
-          - '*'
-        - apiGroups:
-          - apps
-          resources:
-          - daemonsets
-          - deployments
           verbs:
           - '*'
         - apiGroups:
@@ -434,8 +412,11 @@ spec:
           - nodetopology.openshift.io
           resources:
           - numaresourcesoperators
+          - numaresourcesschedulers
           verbs:
-          - '*'
+          - get
+          - list
+          - watch
         - apiGroups:
           - nodetopology.openshift.io
           resources:
@@ -453,24 +434,10 @@ spec:
           - patch
           - update
         - apiGroups:
-          - nodetopology.openshift.io
-          resources:
-          - numaresourcesschedulers
-          verbs:
-          - create
-          - delete
-          - get
-          - list
-          - patch
-          - update
-          - watch
-        - apiGroups:
           - rbac.authorization.k8s.io
           resources:
           - clusterrolebindings
           - clusterroles
-          - rolebindings
-          - roles
           verbs:
           - '*'
         - apiGroups:
@@ -607,13 +574,37 @@ spec:
         - apiGroups:
           - ""
           resources:
+          - configmaps
+          - serviceaccounts
           - services
+          verbs:
+          - '*'
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - apps
+          resources:
+          - daemonsets
+          - deployments
           verbs:
           - '*'
         - apiGroups:
           - networking.k8s.io
           resources:
           - networkpolicies
+          verbs:
+          - '*'
+        - apiGroups:
+          - rbac.authorization.k8s.io
+          resources:
+          - rolebindings
+          - roles
           verbs:
           - '*'
         serviceAccountName: numaresources-controller-manager

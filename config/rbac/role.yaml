@@ -7,13 +7,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - configmaps
-  - serviceaccounts
-  verbs:
-  - '*'
-- apiGroups:
-  - ""
-  resources:
   - events
   verbs:
   - create
@@ -26,24 +19,9 @@ rules:
   - list
   - watch
 - apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - apiextensions.k8s.io
   resources:
   - customresourcedefinitions
-  verbs:
-  - '*'
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  - deployments
   verbs:
   - '*'
 - apiGroups:
@@ -84,8 +62,11 @@ rules:
   - nodetopology.openshift.io
   resources:
   - numaresourcesoperators
+  - numaresourcesschedulers
   verbs:
-  - '*'
+  - get
+  - list
+  - watch
 - apiGroups:
   - nodetopology.openshift.io
   resources:
@@ -103,24 +84,10 @@ rules:
   - patch
   - update
 - apiGroups:
-  - nodetopology.openshift.io
-  resources:
-  - numaresourcesschedulers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - clusterrolebindings
   - clusterroles
-  - rolebindings
-  - roles
   verbs:
   - '*'
 - apiGroups:
@@ -148,12 +115,36 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
+  - serviceaccounts
   - services
+  verbs:
+  - '*'
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  - deployments
   verbs:
   - '*'
 - apiGroups:
   - networking.k8s.io
   resources:
   - networkpolicies
+  verbs:
+  - '*'
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings
+  - roles
   verbs:
   - '*'

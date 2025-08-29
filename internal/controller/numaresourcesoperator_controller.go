@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -93,30 +94,30 @@ type NUMAResourcesOperatorReconciler struct {
 	ForwardMCPConds bool
 }
 
-// TODO: narrow down
-
 // Namespace Scoped
+//+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch,namespace="numaresources"
 //+kubebuilder:rbac:groups="",resources=services,verbs=*,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*,namespace="numaresources"
+//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=*,namespace="numaresources"
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=*,namespace="numaresources"
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=*,namespace="numaresources"
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=*,namespace="numaresources"
 
 // Cluster Scoped
-//+kubebuilder:rbac:groups=topology.node.k8s.io,resources=noderesourcetopologies,verbs=get;list;create;update
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=list
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusteroperators,verbs=get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=get
-//+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=machineconfigs,verbs=*
 //+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=machineconfigpools,verbs=get;list;watch
+
+//+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=machineconfigs,verbs=*
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=*
 //+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=*
-//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=*
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=*
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=*
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
-//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
-//+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
+
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=list
-//+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=*
+//+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+//+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=get;list;watch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/finalizers,verbs=update
 
@@ -636,10 +637,12 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 		handler.EnqueueRequestsFromMapFunc(r.configMapToNUMAResourceOperator),
 		builder.WithPredicates(configMapPredicates)).
 		Owns(&apiextensionv1.CustomResourceDefinition{}).
+		Owns(&corev1.Service{}, builder.WithPredicates(p)).
 		Owns(&corev1.ServiceAccount{}, builder.WithPredicates(p)).
 		Owns(&rbacv1.RoleBinding{}, builder.WithPredicates(p)).
 		Owns(&rbacv1.Role{}, builder.WithPredicates(p)).
 		Owns(&appsv1.DaemonSet{}, builder.WithPredicates(p)).
+		Owns(&networkingv1.NetworkPolicy{}, builder.WithPredicates(p)).
 		Complete(r)
 }
 
