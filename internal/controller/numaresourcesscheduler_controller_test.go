@@ -49,6 +49,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
+	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
@@ -847,9 +848,12 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 		numOfMasters := 3
 
 		When("kubelet fix is enabled", func() {
-			fixedVersion, _ := platform.ParseVersion(activePodsResourcesSupportSince)
+			fixedVersion, _ := platform.ParseVersion("4.20.0")
+			unfixedVersion, _ := platform.ParseVersion("4.19.0")            // can't (and we must not even if we can) rewrite history
+			futureFixedVersionZstream, _ := platform.ParseVersion("4.20.1") // we must never regress
+			futureFixedVersion, _ := platform.ParseVersion("4.21.0")        // we must never regress
 
-			DescribeTable("should configure by default the informerMode to the expected when field is not set", func(reconcilerPlatInfo PlatformInfo, expectedInformer string) {
+			DescribeTable("should configure by default the informerMode to the expected when field is not set", func(reconcilerPlatInfo platforminfo.PlatformInfo, expectedInformer string) {
 				var err error
 				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
 				initObjects := []runtime.Object{nrs}
@@ -876,17 +880,18 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				Expect(c).ToNot(BeNil())
 				Expect(c.Status).To(Equal(expectedDedicatedActiveStatus))
 			},
-				Entry("with fixed Openshift the default informer is Shared", PlatformInfo{
-					Platform: platform.OpenShift,
-					Version:  fixedVersion,
-				}, depmanifests.CacheInformerShared),
-				Entry("with fixed Hypershift the default informer is Shared", PlatformInfo{
-					Platform: platform.HyperShift,
-					Version:  fixedVersion,
-				}, depmanifests.CacheInformerShared),
-				Entry("with unknown platform the default informer is Dedicated (unchanged)", PlatformInfo{}, depmanifests.CacheInformerDedicated))
+				Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, fixedVersion), depmanifests.CacheInformerShared),
+				Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, fixedVersion), depmanifests.CacheInformerShared),
+				Entry("with unfixed platform the default informer is Dedicated (unchanged)", platforminfo.New(platform.OpenShift, unfixedVersion), depmanifests.CacheInformerDedicated),
+				Entry("with unfixed platform the default informer is Dedicated (unchanged)", platforminfo.New(platform.HyperShift, unfixedVersion), depmanifests.CacheInformerDedicated),
+				Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, futureFixedVersion), depmanifests.CacheInformerShared),
+				Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, futureFixedVersion), depmanifests.CacheInformerShared),
+				Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, futureFixedVersionZstream), depmanifests.CacheInformerShared),
+				Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, futureFixedVersionZstream), depmanifests.CacheInformerShared),
+				Entry("with unknown platform the default informer is Dedicated (unchanged)", platforminfo.PlatformInfo{}, depmanifests.CacheInformerDedicated),
+			)
 
-			DescribeTable("should preserve informerMode value if set", func(reconcilerPlatInfo PlatformInfo) {
+			DescribeTable("should preserve informerMode value if set", func(reconcilerPlatInfo platforminfo.PlatformInfo) {
 				var err error
 				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
 				infMode := nropv1.SchedulerInformerDedicated
@@ -903,17 +908,17 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				Expect(err).ToNot(HaveOccurred())
 				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(infMode))
 			},
-				Entry("with Openshift", PlatformInfo{
+				Entry("with Openshift", platforminfo.PlatformInfo{
 					Platform: platform.OpenShift,
 					Version:  fixedVersion,
 				}),
-				Entry("with Hypershift", PlatformInfo{
+				Entry("with Hypershift", platforminfo.PlatformInfo{
 					Platform: platform.HyperShift,
 					Version:  fixedVersion,
 				}),
-				Entry("with unknown platform", PlatformInfo{}))
+				Entry("with unknown platform", platforminfo.PlatformInfo{}))
 
-			DescribeTable("should allow to update the informerMode to be Dedicated after an overridden default", func(reconcilerPlatInfo PlatformInfo) {
+			DescribeTable("should allow to update the informerMode to be Dedicated after an overridden default", func(reconcilerPlatInfo platforminfo.PlatformInfo) {
 				var err error
 				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
 				initObjects := []runtime.Object{nrs}
@@ -948,11 +953,11 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(informerMode))
 			},
-				Entry("with Openshift", PlatformInfo{
+				Entry("with Openshift", platforminfo.PlatformInfo{
 					Platform: platform.OpenShift,
 					Version:  fixedVersion,
 				}),
-				Entry("with Hypershift", PlatformInfo{
+				Entry("with Hypershift", platforminfo.PlatformInfo{
 					Platform: platform.HyperShift,
 					Version:  fixedVersion,
 				}))
@@ -972,7 +977,7 @@ var _ = Describe("Test computeSchedulerReplicas", func() {
 	DescribeTable("should compute replicas correctly for different platforms and node counts",
 		func(platform platform.Platform, numControlPlane, numWorker int, expectedReplicas *int32, expectError bool) {
 			// setup reconciler with platform info
-			reconciler.PlatformInfo = PlatformInfo{
+			reconciler.PlatformInfo = platforminfo.PlatformInfo{
 				Platform: platform,
 				Version:  "v4.14.0",
 			}
@@ -989,7 +994,7 @@ var _ = Describe("Test computeSchedulerReplicas", func() {
 			// recreate reconciler with nodes
 			reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nodes...)
 			Expect(err).ToNot(HaveOccurred())
-			reconciler.PlatformInfo = PlatformInfo{
+			reconciler.PlatformInfo = platforminfo.PlatformInfo{
 				Platform: platform,
 				Version:  "v4.14.0",
 			}
@@ -1035,7 +1040,7 @@ var _ = Describe("Test computeSchedulerReplicas", func() {
 	Context("when replicas are explicitly set", func() {
 		It("should return the explicitly set replicas without checking nodes", func() {
 			// setup reconciler with HyperShift platform (uses worker nodes)
-			reconciler.PlatformInfo = PlatformInfo{
+			reconciler.PlatformInfo = platforminfo.PlatformInfo{
 				Platform: platform.HyperShift,
 				Version:  "v4.14.0",
 			}
@@ -1044,7 +1049,7 @@ var _ = Describe("Test computeSchedulerReplicas", func() {
 			nodes := fakeNodes(3, 0) // only control-plane nodes
 			reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nodes...)
 			Expect(err).ToNot(HaveOccurred())
-			reconciler.PlatformInfo = PlatformInfo{
+			reconciler.PlatformInfo = platforminfo.PlatformInfo{
 				Platform: platform.HyperShift,
 				Version:  "v4.14.0",
 			}
@@ -1062,57 +1067,6 @@ var _ = Describe("Test computeSchedulerReplicas", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).ToNot(BeNil())
 			Expect(*result).To(Equal(explicitReplicas))
-		})
-	})
-})
-
-var _ = Describe("Test scheduler spec PreNormalize", func() {
-	When("Spec.SchedulerInformer is not set by the user", func() {
-		It("should override default informer to Shared if kubelet is fixed - first supported zstream version", func() {
-			v, _ := platform.ParseVersion(activePodsResourcesSupportSince)
-			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			Expect(*spec.SchedulerInformer).To(Equal(nropv1.SchedulerInformerShared))
-		})
-
-		It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (zstream)", func() {
-			v, _ := platform.ParseVersion("4.20.1000")
-			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			Expect(*spec.SchedulerInformer).To(Equal(nropv1.SchedulerInformerShared))
-		})
-
-		It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (ystream)", func() {
-			v, _ := platform.ParseVersion("4.21.0")
-			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			Expect(*spec.SchedulerInformer).To(Equal(nropv1.SchedulerInformerShared))
-		})
-
-		It("should not override default informer if kubelet is not fixed - version is less than first supported (zstream)", func() {
-			// this is only for testing purposes as there is plan to backport the fix to older minor versions
-			// will need to remove this test if the fix is supported starting the first zstream of the release
-			v, _ := platform.ParseVersion("4.20.0")
-			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			Expect(spec.SchedulerInformer).To(BeNil())
-		})
-
-		It("should not override default informer if kubelet is not fixed - version is less than first supported (ystream)", func() {
-			v, _ := platform.ParseVersion("4.13.0")
-			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			Expect(spec.SchedulerInformer).To(BeNil())
-		})
-	})
-	When("Spec.SchedulerInformer is set by the user", func() {
-		It("should preserve informer value set by the user even if kubelet is fixed", func() {
-			v, _ := platform.ParseVersion(activePodsResourcesSupportSince)
-			spec := nropv1.NUMAResourcesSchedulerSpec{
-				SchedulerInformer: ptr.To(nropv1.SchedulerInformerDedicated),
-			}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			Expect(*spec.SchedulerInformer).To(Equal(nropv1.SchedulerInformerDedicated))
 		})
 	})
 })
