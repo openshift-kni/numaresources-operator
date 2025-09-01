@@ -41,7 +41,9 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	depmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
@@ -675,9 +677,12 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 		var reconciler *NUMAResourcesSchedulerReconciler
 
 		ginkgo.When("kubelet fix is enabled", func() {
-			fixedVersion, _ := platform.ParseVersion(activePodsResourcesSupportSince)
+			fixedVersion, _ := platform.ParseVersion("4.17.40")
+			unfixedVersion, _ := platform.ParseVersion("4.17.0")             // can't (and we must not even if we can) rewrite history
+			futureFixedVersionZstream, _ := platform.ParseVersion("4.17.41") // we must never regress
+			futureFixedVersion, _ := platform.ParseVersion("4.21.0")         // we must never regress
 
-			ginkgo.DescribeTable("should configure by default the informerMode to the expected when field is not set", func(reconcilerPlatInfo PlatformInfo, expectedInformer string) {
+			ginkgo.DescribeTable("should configure by default the informerMode to the expected when field is not set", func(reconcilerPlatInfo platforminfo.PlatformInfo, expectedInformer string) {
 				var err error
 				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
 				reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(nrs)
@@ -702,17 +707,18 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				gomega.Expect(c).ToNot(gomega.BeNil())
 				gomega.Expect(c.Status).To(gomega.Equal(expectedDedicatedActiveStatus))
 			},
-				ginkgo.Entry("with fixed Openshift the default informer is Shared", PlatformInfo{
-					Platform: platform.OpenShift,
-					Version:  fixedVersion,
-				}, depmanifests.CacheInformerShared),
-				ginkgo.Entry("with fixed Hypershift the default informer is Shared", PlatformInfo{
-					Platform: platform.HyperShift,
-					Version:  fixedVersion,
-				}, depmanifests.CacheInformerShared),
-				ginkgo.Entry("with unknown platform the default informer is Dedicated (unchanged)", PlatformInfo{}, depmanifests.CacheInformerDedicated))
+				ginkgo.Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, fixedVersion), depmanifests.CacheInformerShared),
+				ginkgo.Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, fixedVersion), depmanifests.CacheInformerShared),
+				ginkgo.Entry("with unfixed platform the default informer is Dedicated (unchanged)", platforminfo.New(platform.OpenShift, unfixedVersion), depmanifests.CacheInformerDedicated),
+				ginkgo.Entry("with unfixed platform the default informer is Dedicated (unchanged)", platforminfo.New(platform.HyperShift, unfixedVersion), depmanifests.CacheInformerDedicated),
+				ginkgo.Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, futureFixedVersion), depmanifests.CacheInformerShared),
+				ginkgo.Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, futureFixedVersion), depmanifests.CacheInformerShared),
+				ginkgo.Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, futureFixedVersionZstream), depmanifests.CacheInformerShared),
+				ginkgo.Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, futureFixedVersionZstream), depmanifests.CacheInformerShared),
+				ginkgo.Entry("with unknown platform the default informer is Dedicated (unchanged)", platforminfo.PlatformInfo{}, depmanifests.CacheInformerDedicated),
+			)
 
-			ginkgo.DescribeTable("should preserve informerMode value if set", func(reconcilerPlatInfo PlatformInfo) {
+			ginkgo.DescribeTable("should preserve informerMode value if set", func(reconcilerPlatInfo platforminfo.PlatformInfo) {
 				var err error
 				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
 				infMode := nropv1.SchedulerInformerDedicated
@@ -727,17 +733,17 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				gomega.Expect(err).ToNot(gomega.HaveOccurred())
 				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(infMode))
 			},
-				ginkgo.Entry("with Openshift", PlatformInfo{
+				ginkgo.Entry("with Openshift", platforminfo.PlatformInfo{
 					Platform: platform.OpenShift,
 					Version:  fixedVersion,
 				}),
-				ginkgo.Entry("with Hypershift", PlatformInfo{
+				ginkgo.Entry("with Hypershift", platforminfo.PlatformInfo{
 					Platform: platform.HyperShift,
 					Version:  fixedVersion,
 				}),
-				ginkgo.Entry("with unknown platform", PlatformInfo{}))
+				ginkgo.Entry("with unknown platform", platforminfo.PlatformInfo{}))
 
-			ginkgo.DescribeTable("should allow to update the informerMode to be Dedicated after an overridden default", func(reconcilerPlatInfo PlatformInfo) {
+			ginkgo.DescribeTable("should allow to update the informerMode to be Dedicated after an overridden default", func(reconcilerPlatInfo platforminfo.PlatformInfo) {
 				var err error
 				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
 				reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(nrs)
@@ -770,63 +776,14 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(informerMode))
 			},
-				ginkgo.Entry("with Openshift", PlatformInfo{
+				ginkgo.Entry("with Openshift", platforminfo.PlatformInfo{
 					Platform: platform.OpenShift,
 					Version:  fixedVersion,
 				}),
-				ginkgo.Entry("with Hypershift", PlatformInfo{
+				ginkgo.Entry("with Hypershift", platforminfo.PlatformInfo{
 					Platform: platform.HyperShift,
 					Version:  fixedVersion,
 				}))
-		})
-	})
-})
-
-var _ = ginkgo.Describe("Test scheduler spec platformNormalize", func() {
-	ginkgo.When("Spec.SchedulerInformer is not set by the user", func() {
-		ginkgo.It("should override default informer to Shared if kubelet is fixed - first supported zstream version", func() {
-			v, _ := platform.ParseVersion(activePodsResourcesSupportSince)
-			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			gomega.Expect(*spec.SchedulerInformer).To(gomega.Equal(nropv1.SchedulerInformerShared))
-		})
-
-		ginkgo.It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (zstream)", func() {
-			v, _ := platform.ParseVersion("4.17.41")
-			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			gomega.Expect(*spec.SchedulerInformer).To(gomega.Equal(nropv1.SchedulerInformerShared))
-		})
-
-		ginkgo.It("should override default informer to Shared if kubelet is fixed - version is greater than first supported (ystream)", func() {
-			v, _ := platform.ParseVersion("4.20.0")
-			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			gomega.Expect(*spec.SchedulerInformer).To(gomega.Equal(nropv1.SchedulerInformerShared))
-		})
-
-		ginkgo.It("should not override default informer if kubelet is not fixed - version is less than first supported (zstream)", func() {
-			v, _ := platform.ParseVersion("4.17.8")
-			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			gomega.Expect(spec.SchedulerInformer).To(gomega.BeNil())
-		})
-
-		ginkgo.It("should not override default informer if kubelet is not fixed - version is less than first supported (ystream)", func() {
-			v, _ := platform.ParseVersion("4.13.0")
-			spec := nropv1.NUMAResourcesSchedulerSpec{}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			gomega.Expect(spec.SchedulerInformer).To(gomega.BeNil())
-		})
-	})
-	ginkgo.When("Spec.SchedulerInformer is set by the user", func() {
-		ginkgo.It("should preserve informer value set by the user even if kubelet is fixed", func() {
-			v, _ := platform.ParseVersion(activePodsResourcesSupportSince)
-			spec := nropv1.NUMAResourcesSchedulerSpec{
-				SchedulerInformer: ptr.To(nropv1.SchedulerInformerDedicated),
-			}
-			platformNormalize(&spec, PlatformInfo{Platform: platform.OpenShift, Version: v})
-			gomega.Expect(*spec.SchedulerInformer).To(gomega.Equal(nropv1.SchedulerInformerDedicated))
 		})
 	})
 })
