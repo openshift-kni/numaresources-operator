@@ -56,6 +56,7 @@ import (
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/controllers"
 	"github.com/openshift-kni/numaresources-operator/internal/api/features"
+	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/controlplane"
@@ -297,10 +298,7 @@ func main() {
 			SchedulerManifests: schedMf,
 			Namespace:          namespace,
 			AutodetectReplicas: info.NodeCount,
-			PlatformInfo: controllers.PlatformInfo{
-				Platform: clusterPlatform,
-				Version:  clusterPlatformVersion,
-			},
+			PlatformInfo:       platforminfo.New(clusterPlatform, clusterPlatformVersion),
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
 			os.Exit(1)

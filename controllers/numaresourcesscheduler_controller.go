@@ -45,6 +45,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
@@ -57,17 +58,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 )
 
-const (
-	// ActivePodsResourcesSupportSince defines the OCP version which started to support the fixed kubelet
-	// in which the PodResourcesAPI lists the active pods by default
-	activePodsResourcesSupportSince = "4.17.40"
-)
-
-type PlatformInfo struct {
-	Platform platform.Platform
-	Version  platform.Version
-}
-
 // NUMAResourcesSchedulerReconciler reconciles a NUMAResourcesScheduler object
 type NUMAResourcesSchedulerReconciler struct {
 	client.Client
@@ -75,7 +65,7 @@ type NUMAResourcesSchedulerReconciler struct {
 	SchedulerManifests schedmanifests.Manifests
 	Namespace          string
 	AutodetectReplicas int
-	PlatformInfo       PlatformInfo
+	PlatformInfo       platforminfo.PlatformInfo
 }
 
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
@@ -269,26 +259,21 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	return schedStatus, nil
 }
 
-func platformNormalize(spec *nropv1.NUMAResourcesSchedulerSpec, platInfo PlatformInfo) {
+func platformNormalize(spec *nropv1.NUMAResourcesSchedulerSpec, platInfo platforminfo.PlatformInfo) {
 	if platInfo.Platform != platform.OpenShift && platInfo.Platform != platform.HyperShift {
 		return
 	}
-
-	parsedVersion, _ := platform.ParseVersion(activePodsResourcesSupportSince)
-	ok, err := platInfo.Version.AtLeast(parsedVersion)
-	if err != nil {
-		klog.Infof("failed to compare version %v with %v, err %v", parsedVersion, platInfo.Version, err)
+	if spec.SchedulerInformer != nil {
+		// assume user-provided value. Nothing to do.
+		klog.V(4).InfoS("SchedulerInformer explicit value", "Platform", platInfo.Platform, "PlatformVersion", platInfo.Version.String(), "SchedulerInformer", *spec.SchedulerInformer)
 		return
 	}
-
-	if !ok {
+	if !platInfo.Properties.PodResourcesListFilterActivePods {
+		// keep shared default for backward compatibility. TODO: review/switch default in 4.21
 		return
 	}
-
-	if spec.SchedulerInformer == nil {
-		spec.SchedulerInformer = ptr.To(nropv1.SchedulerInformerShared)
-		klog.V(4).InfoS("SchedulerInformer default is overridden", "Platform", platInfo.Platform, "PlatformVersion", platInfo.Version.String(), "SchedulerInformer", &spec.SchedulerInformer)
-	}
+	spec.SchedulerInformer = ptr.To(nropv1.SchedulerInformerShared)
+	klog.V(4).InfoS("SchedulerInformer default is overridden", "Platform", platInfo.Platform, "PlatformVersion", platInfo.Version.String(), "SchedulerInformer", *spec.SchedulerInformer)
 }
 
 func buildDedicatedInformerCondition(instance nropv1.NUMAResourcesScheduler, normalized nropv1.NUMAResourcesSchedulerSpec) metav1.Condition {
