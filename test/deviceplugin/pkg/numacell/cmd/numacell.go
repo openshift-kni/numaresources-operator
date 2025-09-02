@@ -25,12 +25,12 @@ import (
 
 	"github.com/jaypipes/ghw/pkg/option"
 	"github.com/jaypipes/ghw/pkg/topology"
-	"github.com/kubevirt/device-plugin-manager/pkg/dpm"
 
 	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/yaml"
 
+	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/dpm"
 	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
 	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/plugin"
@@ -45,6 +45,14 @@ func summarize(topoInfo *topology.Info) string {
 		}
 	}
 	return buf.String()
+}
+
+func logSummary(topoInfo *topology.Info) {
+	for _, node := range topoInfo.Nodes {
+		for _, core := range node.Cores {
+			klog.V(2).InfoS("hardware summary", "NUMANode", node.ID, "core", core.String())
+		}
+	}
 }
 
 func render(w io.Writer) int {
@@ -69,27 +77,36 @@ func render(w io.Writer) int {
 }
 
 func Execute() {
-	var renderManifest bool
+	klog.InitFlags(nil)
+
+	var discoverMode bool
+	var renderMode bool
 	var sysfsPath string
 	var deviceCount int
-	flag.BoolVar(&renderManifest, "render", false, "render daemonset manifest and exit")
+	flag.BoolVar(&discoverMode, "discover", false, "discover NUMA resources and exit")
+	flag.BoolVar(&renderMode, "render", false, "render daemonset manifest and exit")
 	flag.StringVar(&sysfsPath, "sysfs", "/sys", "mount path of sysfs")
 	flag.IntVar(&deviceCount, "devices", api.NUMACellDefaultDeviceCount, "amount of devices to expose (will not be decremented anyway)")
 	flag.Parse()
 
-	if renderManifest {
+	if renderMode {
 		os.Exit(render(os.Stdout))
 	}
 
-	klog.Infof("using sysfs at %q", sysfsPath)
 	topoInfo, err := topology.New(option.WithPathOverrides(option.PathOverrides{
 		"/sys": sysfsPath,
 	}))
 	if err != nil {
-		klog.Fatalf("error getting topology info from %q: %v", sysfsPath, err)
+		klog.ErrorS(err, "error getting topology info from sysfs", "mountPath", sysfsPath)
 	}
 
-	klog.Infof("hardware detected:\n%s", summarize(topoInfo))
+	if discoverMode {
+		fmt.Printf("%s", summarize(topoInfo))
+		os.Exit(0)
+	}
+
+	klog.InfoS("NUMACell device plugin starting ", "sysfs", sysfsPath)
+	logSummary(topoInfo)
 
 	manager := dpm.NewManager(plugin.NewNUMACellLister(topoInfo, deviceCount))
 	manager.Run()
