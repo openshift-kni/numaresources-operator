@@ -39,10 +39,10 @@ type NUMACellLister struct {
 
 func NewNUMACellLister(topoInfo *topology.Info, deviceCount int) NUMACellLister {
 	if deviceCount <= 0 {
-		klog.Warningf("invalid devices count, reset to %d", numacellapi.NUMACellDefaultDeviceCount)
+		klog.InfoS("invalid devices count, forced reset", "devicesPerNUMACell", numacellapi.NUMACellDefaultDeviceCount)
 		deviceCount = numacellapi.NUMACellDefaultDeviceCount
 	}
-	klog.Infof("NUMACell: %d devices per NUMA cell", deviceCount)
+	klog.InfoS("detected device count ", "devicesPerNUMACell", deviceCount)
 	return NUMACellLister{
 		topoInfo:    topoInfo,
 		nameToID:    make(map[string]int64),
@@ -76,7 +76,7 @@ func (ncl NUMACellLister) Discover(pluginListCh chan dpm.PluginNameList) {
 // NewPlugin initializes new device plugin with NUMACell specific attributes.
 func (ncl NUMACellLister) NewPlugin(deviceID string) dpm.PluginInterface {
 	numacellID, found := ncl.nameToID[deviceID]
-	klog.Infof("Creating device plugin %s -> %d (%v)", deviceID, numacellID, found)
+	klog.InfoS("Creating device plugin", "deviceID", deviceID, "NUMACellID", numacellID, "found", found)
 	return &NUMACellDevicePlugin{
 		deviceID:    deviceID,
 		numacellID:  numacellID,
@@ -114,10 +114,10 @@ func (dpi *NUMACellDevicePlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.De
 	// Send initial list of devices
 	resp := new(pluginapi.ListAndWatchResponse)
 	resp.Devices = devs
-	klog.Infof("send devices %v\n", resp)
+	klog.V(4).InfoS("ListAndWatchResponse", "data", resp)
 
 	if err := s.Send(resp); err != nil {
-		klog.Errorf("failed to list NUMA cells: %v\n", err)
+		klog.ErrorS(err, "failed to list NUMA cells")
 		return err
 	}
 
@@ -125,7 +125,7 @@ func (dpi *NUMACellDevicePlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.De
 	for range dpi.update {
 		err := s.Send(&pluginapi.ListAndWatchResponse{Devices: devs})
 		if err != nil {
-			klog.Errorf("error sending ListAndWatchResponse: %v", err)
+			klog.ErrorS(err, "error sending ListAndWatchResponse")
 			return err
 		}
 	}
@@ -138,7 +138,7 @@ func (dpi *NUMACellDevicePlugin) Allocate(ctx context.Context, r *pluginapi.Allo
 
 	dpi.update <- message{}
 
-	klog.Infof("Allocate() called with %+v", r)
+	klog.V(4).InfoS("Allocate()", "request", r)
 	for _, container := range r.ContainerRequests {
 		if len(container.DevicesIDs) != 1 {
 			return nil, fmt.Errorf("can't allocate more than 1 numacell")
@@ -161,7 +161,7 @@ func (dpi *NUMACellDevicePlugin) Allocate(ctx context.Context, r *pluginapi.Allo
 
 		response.ContainerResponses = append(response.ContainerResponses, containerResp)
 	}
-	klog.Infof("AllocateResponse send: %+v", response)
+	klog.V(4).InfoS("Allocate", "response", response)
 	return &response, nil
 }
 

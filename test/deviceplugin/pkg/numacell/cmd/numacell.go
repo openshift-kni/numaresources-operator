@@ -47,6 +47,14 @@ func summarize(topoInfo *topology.Info) string {
 	return buf.String()
 }
 
+func logSummary(topoInfo *topology.Info) {
+	for _, node := range topoInfo.Nodes {
+		for _, core := range node.Cores {
+			klog.V(2).InfoS("hardware summary", "NUMANode", node.ID, "core", core.String())
+		}
+	}
+}
+
 func render(w io.Writer) int {
 	nodeSelector := map[string]string{
 		"${NODELABEL}": "${NODEVALUE}",
@@ -69,6 +77,8 @@ func render(w io.Writer) int {
 }
 
 func Execute() {
+	klog.InitFlags(nil)
+
 	var renderManifest bool
 	var sysfsPath string
 	var deviceCount int
@@ -81,15 +91,15 @@ func Execute() {
 		os.Exit(render(os.Stdout))
 	}
 
-	klog.Infof("using sysfs at %q", sysfsPath)
+	klog.InfoS("scanning sysfs", "mountPath", sysfsPath)
 	topoInfo, err := topology.New(option.WithPathOverrides(option.PathOverrides{
 		"/sys": sysfsPath,
 	}))
 	if err != nil {
-		klog.Fatalf("error getting topology info from %q: %v", sysfsPath, err)
+		klog.ErrorS(err, "error getting topology info from sysfs", "mountPath", sysfsPath)
 	}
 
-	klog.Infof("hardware detected:\n%s", summarize(topoInfo))
+	logSummary(topoInfo)
 
 	manager := dpm.NewManager(plugin.NewNUMACellLister(topoInfo, deviceCount))
 	manager.Run()
