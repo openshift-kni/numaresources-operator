@@ -13,7 +13,8 @@
 - AI-assisted commits must include the `Assisted-by` tag in the bottom section, alongside the already mandatory
   `Signed-off-by` tag (DCO). The value of the tag must include the AI assistant being used and its version.
   Example: `Assisted-by: Cursor v1.2.2`
-- AI-assisted commits must include the `AI-Attribution` tag in the bottom section. The tag must be an
+- AI-assisted commits must include the `AI-attribution` tag in the bottom section. The tag must be an
   Abbreviated Statement in the https://aiattribution.github.io/ format.
+  Example: `AI-attribution: AIA EAI Hin R claude-4-sonnet v1.0`
   We acknowledge, this duplicates the `Assisted-by` content, but is necessary for logistic reasons.
 - AI-assisted commits should adhere to the project rules outlined in `PROMPTING.md`
