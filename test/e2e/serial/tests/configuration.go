@@ -827,7 +827,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						klog.Infof("reverting configuration via the kubeletconfig owner %s/%s", ref.Kind, ref.Name)
 
 						// using unstructured object to modify the Topology Manager Policy through performance profile
-						updatePerformanceProfileFieldUnstructured(dynamicClient, ctx, ref.Name, v1beta1.NoneTopologyManagerPolicy, "spec", "numa", "topologyPolicy")
+						updatePerformanceProfileFieldUnstructured(dynamicClient, ctx, ref.Name, initialTopologyManagerPolicy, "spec", "numa", "topologyPolicy")
 					}
 
 					By("waiting for mcp to update")
