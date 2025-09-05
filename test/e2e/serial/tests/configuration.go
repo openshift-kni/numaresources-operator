@@ -482,7 +482,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			initialNrtList, err = e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
 			Expect(err).ToNot(HaveOccurred(), "cannot get any NodeResourceTopology object from the cluster")
 
-			mcpsInfo, err := buildMCPsInfo(fxt.Client, context.TODO(), *nroOperObj)
+			mcpsInfo, err := buildMCPsInfo(fxt, context.TODO(), *nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mcpsInfo).ToNot(BeEmpty())
 
@@ -540,7 +540,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}
 
 				// update kubeletconfig via the performanceprofile using dynamic client
-				fxt.Log.log.Info("update configuration via the kubeletconfig", "owner", ref.Kind+"/"+ref.Name)
+				fxt.Log.Info("update configuration via the kubeletconfig", "owner", ref.Kind+"/"+ref.Name)
 				tmScopeAnn := fmt.Sprintf("{\"topologyManagerScope\": %q, \"cpuManagerPolicyOptions\": {\"full-pcpus-only\": \"false\"}}", newTMScope)
 				updatePerformanceProfileFieldUnstructured(dynamicClient, ctx, ref.Name, tmScopeAnn, "metadata", "annotations", "kubeletconfig.experimental")
 			}
@@ -557,7 +557,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 				currentTMScope := kcObj.TopologyManagerScope
 
-				mcpsInfo, err := buildMCPsInfo(fxt.Client, context.TODO(), *nroOperObj)
+				mcpsInfo, err := buildMCPsInfo(fxt, context.TODO(), *nroOperObj)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(mcpsInfo).ToNot(BeEmpty())
 
@@ -587,12 +587,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						updatePerformanceProfileFieldUnstructured(dynamicClient, ctx, ref.Name, tmScopeAnn, "metadata", "annotations", "kubeletconfig.experimental")
 					}
 					By("waiting for mcp to update")
-					waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, time.Now().String(), mcpsInfo...)
+					waitForMcpUpdate(fxt, context.TODO(), MachineConfig, time.Now().String(), mcpsInfo...)
 				}
 			}()
 
 			By("waiting for mcp to update")
-			waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, time.Now().String(), mcpsInfo...)
+			waitForMcpUpdate(fxt, context.TODO(), MachineConfig, time.Now().String(), mcpsInfo...)
 
 			By("checking that NUMAResourcesOperator's ConfigMap has changed")
 			cmList := &corev1.ConfigMapList{}
@@ -717,7 +717,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			err := fxt.Client.Get(ctx, nroKey, &nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 
-			mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, nroOperObj)
+			mcpsInfo, err := buildMCPsInfo(fxt, ctx, nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mcpsInfo).ToNot(BeEmpty())
 
@@ -795,7 +795,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
 				Expect(err).ToNot(HaveOccurred())
 
-				mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, nroOperObj)
+				mcpsInfo, err := buildMCPsInfo(fxt, ctx, nroOperObj)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(mcpsInfo).ToNot(BeEmpty())
 
@@ -832,12 +832,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					}
 
 					By("waiting for mcp to update")
-					waitForMcpUpdate(fxt.Client, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
+					waitForMcpUpdate(fxt, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
 				}
 			}()
 
 			By("waiting for mcp to update")
-			waitForMcpUpdate(fxt.Client, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
+			waitForMcpUpdate(fxt, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
 
 			var schedulerName string
 			var nroSchedObj nropv1.NUMAResourcesScheduler
@@ -861,7 +861,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(ctx, schedDeployment)
 			Expect(err).ToNot(HaveOccurred())
 
-			mcpsInfo, err = buildMCPsInfo(fxt.Client, ctx, nroOperObj)
+			mcpsInfo, err = buildMCPsInfo(fxt, ctx, nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mcpsInfo).ToNot(BeEmpty())
 
@@ -900,7 +900,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}
 
 			By("waiting for mcp to update")
-			waitForMcpUpdate(fxt.Client, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
+			waitForMcpUpdate(fxt, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
 
 			By("creating a Topology Affinity Error deployment and check if the pod status is pending")
 			deployment := createTAEDeployment(fxt, ctx, "testdp", serialconfig.Config.SchedulerName, cpuResources)
