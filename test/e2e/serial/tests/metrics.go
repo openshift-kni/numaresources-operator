@@ -22,9 +22,10 @@ import (
 	"net"
 	"strings"
 
+	"github.com/go-logr/logr"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -47,8 +48,11 @@ var _ = Describe("metrics exposed securely", Serial, Label("feature:metrics"), f
 	ctx := context.Background()
 	var namespace string
 	var nropObj *nropv1.NUMAResourcesOperator
+	var lh logr.Logger
 
 	BeforeEach(func() {
+		lh = GinkgoLogr
+
 		nropObj = objects.TestNRO()
 		nname := client.ObjectKeyFromObject(nropObj)
 
@@ -65,7 +69,7 @@ var _ = Describe("metrics exposed securely", Serial, Label("feature:metrics"), f
 		It("should be able to fetch metrics from the manager container", func() {
 			managerPod, err := deploy.FindNUMAResourcesOperatorPod(ctx, e2eclient.Client, nropObj)
 			Expect(err).ToNot(HaveOccurred())
-			stdout := fetchMetricsFromPod(ctx, managerPod, metricsAddress, metricsPort)
+			stdout := fetchMetricsFromPod(lh, ctx, managerPod, metricsAddress, metricsPort)
 			Expect(strings.Contains(stdout, "workqueue_adds_total{controller=\"numaresourcesoperator\",name=\"numaresourcesoperator\"}")).To(BeTrue(), "workqueue_adds_total operator metric not found")
 			Expect(strings.Contains(stdout, "workqueue_adds_total{controller=\"numaresourcesscheduler\",name=\"numaresourcesscheduler\"}")).To(BeTrue(), "workqueue_adds_total scheduler metric not found")
 		})
@@ -82,14 +86,14 @@ var _ = Describe("metrics exposed securely", Serial, Label("feature:metrics"), f
 			Expect(err).ToNot(HaveOccurred(), "Error listing worker pods: %v", err)
 			Expect(pods.Items).ToNot(BeEmpty(), "There should be at least one worker pod")
 			workerPod := &pods.Items[0]
-			stdout := fetchMetricsFromPod(ctx, workerPod, metricsAddress, metricsPort)
+			stdout := fetchMetricsFromPod(lh, ctx, workerPod, metricsAddress, metricsPort)
 			Expect(strings.Contains(stdout, "rte_noderesourcetopology_writes_total")).To(BeTrue(), "rte_noderesourcetopology_writes_total metric not found")
 			Expect(strings.Contains(stdout, "rte_wakeup_delay_milliseconds")).To(BeTrue(), "rte_wakeup_delay_milliseconds metric not found")
 		})
 	})
 })
 
-func fetchMetricsFromPod(ctx context.Context, pod *corev1.Pod, metricsAddress, metricsPort string) string {
+func fetchMetricsFromPod(lh logr.Logger, ctx context.Context, pod *corev1.Pod, metricsAddress, metricsPort string) string {
 	GinkgoHelper()
 	endpoint := net.JoinHostPort(metricsAddress, metricsPort)
 
@@ -100,7 +104,7 @@ func fetchMetricsFromPod(ctx context.Context, pod *corev1.Pod, metricsAddress, m
 		"-k",
 		fmt.Sprintf("https://%s/metrics", endpoint),
 	}
-	klog.V(2).InfoS("executing command", "args", cmd, "pod", key.String())
+	lh.V(2).Info("executing command", "args", cmd, "pod", key.String())
 	stdout, stderr, err := remoteexec.CommandOnPod(ctx, e2eclient.K8sClient, pod, cmd...)
 	Expect(err).ToNot(HaveOccurred(), "failed exec command on pod. pod=%q; cmd=%q; err=%v; stderr=%q", key.String(), cmd, err, stderr)
 	Expect(stdout).NotTo(BeEmpty(), stdout)

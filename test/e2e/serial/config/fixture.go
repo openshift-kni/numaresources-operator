@@ -19,13 +19,14 @@ package config
 import (
 	"context"
 
-	"k8s.io/klog/v2"
+	"github.com/go-logr/logr"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/internal/fixture/dumpr"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
@@ -57,15 +58,22 @@ func (cfg *E2EConfig) RecordNRTReference() error {
 		return err
 	}
 	// TODO: multi-line value in structured log
-	klog.InfoS("recorded reference NRT data", "data", intnrt.ListToString(cfg.NRTList.Items, " reference"))
+	cfg.Fixture.Log.Info("recorded reference NRT data", "data", intnrt.ListToString(cfg.NRTList.Items, " reference"))
 	return nil
 }
 
 var Config *E2EConfig
 
-func SetupFixture() error {
+func SetupFixture(lh logr.Logger, dp dumpr.Dumper) error {
 	var err error
-	Config, err = NewFixtureWithOptions("e2e-test-infra", e2efixture.OptionRandomizeName|e2efixture.OptionAvoidCooldown|e2efixture.OptionStaticClusterData)
+	Config, err = NewFixtureWithOptions(
+		"e2e-test-infra",
+		e2efixture.WithRandomizeName(),
+		e2efixture.WithAvoidCooldown(),
+		e2efixture.WithStaticClusterData(),
+		e2efixture.WithLogger(lh),
+		e2efixture.WithDumper(dp),
+	)
 	return err
 }
 
@@ -73,14 +81,14 @@ func TeardownFixture() error {
 	return e2efixture.Teardown(Config.Fixture)
 }
 
-func NewFixtureWithOptions(nsName string, options e2efixture.Options) (*E2EConfig, error) {
+func NewFixtureWithOptions(nsName string, options ...e2efixture.Option) (*E2EConfig, error) {
 	var err error
 	cfg := E2EConfig{
 		NROOperObj:  &nropv1.NUMAResourcesOperator{},
 		NROSchedObj: &nropv1.NUMAResourcesScheduler{},
 	}
 
-	cfg.Fixture, err = e2efixture.SetupWithOptions(nsName, nrtv1alpha2.NodeResourceTopologyList{}, options)
+	cfg.Fixture, err = e2efixture.SetupWithOptions(nsName, nrtv1alpha2.NodeResourceTopologyList{}, options...)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +109,7 @@ func NewFixtureWithOptions(nsName string, options e2efixture.Options) (*E2EConfi
 	}
 
 	cfg.SchedulerName = cfg.NROSchedObj.Status.SchedulerName
-	klog.InfoS("detected scheduler name", "schedulerName", cfg.SchedulerName)
+	cfg.Fixture.Log.Info("detected scheduler name", "schedulerName", cfg.SchedulerName)
 
 	return &cfg, nil
 }

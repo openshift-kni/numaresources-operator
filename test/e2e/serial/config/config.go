@@ -23,8 +23,8 @@ import (
 	"os"
 	"strconv"
 
-	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/textlogger"
+	"github.com/go-logr/logr"
+
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -38,6 +38,7 @@ import (
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/nrovalidate/validator"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/fixture/dumpr"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
 
 	. "github.com/onsi/gomega"
@@ -71,11 +72,16 @@ const (
 // and indisturbed on the cluster. No concurrency at all is possible,
 // each test "owns" the cluster - but again, must leave no leftovers.
 
-func Setup() {
-	config := textlogger.NewConfig(textlogger.Verbosity(GetVerbosity()))
-	ctrl.SetLogger(textlogger.NewLogger(config))
+type Params struct {
+	MakeLogr  func() logr.Logger
+	MakeDumpr func() dumpr.Dumper
+}
 
-	err := SetupFixture()
+func Setup(params Params) {
+	lh := params.MakeLogr()
+	ctrl.SetLogger(lh)
+
+	err := SetupFixture(lh, params.MakeDumpr())
 	Expect(err).ToNot(HaveOccurred())
 	Expect(Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
 	SetupInfra(Config.Fixture, Config.NROOperObj, Config.infraNRTList)
@@ -101,19 +107,6 @@ func Teardown() {
 	Expect(err).NotTo(HaveOccurred())
 }
 
-func GetVerbosity() int {
-	rawLevel, ok := os.LookupEnv("E2E_NROP_VERBOSE")
-	if !ok {
-		return DefaultVerbosity
-	}
-	level, err := strconv.Atoi(rawLevel)
-	if err != nil {
-		// TODO: log how?
-		return DefaultVerbosity
-	}
-	return level
-}
-
 func GetRteCiImage() string {
 	if pullSpec, ok := os.LookupEnv("E2E_RTE_CI_IMAGE"); ok {
 		return pullSpec
@@ -121,7 +114,7 @@ func GetRteCiImage() string {
 	return nropTestCIImage
 }
 
-func validateTopologyManagerConfiguration(kconfigs map[string]*kubeletconfigv1beta1.KubeletConfiguration, nrts []nrtv1alpha2.NodeResourceTopology) error {
+func validateTopologyManagerConfiguration(lh logr.Logger, kconfigs map[string]*kubeletconfigv1beta1.KubeletConfiguration, nrts []nrtv1alpha2.NodeResourceTopology) error {
 	var errs []error
 	for nodeName, kconfig := range kconfigs {
 		nrt, err := e2enrt.FindFromList(nrts, nodeName)
@@ -137,7 +130,7 @@ func validateTopologyManagerConfiguration(kconfigs map[string]*kubeletconfigv1be
 		}
 		kconfTMPolicy := kconfig.TopologyManagerPolicy
 		if kconfTMPolicy == "" {
-			klog.InfoS("Topology Manager Policy not set in kubeletconfig, fixing", "policy", tmPolicyDefault)
+			lh.Info("Topology Manager Policy not set in kubeletconfig, fixing", "policy", tmPolicyDefault)
 			kconfTMPolicy = tmPolicyDefault
 		}
 		if nrtTMPolicy.Value != kconfTMPolicy {
@@ -152,7 +145,7 @@ func validateTopologyManagerConfiguration(kconfigs map[string]*kubeletconfigv1be
 		}
 		kconfTMScope := kconfig.TopologyManagerScope
 		if kconfTMScope == "" {
-			klog.InfoS("Topology Manager Scope not set in kubeletconfig, fixing", "scope", tmScopeDefault)
+			lh.Info("Topology Manager Scope not set in kubeletconfig, fixing", "scope", tmScopeDefault)
 			kconfTMScope = tmScopeDefault
 		}
 		if nrtTMScope.Value != kconfTMScope {
@@ -170,7 +163,7 @@ func validateTopologyManagerConfiguration(kconfigs map[string]*kubeletconfigv1be
 	return errors.Join(errs...)
 }
 
-func CheckNodesTopology(ctx context.Context) error {
+func CheckNodesTopology(lh logr.Logger, ctx context.Context) error {
 	kconfigs, err := validator.GetKubeletConfigurationsFromTASEnabledNodes(ctx, e2eclient.Client)
 	if err != nil {
 		return err
@@ -181,12 +174,12 @@ func CheckNodesTopology(ctx context.Context) error {
 		return err
 	}
 
-	err = validateTopologyManagerConfiguration(kconfigs, nrtList.Items)
+	err = validateTopologyManagerConfiguration(lh, kconfigs, nrtList.Items)
 	if err != nil {
 		return err
 	}
 
-	err = validateNRTAvailability(ctx, nrtList)
+	err = validateNRTAvailability(lh, ctx, nrtList)
 	if err != nil {
 		return err
 	}
@@ -214,14 +207,14 @@ func getNRTList(ctx context.Context, cli client.Client) (nrtv1alpha2.NodeResourc
 	return nrtList, nil
 }
 
-func validateNRTAvailability(ctx context.Context, nrtList nrtv1alpha2.NodeResourceTopologyList) error {
+func validateNRTAvailability(lh logr.Logger, ctx context.Context, nrtList nrtv1alpha2.NodeResourceTopologyList) error {
 	workers, err := nodes.GetWorkers(&deployer.Environment{Cli: e2eclient.Client, Ctx: ctx})
 	if err != nil {
 		return err
 	}
 	for _, node := range workers {
 		if _, err := e2enrt.FindFromList(nrtList.Items, node.Name); err != nil {
-			klog.InfoS("NRT data missing", "workerNode", node.Name)
+			lh.Info("NRT data missing", "workerNode", node.Name)
 			return err
 		}
 	}

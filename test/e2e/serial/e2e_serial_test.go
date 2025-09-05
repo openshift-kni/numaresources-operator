@@ -24,8 +24,11 @@ import (
 	_ "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
 	_ "github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 
+	"github.com/go-logr/logr"
+
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/fixture/dumpr"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -43,8 +46,15 @@ var _ = BeforeSuite(func() {
 
 	ctx := context.Background()
 	serialconfig.DumpEnvironment(os.Stderr) // logging is not fully setup yet, we need to bruteforce
-	Expect(serialconfig.CheckNodesTopology(ctx)).Should(Succeed())
-	serialconfig.Setup()
+	Expect(serialconfig.CheckNodesTopology(GinkgoLogr, ctx)).Should(Succeed())
+	serialconfig.Setup(serialconfig.Params{
+		MakeLogr: func() logr.Logger {
+			return GinkgoLogr
+		},
+		MakeDumpr: func() dumpr.Dumper {
+			return dumpr.NewFormatter(GinkgoWriter)
+		},
+	})
 	setupExecuted = true
 })
 
