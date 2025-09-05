@@ -1,2 +1,5 @@
+---
 approvers:
   - konflux-approvers
+reviewers:
+  - konflux-reviewers
