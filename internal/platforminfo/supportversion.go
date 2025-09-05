@@ -35,9 +35,8 @@ const (
 	// have the fix, thus we need to track them separately
 	StableSupportSince           = "4.20.0"
 	NightlySupportSince          = "4.20.0-0.nightly-2025-08-04-154809"
-	KonfluxNightlySupportSince   = "4.20.0-0.konflux-nightly-0000-00-00-000000"
-	CISupportSince               = "4.20.0-0.ci-0000-00-00-000000"
-	DevPreviewSupportSince       = "4.20.0-ec.0"
+	CISupportSince               = "4.20.0-0.ci-2025-08-01-195417"
+	DevPreviewSupportSince       = "4.20.0-ec.6"
 	ReleaseCandidateSupportSince = "4.20.0-rc.0"
 )
 
@@ -46,10 +45,6 @@ func decodeMinimumVersion(version platform.Version) string {
 	// Nightly; example: 4.20.0-0.nightly-2025-08-04-154809
 	if strings.Contains(v, ".nightly-") {
 		return NightlySupportSince
-	}
-	// K5x nightly; example: 4.19.0-0.konflux-nightly-2025-08-05-060813
-	if strings.Contains(v, ".konflux-nightly-") {
-		return KonfluxNightlySupportSince
 	}
 	// CI; example: 4.19.0-0.ci-2025-08-05-050737
 	if strings.Contains(v, ".ci-") {
