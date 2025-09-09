@@ -214,6 +214,10 @@ spec:
                   - resource
                   type: object
                 type: array
+              replicas:
+                description: Computed scheduler replicas
+                format: int32
+                type: integer
               schedulerName:
                 description: Scheduler name to be used in pod templates
                 type: string

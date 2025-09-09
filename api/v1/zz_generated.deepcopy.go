@@ -300,6 +300,11 @@ func (in *NUMAResourcesSchedulerStatus) DeepCopyInto(out *NUMAResourcesScheduler
 		*out = new(metav1.Duration)
 		**out = **in
 	}
+	if in.Replicas != nil {
+		in, out := &in.Replicas, &out.Replicas
+		*out = new(int32)
+		**out = **in
+	}
 	if in.Conditions != nil {
 		in, out := &in.Conditions, &out.Conditions
 		*out = make([]metav1.Condition, len(*in))

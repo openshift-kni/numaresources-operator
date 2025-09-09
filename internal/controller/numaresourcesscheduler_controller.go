@@ -302,6 +302,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	schedStatus.CacheResyncPeriod = &metav1.Duration{
 		Duration: cacheResyncPeriod,
 	}
+	schedStatus.Replicas = replicas
 
 	informerCondition := buildDedicatedInformerCondition(*instance, schedSpec)
 	schedStatus.Conditions = status.GetUpdatedSchedulerConditions(schedStatus.Conditions, informerCondition)

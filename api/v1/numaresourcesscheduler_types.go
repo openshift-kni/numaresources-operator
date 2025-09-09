@@ -132,9 +132,15 @@ type NUMAResourcesSchedulerStatus struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Scheduler cache resync period"
 	CacheResyncPeriod *metav1.Duration `json:"cacheResyncPeriod,omitempty"`
+	// Computed scheduler replicas
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler replicas",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:int"}
+	Replicas *int32 `json:"replicas,omitempty"`
 	// Conditions show the current state of the NUMAResourcesOperator Operator
+	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 	// RelatedObjects list of objects of interest for this operator
+	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Related Objects"
 	RelatedObjects []configv1.ObjectReference `json:"relatedObjects,omitempty"`
 }
