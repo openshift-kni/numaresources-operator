@@ -101,6 +101,45 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 		})
 	})
 
+	Context("with status conditions updates", func() {
+		It("should fix degraded condition on progressing scheduler", func() {
+			nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 9*time.Second)
+			reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nrs)
+			Expect(err).ToNot(HaveOccurred())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).To(HaveOccurred())
+
+			Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(Succeed())
+			degradedCondition := getConditionByType(nrs.Status.Conditions, status.ConditionDegraded)
+			Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+			Expect(degradedCondition.Reason).To(Equal(status.ReasonInternalError))
+			Expect(degradedCondition.Message).To(ContainSubstring("failed to compute scheduler replicas"))
+
+			node := &corev1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("master-node-0"),
+					Labels: map[string]string{
+						"node-role.kubernetes.io/control-plane": "",
+					},
+				},
+			}
+			Expect(reconciler.Client.Create(context.TODO(), node)).To(Succeed())
+			_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(Succeed())
+			degradedCondition = getConditionByType(nrs.Status.Conditions, status.ConditionDegraded)
+			Expect(degradedCondition.Status).To(Equal(metav1.ConditionFalse), "scheduler reported as Degraded: %v", degradedCondition)
+			Expect(degradedCondition.Reason).To(Equal(status.ConditionDegraded))
+			Expect(degradedCondition.Message).To(BeEmpty())
+
+			progressingCondition := getConditionByType(nrs.Status.Conditions, status.ConditionProgressing)
+			Expect(progressingCondition.Status).To(Equal(metav1.ConditionTrue), "scheduler not reported Progressing: %v", nrs.Status.Conditions)
+		})
+	})
+
 	Context("with correct NRS CR", func() {
 		var nrs *nropv1.NUMAResourcesScheduler
 		var reconciler *NUMAResourcesSchedulerReconciler
