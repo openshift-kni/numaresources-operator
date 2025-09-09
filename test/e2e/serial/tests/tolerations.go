@@ -536,9 +536,11 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 			When("RTE pods are not running yet", func() {
 				var taintedNode *corev1.Node
-				customPolicySupportEnabled := isCustomPolicySupportEnabled(&nroOperObj)
+				var customPolicySupportEnabled bool
 
 				BeforeEach(func(ctx context.Context) {
+					customPolicySupportEnabled = isCustomPolicySupportEnabled(&nroOperObj)
+
 					By("Get list of worker nodes")
 					var err error
 					workers, err = nodes.GetWorkers(fxt.DEnv())
@@ -579,7 +581,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					Expect(err).ToNot(HaveOccurred())
 
 					By("wait for all the RTE pods owned by the daemonset to be deleted")
-					err = wait.With(fxt.Client).Interval(30*time.Second).Timeout(2*time.Minute).ForPodListAllDeleted(ctx, rtePods)
+					err = wait.With(fxt.Client).Interval(30*time.Second).Timeout(2*time.Minute).ForPodsAllDeleted(ctx, podlist.ToPods(rtePods))
 					Expect(err).ToNot(HaveOccurred(), "Expected all RTE pods owned by the DaemonSet to be deleted within the timeout")
 
 					tnts, _, err = taints.ParseTaints([]string{testTaint()})

@@ -83,7 +83,7 @@ func (wt Waiter) ForPodDeleted(ctx context.Context, podNamespace, podName string
 	})
 }
 
-func (wt Waiter) ForPodListAllRunning(ctx context.Context, pods []*corev1.Pod) ([]*corev1.Pod, []*corev1.Pod) {
+func (wt Waiter) ForPodsAllRunning(ctx context.Context, pods []*corev1.Pod) ([]*corev1.Pod, []*corev1.Pod) {
 	var lock sync.Mutex
 	var failed []*corev1.Pod
 	var updated []*corev1.Pod
@@ -112,21 +112,19 @@ func (wt Waiter) ForPodListAllRunning(ctx context.Context, pods []*corev1.Pod) (
 	return failed, updated
 }
 
-func (wt Waiter) ForPodListAllDeleted(ctx context.Context, pods []corev1.Pod) error {
+func (wt Waiter) ForPodsAllDeleted(ctx context.Context, pods []*corev1.Pod) error {
 	if len(pods) == 0 {
-		klog.Infof("ForPodListAllDeleted called with an empty list of pods. Nothing to do.")
+		klog.Infof("ForPodsAllDeleted called with an empty slice of pods. Nothing to do.")
 		return nil
 	}
 
 	klog.Infof("Waiting for %d pod(s) to be deleted.", len(pods))
 
 	var eg errgroup.Group
-	for idx := range pods {
-		pod := pods[idx]
-		podKey := client.ObjectKeyFromObject(&pod).String()
-
+	for _, pod := range pods {
+		podKey := client.ObjectKeyFromObject(pod).String()
 		eg.Go(func() error {
-			klog.Infof("Goroutine started: waiting for pod %s to be deleted.", podKey)
+			klog.Infof("Waiting for pod %s to be deleted.", podKey)
 			err := wt.ForPodDeleted(ctx, pod.Namespace, pod.Name)
 			if err != nil {
 				klog.Warningf("Failed to confirm deletion for pod %s: %v", podKey, err)

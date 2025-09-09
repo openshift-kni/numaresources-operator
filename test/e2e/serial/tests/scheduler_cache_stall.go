@@ -220,7 +220,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 
 					// very generous timeout here. It's hard and racy to check we had 2 pods pending (expected phased scheduling),
 					// but that would be the most correct and stricter testing.
-					failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodListAllRunning(ctx, testPods)
+					failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodsAllRunning(ctx, testPods)
 					if len(failedPods) > 0 {
 						nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
 						// TODO: multi-line value in structured log
@@ -238,10 +238,10 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					}
 				},
-				Entry("vs best-effort pods", Label(label.Tier1), func(job *batchv1.Job) {
+				Entry("vs best-effort pods", func(job *batchv1.Job) {
 					klog.InfoS("Creating a job whose containers have requests=none")
 				}),
-				Entry("vs burstable pods", Label(label.Tier1), func(job *batchv1.Job) {
+				Entry("vs burstable pods", func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("100m"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
@@ -258,7 +258,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 				// GAP: pinnable cpu (but not memory)
 				// however with the recommended config, we can't have pinnable CPUs without pinnable memory;
 				// we would need cpumanager policy=static and memorymanager policy=none, which we don't recommend.
-				Entry("vs guaranteed pods with pinnable memory", Label(label.Tier1), func(job *batchv1.Job) {
+				Entry("vs guaranteed pods with pinnable memory", func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("100m"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
@@ -272,7 +272,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					// TODO: multi-line value in structured log
 					klog.InfoS("Creating a job whose containers have limits", "resources", e2ereslist.ToString(jobRequiredRes))
 				}),
-				Entry("vs guaranteed pods with pinnable memory and CPU", Label(label.Tier1), func(job *batchv1.Job) {
+				Entry("vs guaranteed pods with pinnable memory and CPU", func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("1"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
@@ -357,7 +357,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						testPods = append(testPods, testPod)
 					}
 
-					failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodListAllRunning(ctx, testPods)
+					failedPods, updatedPods := wait.With(fxt.Client).Timeout(timeout).ForPodsAllRunning(ctx, testPods)
 
 					for _, failedPod := range failedPods {
 						_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
@@ -370,13 +370,13 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					}
 				},
-				Entry("should handle a burst of qos=guaranteed pods", Label(label.Tier0), func(pod *corev1.Pod) {
+				Entry("should handle a burst of qos=guaranteed pods", func(pod *corev1.Pod) {
 					pod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 						corev1.ResourceMemory: resource.MustParse("64Mi"),
 					}
 				}),
-				Entry("should handle a burst of qos=burstable pods", Label(label.Tier0), func(pod *corev1.Pod) {
+				Entry("should handle a burst of qos=burstable pods", func(pod *corev1.Pod) {
 					pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
 						corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 						corev1.ResourceMemory: resource.MustParse("64Mi"),
