@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/google/go-cmp/cmp"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -39,7 +40,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/klog/v2"
 	"k8s.io/kubelet/config/v1beta1"
 	"k8s.io/utils/ptr"
 
@@ -324,7 +324,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			seenStatusConf := false
 			immediate := true
 			err = k8swait.PollUntilContextTimeout(context.Background(), 10*time.Second, 5*time.Minute, immediate, func(ctx context.Context) (bool, error) {
-				klog.InfoS("getting NRO object", "key", nroKey.String())
+				fxt.Log.Info("getting NRO object", "key", nroKey.String())
 
 				// getting the same object twice is awkward, but still it seems better better than skipping inside a loop.
 				err := fxt.Client.Get(ctx, nroKey, &nroOperObj)
@@ -341,7 +341,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						len(nroOperObj.Status.NodeGroups), len(nroOperObj.Spec.NodeGroups),
 					)
 				}
-				klog.InfoS("fetched NRO Object", "key", nroKey.String())
+				fxt.Log.Info("fetched NRO Object", "key", nroKey.String())
 
 				// the assumption here is that the configured node group selector will be targeting one mcp
 				Expect(nroOperObj.Status.MachineConfigPools[0].Name).To(Equal(nroOperObj.Status.NodeGroups[0].PoolName))
@@ -370,11 +370,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				// the operator may take nonzero time to populate the status, and this is still fine.\
 				// NOTE HERE: we need to match the types as well (ptr and ptr)
 				matchFromMCP := cmp.Equal(statusConfFromMCP, &specConf)
-				// TODO: multi-line value in structured log
-				klog.InfoS("result of checking the status from MachineConfigPools", "NRO Object", nroKey.String(), "status", toJSON(statusConfFromMCP), "spec", toJSON(specConf), "match", matchFromMCP)
+				fxt.Dump.Infof(toJSON(statusConfFromMCP), "result of checking the status from MachineConfigPools NRO=%s match=%v", nroKey.String(), matchFromMCP)
+				fxt.Dump.Infof(toJSON(specConf), "result of checking the spec from MachineConfigPools NRO=%s match=%v", nroKey.String(), matchFromMCP)
+
 				matchFromGroupStatus := cmp.Equal(statusConfFromGroupStatus, specConf)
-				// TODO: multi-line value in structured log
-				klog.InfoS("result of checking the status from NodeGroupStatus", "NRO Object", nroKey.String(), "status", toJSON(statusConfFromGroupStatus), "spec", toJSON(specConf), "match", matchFromGroupStatus)
+				fxt.Dump.Infof(toJSON(statusConfFromGroupStatus), "result of checking the status from NodeGroupStatus NOPR=%s match=%v", nroKey.String(), matchFromGroupStatus)
+				fxt.Dump.Infof(toJSON(specConf), "result of checking the spec from NodeGroupStatus NOPR=%s match=%v", nroKey.String(), matchFromGroupStatus)
 
 				return matchFromMCP && matchFromGroupStatus, nil
 			})
@@ -441,7 +442,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			kcCmsPre, err := getKubeletConfigMapsSoftOwnedBy(ctx, fxt.Client, nroOperObj.Name)
 			Expect(err).ToNot(HaveOccurred(), "cannot list KubeletConfig ConfigMaps in the cluster (PRE)")
 			kcCmNamesPre := sets.List[string](accumulateKubeletConfigNames(kcCmsPre))
-			klog.InfoS("initial set of configmaps from kubeletconfigs", "configmaps", strings.Join(kcCmNamesPre, ","))
+			fxt.Log.Info("initial set of configmaps from kubeletconfigs", "configmaps", strings.Join(kcCmNamesPre, ","))
 
 			By("creating extra ctrplane kubeletconfig")
 			ctrlPlaneKc := intobjs.NewKubeletConfigAutoresizeControlPlane()
@@ -460,7 +461,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				kcCmsCur, err := getKubeletConfigMapsSoftOwnedBy(ctx, fxt.Client, nroOperObj.Name)
 				Expect(err).ToNot(HaveOccurred(), "cannot list KubeletConfig ConfigMaps in the cluster (current)")
 				kcCmNamesCur := sets.List[string](accumulateKubeletConfigNames(kcCmsCur))
-				klog.InfoS("current set of configmaps from kubeletconfigs", "configmaps", strings.Join(kcCmNamesCur, ","))
+				fxt.Log.Info("current set of configmaps from kubeletconfigs", "configmaps", strings.Join(kcCmNamesCur, ","))
 				return kcCmNamesCur
 			}).WithContext(ctx).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Equal(kcCmNamesPre))
 		})
@@ -481,7 +482,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			initialNrtList, err = e2enrt.GetUpdated(fxt.Client, initialNrtList, timeout)
 			Expect(err).ToNot(HaveOccurred(), "cannot get any NodeResourceTopology object from the cluster")
 
-			mcpsInfo, err := buildMCPsInfo(fxt.Client, context.TODO(), *nroOperObj)
+			mcpsInfo, err := buildMCPsInfo(fxt, context.TODO(), *nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mcpsInfo).ToNot(BeEmpty())
 
@@ -539,7 +540,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}
 
 				// update kubeletconfig via the performanceprofile using dynamic client
-				klog.Infof("update configuration via the kubeletconfig owner %s/%s", ref.Kind, ref.Name)
+				fxt.Log.Info("update configuration via the kubeletconfig", "owner", ref.Kind+"/"+ref.Name)
 				tmScopeAnn := fmt.Sprintf("{\"topologyManagerScope\": %q, \"cpuManagerPolicyOptions\": {\"full-pcpus-only\": \"false\"}}", newTMScope)
 				updatePerformanceProfileFieldUnstructured(dynamicClient, ctx, ref.Name, tmScopeAnn, "metadata", "annotations", "kubeletconfig.experimental")
 			}
@@ -556,7 +557,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 				currentTMScope := kcObj.TopologyManagerScope
 
-				mcpsInfo, err := buildMCPsInfo(fxt.Client, context.TODO(), *nroOperObj)
+				mcpsInfo, err := buildMCPsInfo(fxt, context.TODO(), *nroOperObj)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(mcpsInfo).ToNot(BeEmpty())
 
@@ -586,12 +587,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						updatePerformanceProfileFieldUnstructured(dynamicClient, ctx, ref.Name, tmScopeAnn, "metadata", "annotations", "kubeletconfig.experimental")
 					}
 					By("waiting for mcp to update")
-					waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, time.Now().String(), mcpsInfo...)
+					waitForMcpUpdate(fxt, context.TODO(), MachineConfig, time.Now().String(), mcpsInfo...)
 				}
 			}()
 
 			By("waiting for mcp to update")
-			waitForMcpUpdate(fxt.Client, context.TODO(), MachineConfig, time.Now().String(), mcpsInfo...)
+			waitForMcpUpdate(fxt, context.TODO(), MachineConfig, time.Now().String(), mcpsInfo...)
 
 			By("checking that NUMAResourcesOperator's ConfigMap has changed")
 			cmList := &corev1.ConfigMapList{}
@@ -624,7 +625,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Expect(err).ToNot(HaveOccurred(), "failed to obtain rteConfig from ConfigMap %q error: %v", cmKey.String(), err)
 
 				if conf.Kubelet.TopologyManagerScope == initialTMScope {
-					klog.Warningf("ConfigMap %q has not been updated with new TopologyManagerScope after kubeletconfig modification", cmKey.String())
+					fxt.Log.Info("ConfigMap has not been updated with new TopologyManagerScope after kubeletconfig modification", "cmKey", cmKey.String())
 					return false
 				}
 				return true
@@ -705,10 +706,10 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 			cpuNum, ok := cpuQty.AsInt64()
 			Expect(ok).To(BeTrue(), "invalid CPU resource in zone %q node %q: %v", referenceZone.Name, referenceNode.Name, cpuQty)
-			klog.InfoS("available CPUs per numa on the node", "cpuNum", cpuNum)
+			fxt.Log.Info("available CPUs per numa on the node", "cpuNum", cpuNum)
 
 			cpuResources := strconv.Itoa(int(float64(cpuNum) * cpuResourcePercentage))
-			klog.InfoS("CPU resources requested to create a topology affinity error deployment", "cpuResources", cpuResources)
+			fxt.Log.Info("CPU resources requested to create a topology affinity error deployment", "cpuResources", cpuResources)
 
 			By("fetching the matching kubeletconfig for the numaresources-operator cr")
 			var nroOperObj nropv1.NUMAResourcesOperator
@@ -716,7 +717,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			err := fxt.Client.Get(ctx, nroKey, &nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 
-			mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, nroOperObj)
+			mcpsInfo, err := buildMCPsInfo(fxt, ctx, nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mcpsInfo).ToNot(BeEmpty())
 
@@ -780,7 +781,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					}
 
 					By("modifying Topology Manager Policy to 'none' under performance profile using dynamic client")
-					klog.InfoS("update Topology Manager Policy to 'none' via the kubeletconfig owner", "kind", ref.Kind, "name", ref.Name)
+					fxt.Log.Info("update Topology Manager Policy to 'none' via the kubeletconfig owner", "kind", ref.Kind, "name", ref.Name)
 
 					// using unstructured object to modify the Topology Manager Policy through performance profile
 					updatePerformanceProfileFieldUnstructured(dynamicClient, ctx, ref.Name, v1beta1.NoneTopologyManagerPolicy, "spec", "numa", "topologyPolicy")
@@ -794,7 +795,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				kcObj, err := kubeletconfig.MCOKubeletConfToKubeletConf(targetedKC)
 				Expect(err).ToNot(HaveOccurred())
 
-				mcpsInfo, err := buildMCPsInfo(fxt.Client, ctx, nroOperObj)
+				mcpsInfo, err := buildMCPsInfo(fxt, ctx, nroOperObj)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(mcpsInfo).ToNot(BeEmpty())
 
@@ -824,19 +825,19 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						}
 
 						By("reverting kubeletconfig changes to the initial state under performance profile using dynamic client")
-						klog.Infof("reverting configuration via the kubeletconfig owner %s/%s", ref.Kind, ref.Name)
+						fxt.Log.Info("reverting configuration via the kubeletconfig", "owner", ref.Kind+"/"+ref.Name)
 
 						// using unstructured object to modify the Topology Manager Policy through performance profile
 						updatePerformanceProfileFieldUnstructured(dynamicClient, ctx, ref.Name, initialTopologyManagerPolicy, "spec", "numa", "topologyPolicy")
 					}
 
 					By("waiting for mcp to update")
-					waitForMcpUpdate(fxt.Client, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
+					waitForMcpUpdate(fxt, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
 				}
 			}()
 
 			By("waiting for mcp to update")
-			waitForMcpUpdate(fxt.Client, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
+			waitForMcpUpdate(fxt, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
 
 			var schedulerName string
 			var nroSchedObj nropv1.NUMAResourcesScheduler
@@ -860,7 +861,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(ctx, schedDeployment)
 			Expect(err).ToNot(HaveOccurred())
 
-			mcpsInfo, err = buildMCPsInfo(fxt.Client, ctx, nroOperObj)
+			mcpsInfo, err = buildMCPsInfo(fxt, ctx, nroOperObj)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(mcpsInfo).ToNot(BeEmpty())
 
@@ -892,14 +893,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}
 
 				By("modifying Topology Manager Policy to 'single-numa-node' under performance profile using dynamic client")
-				klog.InfoS("update Topology Manager Policy to 'single-numa-node' via the kubeletconfig owner", "kind", ref.Kind, "name", ref.Name)
+				fxt.Log.Info("update Topology Manager Policy to 'single-numa-node' via the kubeletconfig owner", "kind", ref.Kind, "name", ref.Name)
 
 				// using unstructured object to modify the Topology Manager Policy through performance profile
 				updatePerformanceProfileFieldUnstructured(dynamicClient, ctx, ref.Name, v1beta1.SingleNumaNodeTopologyManagerPolicy, "spec", "numa", "topologyPolicy")
 			}
 
 			By("waiting for mcp to update")
-			waitForMcpUpdate(fxt.Client, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
+			waitForMcpUpdate(fxt, ctx, MachineConfig, time.Now().String(), mcpsInfo...)
 
 			By("creating a Topology Affinity Error deployment and check if the pod status is pending")
 			deployment := createTAEDeployment(fxt, ctx, "testdp", serialconfig.Config.SchedulerName, cpuResources)
@@ -925,7 +926,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			// The conclusion is as long as there is exactly one pod that is pending the scheduler is behaving correctly.
 			const maxPodsWithTAE = 10
 			if len(pods) > maxPodsWithTAE {
-				klog.Warningf("current length of the pods list: %d, is bigger than %d", len(pods), maxPodsWithTAE)
+				fxt.Log.Info("unexpected length of the pods list", "current", len(pods), "max", maxPodsWithTAE)
 			}
 
 			By("checking to see if there is more than one pod that is pending")
@@ -1000,7 +1001,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Eventually(func(g Gomega) {
 					var updated nropv1.NUMAResourcesOperator
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed())
-					g.Expect(isDegradedWith(updated.Status.Conditions, "must have only a single specifier set", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
+					g.Expect(isDegradedWith(fxt.Log, updated.Status.Conditions, "must have only a single specifier set", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			})
 
@@ -1056,7 +1057,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 				origNodeGroups := nodegroup.CloneList(initialOperObj.Spec.NodeGroups)
 
-				klog.InfoS("the new node group to add", "name", ng.ToString())
+				fxt.Log.Info("the new node group to add", "name", ng.ToString())
 				newNodeGroups := append(nodegroup.CloneList(initialOperObj.Spec.NodeGroups), ng)
 				var updatedNRO nropv1.NUMAResourcesOperator
 				Eventually(func(g Gomega) {
@@ -1086,7 +1087,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				By("wait for NodeGroupStatus to reflect changes")
 				Eventually(func(g Gomega) {
 					g.Expect(ng.PoolName).ToNot(BeNil())
-					verifyStatusUpdate(fxt.Client, ctx, nroKey, updatedNRO, *ng.PoolName, specConf)
+					verifyStatusUpdate(fxt, ctx, nroKey, updatedNRO, *ng.PoolName, specConf)
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 
 				By("update the same node group config and ensure it's updated in the operator status")
@@ -1104,7 +1105,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					PoolName: &mcp.Name,
 					Config:   &conf,
 				}
-				klog.InfoS("the updated node group to apply", "name", ng.ToString())
+				fxt.Log.Info("the updated node group to apply", "name", ng.ToString())
 				newNodeGroups = append(nodegroup.CloneList(initialOperObj.Spec.NodeGroups), ng)
 
 				Eventually(func(g Gomega) {
@@ -1116,7 +1117,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				By("wait for NodeGroupStatus to reflect config changes")
 				Eventually(func(g Gomega) {
 					g.Expect(ng.PoolName).ToNot(BeNil())
-					verifyStatusUpdate(fxt.Client, ctx, nroKey, updatedNRO, *ng.PoolName, newSpecConf)
+					verifyStatusUpdate(fxt, ctx, nroKey, updatedNRO, *ng.PoolName, newSpecConf)
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 
 				Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
@@ -1135,14 +1136,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
 				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-				klog.Info("verify respective daemonset is deleted")
+				fxt.Log.Info("verify respective daemonset is deleted")
 				err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonSetDeleted(ctx, wait.ObjectKey{
 					Namespace: ds.Namespace,
 					Name:      ds.Name,
 				})
 				Expect(err).ToNot(HaveOccurred())
 
-				klog.Info("verify the operator status no longer reference to the deleted node group")
+				fxt.Log.Info("verify the operator status no longer reference to the deleted node group")
 				Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
 
 				for _, dsStatus := range updatedNRO.Status.DaemonSets {
@@ -1208,7 +1209,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Eventually(func(g Gomega) {
 					var updated nropv1.NUMAResourcesOperator
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed())
-					g.Expect(isDegradedWith(updated.Status.Conditions, expectedMsg, validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected for pool name: %q", poolName)
+					g.Expect(isDegradedWith(fxt.Log, updated.Status.Conditions, expectedMsg, validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected for pool name: %q", poolName)
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			},
 				Entry("duplicate pool name", context.TODO(), "duplicate"),
@@ -1257,7 +1258,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Eventually(func(g Gomega) {
 					var updated nropv1.NUMAResourcesOperator
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed())
-					g.Expect(isDegradedWith(updated.Status.Conditions, "Should specify PoolName only", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
+					g.Expect(isDegradedWith(fxt.Log, updated.Status.Conditions, "Should specify PoolName only", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			})
 		})
@@ -1281,15 +1282,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					Expect(err).ToNot(HaveOccurred())
 
 					if len(updatedConfigMaps.Items) == 0 {
-						klog.InfoS("RTE configmap mismatch ", "current", len(updatedConfigMaps.Items), "desired", 1)
+						fxt.Log.Info("RTE configmap mismatch ", "current", len(updatedConfigMaps.Items), "desired", 1)
 						return false
 					}
 					// choose the first one arbitrary
 					rteConfigMap = &updatedConfigMaps.Items[0]
 					return true
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
-				// TODO: multi-line value in structured log
-				klog.InfoS("found RTE configmap", "rteConfigMap", rteConfigMap)
+				fxt.Dump.Infof(toJSON(rteConfigMap), "found RTE configmap")
 
 				poolName := rteConfigMap.Labels[rteconfig.LabelNodeGroupName+"/"+rteconfig.LabelNodeGroupKindMachineConfigPool]
 				nodeSelector, err := nodegroups.NodeSelectorFromPoolName(ctx, e2eclient.Client, poolName)
@@ -1312,7 +1312,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 						matchingErr := configuration.CheckTopologyManagerConfigMatching(updatedNrtObj, &cfg)
 						if matchingErr != "" {
-							klog.InfoS("NRT doesn't match topologyManager configuration", "nrtName", updatedNrtObj.Name, "problem", matchingErr)
+							fxt.Log.Info("NRT doesn't match topologyManager configuration", "nrtName", updatedNrtObj.Name, "problem", matchingErr)
 							return false
 						}
 						return true
@@ -1367,12 +1367,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				workerNodes, err := nodes.GetWorkerNodes(e2eclient.K8sClient)
 				Expect(err).ToNot(HaveOccurred())
 
-				targetNode, targetNodeInitial, initialCustomRoleLabelKey := mutateNodeCustomLabel(workerNodes)
+				targetNode, targetNodeInitial, initialCustomRoleLabelKey := mutateNodeCustomLabel(fxt.Log, workerNodes)
 				Expect(e2eclient.Client.Patch(ctx, targetNode, client.MergeFrom(targetNodeInitial))).To(Succeed())
 				waitForMCPUpdateFunc(mcp)
 
 				defer func() {
-					klog.InfoS("reverting node back to its initial state", "nodeName", targetNodeInitial.Name)
+					fxt.Log.Info("reverting node back to its initial state", "nodeName", targetNodeInitial.Name)
 					baseTargetNode := targetNode.DeepCopy()
 					targetNode.Labels = targetNodeInitial.Labels
 					Expect(fxt.Client.Patch(ctx, targetNode, client.MergeFrom(baseTargetNode))).To(Succeed())
@@ -1396,7 +1396,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					waitForMCPUpdateFunc(targetedMCP)
 				}()
 
-				klog.InfoS("adding nodeGroup", "poolName", mcp.Name)
+				fxt.Log.Info("adding nodeGroup", "poolName", mcp.Name)
 				testNG := nropv1.NodeGroup{
 					PoolName: ptr.To(mcp.Name),
 				}
@@ -1431,7 +1431,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					err := e2eclient.Client.Get(ctx, client.ObjectKey{Namespace: ns, Name: dsName}, updatedConfigMap)
 					if err != nil {
 						if errors.IsNotFound(err) {
-							klog.InfoS("expected RTE ConfigMap to be found", "key", key)
+							fxt.Log.Info("expected RTE ConfigMap to be found", "key", key)
 							return false
 						}
 						Expect(err).ToNot(HaveOccurred())
@@ -1439,8 +1439,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					rteConfigMap = updatedConfigMap
 					return true
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
-				// TODO: multi-line value in structured log
-				klog.InfoS("found RTE configmap", "rteConfigMap", rteConfigMap)
+				fxt.Dump.Infof(toJSON(rteConfigMap), "found RTE configmap")
 
 				poolName := rteConfigMap.Labels[rteconfig.LabelNodeGroupName+"/"+rteconfig.LabelNodeGroupKindMachineConfigPool]
 				nodeSelector, err := nodegroups.NodeSelectorFromPoolName(ctx, e2eclient.Client, poolName)
@@ -1460,14 +1459,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						updatedNrtObj := &nrtv1alpha2.NodeResourceTopology{}
 						if err := e2eclient.Client.Get(ctx, client.ObjectKey{Name: node.Name}, updatedNrtObj); err != nil {
 							if errors.IsNotFound(err) {
-								klog.InfoS("NRT was not found, waiting for its creation", "nrtName", node.Name)
+								fxt.Log.Info("NRT was not found, waiting for its creation", "nrtName", node.Name)
 								return false
 							}
 							Expect(err).ToNot(HaveOccurred())
 						}
 						matchingErr := configuration.CheckTopologyManagerConfigMatching(updatedNrtObj, &cfg)
 						if matchingErr != "" {
-							klog.InfoS("NRT doesn't match topologyManager configuration", "nrtName", updatedNrtObj.Name, "problem", matchingErr)
+							fxt.Log.Info("NRT doesn't match topologyManager configuration", "nrtName", updatedNrtObj.Name, "problem", matchingErr)
 							return false
 						}
 						return true
@@ -1478,7 +1477,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 	})
 })
 
-func mutateNodeCustomLabel(nodes []corev1.Node) (*corev1.Node, *corev1.Node, string) {
+func mutateNodeCustomLabel(lh logr.Logger, nodes []corev1.Node) (*corev1.Node, *corev1.Node, string) {
 	targetNode := nodeWithoutCustomRole(nodes)
 	var customRoleKey string
 	if targetNode == nil {
@@ -1494,10 +1493,10 @@ func mutateNodeCustomLabel(nodes []corev1.Node) (*corev1.Node, *corev1.Node, str
 	}
 	targetNodeInitial := targetNode.DeepCopy()
 	if customRoleKey != "" {
-		klog.InfoS("changing node labels", "targetNode", targetNode.Name, "adding", getLabelRoleMCPTest(), "removing", customRoleKey)
+		lh.Info("changing node labels", "targetNode", targetNode.Name, "adding", getLabelRoleMCPTest(), "removing", customRoleKey)
 		delete(targetNode.Labels, customRoleKey)
 	} else {
-		klog.InfoS("changing node labels", "targetNode", targetNode.Name, "adding", getLabelRoleMCPTest())
+		lh.Info("changing node labels", "targetNode", targetNode.Name, "adding", getLabelRoleMCPTest())
 	}
 	targetNode.Labels[getLabelRoleMCPTest()] = ""
 	return targetNode, targetNodeInitial, customRoleKey
@@ -1524,17 +1523,19 @@ func nodeWithoutCustomRole(nodes []corev1.Node) *corev1.Node {
 	return nil
 }
 
-func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.ObjectKey, appliedObj nropv1.NUMAResourcesOperator, expectedPoolName string, expectedConf nropv1.NodeGroupConfig) {
-	klog.InfoS("fetch NRO object", "key", key.String())
+func verifyStatusUpdate(fxt *e2efixture.Fixture, ctx context.Context, key client.ObjectKey, appliedObj nropv1.NUMAResourcesOperator, expectedPoolName string, expectedConf nropv1.NodeGroupConfig) {
+	GinkgoHelper()
+
+	fxt.Log.Info("fetch NRO object", "key", key.String())
 	var updatedNRO nropv1.NUMAResourcesOperator
 	Eventually(func(g Gomega) {
-		g.Expect(cli.Get(ctx, key, &updatedNRO)).To(Succeed())
+		g.Expect(fxt.Client.Get(ctx, key, &updatedNRO)).To(Succeed())
 		g.Expect(updatedNRO.Status.NodeGroups).To(HaveLen(len(appliedObj.Spec.NodeGroups)),
 			"NodeGroups Status mismatch: found %d, expected %d", len(updatedNRO.Status.NodeGroups), len(appliedObj.Spec.NodeGroups))
 		g.Expect(status.NUMAResourceOperatorNeedsUpdate(&appliedObj.Status, &updatedNRO.Status)).To(BeTrue())
 	}).WithTimeout(10 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
 
-	klog.InfoS("successfully fetched NRO object", "key", key.String())
+	fxt.Log.Info("successfully fetched NRO object", "key", key.String())
 
 	statusIdxInNodeGroups := -1
 	for idx, ngStatus := range updatedNRO.Status.NodeGroups {
@@ -1559,11 +1560,11 @@ func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.Objec
 	Expect(statusConfFromMCP).ToNot(BeNil(), "the config of the node group with pool name %q set is still not reflected in the operator status", expectedPoolName)
 
 	// no need to re-check the pool names because this is already tested in the loops, getting here means both statuses reflect the node group with the PoolName
-	klog.Info("verify daemonset is recorded in all relevant places")
+	fxt.Log.Info("verify daemonset is recorded in all relevant places")
 	found := false
 	for _, ds := range updatedNRO.Status.DaemonSets {
 		if reflect.DeepEqual(ds, statusFromNodeGroups.DaemonSet) {
-			klog.Info("daemonset was found")
+			fxt.Log.Info("daemonset was found")
 			found = true
 			break
 		}
@@ -1576,11 +1577,13 @@ func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.Objec
 	// the operator may take nonzero time to populate the status, and this is still fine.\
 	// NOTE HERE: we need to match the types as well (ptr and ptr)
 	matchFromMCP := cmp.Equal(statusConfFromMCP, &expectedConf)
-	// TODO: multi-line value in structured log
-	klog.InfoS("result of checking the status from MachineConfigPools", "NRO Object", key.String(), "status", toJSON(statusConfFromMCP), "spec", toJSON(expectedConf), "match", matchFromMCP)
+	fxt.Dump.Infof(toJSON(statusConfFromMCP), "result of checking the status from MachineConfigPools NRO=%s match=%v", key.String(), matchFromMCP)
+	fxt.Dump.Infof(toJSON(expectedConf), "result of checking the spec from MachineConfigPools NRO=%s match=%v", key.String(), matchFromMCP)
+
 	matchFromGroupStatus := cmp.Equal(statusFromNodeGroups.Config, expectedConf)
-	// TODO: multi-line value in structured log
-	klog.InfoS("result of checking the status from NodeGroupStatus", "NRO Object", key.String(), "status", toJSON(statusFromNodeGroups), "spec", toJSON(expectedConf), "match", matchFromGroupStatus)
+	fxt.Dump.Infof(toJSON(statusFromNodeGroups), "result of checking the status from NodeGroupStatus NRO=%s match=%v", key.String(), matchFromGroupStatus)
+	fxt.Dump.Infof(toJSON(expectedConf), "result of checking the status from expected conf NRO=%s match=%v", key.String(), matchFromGroupStatus)
+
 	Expect(matchFromMCP && matchFromGroupStatus).To(BeTrue(), "config status mismatch")
 }
 

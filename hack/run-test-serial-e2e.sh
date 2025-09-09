@@ -39,6 +39,7 @@ if [ -n "${E2E_SERIAL_SKIP}" ]; then
 	SKIP="-ginkgo.skip=${E2E_SERIAL_SKIP}"
 fi
 
+VERBOSE=""
 DRY_RUN="false"
 REPORT_FILE=""
 
@@ -98,6 +99,14 @@ while [[ $# -gt 0 ]]; do
 			shift
 			shift
 			;;
+		--verbose)
+			VERBOSE="${VERBOSE} -ginkgo.v"
+			shift
+			;;
+		--debug)
+			VERBOSE="${VERBOSE} -ginkgo.vv -test.v"
+			shift
+			;;
 		--help)
 			echo "usage: $0 [options]"
 			echo "[options] are always '--opt val' and never '--opt=val'"
@@ -112,6 +121,8 @@ while [[ $# -gt 0 ]]; do
 			echo "--skip <regex>          skip cases matching <regex> (passed to -ginkgo.skip)"
 			echo "--label-filter <query>  filter cases based on the matching <query> (passed to -ginkgo.label-filter)"
 			echo "--report-file <file>    write report file for this suite on <file>"
+			echo "--verbose               add debug output (becomes -ginkgo.v)"
+			echo "--debug                 add even more debug output (becomes -ginkgo.vv + other settings)"
 			echo "--help                  shows this message and helps correctly"
 			exit 0
 			;;
@@ -187,10 +198,10 @@ function runtests() {
 	fi
 	echo "Running Serial, disruptive E2E Tests"
 	runcmd ${BIN_DIR}/e2e-nrop-serial.test \
-		--ginkgo.v \
 		--ginkgo.timeout="5h" \
 		--ginkgo.junit-report=${REPORT_FILE} \
 		${NO_COLOR} \
+		${VERBOSE} \
 		${SKIP} \
 		${LABEL_FILTER} \
 		${FOCUS}

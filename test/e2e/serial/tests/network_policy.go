@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,8 +32,10 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
+	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
+	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -51,6 +52,7 @@ import (
 // Full coverage for inter-pod communication is challenging, so we include basic tests to validate the expected behavior.
 
 var _ = Describe("network policies are applied", Ordered, Label("feature:network_policies"), func() {
+	var fxt *e2efixture.Fixture
 	var namespace string
 	var ctx context.Context
 	var nropObj *nropv1.NUMAResourcesOperator
@@ -92,6 +94,19 @@ var _ = Describe("network policies are applied", Ordered, Label("feature:network
 		prometheusPod = &prometheusPods.Items[0]
 	})
 
+	BeforeEach(func() {
+		Expect(serialconfig.Config).ToNot(BeNil())
+		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
+
+		var err error
+		fxt, err = e2efixture.Setup("e2e-test-non-regression", serialconfig.Config.NRTList)
+		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
+	})
+
+	AfterEach(func() {
+		Expect(e2efixture.Teardown(fxt)).To(Succeed())
+	})
+
 	type trafficCase struct {
 		FromPod     func() *corev1.Pod
 		ToHost      func() string
@@ -107,9 +122,9 @@ var _ = Describe("network policies are applied", Ordered, Label("feature:network
 				Skip("currently known broken: " + tc.Description)
 			}
 			Expect(tc.FromPod).ToNot(BeNil(), "source pod should not be nil")
-			klog.InfoS("Running traffic test", "description", tc.Description)
-			reachable := trafficTest(e2eclient.K8sClient, ctx, tc.FromPod(), tc.ToHost(), tc.ToPort)
-			klog.InfoS("Traffic test result", "reachable", reachable)
+			fxt.Log.Info("Running traffic test", "description", tc.Description)
+			reachable := trafficTest(fxt.K8sClient, ctx, tc.FromPod(), tc.ToHost(), tc.ToPort)
+			fxt.Log.Info("Traffic test result", "reachable", reachable)
 			Expect(reachable).To(Equal(tc.ShouldAllow), tc.Description)
 		},
 		// Testing operator and operands egress traffic to API server

@@ -22,6 +22,8 @@ import (
 	"math"
 	"time"
 
+	"github.com/go-logr/logr"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -29,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/klog/v2"
 	corev1qos "k8s.io/kubectl/pkg/util/qos"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -51,6 +52,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
+	"github.com/openshift-kni/numaresources-operator/test/internal/fixture/dumpr"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/internal/nrosched"
@@ -113,13 +115,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			if len(nrtCandidates) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
 			}
-			klog.InfoS("Found node with 2 NUMA zones", "count", len(nrtCandidates))
+			fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrtCandidates))
 
 			nrts = e2enrt.FilterByTopologyManagerPolicy(nrtCandidates, intnrt.SingleNUMANode)
 			if len(nrts) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 			}
-			klog.InfoS("Found node with 2 NUMA zones", "count", len(nrts))
+			fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrts))
 
 			numOfNodeToBePadded := len(nrts) - 1
 
@@ -159,7 +161,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
 
-			klog.InfoS("picking target", "nodeName", targetNodeName)
+			fxt.Log.Info("picking target", "nodeName", targetNodeName)
 
 			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
@@ -230,8 +232,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			rl := e2ereslist.FromGuaranteedPod(updatedPod)
-			// TODO: multi-line value in structured log
-			klog.InfoS("post-create pod resource list", "spec", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), "updated", e2ereslist.ToString(rl))
+			fxt.Dump.Infof(e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), "post-create pod resource list spec")
+			fxt.Dump.Infof(e2ereslist.ToString(rl), "post-create pod resource list updated")
 
 			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -281,7 +283,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() int {
 				r, err := podlist.With(fxt.Client).ReplicaSetByDeployment(context.TODO(), *updatedDp)
 				Expect(err).ToNot(HaveOccurred())
-				klog.InfoS("number of replicasets under deployment", "deployment", namespacedDpName, "count", len(r))
+				fxt.Log.Info("number of replicasets under deployment", "deployment", namespacedDpName, "count", len(r))
 				return len(r)
 			}).WithTimeout(10*time.Second).WithPolling(1*time.Second).Should(Equal(len(dpReplicas)+1), "deployment %q replicasets were not increased by 1", namespacedDpName)
 
@@ -294,11 +296,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() bool {
 				pods, err = podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 				if err != nil {
-					klog.ErrorS(err, "failed to list the pods of deployment", "deployment", namespacedDpName)
+					fxt.Log.Error(err, "failed to list the pods of deployment", "deployment", namespacedDpName)
 					return false
 				}
 				if len(pods) != 1 {
-					klog.InfoS("pods are exists under deployment", "count", len(pods), "deployment", namespacedDpName)
+					fxt.Log.Info("pods are exists under deployment", "count", len(pods), "deployment", namespacedDpName)
 					return false
 				}
 				return true
@@ -318,8 +320,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			rl = e2ereslist.FromGuaranteedPod(updatedPod)
-			// TODO: multi-line value in structured log
-			klog.InfoS("post-update pod resource list", "spec", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), "updated", e2ereslist.ToString(rl))
+			fxt.Dump.Infof(e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), "post-update pod resource list spec")
+			fxt.Dump.Infof(e2ereslist.ToString(rl), "post-update pod resource list updated")
 
 			By("wait for NRT data to settle")
 			e2efixture.MustSettleNRT(fxt)
@@ -345,7 +347,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			// we need to saturate the targeted node in such way that the pod won't be able to land on it.
 			// let's add a special label for the targeted node, so we can tell the padder package to pad it specifically
-			unlabel, err := labelNode(fxt.Client, "padded.node", targetNodeName)
+			unlabel, err := labelNode(fxt, "padded.node", targetNodeName)
 			Expect(err).ToNot(HaveOccurred())
 			cleanFuncs = append(cleanFuncs, unlabel)
 
@@ -393,7 +395,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() int {
 				r, err := podlist.With(fxt.Client).ReplicaSetByDeployment(context.TODO(), *updatedDp)
 				Expect(err).ToNot(HaveOccurred())
-				klog.InfoS("number of replicasets under deployment", "deployment", namespacedDpName, "count", len(r))
+				fxt.Log.Info("number of replicasets under deployment", "deployment", namespacedDpName, "count", len(r))
 				return len(r)
 			}).WithTimeout(10*time.Second).WithPolling(1*time.Second).Should(Equal(len(dpReplicas)+1), "deployment %q replicasets were not increased by 1", namespacedDpName)
 
@@ -404,11 +406,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() bool {
 				pods, err = podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 				if err != nil {
-					klog.ErrorS(err, "failed to list the pods of deployment", "deployment", namespacedDpName)
+					fxt.Log.Error(err, "failed to list the pods of deployment", "deployment", namespacedDpName)
 					return false
 				}
 				if len(pods) != 1 {
-					klog.InfoS("pods are exists under deployment", "count", len(pods), "deployment", namespacedDpName)
+					fxt.Log.Info("pods are exists under deployment", "count", len(pods), "deployment", namespacedDpName)
 					return false
 				}
 				return true
@@ -430,8 +432,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			rl = e2ereslist.FromGuaranteedPod(updatedPod)
-			// TODO: multi-line value in structured log
-			klog.InfoS("post-reroute pod resource list", "spec", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), "updated", e2ereslist.ToString(rl))
+			fxt.Dump.Infof(e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), "post-reroute pod resource list spec")
+			fxt.Dump.Infof(e2ereslist.ToString(rl), "post-reroute pod resource list updated")
 
 			nrtReorganized, err := e2enrt.FindFromList(nrtReorganizedList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -504,13 +506,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			if len(nrtCandidates) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
 			}
-			klog.InfoS("Found node with 2 NUMA zones", "count", len(nrtCandidates))
+			fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrtCandidates))
 
 			nrts = e2enrt.FilterByTopologyManagerPolicy(nrtCandidates, intnrt.SingleNUMANode)
 			if len(nrts) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 			}
-			klog.InfoS("Found node with 2 NUMA zones", "count", len(nrts))
+			fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrts))
 
 			numOfNodeToBePadded := len(nrts) - 1
 
@@ -550,7 +552,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
 
-			klog.InfoS("picking target", "nodeName", targetNodeName)
+			fxt.Log.Info("picking target", "nodeName", targetNodeName)
 
 			nrtInitialList, err := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Second*10)
 			Expect(err).ToNot(HaveOccurred())
@@ -566,8 +568,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// calculate base load on the target node
 			baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
-			// TODO: multi-line value in structured log
-			klog.InfoS("computed base load", "baseload", baseload)
+			fxt.Dump.Infof(baseload.String(), "computed base load")
 
 			// get least available CPU and Memory on each NUMA node while taking baseload into consideration
 			cpus := leastAvailableResourceQtyInAllZone(*targetNrtInitial, baseload, corev1.ResourceCPU)
@@ -668,11 +669,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() bool {
 				pods, err = podlist.With(fxt.Client).ByDeployment(context.TODO(), *updatedDp)
 				if err != nil {
-					klog.ErrorS(err, "failed to list the pods of deployment", "deployment", namespacedDpName)
+					fxt.Log.Error(err, "failed to list the pods of deployment", "deployment", namespacedDpName)
 					return false
 				}
 				if len(pods) != 2 {
-					klog.InfoS("pods are exists under deployment", "count", len(pods), "deployment", namespacedDpName)
+					fxt.Log.Info("pods are exists under deployment", "count", len(pods), "deployment", namespacedDpName)
 					return false
 				}
 				return true
@@ -744,13 +745,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			if len(nrtCandidates) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
 			}
-			klog.InfoS("Found node with 2 NUMA zones", "count", len(nrtCandidates))
+			fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrtCandidates))
 
 			nrts = e2enrt.FilterByTopologyManagerPolicy(nrtCandidates, intnrt.SingleNUMANode)
 			if len(nrts) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with valid policy - found %d", len(nrts))
 			}
-			klog.InfoS("Found node with 2 NUMA zones", "count", len(nrts))
+			fxt.Log.Info("Found node with 2 NUMA zones", "count", len(nrts))
 
 			numOfNodeToBePadded := len(nrts) - 1
 
@@ -783,7 +784,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(targetNodeNameSet.Len()).To(Equal(1), "could not find the target node")
 			targetNodeName, ok := e2efixture.PopNodeName(targetNodeNameSet)
 			Expect(ok).To(BeTrue())
-			klog.InfoS("picking target", "nodeName", targetNodeName)
+			fxt.Log.Info("picking target", "nodeName", targetNodeName)
 
 			nrtInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, timeout)
 			Expect(err).ToNot(HaveOccurred())
@@ -842,11 +843,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() bool {
 				pods, err = podlist.With(fxt.Client).ByReplicaSet(context.TODO(), *rs)
 				if err != nil {
-					klog.ErrorS(err, "failed to list the pods of replicaset", "replicaset", namespacedRsName.String())
+					fxt.Log.Error(err, "failed to list the pods of replicaset", "replicaset", namespacedRsName.String())
 					return false
 				}
 				if len(pods) != int(replicaNumber) {
-					klog.InfoS("pods belonging to replicaset", "count", len(pods), "replicaset", namespacedRsName.String())
+					fxt.Log.Info("pods belonging to replicaset", "count", len(pods), "replicaset", namespacedRsName.String())
 					return false
 				}
 				return true
@@ -894,7 +895,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			By("verify replicaset's pods are deleted")
 			for _, pod := range pods {
-				klog.InfoS("waiting for pod to get deleted", "namespace", pod.Namespace, "name", pod.Name)
+				fxt.Log.Info("waiting for pod to get deleted", "namespace", pod.Namespace, "name", pod.Name)
 				err := wait.With(fxt.Client).Timeout(2*time.Minute).ForPodDeleted(context.TODO(), pod.Namespace, pod.Name)
 				Expect(err).ToNot(HaveOccurred(), "pod %s/%s still exists", pod.Namespace, pod.Name)
 			}
@@ -940,11 +941,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() bool {
 				pods, err = podlist.With(fxt.Client).ByReplicaSet(context.TODO(), *rs)
 				if err != nil {
-					klog.ErrorS(err, "failed to list the pods of replicaset", "replicaset", namespacedRsName.String())
+					fxt.Log.Error(err, "failed to list the pods of replicaset", "replicaset", namespacedRsName.String())
 					return false
 				}
 				if len(pods) != int(replicaNumber) {
-					klog.InfoS("pods belonging to replicaset", "count", len(pods), "replicaset", namespacedRsName.String())
+					fxt.Log.Info("pods belonging to replicaset", "count", len(pods), "replicaset", namespacedRsName.String())
 					return false
 				}
 				return true
@@ -997,17 +998,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	})
 })
 
-func makePaddingPod(namespace, nodeName string, zone nrtv1alpha2.Zone, podReqs corev1.ResourceList) (*corev1.Pod, error) {
-	// TODO: multi-line value in structured log
-	klog.InfoS("want to have zone with allocatable", "zone", zone.Name, "allocatable", e2ereslist.ToString(podReqs))
+func makePaddingPod(dh dumpr.Dumper, namespace, nodeName string, zone nrtv1alpha2.Zone, podReqs corev1.ResourceList) (*corev1.Pod, error) {
+	dh.Infof(e2ereslist.ToString(podReqs), "want to have zone %q with allocatable", zone.Name)
 
 	paddingReqs, err := e2enrt.SaturateZoneUntilLeft(zone, podReqs, e2enrt.DropHostLevelResources)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: multi-line value in structured log
-	klog.InfoS("padding resource to saturate", "nodeName", nodeName, "paddingReqs", e2ereslist.ToString(paddingReqs))
+	dh.Infof(e2ereslist.ToString(paddingReqs), "padding resource to saturate node %q", nodeName)
 
 	padPod := newPaddingPod(nodeName, zone.Name, namespace, paddingReqs)
 	return padPod, nil
@@ -1040,78 +1039,30 @@ func newPaddingPod(nodeName, zoneName, namespace string, resourceReqs corev1.Res
 	}
 }
 
-func pinPodTo(pod *corev1.Pod, nodeName, zoneName string) (*corev1.Pod, error) {
+func pinPodTo(lh logr.Logger, pod *corev1.Pod, nodeName, zoneName string) (*corev1.Pod, error) {
 	zoneID, err := e2enrt.GetZoneIDFromName(zoneName)
 	if err != nil {
 		return nil, err
 	}
 
-	klog.InfoS("pinning padding pod for node zone", "nodeName", nodeName, "zoneID", zoneID)
+	lh.Info("pinning padding pod for node zone", "nodeName", nodeName, "zoneID", zoneID)
 	cnt := &pod.Spec.Containers[0] // shortcut
 	cnt.Resources.Limits[numacellapi.MakeResourceName(zoneID)] = resource.MustParse("1")
 
-	pinnedPod, err := pinPodToNode(pod, nodeName)
-	if err != nil {
-		return nil, err
-	}
-	return pinnedPod, nil
+	return pinPodToNode(lh, pod, nodeName), nil
 }
 
-func pinPodToNode(pod *corev1.Pod, nodeName string) (*corev1.Pod, error) {
-	klog.InfoS("pinning padding pod for node", "nodeName", nodeName)
-
-	klog.InfoS("forcing affinity to", "key", "kubernetes.io/hostname", "value", nodeName)
+func pinPodToNode(lh logr.Logger, pod *corev1.Pod, nodeName string) *corev1.Pod {
+	lh.Info("pinning padding pod for node", "nodeName", nodeName)
+	lh.Info("forcing affinity to", "key", "kubernetes.io/hostname", "value", nodeName)
 	pod.Spec.NodeSelector = map[string]string{
 		"kubernetes.io/hostname": nodeName,
 	}
-	return pod, nil
+	return pod
 }
 
-func dumpNRTForNode(cli client.Client, nodeName, tag string) {
-	nrt := nrtv1alpha2.NodeResourceTopology{}
-	err := cli.Get(context.TODO(), client.ObjectKey{Name: nodeName}, &nrt)
-	Expect(err).ToNot(HaveOccurred())
-	klog.InfoS("NRT for node", "nodeName", nodeName, "tag", tag, "nrt", intnrt.ToString(nrt))
-}
-
-func labelNode(cli client.Client, label, nodeName string) (func() error, error) {
-	return labelNodeWithValue(cli, label, "", nodeName)
-}
-
-func labelNodeWithValue(cli client.Client, key, val, nodeName string) (func() error, error) {
-	nodeObj := &corev1.Node{}
-	nodeKey := client.ObjectKey{Name: nodeName}
-	if err := cli.Get(context.TODO(), nodeKey, nodeObj); err != nil {
-		return nil, err
-	}
-
-	sel, err := labels.Parse(fmt.Sprintf("%s=%s", key, val))
-	if err != nil {
-		return nil, err
-	}
-
-	nodeObj.Labels[key] = val
-	klog.InfoS("adding label", "label", sel.String(), "nodeName", nodeName)
-	if err := cli.Update(context.TODO(), nodeObj); err != nil {
-		return nil, err
-	}
-
-	unlabelFunc := func() error {
-		nodeObj := &corev1.Node{}
-		nodeKey := client.ObjectKey{Name: nodeName}
-		if err := cli.Get(context.TODO(), nodeKey, nodeObj); err != nil {
-			return err
-		}
-
-		delete(nodeObj.Labels, key)
-		klog.InfoS("removing label", "label", sel.String(), "nodeName", nodeName)
-		if err := cli.Update(context.TODO(), nodeObj); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	return unlabelFunc, nil
+func labelNode(fxt *e2efixture.Fixture, label, nodeName string) (func() error, error) {
+	return labelNodeWithValue(fxt, label, "", nodeName)
 }
 
 func availableResourceType(nrtInfo nrtv1alpha2.NodeResourceTopology, resName corev1.ResourceName) resource.Quantity {

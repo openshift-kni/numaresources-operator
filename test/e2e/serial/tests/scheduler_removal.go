@@ -23,7 +23,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/klog/v2/textlogger"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -45,14 +44,11 @@ import (
 var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources scheduler removal on a live cluster", Serial, Label("disruptive", "scheduler", "schedrst"), Label("feature:schedrst"), func() {
 	var fxt *e2efixture.Fixture
 	var nroSchedObj *nropv1.NUMAResourcesScheduler
-	var config *textlogger.Config
 	var dpNName nropv1.NamespacedName
 
 	BeforeEach(func() {
 		Expect(serialconfig.Config).ToNot(BeNil())
 		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
-
-		config = textlogger.NewConfig(textlogger.Verbosity(1))
 
 		var err error
 		fxt, err = e2efixture.Setup("e2e-test-sched-remove", serialconfig.Config.NRTList)
@@ -83,7 +79,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 			Expect(err).ToNot(HaveOccurred())
 
 			// make sure scheduler deployment is gone
-			err = depwait.With(fxt.Client, textlogger.NewLogger(config)).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(context.TODO(), dpNName.Namespace, dpNName.Name)
+			err = depwait.With(fxt.Client, fxt.Log).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(context.TODO(), dpNName.Namespace, dpNName.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			maxStep := 3
@@ -108,7 +104,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 			Expect(err).ToNot(HaveOccurred())
 
 			// make sure scheduler deployment is gone
-			err = depwait.With(fxt.Client, textlogger.NewLogger(config)).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(context.TODO(), dpNName.Namespace, dpNName.Name)
+			err = depwait.With(fxt.Client, fxt.Log).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(context.TODO(), dpNName.Namespace, dpNName.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			dp := createDeployment(fxt, "testdp", serialconfig.Config.SchedulerName)
@@ -139,7 +135,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 			Expect(err).ToNot(HaveOccurred())
 
 			// make sure scheduler deployment is gone
-			err = depwait.With(fxt.Client, textlogger.NewLogger(config)).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(ctx, dpNName.Namespace, dpNName.Name)
+			err = depwait.With(fxt.Client, fxt.Log).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentDeleted(ctx, dpNName.Namespace, dpNName.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			dp := createDeployment(fxt, "testdp", nroSchedObj.Status.SchedulerName)

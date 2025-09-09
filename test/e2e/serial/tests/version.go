@@ -21,7 +21,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 
-	"k8s.io/klog/v2"
+	"github.com/go-logr/logr"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/buildinfo"
@@ -36,6 +36,12 @@ import (
 )
 
 var _ = Describe("[serial] numaresources version", Serial, Label("feature:config"), func() {
+	var lh logr.Logger
+
+	BeforeEach(func() {
+		lh = GinkgoLogr
+	})
+
 	When("checking the versions", func() {
 		It("should verify all the components", Label("tier0", "versioncheck"), func(ctx context.Context) {
 			Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
@@ -67,7 +73,7 @@ var _ = Describe("[serial] numaresources version", Serial, Label("feature:config
 			// this should not happen, but since we are sneaking in, not worth to fail
 			nropBi := buildinfo.BuildInfo{}
 			if err := json.Unmarshal(stdout, &nropBi); err != nil {
-				klog.ErrorS(err, "buildinfo unmarshal failure", "nropNamespace", pod.Namespace, "nropName", pod.Name)
+				lh.Error(err, "buildinfo unmarshal failure", "nropNamespace", pod.Namespace, "nropName", pod.Name)
 				By("running against NUMAResources UNKNOWN UNKNOWN")
 				return
 			}

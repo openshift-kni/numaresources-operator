@@ -25,7 +25,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog/v2"
 	corev1qos "k8s.io/kubectl/pkg/util/qos"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -150,15 +149,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				//calculate a base load on the node
 				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
-				// TODO: multi-line value in structured log
-				klog.InfoS("computed base load", "value", baseload)
+				fxt.Dump.Infof(baseload.String(), "computed base load")
 				baseload.Apply(paddingRes)
 				for zIdx, zone := range nrtInfo.Zones {
 					podName := fmt.Sprintf("padding-%d-%d", nIdx, zIdx)
-					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingRes)
+					padPod, err := makePaddingPod(fxt.Dump, fxt.Namespace.Name, podName, zone, paddingRes)
 					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
 
-					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
+					padPod, err = pinPodTo(fxt.Log, padPod, nodeName, zone.Name)
 					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
 
 					err = fxt.Client.Create(context.TODO(), padPod)
@@ -455,9 +453,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			e2efixture.MustSettleNRT(fxt)
 
 			for _, unsuitableNodeName := range unsuitableNodeNames {
-				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
+				dumpNRTForNode(fxt, context.TODO(), unsuitableNodeName, "unsuitable")
 			}
-			dumpNRTForNode(fxt.Client, targetNodeName, "target")
+			dumpNRTForNode(fxt, context.TODO(), targetNodeName, "target")
 
 			By(fmt.Sprintf("checking the resource allocation on %q as the test starts", targetNodeName))
 			var nrtInitial nrtv1alpha2.NodeResourceTopology
@@ -465,7 +463,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			By("running the test pod")
-			klog.Info(objects.DumpPODResourceRequirements(pod))
+			fxt.Dump.Infof(objects.DumpPODResourceRequirements(pod), "test pod requirements")
 
 			By("running the test pod")
 			err = fxt.Client.Create(context.TODO(), pod)
@@ -475,7 +473,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			updatedPod, err := wait.With(fxt.Client).Timeout(2*time.Minute).ForPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
-				dumpNRTForNode(fxt.Client, targetNodeName, "target")
+				dumpNRTForNode(fxt, context.TODO(), targetNodeName, "target")
 			}
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1390,12 +1388,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			e2efixture.MustSettleNRT(fxt)
 
 			for _, unsuitableNodeName := range unsuitableNodeNames {
-				dumpNRTForNode(fxt.Client, unsuitableNodeName, "unsuitable")
+				dumpNRTForNode(fxt, context.TODO(), unsuitableNodeName, "unsuitable")
 			}
-			dumpNRTForNode(fxt.Client, targetNodeName, "target")
+			dumpNRTForNode(fxt, context.TODO(), targetNodeName, "target")
 
 			By("running the test pod")
-			klog.Info(objects.DumpPODResourceRequirements(pod))
+			fxt.Dump.Infof(objects.DumpPODResourceRequirements(pod), "test pod requirements")
 			err := fxt.Client.Create(context.TODO(), pod)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1403,7 +1401,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			_, err = wait.With(fxt.Client).Interval(10*time.Second).Steps(5).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
-				dumpNRTForNode(fxt.Client, targetNodeName, "target")
+				dumpNRTForNode(fxt, context.TODO(), targetNodeName, "target")
 			}
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1412,18 +1410,18 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Eventually(func() bool {
 				events, err := objects.GetEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				if err != nil {
-					klog.ErrorS(err, "failed to get events for pod", "namespace", pod.Namespace, "name", pod.Name)
+					fxt.Log.Error(err, "failed to get events for pod", "namespace", pod.Namespace, "name", pod.Name)
 				}
 				for _, e := range events {
 					ok, err := regexp.MatchString(errMsg, e.Message)
 					if err != nil {
-						klog.ErrorS(err, "bad message regex", "pattern", errMsg, "eventMessage", e.Message)
+						fxt.Log.Error(err, "bad message regex", "pattern", errMsg, "eventMessage", e.Message)
 					}
 					if e.Reason == "FailedScheduling" && ok {
 						return true
 					}
 				}
-				klog.InfoS("failed to find the expected event with Reason=\"FailedScheduling\" and Message contains", "expected", errMsg)
+				fxt.Log.Info("failed to find the expected event with Reason=\"FailedScheduling\" and Message contains", "expected", errMsg)
 				if !loggedEvents {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 					loggedEvents = true
@@ -2133,10 +2131,10 @@ func setupPadding(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopol
 		}
 
 		By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(numaRes)))
-		padPod, err := makePaddingPod(fxt.Namespace.Name, "target", zone, numaRes)
+		padPod, err := makePaddingPod(fxt.Dump, fxt.Namespace.Name, "target", zone, numaRes)
 		Expect(err).ToNot(HaveOccurred())
 
-		padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
+		padPod, err = pinPodTo(fxt.Log, padPod, nrtInfo.Name, zone.Name)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = fxt.Client.Create(context.TODO(), padPod)
@@ -2171,10 +2169,10 @@ func setupPaddingForUnsuitableNodes(fxt *e2efixture.Fixture, nrtList nrtv1alpha2
 				By(fmt.Sprintf("saturating node %q -> %q zone %q to fit only (adjusted) %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes)))
 			}
 
-			padPod, err := makePaddingPod(fxt.Namespace.Name, name, zone, padRes)
+			padPod, err := makePaddingPod(fxt.Dump, fxt.Namespace.Name, name, zone, padRes)
 			Expect(err).ToNot(HaveOccurred())
 
-			padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
+			padPod, err = pinPodTo(fxt.Log, padPod, nrtInfo.Name, zone.Name)
 			Expect(err).ToNot(HaveOccurred())
 
 			err = fxt.Client.Create(context.TODO(), padPod)
@@ -2246,4 +2244,11 @@ func newContainerScopeSingleNUMANodeFuncs() tmScopeFuncs {
 		checkConsumedRes:        e2enrt.CheckNodeConsumedResourcesAtLeast,
 		filterMatchingResources: e2enrt.FilterAnyNodeMatchingResources,
 	}
+}
+
+func dumpNRTForNode(fxt *e2efixture.Fixture, ctx context.Context, nodeName, tag string) {
+	GinkgoHelper()
+	nrt := nrtv1alpha2.NodeResourceTopology{}
+	Expect(fxt.Client.Get(ctx, client.ObjectKey{Name: nodeName}, &nrt)).To(Succeed())
+	fxt.Dump.Infof(intnrt.ToString(nrt), "NRT for node %q: %v", nodeName, tag)
 }
