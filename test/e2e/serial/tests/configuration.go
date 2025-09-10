@@ -849,7 +849,8 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 			schedPods, err := podlist.With(fxt.Client).ByDeployment(ctx, *schedDeployment)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(schedPods).To(HaveLen(1))
+			schedPodsReplicas := *schedDeployment.Spec.Replicas
+			Expect(schedPods).To(HaveLen(int(schedPodsReplicas)))
 
 			schedulerName = nroSchedObj.Status.SchedulerName
 			Expect(schedulerName).ToNot(BeEmpty(), "cannot autodetect the TAS scheduler name from the cluster")
