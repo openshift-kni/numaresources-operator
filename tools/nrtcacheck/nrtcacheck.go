@@ -71,6 +71,7 @@ type ProgArgs struct {
 }
 
 func main() {
+	klog.InitFlags(nil)
 	parsedArgs, err := parseArgs(os.Args[1:]...)
 	if err != nil {
 		klog.V(1).ErrorS(err, "parsing args")
@@ -95,6 +96,11 @@ func main() {
 		klog.V(1).ErrorS(err, "creating client with scheme")
 		os.Exit(1)
 	}
+	k8sCli, err := clientutil.NewK8s()
+	if err != nil {
+		klog.V(1).ErrorS(err, "creating k8s client")
+		os.Exit(1)
+	}
 
 	ctx := context.Background()
 
@@ -108,14 +114,8 @@ func main() {
 		klog.V(1).InfoS("RTE:", "node", node, "pod", podnn.String())
 	}
 
-	k8sCli, err := clientutil.NewK8s()
-	if err != nil {
-		klog.V(1).ErrorS(err, "creating k8s client")
-		os.Exit(1)
-	}
-
 	env := schedcache.Env{
-		Ctx:    context.Background(),
+		Ctx:    ctx,
 		Cli:    cli,
 		K8sCli: k8sCli,
 		Log:    textlogger.NewLogger(logCfg),
@@ -205,7 +205,7 @@ func findRTEPodsByNodeName(ctx context.Context, cli client.Client) (map[string]t
 		Name: objectnames.DefaultNUMAResourcesOperatorCrName,
 	}
 	nroObj := nropv1.NUMAResourcesOperator{}
-	err := cli.Get(context.TODO(), nroNName, &nroObj)
+	err := cli.Get(ctx, nroNName, &nroObj)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func findRTEPodsByNodeName(ctx context.Context, cli client.Client) (map[string]t
 	podsByName := make(map[string]types.NamespacedName)
 	for _, ds := range nroObj.Status.DaemonSets {
 		dsObj := appsv1.DaemonSet{}
-		err = cli.Get(context.TODO(), types.NamespacedName{Namespace: ds.Namespace, Name: ds.Name}, &dsObj)
+		err = cli.Get(ctx, types.NamespacedName{Namespace: ds.Namespace, Name: ds.Name}, &dsObj)
 		if err != nil {
 			return nil, err
 		}

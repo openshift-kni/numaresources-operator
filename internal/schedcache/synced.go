@@ -57,7 +57,7 @@ func HasSynced(env *Env, nodeNames []string) (bool, map[string]sets.Set[string],
 	var nroSched nropv1.NUMAResourcesScheduler
 	nroKey := client.ObjectKey{Name: objectnames.DefaultNUMAResourcesSchedulerCrName}
 
-	err = env.Cli.Get(context.TODO(), nroKey, &nroSched)
+	err = env.Cli.Get(env.Ctx, nroKey, &nroSched)
 	if err != nil {
 		return false, nil, err
 	}

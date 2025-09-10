@@ -438,9 +438,8 @@ bin/mkginkgolabelfilter: tools/mkginkgolabelfilter/mkginkgolabelfilter.go
 	LDFLAGS="-static"
 	@go build -o $@ -ldflags "$$LDFLAGS" $<
 
-bin/nrtcacheck: build-tools tools/nrtcacheck/nrtcacheck.go
-	LDFLAGS="-s -w" \
-	go build -mod=vendor -o $@ -ldflags "$$LDFLAGS" -tags "$$GOTAGS" $<
+bin/nrtcacheck: tools/nrtcacheck/nrtcacheck.go build-tools
+	LDFLAGS="-s -w" go build -mod=vendor -o $@ -ldflags "$$LDFLAGS" -tags "$$GOTAGS" $<
 
 verify-generated: bundle generate
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
