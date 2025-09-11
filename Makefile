@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 4.20.999-snapshot
+VERSION ?= 4.21.999-snapshot
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -641,7 +641,7 @@ konflux-generate-catalog: yq opm
 .PHONY: konflux-generate-catalog-production ## generate a registry.redhat.io catalog
 konflux-generate-catalog-production: konflux-generate-catalog
         # overlay the bundle image for production
-	sed -i 's|quay.io/redhat-user-workloads/telco-5g-tenant/$(PACKAGE_NAME_KONFLUX)-bundle-4-20|registry.redhat.io/openshift4/$(PACKAGE_NAME_KONFLUX)-bundle|g' $(CATALOG_KONFLUX)
+	sed -i 's|quay.io/redhat-user-workloads/telco-5g-tenant/$(PACKAGE_NAME_KONFLUX)-bundle-4-21|registry.redhat.io/openshift4/$(PACKAGE_NAME_KONFLUX)-bundle|g' $(CATALOG_KONFLUX)
         # From now on, all the related images must reference production (registry.redhat.io) exclusively
 	./hack/konflux-validate-related-images-production.sh --set-catalog-file $(CATALOG_KONFLUX)
 	$(OPM) validate .konflux/catalog/$(PACKAGE_NAME_KONFLUX)/

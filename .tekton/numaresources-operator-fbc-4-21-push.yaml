@@ -10,15 +10,19 @@ metadata:
     pipelinesascode.tekton.dev/on-cel-expression: |
       event == "push" &&
       target_branch == "main" &&
-      (".tekton/numaresources-must-gather-4-20-push.yaml".pathChanged() ||
-      ".konflux/must-gather/***".pathChanged() ||
-      "must-gather/***".pathChanged())
+      (
+        '.tekton/fbc-pipeline.yaml'.pathChanged() ||
+        '.tekton/images-mirror-set.yaml'.pathChanged() ||
+        '.tekton/numaresources-operator-fbc-4-21-push.yaml'.pathChanged() ||
+        '.konflux/catalog/bundle.builds.in.yaml'.pathChanged() ||
+        '.konflux/Dockerfile.catalog'.pathChanged()
+      )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: numaresources-must-gather-4-20
-    appstudio.openshift.io/component: numaresources-must-gather-4-20
+    appstudio.openshift.io/application: numaresources-operator-fbc-4-21
+    appstudio.openshift.io/component: numaresources-operator-fbc-4-21
     pipelines.appstudio.openshift.io/type: build
-  name: numaresources-must-gather-4-20-on-push
+  name: numaresources-operator-fbc-4-21-on-push
   namespace: telco-5g-tenant
 spec:
   params:
@@ -27,24 +31,21 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-must-gather-4-20:{{revision}}
+    value: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-fbc-4-21:{{revision}}
   - name: build-platforms
     value:
     - linux/x86_64
   - name: dockerfile
-    value: .konflux/must-gather/must-gather.konflux.Dockerfile
-  - name: build-source-image
-    value: "true"
+    value: .konflux/Dockerfile.catalog
+  - name: additional-tags
+    value: ["latest"]
+  # We have configured an fbc exception for hermetic builds on the release repo.
   - name: hermetic
-    value: "true"
-  - name: prefetch-input
-    value: '[{"type": "rpm", "path": ".konflux/must-gather"}]'
-  - name: skip-sast-coverity
-    value: "true"
+    value: "false"
   pipelineRef:
-    name: build-pipeline-must-gather
+    name: fbc-pipeline    
   taskRunTemplate:
-    serviceAccountName: build-pipeline-numaresources-must-gather-4-20
+    serviceAccountName: build-pipeline-numaresources-operator-fbc-4-21
   workspaces:
   - name: git-auth
     secret:

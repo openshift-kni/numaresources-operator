@@ -4,25 +4,26 @@ metadata:
   annotations:
     build.appstudio.openshift.io/repo: https://github.com/openshift-kni/numaresources-operator?rev={{revision}}
     build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/pull_request_number: '{{pull_request_number}}'
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
-    pipelinesascode.tekton.dev/cancel-in-progress: "false"
+    pipelinesascode.tekton.dev/cancel-in-progress: "true"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: |
-      event == "push" &&
+      event == "pull_request" &&
       target_branch == "main" &&
       (
         '.tekton/fbc-pipeline.yaml'.pathChanged() ||
         '.tekton/images-mirror-set.yaml'.pathChanged() ||
-        '.tekton/numaresources-operator-fbc-4-20-push.yaml'.pathChanged() ||
+        '.tekton/numaresources-operator-fbc-4-21-pull-request.yaml'.pathChanged() ||
         '.konflux/catalog/bundle.builds.in.yaml'.pathChanged() ||
         '.konflux/Dockerfile.catalog'.pathChanged()
       )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: numaresources-operator-fbc-4-20
-    appstudio.openshift.io/component: numaresources-operator-fbc-4-20
+    appstudio.openshift.io/application: numaresources-operator-fbc-4-21
+    appstudio.openshift.io/component: numaresources-operator-fbc-4-21
     pipelines.appstudio.openshift.io/type: build
-  name: numaresources-operator-fbc-4-20-on-push
+  name: numaresources-operator-fbc-4-21-on-pull-request
   namespace: telco-5g-tenant
 spec:
   params:
@@ -31,21 +32,23 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-fbc-4-20:{{revision}}
+    value: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-fbc-4-21:on-pr-{{revision}}
+  - name: image-expires-after
+    value: 5d
   - name: build-platforms
     value:
     - linux/x86_64
   - name: dockerfile
     value: .konflux/Dockerfile.catalog
   - name: additional-tags
-    value: ["latest"]
+    value: []
   # We have configured an fbc exception for hermetic builds on the release repo.
   - name: hermetic
     value: "false"
   pipelineRef:
     name: fbc-pipeline    
   taskRunTemplate:
-    serviceAccountName: build-pipeline-numaresources-operator-fbc-4-20
+    serviceAccountName: build-pipeline-numaresources-operator-fbc-4-21
   workspaces:
   - name: git-auth
     secret:

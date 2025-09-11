@@ -44,7 +44,7 @@ func TestNewWithDiscover(t *testing.T) {
 		{
 			description: "first major fixed",
 			plat:        platform.OpenShift,
-			ver:         mustParseVersion("4.20.0"), // at time of writing
+			ver:         mustParseVersion("4.21.0"), // at time of writing
 			expected: PlatformProperties{
 				PodResourcesListFilterActivePods: true,
 			},
@@ -52,7 +52,7 @@ func TestNewWithDiscover(t *testing.T) {
 		{
 			description: "next Z-stream fixed, must never regress", // at time of writing
 			plat:        platform.OpenShift,
-			ver:         mustParseVersion("4.20.1"),
+			ver:         mustParseVersion("4.21.1"),
 			expected: PlatformProperties{
 				PodResourcesListFilterActivePods: true,
 			},
@@ -60,7 +60,7 @@ func TestNewWithDiscover(t *testing.T) {
 		{
 			description: "next major fixed, must never regress", // at time of writing
 			plat:        platform.OpenShift,
-			ver:         mustParseVersion("4.21.0"),
+			ver:         mustParseVersion("4.22.0"),
 			expected: PlatformProperties{
 				PodResourcesListFilterActivePods: true,
 			},
