@@ -65,7 +65,11 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 	})
 
 	Context("using the NUMA-aware scheduler with NRT data", func() {
-		var cpusPerPod int64 = 2 // must be even. Must be >= 2
+		var cpusPerPod int64
+
+		BeforeEach(func() {
+			cpusPerPod = 2 // must be even. Must be >= 2
+		})
 
 		DescribeTable("[node1] against a single node", Label("node1"),
 			// the ourpose of this test is to send a burst of pods towards a node. Each pod must require resources in such a way
