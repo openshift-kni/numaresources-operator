@@ -20,11 +20,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -201,6 +204,58 @@ func TestIsUpdatedNUMAResourcesOperator(t *testing.T) {
 	}
 }
 
+func TestNUMAResourcesSchedulerNeedsUpdate(t *testing.T) {
+	type testCase struct {
+		name            string
+		oldStatus       nropv1.NUMAResourcesSchedulerStatus
+		updaterFunc     func(*nropv1.NUMAResourcesSchedulerStatus)
+		expectedUpdated bool
+	}
+	testCases := []testCase{
+		{
+			name:            "empty status, no change",
+			oldStatus:       nropv1.NUMAResourcesSchedulerStatus{},
+			updaterFunc:     func(st *nropv1.NUMAResourcesSchedulerStatus) {},
+			expectedUpdated: false,
+		},
+		{
+			name: "status, conditions, updated only time",
+			oldStatus: nropv1.NUMAResourcesSchedulerStatus{
+				Conditions: NewConditions(ConditionAvailable, "test all good", "testing info"),
+			},
+			updaterFunc: func(st *nropv1.NUMAResourcesSchedulerStatus) {
+				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
+				st.Conditions = NewConditions(ConditionAvailable, "test all good", "testing info")
+			},
+			expectedUpdated: false,
+		},
+		{
+			name: "status, conditions, updated only time, other fields changed",
+			oldStatus: nropv1.NUMAResourcesSchedulerStatus{
+				Conditions: NewConditions(ConditionAvailable, "test all good", "testing info"),
+			},
+			updaterFunc: func(st *nropv1.NUMAResourcesSchedulerStatus) {
+				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
+				st.Conditions = NewConditions(ConditionAvailable, "test all good", "testing info")
+				st.CacheResyncPeriod = ptr.To(metav1.Duration{Duration: 42 * time.Second})
+			},
+			expectedUpdated: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			oldStatus := *tc.oldStatus.DeepCopy()
+			newStatus := *tc.oldStatus.DeepCopy()
+			tc.updaterFunc(&newStatus)
+			got := NUMAResourcesSchedulerNeedsUpdate(oldStatus, newStatus)
+			if got != tc.expectedUpdated {
+				t.Errorf("isUpdated %v expected %v", got, tc.expectedUpdated)
+			}
+		})
+	}
+}
+
 func TestReasonFromError(t *testing.T) {
 	type testCase struct {
 		name     string
@@ -276,6 +331,167 @@ func TestMessageFromError(t *testing.T) {
 			got := MessageFromError(tcase.err)
 			if got != tcase.expected {
 				t.Errorf("failure getting message from error: got=%q expected=%q", got, tcase.expected)
+			}
+		})
+	}
+}
+
+func TestGetUpdatedSchedulerConditions(t *testing.T) {
+	tests := []struct {
+		name       string
+		conditions []metav1.Condition
+		condition  metav1.Condition
+		expected   []metav1.Condition
+	}{
+		{
+			name: "first reconcile iteration - with operator condition",
+			condition: metav1.Condition{
+				Type:    ConditionAvailable,
+				Status:  metav1.ConditionTrue,
+				Reason:  ConditionAvailable,
+				Message: "test",
+			},
+			expected: []metav1.Condition{
+				{
+					Type:    ConditionAvailable,
+					Status:  metav1.ConditionTrue,
+					Reason:  ConditionAvailable,
+					Message: "test",
+				},
+				{
+					Type:   ConditionUpgradeable,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionUpgradeable,
+				},
+				{
+					Type:   ConditionProgressing,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionProgressing,
+				},
+				{
+					Type:   ConditionDegraded,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionDegraded,
+				},
+				{
+					Type:   ConditionDedicatedInformerActive,
+					Status: metav1.ConditionUnknown,
+					Reason: ConditionDedicatedInformerActive,
+				},
+			},
+		},
+		{
+			name: "first reconcile iteration - with informer condition",
+			condition: metav1.Condition{
+				Type:    ConditionDedicatedInformerActive,
+				Status:  metav1.ConditionTrue,
+				Reason:  ConditionDedicatedInformerActive,
+				Message: "test",
+			},
+			expected: []metav1.Condition{
+				{
+					Type:   ConditionAvailable,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionAvailable,
+				},
+				{
+					Type:   ConditionUpgradeable,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionUpgradeable,
+				},
+				{
+					Type:   ConditionProgressing,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionProgressing,
+				},
+				{
+					Type:   ConditionDegraded,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionDegraded,
+				},
+				{
+					Type:    ConditionDedicatedInformerActive,
+					Status:  metav1.ConditionTrue,
+					Reason:  ConditionDedicatedInformerActive,
+					Message: "test",
+				},
+			},
+		},
+		{
+			name: "non-empty with informer condition",
+			conditions: []metav1.Condition{
+				{
+					Type:   ConditionAvailable,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionAvailable,
+				},
+				{
+					Type:   ConditionUpgradeable,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionUpgradeable,
+				},
+				{
+					Type:   ConditionProgressing,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionProgressing,
+				},
+				{
+					Type:   ConditionDegraded,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionDegraded,
+				},
+				{
+					Type:    ConditionDedicatedInformerActive,
+					Status:  metav1.ConditionTrue,
+					Reason:  ConditionDedicatedInformerActive,
+					Message: "test",
+				},
+			},
+			condition: metav1.Condition{
+				Type:    ConditionDedicatedInformerActive,
+				Status:  metav1.ConditionFalse,
+				Reason:  ConditionDedicatedInformerActive,
+				Message: "test3",
+			},
+			expected: []metav1.Condition{
+				{
+					Type:   ConditionAvailable,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionAvailable,
+				},
+				{
+					Type:   ConditionUpgradeable,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionUpgradeable,
+				},
+				{
+					Type:   ConditionProgressing,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionProgressing,
+				},
+				{
+					Type:   ConditionDegraded,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionDegraded,
+				},
+				{
+					Type:    ConditionDedicatedInformerActive,
+					Status:  metav1.ConditionFalse,
+					Reason:  ConditionDedicatedInformerActive,
+					Message: "test3",
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := GetUpdatedSchedulerConditions(tt.conditions, tt.condition)
+
+			resetIncomparableConditionFields(got)
+			resetIncomparableConditionFields(tt.expected)
+
+			if !reflect.DeepEqual(got, tt.expected) {
+				t.Errorf("mismatching conditions got\n%v\nexpected\n%v\n", got, tt.expected)
 			}
 		})
 	}
