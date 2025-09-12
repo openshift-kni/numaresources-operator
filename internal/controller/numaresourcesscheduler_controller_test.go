@@ -887,10 +887,10 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 		numOfMasters := 3
 
 		When("kubelet fix is enabled", func() {
-			fixedVersion, _ := platform.ParseVersion("4.20.0")
+			fixedVersion, _ := platform.ParseVersion("4.21.0")
 			unfixedVersion, _ := platform.ParseVersion("4.19.0")            // can't (and we must not even if we can) rewrite history
-			futureFixedVersionZstream, _ := platform.ParseVersion("4.20.1") // we must never regress
-			futureFixedVersion, _ := platform.ParseVersion("4.21.0")        // we must never regress
+			futureFixedVersionZstream, _ := platform.ParseVersion("4.21.1") // we must never regress
+			futureFixedVersion, _ := platform.ParseVersion("4.22.0")        // we must never regress
 
 			DescribeTable("should configure by default the informerMode to the expected when field is not set", func(reconcilerPlatInfo platforminfo.PlatformInfo, expectedInformer string) {
 				var err error
