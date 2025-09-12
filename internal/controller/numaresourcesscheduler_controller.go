@@ -304,7 +304,8 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	}
 
 	informerCondition := buildDedicatedInformerCondition(*instance, schedSpec)
-	schedStatus.Conditions = status.GetUpdatedSchedulerConditions(schedStatus.Conditions, informerCondition)
+	// intentionally override with nil conditions to trigger a reset of the old status conditions
+	schedStatus.Conditions = status.GetUpdatedSchedulerConditions(nil, informerCondition)
 
 	r.SchedulerManifests.Deployment.Spec.Replicas = schedSpec.Replicas
 	klog.V(4).InfoS("using scheduler replicas", "replicas", *r.SchedulerManifests.Deployment.Spec.Replicas)
