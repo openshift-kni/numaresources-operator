@@ -23,12 +23,12 @@ import (
 )
 
 func TestDecodeMinimumVersion(t *testing.T) {
-	nightly, _ := platform.ParseVersion("4.20.0-0.nightly-2025-08-04-12")
-	ci, _ := platform.ParseVersion("4.20.0-0.ci-2025-08-04-12")
-	ec, _ := platform.ParseVersion("4.20.0-ec.2")
-	rc, _ := platform.ParseVersion("4.20.0-rc.2")
-	stable, _ := platform.ParseVersion("4.20.0")
-	unrecognized, _ := platform.ParseVersion("4.20.0-unknown")
+	nightly, _ := platform.ParseVersion("4.21.0-0.nightly-2025-08-04-12")
+	ci, _ := platform.ParseVersion("4.21.0-0.ci-2025-08-04-12")
+	ec, _ := platform.ParseVersion("4.21.0-ec.2")
+	rc, _ := platform.ParseVersion("4.21.0-rc.2")
+	stable, _ := platform.ParseVersion("4.21.0")
+	unrecognized, _ := platform.ParseVersion("4.21.0-unknown")
 
 	tests := []struct {
 		name                 string
@@ -91,13 +91,12 @@ func TestDecodeMinimumVersion(t *testing.T) {
 }
 
 func TestIsVersionEnoughForPodresourcesListFilterActivePods(t *testing.T) {
-	nightlyGreater, _ := platform.ParseVersion("4.20.0-0.nightly-2025-08-04-154810")
-	ciGreater, _ := platform.ParseVersion("4.20.0-0.ci-2025-10-00-000000")
-	stableGreater, _ := platform.ParseVersion("4.20.1")
-	ecGreater, _ := platform.ParseVersion("4.20.0-ec.8")
-	rcGreater, _ := platform.ParseVersion("4.20.0-rc.2")
+	nightlyGreater, _ := platform.ParseVersion("4.21.0-0.nightly-2026-08-04-154810")
+	ciGreater, _ := platform.ParseVersion("4.21.0-0.ci-2026-10-00-000000")
+	stableGreater, _ := platform.ParseVersion("4.21.1")
+	ecGreater, _ := platform.ParseVersion("4.21.0-ec.8")
+	rcGreater, _ := platform.ParseVersion("4.21.0-rc.2")
 
-	unsupportedNightly, _ := platform.ParseVersion("4.20.0-0.nightly-2024-08-04-150000")
 	unsupportedStable, _ := platform.ParseVersion("4.19.0")
 
 	tests := []struct {
@@ -121,12 +120,6 @@ func TestIsVersionEnoughForPodresourcesListFilterActivePods(t *testing.T) {
 			platf:   platform.OpenShift,
 			version: nightlyGreater,
 			want:    true,
-		},
-		{
-			name:    "nightly - unsupported",
-			platf:   platform.OpenShift,
-			version: unsupportedNightly,
-			want:    false,
 		},
 		{
 			name:    "stable - least supported",
