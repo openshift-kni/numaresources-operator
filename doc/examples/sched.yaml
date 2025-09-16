@@ -2,7 +2,10 @@ apiVersion: nodetopology.openshift.io/v1
 kind: NUMAResourcesScheduler
 metadata:
   name: numaresourcesscheduler
+  annotations:
+    config.numa-operator.openshift.io/scheduler-qos-request: "burstable"
 spec:
   imageSpec: "quay.io/openshift-kni/scheduler-plugins:4.21-snapshot"
   logLevel: "Trace"
   schedulerName: topo-aware-scheduler
+  replicas: 3

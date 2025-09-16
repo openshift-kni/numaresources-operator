@@ -33,16 +33,16 @@ const (
 	// first OCP build to have the fix is always the nightly build. Yet that doesn't necessarily mean that builds of other lanes
 	// (e.i CI, dev-preview) that produce the build after the specific nightly build date will certainly
 	// have the fix, thus we need to track them separately
-	StableSupportSince           = "4.21.0"
-	NightlySupportSince          = "4.21.0-0.nightly-0000-00-00-000000"
-	CISupportSince               = "4.21.0-0.ci-0000-00-00-000000"
-	DevPreviewSupportSince       = "4.21.0-ec.6"
-	ReleaseCandidateSupportSince = "4.21.0-rc.0"
+	StableSupportSince           = "4.20.0"
+	NightlySupportSince          = "4.20.0-0.nightly-2025-08-04-154809"
+	CISupportSince               = "4.20.0-0.ci-2025-08-01-195417"
+	DevPreviewSupportSince       = "4.20.0-ec.6"
+	ReleaseCandidateSupportSince = "4.20.0-rc.0"
 )
 
 func decodeMinimumVersion(version platform.Version) string {
 	v := version.String()
-	// Nightly; example: 4.21.0-0.nightly-2025-08-04-154809
+	// Nightly; example: 4.20.0-0.nightly-2025-08-04-154809
 	if strings.Contains(v, ".nightly-") {
 		return NightlySupportSince
 	}
@@ -50,15 +50,15 @@ func decodeMinimumVersion(version platform.Version) string {
 	if strings.Contains(v, ".ci-") {
 		return CISupportSince
 	}
-	// DevPreview; example: 4.21.0-ec.5
+	// DevPreview; example: 4.20.0-ec.5
 	if strings.Contains(v, "-ec.") {
 		return DevPreviewSupportSince
 	}
-	// Release Candidate: example: 4.21.0-rc.1
+	// Release Candidate: example: 4.20.0-rc.1
 	if strings.Contains(v, "-rc.") {
 		return ReleaseCandidateSupportSince
 	}
-	// Stable: example: 4.21.1
+	// Stable: example: 4.20.1
 	if !strings.Contains(v, "-") {
 		return StableSupportSince
 	}
