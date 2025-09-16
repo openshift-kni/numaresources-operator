@@ -147,7 +147,11 @@ func Setup(baseName string, nrtList nrtv1alpha2.NodeResourceTopologyList) (*Fixt
 }
 
 func Teardown(ft *Fixture) error {
+	ts := time.Now()
 	ginkgo.By(fmt.Sprintf("tearing down the test namespace %q", ft.Namespace.Name))
+	defer func() {
+		klog.Infof("tore down the test namespace %q in %v", ft.Namespace.Name, time.Since(ts))
+	}()
 	err := teardownNamespace(ft.Client, ft.Namespace)
 	if err != nil {
 		klog.Errorf("cannot teardown namespace %q: %s", ft.Namespace.Name, err)
