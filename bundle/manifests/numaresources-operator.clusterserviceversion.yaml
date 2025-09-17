@@ -656,5 +656,5 @@ spec:
   minKubeVersion: 1.23.0
   provider:
     name: Red Hat
-  replaces: numaresources-operator.v4.19.999-snapshot
+  replaces: numaresources-operator.v4.20.999-snapshot
   version: 4.21.999-snapshot
