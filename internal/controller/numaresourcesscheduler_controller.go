@@ -303,9 +303,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		Duration: cacheResyncPeriod,
 	}
 
-	informerCondition := buildDedicatedInformerCondition(*instance, schedSpec)
-	// intentionally override with nil conditions to trigger a reset of the old status conditions
-	schedStatus.Conditions = status.GetUpdatedSchedulerConditions(nil, informerCondition)
+	schedStatus.Conditions = updateDedicatedInformerCondition(status.NewNUMAResourcesSchedulerBaseConditions(), *instance, schedSpec)
 
 	r.SchedulerManifests.Deployment.Spec.Replicas = schedSpec.Replicas
 	klog.V(4).InfoS("using scheduler replicas", "replicas", *r.SchedulerManifests.Deployment.Spec.Replicas)
@@ -369,29 +367,37 @@ func platformNormalize(spec *nropv1.NUMAResourcesSchedulerSpec, platInfo platfor
 	klog.V(4).InfoS("SchedulerInformer default is overridden", "Platform", platInfo.Platform, "PlatformVersion", platInfo.Version.String(), "SchedulerInformer", *spec.SchedulerInformer)
 }
 
-func buildDedicatedInformerCondition(instance nropv1.NUMAResourcesScheduler, normalized nropv1.NUMAResourcesSchedulerSpec) metav1.Condition {
-	condition := metav1.Condition{
-		Type:               status.ConditionDedicatedInformerActive,
-		Status:             metav1.ConditionTrue,
-		ObservedGeneration: instance.ObjectMeta.Generation,
-		Reason:             status.ConditionDedicatedInformerActive,
+func updateDedicatedInformerCondition(conds []metav1.Condition, instance nropv1.NUMAResourcesScheduler, normalized nropv1.NUMAResourcesSchedulerSpec) []metav1.Condition {
+	condition := status.FindCondition(conds, status.ConditionDedicatedInformerActive)
+	if condition == nil { // should never happen
+		klog.InfoS("missing condition: %q", status.ConditionDedicatedInformerActive)
+		return conds
 	}
-
-	if *normalized.SchedulerInformer == nropv1.SchedulerInformerShared {
+	if normalized.SchedulerInformer == nil { // should never happen
+		klog.InfoS("nil SchedulerInformer in spec")
+		condition.Status = metav1.ConditionUnknown
+		return conds
+	}
+	if *normalized.SchedulerInformer == nropv1.SchedulerInformerDedicated {
+		condition.Status = metav1.ConditionTrue
+	} else {
 		condition.Status = metav1.ConditionFalse
 	}
-
-	return condition
+	condition.ObservedGeneration = instance.ObjectMeta.Generation
+	return conds
 }
 
 func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesSchedulerStatus, sched *nropv1.NUMAResourcesScheduler, condition string, reason string, message string) error {
-	c := metav1.Condition{
-		Type:    condition,
-		Status:  metav1.ConditionTrue,
-		Reason:  reason,
-		Message: message,
+	conds := status.CloneConditions(sched.Status.Conditions)
+	if len(conds) == 0 {
+		conds = status.NewNUMAResourcesSchedulerBaseConditions()
 	}
-	sched.Status.Conditions = status.GetUpdatedSchedulerConditions(sched.Status.Conditions, c)
+	ok := status.UpdateConditionsInPlace(conds, condition, metav1.ConditionTrue, reason, message)
+	if !ok {
+		klog.InfoS("fail to update condition", "conditionType", condition, "reason", reason, "message", message)
+	}
+	// we need to set something anyway
+	sched.Status.Conditions = conds
 
 	if !status.NUMAResourcesSchedulerNeedsUpdate(initialStatus, sched.Status) {
 		return nil

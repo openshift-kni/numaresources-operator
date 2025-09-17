@@ -20,9 +20,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
+
+	"github.com/google/go-cmp/cmp"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -43,6 +44,7 @@ func TestFindCondition(t *testing.T) {
 		expectedFound bool
 	}
 
+	now := time.Now()
 	testCases := []testCase{
 		{
 			name:          "nil conditions",
@@ -52,13 +54,13 @@ func TestFindCondition(t *testing.T) {
 		{
 			name:          "missing condition",
 			desired:       "foobar",
-			conds:         newBaseConditions(),
+			conds:         newBaseConditions(now),
 			expectedFound: false,
 		},
 		{
 			name:          "found condition",
 			desired:       ConditionProgressing,
-			conds:         newBaseConditions(),
+			conds:         newBaseConditions(now),
 			expectedFound: true,
 		},
 	}
@@ -74,7 +76,7 @@ func TestFindCondition(t *testing.T) {
 	}
 }
 
-func TestUpdateConditions(t *testing.T) {
+func TestComputeConditions(t *testing.T) {
 	err := nropv1.AddToScheme(scheme.Scheme)
 	if err != nil {
 		t.Errorf("nropv1.AddToScheme() failed with: %v", err)
@@ -84,7 +86,7 @@ func TestUpdateConditions(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(nro).Build()
 
 	var ok bool
-	nro.Status.Conditions, ok = UpdateConditions(nro.Status.Conditions, ConditionProgressing, "testReason", "test message")
+	nro.Status.Conditions, ok = ComputeConditions(nro.Status.Conditions, ConditionProgressing, "testReason", "test message")
 	if !ok {
 		t.Errorf("Update did not change status, but it should")
 	}
@@ -107,7 +109,7 @@ func TestUpdateConditions(t *testing.T) {
 	}
 
 	// same status twice in a row. We should not overwrite identical status to save transactions.
-	_, ok = UpdateConditions(nro.Status.Conditions, ConditionProgressing, "testReason", "test message")
+	_, ok = ComputeConditions(nro.Status.Conditions, ConditionProgressing, "testReason", "test message")
 	if ok {
 		t.Errorf("Update did change status, but it should not")
 	}
@@ -325,7 +327,7 @@ func TestMessageFromError(t *testing.T) {
 	}
 }
 
-func TestGetUpdatedSchedulerConditions(t *testing.T) {
+func TestUpdateConditionsInPlace(t *testing.T) {
 	tests := []struct {
 		name       string
 		conditions []metav1.Condition
@@ -333,7 +335,8 @@ func TestGetUpdatedSchedulerConditions(t *testing.T) {
 		expected   []metav1.Condition
 	}{
 		{
-			name: "first reconcile iteration - with operator condition",
+			name:       "first reconcile iteration - with operator condition",
+			conditions: NewNUMAResourcesSchedulerBaseConditions(),
 			condition: metav1.Condition{
 				Type:    ConditionAvailable,
 				Status:  metav1.ConditionTrue,
@@ -370,7 +373,8 @@ func TestGetUpdatedSchedulerConditions(t *testing.T) {
 			},
 		},
 		{
-			name: "first reconcile iteration - with informer condition",
+			name:       "first reconcile iteration - with informer condition",
+			conditions: NewNUMAResourcesSchedulerBaseConditions(),
 			condition: metav1.Condition{
 				Type:    ConditionDedicatedInformerActive,
 				Status:  metav1.ConditionTrue,
@@ -474,13 +478,14 @@ func TestGetUpdatedSchedulerConditions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GetUpdatedSchedulerConditions(tt.conditions, tt.condition)
+			got := CloneConditions(tt.conditions)
+			UpdateConditionsInPlace(got, tt.condition.Type, tt.condition.Status, tt.condition.Reason, tt.condition.Message)
 
 			resetIncomparableConditionFields(got)
 			resetIncomparableConditionFields(tt.expected)
 
-			if !reflect.DeepEqual(got, tt.expected) {
-				t.Errorf("mismatching conditions got\n%v\nexpected\n%v\n", got, tt.expected)
+			if diff := cmp.Diff(got, tt.expected); diff != "" {
+				t.Errorf("mismatching conditions: %s", diff)
 			}
 		})
 	}
