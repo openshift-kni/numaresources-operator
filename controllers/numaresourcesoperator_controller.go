@@ -29,7 +29,7 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 	"github.com/pkg/errors"
-	
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -179,7 +179,7 @@ func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, inst
 }
 
 func updateStatus(ctx context.Context, cli client.Client, instance *nropv1.NUMAResourcesOperator, condition string, reason string, message string) (bool, error) {
-	conditions, ok := status.GetUpdatedConditions(instance.Status.Conditions, condition, reason, message)
+	conditions, ok := status.UpdateConditions(instance.Status.Conditions, condition, reason, message)
 	if !ok {
 		return false, nil
 	}
