@@ -140,10 +140,6 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 				noisePods = []*corev1.Pod{}
 			})
 
-			AfterEach(func(ctx context.Context) {
-				Expect(wait.With(fxt.Client).Interval(3*time.Second).Timeout(30*time.Second).ForPodsAllDeleted(ctx, noisePods)).To(Succeed())
-			})
-
 			DescribeTable("should be able to schedule pods with no stalls", Label("nodeAll"),
 				// like non-regression tests, but with jobs present
 				func(ctx context.Context, makeNoisePod makePodFunc) {

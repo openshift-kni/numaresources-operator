@@ -118,7 +118,12 @@ func (wt Waiter) ForPodsAllDeleted(ctx context.Context, pods []*corev1.Pod) erro
 		return nil
 	}
 
+	ts := time.Now()
 	klog.Infof("Waiting for %d pod(s) to be deleted.", len(pods))
+	defer func() {
+		elapsed := time.Since(ts)
+		klog.Infof("Waited for %d pods(s) deleted for %v", len(pods), elapsed)
+	}()
 
 	var eg errgroup.Group
 	for _, pod := range pods {
