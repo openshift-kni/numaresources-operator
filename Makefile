@@ -655,7 +655,7 @@ konflux-generate-catalog-production: yq opm
 		CATALOG_TEMPLATE_KONFLUX_OUTPUT=$(shell pwd)/$(CATALOG_TEMPLATE_KONFLUX_OUTPUT) \
 		CATALOG_KONFLUX=$(shell pwd)/$(CATALOG_KONFLUX) \
 		PACKAGE_NAME_KONFLUX=$(PACKAGE_NAME_KONFLUX) \
-		BUNDLE_NAME_SUFFIX=bundle-4-20 \
+		BUNDLE_NAME_SUFFIX=bundle-4-21 \
 		PRODUCTION_BUNDLE_NAME=bundle \
 		BUNDLE_BUILDS_FILE=$(shell pwd)/.konflux/catalog/bundle.builds.in.yaml \
 		OPM=$(OPM) \
