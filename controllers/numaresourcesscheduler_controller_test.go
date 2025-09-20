@@ -33,13 +33,17 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	depmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
@@ -207,6 +211,67 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(gomega.HaveOccurred())
 			gomega.Expect(nrs.Status.CacheResyncPeriod).ToNot(gomega.BeNil())
 			gomega.Expect(nrs.Status.CacheResyncPeriod.Seconds()).To(gomega.Equal(resyncPeriod.Seconds()))
+		})
+
+		ginkgo.Context("should reflect DedicatedInformerActive in status conditions", func() {
+			ginkgo.It("with default values", func() {
+				key := client.ObjectKeyFromObject(nrs)
+				_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(gomega.Succeed())
+
+				c := getConditionByType(nrs.Status.Conditions, status.ConditionDedicatedInformerActive)
+
+				gomega.Expect(c).ToNot(gomega.BeNil())
+				gomega.Expect(c.Status).To(gomega.Equal(metav1.ConditionTrue))
+			})
+
+			ginkgo.It("with updated values - explicitly configured to Dedicated", func() {
+				nrs := nrs.DeepCopy()
+				nrs.Spec.SchedulerInformer = ptr.To(nropv1.SchedulerInformerDedicated)
+
+				gomega.Eventually(func() bool {
+					if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+						klog.Warningf("failed to update the scheduler object; err: %v", err)
+						return false
+					}
+					return true
+				}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(gomega.Succeed())
+
+				c := getConditionByType(nrs.Status.Conditions, status.ConditionDedicatedInformerActive)
+
+				gomega.Expect(c).ToNot(gomega.BeNil())
+				gomega.Expect(c.Status).To(gomega.Equal(metav1.ConditionTrue))
+			})
+
+			ginkgo.It("with updated values - explicitly configured to Shared", func() {
+				nrs := nrs.DeepCopy()
+				nrs.Spec.SchedulerInformer = ptr.To(nropv1.SchedulerInformerShared)
+
+				gomega.Eventually(func() bool {
+					if err := reconciler.Client.Update(context.TODO(), nrs); err != nil {
+						klog.Warningf("failed to update the scheduler object; err: %v", err)
+						return false
+					}
+					return true
+				}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(gomega.Succeed())
+
+				c := getConditionByType(nrs.Status.Conditions, status.ConditionDedicatedInformerActive)
+
+				gomega.Expect(c).ToNot(gomega.BeNil())
+				gomega.Expect(c.Status).To(gomega.Equal(metav1.ConditionFalse))
+			})
 		})
 
 		ginkgo.It("should have the correct priority class", func() {
@@ -605,6 +670,121 @@ var _ = ginkgo.Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			ginkgo.Entry("replicas=1", int32(1), false),
 			ginkgo.Entry("replicas=3", int32(3), true),
 		)
+	})
+
+	ginkgo.Context("with kubelet PodResourcesAPI listing active pods by default", func() {
+		var nrs *nropv1.NUMAResourcesScheduler
+		var reconciler *NUMAResourcesSchedulerReconciler
+
+		ginkgo.When("kubelet fix is enabled", func() {
+			fixedVersion, _ := platform.ParseVersion("4.17.40")
+			unfixedVersion, _ := platform.ParseVersion("4.17.0")             // can't (and we must not even if we can) rewrite history
+			futureFixedVersionZstream, _ := platform.ParseVersion("4.17.41") // we must never regress
+			futureFixedVersion, _ := platform.ParseVersion("4.21.0")         // we must never regress
+
+			ginkgo.DescribeTable("should configure by default the informerMode to the expected when field is not set", func(reconcilerPlatInfo platforminfo.PlatformInfo, expectedInformer string) {
+				var err error
+				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(nrs)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				reconciler.PlatformInfo = reconcilerPlatInfo
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, expectedInformer)
+
+				expectedDedicatedActiveStatus := metav1.ConditionTrue
+				if expectedInformer == depmanifests.CacheInformerShared {
+					expectedDedicatedActiveStatus = metav1.ConditionFalse
+				}
+
+				gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(gomega.Succeed())
+				c := getConditionByType(nrs.Status.Conditions, status.ConditionDedicatedInformerActive)
+
+				gomega.Expect(c).ToNot(gomega.BeNil())
+				gomega.Expect(c.Status).To(gomega.Equal(expectedDedicatedActiveStatus))
+			},
+				ginkgo.Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, fixedVersion), depmanifests.CacheInformerShared),
+				ginkgo.Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, fixedVersion), depmanifests.CacheInformerShared),
+				ginkgo.Entry("with unfixed platform the default informer is Dedicated (unchanged)", platforminfo.New(platform.OpenShift, unfixedVersion), depmanifests.CacheInformerDedicated),
+				ginkgo.Entry("with unfixed platform the default informer is Dedicated (unchanged)", platforminfo.New(platform.HyperShift, unfixedVersion), depmanifests.CacheInformerDedicated),
+				ginkgo.Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, futureFixedVersion), depmanifests.CacheInformerShared),
+				ginkgo.Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, futureFixedVersion), depmanifests.CacheInformerShared),
+				ginkgo.Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, futureFixedVersionZstream), depmanifests.CacheInformerShared),
+				ginkgo.Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, futureFixedVersionZstream), depmanifests.CacheInformerShared),
+				ginkgo.Entry("with unknown platform the default informer is Dedicated (unchanged)", platforminfo.PlatformInfo{}, depmanifests.CacheInformerDedicated),
+			)
+
+			ginkgo.DescribeTable("should preserve informerMode value if set", func(reconcilerPlatInfo platforminfo.PlatformInfo) {
+				var err error
+				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				infMode := nropv1.SchedulerInformerDedicated
+				nrs.Spec.SchedulerInformer = &infMode
+				reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(nrs)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				reconciler.PlatformInfo = reconcilerPlatInfo
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(infMode))
+			},
+				ginkgo.Entry("with Openshift", platforminfo.PlatformInfo{
+					Platform: platform.OpenShift,
+					Version:  fixedVersion,
+				}),
+				ginkgo.Entry("with Hypershift", platforminfo.PlatformInfo{
+					Platform: platform.HyperShift,
+					Version:  fixedVersion,
+				}),
+				ginkgo.Entry("with unknown platform", platforminfo.PlatformInfo{}))
+
+			ginkgo.DescribeTable("should allow to update the informerMode to be Dedicated after an overridden default", func(reconcilerPlatInfo platforminfo.PlatformInfo) {
+				var err error
+				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(nrs)
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				reconciler.PlatformInfo = reconcilerPlatInfo
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				// intentionally skip checking default value
+
+				// should query the object after reconcile because the defaults are overridden
+				gomega.Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(gomega.HaveOccurred())
+
+				nrsUpdated := nrs.DeepCopy()
+				informerMode := nropv1.SchedulerInformerDedicated
+				nrsUpdated.Spec.SchedulerInformer = &informerMode
+				gomega.Eventually(func() bool {
+					if err := reconciler.Client.Update(context.TODO(), nrsUpdated); err != nil {
+						klog.Warningf("failed to update the scheduler object; err: %v", err)
+						return false
+					}
+					return true
+				}, 30*time.Second, 5*time.Second).Should(gomega.BeTrue())
+
+				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				gomega.Expect(err).ToNot(gomega.HaveOccurred())
+
+				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(informerMode))
+			},
+				ginkgo.Entry("with Openshift", platforminfo.PlatformInfo{
+					Platform: platform.OpenShift,
+					Version:  fixedVersion,
+				}),
+				ginkgo.Entry("with Hypershift", platforminfo.PlatformInfo{
+					Platform: platform.HyperShift,
+					Version:  fixedVersion,
+				}))
+		})
 	})
 })
 
