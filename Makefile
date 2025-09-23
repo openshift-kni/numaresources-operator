@@ -300,7 +300,7 @@ build-buildinfo: bin/buildhelper
 build: generate generate-source fmt vet binary
 
 .PHONY: build-rte
-build-rte: generate-source fmt vet binary-rte
+build-rte: generate-source fmt vet binary-rte introspect-data
 
 .PHONY: build-numacell
 build-numacell: fmt vet binary-numacell
