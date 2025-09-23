@@ -1,0 +1,86 @@
+******************************************************************************************
+Processing node:  control-plane-1
+******************************************************************************************
+I1001 12:18:39.703982 2641319 pfpsyncchk.go:182] "scheduler is off-sync with RTE" podfingerprint="pfp0v0019316f7e44a76ff27"
+I1001 12:18:39.704137 2641319 pfpsyncchk.go:182] "scheduler is off-sync with RTE" podfingerprint="pfp0v001dd93850006612179"
+Expected PFP: pfp0v0019316f7e44a76ff27
+Computed PFP: pfp0v0012a06b0bbc2e0ed86
+Found on RTE: true
+Last write from scheduler: 2025-09-29 06:20:23.606545132 +0000 UTC
+Last write from RTE: 2025-09-29 06:20:19.687254798 +0000 UTC
+
+Pods found on RTE only:
+Pods found on scheduler only:
+ - openshift-kube-apiserver/installer-10-control-plane-1
+ - openshift-kube-apiserver/installer-9-control-plane-1
+ - openshift-kube-scheduler/revision-pruner-6-control-plane-1
+ - openshift-kube-apiserver/installer-12-control-plane-1
+ - openshift-etcd/revision-pruner-10-control-plane-1
+ - openshift-kube-apiserver/installer-7-control-plane-1
+ - openshift-kube-apiserver/installer-11-control-plane-1
+
+________________________________
+Expected PFP: pfp0v001dd93850006612179
+Computed PFP: pfp0v0012a06b0bbc2e0ed86
+Found on RTE: true
+Last write from scheduler: 2025-09-29 06:19:38.499706207 +0000 UTC
+Last write from RTE: 2025-09-29 06:19:29.687691808 +0000 UTC
+
+Pods found on RTE only:
+Pods found on scheduler only:
+ - openshift-kube-apiserver/installer-11-control-plane-1
+ - openshift-kube-apiserver/installer-7-control-plane-1
+ - openshift-kube-apiserver/installer-9-control-plane-1
+ - openshift-kube-scheduler/revision-pruner-6-control-plane-1
+ - openshift-etcd/revision-pruner-10-control-plane-1
+ - openshift-kube-apiserver/installer-10-control-plane-1
+ - numaresources/test-dp
+ - openshift-kube-apiserver/installer-12-control-plane-1
+
+________________________________
+
+******************************************************************************************
+Processing node:  control-plane-2
+******************************************************************************************
+I1001 12:18:39.705064 2641319 pfpsyncchk.go:182] "scheduler is off-sync with RTE" podfingerprint="pfp0v0017dd331cc313ac040"
+Expected PFP: pfp0v0017dd331cc313ac040
+Computed PFP: pfp0v001f00d117476e39aba
+Found on RTE: true
+Last write from scheduler: 2025-09-29 06:20:23.602963713 +0000 UTC
+Last write from RTE: 2025-09-29 06:20:12.744244581 +0000 UTC
+
+Pods found on RTE only:
+Pods found on scheduler only:
+ - openshift-kube-apiserver/installer-12-control-plane-2
+ - openshift-kube-apiserver/installer-7-control-plane-2
+ - openshift-kube-apiserver/installer-10-control-plane-2
+ - openshift-kube-scheduler/revision-pruner-6-control-plane-2
+ - openshift-kube-apiserver/installer-11-control-plane-2
+ - openshift-kube-apiserver/installer-9-control-plane-2
+ - openshift-etcd/revision-pruner-10-control-plane-2
+
+________________________________
+
+******************************************************************************************
+Processing node:  control-plane-3
+******************************************************************************************
+I1001 12:18:39.706046 2641319 pfpsyncchk.go:182] "scheduler is off-sync with RTE" podfingerprint="pfp0v001e5569d55891c3a90"
+Expected PFP: pfp0v001e5569d55891c3a90
+Computed PFP: pfp0v0016bebb9b36718de54
+Found on RTE: true
+Last write from scheduler: 2025-09-29 06:20:23.604753254 +0000 UTC
+Last write from RTE: 2025-09-29 06:20:22.465965535 +0000 UTC
+
+Pods found on RTE only:
+Pods found on scheduler only:
+ - openshift-kube-apiserver/installer-9-control-plane-3
+ - openshift-kube-apiserver/installer-10-control-plane-3
+ - numaresources/hello-completed-norestart
+ - openshift-kube-apiserver/installer-7-control-plane-3
+ - openshift-etcd/revision-pruner-10-control-plane-3
+ - openshift-kube-apiserver/installer-12-control-plane-3
+ - openshift-kube-apiserver/installer-11-control-plane-3
+ - openshift-kube-scheduler/revision-pruner-6-control-plane-3
+
+________________________________
+
