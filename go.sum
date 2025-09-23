@@ -104,8 +104,8 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2 h1:uAwqOtyrFY
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2/go.mod h1:LBzS4n6GX1C69tzSd5EibZ9cGOXFuHP7GxEMDYVe1sM=
 github.com/k8stopologyawareschedwg/podfingerprint v0.2.2 h1:iFHPfZInM9pz2neye5RdmORMp1hPmte1EGJYpOOzZVg=
 github.com/k8stopologyawareschedwg/podfingerprint v0.2.2/go.mod h1:C23pM15t06dXg/OihGlqBvnYzLr+MXDXJ7zMfbNAyXI=
-github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.2 h1:+OWavCm95X2SVvgeAyLYCB1UVkzPADO+Nj2iHPtdiy0=
-github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.2/go.mod h1:CxbPRJYtNn9KxW3h4hOeUZQheXo0/4KMLsMU0wSiSCM=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.5 h1:DsRS73aLnnRYGBbqX3lTYLqS5rrFVUpAaGG6xxrfDdE=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.5/go.mod h1:CxbPRJYtNn9KxW3h4hOeUZQheXo0/4KMLsMU0wSiSCM=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=

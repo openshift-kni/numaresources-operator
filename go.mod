@@ -13,7 +13,7 @@ require (
 	github.com/k8stopologyawareschedwg/deployer v0.23.0
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2
 	github.com/k8stopologyawareschedwg/podfingerprint v0.2.2
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.2
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.5
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.1
