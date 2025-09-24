@@ -6,6 +6,7 @@ NRO_NAMESPACE=$(nro_namespace)
 PFPSTATUS_DIR="/must-gather/namespaces/$NRO_NAMESPACE/pfpstatus"
 RTE_DIR="$PFPSTATUS_DIR/resource-topology-exporters"
 SCHEDULER_DIR="$PFPSTATUS_DIR/scheduler"
+PFPSYNCCHK_RESULTS_DIR="$PFPSTATUS_DIR/pfpsyncchk_results"
 
 OC_GET_PODS="oc get pods -n $NRO_NAMESPACE"
 
@@ -28,7 +29,9 @@ function get_rte_container_arg_value() {
     fi
 }
 
-mkdir -p "$RTE_DIR" "$SCHEDULER_DIR"
+mkdir -p "$RTE_DIR" "$SCHEDULER_DIR" "$PFPSYNCCHK_RESULTS_DIR"
+
+NODES=()
 
 RTE_PODS=$($OC_GET_PODS -l name='resource-topology' -o jsonpath='{.items[*].metadata.name}')
 
@@ -58,5 +61,11 @@ for node in "${NODES[@]}"; do
         echo "FileNotFound" > "$SCHEDULER_DIR/$node"
     else
         oc exec $sched_pod -n $NRO_NAMESPACE -- /bin/sh -c "cat $pfp_status_dir/$node" > "$SCHEDULER_DIR/$node"
+    fi
+done
+
+for node in "${NODES[@]}"; do
+    if [ -f "$RTE_DIR/$node.json" ] && [ -f "$SCHEDULER_DIR/$node" ]; then
+        pfpsyncchk -from-rte "$RTE_DIR/$node.json" -from-scheduler "$SCHEDULER_DIR/$node" >> "$PFPSYNCCHK_RESULTS_DIR/$node.txt"
     fi
 done

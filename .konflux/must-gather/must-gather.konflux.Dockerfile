@@ -1,3 +1,11 @@
+# follow https://brewweb.engineering.redhat.com/brew/packageinfo?packageID=70135
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.24@sha256:b91431604c435f3cabec20ddb653c0537c8ba8097ada57960d54a1266f95a7c3 as tool-builder
+
+WORKDIR /go/src/github.com/openshift-kni/numaresources-operator
+COPY . .
+
+RUN make bin/pfpsyncchk
+
 FROM registry.redhat.io/openshift4/ose-must-gather-rhel9:latest as mgbuilder
 
 COPY . .
@@ -17,6 +25,7 @@ RUN microdnf install -y procps-ng tar rsync ; microdnf clean all
 # Copy must-gather required binaries
 COPY --from=mgbuilder /usr/bin/openshift-must-gather /usr/bin/openshift-must-gather
 COPY --from=mgbuilder /usr/bin/oc /usr/bin/oc
+COPY --from=tool-builder /go/src/github.com/openshift-kni/numaresources-operator/bin/pfpsyncchk /usr/bin/pfpsyncchk
 
 COPY --from=mgbuilder /usr/libexec/must-gather/numaresources-operator/* /usr/bin/
 
