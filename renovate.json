@@ -7,31 +7,44 @@
     },
     "packageRules": [
         {
-            "matchUpdateTypes": ["minor"],
+            "matchUpdateTypes": [
+                "minor"
+            ],
             "enabled": false
         },
         {
-            "addLabels": ["approved", "lgtm"],
+            "addLabels": [
+                "approved",
+                "lgtm"
+            ],
             "autoApprove": true,
             "automerge": true,
             "enabled": true,
             "ignoreTests": false,
-            "matchDatasources": ["docker"],
-            "matchManagers": ["dockerfile"],
-            "matchPaths": [".konflux/**"],
-            "matchUpdateTypes": ["digest"],
+            "matchDatasources": [
+                "docker"
+            ],
+            "matchManagers": [
+                "dockerfile"
+            ],
+            "matchFileNames": [
+                ".konflux/**"
+            ],
+            "matchUpdateTypes": [
+                "digest"
+            ],
             "platformAutomerge": true
         }
-    ],    
+    ],
     "prConcurrentLimit": 0,
     "pruneBranchAfterAutomerge": true,
     "tekton": {
         "autoApprove": true,
         "automerge": true,
         "enabled": true,
-        "fileMatch": [
-            "\\.yaml$",
-            "\\.yml$"
+        "managerFilePatterns": [
+            "/\\.yaml$/",
+            "/\\.yml$/"
         ],
         "ignoreTests": false,
         "includePaths": [
@@ -47,7 +60,7 @@
                     "digest"
                 ]
             }
-        ],        
+        ],
         "platformAutomerge": true
     }
 }
