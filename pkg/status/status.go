@@ -52,6 +52,7 @@ const (
 	ConditionTypeIncorrectNUMAResourcesSchedulerResourceName = "IncorrectNUMAResourcesSchedulerResourceName"
 )
 
+// NUMAResourceOperatorNeedsUpdate returns true if the status changed, so if it should be sent to the apiserver, false otherwise.
 func NUMAResourceOperatorNeedsUpdate(oldStatus, newStatus *nropv1.NUMAResourcesOperatorStatus) bool {
 	os := oldStatus.DeepCopy()
 	ns := newStatus.DeepCopy()
@@ -62,6 +63,7 @@ func NUMAResourceOperatorNeedsUpdate(oldStatus, newStatus *nropv1.NUMAResourcesO
 	return !reflect.DeepEqual(os, ns)
 }
 
+// NUMAResourcesSchedulerNeedsUpdate returns true if the status changed, so if it should be sent to the apiserver, false otherwise.
 func NUMAResourcesSchedulerNeedsUpdate(oldStatus, newStatus nropv1.NUMAResourcesSchedulerStatus) bool {
 	os := oldStatus.DeepCopy()
 	ns := newStatus.DeepCopy()
@@ -72,6 +74,7 @@ func NUMAResourcesSchedulerNeedsUpdate(oldStatus, newStatus nropv1.NUMAResources
 	return !reflect.DeepEqual(os, ns)
 }
 
+// EqualConditions returns true if the two condition slices are semantically equivalent, false otherwise.
 func EqualConditions(current, updated []metav1.Condition) bool {
 	c := CloneConditions(current)
 	u := CloneConditions(updated)
@@ -82,24 +85,43 @@ func EqualConditions(current, updated []metav1.Condition) bool {
 	return reflect.DeepEqual(c, u)
 }
 
-// UpdateConditions compute new conditions based on arguments, and then compare with given current conditions.
+// ComputeConditions compute new conditions based on arguments, and then compare with given current conditions.
 // Returns the conditions to use, either current or newly computed, and a boolean flag which is `true` if conditions need
 // update - so if they are updated since the current conditions.
-func UpdateConditions(currentConditions []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
+func ComputeConditions(currentConditions []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
 	conditions := NewConditions(condition, reason, message)
-
-	cond := CloneConditions(conditions)
-	curCond := CloneConditions(currentConditions)
-
-	resetIncomparableConditionFields(cond)
-	resetIncomparableConditionFields(curCond)
-
-	if reflect.DeepEqual(cond, curCond) {
+	if EqualConditions(currentConditions, conditions) {
 		return currentConditions, false
 	}
 	return conditions, true
 }
 
+// UpdateConditionsInPlace mutates the given conditions, setting the value of the one pointed out to `condition` to the given values.
+// Differently from `ComputeConditions`, it doesn't allocate new data. Returns true if successfully mutated conditions, false otherwise
+func UpdateConditionsInPlace(conds []metav1.Condition, condition string, status metav1.ConditionStatus, reason string, message string) bool {
+	cond := FindCondition(conds, condition)
+	if cond == nil {
+		return false // should never happen
+	}
+
+	now := time.Now()
+	cond.Status = status
+	cond.Reason = reason
+	cond.Message = message
+	cond.LastTransitionTime = metav1.Time{Time: now}
+
+	if condition == ConditionAvailable {
+		upCond := FindCondition(conds, ConditionUpgradeable)
+		if upCond == nil {
+			return false // should never happen
+		}
+		upCond.Status = cond.Status
+		upCond.LastTransitionTime = cond.LastTransitionTime
+	}
+	return true
+}
+
+// FindCondition returns a pointer to the Condition object matching the given `condition` by type on success, nil otherwise.
 func FindCondition(conditions []metav1.Condition, condition string) *metav1.Condition {
 	for idx := 0; idx < len(conditions); idx++ {
 		cond := &conditions[idx]
@@ -110,8 +132,11 @@ func FindCondition(conditions []metav1.Condition, condition string) *metav1.Cond
 	return nil
 }
 
+// NewConditions creates a new set of pristine conditions. The given `condition` is set, and its `reason` and `message` are
+// optionally set. Note that Available always imply Upgradeable, and that we ignore `reason` and `message` for it.
 func NewConditions(condition string, reason string, message string) []metav1.Condition {
-	conditions := newBaseConditions()
+	now := time.Now()
+	conditions := newBaseConditions(now)
 	switch condition {
 	case ConditionAvailable:
 		conditions[0].Status = metav1.ConditionTrue
@@ -128,8 +153,7 @@ func NewConditions(condition string, reason string, message string) []metav1.Con
 	return conditions
 }
 
-func newBaseConditions() []metav1.Condition {
-	now := time.Now()
+func newBaseConditions(now time.Time) []metav1.Condition {
 	return []metav1.Condition{
 		{
 			Type:               ConditionAvailable,
@@ -158,42 +182,28 @@ func newBaseConditions() []metav1.Condition {
 	}
 }
 
+// NewNUMAResourcesSchedulerBaseConditions creates specific conditions on
+// top of NewBaseConditions.
 func NewNUMAResourcesSchedulerBaseConditions() []metav1.Condition {
 	now := time.Now()
-	return []metav1.Condition{
-		{
-			Type:               ConditionAvailable,
-			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Time{Time: now},
-			Reason:             ConditionAvailable,
-		},
-		{
-			Type:               ConditionUpgradeable,
-			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Time{Time: now},
-			Reason:             ConditionUpgradeable,
-		},
-		{
-			Type:               ConditionProgressing,
-			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Time{Time: now},
-			Reason:             ConditionProgressing,
-		},
-		{
-			Type:               ConditionDegraded,
-			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Time{Time: now},
-			Reason:             ConditionDegraded,
-		},
-		{
-			Type:               ConditionDedicatedInformerActive,
-			Status:             metav1.ConditionUnknown,
-			LastTransitionTime: metav1.Time{Time: now},
-			Reason:             ConditionDedicatedInformerActive,
-		},
-	}
+	conds := append(newBaseConditions(now), metav1.Condition{
+		Type:               ConditionDedicatedInformerActive,
+		Status:             metav1.ConditionUnknown,
+		LastTransitionTime: metav1.Time{Time: now},
+		Reason:             ConditionDedicatedInformerActive,
+	})
+	return conds
 }
 
+// CloneConditions creates a deep copy of the given `conditions`.
+func CloneConditions(conditions []metav1.Condition) []metav1.Condition {
+	var c = make([]metav1.Condition, len(conditions))
+	copy(c, conditions)
+	return c
+}
+
+// ReasonFromError translates the `err` error into a string to be used
+// for conditions. Handles nil errors gracefully.
 func ReasonFromError(err error) string {
 	if err == nil {
 		return ReasonAsExpected
@@ -201,6 +211,8 @@ func ReasonFromError(err error) string {
 	return ReasonInternalError
 }
 
+// MessageFromError translates the `err` error into a string to be used
+// for conditions. Handles nil errors gracefully.
 func MessageFromError(err error) string {
 	if err == nil {
 		return ""
@@ -217,39 +229,4 @@ func resetIncomparableConditionFields(conditions []metav1.Condition) {
 		conditions[idx].LastTransitionTime = metav1.Time{}
 		conditions[idx].ObservedGeneration = 0
 	}
-}
-
-func CloneConditions(conditions []metav1.Condition) []metav1.Condition {
-	var c = make([]metav1.Condition, len(conditions))
-	copy(c, conditions)
-	return c
-}
-
-func GetUpdatedSchedulerConditions(conditions []metav1.Condition, condition metav1.Condition) []metav1.Condition {
-	updatedConditions := NewNUMAResourcesSchedulerBaseConditions()
-	if len(conditions) != 0 {
-		updatedConditions = CloneConditions(conditions)
-	}
-
-	now := time.Now()
-	for idx, cond := range updatedConditions {
-		if cond.Type == condition.Type {
-			updatedConditions[idx] = condition
-			updatedConditions[idx].LastTransitionTime = metav1.Time{Time: now}
-			break
-		}
-	}
-
-	if condition.Type == ConditionAvailable {
-		for idx, cond := range updatedConditions {
-			if cond.Type == ConditionUpgradeable {
-				updatedConditions[idx].Status = condition.Status
-				updatedConditions[idx].LastTransitionTime = metav1.Time{Time: now}
-
-				break
-			}
-		}
-	}
-
-	return updatedConditions
 }
