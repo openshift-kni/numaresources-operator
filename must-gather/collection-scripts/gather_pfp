@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+. namespace
+NRO_NAMESPACE=$(nro_namespace)
+
+PFPSTATUS_DIR="/must-gather/namespaces/$NRO_NAMESPACE/pfpstatus"
+RTE_DIR="$PFPSTATUS_DIR/resource-topology-exporters"
+SCHEDULER_DIR="$PFPSTATUS_DIR/scheduler"
+PFPSYNCCHK_RESULTS_DIR="$PFPSTATUS_DIR/pfpsyncchk_results"
+
+OC_GET_PODS="oc get pods -n $NRO_NAMESPACE"
+
+function replace_dot_with_underscore() {
+    echo $1 | sed 's/\./_/g'
+}
+
+function get_rte_container_arg_value() {
+    local pod_name=$1
+    # always use container name in a multi-container pod
+    local container_name="resource-topology-exporter"
+    local arg_name="pods-fingerprint-status-file"
+    
+    # Get the args array for the specified container
+    local args_json=$($OC_GET_PODS $pod_name -o jsonpath="{.spec.containers[?(@.name==\"$container_name\")].args}")
+    
+    if [ -n "$args_json" ]; then
+        # Extract the value for the specific argument
+        echo "$args_json" | jq -r ".[] | select(startswith(\"$arg_name=\")) | sub(\"$arg_name=\"; \"\")"
+    fi
+}
+
+mkdir -p "$RTE_DIR" "$SCHEDULER_DIR" "$PFPSYNCCHK_RESULTS_DIR"
+
+NODES=()
+
+RTE_PODS=$($OC_GET_PODS -l name='resource-topology' -o jsonpath='{.items[*].metadata.name}')
+
+for pod in $RTE_PODS; do
+    node_name=$($OC_GET_PODS $pod -o jsonpath='{.spec.nodeName}')
+    node_name=$(replace_dot_with_underscore $node_name)
+    NODES+=($node_name)
+    
+    pfp_status_file=$(get_rte_container_arg_value $pod)
+    if [ -z "$pfp_status_file" ]; then
+        echo "FileNotFound" > "$RTE_DIR/$node_name.json"
+    else
+        oc exec $pod -n $NRO_NAMESPACE -- /bin/sh -c "cat $pfp_status_file" > "$RTE_DIR/$node_name.json"
+    fi
+done
+
+
+
+# considering the HA support for scheduler there could be more than one scheduler pod,
+# but one should be enough because it has all the nodes statuses, file per node.
+# pick the pod that is in Running phase
+sched_pod=$($OC_GET_PODS -l app=secondary-scheduler -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' | head -1)
+pfp_status_dir=$($OC_GET_PODS $sched_pod -o jsonpath='{.spec.containers[0].env[?(@.name=="PFP_STATUS_DUMP")].value}')
+
+for node in "${NODES[@]}"; do
+    if [ -z "$pfp_status_dir" ]; then
+        echo "FileNotFound" > "$SCHEDULER_DIR/$node"
+    else
+        oc exec $sched_pod -n $NRO_NAMESPACE -- /bin/sh -c "cat $pfp_status_dir/$node" > "$SCHEDULER_DIR/$node"
+    fi
+done
+
+for node in "${NODES[@]}"; do
+    if [ -f "$RTE_DIR/$node.json" ] && [ -f "$SCHEDULER_DIR/$node" ]; then
+        pfpsyncchk -from-rte "$RTE_DIR/$node.json" -from-scheduler "$SCHEDULER_DIR/$node" >> "$PFPSYNCCHK_RESULTS_DIR/$node.txt"
+    fi
+done
