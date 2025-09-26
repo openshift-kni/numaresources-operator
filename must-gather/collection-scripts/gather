@@ -32,4 +32,7 @@ done
 # Collect NRO details
 /usr/bin/gather_nro
 
+# Collect PFP debugging data
+/usr/bin/gather_pfp
+
 exit 0
