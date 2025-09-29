@@ -17,12 +17,12 @@ limitations under the License.
 package status
 
 import (
+	"reflect"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
 )
 
 // TODO: are we duping these?
@@ -34,6 +34,10 @@ const (
 )
 
 const (
+	ConditionDedicatedInformerActive = "DedicatedInformerActive"
+)
+
+const (
 	ConditionTypeIncorrectNUMAResourcesOperatorResourceName = "IncorrectNUMAResourcesOperatorResourceName"
 )
 
@@ -41,15 +45,39 @@ const (
 	ConditionTypeIncorrectNUMAResourcesSchedulerResourceName = "IncorrectNUMAResourcesSchedulerResourceName"
 )
 
-func GetUpdatedConditions(currentConditions []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
+func NUMAResourcesSchedulerNeedsUpdate(oldStatus, newStatus nropv1.NUMAResourcesSchedulerStatus) bool {
+	os := oldStatus.DeepCopy()
+	ns := newStatus.DeepCopy()
+
+	resetIncomparableConditionFields(os.Conditions)
+	resetIncomparableConditionFields(ns.Conditions)
+
+	return !reflect.DeepEqual(os, ns)
+}
+
+func EqualConditions(current, updated []metav1.Condition) bool {
+	c := CloneConditions(current)
+	u := CloneConditions(updated)
+
+	resetIncomparableConditionFields(c)
+	resetIncomparableConditionFields(u)
+
+	return reflect.DeepEqual(c, u)
+}
+
+// UpdateConditions compute new conditions based on arguments, and then compare with given current conditions.
+// Returns the conditions to use, either current or newly computed, and a boolean flag which is `true` if conditions need
+// update - so if they are updated since the current conditions.
+func UpdateConditions(currentConditions []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
 	conditions := NewConditions(condition, reason, message)
 
-	options := []cmp.Option{
-		cmpopts.IgnoreFields(metav1.Condition{}, "LastTransitionTime"),
-		cmpopts.IgnoreFields(metav1.Condition{}, "ObservedGeneration"),
-	}
+	cond := CloneConditions(conditions)
+	curCond := CloneConditions(currentConditions)
 
-	if cmp.Equal(conditions, currentConditions, options...) {
+	resetIncomparableConditionFields(cond)
+	resetIncomparableConditionFields(curCond)
+
+	if EqualConditions(currentConditions, conditions) {
 		return currentConditions, false
 	}
 	return conditions, true
@@ -117,6 +145,83 @@ type ErrResourcesNotReady struct {
 	Message string
 }
 
+func NewNUMAResourcesSchedulerBaseConditions() []metav1.Condition {
+	now := time.Now()
+	return []metav1.Condition{
+		{
+			Type:               ConditionAvailable,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Time{Time: now},
+			Reason:             ConditionAvailable,
+		},
+		{
+			Type:               ConditionUpgradeable,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Time{Time: now},
+			Reason:             ConditionUpgradeable,
+		},
+		{
+			Type:               ConditionProgressing,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Time{Time: now},
+			Reason:             ConditionProgressing,
+		},
+		{
+			Type:               ConditionDegraded,
+			Status:             metav1.ConditionFalse,
+			LastTransitionTime: metav1.Time{Time: now},
+			Reason:             ConditionDegraded,
+		},
+		{
+			Type:               ConditionDedicatedInformerActive,
+			Status:             metav1.ConditionUnknown,
+			LastTransitionTime: metav1.Time{Time: now},
+			Reason:             ConditionDedicatedInformerActive,
+		},
+	}
+}
+
 func (e ErrResourcesNotReady) Error() string {
 	return e.Message
+}
+
+func resetIncomparableConditionFields(conditions []metav1.Condition) {
+	for idx := range conditions {
+		conditions[idx].LastTransitionTime = metav1.Time{}
+		conditions[idx].ObservedGeneration = 0
+	}
+}
+
+func CloneConditions(conditions []metav1.Condition) []metav1.Condition {
+	var c = make([]metav1.Condition, len(conditions))
+	copy(c, conditions)
+	return c
+}
+
+func GetUpdatedSchedulerConditions(conditions []metav1.Condition, condition metav1.Condition) []metav1.Condition {
+	updatedConditions := NewNUMAResourcesSchedulerBaseConditions()
+	if len(conditions) != 0 {
+		updatedConditions = CloneConditions(conditions)
+	}
+
+	now := time.Now()
+	for idx, cond := range updatedConditions {
+		if cond.Type == condition.Type {
+			updatedConditions[idx] = condition
+			updatedConditions[idx].LastTransitionTime = metav1.Time{Time: now}
+			break
+		}
+	}
+
+	if condition.Type == ConditionAvailable {
+		for idx, cond := range updatedConditions {
+			if cond.Type == ConditionUpgradeable {
+				updatedConditions[idx].Status = condition.Status
+				updatedConditions[idx].LastTransitionTime = metav1.Time{Time: now}
+				break
+			}
+		}
+	}
+
+	return updatedConditions
 }
