@@ -102,10 +102,10 @@ github.com/k8stopologyawareschedwg/deployer v0.23.0 h1:Or30vJZ3cQNHxiRbnjaI1e8xa
 github.com/k8stopologyawareschedwg/deployer v0.23.0/go.mod h1:f4G4LRMdkRrc76GBsJR8HOdFqiPPqWq7IYemJqtNgQk=
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2 h1:uAwqOtyrFYggq3pVf3hs1XKkBxrQ8dkgjWz3LCLJsiY=
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2/go.mod h1:LBzS4n6GX1C69tzSd5EibZ9cGOXFuHP7GxEMDYVe1sM=
-github.com/k8stopologyawareschedwg/podfingerprint v0.2.2 h1:iFHPfZInM9pz2neye5RdmORMp1hPmte1EGJYpOOzZVg=
-github.com/k8stopologyawareschedwg/podfingerprint v0.2.2/go.mod h1:C23pM15t06dXg/OihGlqBvnYzLr+MXDXJ7zMfbNAyXI=
-github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.5 h1:DsRS73aLnnRYGBbqX3lTYLqS5rrFVUpAaGG6xxrfDdE=
-github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.5/go.mod h1:CxbPRJYtNn9KxW3h4hOeUZQheXo0/4KMLsMU0wSiSCM=
+github.com/k8stopologyawareschedwg/podfingerprint v0.2.3 h1:nVKmzn6g7CHhDtB+jG85Db/B/ALRY9VLh5ueAfVPEHU=
+github.com/k8stopologyawareschedwg/podfingerprint v0.2.3/go.mod h1:E0bjgihZTSwRIJVjNV45Lm0C/j5w+YkGSnfpYXoI8Ws=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.6 h1:MCIJIgf3cSF2Xbz6KHzCq0eM0yoiM/mi9WUm5VeYNTo=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.6/go.mod h1:Vj4XEWW47QRiHAuIcv9o++gjRl7Mok1fmMOUSz0yoWA=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=
@@ -140,6 +140,8 @@ github.com/onsi/ginkgo/v2 v2.22.0 h1:Yed107/8DjTr0lKCNt7Dn8yQ6ybuDRQoMGrNFKzMfHg
 github.com/onsi/ginkgo/v2 v2.22.0/go.mod h1:7Du3c42kxCUegi0IImZ1wUQzMBVecgIHjR1C+NkhLQo=
 github.com/onsi/gomega v1.36.1 h1:bJDPBO7ibjxcbHMgSCoo4Yj18UWbKDlLwX1x9sybDcw=
 github.com/onsi/gomega v1.36.1/go.mod h1:PvZbdDc8J6XJEpDK4HCuRBm8a6Fzp9/DmhC9C7yFlog=
+github.com/openshift-kni/debug-tools v0.2.5 h1:YDHniE7pvEnveQPXPP2TOHcWbPzfpbcPsMJ2wu4vAEk=
+github.com/openshift-kni/debug-tools v0.2.5/go.mod h1:kBoANbhBO3X7qXwrve0dcEtAM97Enrm7mF58p8RLLJI=
 github.com/openshift/api v0.0.0-20250305013520-e7f23be12279 h1:eYvpiSNyNl7P7kmtNH0d6zAMLlrziyz370m0q1tggJE=
 github.com/openshift/api v0.0.0-20250305013520-e7f23be12279/go.mod h1:Shkl4HanLwDiiBzakv+con/aMGnVE2MAGvoKp5oyYUo=
 github.com/openshift/client-go v0.0.0-20240510131258-f646d5f29250 h1:WQ0e89xebsNeChdYw8QrxggYkFtEQOaLBEKJDkMmcUk=

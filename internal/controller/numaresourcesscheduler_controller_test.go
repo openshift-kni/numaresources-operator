@@ -54,6 +54,7 @@ import (
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
@@ -470,11 +471,11 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			// ordering doesn't matter
 			for _, ev := range []corev1.EnvVar{
 				{
-					Name:  schedupdate.PFPStatusDumpEnvVar,
-					Value: schedupdate.PFPStatusDir,
+					Name:  envvar.PFPStatusDump,
+					Value: envvar.PFPStatusDirDefault,
 				},
 			} {
-				gotEv := schedupdate.FindEnvVarByName(cnt.Env, ev.Name)
+				gotEv := envvar.FindByName(cnt.Env, ev.Name)
 				Expect(gotEv).ToNot(BeNil(), "missing environment variable %q in %q", ev.Name, cnt.Name)
 				Expect(gotEv.Value).To(Equal(ev.Value), "unexpected value %q (wants %q) for variable %q in %q", gotEv.Value, ev.Value, ev.Name, cnt.Name)
 			}
@@ -513,18 +514,18 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			// ordering doesn't matter
 			for _, ev := range []corev1.EnvVar{
 				{
-					Name: schedupdate.PFPStatusDumpEnvVar,
+					Name: envvar.PFPStatusDump,
 				},
 			} {
-				gotEv := schedupdate.FindEnvVarByName(cnt.Env, ev.Name)
+				gotEv := envvar.FindByName(cnt.Env, ev.Name)
 				Expect(gotEv).To(BeNil(), "unexpected environment variable %q in %q", ev.Name, cnt.Name)
 			}
 		})
 
 		It("should have scheduler CacheResyncDebug by default as DumpJSONFile", func() {
 			expectedEnvVar := corev1.EnvVar{
-				Name:  schedupdate.PFPStatusDumpEnvVar,
-				Value: schedupdate.PFPStatusDir,
+				Name:  envvar.PFPStatusDump,
+				Value: envvar.PFPStatusDirDefault,
 			}
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
@@ -533,7 +534,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			dp := &appsv1.Deployment{}
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
 
-			gotEv := schedupdate.FindEnvVarByName(dp.Spec.Template.Spec.Containers[0].Env, expectedEnvVar.Name)
+			gotEv := envvar.FindByName(dp.Spec.Template.Spec.Containers[0].Env, expectedEnvVar.Name)
 			Expect(gotEv).To(HaveValue(Equal(expectedEnvVar)))
 		})
 
@@ -553,8 +554,8 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 			dumpJSONFile := nropv1.CacheResyncDebugDumpJSONFile
 			expectedEnvVar := corev1.EnvVar{
-				Name:  schedupdate.PFPStatusDumpEnvVar,
-				Value: schedupdate.PFPStatusDir,
+				Name:  envvar.PFPStatusDump,
+				Value: envvar.PFPStatusDirDefault,
 			}
 
 			nrs.Spec.CacheResyncDebug = &dumpJSONFile
@@ -571,7 +572,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 			Expect(*nrs.Spec.CacheResyncDebug).To(Equal(dumpJSONFile))
 
-			gotEv := schedupdate.FindEnvVarByName(dp.Spec.Template.Spec.Containers[0].Env, expectedEnvVar.Name)
+			gotEv := envvar.FindByName(dp.Spec.Template.Spec.Containers[0].Env, expectedEnvVar.Name)
 			Expect(gotEv).To(HaveValue(Equal(expectedEnvVar)))
 		})
 

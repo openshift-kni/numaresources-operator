@@ -37,6 +37,7 @@ import (
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcetopologyexporter"
 
+	knistatus "github.com/openshift-kni/debug-tools/pkg/pfpstatus"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 )
 
@@ -72,7 +73,8 @@ func main() {
 	}
 
 	config := textlogger.NewConfig(textlogger.Verbosity(parsedArgs.Global.Verbose))
-	ctrl.SetLogger(textlogger.NewLogger(config))
+	logh := textlogger.NewLogger(config)
+	ctrl.SetLogger(logh)
 
 	k8scli, err := k8shelpers.GetK8sClient(parsedArgs.Global.KubeConfig)
 	if err != nil {
@@ -113,6 +115,10 @@ func main() {
 	if err != nil {
 		klog.Fatalf("failed to setup metrics server: %v", err)
 	}
+
+	pfpStatusParams := knistatus.DefaultParams()
+	knistatus.ParamsFromEnv(logh, &pfpStatusParams)
+	knistatus.Setup(logh, pfpStatusParams)
 
 	hnd := resourcetopologyexporter.Handle{
 		ResMon: resourcemonitor.Handle{

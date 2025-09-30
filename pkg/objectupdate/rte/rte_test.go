@@ -85,7 +85,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			name: "defaults",
 			conf: nropv1.DefaultNodeGroupConfig(),
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
 			},
 		},
 		{
@@ -96,7 +96,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				},
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=32s", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=32s", "--metrics-mode=httptls",
 			},
 		},
 		{
@@ -105,7 +105,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				PodsFingerprinting: &pfpEnabled,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=all", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=all", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
 			},
 		},
 		{
@@ -123,7 +123,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshMode: &refreshEvents,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--notify-file=/run/rte/notify", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--notify-file=/run/rte/notify", "--metrics-mode=httptls",
 			},
 		},
 		{
@@ -132,7 +132,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshMode: &refreshPeriodic,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
 			},
 		},
 		{
@@ -141,7 +141,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshPause: &infoRefreshPauseEnabled,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=with-exclusive-resources", "--no-publish", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--no-publish", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
 			},
 		},
 		{
@@ -150,7 +150,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshPause: &infoRefreshPauseDisabled,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-status-file=/run/pfpstatus/dump.json", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
 			},
 		},
 	}
