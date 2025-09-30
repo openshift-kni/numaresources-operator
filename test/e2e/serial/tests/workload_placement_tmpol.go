@@ -144,8 +144,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				//calculate a base load on the node
 				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
-				// TODO: multi-line value in structured log
-				klog.InfoS("computed base load", "value", baseload)
+				fxt.Dump.Infof(baseload.String(), "computed base load")
 				paddingResWithBaseload := paddingRes.DeepCopy()
 				baseload.AddTo(paddingResWithBaseload)
 				var zonePaddingRes corev1.ResourceList
@@ -155,7 +154,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 						zonePaddingRes = paddingResWithBaseload
 					}
 					podName := fmt.Sprintf("padding-%d-%d", nIdx, zIdx)
-					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, zonePaddingRes)
+					padPod, err := makePaddingPod(fxt, fxt.Namespace.Name, podName, zone, zonePaddingRes)
 					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
 
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
@@ -2134,7 +2133,7 @@ func setupPadding(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopol
 		}
 
 		e2efixture.By("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(numaRes))
-		padPod, err := makePaddingPod(fxt.Namespace.Name, "target", zone, numaRes)
+		padPod, err := makePaddingPod(fxt, fxt.Namespace.Name, "target", zone, numaRes)
 		Expect(err).ToNot(HaveOccurred())
 
 		padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
@@ -2172,7 +2171,7 @@ func setupPaddingForUnsuitableNodes(fxt *e2efixture.Fixture, nrtList nrtv1alpha2
 				e2efixture.By("saturating node %q -> %q zone %q to fit only (adjusted) %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes))
 			}
 
-			padPod, err := makePaddingPod(fxt.Namespace.Name, name, zone, padRes)
+			padPod, err := makePaddingPod(fxt, fxt.Namespace.Name, name, zone, padRes)
 			Expect(err).ToNot(HaveOccurred())
 
 			padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)

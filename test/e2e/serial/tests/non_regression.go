@@ -277,8 +277,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(schedOK).To(BeFalse(), "pod %s/%s not assigned to a specific node without a scheduler %s", updatedPod.Namespace, updatedPod.Name, nonExistingSchedulerName)
 
 			rl := e2ereslist.FromGuaranteedPod(updatedPod)
-			// TODO: multi-line value in structured log
-			klog.InfoS("post-create pod resource list", "spec", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), "updated", e2ereslist.ToString(rl))
+			fxt.Dump.Infof(fmt.Sprintf("spec: %s\nupdated: %s", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), e2ereslist.ToString(rl)), "post-create pod resource list")
 
 			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -343,8 +342,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				//calculate base load on the node
 				baseload, err := baseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
-				// TODO: multi-line value in structured log
-				klog.InfoS("computed base load", "value", baseload)
+				fxt.Dump.Infof(baseload.String(), "computed base load")
 
 				//get nrt info of the node
 				klog.InfoS("preparing node to fit the test case", "nodeName", nodeName)

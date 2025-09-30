@@ -56,8 +56,7 @@ func (cfg *E2EConfig) RecordNRTReference() error {
 	if err != nil {
 		return err
 	}
-	// TODO: multi-line value in structured log
-	klog.InfoS("recorded reference NRT data", "data", intnrt.ListToString(cfg.NRTList.Items, " reference"))
+	cfg.Fixture.Dump.Infof(intnrt.ListToString(cfg.NRTList.Items, " reference"), "recorded reference NRT data")
 	return nil
 }
 

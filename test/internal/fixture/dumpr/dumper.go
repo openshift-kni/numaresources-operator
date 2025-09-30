@@ -55,7 +55,11 @@ func (fr formatter) Infof(data string, format string, values ...any) {
 
 func (fr formatter) Errorf(data string, err error, format string, values ...any) {
 	var buf bytes.Buffer
-	buf.WriteString(err.Error())
+	if err != nil {
+		buf.WriteString(err.Error())
+	} else {
+		buf.WriteString("<NIL ERROR>")
+	}
 	buf.WriteString(": ")
 	fmt.Fprintf(&buf, format, values...)
 	buf.WriteString("\n")
