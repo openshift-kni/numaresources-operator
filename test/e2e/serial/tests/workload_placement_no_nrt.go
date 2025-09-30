@@ -99,7 +99,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			updateInfoRefreshPause(context.TODO(), fxt, initialInfoRefreshPause, nropObjInitial)
 		})
 
-		It("should make a best-effort pod running", Label(label.Tier1), func() {
+		It("[test_id:85012] should make a best-effort pod running", Label(label.Tier1), func() {
 			By("create best-effort pod expect it to start running")
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
@@ -113,7 +113,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should make a burstable pod running", Label(label.Tier1), func() {
+		It("[test_id:85013] should make a burstable pod running", Label(label.Tier1), func() {
 			By("create burstable pod and expect it to run")
 			testPod = objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
