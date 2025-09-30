@@ -152,20 +152,20 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 				}
 			},
-			Entry("should handle a burst of qos=guaranteed pods", Label(label.Tier0), func(pod *corev1.Pod) {
+			Entry("[test_id:84018] should handle a burst of qos=guaranteed pods", Label(label.Tier0), func(pod *corev1.Pod) {
 				pod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
 					corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 					corev1.ResourceMemory: resource.MustParse("64Mi"),
 				}
 			}),
-			Entry("should handle a burst of qos=burstable pods", Label(label.Tier1), func(pod *corev1.Pod) {
+			Entry("[test_id:84019] should handle a burst of qos=burstable pods", Label(label.Tier1), func(pod *corev1.Pod) {
 				pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
 					corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 					corev1.ResourceMemory: resource.MustParse("64Mi"),
 				}
 			}),
 			// this is REALLY REALLY to prevent the most catastrophic regressions
-			Entry("should handle a burst of qos=best-effort pods", Label(label.Tier2), func(pod *corev1.Pod) {}),
+			Entry("[test_id:84020] should handle a burst of qos=best-effort pods", Label(label.Tier2), func(pod *corev1.Pod) {}),
 		)
 
 		DescribeTable("[nodeAll] against all the available worker nodes", Label("nodeAll"),
@@ -249,20 +249,20 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 				}
 			},
-			Entry("should handle a burst of qos=guaranteed pods", Label(label.Tier0), func(pod *corev1.Pod) {
+			Entry("[test_id:84021] should handle a burst of qos=guaranteed pods", Label(label.Tier0), func(pod *corev1.Pod) {
 				pod.Spec.Containers[0].Resources.Limits = corev1.ResourceList{
 					corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 					corev1.ResourceMemory: resource.MustParse("64Mi"),
 				}
 			}),
-			Entry("should handle a burst of qos=burstable pods", Label(label.Tier1), func(pod *corev1.Pod) {
+			Entry("[test_id:84022] should handle a burst of qos=burstable pods", Label(label.Tier1), func(pod *corev1.Pod) {
 				pod.Spec.Containers[0].Resources.Requests = corev1.ResourceList{
 					corev1.ResourceCPU:    *resource.NewQuantity(cpusPerPod, resource.DecimalSI),
 					corev1.ResourceMemory: resource.MustParse("64Mi"),
 				}
 			}),
 			// this is REALLY REALLY to prevent the most catastrophic regressions
-			Entry("should handle a burst of qos=best-effort pods", Label(label.Tier2), func(pod *corev1.Pod) {}),
+			Entry("[test_id:84023] should handle a burst of qos=best-effort pods", Label(label.Tier2), func(pod *corev1.Pod) {}),
 		)
 
 		// TODO: mixed
