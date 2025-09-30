@@ -662,7 +662,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("should make a pod with three gu cnt land on a node with enough resources, containers should be spread on a different zone",
+		Entry("[test_id:85000] should make a pod with three gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			Label(label.Tier1, "tmscope:cnt", "testtype4"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
@@ -706,7 +706,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+		Entry("[test_id:85001] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			Label(label.Tier1, "tmscope:cnt", "cpu", "testtype4"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
@@ -758,7 +758,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+		Entry("[test_id:85002] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			Label(label.Tier1, "tmscope:cnt", "memory", "testtype4"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
@@ -810,7 +810,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+		Entry("[test_id:85003] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			Label(label.Tier1, "testtype4", "tmscope:cnt", "hugepages2Mi"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
@@ -862,7 +862,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
+		Entry("[test_id:85004] pod with two gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			Label(label.Tier1, "testtype4", "tmscope:cnt", "hugepages1Gi"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
@@ -963,7 +963,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("should make a pod with one init cnt and three gu cnt land on a node with enough resources, containers should be spread on a different zone",
+		Entry("[test_id:85005] should make a pod with one init cnt and three gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			Label(label.Tier1, "tmscope:container", "testtype11"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
@@ -1013,7 +1013,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("should make a pod with 3 gu cnt and 3 init cnt land on a node with enough resources, when sum of init and app cnt resources are more than node resources",
+		Entry("[test_id:85006] should make a pod with 3 gu cnt and 3 init cnt land on a node with enough resources, when sum of init and app cnt resources are more than node resources",
 			Label(label.Tier1, "tmscope:container", "testtype29"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			podResourcesRequest{
@@ -1446,7 +1446,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		// but only one container can be aligned to a single numa node while the second container cannot. Because of that, the pod should keep on pending and we expect
 		// to see the reason for not scheduling the pod on that target node as "cannot align container: testcnt-1", because the other worker nodes have insufficient
 		// free resources to accommodate the pod thus they will be rejected as candidates at earlier stage
-		Entry("pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+		Entry("[test_id:85007] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			Label(label.Tier0, "unsched", "tmscope:cnt", "cpu"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			nrosched.ErrorCannotAlignContainer,
@@ -1595,7 +1595,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+		Entry("[test_id:85008] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			Label(label.Tier0, "unsched", "tmscope:cnt", "memory"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			nrosched.ErrorCannotAlignContainer,
@@ -1654,7 +1654,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+		Entry("[test_id:85009] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			Label(label.Tier0, "unsched", "tmscope:cnt", "hugepages2Mi"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			nrosched.ErrorCannotAlignContainer,
@@ -1712,7 +1712,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
+		Entry("[test_id:85011] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
 			Label(label.Tier0, "unsched", "tmscope:cnt", "hugepages1Gi"),
 			tmSingleNUMANodeFuncsHandler[intnrt.Container],
 			nrosched.ErrorCannotAlignContainer,
