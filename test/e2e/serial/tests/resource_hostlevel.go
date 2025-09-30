@@ -127,7 +127,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				klog.InfoS("expected required resources to reflect in NRT", "resources", accumulatedRes)
 				expectNRTConsumedResources(fxt, *targetNrtInitial, accumulatedRes, updatedPod)
 			},
-			Entry("[qos:gu] with ephemeral storage, single-container",
+			Entry("[test_id:84015][qos:gu] with ephemeral storage, single-container",
 				Label("qos:gu"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
@@ -140,7 +140,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				},
 				corev1.PodQOSGuaranteed,
 			),
-			Entry("[qos:bu] with ephemeral storage, single-container",
+			Entry("[test_id:84016][qos:bu] with ephemeral storage, single-container",
 				Label("qos:bu"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
@@ -153,7 +153,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				},
 				corev1.PodQOSBurstable,
 			),
-			Entry("[qos:be] with ephemeral storage, single-container",
+			Entry("[test_id:84017][qos:be] with ephemeral storage, single-container",
 				Label("qos:be"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
