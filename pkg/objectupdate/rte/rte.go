@@ -18,7 +18,6 @@ package rte
 
 import (
 	"fmt"
-	"path/filepath"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +35,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
 )
 
 // these should be provided by a deployer API
@@ -192,13 +192,17 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 	klog.V(2).InfoS("DaemonSet update: pod fingerprinting status", "daemonset", ds.Name, "enabled", pfpEnabled)
 	if pfpEnabled {
 		flags.SetToggle("--pods-fingerprint")
-		flags.SetOption("--pods-fingerprint-status-file", filepath.Join(pfpStatusDir, "dump.json"))
 		flags.SetOption("--pods-fingerprint-method", pfpMethod)
 
 		podSpec := &ds.Spec.Template.Spec
-		// TODO: this doesn't really belong here, but OTOH adding the status file without having set
+
+		// TODO: these don't really belong here, but OTOH adding the status file without having set
 		// the volume doesn't work either. We need a deeper refactoring in this area.
 		AddVolumeMountMemory(podSpec, cnt, pfpStatusMountName, pfpStatusDir, 8*_MiB)
+		envvar.SetForContainer(cnt, envvar.PFPStatusDump, envvar.PFPStatusDirDefault)
+	} else {
+		// TODO: ditto
+		envvar.DeleteFromContainer(cnt, envvar.PFPStatusDump)
 	}
 
 	flags.SetOption("--add-nrt-owner", "false")

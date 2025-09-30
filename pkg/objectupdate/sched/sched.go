@@ -33,18 +33,13 @@ import (
 	intreslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
 )
 
 // these should be provided by a deployer API
 
 const (
 	MainContainerName = "secondary-scheduler"
-)
-
-const (
-	PFPStatusDumpEnvVar = "PFP_STATUS_DUMP"
-
-	PFPStatusDir = "/run/pfpstatus"
 )
 
 // TODO: we should inject also the mount point. As it is now, the information is split between the manifest
@@ -69,44 +64,10 @@ func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSc
 
 	cacheResyncDebug := *spec.CacheResyncDebug
 	if cacheResyncDebug == nropv1.CacheResyncDebugDumpJSONFile {
-		setContainerEnvVar(cnt, PFPStatusDumpEnvVar, PFPStatusDir)
+		envvar.SetForContainer(cnt, envvar.PFPStatusDump, envvar.PFPStatusDirDefault)
 	} else {
-		deleteContainerEnvVar(cnt, PFPStatusDumpEnvVar)
+		envvar.DeleteFromContainer(cnt, envvar.PFPStatusDump)
 	}
-}
-
-func setContainerEnvVar(cnt *corev1.Container, name, value string) {
-	if env := FindEnvVarByName(cnt.Env, name); env != nil {
-		klog.V(2).InfoS("overriding existing environment variable", "name", name, "oldValue", env.Value, "newValue", value)
-		env.Value = value
-		return
-	}
-
-	cnt.Env = append(cnt.Env, corev1.EnvVar{
-		Name:  name,
-		Value: value,
-	})
-}
-
-func deleteContainerEnvVar(cnt *corev1.Container, name string) {
-	var envs []corev1.EnvVar
-	for _, env := range cnt.Env {
-		if env.Name == name {
-			continue
-		}
-		envs = append(envs, env)
-	}
-	cnt.Env = envs
-}
-
-func FindEnvVarByName(envs []corev1.EnvVar, name string) *corev1.EnvVar {
-	for idx := range envs {
-		env := &envs[idx]
-		if env.Name == name {
-			return env
-		}
-	}
-	return nil
 }
 
 func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {

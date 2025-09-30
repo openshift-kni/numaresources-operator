@@ -12,11 +12,12 @@ require (
 	github.com/jaypipes/ghw v0.16.0
 	github.com/k8stopologyawareschedwg/deployer v0.23.0
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2
-	github.com/k8stopologyawareschedwg/podfingerprint v0.2.2
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.5
+	github.com/k8stopologyawareschedwg/podfingerprint v0.2.3
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.21.6
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.1
+	github.com/openshift-kni/debug-tools v0.2.5
 	github.com/openshift/api v0.0.0-20250305013520-e7f23be12279 // release-4.18
 	github.com/openshift/hypershift/api v0.0.0-20241115183703-d41904871380 // release-4.18
 	github.com/sergi/go-diff v1.1.0
