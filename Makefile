@@ -410,7 +410,7 @@ goversion:
 build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform update-buildinfo
 
 .PHONY: build-tools-all
-build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap bin/watchnrtattr bin/mkginkgolabelfilter bin/nrtcacheck update-buildinfo
+build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap bin/watchnrtattr bin/mkginkgolabelfilter bin/pfpsyncchk update-buildinfo
 
 pkg/version/_buildinfo.json: bin/buildhelper
 	@bin/buildhelper inspect > pkg/version/_buildinfo.json
@@ -438,7 +438,7 @@ bin/mkginkgolabelfilter: tools/mkginkgolabelfilter/mkginkgolabelfilter.go
 	LDFLAGS="-static"
 	@go build -o $@ -ldflags "$$LDFLAGS" $<
 
-bin/nrtcacheck: tools/nrtcacheck/nrtcacheck.go build-tools
+bin/pfpsyncchk: tools/pfpsyncchk/pfpsyncchk.go 
 	LDFLAGS="-s -w" go build -mod=vendor -o $@ -ldflags "$$LDFLAGS" -tags "$$GOTAGS" $<
 
 verify-generated: bundle generate

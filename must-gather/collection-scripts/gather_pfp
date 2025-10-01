@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+
+. namespace
+NRO_NAMESPACE=$(nro_namespace)
+
+
+PFPSTATUS_DIR="/must-gather/namespaces/$NRO_NAMESPACE/pfpstatus"
+RTE_DIR="$PFPSTATUS_DIR/resource-topology-exporters"
+SCHEDULER_DIR="$PFPSTATUS_DIR/scheduler"
+mkdir -p "$RTE_DIR" "$SCHEDULER_DIR"
+
+# common variables
+OC_GET_PODS="oc get pods -n $NRO_NAMESPACE"
+OC_EXEC="oc exec -n $NRO_NAMESPACE"
+
+TAS_NODES=()
+
+function replace_dot_with_underscore() {
+    echo $1 | sed 's/\./_/g'
+}
+
+function gather_rte_pfp_status_files() {
+    local rte_pods=$($OC_GET_PODS -l name='resource-topology' -o jsonpath='{.items[*].metadata.name}')
+    for pod in $rte_pods; do
+        local node_name=$($OC_GET_PODS $pod -o jsonpath='{.spec.nodeName}')
+        node_name=$(replace_dot_with_underscore $node_name)
+        TAS_NODES+=($node_name)
+
+        local pfp_status_file_path=$($OC_EXEC $pod -- printenv PFP_STATUS_DUMP)
+        if [ -n "$pfp_status_file_path" ]; then
+            $OC_EXEC $pod -c resource-topology-exporter -- /bin/sh -c "cat $pfp_status_file_path/$node_name" > "$RTE_DIR/$node_name"
+        fi
+    done
+}
+
+function gather_scheduler_pfp_status_files() {
+    # considering the HA support for scheduler there could be more than one scheduler pod,
+    # but one should be enough because it has all the nodes statuses, a file per node.
+    # pick the first pod that is in Running phase
+    local sched_pod=$($OC_GET_PODS -l app=secondary-scheduler -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' | awk '{print $1}')
+    if [ -z "$sched_pod" ]; then
+        echo "No running scheduler pod found"
+        return
+    fi
+
+    local pfp_status_dir=$($OC_EXEC $sched_pod -- printenv PFP_STATUS_DUMP)
+    for node in "${TAS_NODES[@]}"; do
+        if [ -n "$pfp_status_dir" ]; then
+            $OC_EXEC $sched_pod -- /bin/sh -c "cat $pfp_status_dir/$node" > "$SCHEDULER_DIR/$node"
+        fi
+    done
+}
+
+gather_rte_pfp_status_files
+gather_scheduler_pfp_status_files
