@@ -84,6 +84,10 @@ spec:
     description: Additional tags to apply to the built container image
     name: additional-tags
     type: array
+  - name: buildah-format
+    default: oci
+    type: string
+    description: The format for the resulting image's mediaType. Valid values are oci or docker.
   results:
   - description: ''
     name: IMAGE_URL
@@ -111,7 +115,7 @@ spec:
       - name: name
         value: init
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-init:0.2@sha256:ec962d0be18f36ca7d331c99bf243800f569fc0a2ea6f8c8c3d3a574b71c44dc
+        value: quay.io/konflux-ci/tekton-catalog/task-init:0.2@sha256:526a104a3342e36dad5c5e7f98c647da6b2a33897e458f772ff4afe523e0690a
       - name: kind
         value: task
       resolver: bundles
@@ -204,6 +208,8 @@ spec:
       value: 'true'
     - name: ADDITIONAL_SECRET
       value: telco-5g-redhat-pull-secret
+    - name: BUILDAH_FORMAT
+      value: $(params.buildah-format)
     runAfter:
     - clone-repository
     taskRef:
@@ -233,6 +239,8 @@ spec:
     - name: IMAGES
       value:
       - $(tasks.build-images.results.IMAGE_REF[*])
+    - name: BUILDAH_FORMAT
+      value: $(params.buildah-format)
     runAfter:
     - build-images
     taskRef:
@@ -353,7 +361,7 @@ spec:
       - name: name
         value: fbc-fips-check-oci-ta
       - name: bundle
-        value: quay.io/konflux-ci/tekton-catalog/task-fbc-fips-check-oci-ta:0.1@sha256:46fad72e5586eb7a772d97b2ceac10cf088851ea9eeef16aaa104d5d80dac50a
+        value: quay.io/konflux-ci/tekton-catalog/task-fbc-fips-check-oci-ta:0.1@sha256:286eff4264fc502de7be64d77fee8cc17a44b13174c2bc1618cef40677cb53e6
       - name: kind
         value: task
       resolver: bundles
