@@ -91,6 +91,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 		Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(HaveOccurred())
 		degradedCondition := getConditionByType(nrs.Status.Conditions, status.ConditionDegraded)
+		Expect(degradedCondition).ToNot(BeNil())
 		Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
 		Expect(degradedCondition.Reason).To(Equal(reason))
 	}
