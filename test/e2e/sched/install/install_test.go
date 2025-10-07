@@ -41,7 +41,7 @@ import (
 
 var _ = Describe("[Scheduler] install", func() {
 	Context("with a running cluster with all the components", func() {
-		It("[test_id:48598][tier2] should perform the scheduler deployment and verify the condition is reported as available", func() {
+		It("[test_id:48598][tier2] should perform the scheduler deployment and verify it is reported as available with healthy conditions", func() {
 			var err error
 			nroSchedObj := objects.TestNROScheduler()
 
@@ -61,16 +61,8 @@ var _ = Describe("[Scheduler] install", func() {
 					return false
 				}
 
-				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
-				if cond == nil {
-					klog.Warningf("missing conditions in %v", updatedNROObj)
-					return false
-				}
-
-				klog.Infof("condition: %v", cond)
-				klog.Infof("conditions: %v", updatedNROObj.Status.Conditions)
-
-				return cond.Status == metav1.ConditionTrue
+				klog.InfoS("scheduler status", "conditions", updatedNROObj.Status.Conditions)
+				return isReportedAvailable(updatedNROObj.Status.Conditions)
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "NRO Scheduler condition did not become available")
 
 			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
@@ -112,3 +104,49 @@ var _ = Describe("[Scheduler] install", func() {
 		})
 	})
 })
+
+func isReportedAvailable(conditions []metav1.Condition) bool {
+	// conditions that should be True
+	availableCond := status.FindCondition(conditions, status.ConditionAvailable)
+	if availableCond == nil {
+		klog.InfoS("missing available condition status")
+		return false
+	}
+	if availableCond.Status != metav1.ConditionTrue {
+		klog.Info("scheduler not reported as available")
+		return false
+	}
+
+	upgradeCond := status.FindCondition(conditions, status.ConditionUpgradeable)
+	if upgradeCond == nil {
+		klog.InfoS("missing upgradeable condition status")
+		return false
+	}
+	if upgradeCond.Status != metav1.ConditionTrue {
+		klog.Info("scheduler not reported as upgradeable")
+		return false
+	}
+
+	// conditions that should be False
+	degradedCond := status.FindCondition(conditions, status.ConditionDegraded)
+	if degradedCond == nil {
+		klog.Info("missing degraded condition status")
+		return false
+	}
+	if degradedCond.Status == metav1.ConditionTrue {
+		klog.Info("scheduler reported as degraded")
+		return false
+	}
+
+	progressCond := status.FindCondition(conditions, status.ConditionProgressing)
+	if progressCond == nil {
+		klog.Info("missing progressing condition status")
+		return false
+	}
+	if progressCond.Status == metav1.ConditionTrue {
+		klog.Info("scheduler reported as progressing")
+		return false
+	}
+
+	return true
+}
