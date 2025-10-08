@@ -152,10 +152,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 				// TODO: multi-line value in structured log
 				klog.InfoS("computed base load", "value", baseload)
-				baseload.Apply(paddingRes)
+				paddingResWithBaseload := paddingRes.DeepCopy()
+				baseload.Apply(paddingResWithBaseload)
 				for zIdx, zone := range nrtInfo.Zones {
 					podName := fmt.Sprintf("padding-%d-%d", nIdx, zIdx)
-					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingRes)
+					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, paddingResWithBaseload)
 					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
 
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
