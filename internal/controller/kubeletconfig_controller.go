@@ -48,7 +48,9 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	intkubeletconfig "github.com/openshift-kni/numaresources-operator/internal/kubeletconfig"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
+	intreconcile "github.com/openshift-kni/numaresources-operator/internal/reconcile"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
@@ -57,7 +59,8 @@ import (
 )
 
 const (
-	kubeletConfigRetryPeriod = 30 * time.Second
+	kubeletConfigRetryPeriod           = 30 * time.Second
+	MachineConfigPoolPausedRetryPeriod = 2 * time.Minute
 )
 
 const (
@@ -116,22 +119,20 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// KubeletConfig changes are expected to be sporadic, yet are important enough
 	// to be made visible at kubernetes level. So we generate events to handle them
-	cm, err := r.reconcileConfigMap(ctx, instance, req.NamespacedName)
-	if err != nil {
-		var klErr *InvalidKubeletConfig
-		if errors.As(err, &klErr) {
-			r.Recorder.Event(instance, "Normal", "ProcessSkip", "ignored kubelet config "+klErr.ObjectName)
-			return ctrl.Result{}, nil
-		}
-
-		klog.ErrorS(err, "failed to reconcile configmap", "controller", "kubeletconfig")
-
-		r.Recorder.Event(instance, "Warning", "ProcessFailed", "Failed to update RTE config from kubelet config "+req.NamespacedName.String())
-		return ctrl.Result{}, err
+	cm, step := r.reconcileConfigMap(ctx, instance, req.NamespacedName)
+	if step.Error != nil && step.ConditionInfo.Reason != intreconcile.EventProcessSkip {
+		klog.ErrorS(step.Error, "failed to reconcile configmap", "controller", "kubeletconfig")
+		r.Recorder.Event(instance, step.ConditionInfo.Type, step.ConditionInfo.Reason, step.ConditionInfo.Message)
+		return step.Result, step.Error
 	}
 
-	r.Recorder.Event(instance, "Normal", "ProcessOK", fmt.Sprintf("Updated RTE config %s/%s from kubelet config %s", cm.Namespace, cm.Name, req.NamespacedName.String()))
-	return ctrl.Result{}, nil
+	if step.ConditionInfo.Reason == intreconcile.EventProcessSuccess {
+		step = step.WithMessage(fmt.Sprintf("Updated RTE config %s/%s from kubelet config %s", cm.Namespace, cm.Name, req.NamespacedName.String()))
+	}
+
+	r.Recorder.Event(instance, step.ConditionInfo.Type, step.ConditionInfo.Reason, step.ConditionInfo.Message)
+
+	return step.Result, nil
 }
 
 func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
@@ -197,25 +198,29 @@ func (e *InvalidKubeletConfig) Unwrap() error {
 	return e.Err
 }
 
-func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*corev1.ConfigMap, error) {
+func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*corev1.ConfigMap, intreconcile.Step) {
 	// first check if the ConfigMap should be deleted
 	// to save all the additional work related for create/update
 	cm, deleted, err := r.deleteConfigMap(ctx, instance, kcKey)
 	if deleted {
-		return cm, err
+		return cm, intreconcile.StepWarning(fmt.Errorf("Failed to update RTE config from kubelet config %s: %v", kcKey.Name, err))
 	}
 
-	kcHandler, err := r.makeKCHandlerForPlatform(ctx, instance, kcKey)
-	if err != nil {
-		return nil, err
+	kcHandler, step := r.makeKCHandlerForPlatform(ctx, instance, kcKey)
+	if step.Error != nil {
+		return nil, step
 	}
+
 	kubeletConfig, err := kubeletconfig.MCOKubeletConfToKubeletConf(kcHandler.mcoKc)
 	if err != nil {
 		klog.ErrorS(err, "cannot extract KubeletConfiguration from MCO KubeletConfig", "name", kcKey.Name)
-		return nil, err
+		return nil, FailedConfigMapUpdateStep(kcKey.Name, err)
 	}
-
-	return r.syncConfigMap(ctx, kubeletConfig, instance, kcHandler)
+	cm, err = r.syncConfigMap(ctx, kubeletConfig, instance, kcHandler)
+	if err != nil {
+		return cm, FailedConfigMapUpdateStep(kcKey.Name, err)
+	}
+	return cm, step
 }
 
 func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, instance *nropv1.NUMAResourcesOperator, kcHandler *kubeletConfigHandler) (*corev1.ConfigMap, error) {
@@ -244,17 +249,17 @@ func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, kubeletConf
 	return rendered, nil
 }
 
-func (r *KubeletConfigReconciler) makeKCHandlerForPlatform(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*kubeletConfigHandler, error) {
+func (r *KubeletConfigReconciler) makeKCHandlerForPlatform(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*kubeletConfigHandler, intreconcile.Step) {
 	switch r.Platform {
 	case platform.OpenShift:
 		mcoKc := &mcov1.KubeletConfig{}
 		if err := r.Client.Get(ctx, kcKey, mcoKc); err != nil {
-			return nil, err
+			return nil, FailedConfigMapUpdateStep(kcKey.Name, err)
 		}
 
 		mcps, err := machineconfigpools.GetListByNodeGroupsV1(ctx, r.Client, instance.Spec.NodeGroups)
 		if err != nil {
-			return nil, err
+			return nil, FailedConfigMapUpdateStep(kcKey.Name, err)
 		}
 
 		mcp, err := machineconfigpools.FindBySelector(mcps, mcoKc.Spec.MachineConfigPoolSelector)
@@ -262,12 +267,9 @@ func (r *KubeletConfigReconciler) makeKCHandlerForPlatform(ctx context.Context, 
 			klog.ErrorS(err, "cannot find a matching mcp for MCO KubeletConfig", "name", kcKey.Name)
 			var notFound *machineconfigpools.NotFound
 			if errors.As(err, &notFound) {
-				return nil, &InvalidKubeletConfig{
-					ObjectName: kcKey.Name,
-					Err:        notFound,
-				}
+				return nil, intreconcile.StepNormalSkip(fmt.Errorf("%s: %v", kcKey, notFound))
 			}
-			return nil, err
+			return nil, FailedConfigMapUpdateStep(kcKey.Name, err)
 		}
 
 		klog.V(3).InfoS("matched MCP to MCO KubeletConfig", "kubeletconfig name", kcKey.Name, "MCP name", mcp.Name)
@@ -275,32 +277,78 @@ func (r *KubeletConfigReconciler) makeKCHandlerForPlatform(ctx context.Context, 
 		// nothing we care about, and we can't do much anyway
 		if mcoKc.Spec.KubeletConfig == nil {
 			klog.InfoS("detected KubeletConfig with empty payload, ignoring", "name", kcKey.Name)
-			return nil, &InvalidKubeletConfig{ObjectName: kcKey.Name}
+			return nil, intreconcile.StepNormalSkip(fmt.Errorf("Invalid KubeletConfig %s", kcKey.Name))
 		}
+
+		if mcp.Spec.Paused {
+			klog.InfoS("detected paused MCP", "name", mcp.Name)
+			//if the CM exists -> just skip;
+			//if the CM does not exist -> create it based on the current active machineConfig
+
+			expectedCMName := objectnames.GetComponentName(instance.Name, mcp.Name)
+			existingCM := &corev1.ConfigMap{}
+			if err := r.Client.Get(ctx, client.ObjectKey{Namespace: r.Namespace, Name: expectedCMName}, existingCM); err != nil {
+				if apierrors.IsNotFound(err) {
+					currentConfigName := mcp.Status.Configuration.Name
+					currentConfigObj := &mcov1.MachineConfig{}
+					if err := r.Client.Get(ctx, client.ObjectKey{Name: currentConfigName}, currentConfigObj); err != nil {
+						klog.ErrorS(err, "cannot find the current machineConfig", "name", currentConfigName)
+						return nil, stepNormalSkipForPausedupdates("failed to find the current machineConfig %s: %v", currentConfigName, err)
+					}
+
+					// use local version of github.com/openshift/machine-config-operator/pkg/controller/common.ParseAndConvertConfig
+					_, dataInBytes, err := intkubeletconfig.ParseKubeletConfigRawData(currentConfigObj.Spec.Config.Raw)
+					if err != nil {
+						klog.ErrorS(err, "cannot parse the current machineConfig", "name", currentConfigName)
+						return nil, stepNormalSkipForPausedupdates("failed to parse the current machineConfig %s: %v", currentConfigName, err)
+					}
+
+					decodeKc, err := intkubeletconfig.DecodeKubeletConfigurationFromData(dataInBytes)
+					if err != nil {
+						klog.ErrorS(err, "cannot decode the current KubeletConfig data from MachineConfig", "name", currentConfigName)
+						return nil, stepNormalSkipForPausedupdates("failed to decode the current KubeletConfig data from MachineConfig %s: %v", currentConfigName, err)
+					}
+
+					successStepWithRetry := intreconcile.StepNormalSucess(fmt.Sprintf("Created ConfigMap based on the current machineConfig for paused MCP %s", mcp.Name))
+					successStepWithRetry.Result = ctrl.Result{Requeue: true, RequeueAfter: MachineConfigPoolPausedRetryPeriod}
+					return &kubeletConfigHandler{
+						ownerObject: existingCM,
+						mcoKc:       decodeKc,
+						poolName:    mcp.Name,
+						setCtrlRef:  controllerutil.SetControllerReference,
+					}, successStepWithRetry
+				}
+			}
+
+			step := intreconcile.StepNormalSkip(fmt.Errorf("MachineConfigPool of KubeletConfig %s is paused", kcKey.Name))
+			step.Result = ctrl.Result{Requeue: true, RequeueAfter: MachineConfigPoolPausedRetryPeriod}
+			return nil, step
+		}
+
 		return &kubeletConfigHandler{
 			ownerObject: mcoKc,
 			mcoKc:       mcoKc,
 			poolName:    mcp.Name,
 			setCtrlRef:  controllerutil.SetControllerReference,
-		}, nil
+		}, intreconcile.StepNormalSucess("")
 
 	case platform.HyperShift:
 		cmKc := &corev1.ConfigMap{}
 		if err := r.Client.Get(ctx, kcKey, cmKc); err != nil {
-			return nil, err
+			return nil, FailedConfigMapUpdateStep(kcKey.Name, err)
 		}
 
 		nodePoolName := cmKc.Labels[HyperShiftNodePoolLabel]
 		kcData := cmKc.Data[HyperShiftConfigMapConfigKey]
 		mcoKc, err := kubeletconfig.DecodeFromData([]byte(kcData), r.Scheme)
 		if err != nil {
-			return nil, err
+			return nil, FailedConfigMapUpdateStep(kcKey.Name, err)
 		}
 
 		// nothing we care about, and we can't do much anyway
 		if mcoKc.Spec.KubeletConfig == nil {
 			klog.InfoS("detected KubeletConfig with empty payload, ignoring", "name", kcKey.Name)
-			return nil, &InvalidKubeletConfig{ObjectName: kcKey.Name}
+			return nil, intreconcile.StepNormalSkip(fmt.Errorf("Invalid KubeletConfig %s", kcKey.Name))
 		}
 		return &kubeletConfigHandler{
 			ownerObject: cmKc,
@@ -312,9 +360,19 @@ func (r *KubeletConfigReconciler) makeKCHandlerForPlatform(ctx context.Context, 
 			setCtrlRef: func(owner, controlled metav1.Object, scheme *runtime.Scheme, opts ...controllerutil.OwnerReferenceOption) error {
 				return nil
 			},
-		}, nil
+		}, intreconcile.StepNormalSucess("")
 	}
-	return nil, fmt.Errorf("unsupported platform: %s", r.Platform)
+	return nil, FailedConfigMapUpdateStep(kcKey.Name, fmt.Errorf("unsupported platform: %s", r.Platform))
+}
+
+func stepNormalSkipForPausedupdates(s string, args ...any) intreconcile.Step {
+	step := intreconcile.StepNormalSkip(fmt.Errorf(s, args...))
+	step.Result = ctrl.Result{Requeue: true, RequeueAfter: MachineConfigPoolPausedRetryPeriod}
+	return step
+}
+
+func FailedConfigMapUpdateStep(objName string, err error) intreconcile.Step {
+	return intreconcile.StepWarning(fmt.Errorf("Failed to update RTE config from kubelet config %s: %v", objName, err))
 }
 
 func (r *KubeletConfigReconciler) deleteConfigMap(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*corev1.ConfigMap, bool, error) {
