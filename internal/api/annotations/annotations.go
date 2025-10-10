@@ -19,10 +19,22 @@ package annotations
 const (
 	PauseReconciliationAnnotation        = "config.numa-operator.openshift.io/pause-reconciliation"
 	PauseReconciliationAnnotationEnabled = "enabled"
+
+	// introduced in: 4.20
+	// remove in: 4.22 (tentative)
+	SchedulerQOSRequestAnnotation = "config.numa-operator.openshift.io/scheduler-qos-request"
+	SchedulerQOSRequestBurstable  = "burstable"
 )
 
 func IsPauseReconciliationEnabled(annot map[string]string) bool {
 	if v, ok := annot[PauseReconciliationAnnotation]; ok && v == PauseReconciliationAnnotationEnabled {
+		return true
+	}
+	return false
+}
+
+func IsSchedulerQOSRequestBurstable(annot map[string]string) bool {
+	if v, ok := annot[SchedulerQOSRequestAnnotation]; ok && v == SchedulerQOSRequestBurstable {
 		return true
 	}
 	return false

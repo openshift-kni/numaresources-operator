@@ -222,7 +222,11 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 
 	// node-critical so the pod won't be preempted by pods having the most critical priority class
 	r.SchedulerManifests.Deployment.Spec.Template.Spec.PriorityClassName = schedulerPriorityClassName
-
+	if err := schedupdate.SchedulerResourcesRequest(r.SchedulerManifests.Deployment, instance); err != nil {
+		// NOT CRITICAL! should never happen. Trust the existing manifests and move on
+		// TODO: this becomes critical once we remove the defaults from the manifests
+		klog.ErrorS(err, "failed to enforce the scheduler resources, continuing with manifests defaults")
+	}
 	schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec)
 
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
