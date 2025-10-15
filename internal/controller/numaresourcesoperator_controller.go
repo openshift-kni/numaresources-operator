@@ -521,11 +521,13 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		}
 	}
 
-	dsPoolPairs := []poolDaemonSet{}
+	rteupdate.DaemonSetRolloutSettings(r.RTEManifests.Core.DaemonSet)
 	err = rteupdate.DaemonSetAffinitySettings(r.RTEManifests.Core.DaemonSet, r.RTEManifests.Core.DaemonSet.Spec.Template.Labels)
 	if err != nil {
 		klog.ErrorS(err, "failed to update RTE affinity settings")
 	}
+
+	dsPoolPairs := []poolDaemonSet{}
 
 	// using a slice of poolDaemonSet instead of a map because Go maps assignment order is not consistent and non-deterministic
 	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.Core.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)

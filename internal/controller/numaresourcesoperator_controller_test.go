@@ -20,6 +20,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	igntypes "github.com/coreos/ignition/v2/config/v3_2/types"
@@ -294,7 +296,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(ds.Spec.Template.Spec.PriorityClassName).To(Equal(nrosched.SchedulerPriorityClassName))
 				})
 
-				It("RTE Daeamonset should have PodAntiAffinity", func() {
+				It("should have PodAntiAffinity for RTE Daemonset", func() {
 					dsKey := client.ObjectKey{
 						Name:      objectnames.GetComponentName(nro.Name, pn1),
 						Namespace: testNamespace,
@@ -317,6 +319,19 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(ds.Spec.Template.Spec.Affinity).ToNot(BeNil())
 					Expect(ds.Spec.Template.Spec.Affinity.PodAntiAffinity).ToNot(BeNil())
 					Expect(*ds.Spec.Template.Spec.Affinity.PodAntiAffinity).To(Equal(expected))
+				})
+
+				It("should have a update strategy with MaxUnavailable set", func() {
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn1),
+						Namespace: testNamespace,
+					}
+					var ds appsv1.DaemonSet
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, &ds)).To(Succeed())
+
+					Expect(ds.Spec.UpdateStrategy.Type).To(Equal(appsv1.RollingUpdateDaemonSetStrategyType))
+					Expect(ds.Spec.UpdateStrategy.RollingUpdate).ToNot(BeNil())
+					Expect(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable.String()).To(BeStringPercentageAtLeast(10))
 				})
 
 				It("should update node group statuses with the updated configuration", func() {
@@ -2314,6 +2329,20 @@ func ensureMCPIsReady(mcp *machineconfigv1.MachineConfigPool, nroName string) {
 			Status: corev1.ConditionTrue,
 		},
 	}
+}
+
+func BeStringPercentageAtLeast(amount int) gomegatypes.GomegaMatcher {
+	return gcustom.MakeMatcher(func(val string) (bool, error) {
+		if !strings.HasSuffix(val, "%") {
+			return false, fmt.Errorf("not a percentage: %q", val)
+		}
+		val = strings.TrimSuffix(val, "%")
+		perc, err := strconv.Atoi(val)
+		if err != nil {
+			return false, fmt.Errorf("not a percentage: %q: %w", val, err)
+		}
+		return perc >= amount, nil
+	}).WithTemplate("Percentage expressed as string should be greater than {{.Data}}").WithTemplateData(amount)
 }
 
 func CauseRequeue() gomegatypes.GomegaMatcher {
