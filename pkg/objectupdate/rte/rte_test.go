@@ -17,6 +17,7 @@ limitations under the License.
 package rte
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -417,4 +418,23 @@ func TestDaemonSetAffinitySettings(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDaemonSetRolloutSettings(t *testing.T) {
+	ds := testDs.DeepCopy()
+	DaemonSetRolloutSettings(ds)
+
+	updateStrategy := toJSON(ds.Spec.UpdateStrategy)
+	expectedStrategy := `{"type":"RollingUpdate","rollingUpdate":{"maxUnavailable":"10%"}}`
+	if updateStrategy != expectedStrategy {
+		t.Errorf("unexpected json strategy: %q", updateStrategy)
+	}
+}
+
+func toJSON(obj any) string {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return "<ERROR>"
+	}
+	return string(data)
 }
