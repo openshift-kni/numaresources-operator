@@ -272,4 +272,90 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 		Entry("OpenShift Platform", NewFakeKubeletConfigReconciler, platform.OpenShift),
 		Entry("HyperShift Platform", NewFakeKubeletConfigReconcilerForHyperShift, platform.HyperShift),
 	)
+
+	Context("kubeletconfig updates with paused MCPs", func() {
+		var nro *nropv1.NUMAResourcesOperator
+		var mcp1, mcpPaused *machineconfigv1.MachineConfigPool
+		var mcoKC1, mcoKCPaused *machineconfigv1.KubeletConfig
+		var label1 map[string]string
+		var kc1Key, kc2Key client.ObjectKey
+		var poolName1, poolName2 string
+		cmKc1 := &corev1.ConfigMap{}
+		var reconciler *KubeletConfigReconciler
+		var err error
+
+		BeforeEach(func() {
+			label1 = map[string]string{
+				"test1": "test1",
+			}
+			mcp1 = testobjs.NewMachineConfigPool("test1", label1, &metav1.LabelSelector{MatchLabels: label1}, &metav1.LabelSelector{MatchLabels: label1})
+			poolName1 = mcp1.Name
+			kubeletConfig := &kubeletconfigv1beta1.KubeletConfiguration{}
+			mcoKC1 = testobjs.NewKubeletConfig(poolName1, label1, mcp1.Spec.MachineConfigSelector, kubeletConfig)
+			kc1Key = client.ObjectKeyFromObject(mcoKC1)
+
+			label2 := map[string]string{
+				"test2": "test2",
+			}
+			mcpPaused = testobjs.NewMachineConfigPool("test2", label2, &metav1.LabelSelector{MatchLabels: label2}, &metav1.LabelSelector{MatchLabels: label2})
+			mcpPaused.Spec.Paused = true
+			poolName2 = mcpPaused.Name
+			kubeletConfigPaused := &kubeletconfigv1beta1.KubeletConfiguration{}
+			mcoKCPaused = testobjs.NewKubeletConfig(poolName2, label2, mcpPaused.Spec.MachineConfigSelector, kubeletConfigPaused)
+			kc2Key = client.ObjectKeyFromObject(mcoKCPaused)
+
+			ng1 := nropv1.NodeGroup{
+				PoolName: &poolName1,
+			}
+			ng2 := nropv1.NodeGroup{
+				PoolName: &poolName2,
+			}
+			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1, ng2)
+
+			reconciler, err = NewFakeKubeletConfigReconciler(nro, mcp1, mcoKC1, cmKc1, mcpPaused, mcoKCPaused) //TODO remove cmKc1
+			Expect(err).ToNot(HaveOccurred())
+		})
+		It("should create configmap for active MCP", func() {
+			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: kc1Key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(reconcile.Result{}))
+			cm := &corev1.ConfigMap{}
+			key := client.ObjectKey{
+				Namespace: testNamespace,
+				Name:      objectnames.GetComponentName(nro.Name, poolName1),
+			}
+			Expect(reconciler.Client.Get(context.TODO(), key, cm)).To(Succeed())
+		})
+
+		It("should not create configmap for paused MCP, then create it when un-paused", func() {
+			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: kc2Key})
+			Expect(err).ToNot(HaveOccurred())
+
+			fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
+			Expect(ok).To(BeTrue())
+			event := <-fakeRecorder.Events
+			Expect(event).To(ContainSubstring("ProcessSkip"))
+			Expect(event).To(ContainSubstring("is paused"))
+			Expect(result).To(Equal(reconcile.Result{RequeueAfter: MachineConfigPoolPausedRetryPeriod}))
+
+			cm := &corev1.ConfigMap{}
+			key := client.ObjectKey{
+				Namespace: testNamespace,
+				Name:      objectnames.GetComponentName(nro.Name, poolName2),
+			}
+			Expect(reconciler.Client.Get(context.TODO(), key, cm)).To(HaveOccurred())
+
+			mcpPaused.Spec.Paused = false
+			Expect(reconciler.Client.Update(context.TODO(), mcpPaused)).To(Succeed())
+
+			result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: kc2Key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(reconcile.Result{}))
+			Expect(reconciler.Client.Get(context.TODO(), key, cm)).To(Succeed())
+			event = <-fakeRecorder.Events
+			Expect(event).To(ContainSubstring("ProcessOK"))
+			Expect(event).To(ContainSubstring(mcoKCPaused.Name))
+		})
+	})
+
 })
