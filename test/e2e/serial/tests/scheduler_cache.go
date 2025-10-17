@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -430,9 +431,9 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				// this is a slight abuse. We want to wait for hostsRequired < desiredPods to be running. Other pod(s) must be pending.
 				// So we wait a bit too much unnecessarily, but wetake this chance to ensure the pod(s) which are supposed to be pending
 				// stay pending at least up until timeout
-				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodsAllRunning(context.TODO(), testPods)
-				Expect(updatedPods).To(HaveLen(hostsRequired))
-				Expect(failedPods).To(HaveLen(expectedPending))
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodsAllRunning(ctx, testPods)
+				Expect(updatedPods).To(HaveLen(hostsRequired), describePods(updatedPods...))
+				Expect(failedPods).To(HaveLen(expectedPending), describePods(failedPods...))
 				Expect(len(updatedPods) + len(failedPods)).To(Equal(desiredPods))
 
 				var usedNodes []string
@@ -458,7 +459,6 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 			})
 
 			It("should unblock non-fitting pod in pending state when resources are freed (pod deleted)", func() {
-
 				hostsRequired := 2
 				NUMAZonesRequired := 2
 				desiredPods := 3
@@ -551,8 +551,8 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				// So we wait a bit too much unnecessarily, but wetake this chance to ensure the pod(s) which are supposed to be pending
 				// stay pending at least up until timeout
 				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodsAllRunning(context.TODO(), testPods)
-				Expect(updatedPods).To(HaveLen(hostsRequired))
-				Expect(failedPods).To(HaveLen(expectedPending))
+				Expect(updatedPods).To(HaveLen(hostsRequired), describePods(updatedPods...))
+				Expect(failedPods).To(HaveLen(expectedPending), describePods(failedPods...))
 
 				var usedNodes []string
 				for _, updatedPod := range updatedPods {
@@ -599,12 +599,28 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				// NRT updater, resync loop, scheduler retry loop.
 				failedPods, updatedPods = wait.With(fxt.Client).Timeout(5*time.Minute).ForPodsAllRunning(context.TODO(), expectedRunningPods)
 				dumpFailedPodInfo(fxt, failedPods)
-				Expect(updatedPods).To(HaveLen(hostsRequired))
+				Expect(updatedPods).To(HaveLen(hostsRequired), describePods(updatedPods...))
 				Expect(failedPods).To(BeEmpty())
 			})
 		})
 	})
 })
+
+func describePods(pods ...*corev1.Pod) string {
+	if len(pods) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	for _, pod := range pods {
+		fmt.Fprintf(&sb, ", pod %s (uid=%s) status=%s", klog.KObj(pod), pod.UID, describePodStatus(pod.Status))
+	}
+	return sb.String()[2:]
+}
+
+func describePodStatus(pst corev1.PodStatus) string {
+	cntSt := toJSON(pst.ContainerStatuses) // keep this last
+	return fmt.Sprintf("<qos=%s phase=%s reason=%s containerStatuses=%s>", pst.QOSClass, pst.Phase, pst.Reason, cntSt)
+}
 
 func dumpFailedPodInfo(fxt *e2efixture.Fixture, failedPods []*corev1.Pod) {
 	if len(failedPods) == 0 {
