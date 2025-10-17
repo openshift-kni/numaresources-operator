@@ -198,7 +198,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			e2efixture.MustSettleNRT(fxt)
 
 			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
-			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
+			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 		})
@@ -233,7 +233,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			e2efixture.MustSettleNRT(fxt)
 
 			for _, pod := range pods {
-				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
+				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
@@ -273,7 +273,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			e2efixture.MustSettleNRT(fxt)
 
 			for _, pod := range pods {
-				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
+				isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
@@ -310,7 +310,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			for _, pod := range pods {
 				Eventually(func(g Gomega) {
-					isFailed, err := nrosched.CheckPODKubeletRejectWithTopologyAffinityError(fxt.K8sClient, pod.Namespace, pod.Name)
+					isFailed, err := nrosched.CheckPODKubeletRejectWithTopologyAffinityError(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name)
 					if err != nil {
 						_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 					}
@@ -423,7 +423,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			for _, pod := range pods {
 				if pod.Spec.NodeName == targetNodeName {
 					By(fmt.Sprintf("verify events for pod %s/%s node: %q", pod.Namespace, pod.Name, pod.Spec.NodeName))
-					scheduledWithTAS, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+					scheduledWithTAS, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 					if err != nil {
 						_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 					}
@@ -434,7 +434,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					Expect(err).ToNot(HaveOccurred(), "unable to get pod %s/%s to be Running after %v", pod.Namespace, pod.Name, podRunningTimeout)
 
 				} else {
-					isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
+					isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
 					if err != nil {
 						_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 					}
@@ -592,7 +592,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled", serialconfig.Config.SchedulerName))
-			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
+			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
 			Expect(err).ToNot(HaveOccurred())
 			if !isFailed {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
@@ -715,7 +715,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			var succeededPods int
 			for _, pod := range pods {
-				isFailed, err := nrosched.CheckPODSchedulingFailed(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
+				isFailed, err := nrosched.CheckPODSchedulingFailed(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}

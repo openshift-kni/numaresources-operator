@@ -257,7 +257,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 
 				for _, pod := range pods {
 					Expect(pod.Spec.NodeName).To(Equal(targetNodeName))
-					schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
+					schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 

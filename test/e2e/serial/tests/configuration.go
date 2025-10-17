@@ -303,7 +303,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}
 			Expect(err).ToNot(HaveOccurred())
 
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
+			schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
 		})
@@ -659,7 +659,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(err).ToNot(HaveOccurred())
 
 			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, testPod.Namespace, testPod.Name, schedulerName)
+			schedOK, err := nrosched.CheckPODWasScheduledWith(ctx, fxt.K8sClient, testPod.Namespace, testPod.Name, schedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", testPod.Namespace, testPod.Name, schedulerName)
 
@@ -944,7 +944,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			schedulerName = nroSchedObj.Status.SchedulerName
 			Expect(schedulerName).ToNot(BeEmpty(), "cannot autodetect the TAS scheduler name from the cluster")
 
-			isFailed, err := nrosched.CheckPodSchedulingFailedWithMsg(fxt.K8sClient, pendingPod.Namespace, pendingPod.Name, schedulerName, fmt.Sprintf("cannot align %s", kcObj.TopologyManagerScope))
+			isFailed, err := nrosched.CheckPodSchedulingFailedWithMsg(ctx, fxt.K8sClient, pendingPod.Namespace, pendingPod.Name, schedulerName, fmt.Sprintf("cannot align %s", kcObj.TopologyManagerScope))
 			Expect(err).ToNot(HaveOccurred())
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pendingPod.Namespace, pendingPod.Name, schedulerName)
 		})
