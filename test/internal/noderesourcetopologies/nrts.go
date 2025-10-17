@@ -181,14 +181,16 @@ func CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha2.NodeRe
 func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha2.NodeResourceTopology, required corev1.ResourceList, podQoS corev1.PodQOSClass) (string, error) {
 	// NRTs do not reflect host-level resources topology thus drop them when verifying the consumed ones
 	filteredRes := DropHostLevelResources(required)
-	nodeResInitialInfo, err := accumulateNodeAvailableResources(nrtInitial, "initial")
+	nodeResInitialInfo, err := accumulateNodeAvailableResources(nrtInitial)
 	if err != nil {
 		return "", err
 	}
-	nodeResUpdatedInfo, err := accumulateNodeAvailableResources(nrtUpdated, "updated")
+	klog.Infof("resourceInfo available initial: %s", e2enrt.ResourceInfoListToString(nodeResInitialInfo))
+	nodeResUpdatedInfo, err := accumulateNodeAvailableResources(nrtUpdated)
 	if err != nil {
 		return "", err
 	}
+	klog.Infof("resourceInfo available updated: %s", e2enrt.ResourceInfoListToString(nodeResUpdatedInfo))
 	ok, err := checkConsumedResourcesAtLeast(nodeResInitialInfo, nodeResUpdatedInfo, filteredRes, podQoS)
 	if err != nil {
 		klog.Errorf("error checking node %q: %v", nrtInitial.Name, err)
@@ -201,7 +203,7 @@ func CheckNodeConsumedResourcesAtLeast(nrtInitial, nrtUpdated nrtv1alpha2.NodeRe
 	return "", nil
 }
 
-func accumulateNodeAvailableResources(nrt nrtv1alpha2.NodeResourceTopology, reason string) ([]nrtv1alpha2.ResourceInfo, error) {
+func accumulateNodeAvailableResources(nrt nrtv1alpha2.NodeResourceTopology) ([]nrtv1alpha2.ResourceInfo, error) {
 	resList := make(corev1.ResourceList, 2)
 	for _, zone := range nrt.Zones {
 		for _, res := range zone.Resources {
@@ -226,7 +228,6 @@ func accumulateNodeAvailableResources(nrt nrtv1alpha2.NodeResourceTopology, reas
 	if len(resInfoList) < 1 {
 		return resInfoList, fmt.Errorf("failed to accumulate resources for node %q", nrt.Name)
 	}
-	klog.Infof("resInfoList available %s: %s", reason, e2enrt.ResourceInfoListToString(resInfoList))
 	return resInfoList, nil
 }
 
@@ -423,7 +424,7 @@ func FilterAnyNodeMatchingResources(nrts []nrtv1alpha2.NodeResourceTopology, req
 	// NRTs do not reflect host-level resources topology thus drop them when verifying the consumed ones
 	filteredReq := DropHostLevelResources(requests)
 	for _, nrt := range nrts {
-		nodeRes, err := accumulateNodeAvailableResources(nrt, "initial")
+		nodeRes, err := accumulateNodeAvailableResources(nrt)
 		if err != nil {
 			klog.Errorf("ERROR: %v", err)
 			continue
