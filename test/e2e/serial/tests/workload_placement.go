@@ -130,20 +130,17 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			labSel, err := labels.Parse(serialconfig.MultiNUMALabel + "=2")
 			Expect(err).ToNot(HaveOccurred())
 
-			err = padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceListPerZone(rl).Pad(timeout, e2epadder.PaddingOptions{
+			padOpts := e2epadder.PaddingOptions{
 				LabelSelector: labSel,
-			})
-			Expect(err).ToNot(HaveOccurred())
+			}
+			Expect(padder.Nodes(numOfNodeToBePadded).UntilAvailableIsResourceListPerZone(rl).Pad(timeout, padOpts)).To(Succeed())
 		})
 
 		AfterEach(func() {
 			By("unpadding the nodes after test finish")
-			err := padder.Clean()
-			Expect(err).ToNot(HaveOccurred())
-
-			for _, f := range cleanFuncs {
-				err := f()
-				Expect(err).ToNot(HaveOccurred())
+			Expect(padder.Clean()).To(Succeed())
+			for _, cleanFn := range cleanFuncs {
+				Expect(cleanFn()).To(Succeed())
 			}
 		})
 

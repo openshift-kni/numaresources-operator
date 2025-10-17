@@ -338,7 +338,6 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 			)
 
 			It("should keep non-fitting pod in pending state forever", func() {
-
 				hostsRequired := 2
 				NUMAZonesRequired := 2
 				desiredPods := 3
@@ -421,9 +420,11 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 					testPods = append(testPods, pod)
 				}
 
+				ctx := context.Background()
+
 				klog.InfoS("Creating pods each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
 				for _, testPod := range testPods {
-					err := fxt.Client.Create(context.TODO(), testPod)
+					err := fxt.Client.Create(ctx, testPod)
 					Expect(err).ToNot(HaveOccurred())
 				}
 				// note the cleanup is done automatically once the ns on which we run is deleted - the fixture takes acre
