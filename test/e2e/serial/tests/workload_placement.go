@@ -108,7 +108,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 		BeforeEach(func() {
 			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
+			e2efixture.By("filtering available nodes with at least %d NUMA zones", 2)
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
 			if len(nrtCandidates) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
@@ -122,7 +122,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			klog.InfoS("Found node with 2 NUMA zones", "count", len(nrts))
 
 			numOfNodeToBePadded := len(nrts) - 1
-
 			rl := corev1.ResourceList{
 				corev1.ResourceCPU:    resource.MustParse("1"),
 				corev1.ResourceMemory: resource.MustParse("4G"),

@@ -409,7 +409,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			numaZonesRequired := 2
 
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", numaZonesRequired))
+			e2efixture.By("filtering available nodes with at least %d NUMA zones", numaZonesRequired)
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, numaZonesRequired)
 			if len(nrtCandidates) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", numaZonesRequired, len(nrtCandidates))
@@ -426,7 +426,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(candidateNodeNames))
 			unsuitableNodeNames := e2efixture.ListNodeNames(candidateNodeNames)
 
-			By(fmt.Sprintf("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames))
+			e2efixture.By("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames)
 
 			// make targetFreeResPerNUMA the complement of the test pod's resources
 			// IOW targetFreeResPerNUMA + baseload + podResourcesRequest equals to all node's allocatable resources
@@ -459,7 +459,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			dumpNRTForNode(fxt.Client, targetNodeName, "target")
 
-			By(fmt.Sprintf("checking the resource allocation on %q as the test starts", targetNodeName))
+			e2efixture.By("checking the resource allocation on %q as the test starts", targetNodeName)
 			var nrtInitial nrtv1alpha2.NodeResourceTopology
 			err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: targetNodeName}, &nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
@@ -479,11 +479,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
+			e2efixture.By("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName)
 			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
 				"pod landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			e2efixture.By("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName)
 			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)

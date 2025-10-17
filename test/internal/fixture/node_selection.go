@@ -17,7 +17,10 @@
 package fixture
 
 import (
+	"fmt"
 	"os"
+
+	"github.com/onsi/ginkgo/v2"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -56,4 +59,8 @@ func PopNodeName(nodeNames sets.Set[string]) (string, bool) {
 
 func ListNodeNames(nodeNames sets.Set[string]) []string {
 	return sets.List[string](nodeNames)
+}
+
+func By(format string, args ...any) {
+	ginkgo.By(fmt.Sprintf(format, args...))
 }
