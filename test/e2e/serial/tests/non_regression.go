@@ -272,7 +272,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
 
 			By(fmt.Sprintf("checking the pod was assigned to a specific node and not scheduled by a scheduler %q", nonExistingSchedulerName))
-			schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, nonExistingSchedulerName)
+			schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, nonExistingSchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeFalse(), "pod %s/%s not assigned to a specific node without a scheduler %s", updatedPod.Namespace, updatedPod.Name, nonExistingSchedulerName)
 
@@ -500,7 +500,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			errorPods := 0
 			for _, pod := range pods {
-				schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
+				schedOK, err := nrosched.CheckPODWasScheduledWith(ctx, fxt.K8sClient, pod.Namespace, pod.Name, schedulerName)
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}

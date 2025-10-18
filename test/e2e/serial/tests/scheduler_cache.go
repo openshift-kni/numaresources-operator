@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -78,7 +79,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 		fxt, err = e2efixture.Setup("e2e-test-sched-cache", serialconfig.Config.NRTList)
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
-		err = fxt.Client.List(context.TODO(), &nrtList)
+		err = fxt.Client.List(context.Background(), &nrtList)
 		Expect(err).ToNot(HaveOccurred())
 	})
 
@@ -96,7 +97,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 		BeforeEach(func() {
 			nroKey = objects.NROObjectKey()
-			err := fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
+			err := fxt.Client.Get(context.Background(), nroKey, &nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 
 			if len(nroOperObj.Status.MachineConfigPools) != 1 {
@@ -120,7 +121,6 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 		When("[podburst] handling a burst of pods", Label("podburst"), func() {
 			It("should keep possibly-fitting pod in pending state until overreserve is corrected by update", func() {
-
 				hostsRequired := 2
 				NUMAZonesRequired := 2
 				desiredPodsPerNode := 2
@@ -192,21 +192,23 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				// but it's not the behavior we expect. A conforming scheduler is expected to send first two pods,
 				// wait for reconciliation, the send the missing two.
 
+				ctx := context.Background()
+
 				klog.InfoS("Creating pods each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
 				for _, testPod := range testPods {
-					err := fxt.Client.Create(context.TODO(), testPod)
+					err := fxt.Client.Create(ctx, testPod)
 					Expect(err).ToNot(HaveOccurred())
 				}
 				// note the cleanup is done automatically once the ns on which we run is deleted - the fixture takes care
 
 				// very generous timeout here. It's hard and racy to check we had 2 pods pending (expected phased scheduling),
 				// but that would be the most correct and stricter testing.
-				failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodsAllRunning(context.TODO(), testPods)
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodsAllRunning(ctx, testPods)
 				dumpFailedPodInfo(fxt, failedPods)
 				Expect(failedPods).To(BeEmpty(), "unexpected failed pods: %q", accumulatePodNamespacedNames(failedPods))
 
 				for _, updatedPod := range updatedPods {
-					schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+					schedOK, err := nrosched.CheckPODWasScheduledWith(ctx, fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 				}
@@ -287,8 +289,10 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 					// note a compute node can handle exactly N=(NUMAZonesRequired * desiredPodsPerNUMAZone) pods
 					// because how we constructed the requirements.
 
+					ctx := context.Background()
+
 					for _, testPod := range testPods {
-						err := fxt.Client.Create(context.TODO(), testPod)
+						err := fxt.Client.Create(ctx, testPod)
 						Expect(err).ToNot(HaveOccurred())
 					}
 					// note the cleanup is done automatically once the ns on which we run is deleted - the fixture takes care
@@ -296,7 +300,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 					By("waiting for the test pods to go running")
 					// even more generous timeout here. We need to tolerate more reconciliation time because of the interference
 					startTime := time.Now()
-					failedPods, updatedPods := wait.With(fxt.Client).Interval(5*time.Second).Timeout(5*time.Minute).ForPodsAllRunning(context.TODO(), testPods)
+					failedPods, updatedPods := wait.With(fxt.Client).Interval(5*time.Second).Timeout(5*time.Minute).ForPodsAllRunning(ctx, testPods)
 					dumpFailedPodInfo(fxt, failedPods)
 					elapsed := time.Since(startTime)
 					klog.InfoS("test pods (payload + interference) gone running", "elapsed", elapsed)
@@ -307,7 +311,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 						if isInterferencePod(updatedPod) {
 							continue
 						}
-						schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+						schedOK, err := nrosched.CheckPODWasScheduledWith(ctx, fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 						Expect(err).ToNot(HaveOccurred())
 						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					}
@@ -337,7 +341,6 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 			)
 
 			It("should keep non-fitting pod in pending state forever", func() {
-
 				hostsRequired := 2
 				NUMAZonesRequired := 2
 				desiredPods := 3
@@ -420,9 +423,11 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 					testPods = append(testPods, pod)
 				}
 
+				ctx := context.Background()
+
 				klog.InfoS("Creating pods each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
 				for _, testPod := range testPods {
-					err := fxt.Client.Create(context.TODO(), testPod)
+					err := fxt.Client.Create(ctx, testPod)
 					Expect(err).ToNot(HaveOccurred())
 				}
 				// note the cleanup is done automatically once the ns on which we run is deleted - the fixture takes acre
@@ -430,14 +435,14 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				// this is a slight abuse. We want to wait for hostsRequired < desiredPods to be running. Other pod(s) must be pending.
 				// So we wait a bit too much unnecessarily, but wetake this chance to ensure the pod(s) which are supposed to be pending
 				// stay pending at least up until timeout
-				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodsAllRunning(context.TODO(), testPods)
-				Expect(updatedPods).To(HaveLen(hostsRequired))
-				Expect(failedPods).To(HaveLen(expectedPending))
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodsAllRunning(ctx, testPods)
+				Expect(updatedPods).To(HaveLen(hostsRequired), describePods(updatedPods...))
+				Expect(failedPods).To(HaveLen(expectedPending), describePods(failedPods...))
 				Expect(len(updatedPods) + len(failedPods)).To(Equal(desiredPods))
 
 				var usedNodes []string
 				for _, updatedPod := range updatedPods {
-					schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+					schedOK, err := nrosched.CheckPODWasScheduledWith(ctx, fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
@@ -458,7 +463,6 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 			})
 
 			It("should unblock non-fitting pod in pending state when resources are freed (pod deleted)", func() {
-
 				hostsRequired := 2
 				NUMAZonesRequired := 2
 				desiredPods := 3
@@ -540,9 +544,11 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 					testPods = append(testPods, pod)
 				}
 
+				ctx := context.Background()
+
 				klog.InfoS("Creating pods each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
 				for _, testPod := range testPods {
-					err := fxt.Client.Create(context.TODO(), testPod)
+					err := fxt.Client.Create(ctx, testPod)
 					Expect(err).ToNot(HaveOccurred())
 				}
 				// note the cleanup is done automatically once the ns on which we run is deleted - the fixture takes acre
@@ -550,13 +556,13 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				// this is a slight abuse. We want to wait for hostsRequired < desiredPods to be running. Other pod(s) must be pending.
 				// So we wait a bit too much unnecessarily, but wetake this chance to ensure the pod(s) which are supposed to be pending
 				// stay pending at least up until timeout
-				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodsAllRunning(context.TODO(), testPods)
-				Expect(updatedPods).To(HaveLen(hostsRequired))
-				Expect(failedPods).To(HaveLen(expectedPending))
+				failedPods, updatedPods := wait.With(fxt.Client).Timeout(time.Minute).ForPodsAllRunning(ctx, testPods)
+				Expect(updatedPods).To(HaveLen(hostsRequired), describePods(updatedPods...))
+				Expect(failedPods).To(HaveLen(expectedPending), describePods(failedPods...))
 
 				var usedNodes []string
 				for _, updatedPod := range updatedPods {
-					schedOK, err := nrosched.CheckPODWasScheduledWith(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
+					schedOK, err := nrosched.CheckPODWasScheduledWith(ctx, fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
@@ -588,23 +594,39 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 				// all set, trigger the final step
 				klog.InfoS("Deleting pod", "namespace", targetPod.Namespace, "name", targetPod.Name)
-				err := fxt.Client.Delete(context.TODO(), targetPod)
+				err := fxt.Client.Delete(ctx, targetPod)
 				Expect(err).ToNot(HaveOccurred())
 				// VERY generous timeout, we expect the delete to be much faster
-				err = wait.With(fxt.Client).Timeout(5*time.Minute).ForPodDeleted(context.TODO(), targetPod.Namespace, targetPod.Name)
+				err = wait.With(fxt.Client).Timeout(5*time.Minute).ForPodDeleted(ctx, targetPod.Namespace, targetPod.Name)
 				Expect(err).ToNot(HaveOccurred())
 
 				// here we really need a quite long timeout. Still 300s is a bit of overshot (expected so).
 				// The reason to be supercareful here is the potentially long interplay between
 				// NRT updater, resync loop, scheduler retry loop.
-				failedPods, updatedPods = wait.With(fxt.Client).Timeout(5*time.Minute).ForPodsAllRunning(context.TODO(), expectedRunningPods)
+				failedPods, updatedPods = wait.With(fxt.Client).Timeout(5*time.Minute).ForPodsAllRunning(ctx, expectedRunningPods)
 				dumpFailedPodInfo(fxt, failedPods)
-				Expect(updatedPods).To(HaveLen(hostsRequired))
+				Expect(updatedPods).To(HaveLen(hostsRequired), describePods(updatedPods...))
 				Expect(failedPods).To(BeEmpty())
 			})
 		})
 	})
 })
+
+func describePods(pods ...*corev1.Pod) string {
+	if len(pods) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	for _, pod := range pods {
+		fmt.Fprintf(&sb, ", pod %s (uid=%s) status=%s", klog.KObj(pod), pod.UID, describePodStatus(pod.Status))
+	}
+	return sb.String()[2:]
+}
+
+func describePodStatus(pst corev1.PodStatus) string {
+	cntSt := toJSON(pst.ContainerStatuses) // keep this last
+	return fmt.Sprintf("<qos=%s phase=%s reason=%s containerStatuses=%s>", pst.QOSClass, pst.Phase, pst.Reason, cntSt)
+}
 
 func dumpFailedPodInfo(fxt *e2efixture.Fixture, failedPods []*corev1.Pod) {
 	if len(failedPods) == 0 {
