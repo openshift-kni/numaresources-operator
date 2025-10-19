@@ -236,7 +236,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					}
 				},
-				Entry("with non-restartable pods with guaranteed init and app containers", context.TODO(), func(podNamespace string, idx int) *corev1.Pod {
+				Entry("[test_id:83865] with non-restartable pods with guaranteed init and app containers", context.TODO(), func(podNamespace string, idx int) *corev1.Pod {
 					return &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace:    podNamespace,
@@ -278,7 +278,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						},
 					}
 				}),
-				Entry("with non-restartable pods with guaranteed init and long running app containers", context.TODO(), func(podNamespace string, idx int) *corev1.Pod {
+				Entry("[test_id:83866] with non-restartable pods with guaranteed init and long running app containers", context.TODO(), func(podNamespace string, idx int) *corev1.Pod {
 					return &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace:    podNamespace,
@@ -320,7 +320,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						},
 					}
 				}),
-				Entry("with non-restartable pods with guaranteed pod with partially terminated app containers", context.TODO(), func(podNamespace string, idx int) *corev1.Pod {
+				Entry("[test_id:83867] with non-restartable pods with guaranteed pod with partially terminated app containers", context.TODO(), func(podNamespace string, idx int) *corev1.Pod {
 					return &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace:    podNamespace,
@@ -360,7 +360,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						},
 					}
 				}),
-				Entry("with restartable pods with guaranteed pod with partially terminated app containers", context.TODO(), func(podNamespace string, idx int) *corev1.Pod {
+				Entry("[test_id:83868] with restartable pods with guaranteed pod with partially terminated app containers", context.TODO(), func(podNamespace string, idx int) *corev1.Pod {
 					return &corev1.Pod{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace:    podNamespace,
