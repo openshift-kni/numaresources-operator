@@ -34,7 +34,6 @@ import (
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
 	"github.com/openshift-kni/debug-tools/pkg/pfpstatus/record"
-	"github.com/openshift-kni/numaresources-operator/internal/mustgather"
 )
 
 //go:embed README.md
@@ -55,10 +54,6 @@ type diff struct {
 	rteLastWrite        time.Time
 	foundOnRTEOnly      []podfingerprint.NamespacedName
 	foundOnSchedOnly    []podfingerprint.NamespacedName
-}
-
-func isEmpty(a []record.RecordedStatus) bool {
-	return len(a) == 0
 }
 
 func printPrettyString(sts []diff) {
@@ -88,21 +83,26 @@ func printPrettyString(sts []diff) {
 	fmt.Println(sb.String())
 }
 
-// refineSchedListToMap filters out synced fingerprints and in case of duplicates keeps the newest
-// record based on the RecordTime. Returns a statuses map whose key is fingerprintExpected and
-// whose value is the newest record.
-func refineSchedListToMap(statuses []record.RecordedStatus) map[string]record.RecordedStatus {
+// refineListToMap filters out synced fingerprints where relevant and in case of duplicates keeps the newest
+// record based on the RecordTime. Returns a statuses map with the newest records, whose key is fingerprintExpected
+// for lists that have both fingerprints (i.e. from scheduler) and, key is FingerprintComputed otherwise.
+func refineListToMap(statuses []record.RecordedStatus) map[string]record.RecordedStatus {
 	refined := make(map[string]record.RecordedStatus, len(statuses))
 	for _, s := range statuses {
 		// we know that the last status report is the final one, but in this tool we don't
 		// care about the last one only, instead we care more to see the trend of reported
 		// pfp Statuses from the scheduler side so we skip the synced ones while continue
 		// to process the others even if it is known that they eventually synced
-		if s.FingerprintExpected == s.FingerprintComputed {
+		if s.FingerprintExpected != "" && s.FingerprintExpected == s.FingerprintComputed {
 			continue
 		}
 
-		key := s.FingerprintExpected
+		key := s.FingerprintExpected // processing statuses list from scheduler
+		if key == "" {
+			// processing statuses list from RTE
+			key = s.FingerprintComputed
+		}
+
 		if existing, ok := refined[key]; ok {
 			if s.RecordTime.Before(existing.RecordTime) {
 				continue
@@ -111,34 +111,6 @@ func refineSchedListToMap(statuses []record.RecordedStatus) map[string]record.Re
 		refined[key] = s
 	}
 	return refined
-}
-
-// refineRTEListToMap filters out duplicates and keeps the newest record based on the RecordTime.
-// Returns a statuses map whose key is fingerprintComputed and whose value is the newest record.
-func refineRTEListToMap(statuses []record.RecordedStatus) map[string]record.RecordedStatus {
-	refined := make(map[string]record.RecordedStatus, len(statuses))
-	for _, s := range statuses {
-		key := s.FingerprintComputed
-		if existing, ok := refined[key]; ok {
-			if s.RecordTime.Before(existing.RecordTime) {
-				continue
-			}
-		}
-		refined[key] = s
-	}
-	return refined
-}
-
-// getDiff gets two lists of podfingerprint.NamespacedName `a` and `b` and returns two lists of podfingerprint.NamespacedName.
-// The first list contains the elements of `a` that are not in `b`, and the second list contains the elements of `b` that are not in `a`.
-func getDiff(a []podfingerprint.NamespacedName, b []podfingerprint.NamespacedName) ([]podfingerprint.NamespacedName, []podfingerprint.NamespacedName) {
-	aSet := sets.New[podfingerprint.NamespacedName](a...)
-	bSet := sets.New[podfingerprint.NamespacedName](b...)
-
-	aOnly := aSet.Difference(bSet)
-	bOnly := bSet.Difference(aSet)
-
-	return aOnly.UnsortedList(), bOnly.UnsortedList()
 }
 
 // getDifference gets two maps of record.RecordedStatus and returns a list of differences between
@@ -162,8 +134,10 @@ func getDifference(refinedSchedStatuses map[string]record.RecordedStatus, refine
 		}
 
 		// no need to check for pod duplications, this cannot happen in real kubernetes
-
-		foundOnRTEOnly, foundOnSchedOnly := getDiff(rteStatus.Pods, schedStatus.Pods)
+		rteSet := sets.New[podfingerprint.NamespacedName](rteStatus.Pods...)
+		schedSet := sets.New[podfingerprint.NamespacedName](schedStatus.Pods...)
+		foundOnRTEOnly := rteSet.Difference(schedSet).UnsortedList()
+		foundOnSchedOnly := schedSet.Difference(rteSet).UnsortedList()
 
 		if len(foundOnRTEOnly) == 0 && len(foundOnSchedOnly) == 0 {
 			klog.InfoS("scheduler is synced with RTE",
@@ -183,34 +157,45 @@ func getDifference(refinedSchedStatuses map[string]record.RecordedStatus, refine
 			foundOnSchedOnly:    foundOnSchedOnly,
 		}
 		result = append(result, currentDiff)
-		klog.InfoS("scheduler is off-sync with RTE", "podfingerprint", key)
 	}
+
 	return result
 }
 
 // verifyPFPSync verifies if the PFP statuses from RTE and scheduler are in sync, and prints out the difference between them if any.
-func verifyPFPSync(fromRTE []record.RecordedStatus, fromSched []record.RecordedStatus) error {
-	if isEmpty(fromRTE) || isEmpty(fromSched) { // should never happen
-		return fmt.Errorf("sync check is skipped, recorded statuses are missing: RTEStatusListLength=%d, schedulerStatusListLength=%d", len(fromRTE), len(fromSched))
+func verifyPFPSync(fromRTE []record.RecordedStatus, fromSched []record.RecordedStatus) (bool, error) {
+	isFinalStatusSynced := false
+	latest := fromSched[len(fromSched)-1]
+	for _, st := range fromSched {
+		if st.RecordTime.After(latest.RecordTime) {
+			latest = st
+		}
+	}
+	if latest.FingerprintComputed == latest.FingerprintExpected {
+		isFinalStatusSynced = true
 	}
 
-	//make map from sched where the expectedPFP is the key, makes sure no duplication and uses the freshest report
-	refinedSchedStatuses := refineSchedListToMap(fromSched)
+	if len(fromRTE) == 0 || len(fromSched) == 0 { // should never happen
+		return isFinalStatusSynced, fmt.Errorf("sync check is skipped, recorded statuses are missing: RTEStatusListLength=%d, schedulerStatusListLength=%d", len(fromRTE), len(fromSched))
+	}
+
+	// make map from sched where the expectedPFP is the key, makes sure no duplication and uses the freshest report
+	refinedSchedStatuses := refineListToMap(fromSched)
 	if len(refinedSchedStatuses) == 0 {
 		klog.InfoS("all scheduler PFP status trace is synced with RTE!")
-		return nil
+		return true, nil
 	}
 
-	refinedRTEStatuses := refineRTEListToMap(fromRTE)
+	refinedRTEStatuses := refineListToMap(fromRTE)
 
 	diffStatuses := getDifference(refinedSchedStatuses, refinedRTEStatuses)
 	if len(diffStatuses) == 0 {
 		// should never happen, if it happened there is likely a bug in the scheduler reporting the statuses
-		return fmt.Errorf("no differences found between pod lists of RTE and scheduler, but node is reported to be Dirty on the scheduler")
+		return isFinalStatusSynced, fmt.Errorf("no differences found between pod lists of RTE and scheduler, but node is reported to be Dirty on the scheduler")
 	}
 	printPrettyString(diffStatuses)
 
-	return nil
+	return isFinalStatusSynced, nil
 }
 
 func processFile(filePath string) ([]record.RecordedStatus, error) {
@@ -246,37 +231,90 @@ func processFile(filePath string) ([]record.RecordedStatus, error) {
 	return statusData, nil
 }
 
-func singlePairPFPSyncCheck(rteFilePath string, schedulerFilePath string) error {
+func singlePairPFPSyncCheck(rteFilePath string, schedulerFilePath string) (bool, error) {
 	rteData, err := processFile(rteFilePath)
 	if err != nil {
-		return err
+		return false, err
 	}
 	schedData, err := processFile(schedulerFilePath)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	err = verifyPFPSync(rteData, schedData)
+	return verifyPFPSync(rteData, schedData)
+}
+
+func findFiles(mustgatherDir string, suffix string) (map[string]string, error) {
+	foundDir, err := getDirPath(mustgatherDir, suffix)
 	if err != nil {
-		klog.InfoS("PFP sync finished with error", "error", err)
-		return err
+		return map[string]string{}, err
 	}
-	return nil
+
+	filesMap, err := getFilesPaths(foundDir)
+	if err != nil {
+		return map[string]string{}, err
+	}
+
+	return filesMap, nil
+}
+
+func getDirPath(mustgatherDir string, dirSuffix string) (string, error) {
+	foundPaths := []string{}
+	err := filepath.Walk(mustgatherDir, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() && strings.HasSuffix(path, dirSuffix) {
+			foundPaths = append(foundPaths, path)
+		}
+		return nil
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("failed to find directory %s: %v", dirSuffix, err)
+	}
+
+	if len(foundPaths) == 0 {
+		return "", fmt.Errorf("no directory found ending with %s", dirSuffix)
+	}
+
+	if len(foundPaths) > 1 {
+		return "", fmt.Errorf("multiple directories found ending with %s", dirSuffix)
+	}
+
+	return foundPaths[0], nil
+}
+
+func getFilesPaths(mustgatherDir string) (map[string]string, error) {
+	foundFiles := map[string]string{}
+	mustgatherDir = filepath.Clean(mustgatherDir)
+
+	content, err := os.ReadDir(mustgatherDir)
+	if err != nil {
+		return foundFiles, fmt.Errorf("failed to read directory: %v", err)
+	}
+	for _, content := range content {
+		if content.IsDir() {
+			continue
+		}
+
+		foundFiles[content.Name()] = filepath.Join(mustgatherDir, content.Name())
+	}
+
+	return foundFiles, nil
 }
 
 func mustGatherPFPSyncCheck(mustGatherDirPath string) error {
-	schedNodeFiles, err := mustgather.FindFilesUnderDir(mustGatherDirPath, "/pfpstatus/scheduler")
+	schedNodeFiles, err := findFiles(mustGatherDirPath, "/pfpstatus/scheduler")
 	if err != nil {
 		klog.InfoS("failed to find scheduler node files; skipping sync check", "error", err)
 		return nil
 	}
 
-	rteNodeFiles, err := mustgather.FindFilesUnderDir(mustGatherDirPath, "/pfpstatus/resource-topology-exporters")
+	rteNodeFiles, err := findFiles(mustGatherDirPath, "/pfpstatus/resource-topology-exporters")
 	if err != nil {
 		klog.InfoS("failed to find RTE node files; skipping sync check", "error", err)
 		return nil
 	}
 
+	finalSyncStatuses := make(map[string]bool, len(schedNodeFiles))
 	for node, schedFilePath := range schedNodeFiles {
 		rteFilePath, ok := rteNodeFiles[node]
 		if !ok {
@@ -287,14 +325,29 @@ func mustGatherPFPSyncCheck(mustGatherDirPath string) error {
 		fmt.Println("******************************************************************************************")
 		fmt.Println("Processing node: ", node)
 		fmt.Println("******************************************************************************************")
-		// call verifyPFPSync with the two files
-		err := singlePairPFPSyncCheck(rteFilePath, schedFilePath)
+		isFinalStatusSynced, err := singlePairPFPSyncCheck(rteFilePath, schedFilePath)
 		if err != nil {
-			klog.InfoS("PFP sync finished with error", "error", err)
 			return err
 		}
+		finalSyncStatuses[node] = isFinalStatusSynced
 	}
+
+	printFinalStatuses(finalSyncStatuses)
+
 	return nil
+}
+
+func printFinalStatuses(statuses map[string]bool) {
+	var sb strings.Builder
+	sb.WriteString("***FINAL PFP SYNC STATUSES***\n")
+	for nname, st := range statuses {
+		val := "synced!"
+		if !st {
+			val = "desynced!"
+		}
+		sb.WriteString(fmt.Sprintf("%s: %s\n", nname, val))
+	}
+	fmt.Println(sb.String())
 }
 
 func logProgramProperUsage(programName string) {
@@ -335,11 +388,12 @@ func main() {
 	}
 
 	if *mustGatherDirPath == "" {
-		err := singlePairPFPSyncCheck(*rteFilePath, *schedulerFilePath)
+		finalStatus, err := singlePairPFPSyncCheck(*rteFilePath, *schedulerFilePath)
 		if err != nil {
 			klog.InfoS("PFP sync finished with error", "error", err)
 			os.Exit(exitCodeErrSyncCheck)
 		}
+		printFinalStatuses(map[string]bool{"node": finalStatus})
 		os.Exit(exitCodeSuccess)
 	}
 
