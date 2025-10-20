@@ -213,7 +213,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				By("Waiting for padding pods to be ready")
-				failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
+				failedPodIds := e2efixture.WaitForPaddingPodsRunning(context.Background(), fxt, paddingPods)
 				Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 				By(fmt.Sprintf("checking the resource allocation on %q as the test starts", targetNodeName))
@@ -370,7 +370,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				By("Waiting for padding pods on non-target node to be ready")
-				failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
+				failedPodIds := e2efixture.WaitForPaddingPodsRunning(context.Background(), fxt, paddingPods)
 				Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 				By("padding a NUMA node on the target node")
@@ -398,7 +398,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				}
 
 				By("Waiting for padding pod on target node to be ready")
-				failedPodIds = e2efixture.WaitForPaddingPodsRunning(fxt, paddingPodsTargetNode)
+				failedPodIds = e2efixture.WaitForPaddingPodsRunning(context.Background(), fxt, paddingPodsTargetNode)
 				Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 				By("checking the resource allocation as the test starts")

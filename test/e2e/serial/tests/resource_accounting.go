@@ -160,7 +160,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			}
 
 			By("Waiting for padding pods to be ready")
-			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
+			failedPodIds := e2efixture.WaitForPaddingPodsRunning(context.Background(), fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			By("waiting for the NRT data to settle")
@@ -196,7 +196,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			}
 
 			By("Waiting for padding pods to be ready")
-			failedPodIds = e2efixture.WaitForPaddingPodsRunning(fxt, targetPaddingPods)
+			failedPodIds = e2efixture.WaitForPaddingPodsRunning(context.Background(), fxt, targetPaddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			By("waiting for the NRT data to settle")
@@ -226,7 +226,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			allPaddingPods = append(allPaddingPods, targetPaddingPods...)
 
 			By("Waiting for padding pods to be ready")
-			failedPodIds = e2efixture.WaitForPaddingPodsRunning(fxt, allPaddingPods)
+			failedPodIds = e2efixture.WaitForPaddingPodsRunning(context.Background(), fxt, allPaddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			By("waiting for the NRT data to settle")
@@ -394,7 +394,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			}
 
 			By("Waiting for padding pods to be ready")
-			failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
+			failedPodIds := e2efixture.WaitForPaddingPodsRunning(context.Background(), fxt, paddingPods)
 			Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 			By("waiting for the NRT data to settle")

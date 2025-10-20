@@ -314,7 +314,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				}
 
 				By("wait for padding pods to be running")
-				failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
+				failedPodIds := e2efixture.WaitForPaddingPodsRunning(ctx, fxt, paddingPods)
 				Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 				// no need to wait for NRT to settle because padding pods are BE

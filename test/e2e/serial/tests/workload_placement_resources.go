@@ -216,7 +216,7 @@ func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nrtCandidates []nr
 	paddingPods = append(paddingPods, createPaddingPod(fxt, ctx, "padding-tgt-1", targetNodeName, targetNrtInfo.Zones[1], requiredResources))
 
 	By("Waiting for padding pods to be ready")
-	failedPodIds := e2efixture.WaitForPaddingPodsRunning(fxt, paddingPods)
+	failedPodIds := e2efixture.WaitForPaddingPodsRunning(ctx, fxt, paddingPods)
 	Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
 	By("waiting for the NRT data to settle")
