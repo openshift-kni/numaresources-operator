@@ -72,16 +72,16 @@ type tmScopeFuncs struct {
 
 type tmScopeFuncsHandler map[string]tmScopeFuncs
 
+var (
+	singleNUMAContainerScopeFuncs = newContainerScopeSingleNUMANodeFuncs()
+	singleNUMAPodScopeFuncs       = newPodScopeSingleNUMANodeFuncs()
+)
+
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload placement considering TM policy", Serial, Label("disruptive", "scheduler"), Label("feature:wlplacement", "feature:tmpol"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
-	var singleNUMAContainerScopeFuncs tmScopeFuncs
-	var singleNUMAPodScopeFuncs tmScopeFuncs
 
 	BeforeEach(func() {
-		singleNUMAContainerScopeFuncs = newContainerScopeSingleNUMANodeFuncs()
-		singleNUMAPodScopeFuncs = newPodScopeSingleNUMANodeFuncs()
-
 		Expect(serialconfig.Config).ToNot(BeNil())
 		Expect(serialconfig.Config.Ready()).To(BeTrue(), "NUMA fixture initialization failed")
 
