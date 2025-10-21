@@ -24,6 +24,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )
 
 func NewTestDaemonset(podLabels map[string]string, nodeSelector map[string]string, namespace, name, image string, command, args []string) *appsv1.DaemonSet {
@@ -68,6 +70,18 @@ func NewTestDaemonsetWithPodSpec(podLabels map[string]string, nodeSelector map[s
 		ds.Spec.Template.Spec.NodeSelector = nodeSelector
 	}
 	return ds
+}
+
+func GetDaemonSetsByNamespacedName(cli client.Client, ctx context.Context, nnames ...nropv1.NamespacedName) ([]*appsv1.DaemonSet, error) {
+	var dss []*appsv1.DaemonSet
+	for _, nname := range nnames {
+		var ds appsv1.DaemonSet
+		if err := cli.Get(ctx, client.ObjectKey{Namespace: nname.Namespace, Name: nname.Name}, &ds); err != nil {
+			return nil, err
+		}
+		dss = append(dss, &ds)
+	}
+	return dss, nil
 }
 
 func GetDaemonSetsOwnedBy(cli client.Client, objMeta metav1.ObjectMeta) ([]*appsv1.DaemonSet, error) {
