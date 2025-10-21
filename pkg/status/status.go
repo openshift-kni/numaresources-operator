@@ -98,25 +98,26 @@ func ComputeConditions(currentConditions []metav1.Condition, condition string, r
 
 // UpdateConditionsInPlace mutates the given conditions, setting the value of the one pointed out to `condition` to the given values.
 // Differently from `ComputeConditions`, it doesn't allocate new data. Returns true if successfully mutated conditions, false otherwise
-func UpdateConditionsInPlace(conds []metav1.Condition, condition string, status metav1.ConditionStatus, reason string, message string) bool {
-	cond := FindCondition(conds, condition)
+func UpdateConditionsInPlace(conds []metav1.Condition, condition metav1.Condition, ts time.Time) bool {
+	cond := FindCondition(conds, condition.Type)
 	if cond == nil {
 		return false // should never happen
 	}
 
-	now := time.Now()
-	cond.Status = status
-	cond.Reason = reason
-	cond.Message = message
-	cond.LastTransitionTime = metav1.Time{Time: now}
+	cond.Status = condition.Status
+	cond.ObservedGeneration = condition.ObservedGeneration
+	cond.LastTransitionTime = metav1.Time{Time: ts}
+	cond.Reason = condition.Reason
+	cond.Message = condition.Message
 
-	if condition == ConditionAvailable {
+	if condition.Type == ConditionAvailable {
 		upCond := FindCondition(conds, ConditionUpgradeable)
 		if upCond == nil {
 			return false // should never happen
 		}
 		upCond.Status = cond.Status
 		upCond.LastTransitionTime = cond.LastTransitionTime
+		upCond.ObservedGeneration = cond.ObservedGeneration
 	}
 	return true
 }
@@ -227,6 +228,5 @@ func MessageFromError(err error) string {
 func resetIncomparableConditionFields(conditions []metav1.Condition) {
 	for idx := range conditions {
 		conditions[idx].LastTransitionTime = metav1.Time{}
-		conditions[idx].ObservedGeneration = 0
 	}
 }
