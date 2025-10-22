@@ -268,10 +268,10 @@ overlay_release()
 {
     echo "Overlaying relase..."
 
-    local version="4.20.0"
+    local version="4.20.1"
     local name="numaresources-operator"
     local name_version="$name.v$version"
-    local skip_range=">=4.19.0 <4.20.0"
+    local skip_range=">=4.19.0 <4.20.1"
     local replaces="numaresources-operator.v4.20.0"
     local annotations='
     features.operators.openshift.io/disconnected: "true"
@@ -332,10 +332,10 @@ overlay_release()
     yq e -i ".metadata.annotations[\"olm.skipRange\"] = \"$skip_range\"" $ARG_CSV_FILE
 
     # dont need 'replaces' for first release in a new channel (4.20.0)
-    yq e -i "del(.spec.replaces)" $ARG_CSV_FILE
+    # yq e -i "del(.spec.replaces)" $ARG_CSV_FILE
 
     # use this from 4.20.1 onwards
-    # ./yq e -i ".spec.replaces = $replaces)" $ARG_CSV_FILE
+    yq e -i ".spec.replaces = \"$replaces\"" $ARG_CSV_FILE
 
     echo "Overlaying release completed!"
 }
