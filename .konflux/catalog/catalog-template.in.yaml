@@ -12,13 +12,16 @@ entries:
   - entries:
       - name: numaresources-operator.v4.20.0
         skipRange: '>=4.19.0 <4.20.0'
-        # After 4.20.0 is released, add 4.20.1 back using the quay nudged bundle      
-        # - name: numaresources-operator.v4.20.1
-        #   replaces: numaresources-operator.v4.20.0
-        #   skipRange: '>=4.19.0 <4.20.1'
+      - name: numaresources-operator.v4.20.1
+        replaces: numaresources-operator.v4.20.0
+        skipRange: '>=4.19.0 <4.20.1'
     name: "4.20"
     package: numaresources-operator
     schema: olm.channel
-  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-20@sha256:91d6e7a8408016a1f0ed48f680cc9879f01d9d8ea87c16801007fc565b0380e7
+    # v4.20.0 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:68958183a9e33d86ca9d4d1cb1d1915952a9e34b5e8823430aeb8acf2d3566c0
+    schema: olm.bundle
+    # v4.20.1 bundle
+  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-20@sha256:68958183a9e33d86ca9d4d1cb1d1915952a9e34b5e8823430aeb8acf2d3566c0
     # The url for this last entry is updated by hack/konflux-update-catalog-template.sh automatically
     schema: olm.bundle
