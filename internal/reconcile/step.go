@@ -25,6 +25,15 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/status/conditioninfo"
 )
 
+const (
+	EventTypeNormal  = "Normal"
+	EventTypeWarning = "Warning"
+
+	EventProcessSuccess = "ProcessOK"
+	EventProcessSkip    = "ProcessSkip"
+	EventProcessFailed  = "ProcessFailed"
+)
+
 type Step struct {
 	Result        ctrl.Result
 	ConditionInfo conditioninfo.ConditionInfo
@@ -90,5 +99,37 @@ func StepFailed(err error) Step {
 		Result:        ctrl.Result{},
 		ConditionInfo: conditioninfo.DegradedFromError(err),
 		Error:         err,
+	}
+}
+
+func StepWarning(err error) Step {
+	return Step{
+		ConditionInfo: conditioninfo.ConditionInfo{
+			Type:    EventTypeWarning,
+			Message: status.MessageFromError(err),
+			Reason:  EventProcessFailed,
+		},
+		Error: err,
+	}
+}
+
+func StepNormalSkip(err error) Step {
+	return Step{
+		ConditionInfo: conditioninfo.ConditionInfo{
+			Type:    EventTypeNormal,
+			Message: status.MessageFromError(err),
+			Reason:  EventProcessSkip,
+		},
+		Error: err,
+	}
+}
+
+func StepNormalSucess(msg string) Step {
+	return Step{
+		ConditionInfo: conditioninfo.ConditionInfo{
+			Type:    EventTypeNormal,
+			Message: msg,
+			Reason:  EventProcessSuccess,
+		},
 	}
 }
