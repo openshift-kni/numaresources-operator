@@ -1,0 +1,11 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: numaresources-operator-default-deny-all
+spec:
+  podSelector:
+    matchLabels:
+      app: numaresources-operator
+  policyTypes:
+  - Ingress
+  - Egress
