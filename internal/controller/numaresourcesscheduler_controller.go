@@ -383,7 +383,7 @@ func updateDedicatedInformerCondition(conds []metav1.Condition, instance nropv1.
 	} else {
 		condition.Status = metav1.ConditionFalse
 	}
-	condition.ObservedGeneration = instance.ObjectMeta.Generation
+	condition.ObservedGeneration = instance.Generation
 	return conds
 }
 
@@ -392,7 +392,13 @@ func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, ini
 	if len(conds) == 0 {
 		conds = status.NewNUMAResourcesSchedulerBaseConditions()
 	}
-	ok := status.UpdateConditionsInPlace(conds, condition, metav1.ConditionTrue, reason, message)
+	ok := status.UpdateConditionsInPlace(conds, metav1.Condition{
+		Type:               condition,
+		Status:             metav1.ConditionTrue,
+		ObservedGeneration: sched.Generation,
+		Reason:             reason,
+		Message:            message,
+	}, time.Now())
 	if !ok {
 		klog.InfoS("fail to update condition", "conditionType", condition, "reason", reason, "message", message)
 	}

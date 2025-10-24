@@ -243,67 +243,69 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 		})
 
 		It("[test_id:54916] should be able to modify the configurable values under the NUMAResourcesScheduler CR", Label(label.Tier2, "schedrst"), Label("feature:schedrst"), func() {
+			By("getting the initial scheduler object state")
 			initialNroSchedObj := &nropv1.NUMAResourcesScheduler{}
 			nroSchedKey := objects.NROSchedObjectKey()
-			err := fxt.Client.Get(context.TODO(), nroSchedKey, initialNroSchedObj)
+			ctx := context.TODO()
+			err := fxt.Client.Get(ctx, nroSchedKey, initialNroSchedObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
 			nroSchedObj := initialNroSchedObj.DeepCopy()
 
-			By(fmt.Sprintf("modifying the NUMAResourcesScheduler SchedulerName field to %q", serialconfig.SchedulerTestName))
+			e2efixture.By("modifying the NUMAResourcesScheduler SchedulerName field to %q", serialconfig.SchedulerTestName)
 			Eventually(func(g Gomega) {
 				//updates must be done on object.Spec and active values should be fetched from object.Status
-				err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroSchedObj), nroSchedObj)
-				g.Expect(err).ToNot(HaveOccurred())
-
+				g.Expect(fxt.Client.Get(ctx, client.ObjectKeyFromObject(initialNroSchedObj), nroSchedObj)).To(Succeed())
 				nroSchedObj.Spec.SchedulerName = serialconfig.SchedulerTestName
-				err = fxt.Client.Update(context.TODO(), nroSchedObj)
-				g.Expect(err).ToNot(HaveOccurred())
+				g.Expect(fxt.Client.Update(ctx, nroSchedObj)).To(Succeed())
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-			By(fmt.Sprintf("Verify the scheduler object was updated properly with the new scheduler name %q", serialconfig.SchedulerTestName))
+			e2efixture.By("verifying the scheduler object was updated properly with the new scheduler name %q", serialconfig.SchedulerTestName)
 			updatedSchedObj := &nropv1.NUMAResourcesScheduler{}
-			Eventually(func() string {
-				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), updatedSchedObj)
-				Expect(err).ToNot(HaveOccurred())
-				return updatedSchedObj.Status.SchedulerName
-			}).WithTimeout(time.Minute).WithPolling(time.Second*15).Should(Equal(serialconfig.SchedulerTestName), "failed to update the schedulerName field,expected %q but found %q", serialconfig.SchedulerTestName, updatedSchedObj.Status.SchedulerName)
+			Eventually(func() bool {
+				Expect(fxt.Client.Get(ctx, client.ObjectKeyFromObject(nroSchedObj), updatedSchedObj)).To(Succeed())
+				return isNROSchedUpToDate(updatedSchedObj)
+			}).WithTimeout(time.Minute).WithPolling(time.Second*15).Should(BeTrue(), "failed to update the schedulerName field")
+			Expect(updatedSchedObj.Status.SchedulerName).To(Equal(serialconfig.SchedulerTestName), "failed to update the schedulerName field,expected %q but found %q", serialconfig.SchedulerTestName, updatedSchedObj.Status.SchedulerName)
 
-			defer func() {
+			defer func(rctx context.Context) {
 				By("reverting the changes under the NUMAResourcesScheduler object")
 				// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3
 				Eventually(func(g Gomega) {
 					currentSchedObj := &nropv1.NUMAResourcesScheduler{}
-					err := fxt.Client.Get(context.TODO(), nroSchedKey, currentSchedObj)
-					g.Expect(err).ToNot(HaveOccurred(), "cannot get current %q in the cluster", nroSchedKey.String())
+					g.Expect(fxt.Client.Get(rctx, nroSchedKey, currentSchedObj)).To(Succeed(), "cannot get current %q in the cluster", nroSchedKey.String())
 
 					currentSchedObj.Spec.SchedulerName = initialNroSchedObj.Status.SchedulerName
-					err = fxt.Client.Update(context.TODO(), currentSchedObj)
-					g.Expect(err).ToNot(HaveOccurred())
+					g.Expect(fxt.Client.Update(rctx, currentSchedObj)).To(Succeed())
 				}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to revert changes the changes to the NRO scheduler object")
 
 				updatedSchedObj := &nropv1.NUMAResourcesScheduler{}
 				Eventually(func() string {
-					err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(initialNroSchedObj), updatedSchedObj)
-					Expect(err).ToNot(HaveOccurred())
+					Expect(fxt.Client.Get(rctx, client.ObjectKeyFromObject(initialNroSchedObj), updatedSchedObj)).To(Succeed())
 					return updatedSchedObj.Status.SchedulerName
 				}).WithTimeout(time.Minute).WithPolling(time.Second*15).Should(Equal(initialNroSchedObj.Status.SchedulerName), "failed to revert the schedulerName field,expected %q but found %q", initialNroSchedObj.Status.SchedulerName, updatedSchedObj.Status.SchedulerName)
+			}(context.TODO())
 
-			}()
+			By("checking there are not unexpected changes in the scheduler object")
+			Consistently(func() bool {
+				var nros nropv1.NUMAResourcesScheduler
+				Expect(fxt.Client.Get(ctx, client.ObjectKeyFromObject(nroSchedObj), &nros)).To(Succeed())
+				return isNROSchedAvailableAt(&nros.Status, updatedSchedObj.Generation)
+			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(BeTrue(), "unexpected mutation in NUMAResourcesScheduler")
 
 			By("schedule pod using the new scheduler name")
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomizeName("testpod"))
 			testPod.Spec.SchedulerName = serialconfig.SchedulerTestName
 
-			err = fxt.Client.Create(context.TODO(), testPod)
-			Expect(err).ToNot(HaveOccurred())
+			Expect(fxt.Client.Create(ctx, testPod)).To(Succeed())
 
-			updatedPod, err := wait.With(fxt.Client).Timeout(timeout).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
+			By("ensuring the scheduled pod behaves as expected")
+			updatedPod, err := wait.With(fxt.Client).Timeout(timeout).ForPodPhase(ctx, testPod.Namespace, testPod.Name, corev1.PodRunning)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
 			Expect(err).ToNot(HaveOccurred())
 
-			schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
+			schedOK, err := nrosched.CheckPODWasScheduledWith(ctx, fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.SchedulerTestName)
 		})
@@ -1478,6 +1480,24 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 		})
 	})
 })
+
+func isNROSchedAvailableAt(nrosStatus *nropv1.NUMAResourcesSchedulerStatus, gen int64) bool {
+	if nrosStatus == nil {
+		return false
+	}
+	cond := status.FindCondition(nrosStatus.Conditions, status.ConditionAvailable)
+	if cond == nil {
+		return false
+	}
+	if cond.Status != metav1.ConditionTrue {
+		return false
+	}
+	return cond.ObservedGeneration == gen
+}
+
+func isNROSchedUpToDate(nros *nropv1.NUMAResourcesScheduler) bool {
+	return isNROSchedAvailableAt(&nros.Status, nros.Generation)
+}
 
 func mutateNodeCustomLabel(nodes []corev1.Node) (*corev1.Node, *corev1.Node, string) {
 	targetNode := nodeWithoutCustomRole(nodes)
