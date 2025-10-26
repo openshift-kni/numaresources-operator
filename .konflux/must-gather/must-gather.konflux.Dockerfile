@@ -8,7 +8,7 @@ RUN mv /usr/bin/gather /usr/bin/gather_original
 RUN mkdir -p /usr/libexec/must-gather/numaresources-operator && \
     cp /must-gather/collection-scripts/* /usr/libexec/must-gather/numaresources-operator/
 
-FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4@sha256:44aca991940c02b026c46dd07d485a6a63356b3e809459c9cecd92f997ca4ca8
+FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4@sha256:b94867cbd6fb26fdd85b06d32c2faf1ff7d2c8243e3bfa2b468962a07e5baf77
 
 ARG OPENSHIFT_VERSION
 
