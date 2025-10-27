@@ -19,6 +19,7 @@ package rte
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -417,4 +418,34 @@ func TestDaemonSetAffinitySettings(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDaemonSetRolloutSettings(t *testing.T) {
+	ds := testDs.DeepCopy()
+	DaemonSetRolloutSettings(ds)
+
+	if ds.Spec.UpdateStrategy.RollingUpdate == nil {
+		t.Fatalf("missing rolling update settings")
+	}
+	if ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable == nil {
+		t.Fatalf("missing rolling update max unavailable settings")
+	}
+	if err := checkPercIsAtLeast(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable.String(), 10); err != nil {
+		t.Fatalf("unexpected rolling update max unavailable setting: %v", err)
+	}
+}
+
+func checkPercIsAtLeast(val string, amount int) error {
+	if !strings.HasSuffix(val, "%") {
+		return fmt.Errorf("not a percentage: %q", val)
+	}
+	val = strings.TrimSuffix(val, "%")
+	perc, err := strconv.Atoi(val)
+	if err != nil {
+		return fmt.Errorf("not a percentage: %q: %w", val, err)
+	}
+	if perc < amount {
+		return fmt.Errorf("percentage %q lower than the amount %v", perc, amount)
+	}
+	return nil
 }

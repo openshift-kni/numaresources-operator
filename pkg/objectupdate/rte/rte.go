@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
 
 	securityv1 "github.com/openshift/api/security/v1"
@@ -118,6 +119,21 @@ func DaemonSetAffinitySettings(ds *appsv1.DaemonSet, labels map[string]string) e
 		},
 	}
 	return nil
+}
+
+func DaemonSetRolloutSettings(ds *appsv1.DaemonSet) {
+	// The assumption here builds on key properties of a topology updaters:
+	// 1. updaters are stateless and very fast to start. They just repackage and relay podresources data
+	// 2. updaters will own and clean up incompatible data
+	// 3. but the data layout and semantics are and will be compatible so no cleanup is needed,
+	// 4. otherwise the scheduler needs to detect NRT data deletion and flush its caches
+	// All these properties need to hold true anyway regardless of the maxUnavailable settings,
+	// so we can be quite aggressive here. Should things change we will need to revisit this setting.
+	maxUnavail := intstr.FromString("25%")
+	ds.Spec.UpdateStrategy.Type = appsv1.RollingUpdateDaemonSetStrategyType
+	ds.Spec.UpdateStrategy.RollingUpdate = &appsv1.RollingUpdateDaemonSet{
+		MaxUnavailable: &maxUnavail,
+	}
 }
 
 // UpdateDaemonSetRunAsIDs bump the ds container privileges to 0/0.
