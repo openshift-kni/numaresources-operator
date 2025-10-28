@@ -338,22 +338,25 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 			name:       "first reconcile iteration - with operator condition",
 			conditions: NewNUMAResourcesSchedulerBaseConditions(),
 			condition: metav1.Condition{
-				Type:    ConditionAvailable,
-				Status:  metav1.ConditionTrue,
-				Reason:  ConditionAvailable,
-				Message: "test",
+				Type:               ConditionAvailable,
+				Status:             metav1.ConditionTrue,
+				Reason:             ConditionAvailable,
+				Message:            "test",
+				ObservedGeneration: 42,
 			},
 			expected: []metav1.Condition{
 				{
-					Type:    ConditionAvailable,
-					Status:  metav1.ConditionTrue,
-					Reason:  ConditionAvailable,
-					Message: "test",
+					Type:               ConditionAvailable,
+					Status:             metav1.ConditionTrue,
+					Reason:             ConditionAvailable,
+					Message:            "test",
+					ObservedGeneration: 42,
 				},
 				{
-					Type:   ConditionUpgradeable,
-					Status: metav1.ConditionTrue,
-					Reason: ConditionUpgradeable,
+					Type:               ConditionUpgradeable,
+					Status:             metav1.ConditionTrue,
+					Reason:             ConditionUpgradeable,
+					ObservedGeneration: 42,
 				},
 				{
 					Type:   ConditionProgressing,
@@ -376,10 +379,11 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 			name:       "first reconcile iteration - with informer condition",
 			conditions: NewNUMAResourcesSchedulerBaseConditions(),
 			condition: metav1.Condition{
-				Type:    ConditionDedicatedInformerActive,
-				Status:  metav1.ConditionTrue,
-				Reason:  ConditionDedicatedInformerActive,
-				Message: "test",
+				Type:               ConditionDedicatedInformerActive,
+				Status:             metav1.ConditionTrue,
+				Reason:             ConditionDedicatedInformerActive,
+				Message:            "test",
+				ObservedGeneration: 42,
 			},
 			expected: []metav1.Condition{
 				{
@@ -403,10 +407,11 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 					Reason: ConditionDegraded,
 				},
 				{
-					Type:    ConditionDedicatedInformerActive,
-					Status:  metav1.ConditionTrue,
-					Reason:  ConditionDedicatedInformerActive,
-					Message: "test",
+					Type:               ConditionDedicatedInformerActive,
+					Status:             metav1.ConditionTrue,
+					Reason:             ConditionDedicatedInformerActive,
+					Message:            "test",
+					ObservedGeneration: 42,
 				},
 			},
 		},
@@ -441,10 +446,11 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 				},
 			},
 			condition: metav1.Condition{
-				Type:    ConditionDedicatedInformerActive,
-				Status:  metav1.ConditionFalse,
-				Reason:  ConditionDedicatedInformerActive,
-				Message: "test3",
+				Type:               ConditionDedicatedInformerActive,
+				Status:             metav1.ConditionFalse,
+				Reason:             ConditionDedicatedInformerActive,
+				Message:            "test3",
+				ObservedGeneration: 42,
 			},
 			expected: []metav1.Condition{
 				{
@@ -468,10 +474,11 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 					Reason: ConditionDegraded,
 				},
 				{
-					Type:    ConditionDedicatedInformerActive,
-					Status:  metav1.ConditionFalse,
-					Reason:  ConditionDedicatedInformerActive,
-					Message: "test3",
+					Type:               ConditionDedicatedInformerActive,
+					Status:             metav1.ConditionFalse,
+					Reason:             ConditionDedicatedInformerActive,
+					Message:            "test3",
+					ObservedGeneration: 42,
 				},
 			},
 		},
@@ -479,7 +486,7 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := CloneConditions(tt.conditions)
-			UpdateConditionsInPlace(got, tt.condition.Type, tt.condition.Status, tt.condition.Reason, tt.condition.Message)
+			UpdateConditionsInPlace(got, tt.condition, time.Time{})
 
 			resetIncomparableConditionFields(got)
 			resetIncomparableConditionFields(tt.expected)
