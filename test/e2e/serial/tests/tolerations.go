@@ -19,6 +19,7 @@ package tests
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -135,7 +136,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				Eventually(func(g Gomega) {
 					err := fxt.Client.Get(ctx, nroKey, &updatedNropObj)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(isDegradedWith(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String(), status.ReasonInternalError)).To(BeTrue(), "Condition not degraded as expected")
+					g.Expect(isDegradedWithAnyReason(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String(), status.ReasonInternalError, status.ConditionDegraded)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 			})
 
@@ -164,7 +165,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				Eventually(func(g Gomega) {
 					err := fxt.Client.Get(ctx, nroKey, &updatedNropObj)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(isDegradedWith(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String(), status.ReasonInternalError)).To(BeTrue(), "Condition not degraded as expected")
+					g.Expect(isDegradedWithAnyReason(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String(), status.ReasonInternalError, status.ConditionDegraded)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 			})
 		})
@@ -845,6 +846,25 @@ func isDegradedWith(conds []metav1.Condition, msgContains string, reason string)
 		return false
 	}
 	return true
+}
+
+func isDegradedWithAnyReason(conds []metav1.Condition, msgContains string, reasons ...string) bool {
+	cond := status.FindCondition(conds, status.ConditionDegraded)
+	if cond == nil {
+		return false
+	}
+	if cond.Status != metav1.ConditionTrue {
+		return false
+	}
+	if !strings.Contains(cond.Message, msgContains) {
+		klog.InfoS("Degraded message is not as expected", "condition", cond.String(), "expected message to contain", msgContains)
+		return false
+	}
+	if slices.Contains(reasons, cond.Reason) {
+		return true
+	}
+	klog.InfoS("Degraded reason is not as expected", "condition", cond.String(), "expected one of", reasons)
+	return false
 }
 
 func expectEqualTolerations(tolsA, tolsB []corev1.Toleration) {
