@@ -113,38 +113,36 @@ var _ = Describe("network policies are applied", Ordered, Label("feature:network
 			Expect(reachable).To(Equal(tc.ShouldAllow), tc.Description)
 		},
 		// Testing operator and operands egress traffic to API server
-		Entry("operator -> API server", trafficCase{
+		Entry("[test_id:85771] operator -> API server", trafficCase{
 			FromPod:     func() *corev1.Pod { return operatorPod },
 			ToHost:      func() string { return "$KUBERNETES_SERVICE_HOST" },
 			ToPort:      "$KUBERNETES_SERVICE_PORT",
 			ShouldAllow: true,
 			Description: "operator should access API server",
 		}),
-		Entry("scheduler -> API server", trafficCase{
+		Entry("[test_id:85772] scheduler -> API server", trafficCase{
 			FromPod:     func() *corev1.Pod { return schedulerPod },
 			ToHost:      func() string { return "$KUBERNETES_SERVICE_HOST" },
 			ToPort:      "$KUBERNETES_SERVICE_PORT",
 			ShouldAllow: true,
 			Description: "scheduler should access API server",
 		}),
-		Entry("rte worker -> API server", trafficCase{
+		Entry("[test_id:85773] rte worker -> API server", trafficCase{
 			FromPod:     func() *corev1.Pod { return rteWorkerPod },
 			ToHost:      func() string { return "$KUBERNETES_SERVICE_HOST" },
 			ToPort:      "$KUBERNETES_SERVICE_PORT",
 			ShouldAllow: true,
 			Description: "rte worker should access API server",
 		}),
-
 		// Testing operator and RTE metrics endpoints
-		Entry("prometheus operator -> numaresouces operator metrics endpoint", trafficCase{
+		Entry("[test_id:85774] prometheus operator -> numaresouces operator metrics endpoint", trafficCase{
 			FromPod:     func() *corev1.Pod { return prometheusPod },
 			ToHost:      func() string { return operatorPod.Status.PodIP },
 			ToPort:      "8080",
 			ShouldAllow: true,
 			Description: "prometheus operator pod should access numaresources operator metrics endpoint",
 		}),
-
-		Entry("prometheus operator -> numaresouces rte worker endpoint", trafficCase{
+		Entry("[test_id:85775] prometheus operator -> numaresouces rte worker endpoint", trafficCase{
 			FromPod:     func() *corev1.Pod { return prometheusPod },
 			ToHost:      func() string { return rteWorkerPod.Status.PodIP },
 			ToPort:      "2112",
@@ -153,7 +151,7 @@ var _ = Describe("network policies are applied", Ordered, Label("feature:network
 		}),
 
 		// Testing traffic restrictions between pods in the numaresources namespace
-		Entry("scheduler -> operator", trafficCase{
+		Entry("[test_id:85776] scheduler -> operator", trafficCase{
 			FromPod:     func() *corev1.Pod { return schedulerPod },
 			ToHost:      func() string { return operatorPod.Status.PodIP },
 			ToPort:      "8081",
@@ -162,7 +160,7 @@ var _ = Describe("network policies are applied", Ordered, Label("feature:network
 		}),
 
 		// Testing network traffic restrictions between pods cross namespaces (numaresouces and openshift-monitoring)
-		Entry("numaresouces operator -> prometheus operator", trafficCase{
+		Entry("[test_id:85777] numaresouces operator -> prometheus operator", trafficCase{
 			FromPod:     func() *corev1.Pod { return operatorPod },
 			ToHost:      func() string { return prometheusPod.Status.PodIP },
 			ToPort:      "8081",
@@ -170,7 +168,7 @@ var _ = Describe("network policies are applied", Ordered, Label("feature:network
 			Description: "numaresources operator should NOT access prometheus operator pod",
 		}),
 
-		Entry("prometheus operator -> numaresouces operator", trafficCase{
+		Entry("[test_id:85778] prometheus operator -> numaresouces operator", trafficCase{
 			FromPod:     func() *corev1.Pod { return prometheusPod },
 			ToHost:      func() string { return operatorPod.Status.PodIP },
 			ToPort:      "8081", // readinessProbe!

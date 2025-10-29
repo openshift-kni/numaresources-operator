@@ -62,7 +62,7 @@ var _ = Describe("metrics exposed securely", Serial, Label("feature:metrics"), f
 	When("testing operator metrics endpoint", func() {
 		metricsPort := "8080"
 
-		It("should be able to fetch metrics from the manager container", func() {
+		It("[test_id:85769] should be able to fetch metrics from the manager container", func() {
 			managerPod, err := deploy.FindNUMAResourcesOperatorPod(ctx, e2eclient.Client, nropObj)
 			Expect(err).ToNot(HaveOccurred())
 			stdout := fetchMetricsFromPod(ctx, managerPod, metricsAddress, metricsPort)
@@ -74,7 +74,7 @@ var _ = Describe("metrics exposed securely", Serial, Label("feature:metrics"), f
 	When("testing RTE metrics endpoint", func() {
 		metricsPort := "2112"
 
-		It("should be able to fetch metrics from the RTE pod container", func() {
+		It("[test_id:85770] should be able to fetch metrics from the RTE pod container", func() {
 			labelSelector := fmt.Sprintf("name=%s", e2etestenv.RTELabelName)
 			pods, err := e2eclient.K8sClient.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
 				LabelSelector: labelSelector,
