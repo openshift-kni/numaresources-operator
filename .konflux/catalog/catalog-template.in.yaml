@@ -22,6 +22,6 @@ entries:
   - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:68958183a9e33d86ca9d4d1cb1d1915952a9e34b5e8823430aeb8acf2d3566c0
     schema: olm.bundle
     # v4.20.1 bundle
-  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-20@sha256:68958183a9e33d86ca9d4d1cb1d1915952a9e34b5e8823430aeb8acf2d3566c0
+  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-20@sha256:7ced77adbed8d102eab0eef5ac9afd73fbb6839ba6ea3e1e9ce5f030a56966c0
     # The url for this last entry is updated by hack/konflux-update-catalog-template.sh automatically
     schema: olm.bundle
