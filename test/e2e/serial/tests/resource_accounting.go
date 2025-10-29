@@ -514,7 +514,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			Expect(e2enrt.CheckEqualAvailableResources(*targetNrtReference, *targetNrtCurrent)).To(BeTrue(), "new resources are accounted in NRT although scheduling burstable pod")
 		})
 
-		It("should properly schedule a burstable pod when one of the containers is asking for requests=limits, with no changes in NRTs", Label(label.Tier2), func() {
+		It("[test_id:85768] should properly schedule a burstable pod when one of the containers is asking for requests=limits, with no changes in NRTs", Label(label.Tier2), func() {
 			By("create a burstable pod")
 			pod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod-bu")
 			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName

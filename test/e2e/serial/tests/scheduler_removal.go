@@ -73,7 +73,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 			nroSchedObj = nrosched.CheckNROSchedulerAvailable(context.TODO(), fxt.Client, serialconfig.Config.NROSchedObj.Name)
 		})
 
-		It("[case:1][test_id:47593] should keep existing workloads running", Label(label.Tier1), func() {
+		It("[test_id:47593][case:1] should keep existing workloads running", Label(label.Tier1), func() {
 			var err error
 
 			dp := createDeploymentSync(fxt, "testdp", serialconfig.Config.SchedulerName)
@@ -100,7 +100,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 			}
 		})
 
-		It("[case:2][test_id:49093]should keep new scheduled workloads pending", Label(label.Tier1, "unsched", "feature:unsched"), func() {
+		It("[test_id:49093][case:2] should keep new scheduled workloads pending", Label(label.Tier1, "unsched", "feature:unsched"), func() {
 			var err error
 
 			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name))
@@ -129,7 +129,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 	})
 
 	When("restarting the topology aware scheduler in a live cluster", func() {
-		It("[case:1][test_id:48069] should schedule any pending workloads submitted while the scheduler was unavailable", Label(label.Tier2), func() {
+		It("[test_id:48069][case:1] should schedule any pending workloads submitted while the scheduler was unavailable", Label(label.Tier2), func() {
 			var err error
 
 			ctx := context.TODO()

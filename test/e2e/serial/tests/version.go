@@ -37,7 +37,7 @@ import (
 
 var _ = Describe("[serial] numaresources version", Serial, Label("feature:config"), func() {
 	When("checking the versions", func() {
-		It("should verify all the components", Label("tier0", "versioncheck"), func(ctx context.Context) {
+		It("[test_id:85791] should verify all the components", Label("tier0", "versioncheck"), func(ctx context.Context) {
 			Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
 
 			bi := version.GetBuildInfo()

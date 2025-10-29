@@ -433,7 +433,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 		})
 
-		It("should handle deployment scaleup such as nodes can be fully utilized", Label(label.Tier2, "nonreg"), func(ctx context.Context) {
+		It("[test_id:85779] should handle deployment scaleup such as nodes can be fully utilized", Label(label.Tier2, "nonreg"), func(ctx context.Context) {
 			neededNodes := 2
 
 			// random "high enough" value to let the infra pods run comfortably

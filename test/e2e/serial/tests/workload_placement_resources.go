@@ -124,7 +124,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			},
-			Entry("[tmscope:pod] with topology-manager-scope: pod, using memory as deciding factor",
+			Entry("[test_id:85792] [tmscope:pod] with topology-manager-scope: pod, using memory as deciding factor",
 				Label("tmscope:pod"),
 				intnrt.SingleNUMANode,
 				intnrt.Pod,
@@ -147,7 +147,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 					corev1.ResourceMemory: resource.MustParse("8Gi"),
 				},
 			),
-			Entry("[tmscope:pod] with topology-manager-scope: pod, using CPU as the deciding factor",
+			Entry("[test_id:85793] [tmscope:pod] with topology-manager-scope: pod, using CPU as the deciding factor",
 				Label("tmscope:pod"),
 				intnrt.SingleNUMANode,
 				intnrt.Pod,
