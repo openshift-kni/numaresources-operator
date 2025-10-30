@@ -43,12 +43,11 @@ var _ = Describe("[serial] numaresources version", Serial, Label("feature:config
 			bi := version.GetBuildInfo()
 			By("running the testsuite " + bi.String())
 
-			clusterPlatform, clusterPlatformVersion, err := version.DiscoverCluster(ctx, "", "") // no user-provided settings
+			discoveredCluster, err := version.DiscoverCluster(ctx, "", "") // no user-provided settings
 			if err != nil {
-				By("running against cluster UNKNOWN UNKNOWN")
-			} else {
-				By("running against cluster " + clusterPlatform.String() + " " + clusterPlatformVersion.String())
+				klog.ErrorS(err, "failed to discover cluster")
 			}
+			By("running against cluster " + discoveredCluster.Platform.String() + " " + discoveredCluster.LongVersion.String())
 
 			nropKey := objects.NROObjectKey()
 			nropObj := nropv1.NUMAResourcesOperator{}
