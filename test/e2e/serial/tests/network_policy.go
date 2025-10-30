@@ -50,7 +50,7 @@ import (
 //
 // Full coverage for inter-pod communication is challenging, so we include basic tests to validate the expected behavior.
 
-var _ = Describe("network policies are applied", Ordered, Label("feature:network_policies"), func() {
+var _ = Describe("network policies are applied", Ordered, Label("feature:netpols"), func() {
 	var namespace string
 	var ctx context.Context
 	var nropObj *nropv1.NUMAResourcesOperator
