@@ -164,6 +164,10 @@ test-upgrade-e2e: build-e2e-all
 test-must-gather-e2e: build-must-gather-e2e
 	hack/run-test-must-gather-e2e.sh
 
+.PHONY: test-kustomize
+test-kustomize: ## Validate all kustomization.yaml files can build successfully
+	hack/test-kustomize.sh
+
 # intentional left out:
 #   api/, because autogeneration
 #   cmd/, because kubebuilder scaffolding
