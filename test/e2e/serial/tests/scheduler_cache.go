@@ -120,7 +120,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 		})
 
 		When("[podburst] handling a burst of pods", Label("podburst"), func() {
-			It("should keep possibly-fitting pod in pending state until overreserve is corrected by update", func() {
+			It("[test_id:85786] should keep possibly-fitting pod in pending state until overreserve is corrected by update", func() {
 				hostsRequired := 2
 				NUMAZonesRequired := 2
 				desiredPodsPerNode := 2
@@ -316,7 +316,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					}
 				},
-				Entry("from GU pods, low",
+				Entry("[test_id:85787] from GU pods, low",
 					Label("qos:gu"),
 					machineDesc{
 						coresPerCPU:            2,
@@ -327,7 +327,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 						ratio: 2,
 						qos:   corev1.PodQOSGuaranteed,
 					}),
-				Entry("from BU pods, moderate",
+				Entry("[test_id:85788] from BU pods, moderate",
 					Label("qos:bu"),
 					machineDesc{
 						coresPerCPU:            2,
@@ -340,7 +340,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 					}),
 			)
 
-			It("should keep non-fitting pod in pending state forever", func() {
+			It("[test_id:85789] should keep non-fitting pod in pending state forever", func() {
 				hostsRequired := 2
 				NUMAZonesRequired := 2
 				desiredPods := 3
@@ -462,7 +462,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				}
 			})
 
-			It("should unblock non-fitting pod in pending state when resources are freed (pod deleted)", func() {
+			It("[test_id:85790] should unblock non-fitting pod in pending state when resources are freed (pod deleted)", func() {
 				hostsRequired := 2
 				NUMAZonesRequired := 2
 				desiredPods := 3
