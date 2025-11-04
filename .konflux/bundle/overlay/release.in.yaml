@@ -1,7 +1,5 @@
 ---
 variables:
-  # PLACEHOLDER_ variables will be substituted by ad-hoc overlay logic
-  containerImage: PLACEHOLDER_CONTAINER_IMAGE
   description: |
       NUMA Resources Operator for OpenShift
       Provides NUMA-aware scheduling and resources management for workloads.
