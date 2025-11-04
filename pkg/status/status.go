@@ -23,6 +23,7 @@ import (
 
 	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )
@@ -54,7 +55,7 @@ const (
 )
 
 // NUMAResourceOperatorNeedsUpdate returns true if the status changed, so if it should be sent to the apiserver, false otherwise.
-func NUMAResourceOperatorNeedsUpdate(oldStatus, newStatus *nropv1.NUMAResourcesOperatorStatus) bool {
+func NUMAResourceOperatorNeedsUpdate(oldStatus, newStatus nropv1.NUMAResourcesOperatorStatus) bool {
 	os := oldStatus.DeepCopy()
 	ns := newStatus.DeepCopy()
 
@@ -86,51 +87,52 @@ func EqualConditions(current, updated []metav1.Condition) bool {
 	return reflect.DeepEqual(c, u)
 }
 
-// ComputeConditions compute new conditions based on arguments, and then compare with given current conditions.
-// Returns the conditions to use, either current or newly computed, and a boolean flag which is `true` if conditions need
-// update - so if they are updated since the current conditions.
-func ComputeConditions(currentConditions []metav1.Condition, cond metav1.Condition, now time.Time) ([]metav1.Condition, bool) {
-	conditions := NewBaseConditions(cond, now)
-	if EqualConditions(currentConditions, conditions) {
-		return currentConditions, false
-	}
-	return conditions, true
-}
+// ComputeConditions returns the given conditions updated with the given condition.
+// Returns true if the condition was updated, false otherwise.
+func ComputeConditions(conds []metav1.Condition, condition metav1.Condition, ts time.Time) ([]metav1.Condition, bool) {
+	klog.InfoS("ComputeConditions", "condition", condition.String())
 
-// UpdateConditionsInPlace mutates the given conditions, setting the value of the one pointed out to `condition` to the given values.
-// Differently from `ComputeConditions`, it doesn't allocate new data. Returns true if successfully mutated conditions, false otherwise
-func UpdateConditionsInPlace(conds []metav1.Condition, condition metav1.Condition, ts time.Time) bool {
-	cond := metahelper.FindStatusCondition(conds, condition.Type)
+	newConds := CloneConditions(conds)
+	cond := metahelper.FindStatusCondition(newConds, condition.Type)
 	if cond == nil {
-		return false // should never happen
+		klog.InfoS("Condition not found in status conditions", "condition", condition.Type, "conditions", newConds)
+		return newConds, false // should never happen
 	}
 
+	var updated bool
 	if isBaseCondition(condition.Type) {
-		return updateBaseCondition(conds, condition, ts)
+		updated = updateBaseCondition(&newConds, condition, ts)
+	} else {
+		updated = metahelper.SetStatusCondition(&newConds, condition)
 	}
 
-	return metahelper.SetStatusCondition(&conds, condition)
+	if !updated {
+		klog.InfoS("Failed to update status condition", "condition", condition.Type, "conditions", newConds)
+	}
+
+	return newConds, updated
 }
 
 func isBaseCondition(s string) bool {
 	return s == ConditionAvailable || s == ConditionUpgradeable || s == ConditionProgressing || s == ConditionDegraded
 }
 
-func updateBaseCondition(conds []metav1.Condition, condition metav1.Condition, ts time.Time) bool {
+func updateBaseCondition(conds *[]metav1.Condition, condition metav1.Condition, ts time.Time) bool {
 	// one base condition change is anticipated to change all other base conditions
 	newBase := NewBaseConditions(condition, ts)
 	updated := false
 	for idx := range newBase {
-		changed := metahelper.SetStatusCondition(&conds, newBase[idx])
+		changed := metahelper.SetStatusCondition(conds, newBase[idx])
 		updated = updated || changed
 	}
+
 	return updated
 }
 
 // NewBaseConditions creates a new set of pristine conditions. The given `condition` is set, and its `reason` and `message` are
 // optionally set. Note that Available always imply Upgradeable, and that we ignore `reason` and `message` for it.
 func NewBaseConditions(cond metav1.Condition, now time.Time) []metav1.Condition {
-	conditions := defaultBaseConditions(now)
+	conditions := DefaultBaseConditions(now)
 	switch cond.Type {
 	case ConditionAvailable:
 		conditions[0].Status = metav1.ConditionTrue
@@ -152,30 +154,30 @@ func NewBaseConditions(cond metav1.Condition, now time.Time) []metav1.Condition 
 	return conditions
 }
 
-func defaultBaseConditions(now time.Time) []metav1.Condition {
+func DefaultBaseConditions(timestamp time.Time) []metav1.Condition {
 	return []metav1.Condition{
 		{
 			Type:               ConditionAvailable,
 			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Time{Time: now},
+			LastTransitionTime: metav1.Time{Time: timestamp},
 			Reason:             ConditionAvailable,
 		},
 		{
 			Type:               ConditionUpgradeable,
 			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Time{Time: now},
+			LastTransitionTime: metav1.Time{Time: timestamp},
 			Reason:             ConditionUpgradeable,
 		},
 		{
 			Type:               ConditionProgressing,
 			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Time{Time: now},
+			LastTransitionTime: metav1.Time{Time: timestamp},
 			Reason:             ConditionProgressing,
 		},
 		{
 			Type:               ConditionDegraded,
 			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Time{Time: now},
+			LastTransitionTime: metav1.Time{Time: timestamp},
 			Reason:             ConditionDegraded,
 		},
 	}
@@ -185,7 +187,7 @@ func defaultBaseConditions(now time.Time) []metav1.Condition {
 // top of NewBaseConditions.
 func NewNUMAResourcesSchedulerBaseConditions() []metav1.Condition {
 	now := time.Now()
-	conds := append(defaultBaseConditions(now), metav1.Condition{
+	conds := append(DefaultBaseConditions(now), metav1.Condition{
 		Type:               ConditionDedicatedInformerActive,
 		Status:             metav1.ConditionUnknown,
 		LastTransitionTime: metav1.Time{Time: now},

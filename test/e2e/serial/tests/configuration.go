@@ -1583,7 +1583,7 @@ func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.Objec
 		g.Expect(isNROOperUpToDate(&updatedNRO)).To(BeTrue())
 		g.Expect(updatedNRO.Status.NodeGroups).To(HaveLen(len(appliedObj.Spec.NodeGroups)),
 			"NodeGroups Status mismatch: found %d, expected %d", len(updatedNRO.Status.NodeGroups), len(appliedObj.Spec.NodeGroups))
-		g.Expect(status.NUMAResourceOperatorNeedsUpdate(&appliedObj.Status, &updatedNRO.Status)).To(BeTrue())
+		g.Expect(status.NUMAResourceOperatorNeedsUpdate(appliedObj.Status, updatedNRO.Status)).To(BeTrue())
 	}).WithTimeout(10 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
 
 	klog.InfoS("successfully fetched NRO object", "key", key.String())

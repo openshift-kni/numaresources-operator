@@ -17,7 +17,6 @@ limitations under the License.
 package status
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -26,64 +25,10 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
-
-func TestComputeConditions(t *testing.T) {
-	err := nropv1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		t.Errorf("nropv1.AddToScheme() failed with: %v", err)
-	}
-
-	nro := testobjs.NewNUMAResourcesOperator("test-nro")
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(nro).Build()
-
-	var ok bool
-	nro.Status.Conditions, ok = ComputeConditions(nro.Status.Conditions, metav1.Condition{
-		Type:               ConditionProgressing,
-		Reason:             "testReason",
-		Message:            "test message",
-		ObservedGeneration: 8181,
-	}, time.Time{})
-	if !ok {
-		t.Errorf("Update did not change status, but it should")
-	}
-
-	err = fakeClient.Update(context.TODO(), nro)
-	if err != nil {
-		t.Errorf("Update() failed with: %v", err)
-	}
-
-	updatedNro := &nropv1.NUMAResourcesOperator{}
-	err = fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(nro), updatedNro)
-	if err != nil {
-		t.Errorf("failed to get NUMAResourcesOperator object: %v", err)
-	}
-
-	//shortcut
-	progressingCondition := &updatedNro.Status.Conditions[2]
-	if progressingCondition.Status != metav1.ConditionTrue {
-		t.Errorf("Update() failed to set correct status, expected: %q, got: %q", metav1.ConditionTrue, progressingCondition.Status)
-	}
-
-	// same status twice in a row. We should not overwrite identical status to save transactions.
-	_, ok = ComputeConditions(nro.Status.Conditions, metav1.Condition{
-		Type:               ConditionProgressing,
-		Reason:             "testReason",
-		Message:            "test message",
-		ObservedGeneration: 8181, // assume we reprocess the original spec
-	}, time.Time{})
-	if ok {
-		t.Errorf("Update did change status, but it should not")
-	}
-}
 
 func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 	type testCase struct {
@@ -181,7 +126,7 @@ func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 			oldStatus := tc.oldStatus.DeepCopy()
 			newStatus := tc.oldStatus.DeepCopy()
 			tc.updaterFunc(newStatus)
-			got := NUMAResourceOperatorNeedsUpdate(oldStatus, newStatus)
+			got := NUMAResourceOperatorNeedsUpdate(*oldStatus, *newStatus)
 			if got != tc.expectedUpdated {
 				t.Errorf("isUpdated %v expected %v", got, tc.expectedUpdated)
 			}
@@ -337,12 +282,13 @@ func TestMessageFromError(t *testing.T) {
 	}
 }
 
-func TestUpdateConditionsInPlace(t *testing.T) {
+func TestComputeConditions(t *testing.T) {
 	tests := []struct {
 		name       string
 		conditions []metav1.Condition
 		condition  metav1.Condition
 		expected   []metav1.Condition
+		expectedOk bool
 	}{
 		{
 			name:       "first reconcile iteration - with operator condition",
@@ -384,6 +330,7 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 					Reason: ConditionDedicatedInformerActive,
 				},
 			},
+			expectedOk: true,
 		},
 		{
 			name:       "first reconcile iteration - with informer condition",
@@ -424,6 +371,7 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 					ObservedGeneration: 42,
 				},
 			},
+			expectedOk: true,
 		},
 		{
 			name: "non-empty with informer condition",
@@ -491,6 +439,18 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 					ObservedGeneration: 42,
 				},
 			},
+			expectedOk: true,
+		},
+		{
+			name: "non-empty with not found condition", // should never happen unless initializing condition is corrupted
+			conditions: []metav1.Condition{
+				{
+					Type:   ConditionAvailable,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionAvailable,
+				},
+			},
+			expectedOk: false,
 		},
 		{
 			name: "updating a base condition should affect all other base conditions - progressing to available",
@@ -628,8 +588,13 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := CloneConditions(tt.conditions)
-			UpdateConditionsInPlace(got, tt.condition, time.Time{})
+			got, ok := ComputeConditions(tt.conditions, tt.condition, time.Time{})
+			if !ok && !tt.expectedOk {
+				return
+			}
+			if !ok && tt.expectedOk {
+				t.Errorf("failed to update conditions")
+			}
 
 			resetIncomparableConditionFields(got)
 			resetIncomparableConditionFields(tt.expected)
