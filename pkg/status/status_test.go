@@ -54,13 +54,13 @@ func TestFindCondition(t *testing.T) {
 		{
 			name:          "missing condition",
 			desired:       "foobar",
-			conds:         newBaseConditions(now),
+			conds:         defaultBaseConditions(now),
 			expectedFound: false,
 		},
 		{
 			name:          "found condition",
 			desired:       ConditionProgressing,
-			conds:         newBaseConditions(now),
+			conds:         defaultBaseConditions(now),
 			expectedFound: true,
 		},
 	}
@@ -142,7 +142,7 @@ func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 		{
 			name: "status, conditions, updated only time",
 			oldStatus: &nropv1.NUMAResourcesOperatorStatus{
-				Conditions: NewConditions(metav1.Condition{
+				Conditions: NewBaseConditions(metav1.Condition{
 					Type:    ConditionAvailable,
 					Reason:  "testAllGood",
 					Message: "testing info",
@@ -150,7 +150,7 @@ func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 			},
 			updaterFunc: func(st *nropv1.NUMAResourcesOperatorStatus) {
 				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
-				st.Conditions = NewConditions(metav1.Condition{
+				st.Conditions = NewBaseConditions(metav1.Condition{
 					Type:    ConditionAvailable,
 					Reason:  "testAllGood",
 					Message: "testing info",
@@ -161,7 +161,7 @@ func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 		{
 			name: "status, conditions, updated only time, other fields changed",
 			oldStatus: &nropv1.NUMAResourcesOperatorStatus{
-				Conditions: NewConditions(metav1.Condition{
+				Conditions: NewBaseConditions(metav1.Condition{
 					Type:    ConditionAvailable,
 					Reason:  "testAllGood",
 					Message: "testing info",
@@ -169,7 +169,7 @@ func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 			},
 			updaterFunc: func(st *nropv1.NUMAResourcesOperatorStatus) {
 				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
-				st.Conditions = NewConditions(metav1.Condition{
+				st.Conditions = NewBaseConditions(metav1.Condition{
 					Type:    ConditionAvailable,
 					Reason:  "testAllGood",
 					Message: "testing info",
@@ -186,7 +186,7 @@ func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 		{
 			name: "status, conditions, updated only time, other fields mutated",
 			oldStatus: &nropv1.NUMAResourcesOperatorStatus{
-				Conditions: NewConditions(metav1.Condition{
+				Conditions: NewBaseConditions(metav1.Condition{
 					Type:    ConditionAvailable,
 					Reason:  "testAllGood",
 					Message: "testing info",
@@ -200,7 +200,7 @@ func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 			},
 			updaterFunc: func(st *nropv1.NUMAResourcesOperatorStatus) {
 				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
-				st.Conditions = NewConditions(metav1.Condition{
+				st.Conditions = NewBaseConditions(metav1.Condition{
 					Type:    ConditionAvailable,
 					Reason:  "testAllGood",
 					Message: "testing info",
@@ -246,7 +246,7 @@ func TestNUMAResourcesSchedulerNeedsUpdate(t *testing.T) {
 		{
 			name: "status, conditions, updated only time",
 			oldStatus: nropv1.NUMAResourcesSchedulerStatus{
-				Conditions: NewConditions(metav1.Condition{
+				Conditions: NewBaseConditions(metav1.Condition{
 					Type:    ConditionAvailable,
 					Reason:  "testAllGood",
 					Message: "testing info",
@@ -254,7 +254,7 @@ func TestNUMAResourcesSchedulerNeedsUpdate(t *testing.T) {
 			},
 			updaterFunc: func(st *nropv1.NUMAResourcesSchedulerStatus) {
 				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
-				st.Conditions = NewConditions(metav1.Condition{
+				st.Conditions = NewBaseConditions(metav1.Condition{
 					Type:    ConditionAvailable,
 					Reason:  "testAllGood",
 					Message: "testing info",
@@ -265,7 +265,7 @@ func TestNUMAResourcesSchedulerNeedsUpdate(t *testing.T) {
 		{
 			name: "status, conditions, updated only time, other fields changed",
 			oldStatus: nropv1.NUMAResourcesSchedulerStatus{
-				Conditions: NewConditions(metav1.Condition{
+				Conditions: NewBaseConditions(metav1.Condition{
 					Type:    ConditionAvailable,
 					Reason:  "testAllGood",
 					Message: "testing info",
@@ -273,7 +273,7 @@ func TestNUMAResourcesSchedulerNeedsUpdate(t *testing.T) {
 			},
 			updaterFunc: func(st *nropv1.NUMAResourcesSchedulerStatus) {
 				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
-				st.Conditions = NewConditions(metav1.Condition{
+				st.Conditions = NewBaseConditions(metav1.Condition{
 					Type:    ConditionAvailable,
 					Reason:  "testAllGood",
 					Message: "testing info",

@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"time"
 
+	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
@@ -89,7 +90,7 @@ func EqualConditions(current, updated []metav1.Condition) bool {
 // Returns the conditions to use, either current or newly computed, and a boolean flag which is `true` if conditions need
 // update - so if they are updated since the current conditions.
 func ComputeConditions(currentConditions []metav1.Condition, cond metav1.Condition, now time.Time) ([]metav1.Condition, bool) {
-	conditions := NewConditions(cond, now)
+	conditions := NewBaseConditions(cond, now)
 	if EqualConditions(currentConditions, conditions) {
 		return currentConditions, false
 	}
@@ -104,22 +105,26 @@ func UpdateConditionsInPlace(conds []metav1.Condition, condition metav1.Conditio
 		return false // should never happen
 	}
 
-	cond.Status = condition.Status
-	cond.ObservedGeneration = condition.ObservedGeneration
-	cond.LastTransitionTime = metav1.Time{Time: ts}
-	cond.Reason = condition.Reason
-	cond.Message = condition.Message
-
-	if condition.Type == ConditionAvailable {
-		upCond := FindCondition(conds, ConditionUpgradeable)
-		if upCond == nil {
-			return false // should never happen
-		}
-		upCond.Status = cond.Status
-		upCond.LastTransitionTime = cond.LastTransitionTime
-		upCond.ObservedGeneration = cond.ObservedGeneration
+	if isBaseCondition(condition.Type) {
+		return updateBaseCondition(conds, condition, ts)
 	}
-	return true
+
+	return metahelper.SetStatusCondition(&conds, condition)
+}
+
+func isBaseCondition(s string) bool {
+	return s == ConditionAvailable || s == ConditionUpgradeable || s == ConditionProgressing || s == ConditionDegraded
+}
+
+func updateBaseCondition(conds []metav1.Condition, condition metav1.Condition, ts time.Time) bool {
+	// one base condition change is anticipated to change all other base conditions
+	newBase := NewBaseConditions(condition, ts)
+	updated := false
+	for idx := range newBase {
+		changed := metahelper.SetStatusCondition(&conds, newBase[idx])
+		updated = updated || changed
+	}
+	return updated
 }
 
 // FindCondition returns a pointer to the Condition object matching the given `condition` by type on success, nil otherwise.
@@ -133,14 +138,15 @@ func FindCondition(conditions []metav1.Condition, condition string) *metav1.Cond
 	return nil
 }
 
-// NewConditions creates a new set of pristine conditions. The given `condition` is set, and its `reason` and `message` are
+// NewBaseConditions creates a new set of pristine conditions. The given `condition` is set, and its `reason` and `message` are
 // optionally set. Note that Available always imply Upgradeable, and that we ignore `reason` and `message` for it.
-func NewConditions(cond metav1.Condition, now time.Time) []metav1.Condition {
-	conditions := newBaseConditions(now)
+func NewBaseConditions(cond metav1.Condition, now time.Time) []metav1.Condition {
+	conditions := defaultBaseConditions(now)
 	switch cond.Type {
 	case ConditionAvailable:
 		conditions[0].Status = metav1.ConditionTrue
 		conditions[0].ObservedGeneration = cond.ObservedGeneration
+		conditions[0].Message = cond.Message
 		conditions[1].Status = metav1.ConditionTrue
 		conditions[1].ObservedGeneration = cond.ObservedGeneration
 	case ConditionProgressing:
@@ -157,7 +163,7 @@ func NewConditions(cond metav1.Condition, now time.Time) []metav1.Condition {
 	return conditions
 }
 
-func newBaseConditions(now time.Time) []metav1.Condition {
+func defaultBaseConditions(now time.Time) []metav1.Condition {
 	return []metav1.Condition{
 		{
 			Type:               ConditionAvailable,
@@ -190,7 +196,7 @@ func newBaseConditions(now time.Time) []metav1.Condition {
 // top of NewBaseConditions.
 func NewNUMAResourcesSchedulerBaseConditions() []metav1.Condition {
 	now := time.Now()
-	conds := append(newBaseConditions(now), metav1.Condition{
+	conds := append(defaultBaseConditions(now), metav1.Condition{
 		Type:               ConditionDedicatedInformerActive,
 		Status:             metav1.ConditionUnknown,
 		LastTransitionTime: metav1.Time{Time: now},
