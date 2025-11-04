@@ -54,7 +54,7 @@ const (
 )
 
 // NUMAResourceOperatorNeedsUpdate returns true if the status changed, so if it should be sent to the apiserver, false otherwise.
-func NUMAResourceOperatorNeedsUpdate(oldStatus, newStatus *nropv1.NUMAResourcesOperatorStatus) bool {
+func NUMAResourceOperatorNeedsUpdate(oldStatus, newStatus nropv1.NUMAResourcesOperatorStatus) bool {
 	os := oldStatus.DeepCopy()
 	ns := newStatus.DeepCopy()
 
@@ -86,17 +86,6 @@ func EqualConditions(current, updated []metav1.Condition) bool {
 	return reflect.DeepEqual(c, u)
 }
 
-// ComputeConditions compute new conditions based on arguments, and then compare with given current conditions.
-// Returns the conditions to use, either current or newly computed, and a boolean flag which is `true` if conditions need
-// update - so if they are updated since the current conditions.
-func ComputeConditions(currentConditions []metav1.Condition, cond metav1.Condition, now time.Time) ([]metav1.Condition, bool) {
-	conditions := NewBaseConditionsWith(cond, now)
-	if EqualConditions(currentConditions, conditions) {
-		return currentConditions, false
-	}
-	return conditions, true
-}
-
 // UpdateConditionsInPlace mutates the given conditions, setting the value of the one pointed out to `condition` to the given values.
 // Differently from `ComputeConditions`, it doesn't allocate new data. Returns true if successfully mutated conditions, false otherwise
 func UpdateConditionsInPlace(conds []metav1.Condition, condition metav1.Condition, ts time.Time) bool {
@@ -106,9 +95,8 @@ func UpdateConditionsInPlace(conds []metav1.Condition, condition metav1.Conditio
 	}
 
 	if isBaseCondition(condition.Type) {
-		return updateBaseCondition(conds, condition, ts)
+		return updateBaseCondition(&conds, condition, ts)
 	}
-
 	return metahelper.SetStatusCondition(&conds, condition)
 }
 
@@ -116,14 +104,15 @@ func isBaseCondition(s string) bool {
 	return s == ConditionAvailable || s == ConditionUpgradeable || s == ConditionProgressing || s == ConditionDegraded
 }
 
-func updateBaseCondition(conds []metav1.Condition, condition metav1.Condition, ts time.Time) bool {
+func updateBaseCondition(conds *[]metav1.Condition, condition metav1.Condition, ts time.Time) bool {
 	// one base condition change is anticipated to change all other base conditions
 	newBase := NewBaseConditionsWith(condition, ts)
 	updated := false
 	for idx := range newBase {
-		changed := metahelper.SetStatusCondition(&conds, newBase[idx])
+		changed := metahelper.SetStatusCondition(conds, newBase[idx])
 		updated = updated || changed
 	}
+
 	return updated
 }
 
@@ -141,7 +130,7 @@ func FindCondition(conditions []metav1.Condition, condition string) *metav1.Cond
 // NewBaseConditionsWith creates a new set of pristine conditions. The given `condition` is set, and its `reason` and `message` are
 // optionally set. Note that Available always imply Upgradeable, and that we ignore `reason` and `message` for it.
 func NewBaseConditionsWith(cond metav1.Condition, now time.Time) []metav1.Condition {
-	conditions := defaultBaseConditions(now)
+	conditions := DefaultBaseConditions(now)
 	switch cond.Type {
 	case ConditionAvailable:
 		conditions[0].Status = metav1.ConditionTrue
@@ -163,30 +152,30 @@ func NewBaseConditionsWith(cond metav1.Condition, now time.Time) []metav1.Condit
 	return conditions
 }
 
-func defaultBaseConditions(now time.Time) []metav1.Condition {
+func DefaultBaseConditions(timestamp time.Time) []metav1.Condition {
 	return []metav1.Condition{
 		{
 			Type:               ConditionAvailable,
 			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Time{Time: now},
+			LastTransitionTime: metav1.Time{Time: timestamp},
 			Reason:             ConditionAvailable,
 		},
 		{
 			Type:               ConditionUpgradeable,
 			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Time{Time: now},
+			LastTransitionTime: metav1.Time{Time: timestamp},
 			Reason:             ConditionUpgradeable,
 		},
 		{
 			Type:               ConditionProgressing,
 			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Time{Time: now},
+			LastTransitionTime: metav1.Time{Time: timestamp},
 			Reason:             ConditionProgressing,
 		},
 		{
 			Type:               ConditionDegraded,
 			Status:             metav1.ConditionFalse,
-			LastTransitionTime: metav1.Time{Time: now},
+			LastTransitionTime: metav1.Time{Time: timestamp},
 			Reason:             ConditionDegraded,
 		},
 	}
@@ -196,7 +185,7 @@ func defaultBaseConditions(now time.Time) []metav1.Condition {
 // top of NewBaseConditions.
 func NewNUMAResourcesSchedulerBaseConditions() []metav1.Condition {
 	now := time.Now()
-	conds := append(defaultBaseConditions(now), metav1.Condition{
+	conds := append(DefaultBaseConditions(now), metav1.Condition{
 		Type:               ConditionDedicatedInformerActive,
 		Status:             metav1.ConditionUnknown,
 		LastTransitionTime: metav1.Time{Time: now},
