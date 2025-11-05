@@ -15,6 +15,9 @@ entries:
       - name: numaresources-operator.v4.19.1
         replaces: numaresources-operator.v4.19.0
         skipRange: '>=4.18.0 <4.19.1'
+      - name: numaresources-operator.v4.19.2
+        replaces: numaresources-operator.v4.19.1
+        skipRange: '>=4.18.0 <4.19.2'
     name: "4.19"
     package: numaresources-operator
     schema: olm.channel
@@ -22,6 +25,9 @@ entries:
   - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:2e6024d88c3751cd68f43999f2eeccf2aca0c127ee6be20bca2fc3673374d59e
     schema: olm.bundle
     # v4.19.1 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:32b4217ad227039b5cad74044cb378039daa4ca88bbfdea278938acf385a6289
+    schema: olm.bundle
+    # v4.19.2 bundle
     # The url for this last entry is updated by hack/konflux-update-catalog-template.sh automatically
-  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-19@sha256:0004c7e46200962516f6b797aa70efd0680e03d35a4c594f9bb16dee3ed5bed0
+  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-19@sha256:32b4217ad227039b5cad74044cb378039daa4ca88bbfdea278938acf385a6289
     schema: olm.bundle
