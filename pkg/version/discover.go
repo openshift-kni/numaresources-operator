@@ -25,7 +25,27 @@ import (
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
 )
 
-func DiscoverCluster(ctx context.Context, platformName, platformVersion string) (platform.Platform, platform.Version, error) {
+// DiscoverResult is the result of the cluster discovery process of platform and version.
+// It stores the platform, the short version (minimized) and the long version (full).
+// the short version is the version without the build metadata, and is the one for
+// general use. For more specific use cases concerning to specific Kubernetes versions,
+// the long version should be used.
+type DiscoverResult struct {
+	Platform     platform.Platform
+	ShortVersion platform.Version
+	LongVersion  platform.Version
+}
+
+func newDefaultClusterResult() DiscoverResult {
+	return DiscoverResult{
+		Platform:     platform.Unknown,
+		ShortVersion: platform.MissingVersion,
+		LongVersion:  platform.MissingVersion,
+	}
+}
+
+func DiscoverCluster(ctx context.Context, platformName, platformVersion string) (DiscoverResult, error) {
+	result := newDefaultClusterResult()
 	// if it is unknown, it's fine
 	userPlatform, _ := platform.ParsePlatform(platformName)
 	userPlatformVersion, _ := platform.ParseVersion(platformVersion)
@@ -35,18 +55,20 @@ func DiscoverCluster(ctx context.Context, platformName, platformVersion string) 
 	clusterPlatform := plat.Discovered
 	if clusterPlatform == platform.Unknown {
 		klog.ErrorS(err, "cannot autodetect the platform, and no platform given")
-		return clusterPlatform, "", err
+		return newDefaultClusterResult(), err
 	}
 
+	result.Platform = clusterPlatform
 	platVersion, source, err := detect.FindVersion(ctx, clusterPlatform, userPlatformVersion)
 	klog.InfoS("platform detection", "version", platVersion.Discovered, "reason", source)
-	clusterPlatformVersion := Minimize(platVersion.Discovered)
-	if clusterPlatformVersion == platform.MissingVersion {
+	result.LongVersion = platVersion.Discovered
+	result.ShortVersion = Minimize(platVersion.Discovered)
+	if result.LongVersion == platform.MissingVersion {
 		klog.ErrorS(err, "cannot autodetect the platform version, and no platform given")
-		return clusterPlatform, clusterPlatformVersion, err
+		return result, err
 	}
 
-	klog.InfoS("detected cluster", "platform", clusterPlatform, "version", clusterPlatformVersion)
+	klog.InfoS("detected cluster", "platform", result.Platform, "shortVersion", result.ShortVersion, "longVersion", result.LongVersion)
 
-	return clusterPlatform, clusterPlatformVersion, nil
+	return result, nil
 }

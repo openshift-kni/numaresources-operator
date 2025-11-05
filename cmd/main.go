@@ -214,17 +214,17 @@ func main() {
 
 	ctx := context.Background()
 
-	clusterPlatform, clusterPlatformVersion, err := version.DiscoverCluster(ctx, params.platformName, params.platformVersion)
+	discoveredCluster, err := version.DiscoverCluster(ctx, params.platformName, params.platformVersion)
 	if err != nil {
 		os.Exit(1)
 	}
 
 	if params.detectPlatformOnly {
-		fmt.Printf("platform=%s version=%s\n", clusterPlatform, clusterPlatformVersion)
+		fmt.Printf("platform=%s version=%s\n", discoveredCluster.Platform, discoveredCluster.ShortVersion)
 		os.Exit(0)
 	}
 
-	apiManifests, err := apimanifests.GetManifests(clusterPlatform)
+	apiManifests, err := apimanifests.GetManifests(discoveredCluster.Platform)
 	if err != nil {
 		klog.ErrorS(err, "unable to load the API manifests")
 		os.Exit(1)
@@ -238,7 +238,7 @@ func main() {
 		namespace = defaultNamespace
 	}
 
-	rteManifests, err := rtemanifests.GetManifests(clusterPlatform, clusterPlatformVersion, namespace, false, true)
+	rteManifests, err := rtemanifests.GetManifests(discoveredCluster.Platform, discoveredCluster.ShortVersion, namespace, false, true)
 	if err != nil {
 		klog.ErrorS(err, "unable to load the RTE manifests")
 		os.Exit(1)
@@ -257,7 +257,7 @@ func main() {
 			Core:    rteManifests,
 			Metrics: rteMetricsManifests,
 		}
-		os.Exit(manageRendering(params.render, clusterPlatform, apiManifests, rteMf, namespace, params.enableScheduler))
+		os.Exit(manageRendering(params.render, discoveredCluster.Platform, apiManifests, rteMf, namespace, params.enableScheduler))
 	}
 
 	klog.InfoS("metrics server", "enabled", params.enableMetrics, "addr", params.metricsAddr)
@@ -306,7 +306,7 @@ func main() {
 			Core:    rteManifestsRendered,
 			Metrics: rteMetricsManifests,
 		},
-		Platform:        clusterPlatform,
+		Platform:        discoveredCluster.Platform,
 		Images:          imgs,
 		ImagePullPolicy: pullPolicy,
 		Namespace:       namespace,
@@ -320,7 +320,7 @@ func main() {
 		Scheme:    mgr.GetScheme(),
 		Recorder:  mgr.GetEventRecorderFor("kubeletconfig-controller"),
 		Namespace: namespace,
-		Platform:  clusterPlatform,
+		Platform:  discoveredCluster.Platform,
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "KubeletConfig")
 		os.Exit(1)
@@ -339,7 +339,7 @@ func main() {
 			Scheme:             mgr.GetScheme(),
 			SchedulerManifests: schedMf,
 			Namespace:          namespace,
-			PlatformInfo:       platforminfo.New(clusterPlatform, clusterPlatformVersion),
+			PlatformInfo:       platforminfo.New(discoveredCluster.Platform, discoveredCluster.LongVersion),
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
 			os.Exit(1)
