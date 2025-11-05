@@ -117,7 +117,7 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 
 	initialStatus := *instance.Status.DeepCopy()
 	if len(initialStatus.Conditions) == 0 {
-		instance.Status.Conditions = status.NewNUMAResourcesSchedulerBaseConditions()
+		instance.Status.Conditions = status.NewNUMAResourcesSchedulerConditions()
 	}
 
 	if req.Name != objectnames.DefaultNUMAResourcesSchedulerCrName {
