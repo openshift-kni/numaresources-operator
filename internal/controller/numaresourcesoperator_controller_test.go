@@ -2149,6 +2149,105 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s expected to be deleted; err=%v", mc2Key.Name, err)
 			})
 		})
+
+		Context("with status condition updates", func() {
+			var nro *nropv1.NUMAResourcesOperator
+			var mcp *machineconfigv1.MachineConfigPool
+			var reconciler *NUMAResourcesOperatorReconciler
+			var label map[string]string
+			var key client.ObjectKey
+			var err error
+
+			ctx := context.TODO()
+
+			BeforeEach(func() {
+				label = map[string]string{
+					"test1": "test1",
+				}
+
+				ng := nropv1.NodeGroup{
+					MachineConfigPoolSelector: &metav1.LabelSelector{
+						MatchLabels: label,
+					},
+				}
+				nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
+				key = client.ObjectKeyFromObject(nro)
+
+				mcp = testobjs.NewMachineConfigPool("test1", label, &metav1.LabelSelector{MatchLabels: label}, &metav1.LabelSelector{MatchLabels: label})
+
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
+				Expect(err).ToNot(HaveOccurred())
+
+				result, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+			})
+			It("should report progressing condition for un-paused MCPs but in updating state", func() {
+				Expect(reconciler.Client.Get(ctx, key, nro)).To(Succeed())
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp), mcp)).To(Succeed())
+				mcp.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+					{
+						Type:   machineconfigv1.MachineConfigPoolUpdated,
+						Status: corev1.ConditionFalse,
+					},
+				}
+
+				Expect(reconciler.Client.Update(ctx, mcp)).To(Succeed())
+				result, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
+
+				Expect(reconciler.Client.Get(ctx, key, nro)).To(Succeed())
+
+				progressingCondition := getConditionByType(nro.Status.Conditions, status.ConditionProgressing)
+				Expect(progressingCondition.Status).To(Equal(metav1.ConditionTrue))
+				Expect(progressingCondition.Reason).To(Equal("MachineConfigPoolIsUpdating"))
+				Expect(progressingCondition.Message).To(ContainSubstring("test1 is updating"))
+			})
+			It("should not report progressing condition for paused MCPs", func() {
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp), mcp)).To(Succeed())
+				mcp.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+					{
+						Type:   machineconfigv1.MachineConfigPoolUpdated,
+						Status: corev1.ConditionFalse,
+					},
+				}
+				mcp.Spec.Paused = true
+
+				Expect(reconciler.Client.Update(ctx, mcp)).To(Succeed())
+				result, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				Expect(reconciler.Client.Get(ctx, key, nro)).To(Succeed())
+
+				progressingCondition := getConditionByType(nro.Status.Conditions, status.ConditionProgressing)
+				Expect(progressingCondition.Status).To(Equal(metav1.ConditionFalse), "Progressing condition should be false because the MCP is paused, got conditions: %v", nro.Status.Conditions)
+			})
+
+			It("should report MachineConfigPoolPaused condition for paused MCPs", func() {
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp), mcp)).To(Succeed())
+				mcp.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+					{
+						Type:   machineconfigv1.MachineConfigPoolUpdated,
+						Status: corev1.ConditionFalse,
+					},
+				}
+				mcp.Spec.Paused = true
+
+				Expect(reconciler.Client.Update(ctx, mcp)).To(Succeed())
+				result, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+
+				Expect(reconciler.Client.Get(ctx, key, nro)).To(Succeed())
+
+				pausedCondition := getConditionByType(nro.Status.Conditions, status.ConditionMachineConfigPoolPaused)
+				Expect(pausedCondition.Status).To(Equal(metav1.ConditionTrue), "Paused condition should be true because the MCP is paused, got conditions: %v", nro.Status.Conditions)
+				Expect(pausedCondition.Reason).To(Equal(status.ConditionMachineConfigPoolPaused))
+				Expect(pausedCondition.Message).To(ContainSubstring("detected paused MCPs: test1"))
+			})
+		})
 	})
 
 	Describe("platform agnostic", func() {

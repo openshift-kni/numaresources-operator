@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -129,14 +130,20 @@ func MatchMachineConfigPoolCondition(conditions []machineconfigv1.MachineConfigP
 
 type MCPWaitForUpdatedFunc func(string, *machineconfigv1.MachineConfigPool) bool
 
-func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.ObjectState, MCPWaitForUpdatedFunc) {
+func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.ObjectState, MCPWaitForUpdatedFunc, sets.Set[string]) {
+	pausedMCPs := sets.New[string]()
 	var ret []objectstate.ObjectState
 	if mf.Core.MachineConfig == nil {
-		return ret, nullMachineConfigPoolUpdated
+		return ret, nullMachineConfigPoolUpdated, pausedMCPs
 	}
 	enabledMCCount := 0
 	for _, tree := range em.trees {
 		for _, mcp := range tree.MachineConfigPools {
+			if mcp.Spec.Paused {
+				pausedMCPs.Insert(mcp.Name)
+				continue
+			}
+
 			mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
 			if mcp.Spec.MachineConfigSelector == nil {
 				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
@@ -183,10 +190,16 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 	}
 
 	klog.V(4).InfoS("machineConfigsState", "enabledMachineConfigs", enabledMCCount)
+	// TODO: the API design allows to configure custom annotation per nodegroup,
+	// meaning that the function that checks if an MCP is updated or not is different
+	// in each case. This should be refactored to adapt the flexible configuration or
+	// get consensus on the API design to correct this. The problem with the current
+	// approach is that nodegroups with default selinux will need to have the custom
+	// machine config, which is never met.
 	if enabledMCCount > 0 {
-		return ret, IsMachineConfigPoolUpdated
+		return ret, IsMachineConfigPoolUpdated, pausedMCPs
 	}
-	return ret, IsMachineConfigPoolUpdatedAfterDeletion
+	return ret, IsMachineConfigPoolUpdatedAfterDeletion, pausedMCPs
 }
 
 func nullMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
