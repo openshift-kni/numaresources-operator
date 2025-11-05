@@ -57,7 +57,6 @@ import (
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
@@ -395,7 +394,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			nroKey := objects.NROObjectKey()
 			nroOperObj := nropv1.NUMAResourcesOperator{}
 
-			err := fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
+			err := fxt.Client.Get(ctx, nroKey, &nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 
 			if len(nroOperObj.Spec.NodeGroups) != 1 {
@@ -405,12 +404,9 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}
 
 			By("checking the DSs owned by NROP")
-			dss, err := objects.GetDaemonSetsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
+			dss, err := objects.GetDaemonSetsByNamespacedName(fxt.Client, ctx, nroOperObj.Status.DaemonSets...)
 			Expect(err).ToNot(HaveOccurred())
-
-			dssExpected := namespacedNameListToStringList(nroOperObj.Status.DaemonSets)
-			dssGot := namespacedNameListToStringList(daemonSetListToNamespacedNameList(dss))
-			Expect(dssGot).To(Equal(dssExpected), "mismatching RTE DaemonSets for NUMAResourcesOperator")
+			Expect(dss).To(HaveLen(1), "unexpected DaemonSet count: %d", len(dss))
 
 			By("checking the relatedObjects for NROP")
 			// shortcut, they all must be here anyway
@@ -422,16 +418,13 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			nroSchedKey := objects.NROSchedObjectKey()
 			nroSchedObj := nropv1.NUMAResourcesScheduler{}
 
-			err = fxt.Client.Get(context.TODO(), nroSchedKey, &nroSchedObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
+			Expect(fxt.Client.Get(ctx, nroSchedKey, &nroSchedObj)).To(Succeed(), "cannot get %q in the cluster", nroSchedKey.String())
 
 			By("checking the DP owned by NROSched")
-			dps, err := objects.GetDeploymentOwnedBy(fxt.Client, nroSchedObj.ObjectMeta)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(dps).To(HaveLen(1), "unexpected amount of scheduler deployments: %d", len(dps))
+			Expect(nroSchedObj.Status.Deployment.Name).ToNot(BeEmpty(), "unexpected missing scheduler deployment")
 
 			By("checking the relatedObjects for NROSched")
-			nrsExpected := objRefListToStringList(relatedobjects.Scheduler(dps[0].Namespace, nroSchedObj.Status.Deployment))
+			nrsExpected := objRefListToStringList(relatedobjects.Scheduler(nroSchedObj.Status.Deployment.Namespace, nroSchedObj.Status.Deployment))
 			nrsGot := objRefListToStringList(nroSchedObj.Status.RelatedObjects)
 			Expect(nrsGot).To(Equal(nrsExpected), "mismatching related objects for NUMAResourcesScheduler")
 		})
@@ -1632,23 +1625,6 @@ func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.Objec
 	// TODO: multi-line value in structured log
 	klog.InfoS("result of checking the status from NodeGroupStatus", "NRO Object", key.String(), "status", toJSON(statusFromNodeGroups), "spec", toJSON(expectedConf), "match", matchFromGroupStatus)
 	Expect(matchFromMCP && matchFromGroupStatus).To(BeTrue(), "config status mismatch")
-}
-
-func daemonSetListToNamespacedNameList(dss []*appsv1.DaemonSet) []nropv1.NamespacedName {
-	ret := make([]nropv1.NamespacedName, 0, len(dss))
-	for _, ds := range dss {
-		ret = append(ret, namespacedname.FromObject(ds))
-	}
-	return ret
-}
-
-func namespacedNameListToStringList(nnames []nropv1.NamespacedName) []string {
-	ret := make([]string, 0, len(nnames))
-	for _, nname := range nnames {
-		ret = append(ret, nname.String())
-	}
-	sort.Strings(ret)
-	return ret
 }
 
 func objRefListToStringList(objRefs []configv1.ObjectReference) []string {

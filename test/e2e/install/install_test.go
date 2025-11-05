@@ -446,7 +446,7 @@ func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {
 }
 
 func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context.Context, nroObj *nropv1.NUMAResourcesOperator, reason string) {
-	dss, err := objects.GetDaemonSetsOwnedBy(cli, nroObj.ObjectMeta)
+	dss, err := objects.GetDaemonSetsByNamespacedName(cli, ctx, nroObj.Status.DaemonSets...)
 	if err != nil {
 		klog.InfoS("no DaemonSets", "nroName", nroObj.Name, "nroUID", nroObj.GetUID())
 		return

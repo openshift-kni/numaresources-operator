@@ -83,18 +83,3 @@ func GetDaemonSetsByNamespacedName(cli client.Client, ctx context.Context, nname
 	}
 	return dss, nil
 }
-
-func GetDaemonSetsOwnedBy(cli client.Client, objMeta metav1.ObjectMeta) ([]*appsv1.DaemonSet, error) {
-	dsList := &appsv1.DaemonSetList{}
-	if err := cli.List(context.TODO(), dsList); err != nil {
-		return nil, err
-	}
-
-	var dss []*appsv1.DaemonSet
-	for i := range dsList.Items {
-		if IsOwnedBy(dsList.Items[i].ObjectMeta, objMeta) {
-			dss = append(dss, &dsList.Items[i])
-		}
-	}
-	return dss, nil
-}
