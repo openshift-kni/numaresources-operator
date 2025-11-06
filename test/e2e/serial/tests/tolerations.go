@@ -547,13 +547,9 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					Expect(err).ToNot(HaveOccurred())
 
 					By("list the DSs owned by NROP")
-					dss, err := objects.GetDaemonSetsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
+					dss, err := objects.GetDaemonSetsByNamespacedName(fxt.Client, ctx, nroOperObj.Status.DaemonSets...)
 					Expect(err).ToNot(HaveOccurred())
 					Expect(dss).To(HaveLen(1))
-
-					dssExpected := namespacedNameListToStringList(nroOperObj.Status.DaemonSets)
-					dssGot := namespacedNameListToStringList(daemonSetListToNamespacedNameList(dss))
-					Expect(dssGot).To(Equal(dssExpected), "mismatching RTE daemonsets for NUMAResourcesOperator")
 
 					By("get list of RTE pods owned by the daemonset before NROP CR deletion")
 					ds := dss[0]

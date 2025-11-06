@@ -195,7 +195,12 @@ func updateStatusConditionsIfNeeded(instance *nropv1.NUMAResourcesOperator, cond
 		return
 	}
 	klog.InfoS("updateStatus", "condition", cond.Type, "reason", cond.Reason, "message", cond.Message)
-	conditions, ok := status.ComputeConditions(instance.Status.Conditions, cond.Type, cond.Reason, cond.Message)
+	conditions, ok := status.ComputeConditions(instance.Status.Conditions, metav1.Condition{
+		Type:               cond.Type,
+		Reason:             cond.Reason,
+		Message:            cond.Message,
+		ObservedGeneration: instance.Generation,
+	}, time.Now())
 	if ok {
 		instance.Status.Conditions = conditions
 	}

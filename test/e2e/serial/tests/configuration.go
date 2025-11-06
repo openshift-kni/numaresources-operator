@@ -57,7 +57,6 @@ import (
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
@@ -154,7 +153,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(fxt.Client.Get(ctx, nroKey, &initialNroOperObj)).To(Succeed())
 
 			testMCP := objects.TestMCP()
-			By(fmt.Sprintf("creating new MCP: %q", testMCP.Name))
+			e2efixture.By("creating new MCP: %q", testMCP.Name)
 			// we must have this label in order to match other machine configs that are necessary for proper functionality
 			testMCP.Labels = map[string]string{"machineconfiguration.openshift.io/role": roleMCPTest}
 			testMCP.Spec.MachineConfigSelector = &metav1.LabelSelector{
@@ -167,17 +166,19 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				MatchLabels: map[string]string{getLabelRoleMCPTest(): ""},
 			}
 
-			Expect(fxt.Client.Create(context.TODO(), testMCP)).To(Succeed())
-			defer func() {
+			Expect(fxt.Client.Create(ctx, testMCP)).To(Succeed())
+			defer func(dctx context.Context) {
 				By(fmt.Sprintf("CLEANUP: deleting mcp: %q", testMCP.Name))
-				Expect(fxt.Client.Delete(context.TODO(), testMCP)).To(Succeed())
+				Expect(fxt.Client.Delete(dctx, testMCP)).To(Succeed())
 
 				err := wait.With(fxt.Client).
 					Interval(configuration.MachineConfigPoolUpdateInterval).
 					Timeout(configuration.MachineConfigPoolUpdateTimeout).
-					ForMachineConfigPoolDeleted(context.TODO(), testMCP)
+					ForMachineConfigPoolDeleted(dctx, testMCP)
 				Expect(err).ToNot(HaveOccurred())
-			}()
+			}(context.Background())
+			// intentionally using a background context to avoid timing issues
+			// when the main context is canceled on test end
 			// keep the mcp with zero machine count intentionally to avoid reboots
 
 			testNG := nropv1.NodeGroup{
@@ -186,11 +187,10 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				},
 			}
 
-			By(fmt.Sprintf("modifying the NUMAResourcesOperator nodeGroups field to include new group: %q labels %q", testMCP.Name, testMCP.Labels))
+			e2efixture.By("modifying the NUMAResourcesOperator nodeGroups field to include new group: %q labels %q", testMCP.Name, testMCP.Labels)
 			var nroOperObj nropv1.NUMAResourcesOperator
 			newLogLevel := operatorv1.Trace
 			Eventually(func(g Gomega) {
-				// we need that for the current ResourceVersion
 				g.Expect(fxt.Client.Get(ctx, nroKey, &nroOperObj)).To(Succeed())
 
 				newNGs := append(nroOperObj.Spec.NodeGroups, testNG)
@@ -205,41 +205,45 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				g.Expect(fxt.Client.Update(ctx, &nroOperObj)).To(Succeed())
 			}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-			defer func() {
+			defer func(dctx context.Context) {
 				By("CLEANUP: reverting the changes under the NUMAResourcesOperator object")
 				Eventually(func(g Gomega) {
 					// we need that for the current ResourceVersion
-					g.Expect(fxt.Client.Get(ctx, nroKey, &nroOperObj)).To(Succeed())
+					g.Expect(fxt.Client.Get(dctx, nroKey, &nroOperObj)).To(Succeed())
 
 					nroOperObj.Spec = initialNroOperObj.Spec
-					g.Expect(fxt.Client.Update(ctx, &nroOperObj)).To(Succeed())
+					g.Expect(fxt.Client.Update(dctx, &nroOperObj)).To(Succeed())
 				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
-			}() //end of defer
+			}(context.Background())
+			// intentionally using a background context to avoid timing issues
+			// when the main context is canceled on test end
 
 			By("verify new RTE daemonset is created and all the RTE dameonsets are updated")
+			updatedOperObj := &nropv1.NUMAResourcesOperator{}
 			Eventually(func(g Gomega) {
-				Expect(fxt.Client.Get(ctx, nroKey, &nroOperObj)).To(Succeed())
-				dss, err := objects.GetDaemonSetsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
-				g.Expect(err).ToNot(HaveOccurred())
-				// assumption 1:1 mapping to testMCP
-				g.Expect(dss).To(HaveLen(len(nroOperObj.Spec.NodeGroups)), "daemonsets found owned by NRO object doesn't align with specified NodeGroups")
-
-				for _, ds := range dss {
-					By(fmt.Sprintf("check RTE daemonset %q", ds.Name))
-					if ds.Name == objectnames.GetComponentName(nroOperObj.Name, roleMCPTest) {
-						By("check the correct match labels for the new RTE daemonset")
-						g.Expect(ds.Spec.Template.Spec.NodeSelector).To(Equal(testMCP.Spec.NodeSelector.MatchLabels))
-					}
-					By("check the correct image")
-					cnt := ds.Spec.Template.Spec.Containers[0]
-					g.Expect(cnt.Image).To(Equal(serialconfig.GetRteCiImage()))
-
-					By("checking the correct LogLevel")
-					found, match := matchLogLevelToKlog(&cnt, newLogLevel)
-					g.Expect(found).To(BeTrue(), "-v flag doesn't exist in container %q args under DaemonSet: %q", cnt.Name, ds.Name)
-					g.Expect(match).To(BeTrue(), "LogLevel %s doesn't match the existing -v flag in container: %q managed by DaemonSet: %q", nroOperObj.Spec.LogLevel, cnt.Name, ds.Name)
-				}
+				g.Expect(fxt.Client.Get(ctx, nroKey, updatedOperObj)).To(Succeed())
+				g.Expect(isNROOperUpToDate(updatedOperObj)).To(BeTrue())
 			}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update RTE daemonset node selector")
+
+			dss, err := objects.GetDaemonSetsByNamespacedName(fxt.Client, ctx, updatedOperObj.Status.DaemonSets...)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(dss).To(HaveLen(len(nroOperObj.Spec.NodeGroups)), "daemonsets found owned by NRO object doesn't align with specified NodeGroups")
+			for _, ds := range dss {
+				e2efixture.By("check RTE daemonset %q", ds.Name)
+				if ds.Name == objectnames.GetComponentName(updatedOperObj.Name, roleMCPTest) {
+					By("check the correct match labels for the new RTE daemonset")
+					Expect(ds.Spec.Template.Spec.NodeSelector).To(Equal(testMCP.Spec.NodeSelector.MatchLabels))
+				}
+				By("check the correct image")
+				cnt := ds.Spec.Template.Spec.Containers[0] // shortcut
+				Expect(cnt.Image).To(Equal(serialconfig.GetRteCiImage()))
+
+				By("checking the correct LogLevel")
+				found, match := matchLogLevelToKlog(&cnt, newLogLevel)
+				Expect(found).To(BeTrue(), "-v flag doesn't exist in container %q args under DaemonSet: %q", cnt.Name, ds.Name)
+				Expect(match).To(BeTrue(), "LogLevel %s doesn't match the existing -v flag in container: %q managed by DaemonSet: %q", updatedOperObj.Spec.LogLevel, cnt.Name, ds.Name)
+			}
 		})
 
 		It("[test_id:54916] should be able to modify the configurable values under the NUMAResourcesScheduler CR", Label(label.Tier2, "schedrst"), Label("feature:schedrst"), func() {
@@ -390,7 +394,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			nroKey := objects.NROObjectKey()
 			nroOperObj := nropv1.NUMAResourcesOperator{}
 
-			err := fxt.Client.Get(context.TODO(), nroKey, &nroOperObj)
+			err := fxt.Client.Get(ctx, nroKey, &nroOperObj)
 			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroKey.String())
 
 			if len(nroOperObj.Spec.NodeGroups) != 1 {
@@ -400,12 +404,9 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}
 
 			By("checking the DSs owned by NROP")
-			dss, err := objects.GetDaemonSetsOwnedBy(fxt.Client, nroOperObj.ObjectMeta)
+			dss, err := objects.GetDaemonSetsByNamespacedName(fxt.Client, ctx, nroOperObj.Status.DaemonSets...)
 			Expect(err).ToNot(HaveOccurred())
-
-			dssExpected := namespacedNameListToStringList(nroOperObj.Status.DaemonSets)
-			dssGot := namespacedNameListToStringList(daemonSetListToNamespacedNameList(dss))
-			Expect(dssGot).To(Equal(dssExpected), "mismatching RTE DaemonSets for NUMAResourcesOperator")
+			Expect(dss).To(HaveLen(1), "unexpected DaemonSet count: %d", len(dss))
 
 			By("checking the relatedObjects for NROP")
 			// shortcut, they all must be here anyway
@@ -417,16 +418,13 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			nroSchedKey := objects.NROSchedObjectKey()
 			nroSchedObj := nropv1.NUMAResourcesScheduler{}
 
-			err = fxt.Client.Get(context.TODO(), nroSchedKey, &nroSchedObj)
-			Expect(err).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
+			Expect(fxt.Client.Get(ctx, nroSchedKey, &nroSchedObj)).To(Succeed(), "cannot get %q in the cluster", nroSchedKey.String())
 
 			By("checking the DP owned by NROSched")
-			dps, err := objects.GetDeploymentOwnedBy(fxt.Client, nroSchedObj.ObjectMeta)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(dps).To(HaveLen(1), "unexpected amount of scheduler deployments: %d", len(dps))
+			Expect(nroSchedObj.Status.Deployment.Name).ToNot(BeEmpty(), "unexpected missing scheduler deployment")
 
 			By("checking the relatedObjects for NROSched")
-			nrsExpected := objRefListToStringList(relatedobjects.Scheduler(dps[0].Namespace, nroSchedObj.Status.Deployment))
+			nrsExpected := objRefListToStringList(relatedobjects.Scheduler(nroSchedObj.Status.Deployment.Namespace, nroSchedObj.Status.Deployment))
 			nrsGot := objRefListToStringList(nroSchedObj.Status.RelatedObjects)
 			Expect(nrsGot).To(Equal(nrsExpected), "mismatching related objects for NUMAResourcesScheduler")
 		})
@@ -1002,6 +1000,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Eventually(func(g Gomega) {
 					var updated nropv1.NUMAResourcesOperator
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed())
+					g.Expect(isNROOperUpToDate(&updated)).To(BeTrue())
 					g.Expect(isDegradedWith(updated.Status.Conditions, "must have only a single specifier set", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			})
@@ -1086,6 +1085,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}()
 
 				By("wait for NodeGroupStatus to reflect changes")
+
 				Eventually(func(g Gomega) {
 					g.Expect(ng.PoolName).ToNot(BeNil())
 					verifyStatusUpdate(fxt.Client, ctx, nroKey, updatedNRO, *ng.PoolName, specConf)
@@ -1210,6 +1210,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Eventually(func(g Gomega) {
 					var updated nropv1.NUMAResourcesOperator
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed())
+					g.Expect(isNROOperUpToDate(&updated)).To(BeTrue())
 					g.Expect(isDegradedWith(updated.Status.Conditions, expectedMsg, validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected for pool name: %q", poolName)
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			},
@@ -1259,6 +1260,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Eventually(func(g Gomega) {
 					var updated nropv1.NUMAResourcesOperator
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed())
+					g.Expect(isNROOperUpToDate(&updated)).To(BeTrue())
 					g.Expect(isDegradedWith(updated.Status.Conditions, "Should specify PoolName only", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			})
@@ -1325,6 +1327,8 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			It("[test_id:84316] should change NRT attributes correctly when RTE is pointing to a different nodeGroup", Label(label.OpenShift, label.Slow, label.Tier2, label.Reboot), func(ctx context.Context) {
 				fxt.IsRebootTest = true
 				waitForMCPUpdateFunc := func(mcp *machineconfigv1.MachineConfigPool) {
+					// TODO: this is fragile. We should use ObservedGeneration
+
 					_ = wait.With(fxt.Client).
 						Interval(configuration.MachineConfigPoolUpdateInterval).
 						Timeout(configuration.MachineConfigPoolUpdateTimeout).
@@ -1498,6 +1502,24 @@ func isNROSchedUpToDate(nros *nropv1.NUMAResourcesScheduler) bool {
 	return isNROSchedAvailableAt(&nros.Status, nros.Generation)
 }
 
+func isNROOperAvailableAt(nropStatus *nropv1.NUMAResourcesOperatorStatus, gen int64) bool {
+	if nropStatus == nil {
+		return false
+	}
+	cond := status.FindCondition(nropStatus.Conditions, status.ConditionAvailable)
+	if cond == nil {
+		return false
+	}
+	if cond.Status != metav1.ConditionTrue {
+		return false
+	}
+	return cond.ObservedGeneration == gen
+}
+
+func isNROOperUpToDate(nrop *nropv1.NUMAResourcesOperator) bool {
+	return isNROOperAvailableAt(&nrop.Status, nrop.Generation)
+}
+
 func mutateNodeCustomLabel(nodes []corev1.Node) (*corev1.Node, *corev1.Node, string) {
 	targetNode := nodeWithoutCustomRole(nodes)
 	var customRoleKey string
@@ -1549,6 +1571,7 @@ func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.Objec
 	var updatedNRO nropv1.NUMAResourcesOperator
 	Eventually(func(g Gomega) {
 		g.Expect(cli.Get(ctx, key, &updatedNRO)).To(Succeed())
+		g.Expect(isNROOperUpToDate(&updatedNRO)).To(BeTrue())
 		g.Expect(updatedNRO.Status.NodeGroups).To(HaveLen(len(appliedObj.Spec.NodeGroups)),
 			"NodeGroups Status mismatch: found %d, expected %d", len(updatedNRO.Status.NodeGroups), len(appliedObj.Spec.NodeGroups))
 		g.Expect(status.NUMAResourceOperatorNeedsUpdate(&appliedObj.Status, &updatedNRO.Status)).To(BeTrue())
@@ -1602,23 +1625,6 @@ func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.Objec
 	// TODO: multi-line value in structured log
 	klog.InfoS("result of checking the status from NodeGroupStatus", "NRO Object", key.String(), "status", toJSON(statusFromNodeGroups), "spec", toJSON(expectedConf), "match", matchFromGroupStatus)
 	Expect(matchFromMCP && matchFromGroupStatus).To(BeTrue(), "config status mismatch")
-}
-
-func daemonSetListToNamespacedNameList(dss []*appsv1.DaemonSet) []nropv1.NamespacedName {
-	ret := make([]nropv1.NamespacedName, 0, len(dss))
-	for _, ds := range dss {
-		ret = append(ret, namespacedname.FromObject(ds))
-	}
-	return ret
-}
-
-func namespacedNameListToStringList(nnames []nropv1.NamespacedName) []string {
-	ret := make([]string, 0, len(nnames))
-	for _, nname := range nnames {
-		ret = append(ret, nname.String())
-	}
-	sort.Strings(ret)
-	return ret
 }
 
 func objRefListToStringList(objRefs []configv1.ObjectReference) []string {
