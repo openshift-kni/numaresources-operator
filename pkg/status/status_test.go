@@ -17,7 +17,6 @@ limitations under the License.
 package status
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -26,14 +25,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/ptr"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
 func TestFindCondition(t *testing.T) {
@@ -54,13 +48,13 @@ func TestFindCondition(t *testing.T) {
 		{
 			name:          "missing condition",
 			desired:       "foobar",
-			conds:         newBaseConditions(now),
+			conds:         DefaultBaseConditions(now),
 			expectedFound: false,
 		},
 		{
 			name:          "found condition",
 			desired:       ConditionProgressing,
-			conds:         newBaseConditions(now),
+			conds:         DefaultBaseConditions(now),
 			expectedFound: true,
 		},
 	}
@@ -73,45 +67,6 @@ func TestFindCondition(t *testing.T) {
 				t.Errorf("failure looking for condition %q: got=%v expected=%v", tcase.desired, found, tcase.expectedFound)
 			}
 		})
-	}
-}
-
-func TestComputeConditions(t *testing.T) {
-	err := nropv1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		t.Errorf("nropv1.AddToScheme() failed with: %v", err)
-	}
-
-	nro := testobjs.NewNUMAResourcesOperator("test-nro")
-	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(nro).Build()
-
-	var ok bool
-	nro.Status.Conditions, ok = ComputeConditions(nro.Status.Conditions, ConditionProgressing, "testReason", "test message")
-	if !ok {
-		t.Errorf("Update did not change status, but it should")
-	}
-
-	err = fakeClient.Update(context.TODO(), nro)
-	if err != nil {
-		t.Errorf("Update() failed with: %v", err)
-	}
-
-	updatedNro := &nropv1.NUMAResourcesOperator{}
-	err = fakeClient.Get(context.TODO(), client.ObjectKeyFromObject(nro), updatedNro)
-	if err != nil {
-		t.Errorf("failed to get NUMAResourcesOperator object: %v", err)
-	}
-
-	//shortcut
-	progressingCondition := &updatedNro.Status.Conditions[2]
-	if progressingCondition.Status != metav1.ConditionTrue {
-		t.Errorf("Update() failed to set correct status, expected: %q, got: %q", metav1.ConditionTrue, progressingCondition.Status)
-	}
-
-	// same status twice in a row. We should not overwrite identical status to save transactions.
-	_, ok = ComputeConditions(nro.Status.Conditions, ConditionProgressing, "testReason", "test message")
-	if ok {
-		t.Errorf("Update did change status, but it should not")
 	}
 }
 
@@ -132,22 +87,38 @@ func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 		{
 			name: "status, conditions, updated only time",
 			oldStatus: &nropv1.NUMAResourcesOperatorStatus{
-				Conditions: NewConditions(ConditionAvailable, "test all good", "testing info"),
+				Conditions: NewBaseConditionsWith(metav1.Condition{
+					Type:    ConditionAvailable,
+					Reason:  "testAllGood",
+					Message: "testing info",
+				}, time.Now()),
 			},
 			updaterFunc: func(st *nropv1.NUMAResourcesOperatorStatus) {
 				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
-				st.Conditions = NewConditions(ConditionAvailable, "test all good", "testing info")
+				st.Conditions = NewBaseConditionsWith(metav1.Condition{
+					Type:    ConditionAvailable,
+					Reason:  "testAllGood",
+					Message: "testing info",
+				}, time.Now())
 			},
 			expectedUpdated: false,
 		},
 		{
 			name: "status, conditions, updated only time, other fields changed",
 			oldStatus: &nropv1.NUMAResourcesOperatorStatus{
-				Conditions: NewConditions(ConditionAvailable, "test all good", "testing info"),
+				Conditions: NewBaseConditionsWith(metav1.Condition{
+					Type:    ConditionAvailable,
+					Reason:  "testAllGood",
+					Message: "testing info",
+				}, time.Now()),
 			},
 			updaterFunc: func(st *nropv1.NUMAResourcesOperatorStatus) {
 				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
-				st.Conditions = NewConditions(ConditionAvailable, "test all good", "testing info")
+				st.Conditions = NewBaseConditionsWith(metav1.Condition{
+					Type:    ConditionAvailable,
+					Reason:  "testAllGood",
+					Message: "testing info",
+				}, time.Now())
 				st.DaemonSets = []nropv1.NamespacedName{
 					{
 						Namespace: "foo",
@@ -160,7 +131,11 @@ func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 		{
 			name: "status, conditions, updated only time, other fields mutated",
 			oldStatus: &nropv1.NUMAResourcesOperatorStatus{
-				Conditions: NewConditions(ConditionAvailable, "test all good", "testing info"),
+				Conditions: NewBaseConditionsWith(metav1.Condition{
+					Type:    ConditionAvailable,
+					Reason:  "testAllGood",
+					Message: "testing info",
+				}, time.Now()),
 				DaemonSets: []nropv1.NamespacedName{
 					{
 						Namespace: "foo",
@@ -170,7 +145,11 @@ func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 			},
 			updaterFunc: func(st *nropv1.NUMAResourcesOperatorStatus) {
 				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
-				st.Conditions = NewConditions(ConditionAvailable, "test all good", "testing info")
+				st.Conditions = NewBaseConditionsWith(metav1.Condition{
+					Type:    ConditionAvailable,
+					Reason:  "testAllGood",
+					Message: "testing info",
+				}, time.Now())
 				st.DaemonSets = []nropv1.NamespacedName{
 					{
 						Namespace: "foo",
@@ -187,7 +166,7 @@ func TestNUMAResourceOperatorNeedsUpdate(t *testing.T) {
 			oldStatus := tc.oldStatus.DeepCopy()
 			newStatus := tc.oldStatus.DeepCopy()
 			tc.updaterFunc(newStatus)
-			got := NUMAResourceOperatorNeedsUpdate(oldStatus, newStatus)
+			got := NUMAResourceOperatorNeedsUpdate(*oldStatus, *newStatus)
 			if got != tc.expectedUpdated {
 				t.Errorf("isUpdated %v expected %v", got, tc.expectedUpdated)
 			}
@@ -212,22 +191,38 @@ func TestNUMAResourcesSchedulerNeedsUpdate(t *testing.T) {
 		{
 			name: "status, conditions, updated only time",
 			oldStatus: nropv1.NUMAResourcesSchedulerStatus{
-				Conditions: NewConditions(ConditionAvailable, "test all good", "testing info"),
+				Conditions: NewBaseConditionsWith(metav1.Condition{
+					Type:    ConditionAvailable,
+					Reason:  "testAllGood",
+					Message: "testing info",
+				}, time.Now()),
 			},
 			updaterFunc: func(st *nropv1.NUMAResourcesSchedulerStatus) {
 				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
-				st.Conditions = NewConditions(ConditionAvailable, "test all good", "testing info")
+				st.Conditions = NewBaseConditionsWith(metav1.Condition{
+					Type:    ConditionAvailable,
+					Reason:  "testAllGood",
+					Message: "testing info",
+				}, time.Now())
 			},
 			expectedUpdated: false,
 		},
 		{
 			name: "status, conditions, updated only time, other fields changed",
 			oldStatus: nropv1.NUMAResourcesSchedulerStatus{
-				Conditions: NewConditions(ConditionAvailable, "test all good", "testing info"),
+				Conditions: NewBaseConditionsWith(metav1.Condition{
+					Type:    ConditionAvailable,
+					Reason:  "testAllGood",
+					Message: "testing info",
+				}, time.Now()),
 			},
 			updaterFunc: func(st *nropv1.NUMAResourcesSchedulerStatus) {
 				time.Sleep(42 * time.Millisecond) // make sure the timestamp changed
-				st.Conditions = NewConditions(ConditionAvailable, "test all good", "testing info")
+				st.Conditions = NewBaseConditionsWith(metav1.Condition{
+					Type:    ConditionAvailable,
+					Reason:  "testAllGood",
+					Message: "testing info",
+				}, time.Now())
 				st.CacheResyncPeriod = ptr.To(metav1.Duration{Duration: 42 * time.Second})
 			},
 			expectedUpdated: true,
