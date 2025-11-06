@@ -19,6 +19,6 @@ entries:
     name: "4.21"
     package: numaresources-operator
     schema: olm.channel
-  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-21@sha256:43cf0f525626c0cebd78ab2489488fdaeb1c04531e29888baaa6834556fe6234
+  - image: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-4-21@sha256:4641dc376f615814a95e84d662918fdac19b0fc2181915707869acbdd823dbeb
     # The url for this last entry is updated by hack/konflux-update-catalog-template.sh automatically
     schema: olm.bundle
