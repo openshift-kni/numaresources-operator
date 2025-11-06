@@ -17,6 +17,8 @@
 package conditioninfo
 
 import (
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 )
 
@@ -71,5 +73,15 @@ func DegradedFromError(err error) ConditionInfo {
 		Type:    status.ConditionDegraded,
 		Message: status.MessageFromError(err),
 		Reason:  status.ReasonFromError(err),
+	}
+}
+
+func (ci ConditionInfo) ToMetav1Condition(gen int64) metav1.Condition {
+	return metav1.Condition{
+		Type:               ci.Type,
+		Status:             metav1.ConditionTrue,
+		Reason:             ci.Reason,
+		Message:            ci.Message,
+		ObservedGeneration: gen,
 	}
 }
