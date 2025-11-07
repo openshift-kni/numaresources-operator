@@ -1,0 +1,33 @@
+name: Code Review
+
+on:
+  pull_request:
+    branches: [ "main", "release-4.*" ]
+
+jobs:
+  review:
+    if: github.actor != 'dependabot[bot]' && github.actor != 'red-hat-konflux[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: sshnaidm/gemini-code-review-action@v1
+        with:
+          gemini-key: ${{ secrets.GEMINI_API_KEY }}
+          add-files: 'true'
+          prompt: |
+            Act as a helpful assistant that reviews code changes.
+            You are given a pull request and a list of files that have been changed.
+            You are asked to review the code and provide a summary of the changes.
+            You are also asked to provide a list of potential issues or bugs in the code.
+            You are also asked to provide a list of potential improvements to the code changes using the same langauge.
+            You are also asked to provide a list of potential tests that should be added.
+            You are also asked to provide a list of potential documentation that should be added to the code changes.
+            You are also asked to provide a list of potential best practices that should be followed for the code changes, in addition to the guidelines of the project.
+            You are also asked to provide a list of potential performance improvements that should be made.
+            You are also asked to provide a list of potential security issues that should be addressed.
+            During the review, you should ignore changed files under `vendor` directory.
+            
