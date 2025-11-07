@@ -1,0 +1,3 @@
+have_fun: false
+ignore_patterns:
+  - "vendor/**"
