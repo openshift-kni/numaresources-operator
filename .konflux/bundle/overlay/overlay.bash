@@ -268,10 +268,10 @@ overlay_release()
 {
     echo "Overlaying relase..."
 
-    local version="4.14.10"
+    local version="4.14.11"
     local name="numaresources-operator"
     local name_version="$name.v$version"
-    local skip_range=">=4.13.0 <4.14.10"
+    local skip_range=">=4.13.0 <4.14.11"
     local replaces="numaresources-operator.v4.14.10"
     local annotations='
     features.operators.openshift.io/disconnected: "true"
