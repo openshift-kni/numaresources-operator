@@ -272,7 +272,7 @@ overlay_release()
     local name="numaresources-operator"
     local name_version="$name.v$version"
     local skip_range=">=4.11.0 <4.12.15"
-    local replaces="numaresources-operator.v4.12.15"
+    local replaces="numaresources-operator.v4.12.14"
     local annotations='
     features.operators.openshift.io/disconnected: "true"
     features.operators.openshift.io/fips-compliant: "true"
