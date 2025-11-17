@@ -35,4 +35,7 @@ done
 # Collect PFP debugging data
 /usr/bin/gather_pfp
 
+# Collect SELinux debugging data
+/usr/bin/gather_selinux
+
 exit 0
