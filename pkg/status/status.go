@@ -100,7 +100,7 @@ func ComputeConditions(currentConditions []metav1.Condition, cond metav1.Conditi
 // UpdateConditionsInPlace mutates the given conditions, setting the value of the one pointed out to `condition` to the given values.
 // Differently from `ComputeConditions`, it doesn't allocate new data. Returns true if successfully mutated conditions, false otherwise
 func UpdateConditionsInPlace(conds []metav1.Condition, condition metav1.Condition, ts time.Time) bool {
-	cond := FindCondition(conds, condition.Type)
+	cond := metahelper.FindStatusCondition(conds, condition.Type)
 	if cond == nil {
 		return false // should never happen
 	}
@@ -125,17 +125,6 @@ func updateBaseCondition(conds []metav1.Condition, condition metav1.Condition, t
 		updated = updated || changed
 	}
 	return updated
-}
-
-// FindCondition returns a pointer to the Condition object matching the given `condition` by type on success, nil otherwise.
-func FindCondition(conditions []metav1.Condition, condition string) *metav1.Condition {
-	for idx := 0; idx < len(conditions); idx++ {
-		cond := &conditions[idx]
-		if cond.Type == condition {
-			return cond
-		}
-	}
-	return nil
 }
 
 // NewBaseConditions creates a new set of pristine conditions. The given `condition` is set, and its `reason` and `message` are

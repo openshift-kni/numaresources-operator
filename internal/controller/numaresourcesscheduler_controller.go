@@ -26,6 +26,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -368,7 +369,7 @@ func platformNormalize(spec *nropv1.NUMAResourcesSchedulerSpec, platInfo platfor
 }
 
 func updateDedicatedInformerCondition(conds []metav1.Condition, instance nropv1.NUMAResourcesScheduler, normalized nropv1.NUMAResourcesSchedulerSpec) []metav1.Condition {
-	condition := status.FindCondition(conds, status.ConditionDedicatedInformerActive)
+	condition := metahelper.FindStatusCondition(conds, status.ConditionDedicatedInformerActive)
 	if condition == nil { // should never happen
 		klog.InfoS("missing condition: %q", status.ConditionDedicatedInformerActive)
 		return conds
