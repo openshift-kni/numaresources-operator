@@ -198,10 +198,11 @@ func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, init
 	return nil
 }
 
-// updateStatusConditionsWithConditionInfo returns true if conditions were updated.
-func updateStatusConditionsWithConditionInfo(conds []metav1.Condition, gen int64, cond conditioninfo.ConditionInfo) bool {
+// updateStatusConditionsWithConditionInfo returns updated conditions with the given condition and
+// true if the update is successful, false otherwise.
+func updateStatusConditionsWithConditionInfo(conds []metav1.Condition, gen int64, cond conditioninfo.ConditionInfo) ([]metav1.Condition, bool) {
 	klog.InfoS("updateStatus", "condition", cond.Type, "reason", cond.Reason, "message", cond.Message)
-	return status.UpdateConditionsInPlace(conds, cond.ToMetav1Condition(gen), time.Now())
+	return status.UpdateConditions(conds, cond.ToMetav1Condition(gen), time.Now())
 }
 
 func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesOperatorStatus, instance *nropv1.NUMAResourcesOperator, reason string, stErr error) (ctrl.Result, error) {
@@ -210,7 +211,7 @@ func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, ini
 		info.Reason = reason
 	}
 
-	updateStatusConditionsWithConditionInfo(instance.Status.Conditions, instance.Generation, info)
+	instance.Status.Conditions, _ = updateStatusConditionsWithConditionInfo(instance.Status.Conditions, instance.Generation, info)
 
 	err := r.updateStatus(ctx, initialStatus, instance)
 	if err != nil {
@@ -292,7 +293,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) intreconcile.Step {
 	if step := r.reconcileResourceAPI(ctx, instance, trees); step.EarlyStop() {
-		updateStatusConditionsWithConditionInfo(instance.Status.Conditions, instance.Generation, step.ConditionInfo)
+		instance.Status.Conditions, _ = updateStatusConditionsWithConditionInfo(instance.Status.Conditions, instance.Generation, step.ConditionInfo)
 		return step
 	}
 
@@ -300,14 +301,14 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 
 	if r.Platform == platform.OpenShift {
 		if step := r.reconcileResourceMachineConfig(ctx, instance, existing, trees); step.EarlyStop() {
-			updateStatusConditionsWithConditionInfo(instance.Status.Conditions, instance.Generation, step.ConditionInfo)
+			instance.Status.Conditions, _ = updateStatusConditionsWithConditionInfo(instance.Status.Conditions, instance.Generation, step.ConditionInfo)
 			return step
 		}
 	}
 
 	dsPerPool, step := r.reconcileResourceDaemonSet(ctx, instance, existing, trees)
 	if step.EarlyStop() {
-		updateStatusConditionsWithConditionInfo(instance.Status.Conditions, instance.Generation, step.ConditionInfo)
+		instance.Status.Conditions, _ = updateStatusConditionsWithConditionInfo(instance.Status.Conditions, instance.Generation, step.ConditionInfo)
 		return step
 	}
 
@@ -315,7 +316,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	// is a certain thing if we got to this point otherwise the function would have returned already
 	instance.Status.NodeGroups = syncNodeGroupsStatus(instance, dsPerPool)
 
-	updateStatusConditionsWithConditionInfo(instance.Status.Conditions, instance.Generation, conditioninfo.Available())
+	instance.Status.Conditions, _ = updateStatusConditionsWithConditionInfo(instance.Status.Conditions, instance.Generation, conditioninfo.Available())
 	return intreconcile.StepSuccess()
 }
 

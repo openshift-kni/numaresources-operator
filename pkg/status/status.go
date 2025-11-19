@@ -23,6 +23,7 @@ import (
 
 	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/klog/v2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )
@@ -86,18 +87,28 @@ func EqualConditions(current, updated []metav1.Condition) bool {
 	return reflect.DeepEqual(c, u)
 }
 
-// UpdateConditionsInPlace mutates the given conditions, setting the value of the one pointed out to `condition` to the given values.
-// Differently from `ComputeConditions`, it doesn't allocate new data. Returns true if successfully mutated conditions, false otherwise
-func UpdateConditionsInPlace(conds []metav1.Condition, condition metav1.Condition, ts time.Time) bool {
-	cond := metahelper.FindStatusCondition(conds, condition.Type)
+// UpdateConditions returns the given conditions updated with the given condition.
+// Returns true if the condition was updated, false otherwise.
+func UpdateConditions(conds []metav1.Condition, condition metav1.Condition, ts time.Time) ([]metav1.Condition, bool) {
+	newConds := CloneConditions(conds)
+	cond := metahelper.FindStatusCondition(newConds, condition.Type)
 	if cond == nil {
-		return false // should never happen
+		klog.InfoS("Condition not found in status conditions", "condition", condition.Type, "conditions", newConds)
+		return newConds, false // should never happen
 	}
 
+	var updated bool
 	if isBaseCondition(condition.Type) {
-		return updateBaseCondition(&conds, condition, ts)
+		updated = updateBaseCondition(&newConds, condition, ts)
+	} else {
+		updated = metahelper.SetStatusCondition(&newConds, condition)
 	}
-	return metahelper.SetStatusCondition(&conds, condition)
+
+	if !updated {
+		klog.InfoS("Failed to update status condition", "condition", condition.Type, "conditions", newConds)
+	}
+
+	return newConds, updated
 }
 
 func isBaseCondition(s string) bool {

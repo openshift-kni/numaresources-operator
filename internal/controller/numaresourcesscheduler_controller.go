@@ -147,7 +147,7 @@ func (r *NUMAResourcesSchedulerReconciler) degradeStatus(ctx context.Context, in
 		ObservedGeneration: instance.Generation,
 	}
 
-	status.UpdateConditionsInPlace(instance.Status.Conditions, condition, time.Now())
+	instance.Status.Conditions, _ = status.UpdateConditions(instance.Status.Conditions, condition, time.Now())
 
 	err := r.updateStatus(ctx, initialStatus, instance)
 	if err != nil {
@@ -209,7 +209,7 @@ func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context
 	schedStatus, err := r.syncNUMASchedulerResources(ctx, instance)
 	if err != nil {
 		step := intreconcile.StepFailed(fmt.Errorf("FailedSchedulerSync: %w", err))
-		status.UpdateConditionsInPlace(instance.Status.Conditions, step.ConditionInfo.ToMetav1Condition(instance.Generation), time.Now())
+		instance.Status.Conditions, _ = status.UpdateConditions(instance.Status.Conditions, step.ConditionInfo.ToMetav1Condition(instance.Generation), time.Now())
 		return step
 	}
 
@@ -219,12 +219,12 @@ func (r *NUMAResourcesSchedulerReconciler) reconcileResource(ctx context.Context
 	ok, err := isDeploymentRunning(ctx, r.Client, schedStatus.Deployment)
 	if err != nil {
 		step := intreconcile.StepFailed(err)
-		status.UpdateConditionsInPlace(instance.Status.Conditions, step.ConditionInfo.ToMetav1Condition(instance.Generation), time.Now())
+		instance.Status.Conditions, _ = status.UpdateConditions(instance.Status.Conditions, step.ConditionInfo.ToMetav1Condition(instance.Generation), time.Now())
 		return step
 	}
 	if !ok {
 		step := intreconcile.StepOngoing(5 * time.Second)
-		status.UpdateConditionsInPlace(instance.Status.Conditions, step.ConditionInfo.ToMetav1Condition(instance.Generation), time.Now())
+		instance.Status.Conditions, _ = status.UpdateConditions(instance.Status.Conditions, step.ConditionInfo.ToMetav1Condition(instance.Generation), time.Now())
 		return step
 	}
 
@@ -331,7 +331,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		Duration: cacheResyncPeriod,
 	}
 
-	updateDedicatedInformerCondition(schedStatus.Conditions, *instance, schedSpec)
+	schedStatus.Conditions = updateDedicatedInformerCondition(schedStatus.Conditions, instance.Generation, schedSpec)
 
 	r.SchedulerManifests.Deployment.Spec.Replicas = schedSpec.Replicas
 	klog.V(4).InfoS("using scheduler replicas", "replicas", *r.SchedulerManifests.Deployment.Spec.Replicas)
@@ -395,7 +395,7 @@ func platformNormalize(spec *nropv1.NUMAResourcesSchedulerSpec, platInfo platfor
 	klog.V(4).InfoS("SchedulerInformer default is overridden", "Platform", platInfo.Platform, "PlatformVersion", platInfo.Version.String(), "SchedulerInformer", *spec.SchedulerInformer)
 }
 
-func updateDedicatedInformerCondition(conds []metav1.Condition, instance nropv1.NUMAResourcesScheduler, normalized nropv1.NUMAResourcesSchedulerSpec) {
+func updateDedicatedInformerCondition(conds []metav1.Condition, instanceGeneration int64, normalized nropv1.NUMAResourcesSchedulerSpec) []metav1.Condition {
 	dedicatedStatus := metav1.ConditionFalse
 	if *normalized.SchedulerInformer == nropv1.SchedulerInformerDedicated {
 		dedicatedStatus = metav1.ConditionTrue
@@ -405,11 +405,12 @@ func updateDedicatedInformerCondition(conds []metav1.Condition, instance nropv1.
 		Type:               status.ConditionDedicatedInformerActive,
 		Status:             dedicatedStatus,
 		Reason:             status.ConditionDedicatedInformerActive,
-		ObservedGeneration: instance.Generation,
+		ObservedGeneration: instanceGeneration,
 		LastTransitionTime: metav1.Now(),
 	}
 
-	status.UpdateConditionsInPlace(conds, informerCondition, time.Time{})
+	conds, _ = status.UpdateConditions(conds, informerCondition, time.Time{})
+	return conds
 }
 
 func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesSchedulerStatus, sched *nropv1.NUMAResourcesScheduler) error {

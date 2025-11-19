@@ -328,6 +328,7 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 		conditions []metav1.Condition
 		condition  metav1.Condition
 		expected   []metav1.Condition
+		expectedOk bool
 	}{
 		{
 			name:       "first reconcile iteration - with operator condition",
@@ -369,6 +370,7 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 					Reason: ConditionDedicatedInformerActive,
 				},
 			},
+			expectedOk: true,
 		},
 		{
 			name:       "first reconcile iteration - with informer condition",
@@ -409,6 +411,7 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 					ObservedGeneration: 42,
 				},
 			},
+			expectedOk: true,
 		},
 		{
 			name: "non-empty with informer condition",
@@ -476,12 +479,29 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 					ObservedGeneration: 42,
 				},
 			},
+			expectedOk: true,
+		},
+		{
+			name: "non-empty with not found condition", // should never happen unless initializing condition is corrupted
+			conditions: []metav1.Condition{
+				{
+					Type:   ConditionAvailable,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionAvailable,
+				},
+			},
+			expectedOk: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := CloneConditions(tt.conditions)
-			UpdateConditionsInPlace(got, tt.condition, time.Time{})
+			got, ok := UpdateConditions(tt.conditions, tt.condition, time.Time{})
+			if !ok && !tt.expectedOk {
+				return
+			}
+			if !ok && tt.expectedOk {
+				t.Errorf("failed to update conditions")
+			}
 
 			resetIncomparableConditionFields(got)
 			resetIncomparableConditionFields(tt.expected)
