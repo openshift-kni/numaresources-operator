@@ -767,6 +767,7 @@ func validateMachineConfigLabels(mc client.Object, trees []nodegroupv1.Tree) err
 }
 
 func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
+	rteupdate.AllContainersTerminationMessagePolicy(gdm.DaemonSet)
 	rteupdate.DaemonSetTolerations(gdm.DaemonSet, gdm.NodeGroup.Config.Tolerations)
 
 	err := rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config)

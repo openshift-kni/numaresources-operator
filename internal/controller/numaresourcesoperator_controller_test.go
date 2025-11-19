@@ -2246,6 +2246,20 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(ds.Spec.UpdateStrategy.RollingUpdate).ToNot(BeNil())
 			Expect(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable.String()).To(BeStringPercentageAtLeast(10))
 		})
+
+		It("should have a terminationMessagePolicy with Fallback set", func() {
+			dsKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, pn1),
+				Namespace: testNamespace,
+			}
+			var ds appsv1.DaemonSet
+			Expect(reconciler.Client.Get(context.TODO(), dsKey, &ds)).To(Succeed())
+
+			for _, cnt := range ds.Spec.Template.Spec.Containers {
+				Expect(cnt.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageFallbackToLogsOnError))
+			}
+		})
+
 	})
 })
 
