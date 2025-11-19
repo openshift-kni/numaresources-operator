@@ -244,6 +244,15 @@ func ContainerConfig(ds *appsv1.DaemonSet, name string) error {
 	return nil
 }
 
+func AllContainersTerminationMessagePolicy(ds *appsv1.DaemonSet) {
+	for idx := range ds.Spec.Template.Spec.Containers {
+		cnt := &ds.Spec.Template.Spec.Containers[idx]
+		oldPolicy := cnt.TerminationMessagePolicy
+		cnt.TerminationMessagePolicy = corev1.TerminationMessageFallbackToLogsOnError
+		klog.V(5).InfoS("container termination message policy", "container", cnt.Name, "previous", oldPolicy, "current", cnt.TerminationMessagePolicy)
+	}
+}
+
 func AddVolumeMountMemory(podSpec *corev1.PodSpec, cnt *corev1.Container, mountName, dirName string, sizeMiB int64) {
 	cnt.VolumeMounts = append(cnt.VolumeMounts,
 		corev1.VolumeMount{
