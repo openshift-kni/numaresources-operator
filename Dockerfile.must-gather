@@ -7,6 +7,8 @@ RUN make bin/pfpsyncchk
 
 FROM quay.io/openshift/origin-cli:4.21
 
+RUN yum install -y jq procps-ng tar rsync
+
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/pfpsyncchk /usr/bin/pfpsyncchk
 
 COPY must-gather/collection-scripts/* /usr/bin/
