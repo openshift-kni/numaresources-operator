@@ -767,6 +767,7 @@ func validateMachineConfigLabels(mc client.Object, trees []nodegroupv1.Tree) err
 }
 
 func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
+	rteupdate.AllContainersTerminationMessagePolicy(gdm.DaemonSet)
 	rteupdate.DaemonSetTolerations(gdm.DaemonSet, gdm.NodeGroup.Config.Tolerations)
 
 	err := rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config)
@@ -780,21 +781,18 @@ func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest) e
 	// We cannot do this at GetManifests time because we need to mount
 	// a specific configmap for each daemonset, whose name we know only
 	// when we instantiate the daemonset from the MCP.
-	if gdm.ClusterPlatform != platform.OpenShift && gdm.ClusterPlatform != platform.HyperShift {
-		klog.V(5).InfoS("DaemonSet update: unsupported platform", "pool name", poolName, "platform", gdm.ClusterPlatform)
-		// nothing to do!
-		return nil
-	}
-	err = rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
-	if err != nil {
-		// intentionally info because we want to keep going
-		klog.V(5).InfoS("DaemonSet update: cannot update config", "pool name", poolName, "daemonset", gdm.DaemonSet.Name, "error", err)
-		return err
-	}
-	if gdm.ClusterPlatform != platform.Kubernetes {
+	if gdm.ClusterPlatform == platform.OpenShift || gdm.ClusterPlatform == platform.HyperShift {
+		klog.V(4).InfoS("DaemonSet update: container configuration", "platform", gdm.ClusterPlatform, "daemonSetName", gdm.DaemonSet.Name)
+		err = rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
+		if err != nil {
+			// intentionally info because we want to keep going
+			klog.V(5).InfoS("DaemonSet update: cannot update config", "pool name", poolName, "daemonset", gdm.DaemonSet.Name, "error", err)
+			return err
+		}
 		klog.V(4).InfoS("DaemonSet update: selinux options", "contextType", gdm.SecOpts.SELinuxContextType, "contextName", gdm.SecOpts.SecurityContextName)
 		k8swgrteupdate.SecurityContextWithOpts(gdm.DaemonSet, gdm.SecOpts)
 	}
+
 	// it's possible that the hash will be empty if kubelet controller hasn't created a configmap
 	rteupdate.DaemonSetHashAnnotation(gdm.DaemonSet, gdm.RTEConfigHash)
 	return nil

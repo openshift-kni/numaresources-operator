@@ -435,6 +435,17 @@ func TestDaemonSetRolloutSettings(t *testing.T) {
 	}
 }
 
+func TestAllContainersTerminationMessagePolicy(t *testing.T) {
+	ds := testDs.DeepCopy()
+	AllContainersTerminationMessagePolicy(ds)
+
+	for _, cnt := range ds.Spec.Template.Spec.Containers {
+		if cnt.TerminationMessagePolicy != corev1.TerminationMessageFallbackToLogsOnError {
+			t.Errorf("container %q termination message policy unexpectedly set to %q", cnt.Name, cnt.TerminationMessagePolicy)
+		}
+	}
+}
+
 func checkPercIsAtLeast(val string, amount int) error {
 	if !strings.HasSuffix(val, "%") {
 		return fmt.Errorf("not a percentage: %q", val)
