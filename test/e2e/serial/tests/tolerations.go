@@ -35,6 +35,7 @@ import (
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
@@ -131,11 +132,16 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 				}(ctx)
 
+				expectedReason := status.ConditionDegraded
+				if isPlatformVersionAtLeast("4.18") {
+					expectedReason = status.ReasonInternalError
+				}
+
 				var updatedNropObj nropv1.NUMAResourcesOperator
 				Eventually(func(g Gomega) {
 					err := fxt.Client.Get(ctx, nroKey, &updatedNropObj)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(isDegradedWith(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String(), status.ReasonInternalError)).To(BeTrue(), "Condition not degraded as expected")
+					g.Expect(isDegradedWith(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String(), expectedReason)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 			})
 
@@ -160,11 +166,16 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 				}(ctx)
 
+				expectedReason := status.ConditionDegraded
+				if isPlatformVersionAtLeast("4.18") {
+					expectedReason = status.ReasonInternalError
+				}
+
 				var updatedNropObj nropv1.NUMAResourcesOperator
 				Eventually(func(g Gomega) {
 					err := fxt.Client.Get(ctx, nroKey, &updatedNropObj)
 					g.Expect(err).ToNot(HaveOccurred())
-					g.Expect(isDegradedWith(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String(), status.ReasonInternalError)).To(BeTrue(), "Condition not degraded as expected")
+					g.Expect(isDegradedWith(updatedNropObj.Status.Conditions, kvalidation.ErrorTypeNotSupported.String(), expectedReason)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 			})
 		})
@@ -930,4 +941,16 @@ func verifyUpdatedMCOnNodes(cli client.Client, ctx context.Context, node corev1.
 
 	klog.InfoS("node is updated with mc", "node", node.Name, "mc", desired)
 	return true, nil
+}
+
+func isPlatformVersionAtLeast(versionString string) bool {
+	GinkgoHelper()
+
+	minVersion, err := platform.ParseVersion(versionString)
+	Expect(err).NotTo(HaveOccurred(), "failed to parse version string %q", versionString)
+
+	isAtLeast, err := configuration.PlatVersion.AtLeast(minVersion)
+	Expect(err).NotTo(HaveOccurred(), "failed to compare versions: %v vs %v", configuration.PlatVersion, minVersion)
+
+	return isAtLeast
 }
