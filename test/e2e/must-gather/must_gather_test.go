@@ -24,7 +24,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
+
+	"github.com/opencontainers/selinux/go-selinux"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
@@ -182,6 +185,101 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 				}
 				Expect(podFolderNames).To(ContainElement(MatchRegexp("^numaresources-controller-manager*")))
 				Expect(podFolderNames).To(ContainElement(MatchRegexp("^secondary-scheduler*")))
+			}
+		})
+
+		It("check SELinux data files have been collected", func(ctx context.Context) {
+			destDirContent, err := os.ReadDir(destDir)
+			Expect(err).NotTo(HaveOccurred(), "unable to read contents from destDir:%s. error: %w", destDir, err)
+
+			for _, content := range destDirContent {
+				if !content.IsDir() {
+					continue
+				}
+				mgContentFolder := filepath.Join(destDir, content.Name())
+
+				By(fmt.Sprintf("Checking Folder: %q", mgContentFolder))
+				By("Looking for SELinux info directory")
+
+				selinuxInfoFolder := filepath.Join(mgContentFolder, "selinux_info")
+				_, err = os.Stat(selinuxInfoFolder)
+				Expect(err).ToNot(HaveOccurred(), "selinux_info directory should exist")
+
+				selinuxDirContent, err := os.ReadDir(selinuxInfoFolder)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(selinuxDirContent).ToNot(BeEmpty(), "selinux_info directory should contain node directories")
+
+				// Check each node directory
+				for _, nodeDir := range selinuxDirContent {
+					if !nodeDir.IsDir() {
+						// We expect only directories in selinux_info, but check defensively
+						By(fmt.Sprintf("Warning: unexpected non-directory item in selinux_info: %s", nodeDir.Name()))
+						continue
+					}
+
+					nodeName := nodeDir.Name()
+					nodeSelinuxFolder := filepath.Join(selinuxInfoFolder, nodeName)
+					By(fmt.Sprintf("Checking SELinux data for node: %s", nodeName))
+
+					// Check required files exist
+					requiredFiles := []string{
+						"contexts",
+						"kubelet_systemctl_show",
+						"kubelet_systemctl_cat",
+						"audit_selinux.log",
+						"audit_podresources.log",
+					}
+					err = checkfilesExist(requiredFiles, nodeSelinuxFolder)
+					Expect(err).ToNot(HaveOccurred(), "required SELinux files should exist for node %s", nodeName)
+
+					// Verify contexts file contains kubelet.sock SELinux context
+					By(fmt.Sprintf("Verifying kubelet.sock SELinux context for node: %s", nodeName))
+					contextsFile := filepath.Join(nodeSelinuxFolder, "contexts")
+					contextsData, err := os.ReadFile(contextsFile)
+					Expect(err).ToNot(HaveOccurred())
+
+					contextsContent := string(contextsData)
+
+					// Parse SELinux context from the kubelet.sock line using official selinux package
+					By(fmt.Sprintf("Parsing SELinux context for kubelet.sock on node: %s", nodeName))
+					found := false
+					for _, line := range strings.Split(contextsContent, "\n") {
+						if strings.Contains(line, "/var/lib/kubelet/pod-resources/kubelet.sock") {
+							// Extract SELinux context from ls -Z output (format: "context filename")
+							parts := strings.Fields(line)
+							if len(parts) >= 2 {
+								selinuxLabel := parts[0]
+								context, err := selinux.NewContext(selinuxLabel)
+								Expect(err).ToNot(HaveOccurred(), "should parse SELinux context: %s", selinuxLabel)
+
+								// Check that the type field contains kubelet_var_lib_t
+								contextType := context["type"]
+								Expect(contextType).To(Equal("kubelet_var_lib_t"), "kubelet.sock should have kubelet_var_lib_t SELinux context type, got: %s", contextType)
+
+								By(fmt.Sprintf("Found valid SELinux context for kubelet.sock: %s (type: %s)", selinuxLabel, contextType))
+								found = true
+								break
+							}
+						}
+					}
+					Expect(found).To(BeTrue(), "should find kubelet.sock with valid SELinux context in contexts file")
+
+					// Verify kubelet systemctl show has content
+					By(fmt.Sprintf("Verifying kubelet_systemctl_show content for node: %s", nodeName))
+					kubeletShowFile := filepath.Join(nodeSelinuxFolder, "kubelet_systemctl_show")
+					kubeletShowData, err := os.ReadFile(kubeletShowFile)
+					Expect(err).ToNot(HaveOccurred())
+					kubeletShowContent := string(kubeletShowData)
+					Expect(kubeletShowContent).To(ContainSubstring("ExecStart="), "kubelet_systemctl_show should contain ExecStart property")
+
+					// Verify kubelet systemctl cat has content
+					By(fmt.Sprintf("Verifying kubelet_systemctl_cat content for node: %s", nodeName))
+					kubeletCatFile := filepath.Join(nodeSelinuxFolder, "kubelet_systemctl_cat")
+					kubeletCatData, err := os.ReadFile(kubeletCatFile)
+					Expect(err).ToNot(HaveOccurred())
+					kubeletCatContent := string(kubeletCatData)
+					Expect(kubeletCatContent).To(ContainSubstring("/usr/sbin/restorecon"), "kubelet_systemctl_cat should contain restorecon command in ExecStartPre")
+				}
 			}
 		})
 	})
