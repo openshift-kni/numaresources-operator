@@ -5,7 +5,7 @@ COPY . .
 
 RUN make bin/pfpsyncchk
 
-FROM quay.io/openshift/origin-cli:4.21
+FROM registry.ci.openshift.org/ocp/4.21:cli
 
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/pfpsyncchk /usr/bin/pfpsyncchk
 

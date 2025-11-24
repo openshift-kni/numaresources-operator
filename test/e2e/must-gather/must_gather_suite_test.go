@@ -37,8 +37,8 @@ const (
 	envVarMustGatherImage = "E2E_NROP_MUSTGATHER_IMAGE"
 	envVarMustGatherTag   = "E2E_NROP_MUSTGATHER_TAG"
 
-	defaultMustGatherImage = "quay.io/openshift-kni/numaresources-must-gather"
-	defaultMustGatherTag   = "4.21.999-snapshot"
+	defaultMustGatherImage = "registry.ci.openshift.org/ocp-kni/numaresources-operator"
+	defaultMustGatherTag   = "numaresources-must-gather"
 
 	nroSchedTimeout = 5 * time.Minute
 )
