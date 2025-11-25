@@ -41,6 +41,8 @@ CATALOG_KONFLUX = .konflux/catalog/$(PACKAGE_NAME_KONFLUX)/catalog.yaml
 REPO ?= quay.io/openshift-kni
 IMAGE_TAG_BASE ?= $(REPO)/numaresources-operator
 
+MUST_GATHER_REPO ?= $(REPO)/numaresources-must-gather
+
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
 BUNDLE_IMG ?= $(IMAGE_TAG_BASE)-bundle:$(VERSION)
@@ -149,7 +151,13 @@ test-upgrade-e2e: build-e2e-all
 	hack/run-test-upgrade-e2e.sh
 
 test-must-gather-e2e: build-must-gather-e2e
-	hack/run-test-must-gather-e2e.sh
+	MG_TAG=$(VERSION)-$(shell date +%Y%m%d%H%M%S); \
+	MG_REPO=$(strip $(MUST_GATHER_REPO)); \
+	MG_IMG=$${MG_REPO}:$${MG_TAG}; \
+	$(CONTAINER_ENGINE) build -t $${MG_IMG} -f Dockerfile.must-gather . && \
+	$(CONTAINER_ENGINE) push $${MG_IMG} && \
+	E2E_NROP_MUSTGATHER_TAG=$$MG_TAG E2E_NROP_MUSTGATHER_IMAGE=$$MG_REPO hack/run-test-must-gather-e2e.sh; \
+	skopeo delete $${MG_IMG}
 
 # intentional left out:
 #   api/, because autogeneration
