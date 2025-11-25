@@ -84,8 +84,9 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 			cmd := exec.Command(cmdline[0], cmdline[1:]...)
 			cmd.Stderr = GinkgoWriter
 
-			_, err = cmd.Output()
+			output, err := cmd.Output()
 			Expect(err).ToNot(HaveOccurred())
+			fmt.Fprintf(GinkgoWriter, "output: %s\n", string(output))
 		})
 
 		AfterEach(func() {
