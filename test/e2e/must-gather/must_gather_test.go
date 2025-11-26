@@ -66,7 +66,7 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 				Skip(fmt.Sprintf("unable to find 'oc' executable %v\n", err))
 			}
 
-			mgImageParam := fmt.Sprintf("--image=%s:%s", mustGatherImage, mustGatherTag)
+			mgImageParam := fmt.Sprintf("--image=%s", mustGatherImageRef)
 			mgDestDirParam := fmt.Sprintf("--dest-dir=%s", destDir)
 
 			cmdline := []string{
