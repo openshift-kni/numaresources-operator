@@ -34,11 +34,14 @@ import (
 )
 
 const (
-	envVarMustGatherImage = "E2E_NROP_MUSTGATHER_IMAGE"
-	envVarMustGatherTag   = "E2E_NROP_MUSTGATHER_TAG"
-
+	envVarMustGatherImage  = "E2E_NROP_MUSTGATHER_IMAGE"
+	envVarMustGatherTag    = "E2E_NROP_MUSTGATHER_TAG"
 	defaultMustGatherImage = "quay.io/openshift-kni/numaresources-must-gather"
 	defaultMustGatherTag   = "4.21.999-snapshot"
+
+	// E2E_NROP_MUSTGATHER_IMAGE_REF represents image name + tag/digest
+	// and takes precedence over E2E_NROP_MUSTGATHER_IMAGE and E2E_NROP_MUSTGATHER_TAG
+	envVarMustGatherImageRef = "E2E_NROP_MUSTGATHER_IMAGE_REF"
 
 	nroSchedTimeout = 5 * time.Minute
 )
@@ -48,8 +51,8 @@ var (
 
 	nroSchedObj *nropv1.NUMAResourcesScheduler
 
-	mustGatherImage string
-	mustGatherTag   string
+	// image name + tag/digest
+	mustGatherImageRef string
 )
 
 func TestMustGather(t *testing.T) {
@@ -59,9 +62,8 @@ func TestMustGather(t *testing.T) {
 }
 
 var _ = BeforeSuite(func() {
-	mustGatherImage = getStringValueFromEnv(envVarMustGatherImage, defaultMustGatherImage)
-	mustGatherTag = getStringValueFromEnv(envVarMustGatherTag, defaultMustGatherTag)
-	By(fmt.Sprintf("Using must-gather image %q tag %q", mustGatherImage, mustGatherTag))
+	getMustGatherImageRef()
+	By(fmt.Sprintf("Using must-gather image reference %q", mustGatherImageRef))
 
 	ctx := context.Background()
 
@@ -99,4 +101,14 @@ func getStringValueFromEnv(envVar, fallback string) string {
 		return fallback
 	}
 	return val
+}
+
+func getMustGatherImageRef() {
+	if v, ok := os.LookupEnv(envVarMustGatherImageRef); ok {
+		mustGatherImageRef = v
+		return
+	}
+	mustGatherImage := getStringValueFromEnv(envVarMustGatherImage, defaultMustGatherImage)
+	mustGatherTag := getStringValueFromEnv(envVarMustGatherTag, defaultMustGatherTag)
+	mustGatherImageRef = fmt.Sprintf("%s:%s", mustGatherImage, mustGatherTag)
 }
