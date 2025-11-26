@@ -11,7 +11,7 @@ ENV GOTAGS="strictfipsruntime"
 # Build
 RUN make binary-all
 
-FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4@sha256:1ce44cc2d48598fa6d0fc2eae245e912ef38736b47c4227714c985f5c74dc807
+FROM registry.redhat.io/rhel9-4-els/rhel-minimal:9.4@sha256:3e85e7b776b92ab37d70d24800805218a6284454902b46758835d903eb62f857
 
 ARG OPENSHIFT_VERSION
 
