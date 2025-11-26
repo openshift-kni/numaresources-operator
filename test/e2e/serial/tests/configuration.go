@@ -146,7 +146,13 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 	})
 
 	Context("cluster has at least one suitable node", func() {
-		timeout := 5 * time.Minute
+
+		var timeout time.Duration
+
+		BeforeEach(func() {
+			timeout = 5 * time.Minute
+		})
+
 		It("[test_id:47674] should be able to modify the configurable values under the NUMAResourcesOperator CR", Label("images", label.Tier2, label.OpenShift), func(ctx context.Context) {
 			var initialNroOperObj nropv1.NUMAResourcesOperator
 			nroKey := objects.NROObjectKey()
@@ -463,6 +469,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				return kcCmNamesCur
 			}).WithContext(ctx).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Equal(kcCmNamesPre))
 		})
+
 		It("[test_id:47585] can change kubeletconfig and controller should adapt", Label(label.Reboot, label.Slow, label.Tier2, label.OpenShift), func(ctx context.Context) {
 			fxt.IsRebootTest = true
 
@@ -1265,6 +1272,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			})
 		})
+
 		Context("KubeletConfig changes are being tracked correctly by the operator", func() {
 			var nroObj *nropv1.NUMAResourcesOperator
 
