@@ -201,11 +201,14 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				var reconciler *NUMAResourcesOperatorReconciler
 				var ng1, ng2 nropv1.NodeGroup
 
-				pn1 := "test1"
-				pn2 := "test2"
+				var pn1 string
+				var pn2 string
 
 				BeforeEach(func() {
+					pn1 = "test1"
+					pn2 = "test2"
 					mcp1Selector = &metav1.LabelSelector{
+
 						MatchLabels: map[string]string{
 							pn1: pn1,
 						},
@@ -283,55 +286,6 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					conf := nropv1.DefaultNodeGroupConfig()
 					Expect(nro.Status.NodeGroups[0].Config).To(Equal(conf), "default node group config for %q was not updated in the operator status", nro.Status.NodeGroups[0].PoolName)
 					Expect(nro.Status.NodeGroups[1].Config).To(Equal(conf), "default node group config for %q was not updated in the operator status", nro.Status.NodeGroups[1].PoolName)
-				})
-
-				It("RTE ds should have the correct priority class", func() {
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, pn1),
-						Namespace: testNamespace,
-					}
-					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
-
-					Expect(ds.Spec.Template.Spec.PriorityClassName).To(Equal(nrosched.SchedulerPriorityClassName))
-				})
-
-				It("should have PodAntiAffinity for RTE Daemonset", func() {
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, pn1),
-						Namespace: testNamespace,
-					}
-					var ds appsv1.DaemonSet
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, &ds)).To(Succeed())
-					Expect(ds.Spec.Template.Labels).ToNot(BeEmpty())
-
-					expected := corev1.PodAntiAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchLabels: ds.Spec.Template.Labels,
-								},
-								TopologyKey: "kubernetes.io/hostname",
-							},
-						},
-					}
-
-					Expect(ds.Spec.Template.Spec.Affinity).ToNot(BeNil())
-					Expect(ds.Spec.Template.Spec.Affinity.PodAntiAffinity).ToNot(BeNil())
-					Expect(*ds.Spec.Template.Spec.Affinity.PodAntiAffinity).To(Equal(expected))
-				})
-
-				It("should have a update strategy with MaxUnavailable set", func() {
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, pn1),
-						Namespace: testNamespace,
-					}
-					var ds appsv1.DaemonSet
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, &ds)).To(Succeed())
-
-					Expect(ds.Spec.UpdateStrategy.Type).To(Equal(appsv1.RollingUpdateDaemonSetStrategyType))
-					Expect(ds.Spec.UpdateStrategy.RollingUpdate).ToNot(BeNil())
-					Expect(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable.String()).To(BeStringPercentageAtLeast(10))
 				})
 
 				It("should update node group statuses with the updated configuration", func() {
@@ -2195,6 +2149,117 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s expected to be deleted; err=%v", mc2Key.Name, err)
 			})
 		})
+	})
+
+	Describe("platform agnostic", func() {
+		var nro *nropv1.NUMAResourcesOperator
+		var mcp1 *machineconfigv1.MachineConfigPool
+		var mcp1Selector *metav1.LabelSelector
+		var nroKey client.ObjectKey
+		var cm1 *corev1.ConfigMap
+		var reconciler *NUMAResourcesOperatorReconciler
+		var ng1 nropv1.NodeGroup
+
+		var pn1 string
+
+		BeforeEach(func() {
+			ctx := context.TODO()
+
+			pn1 = "test1"
+
+			mcp1Selector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					pn1: pn1,
+				},
+			}
+			ng1 = nropv1.NodeGroup{
+				PoolName: &pn1,
+			}
+
+			nro = testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng1)
+			nroKey = client.ObjectKeyFromObject(nro)
+
+			// would be used only if the platform supports MCP
+			mcp1 = testobjs.NewMachineConfigPool(pn1, mcp1Selector.MatchLabels, mcp1Selector, mcp1Selector)
+
+			cm1 = testobjs.NewRTEConfigMap(objectnames.GetComponentName(nro.Name, mcp1.Name), testNamespace, "single-numa-node", "pod")
+
+			var err error
+			reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, cm1)
+			Expect(err).ToNot(HaveOccurred())
+
+			// on the first iteration with the default RTE SELinux policy we expect immediate update, thus the reconciliation result is empty
+			Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: nroKey})).ToNot(CauseRequeue())
+
+			Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
+
+			availableCondition := getConditionByType(nro.Status.Conditions, status.ConditionAvailable)
+			Expect(availableCondition).ToNot(BeNil())
+			Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue))
+		})
+
+		It("RTE ds should have the correct priority class", func() {
+			dsKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, pn1),
+				Namespace: testNamespace,
+			}
+			ds := &appsv1.DaemonSet{}
+			Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
+
+			Expect(ds.Spec.Template.Spec.PriorityClassName).To(Equal(nrosched.SchedulerPriorityClassName))
+		})
+
+		It("should have PodAntiAffinity for RTE Daemonset", func() {
+			dsKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, pn1),
+				Namespace: testNamespace,
+			}
+			var ds appsv1.DaemonSet
+			Expect(reconciler.Client.Get(context.TODO(), dsKey, &ds)).To(Succeed())
+			Expect(ds.Spec.Template.Labels).ToNot(BeEmpty())
+
+			expected := corev1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: ds.Spec.Template.Labels,
+						},
+						TopologyKey: "kubernetes.io/hostname",
+					},
+				},
+			}
+
+			Expect(ds.Spec.Template.Spec.Affinity).ToNot(BeNil())
+			Expect(ds.Spec.Template.Spec.Affinity.PodAntiAffinity).ToNot(BeNil())
+			Expect(*ds.Spec.Template.Spec.Affinity.PodAntiAffinity).To(Equal(expected))
+		})
+
+		It("should have a update strategy with MaxUnavailable set", func() {
+			dsKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, pn1),
+				Namespace: testNamespace,
+			}
+			var ds appsv1.DaemonSet
+			Expect(reconciler.Client.Get(context.TODO(), dsKey, &ds)).To(Succeed())
+
+			Expect(ds.Spec.UpdateStrategy.Type).To(Equal(appsv1.RollingUpdateDaemonSetStrategyType))
+			Expect(ds.Spec.UpdateStrategy.RollingUpdate).ToNot(BeNil())
+			Expect(ds.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable.String()).To(BeStringPercentageAtLeast(10))
+		})
+
+		It("should have a terminationMessagePolicy with Fallback set", func() {
+			dsKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nro.Name, pn1),
+				Namespace: testNamespace,
+			}
+			var ds appsv1.DaemonSet
+			Expect(reconciler.Client.Get(context.TODO(), dsKey, &ds)).To(Succeed())
+
+			for _, cnt := range ds.Spec.Template.Spec.Containers {
+				Expect(cnt.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageFallbackToLogsOnError))
+			}
+		})
+
 	})
 })
 
