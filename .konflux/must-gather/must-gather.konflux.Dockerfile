@@ -45,4 +45,5 @@ LABEL com.redhat.component="numaresources-must-gather-container" \
     distribution-scope="public" \
     release="${OPENSHIFT_VERSION}" \
     url="https://github.com/openshift-kni/numaresources-operator" \
-    vendor="Red Hat, Inc."
+    vendor="Red Hat, Inc." \
+    cpe="cpe:/a:redhat:openshift:4.21::el9"
