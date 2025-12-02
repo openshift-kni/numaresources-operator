@@ -45,6 +45,7 @@ LABEL distribution-scope="public"
 LABEL release="${OPENSHIFT_VERSION}"
 LABEL url="https://github.com/openshift-kni/numaresources-operator"
 LABEL vendor="Red Hat, Inc."
+LABEL cpe="cpe:/a:redhat:openshift:4.20::el9"
 
 LABEL io.openshift.expose-services=""
 LABEL io.openshift.tags="numa,topology,node"
