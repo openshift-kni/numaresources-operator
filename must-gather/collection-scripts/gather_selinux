@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+. namespace
+NRO_NAMESPACE=$(nro_namespace)
+
+SELINUX_INFO_DIR="/must-gather/selinux_info"
+mkdir -p "$SELINUX_INFO_DIR"
+
+# common variables
+OC_GET_PODS="oc get pods -n $NRO_NAMESPACE"
+
+function replace_dot_with_underscore() {
+    echo $1 | sed 's/\./_/g'
+}
+
+function gather_selinux_data() {
+    local rte_pods=$($OC_GET_PODS -l name='resource-topology' -o jsonpath='{.items[*].metadata.name}')
+    
+    for pod in $rte_pods; do
+        local original_node_name=$($OC_GET_PODS $pod -o jsonpath='{.spec.nodeName}')
+        local node_name=$(replace_dot_with_underscore $original_node_name)
+        
+        echo "Gathering SELinux data from node: $node_name"
+        
+        local node_dir="$SELINUX_INFO_DIR/$node_name"
+        mkdir -p "$node_dir"
+        
+        # Use oc debug node to collect all data in one session
+        oc debug node/$original_node_name -- bash -c "
+            chroot /host bash -c '
+                echo \"=== SELinux context for /var/lib/kubelet ===\" > /tmp/contexts;
+                ls -Z /var/lib/kubelet >> /tmp/contexts 2>&1;
+                echo \"\" >> /tmp/contexts;
+                echo \"=== SELinux context for kubelet.sock ===\" >> /tmp/contexts;
+                ls -Z /var/lib/kubelet/pod-resources/kubelet.sock >> /tmp/contexts 2>&1;
+                
+                echo \"=== Kubelet service file ===\" > /tmp/kubelet.service;
+                cat /etc/systemd/system/kubelet.service >> /tmp/kubelet.service 2>&1;
+                
+                echo \"=== SELinux audit logs ===\" > /tmp/audit_selinux.log;
+                cat /var/log/audit/audit.log | grep -i selinux >> /tmp/audit_selinux.log 2>&1;
+                
+                echo \"=== Pod-resources related audit logs ===\" > /tmp/audit_podresources.log;
+                cat /var/log/audit/audit.log | grep \"kubelet.*pod-resources\" >> /tmp/audit_podresources.log 2>&1;
+                
+                cat /tmp/contexts;
+                echo \"__SEPARATOR_KUBELET_SERVICE__\";
+                cat /tmp/kubelet.service;
+                echo \"__SEPARATOR_AUDIT_SELINUX__\";
+                cat /tmp/audit_selinux.log;
+                echo \"__SEPARATOR_AUDIT_PODRESOURCES__\";
+                cat /tmp/audit_podresources.log;
+            '
+        " 2>/dev/null | {
+            # Read and separate the output
+            contexts_section=""
+            kubelet_service=""
+            audit_selinux=""
+            audit_podresources=""
+            current_section="contexts"
+            
+            while IFS= read -r line; do
+                case "$line" in
+                    "__SEPARATOR_KUBELET_SERVICE__")
+                        current_section="kubelet_service"
+                        ;;
+                    "__SEPARATOR_AUDIT_SELINUX__")
+                        current_section="audit_selinux"
+                        ;;
+                    "__SEPARATOR_AUDIT_PODRESOURCES__")
+                        current_section="audit_podresources"
+                        ;;
+                    *)
+                        case "$current_section" in
+                            "contexts")
+                                contexts_section="$contexts_section$line\n"
+                                ;;
+                            "kubelet_service")
+                                kubelet_service="$kubelet_service$line\n"
+                                ;;
+                            "audit_selinux")
+                                audit_selinux="$audit_selinux$line\n"
+                                ;;
+                            "audit_podresources")
+                                audit_podresources="$audit_podresources$line\n"
+                                ;;
+                        esac
+                        ;;
+                esac
+            done
+            
+            # Write to separate files
+            echo -e "$contexts_section" > "$node_dir/contexts"
+            echo -e "$kubelet_service" > "$node_dir/kubelet.service"
+            echo -e "$audit_selinux" > "$node_dir/audit_selinux.log"
+            echo -e "$audit_podresources" > "$node_dir/audit_podresources.log"
+        }
+        
+        if [ $? -eq 0 ]; then
+            echo "Successfully collected SELinux data from node: $node_name"
+        else
+            echo "Failed to collect SELinux data from node: $node_name"
+        fi
+    done
+}
+
+if [ -z "${NRO_NAMESPACE}" ]; then
+    echo "NUMAResources Operator namespace not detected. Skipping SELinux data gathering"
+else
+    gather_selinux_data
+fi
