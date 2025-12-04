@@ -97,12 +97,16 @@ func (h *HyperShiftNRO) Teardown(ctx context.Context, timeout time.Duration) {
 		Expect(e2eclient.MNGClient.Delete(ctx, h.KcConfigMapObj)).To(Succeed())
 
 		By("checking that generated configmap has been deleted")
-		Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(h.NroObj), h.NroObj)).To(Succeed())
-		Expect(h.NroObj.Status.DaemonSets).ToNot(BeEmpty())
+		Eventually(func() bool {
+			Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(h.NroObj), h.NroObj)).To(Succeed())
+			nodeGroups := h.NroObj.Status.NodeGroups
+			return len(nodeGroups) != 0 && nodeGroups[0].DaemonSet.Name != ""
+		}).WithTimeout(time.Minute*3).WithPolling(10*time.Second).Should(BeTrue(), "NRO object does not have any DaemonSets status reported")
+
 		cm := &corev1.ConfigMap{}
 		key := client.ObjectKey{
 			Name:      objectnames.GetComponentName(h.NroObj.Name, np.Name),
-			Namespace: h.NroObj.Status.DaemonSets[0].Namespace,
+			Namespace: h.NroObj.Status.NodeGroups[0].DaemonSet.Namespace,
 		}
 		Eventually(func() bool {
 			if err := e2eclient.Client.Get(ctx, key, cm); !errors.IsNotFound(err) {
