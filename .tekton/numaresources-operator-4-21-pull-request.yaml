@@ -14,6 +14,7 @@ metadata:
       (
         '.tekton/build-pipeline.yaml'.pathChanged() ||
         '.konflux/container-build.args'.pathChanged() ||
+        '.konflux/operator/***'.pathChanged() ||
         'api/***'.pathChanged() ||
         'cmd/***'.pathChanged() ||
         'config/***'.pathChanged() ||
@@ -27,8 +28,7 @@ metadata:
         'vendor/***'.pathChanged() ||
         'go.mod'.pathChanged() ||
         'go.sum'.pathChanged() ||
-        '.tekton/numaresources-operator-4-21-pull-request.yaml'.pathChanged() ||
-        '.konflux/operator/***'.pathChanged()
+        '.tekton/numaresources-operator-4-21-pull-request.yaml'.pathChanged()
       )
   creationTimestamp: null
   labels:
@@ -57,7 +57,7 @@ spec:
   - name: dev-package-managers
     value: "true"    
   - name: prefetch-input
-    value: '[{"type": "rpm", "path": ".konflux/operator"}]'
+    value: '[{"type": "rpm", "path": ".konflux/operator/"}]'
   - name: build-source-image
     value: "true"
   - name: skip-preflight
