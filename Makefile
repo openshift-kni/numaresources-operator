@@ -687,11 +687,39 @@ konflux-generate-catalog-production: sync-git-submodules yq opm ## generate a re
 		YQ=$(YQ)
 	$(MAKE) konflux-validate-catalog
 
-.PHONY: konflux-filter-unused-redhat-repos
-konflux-filter-unused-redhat-repos: ## Filter unused repositories from redhat.repo in operator lock folder
-	@echo "Filtering unused repositories from operator runtime lock folder..."
-	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/rpm-lock filter-unused-repos REPO_FILE=$(PROJECT_DIR)/.konflux/operator/redhat.repo
-	@echo "Filtering completed."
+.PHONY: konflux-update-rpm-lock-operator
+konflux-update-rpm-lock-operator: sync-git-submodules ## Update the rpm lock file for the operator
+	@echo "Creating operator/tmp/ directory..."
+	mkdir -p $(PROJECT_DIR)/.konflux/operator/tmp/
+	@echo "Copying rpms.in.yaml to operator/tmp/ directory..."
+	cp $(PROJECT_DIR)/.konflux/operator/rpms.in.yaml $(PROJECT_DIR)/.konflux/operator/tmp/rpms.in.yaml
+	@cat $(PROJECT_DIR)/.konflux/operator/tmp/rpms.in.yaml
+	@echo "Updating rpm lock file for the operator..."
+	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/rpm-lock generate-rhel9-locks \
+		LOCK_SCRIPT_TARGET_DIR=$(PROJECT_DIR)/.konflux/operator/tmp/ \
+		RHEL9_EXECUTION_IMAGE=$$(grep -E '^FROM registry.access.redhat.com/ubi9/ubi-minimal' $(PROJECT_DIR)/.konflux/operator/konflux.Dockerfile | sed 's|FROM ||' | sed 's|ubi-minimal|ubi|g' | sed 's|@.*||') \
+		RHEL9_IMAGE_TO_LOCK=$$(grep -E '^FROM registry.access.redhat.com/ubi9/ubi-minimal' $(PROJECT_DIR)/.konflux/operator/konflux.Dockerfile | sed 's|FROM ||')
+	@echo "Update rpms.lock.yaml with new contents..."
+	cp $(PROJECT_DIR)/.konflux/operator/tmp/rpms.lock.yaml $(PROJECT_DIR)/.konflux/operator/rpms.lock.yaml
+	# intentionally keep operator/tmp/ directory for debugging purposes
+	@echo "RPM lock file updated successfully."
+
+.PHONY: konflux-update-rpm-lock-must-gather
+konflux-update-rpm-lock-must-gather: sync-git-submodules ## Update the rpm lock file for the must-gather
+	@echo "Creating must-gather/tmp/ directory..."
+	mkdir -p $(PROJECT_DIR)/.konflux/must-gather/tmp/
+	@echo "Copying rpms.in.yaml to must-gather/tmp/ directory..."
+	cp $(PROJECT_DIR)/.konflux/must-gather/rpms.in.yaml $(PROJECT_DIR)/.konflux/must-gather/tmp/rpms.in.yaml
+	@cat $(PROJECT_DIR)/.konflux/must-gather/tmp/rpms.in.yaml
+	@echo "Updating rpm lock file for the must-gather..."
+	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/rpm-lock generate-rhel9-locks \
+		LOCK_SCRIPT_TARGET_DIR=$(PROJECT_DIR)/.konflux/must-gather/tmp/ \
+		RHEL9_EXECUTION_IMAGE=$$(grep -E '^FROM registry.access.redhat.com/ubi9/ubi-minimal' $(PROJECT_DIR)/.konflux/must-gather/must-gather.konflux.Dockerfile | sed 's|FROM ||' | sed 's|ubi-minimal|ubi|g' | sed 's|@.*||') \
+		RHEL9_IMAGE_TO_LOCK=$$(grep -E '^FROM registry.access.redhat.com/ubi9/ubi-minimal' $(PROJECT_DIR)/.konflux/must-gather/must-gather.konflux.Dockerfile | sed 's|FROM ||')
+	@echo "Update rpms.lock.yaml with new contents..."
+	cp $(PROJECT_DIR)/.konflux/must-gather/tmp/rpms.lock.yaml $(PROJECT_DIR)/.konflux/must-gather/rpms.lock.yaml
+	# intentionally keep must-gather/tmp/ directory for debugging purposes
+	@echo "RPM lock file updated successfully."
 
 .PHONY: konflux-compare-catalog
 konflux-compare-catalog: sync-git-submodules ## Compare generated catalog with upstream FBC image
@@ -702,5 +730,5 @@ konflux-compare-catalog: sync-git-submodules ## Compare generated catalog with u
 		UPSTREAM_FBC_IMAGE=quay.io/redhat-user-workloads/telco-5g-tenant/$(PACKAGE_NAME_KONFLUX)-fbc-4-21:latest
 
 .PHONY: konflux-all
-konflux-all: konflux-filter-unused-redhat-repos konflux-update-tekton-task-refs konflux-generate-catalog-production konflux-validate-catalog ## Run all Konflux-related targets
+konflux-all: konflux-update-tekton-task-refs konflux-generate-catalog-production konflux-validate-catalog ## Run all Konflux-related targets
 	@echo "All Konflux targets completed successfully."

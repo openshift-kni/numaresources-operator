@@ -12,13 +12,13 @@ metadata:
       event == "pull_request" &&
       target_branch == "main" &&
       (
-        '.tekton/build-pipeline.yaml'.pathChanged() ||
-        '.konflux/container-build.args'.pathChanged() ||
-        'bundle/***'.pathChanged() ||
-        'hack/***'.pathChanged() ||
+        '.konflux/bundle/bundle.konflux.Dockerfile'.pathChanged() ||
         '.konflux/bundle/overlay/***'.pathChanged() ||
+        '.konflux/container-build.args'.pathChanged() ||
+        '.tekton/build-pipeline.yaml'.pathChanged() ||
         '.tekton/numaresources-operator-bundle-4-21-pull-request.yaml'.pathChanged() ||
-        '.konflux/bundle/bundle.konflux.Dockerfile'.pathChanged()
+        'bundle/***'.pathChanged() ||
+        'hack/***'.pathChanged()
       )
   creationTimestamp: null
   labels:
