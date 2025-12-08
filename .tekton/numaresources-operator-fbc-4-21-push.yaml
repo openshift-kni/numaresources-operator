@@ -11,11 +11,11 @@ metadata:
       event == "push" &&
       target_branch == "main" &&
       (
+        '.konflux/Dockerfile.catalog'.pathChanged() ||
+        '.konflux/catalog/bundle.builds.in.yaml'.pathChanged() ||
         '.tekton/fbc-pipeline.yaml'.pathChanged() ||
         '.tekton/images-mirror-set.yaml'.pathChanged() ||
-        '.tekton/numaresources-operator-fbc-4-21-push.yaml'.pathChanged() ||
-        '.konflux/catalog/bundle.builds.in.yaml'.pathChanged() ||
-        '.konflux/Dockerfile.catalog'.pathChanged()
+        '.tekton/numaresources-operator-fbc-4-21-push.yaml'.pathChanged()
       )
   creationTimestamp: null
   labels:

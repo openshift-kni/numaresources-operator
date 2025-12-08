@@ -12,12 +12,15 @@ metadata:
       event == "push" &&
       target_branch == "main" &&
       (
-        '.tekton/build-pipeline.yaml'.pathChanged() ||
         '.konflux/container-build.args'.pathChanged() ||
         '.konflux/operator/***'.pathChanged() ||
+        '.tekton/build-pipeline.yaml'.pathChanged() ||
+        '.tekton/numaresources-operator-4-21-push.yaml'.pathChanged() ||
         'api/***'.pathChanged() ||
         'cmd/***'.pathChanged() ||
         'config/***'.pathChanged() ||
+        'go.mod'.pathChanged() ||
+        'go.sum'.pathChanged() ||
         'hack/***'.pathChanged() ||
         'internal/***'.pathChanged() ||
         'must-gather/***'.pathChanged() ||
@@ -25,10 +28,7 @@ metadata:
         'pkg/***'.pathChanged() ||
         'rte/***'.pathChanged() ||
         'tools/***'.pathChanged() ||
-        'vendor/***'.pathChanged() ||
-        'go.mod'.pathChanged() ||
-        'go.sum'.pathChanged() ||
-        '.tekton/numaresources-operator-4-21-push.yaml'.pathChanged()
+        'vendor/***'.pathChanged()
       )
   creationTimestamp: null
   labels:
