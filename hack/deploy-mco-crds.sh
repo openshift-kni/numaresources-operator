@@ -3,7 +3,7 @@
 source hack/common.sh
 
 # Specify the URL link to the machine config pool CRD
-CRD_MACHINE_CONFIG_POOL_URL="https://raw.githubusercontent.com/openshift/api/refs/heads/master/payload-manifests/crds/0000_80_machine-config_01_machineconfigpools.crd.yaml"
+CRD_MACHINE_CONFIG_POOL_URL="https://raw.githubusercontent.com/openshift/api/refs/heads/master/payload-manifests/crds/0000_80_machine-config_01_machineconfigpools-Default.crd.yaml"
 # Specify the URL link to the kubeletconfig CRD
 CRD_KUBELET_CONFIG_URL="https://raw.githubusercontent.com/openshift/api/refs/heads/master/payload-manifests/crds/0000_80_machine-config_01_kubeletconfigs.crd.yaml"
 
@@ -19,5 +19,12 @@ if ${REPO_DIR}/bin/lsplatform -is-platform HyperShift; then
 	exit 0
 fi
 
-runcmd kubectl apply -f ${CRD_MACHINE_CONFIG_POOL_URL}
-runcmd kubectl apply -f ${CRD_KUBELET_CONFIG_URL}
+if !  runcmd kubectl apply -f ${CRD_MACHINE_CONFIG_POOL_URL}; then
+  echo "failed to apply machineconfigpools crd"
+  exit 1
+fi
+
+if ! runcmd kubectl apply -f ${CRD_KUBELET_CONFIG_URL}; then
+  echo "failed to apply kubeletconfig crd"
+  exit 1
+fi
