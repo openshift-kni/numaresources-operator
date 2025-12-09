@@ -17,7 +17,9 @@ metadata:
         '.tekton/build-pipeline.yaml'.pathChanged() ||
         '.tekton/numaresources-operator-bundle-4-21-push.yaml'.pathChanged() ||
         'bundle/***'.pathChanged() ||
-        'hack/***'.pathChanged()
+        'hack/***'.pathChanged() ||
+        'telco5g-konflux'.pathChanged() ||
+        'telco5g-konflux/***'.pathChanged()
       )
   creationTimestamp: null
   labels:
