@@ -15,7 +15,9 @@ metadata:
         '.konflux/catalog/bundle.builds.in.yaml'.pathChanged() ||
         '.tekton/fbc-pipeline.yaml'.pathChanged() ||
         '.tekton/images-mirror-set.yaml'.pathChanged() ||
-        '.tekton/numaresources-operator-fbc-4-21-push.yaml'.pathChanged()
+        '.tekton/numaresources-operator-fbc-4-21-push.yaml'.pathChanged() ||
+        'telco5g-konflux'.pathChanged() ||
+        'telco5g-konflux/***'.pathChanged()
       )
   creationTimestamp: null
   labels:
