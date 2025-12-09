@@ -15,7 +15,9 @@ metadata:
         '.tekton/images-mirror-set.yaml'.pathChanged() ||
         '.tekton/numaresources-operator-fbc-4-20-push.yaml'.pathChanged() ||
         '.konflux/catalog/bundle.builds.in.yaml'.pathChanged() ||
-        '.konflux/Dockerfile.catalog'.pathChanged()
+        '.konflux/Dockerfile.catalog'.pathChanged() ||
+        'telco5g-konflux'.pathChanged() ||
+        'telco5g-konflux/***'.pathChanged()
       )
   creationTimestamp: null
   labels:
