@@ -3,7 +3,7 @@
 # To re-generate a bundle for another specific version without changing the standard setup, you can:
 # - use the VERSION as arg of the bundle target (e.g make bundle VERSION=0.0.2)
 # - use environment variables to overwrite this value (e.g export VERSION=0.0.2)
-VERSION ?= 4.21.999-snapshot
+VERSION ?= 4.22.999-snapshot
 
 # CHANNELS define the bundle channels used in the bundle.
 # Add a new line here if you would like to change its default config. (E.g CHANNELS = "candidate,fast,stable")
@@ -71,7 +71,7 @@ CONTAINER_ENGINE ?= podman
 
 # Konflux-related variables
 YQ_VERSION ?= 4.45.4
-BUNDLE_NAME_SUFFIX = bundle-4-21
+BUNDLE_NAME_SUFFIX = bundle-4-22
 PRODUCTION_BUNDLE_NAME = bundle
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
@@ -727,7 +727,7 @@ konflux-compare-catalog: sync-git-submodules ## Compare generated catalog with u
 	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/catalog konflux-compare-catalog \
 		CATALOG_KONFLUX=$(PROJECT_DIR)/$(CATALOG_KONFLUX) \
 		PACKAGE_NAME_KONFLUX=$(PACKAGE_NAME_KONFLUX) \
-		UPSTREAM_FBC_IMAGE=quay.io/redhat-user-workloads/telco-5g-tenant/$(PACKAGE_NAME_KONFLUX)-fbc-4-21:latest
+		UPSTREAM_FBC_IMAGE=quay.io/redhat-user-workloads/telco-5g-tenant/$(PACKAGE_NAME_KONFLUX)-fbc-4-22:latest
 
 .PHONY: konflux-all
 konflux-all: konflux-update-tekton-task-refs konflux-generate-catalog-production konflux-validate-catalog ## Run all Konflux-related targets
