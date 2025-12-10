@@ -6,8 +6,8 @@ variables:
 
       You can find additional guidance in the upstream repository: https://github.com/openshift-kni/numaresources-operator
   display_name: "NUMA Resources Operator"
-  manager_version: "numaresources-operator.v4.21.0"
+  manager_version: "numaresources-operator.v4.22.0"
   # min_kube_version should match ocp
   # https://access.redhat.com/solutions/4870701
   min_kube_version: "1.32.0"
-  version: "4.21.0"
+  version: "4.22.0"
