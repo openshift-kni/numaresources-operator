@@ -480,12 +480,12 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 				},
 				{
 					Type:   ConditionProgressing,
-					Status: metav1.ConditionTrue,
+					Status: metav1.ConditionFalse,
 					Reason: ConditionProgressing,
 				},
 				{
 					Type:   ConditionDegraded,
-					Status: metav1.ConditionTrue,
+					Status: metav1.ConditionFalse,
 					Reason: ConditionDegraded,
 				},
 				{
@@ -515,12 +515,12 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 				},
 				{
 					Type:   ConditionProgressing,
-					Status: metav1.ConditionTrue,
+					Status: metav1.ConditionFalse,
 					Reason: ConditionProgressing,
 				},
 				{
 					Type:   ConditionDegraded,
-					Status: metav1.ConditionTrue,
+					Status: metav1.ConditionFalse,
 					Reason: ConditionDegraded,
 				},
 				{
@@ -529,6 +529,139 @@ func TestUpdateConditionsInPlace(t *testing.T) {
 					Reason:             ConditionDedicatedInformerActive,
 					Message:            "test3",
 					ObservedGeneration: 42,
+				},
+			},
+		},
+		{
+			name: "updating a base condition should affect all other base conditions - progressing to available",
+			conditions: []metav1.Condition{
+				{
+					Type:   ConditionAvailable,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionAvailable,
+				},
+				{
+					Type:   ConditionUpgradeable,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionUpgradeable,
+				},
+				{
+					Type:   ConditionProgressing,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionProgressing,
+				},
+				{
+					Type:   ConditionDegraded,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionDegraded,
+				},
+				{
+					Type:   ConditionDedicatedInformerActive,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionDedicatedInformerActive,
+				},
+			},
+			condition: metav1.Condition{
+				Type:               ConditionAvailable,
+				Status:             metav1.ConditionTrue,
+				Reason:             ConditionAvailable,
+				Message:            "test3",
+				ObservedGeneration: 42,
+			},
+			expected: []metav1.Condition{
+				{
+					Type:               ConditionAvailable,
+					Status:             metav1.ConditionTrue,
+					Reason:             ConditionAvailable,
+					Message:            "test3",
+					ObservedGeneration: 42,
+				},
+				{
+					Type:               ConditionUpgradeable,
+					Status:             metav1.ConditionTrue,
+					Reason:             ConditionUpgradeable,
+					ObservedGeneration: 42,
+				},
+				{
+					Type:   ConditionProgressing,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionProgressing,
+				},
+				{
+					Type:   ConditionDegraded,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionDegraded,
+				},
+				{
+					Type:   ConditionDedicatedInformerActive,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionDedicatedInformerActive,
+				},
+			},
+		},
+		{
+			name: "updating a base condition should affect all other base conditions - available to degraded",
+			conditions: []metav1.Condition{
+				{
+					Type:   ConditionAvailable,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionAvailable,
+				},
+				{
+					Type:   ConditionUpgradeable,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionUpgradeable,
+				},
+				{
+					Type:   ConditionProgressing,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionProgressing,
+				},
+				{
+					Type:   ConditionDegraded,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionDegraded,
+				},
+				{
+					Type:   ConditionDedicatedInformerActive,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionDedicatedInformerActive,
+				},
+			},
+			condition: metav1.Condition{
+				Type:               ConditionDegraded,
+				Status:             metav1.ConditionTrue,
+				Reason:             ConditionDegraded,
+				Message:            "test3",
+				ObservedGeneration: 42,
+			},
+			expected: []metav1.Condition{
+				{
+					Type:   ConditionAvailable,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionAvailable,
+				},
+				{
+					Type:   ConditionUpgradeable,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionUpgradeable,
+				},
+				{
+					Type:   ConditionProgressing,
+					Status: metav1.ConditionFalse,
+					Reason: ConditionProgressing,
+				},
+				{
+					Type:               ConditionDegraded,
+					Status:             metav1.ConditionTrue,
+					Reason:             ConditionDegraded,
+					Message:            "test3",
+					ObservedGeneration: 42,
+				},
+				{
+					Type:   ConditionDedicatedInformerActive,
+					Status: metav1.ConditionTrue,
+					Reason: ConditionDedicatedInformerActive,
 				},
 			},
 		},
