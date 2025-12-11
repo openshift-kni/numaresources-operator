@@ -44,9 +44,8 @@ spec:
     value: .konflux/Dockerfile.catalog
   - name: additional-tags
     value: []
-  # We have configured an fbc exception for hermetic builds on the release repo.
   - name: hermetic
-    value: "false"
+    value: "true"
   pipelineRef:
     name: fbc-pipeline    
   taskRunTemplate:
