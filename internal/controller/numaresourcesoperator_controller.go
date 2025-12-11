@@ -139,9 +139,14 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, err
 	}
 
+	initialStatus := *instance.Status.DeepCopy()
+	if len(initialStatus.Conditions) == 0 {
+		instance.Status.Conditions = status.DefaultBaseConditions(time.Now())
+	}
+
 	if req.Name != objectnames.DefaultNUMAResourcesOperatorCrName {
 		err := fmt.Errorf("incorrect NUMAResourcesOperator resource name: %s", instance.Name)
-		return r.degradeStatus(ctx, instance, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, err)
+		return r.degradeStatus(ctx, initialStatus, instance, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, err)
 	}
 
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
@@ -150,17 +155,17 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	if err := validation.NodeGroups(instance.Spec.NodeGroups, r.Platform); err != nil {
-		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
+		return r.degradeStatus(ctx, initialStatus, instance, validation.NodeGroupsError, err)
 	}
 
 	trees, err := getTreesByNodeGroup(ctx, r.Client, instance.Spec.NodeGroups, r.Platform)
 	if err != nil {
-		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
+		return r.degradeStatus(ctx, initialStatus, instance, validation.NodeGroupsError, err)
 	}
 
 	tolerable, err := validation.NodeGroupsTree(instance, trees, r.Platform)
 	if err != nil {
-		return r.degradeStatus(ctx, instance, validation.NodeGroupsError, err)
+		return r.degradeStatus(ctx, initialStatus, instance, validation.NodeGroupsError, err)
 	}
 
 	for idx := range trees {
@@ -168,62 +173,46 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		trees[idx].NodeGroup.Config = &conf
 	}
 
-	curStatus := instance.Status.DeepCopy()
-
 	step := r.reconcileResource(ctx, instance, trees)
+	instance.Status.Conditions, _ = status.ComputeConditions(instance.Status.Conditions, step.ConditionInfo.ToMetav1Condition(instance.Generation), time.Now())
 
 	if step.Done() && tolerable != nil {
-		return r.degradeStatus(ctx, instance, tolerable.Reason, tolerable.Error)
+		return r.degradeStatus(ctx, initialStatus, instance, tolerable.Reason, tolerable.Error)
 	}
 
-	if !status.NUMAResourceOperatorNeedsUpdate(curStatus, &instance.Status) {
-		return step.Result, step.Error
-	}
-
-	updErr := r.Client.Status().Update(ctx, instance)
-	if updErr != nil {
-		klog.InfoS("Failed to update numaresourcesoperator status", "error", updErr)
-		return ctrl.Result{}, fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(instance), updErr)
+	if err := r.updateStatus(ctx, initialStatus, instance); err != nil {
+		klog.InfoS("Failed to update numaresources-operator status", "error", err)
 	}
 
 	return step.Result, step.Error
 }
 
-// updateStatusConditionsIfNeeded returns true if conditions were updated.
-func updateStatusConditionsIfNeeded(instance *nropv1.NUMAResourcesOperator, cond conditioninfo.ConditionInfo) {
-	if cond.Type == "" { // backward (=legacy) compatibility
-		return
+func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesOperatorStatus, instance *nropv1.NUMAResourcesOperator) error {
+	if !status.NUMAResourceOperatorNeedsUpdate(initialStatus, instance.Status) {
+		return nil
 	}
-	klog.InfoS("updateStatus", "condition", cond.Type, "reason", cond.Reason, "message", cond.Message)
-	conditions, ok := status.ComputeConditions(instance.Status.Conditions, metav1.Condition{
-		Type:               cond.Type,
-		Reason:             cond.Reason,
-		Message:            cond.Message,
-		ObservedGeneration: instance.Generation,
-	}, time.Now())
-	if ok {
-		instance.Status.Conditions = conditions
+
+	updErr := r.Client.Status().Update(ctx, instance)
+	if updErr != nil {
+		return fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(instance), updErr)
 	}
+	return nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, instance *nropv1.NUMAResourcesOperator, reason string, stErr error) (ctrl.Result, error) {
+func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesOperatorStatus, instance *nropv1.NUMAResourcesOperator, reason string, stErr error) (ctrl.Result, error) {
 	info := conditioninfo.DegradedFromError(stErr)
 	if reason != "" { // intentionally overwrite
 		info.Reason = reason
 	}
 
-	updateStatusConditionsIfNeeded(instance, info)
-	// TODO: if we keep being degraded, we likely (= if we don't, it's too implicit) keep sending possibly redundant updates to the apiserver
+	instance.Status.Conditions, _ = status.ComputeConditions(instance.Status.Conditions, info.ToMetav1Condition(instance.Generation), time.Now())
 
-	err := r.Client.Status().Update(ctx, instance)
+	err := r.updateStatus(ctx, initialStatus, instance)
 	if err != nil {
 		klog.InfoS("Failed to update numaresourcesoperator status", "error", err)
-		return ctrl.Result{}, fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(instance), err)
 	}
 
-	// we do not return an error here because to pass the validation error a user will need to update NRO CR
-	// that will anyway initiate to reconcile loop
-	return ctrl.Result{}, nil
+	return ctrl.Result{}, err
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) intreconcile.Step {
@@ -298,7 +287,6 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) intreconcile.Step {
 	if step := r.reconcileResourceAPI(ctx, instance, trees); step.EarlyStop() {
-		updateStatusConditionsIfNeeded(instance, step.ConditionInfo)
 		return step
 	}
 
@@ -306,14 +294,12 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 
 	if r.Platform == platform.OpenShift {
 		if step := r.reconcileResourceMachineConfig(ctx, instance, existing, trees); step.EarlyStop() {
-			updateStatusConditionsIfNeeded(instance, step.ConditionInfo)
 			return step
 		}
 	}
 
 	dsPerPool, step := r.reconcileResourceDaemonSet(ctx, instance, existing, trees)
 	if step.EarlyStop() {
-		updateStatusConditionsIfNeeded(instance, step.ConditionInfo)
 		return step
 	}
 
@@ -321,11 +307,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	// is a certain thing if we got to this point otherwise the function would have returned already
 	instance.Status.NodeGroups = syncNodeGroupsStatus(instance, dsPerPool)
 
-	updateStatusConditionsIfNeeded(instance, conditioninfo.Available())
-	return intreconcile.Step{
-		Result:        ctrl.Result{},
-		ConditionInfo: conditioninfo.Available(),
-	}
+	return intreconcile.StepSuccess()
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, daemonSetsInfo []poolDaemonSet) ([]nropv1.NamespacedName, string, error) {

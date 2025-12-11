@@ -26,6 +26,7 @@ import (
 	"github.com/go-logr/logr"
 
 	corev1 "k8s.io/api/core/v1"
+	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -62,7 +63,7 @@ func HasSynced(env *Env, nodeNames []string) (bool, map[string]sets.Set[string],
 		return false, nil, err
 	}
 
-	cond := status.FindCondition(nroSched.Status.Conditions, status.ConditionAvailable)
+	cond := metahelper.FindStatusCondition(nroSched.Status.Conditions, status.ConditionAvailable)
 	if cond == nil {
 		return false, nil, fmt.Errorf("missing condition: available")
 	}

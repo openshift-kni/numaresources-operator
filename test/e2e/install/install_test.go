@@ -24,6 +24,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -91,7 +92,7 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 					return false, err
 				}
 
-				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
+				cond := metahelper.FindStatusCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
 				if cond == nil {
 					klog.InfoS("missing conditions", "nroObj", updatedNROObj)
 					return false, err
@@ -180,7 +181,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 					return false
 				}
 
-				cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionDegraded)
+				cond := metahelper.FindStatusCondition(updatedNROObj.Status.Conditions, status.ConditionDegraded)
 				if cond == nil {
 					klog.InfoS("missing conditions", "nroObj", updatedNROObj)
 					return false
