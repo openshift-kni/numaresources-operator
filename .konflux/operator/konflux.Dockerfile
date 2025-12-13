@@ -41,4 +41,4 @@ LABEL com.redhat.component="numaresources-operator-container" \
       release="${OPENSHIFT_VERSION}" \
       url="https://github.com/openshift-kni/numaresources-operator" \
       vendor="Red Hat, Inc." \
-      cpe="cpe:/a:redhat:openshift:4.21::el9"
+      cpe="cpe:/a:redhat:openshift:4.22::el9"
