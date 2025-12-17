@@ -5,7 +5,7 @@ metadata:
   annotations:
     config.numa-operator.openshift.io/scheduler-qos-request: "burstable"
 spec:
-  imageSpec: "quay.io/openshift-kni/scheduler-plugins:4.21-snapshot"
+  imageSpec: "quay.io/openshift-kni/scheduler-plugins:4.22-snapshot"
   logLevel: "Trace"
   schedulerName: topo-aware-scheduler
   replicas: 3

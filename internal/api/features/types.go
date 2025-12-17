@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	Version = "v4.21.0"
+	Version = "v4.22.0"
 )
 
 type Metadata struct {

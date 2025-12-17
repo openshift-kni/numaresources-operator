@@ -37,7 +37,7 @@ const (
 	envVarMustGatherImage  = "E2E_NROP_MUSTGATHER_IMAGE"
 	envVarMustGatherTag    = "E2E_NROP_MUSTGATHER_TAG"
 	defaultMustGatherImage = "quay.io/openshift-kni/numaresources-must-gather"
-	defaultMustGatherTag   = "4.21.999-snapshot"
+	defaultMustGatherTag   = "4.22.999-snapshot"
 
 	// E2E_NROP_MUSTGATHER_IMAGE_REF represents image name + tag/digest
 	// and takes precedence over E2E_NROP_MUSTGATHER_IMAGE and E2E_NROP_MUSTGATHER_TAG
