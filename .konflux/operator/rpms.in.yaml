@@ -1,15 +1,22 @@
 contentOrigin:
-  # Define at least one source of packages, but you can have as many as you want.
-  repofiles:
-     - ./redhat.repo
+  # Repos defined in this list must exactly match the repos defined in the conforma configuration
+  # See https://github.com/release-engineering/rhtap-ec-policy/blob/main/data/known_rpm_repositories.yml
+  repos:
+    - repoid: ubi-9-for-$basearch-baseos-rpms
+      name: Red Hat Universal Base Image 9 for $basearch - BaseOS (RPMs)
+      baseurl: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/$basearch/baseos/os
+      enabled: "1"
+      gpgcheck: "1"
+      gpgkey: file:///etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
+      sslverify: "1"
+      sslverifystatus: "1"
+      metadata_expire: "86400"
+      enabled_metadata: "1"
 
 packages:
-  # list of rpm names to resolve
   - hwdata
 
 arches:
-  # The list of architectures can be set in the config file. Any `--arch` option set
-  # on the command line will override this list.
   - x86_64
 
 context:
@@ -18,4 +25,4 @@ context:
   # can be combined with `image` and `containerfile`
   containerfile:
     file: konflux.Dockerfile
-    imagePattern: registry.redhat.io/rhel9-4-els/rhel
+    imagePattern: registry.access.redhat.com/ubi9/ubi-minimal
