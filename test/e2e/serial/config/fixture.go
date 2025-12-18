@@ -24,6 +24,7 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/api/features"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
@@ -35,6 +36,7 @@ type E2EConfig struct {
 	NROOperObj    *nropv1.NUMAResourcesOperator
 	NROSchedObj   *nropv1.NUMAResourcesScheduler
 	SchedulerName string
+	ClusterTopics features.TopicInfo
 	infraNRTList  nrtv1alpha2.NodeResourceTopologyList
 }
 
@@ -102,6 +104,11 @@ func NewFixtureWithOptions(ctx context.Context, nsName string, options e2efixtur
 
 	cfg.SchedulerName = cfg.NROSchedObj.Status.SchedulerName
 	klog.InfoS("detected scheduler name", "schedulerName", cfg.SchedulerName)
+
+	cfg.ClusterTopics, err = FetchClusterTopics(ctx, cfg.Fixture, cfg.NROOperObj)
+	if err != nil {
+		return nil, err
+	}
 
 	return &cfg, nil
 }
