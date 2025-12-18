@@ -85,16 +85,16 @@ func EqualConditions(current, updated []metav1.Condition) bool {
 // UpdateConditions compute new conditions based on arguments, and then compare with given current conditions.
 // Returns the conditions to use, either current or newly computed, and a boolean flag which is `true` if conditions need
 // update - so if they are updated since the current conditions.
-func UpdateConditions(currentConditions []metav1.Condition, condition string, reason string, message string) ([]metav1.Condition, bool) {
-	conditions := NewConditions(condition, reason, message)
+func UpdateConditions(currentConditions []metav1.Condition, cond metav1.Condition, now time.Time) ([]metav1.Condition, bool) {
+	conditions := NewConditions(cond, now)
 
-	cond := CloneConditions(conditions)
-	curCond := CloneConditions(currentConditions)
+	conds := CloneConditions(conditions)
+	curConds := CloneConditions(currentConditions)
 
-	resetIncomparableConditionFields(cond)
-	resetIncomparableConditionFields(curCond)
+	resetIncomparableConditionFields(conds)
+	resetIncomparableConditionFields(curConds)
 
-	if reflect.DeepEqual(cond, curCond) {
+	if reflect.DeepEqual(conds, curConds) {
 		return currentConditions, false
 	}
 	return conditions, true
@@ -110,26 +110,29 @@ func FindCondition(conditions []metav1.Condition, condition string) *metav1.Cond
 	return nil
 }
 
-func NewConditions(condition string, reason string, message string) []metav1.Condition {
-	conditions := newBaseConditions()
-	switch condition {
+func NewConditions(cond metav1.Condition, now time.Time) []metav1.Condition {
+	conditions := newBaseConditions(now)
+	switch cond.Type {
 	case ConditionAvailable:
 		conditions[0].Status = metav1.ConditionTrue
+		conditions[0].ObservedGeneration = cond.ObservedGeneration
 		conditions[1].Status = metav1.ConditionTrue
+		conditions[1].ObservedGeneration = cond.ObservedGeneration
 	case ConditionProgressing:
 		conditions[2].Status = metav1.ConditionTrue
-		conditions[2].Reason = reason
-		conditions[2].Message = message
+		conditions[2].Reason = cond.Reason
+		conditions[2].Message = cond.Message
+		conditions[2].ObservedGeneration = cond.ObservedGeneration
 	case ConditionDegraded:
 		conditions[3].Status = metav1.ConditionTrue
-		conditions[3].Reason = reason
-		conditions[3].Message = message
+		conditions[3].Reason = cond.Reason
+		conditions[3].Message = cond.Message
+		conditions[3].ObservedGeneration = cond.ObservedGeneration
 	}
 	return conditions
 }
 
-func newBaseConditions() []metav1.Condition {
-	now := time.Now()
+func newBaseConditions(now time.Time) []metav1.Condition {
 	return []metav1.Condition{
 		{
 			Type:               ConditionAvailable,
