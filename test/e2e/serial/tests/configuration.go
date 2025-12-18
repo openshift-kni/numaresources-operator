@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1521,10 +1522,18 @@ func isNROOperAvailableAt(nropStatus *nropv1.NUMAResourcesOperatorStatus, gen in
 	if cond.Status != metav1.ConditionTrue {
 		return false
 	}
+	// TODO: until all the version reports ObservedGeneration
+	if serialconfig.Config != nil && !slices.Contains(serialconfig.Config.ClusterTopics.Active, "operobsgen") {
+		return true
+	}
 	return cond.ObservedGeneration == gen
 }
 
 func isNROOperUpToDate(nrop *nropv1.NUMAResourcesOperator) bool {
+	// TODO: until all the version reports ObservedGeneration
+	if serialconfig.Config != nil && !slices.Contains(serialconfig.Config.ClusterTopics.Active, "operobsgen") {
+		return true
+	}
 	return isNROOperAvailableAt(&nrop.Status, nrop.Generation)
 }
 
