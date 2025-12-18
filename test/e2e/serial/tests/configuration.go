@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1843,6 +1844,10 @@ func isNROOperSyncedAt(nropStatus *nropv1.NUMAResourcesOperatorStatus, condition
 	}
 	if cond.Status != metav1.ConditionTrue {
 		return errors.New("condition not true")
+	}
+	// TODO: until all the version reports ObservedGeneration
+	if serialconfig.Config != nil && !slices.Contains(serialconfig.Config.ClusterTopics.Active, "operobsgen") {
+		return nil
 	}
 	if cond.ObservedGeneration != gen {
 		return fmt.Errorf("condition at %d expected %d", cond.ObservedGeneration, gen)
