@@ -121,7 +121,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 			node := &corev1.Node{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: fmt.Sprintf("master-node-0"),
+					Name: "master-node-0",
 					Labels: map[string]string{
 						"node-role.kubernetes.io/control-plane": "",
 					},
@@ -132,13 +132,13 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(Succeed())
+
+			progressingCondition := getConditionByType(nrs.Status.Conditions, status.ConditionProgressing)
+			Expect(progressingCondition.Status).To(Equal(metav1.ConditionTrue), "scheduler not reported Progressing: %v", nrs.Status.Conditions)
 			degradedCondition = getConditionByType(nrs.Status.Conditions, status.ConditionDegraded)
 			Expect(degradedCondition.Status).To(Equal(metav1.ConditionFalse), "scheduler reported as Degraded: %v", degradedCondition)
 			Expect(degradedCondition.Reason).To(Equal(status.ConditionDegraded))
 			Expect(degradedCondition.Message).To(BeEmpty())
-
-			progressingCondition := getConditionByType(nrs.Status.Conditions, status.ConditionProgressing)
-			Expect(progressingCondition.Status).To(Equal(metav1.ConditionTrue), "scheduler not reported Progressing: %v", nrs.Status.Conditions)
 		})
 	})
 
