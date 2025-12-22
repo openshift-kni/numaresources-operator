@@ -1,1 +1,2 @@
-numaresources-operator/catalog.yaml
+catalog-template.out.yaml
+numaresources-operator/catalog.json
