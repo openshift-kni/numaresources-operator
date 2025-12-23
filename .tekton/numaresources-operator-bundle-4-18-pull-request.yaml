@@ -12,13 +12,15 @@ metadata:
       event == "pull_request" &&
       target_branch == "release-4.18" &&
       (
-        '.tekton/build-pipeline.yaml'.pathChanged() ||
+        '.konflux/bundle/bundle.konflux.Dockerfile'.pathChanged() ||
+        '.konflux/bundle/overlay/***'.pathChanged() ||
         '.konflux/container-build.args'.pathChanged() ||
+        '.tekton/build-pipeline.yaml'.pathChanged() ||
+        '.tekton/numaresources-operator-bundle-4-18-pull-request.yaml'.pathChanged() ||
         'bundle/***'.pathChanged() ||
         'hack/***'.pathChanged() ||
-        '.konflux/bundle/overlay/***'.pathChanged() ||
-        '.tekton/numaresources-operator-bundle-4-18-pull-request.yaml'.pathChanged() ||
-        '.konflux/bundle/bundle.konflux.Dockerfile'.pathChanged()
+        'telco5g-konflux'.pathChanged() ||
+        'telco5g-konflux/***'.pathChanged()
       )
   creationTimestamp: null
   labels:
