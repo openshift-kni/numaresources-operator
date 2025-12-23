@@ -37,6 +37,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/baseload"
 	intbaseload "github.com/openshift-kni/numaresources-operator/internal/baseload"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
+	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
@@ -1252,4 +1253,214 @@ func getTopologyManagerScope(ctx context.Context, cli client.Client) (string, er
 	}
 	fmt.Printf("cfg: %+v\n", cfg)
 	return cfg.Kubelet.TopologyManagerScope, nil
+}
+
+type resourceGroup struct {
+	testPodResources            []corev1.ResourceList // one for each container
+	targetNodeName              string
+	targetNodeFreeResources     []corev1.ResourceList // one for each NUMA zone
+	unsuitableNodeNames         []string
+	unsuitableNodeFreeResources []corev1.ResourceList // one for each NUMA zone
+	topologyManagerScope        string
+	nrts                        []nrtv1alpha2.NodeResourceTopology
+}
+
+type expectedTestResult string
+
+const (
+	fitAndRunOnTargetAndNodeLevelFitOnUnsuitableNodes expectedTestResult = "fitAndRunOnTargetAndNodeLevelFitOnUnsuitableNodes" // challenge sched, should pisk target
+	fitNodeLevelButNotSingleNumaOnTarget              expectedTestResult = "fitNodeLevelButNotSingleNumaOnTarget"              // unsched case
+)
+
+// validateResourcesGroup performs a (limited) dry validation of the requested test resources against the target node and unsuitable nodes
+func validateResourcesGroup(fxt *e2efixture.Fixture, resourcesGroup resourceGroup, expectedRes expectedTestResult) error {
+	targetNRT, err := e2enrt.FindFromList(resourcesGroup.nrts, resourcesGroup.targetNodeName)
+	if err != nil {
+		return fmt.Errorf("failed to find NRT info for target node %q: %v", resourcesGroup.targetNodeName, err)
+	}
+	resourcesGroup.targetNodeFreeResources, err = computeTargetNodeFreeResources(fxt, resourcesGroup.targetNodeFreeResources, resourcesGroup.targetNodeName, *targetNRT)
+	if err != nil {
+		return fmt.Errorf("failed to compute target node free resources: %v", err)
+	}
+	updatedUnsuitableFreeResourcesMap, err := computeUnsuitableNodeFreeResources(fxt, resourcesGroup.unsuitableNodeFreeResources, resourcesGroup.unsuitableNodeNames, resourcesGroup.nrts)
+	if err != nil {
+		return fmt.Errorf("failed to compute unsuitable node free resources: %v", err)
+	}
+	totalTestPodResources := sumResources(resourcesGroup.testPodResources)
+	targetNodeLevelFreeResources := sumResources(resourcesGroup.targetNodeFreeResources)
+
+	// for all cases ensure node level fit is achieved on target node
+	if !resourcelist.IsSubset(totalTestPodResources, targetNodeLevelFreeResources) {
+		return fmt.Errorf("total test pod resources are not a subset of the available resources on the target node, this is not the desired outcome")
+	}
+
+	switch expectedRes {
+	case fitAndRunOnTargetAndNodeLevelFitOnUnsuitableNodes:
+		// ensure unsuitable nodes have requested resources available on node level
+		for nodeName, freeResPerNUMA := range updatedUnsuitableFreeResourcesMap {
+			nodeLevelFreeResources := sumResources(freeResPerNUMA)
+			if !resourcelist.IsSubset(totalTestPodResources, nodeLevelFreeResources) {
+				return fmt.Errorf("total test pod resources are not a subset of the available resources on the unsuitable node %q, this is not the desired outcome", nodeName)
+			}
+		}
+
+		if resourcesGroup.topologyManagerScope == intnrt.Pod || len(resourcesGroup.testPodResources) == 1 {
+			klog.InfoS("handle TM scope pod case or a single container case")
+			klog.InfoS("sum of all containers resources must fit in at least one numa on the target node")
+			fit := false
+			for _, zoneRes := range resourcesGroup.targetNodeFreeResources {
+				if resourcelist.IsSubset(totalTestPodResources, zoneRes) {
+					fit = true
+					break
+				}
+			}
+			if !fit {
+				return fmt.Errorf("early verdict: total test pod resources are not a subset of the available resources on any NUMA zone of the target node")
+			}
+			return nil
+		}
+
+		klog.InfoS("handle TM scope container case")
+		// Note: this handles the most common case of multiple containers where the test pod has 2 containers.
+		if len(resourcesGroup.testPodResources) > 2 {
+			klog.Warning("this validation is not yet implemented for > 2 containers in a pod, skipping")
+			return nil
+		}
+
+		// getting this far leaves 2 possible permutations: all on one numa or spread on multi-numas
+		klog.InfoS("option 1: check if sum of all containers resources would fit in one numa")
+		for _, zoneRes := range resourcesGroup.targetNodeFreeResources {
+			if resourcelist.IsSubset(totalTestPodResources, zoneRes) {
+				klog.InfoS("sum of all containers resources would fit in one numa", "resources", totalTestPodResources, "zoneRes", zoneRes)
+				return nil
+			}
+		}
+
+		klog.InfoS("option 2: check if the containers resources would be spread on different numas")
+		for _, targetZoneRes := range resourcesGroup.targetNodeFreeResources {
+			if resourcelist.IsSubset(resourcesGroup.testPodResources[0], targetZoneRes) && resourcelist.IsSubset(resourcesGroup.testPodResources[1], targetZoneRes) {
+				klog.InfoS("containers resources would be spread on different numas", "resources", resourcesGroup.testPodResources, "zoneRes", targetZoneRes)
+				return nil
+			}
+		}
+		return fmt.Errorf("early verdict: containers would not fit on the target node")
+
+	case fitNodeLevelButNotSingleNumaOnTarget:
+		klog.InfoS("total test pod resources should NOT fit in any zone on the target node")
+		for _, targetZoneRes := range resourcesGroup.targetNodeFreeResources {
+			if resourcelist.IsSubset(totalTestPodResources, targetZoneRes) {
+				return fmt.Errorf("early verdict: total test pod resources would fit in a zone, this is not the desired outcome")
+			}
+		}
+		if resourcesGroup.topologyManagerScope == intnrt.Pod || len(resourcesGroup.testPodResources) == 1 {
+			// node level fit is checked earlier and nothing else is left to check for these cases
+			return nil
+		}
+
+		if len(resourcesGroup.testPodResources) > 2 {
+			klog.Warning("this validation is not yet implemented for > 2 containers in a pod, skipping")
+			return nil
+		}
+
+		// the only case that is left is : TM scope is container, test pod has 2 containers, and we don't want them to fit in different single numas
+		cnt0InNode0 := resourcelist.IsSubset(resourcesGroup.testPodResources[0], resourcesGroup.targetNodeFreeResources[0])
+		cnt0InNode1 := resourcelist.IsSubset(resourcesGroup.testPodResources[0], resourcesGroup.targetNodeFreeResources[1])
+		cnt1InNode0 := resourcelist.IsSubset(resourcesGroup.testPodResources[1], resourcesGroup.targetNodeFreeResources[0])
+		cnt1InNode1 := resourcelist.IsSubset(resourcesGroup.testPodResources[1], resourcesGroup.targetNodeFreeResources[1])
+
+		if (cnt0InNode0 && cnt1InNode1) || (cnt0InNode1 && cnt1InNode0) {
+			return fmt.Errorf("early verdict: containers would fit in two numas, this is not the desired outcome")
+		}
+		return nil
+	}
+	return nil
+}
+
+func computeTargetNodeFreeResources(fxt *e2efixture.Fixture, freeResources []corev1.ResourceList, targetNodeName string, nrtInfo nrtv1alpha2.NodeResourceTopology) ([]corev1.ResourceList, error) {
+	computedFreeResources := []corev1.ResourceList{}
+	if len(freeResources) == 0 {
+		klog.InfoS("target node free resources are not set, node resources will be fully available on the target node")
+
+		computedFreeResources = make([]corev1.ResourceList, len(nrtInfo.Zones))
+		for idx, zone := range nrtInfo.Zones {
+			for _, resInfo := range zone.Resources {
+				computedFreeResources[idx][corev1.ResourceName(resInfo.Name)] = resInfo.Available
+			}
+		}
+		klog.InfoS("final target node free resources", "resources", computedFreeResources)
+		return computedFreeResources, nil
+	}
+
+	// calc baseload on target node and add it to the freeResources to keep on the node
+	targetNodeBaseload, err := baseload.ForNode(fxt.Client, context.TODO(), targetNodeName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get baseload for target node %q: %v", targetNodeName, err)
+	}
+	updatedTargetNodeFreeResources := freeResources[0].DeepCopy() // in the test we always apply the baseload to the first NUMA zone
+	targetNodeBaseload.Apply(updatedTargetNodeFreeResources)
+	computedFreeResources[0] = updatedTargetNodeFreeResources
+	klog.InfoS("updated target node free resources (baseload applied to first NUMA zone)", "beforeBaseload", freeResources, "afterBaseload", updatedTargetNodeFreeResources, "baseload", resourcelist.ToString(targetNodeBaseload.Resources))
+
+	// fill the rest of available resources on the target node
+	for idx, zone := range nrtInfo.Zones {
+		for _, resInfo := range zone.Resources {
+			if _, ok := computedFreeResources[idx][corev1.ResourceName(resInfo.Name)]; !ok {
+				computedFreeResources[idx][corev1.ResourceName(resInfo.Name)] = resInfo.Available
+			}
+		}
+	}
+
+	klog.InfoS("final target node free resources", "resources", computedFreeResources)
+	return computedFreeResources, nil
+}
+
+func computeUnsuitableNodeFreeResources(fxt *e2efixture.Fixture, freeResources []corev1.ResourceList, unsuitableNodeNames []string, nrts []nrtv1alpha2.NodeResourceTopology) (map[string][]corev1.ResourceList, error) {
+	updatedUnsuitableNodeFreeResourcesList := map[string][]corev1.ResourceList{}
+	if len(freeResources) == 0 {
+		return nil, fmt.Errorf("unsuitable node free resources are not set, node resources will be fully available on the unsuitable nodes")
+	}
+	for _, unsuitableNodeName := range unsuitableNodeNames {
+		unsuitableFreeResources := make([]corev1.ResourceList, len(nrts[0].Zones))
+		unsuitableFreeResources[0] = freeResources[0].DeepCopy()
+		unsuitableFreeResources[1] = freeResources[1].DeepCopy()
+
+		baseload, err := baseload.ForNode(fxt.Client, context.TODO(), unsuitableNodeName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get baseload for unsuitable node %q: %v", unsuitableNodeName, err)
+		}
+		baseload.Apply(unsuitableFreeResources[0])
+		klog.InfoS("updated unsuitable node free resources on first NUMA zone", "node", unsuitableNodeName, "beforeBaseload", freeResources[0], "afterBaseload", unsuitableFreeResources[0], "baseload", resourcelist.ToString(baseload.Resources))
+
+		// fill the rest of available resources on the unsuitable node
+		nrt, err := e2enrt.FindFromList(nrts, unsuitableNodeName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find NRT info for unsuitable node %q: %v", unsuitableNodeName, err)
+		}
+		for idx, zone := range nrt.Zones {
+			for _, resInfo := range zone.Resources {
+				if _, ok := unsuitableFreeResources[idx][corev1.ResourceName(resInfo.Name)]; !ok {
+					unsuitableFreeResources[idx][corev1.ResourceName(resInfo.Name)] = resInfo.Available
+				}
+			}
+		}
+		klog.InfoS("final unsuitable node free resources", "node", unsuitableNodeName, "resources", unsuitableFreeResources)
+		updatedUnsuitableNodeFreeResourcesList[unsuitableNodeName] = unsuitableFreeResources
+	}
+	return updatedUnsuitableNodeFreeResourcesList, nil
+}
+
+func sumResources(resourceLists []corev1.ResourceList) corev1.ResourceList {
+	total := corev1.ResourceList{}
+	for _, resourceList := range resourceLists {
+		for resName, resQty := range resourceList {
+			if _, ok := total[resName]; !ok {
+				total[resName] = resQty.DeepCopy()
+				continue
+			}
+			updatedQty := total[resName].DeepCopy()
+			updatedQty.Add(resQty)
+			total[resName] = updatedQty
+		}
+	}
+	return total
 }
