@@ -31,7 +31,11 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # Konflux catalog configuration
 PACKAGE_NAME_KONFLUX = numaresources-operator
 CATALOG_TEMPLATE_KONFLUX = .konflux/catalog/catalog-template.in.yaml
-CATALOG_KONFLUX = .konflux/catalog/$(PACKAGE_NAME_KONFLUX)/catalog.yaml
+# Telco5g-konflux uses distinct input/output paths when updating the catalog template
+CATALOG_TEMPLATE_KONFLUX_INPUT = .konflux/catalog/catalog-template.in.yaml
+CATALOG_TEMPLATE_KONFLUX_OUTPUT = .konflux/catalog/catalog-template.out.yaml
+CATALOG_OUTPUT_FORMAT = json
+CATALOG_KONFLUX = .konflux/catalog/$(PACKAGE_NAME_KONFLUX)/catalog.$(CATALOG_OUTPUT_FORMAT)
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
@@ -58,10 +62,19 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+# Get the directory of the current makefile
+# Trim any trailing slash from the directory path as we will add if when necessary later
+PROJECT_DIR := $(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
+
 GOOS=$(shell go env GOOS)
 GOARCH=$(shell go env GOARCH)
 
 CONTAINER_ENGINE ?= docker
+
+# Konflux-related variables
+YQ_VERSION ?= 4.45.4
+BUNDLE_NAME_SUFFIX = bundle-4-16
+PRODUCTION_BUNDLE_NAME = bundle
 
 BIN_DIR="bin"
 
@@ -304,7 +317,6 @@ envtest: ## Download envtest-setup locally if necessary.
 	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20230927023946-553bd00cfec5)
 
 # go-install-tool will 'go get' any package $2 and install it to $1.
-PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 define go-install-tool
 @[ -f $(1) ] || { \
 set -e ;\
@@ -437,53 +449,100 @@ golangci-lint:
 
 ##@ Konflux
 
+YQ ?= $(BIN_DIR)/yq
+
+.PHONY: sync-git-submodules
+sync-git-submodules:
+	@echo "Checking git submodules"
+	@if [ "$(SKIP_SUBMODULE_SYNC)" != "yes" ]; then \
+		echo "Syncing git submodules"; \
+		git submodule sync --recursive; \
+		git submodule update --init --recursive; \
+	else \
+		echo "Skipping submodule sync"; \
+	fi
+
 .PHONY: yq
-YQ ?= ./bin/yq
-yq: ## download yq if not in the path
-ifeq (,$(wildcard $(YQ)))
-ifeq (,$(shell which yq 2>/dev/null))
-	@{ \
-	set -e ;\
-	mkdir -p $(dir $(YQ)) ;\
-	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(YQ) https://github.com/mikefarah/yq/releases/download/v4.45.4/yq_$${OS}_$${ARCH} ;\
-	chmod +x $(YQ) ;\
-	}
-else
-YQ = $(shell which yq)
-endif
-endif
+yq: sync-git-submodules ## Download yq
+	@echo "Downloading yq..."
+	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/download download-yq \
+		DOWNLOAD_INSTALL_DIR=$(BIN_DIR) \
+		DOWNLOAD_YQ_VERSION=$(YQ_VERSION)
+	@echo "Yq downloaded successfully."
 
-.PHONY: konflux-update-task-refs ## update task images
-konflux-update-task-refs: yq
-	hack/konflux-update-task-refs.sh .tekton/build-pipeline.yaml
-	hack/konflux-update-task-refs.sh .tekton/fbc-pipeline.yaml
+.PHONY: yq-sort-and-format
+yq-sort-and-format: yq ## Sort keys/reformat all YAML files in the repository
+	@echo "Sorting keys and reformatting YAML files..."
+	@find . -name "*.yaml" -o -name "*.yml" | grep -v -E "(telco5g-konflux/|target/|vendor/|bin/|\.git/)" | while read file; do \
+		echo "Processing $$file..."; \
+		$(YQ) -i '.. |= sort_keys(.)' "$$file"; \
+	done
+	@echo "YAML sorting and formatting completed successfully."
 
-.PHONY: konflux-validate-catalog-template-bundle ## validate the last bundle entry on the catalog template file
-konflux-validate-catalog-template-bundle: yq operator-sdk
-	@{ \
-	set -e ;\
-	bundle=$(shell $(YQ) ".entries[-1].image" $(CATALOG_TEMPLATE_KONFLUX)) ;\
-	echo "validating the last bundle entry: $${bundle} on catalog template: $(CATALOG_TEMPLATE_KONFLUX)" ;\
-	$(OPERATOR_SDK) bundle validate $${bundle} ;\
-	}
+.PHONY: konflux-update-tekton-task-refs
+konflux-update-tekton-task-refs: sync-git-submodules ## Update task references in Tekton pipeline files
+	@echo "Updating task references in Tekton pipeline files..."
+	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/tekton update-task-refs \
+		PIPELINE_FILES="$$(find $(PROJECT_DIR)/.tekton -type f \( -name '*.yaml' -o -name '*.yml' \) -print0 | xargs -0 -r printf '%s ')"
+	@echo "Task references updated successfully."
+
+.PHONY: konflux-validate-catalog-template-bundle
+konflux-validate-catalog-template-bundle: sync-git-submodules yq operator-sdk ## validate the last bundle entry on the catalog template file
+	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/catalog konflux-validate-catalog-template-bundle \
+		CATALOG_TEMPLATE_KONFLUX_INPUT=$(PROJECT_DIR)/$(CATALOG_TEMPLATE_KONFLUX_INPUT) \
+		CATALOG_TEMPLATE_KONFLUX_OUTPUT=$(PROJECT_DIR)/$(CATALOG_TEMPLATE_KONFLUX_OUTPUT) \
+		YQ=$(YQ) \
+		OPERATOR_SDK=$(OPERATOR_SDK) \
+		ENGINE=$(CONTAINER_ENGINE)
 
 .PHONY: konflux-validate-catalog
-konflux-validate-catalog: opm ## validate the current catalog file
-	@echo "validating catalog: .konflux/catalog/$(PACKAGE_NAME_KONFLUX)"
-	$(OPM) validate .konflux/catalog/$(PACKAGE_NAME_KONFLUX)/
+konflux-validate-catalog: sync-git-submodules opm ## validate the current catalog file
+	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/catalog konflux-validate-catalog \
+		CATALOG_KONFLUX=$(PROJECT_DIR)/$(CATALOG_KONFLUX) \
+		OPM=$(OPM)
 
-.PHONY: konflux-generate-catalog ## generate a quay.io catalog
-konflux-generate-catalog: yq opm
-	hack/konflux-update-catalog-template.sh --set-catalog-template-file $(CATALOG_TEMPLATE_KONFLUX) --set-bundle-builds-file .konflux/catalog/bundle.builds.in.yaml	
-	touch $(CATALOG_KONFLUX)
-	$(OPM) alpha render-template basic --output yaml $(CATALOG_TEMPLATE_KONFLUX) > $(CATALOG_KONFLUX)
-	$(OPM) validate .konflux/catalog/$(PACKAGE_NAME_KONFLUX)/
+.PHONY: konflux-generate-catalog
+konflux-generate-catalog: sync-git-submodules yq opm ## generate a quay.io catalog
+	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/catalog konflux-generate-catalog \
+		CATALOG_TEMPLATE_KONFLUX_INPUT=$(PROJECT_DIR)/$(CATALOG_TEMPLATE_KONFLUX_INPUT) \
+		CATALOG_TEMPLATE_KONFLUX_OUTPUT=$(PROJECT_DIR)/$(CATALOG_TEMPLATE_KONFLUX_OUTPUT) \
+		CATALOG_KONFLUX=$(PROJECT_DIR)/$(CATALOG_KONFLUX) \
+		CATALOG_OUTPUT_FORMAT=$(CATALOG_OUTPUT_FORMAT) \
+		PACKAGE_NAME_KONFLUX=$(PACKAGE_NAME_KONFLUX) \
+		BUNDLE_BUILDS_FILE=$(PROJECT_DIR)/.konflux/catalog/bundle.builds.in.yaml \
+		OPM=$(OPM) \
+		YQ=$(YQ)
+	$(MAKE) konflux-validate-catalog
 
-.PHONY: konflux-generate-catalog-production ## generate a registry.redhat.io catalog
-konflux-generate-catalog-production: konflux-generate-catalog
-        # overlay the bundle image for production
-	sed -i 's|quay.io/redhat-user-workloads/telco-5g-tenant/$(PACKAGE_NAME_KONFLUX)-bundle-4-16|registry.redhat.io/openshift4/$(PACKAGE_NAME_KONFLUX)-bundle|g' $(CATALOG_KONFLUX)
-        # From now on, all the related images must reference production (registry.redhat.io) exclusively
-	./hack/konflux-validate-related-images-production.sh --set-catalog-file $(CATALOG_KONFLUX)
-	$(OPM) validate .konflux/catalog/$(PACKAGE_NAME_KONFLUX)/
+.PHONY: konflux-generate-catalog-production
+konflux-generate-catalog-production: sync-git-submodules yq opm ## generate a registry.redhat.io catalog
+	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/catalog konflux-generate-catalog-production \
+		CATALOG_TEMPLATE_KONFLUX_INPUT=$(PROJECT_DIR)/$(CATALOG_TEMPLATE_KONFLUX_INPUT) \
+		CATALOG_TEMPLATE_KONFLUX_OUTPUT=$(PROJECT_DIR)/$(CATALOG_TEMPLATE_KONFLUX_OUTPUT) \
+		CATALOG_KONFLUX=$(PROJECT_DIR)/$(CATALOG_KONFLUX) \
+		CATALOG_OUTPUT_FORMAT=$(CATALOG_OUTPUT_FORMAT) \
+		PACKAGE_NAME_KONFLUX=$(PACKAGE_NAME_KONFLUX) \
+		BUNDLE_NAME_SUFFIX=$(BUNDLE_NAME_SUFFIX) \
+		PRODUCTION_BUNDLE_NAME=$(PRODUCTION_BUNDLE_NAME) \
+		BUNDLE_BUILDS_FILE=$(PROJECT_DIR)/.konflux/catalog/bundle.builds.in.yaml \
+		OPM=$(OPM) \
+		YQ=$(YQ)
+	$(MAKE) konflux-validate-catalog
+
+.PHONY: konflux-filter-unused-redhat-repos
+konflux-filter-unused-redhat-repos: ## Filter unused repositories from redhat.repo in operator lock folder
+	@echo "Filtering unused repositories from operator runtime lock folder..."
+	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/rpm-lock filter-unused-repos REPO_FILE=$(PROJECT_DIR)/.konflux/operator/redhat.repo
+	@echo "Filtering completed."
+
+.PHONY: konflux-compare-catalog
+konflux-compare-catalog: sync-git-submodules ## Compare generated catalog with upstream FBC image
+	@echo "Comparing generated catalog with upstream FBC image..."
+	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/catalog konflux-compare-catalog \
+		CATALOG_KONFLUX=$(PROJECT_DIR)/$(CATALOG_KONFLUX) \
+		PACKAGE_NAME_KONFLUX=$(PACKAGE_NAME_KONFLUX) \
+		UPSTREAM_FBC_IMAGE=quay.io/redhat-user-workloads/telco-5g-tenant/$(PACKAGE_NAME_KONFLUX)-fbc-4-16:latest
+
+.PHONY: konflux-all
+konflux-all: konflux-filter-unused-redhat-repos konflux-update-tekton-task-refs konflux-generate-catalog-production konflux-validate-catalog ## Run all Konflux-related targets
+	@echo "All Konflux targets completed successfully."
