@@ -12,6 +12,9 @@ data:
     profiles:
       - schedulerName: topo-aware-scheduler
         plugins:
+          multiPoint:
+            disabled:
+              - name: DynamicResources
           filter:
             disabled:
               - name: '*'
