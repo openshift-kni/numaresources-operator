@@ -189,7 +189,7 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 			}
 		})
 
-		It("check SELinux data files have been collected", func(ctx context.Context) {
+		It("check SELinux data files have been collected", Label("feature:mgselinuxcollect"), func(ctx context.Context) {
 			destDirContent, err := os.ReadDir(destDir)
 			Expect(err).NotTo(HaveOccurred(), "unable to read contents from destDir:%s. error: %w", destDir, err)
 
