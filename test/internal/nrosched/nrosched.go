@@ -23,6 +23,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
@@ -168,7 +169,7 @@ func CheckNROSchedulerAvailable(ctx context.Context, cli client.Client, schedObj
 		if err != nil {
 			return fmt.Errorf("failed to get the scheduler resource: %v", err)
 		}
-		cond := status.FindCondition(nroSchedObj.Status.Conditions, status.ConditionAvailable)
+		cond := metahelper.FindStatusCondition(nroSchedObj.Status.Conditions, status.ConditionAvailable)
 		if cond == nil {
 			return fmt.Errorf("missing conditions in %v", nroSchedObj)
 		}

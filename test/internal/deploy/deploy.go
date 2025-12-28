@@ -22,6 +22,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
@@ -125,7 +126,7 @@ func DeployNROScheduler(ctx context.Context, timeout time.Duration) *nropv1.NUMA
 		}
 		nroSchedObj = updatedNROObj
 
-		cond := status.FindCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
+		cond := metahelper.FindStatusCondition(updatedNROObj.Status.Conditions, status.ConditionAvailable)
 		if cond == nil {
 			klog.Warningf("missing conditions in %v", updatedNROObj)
 			return false

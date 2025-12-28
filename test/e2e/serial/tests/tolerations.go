@@ -25,6 +25,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	kvalidation "k8s.io/apimachinery/pkg/util/validation/field"
@@ -836,7 +837,7 @@ func isRTEPodFoundOnNode(cli client.Client, ctx context.Context, nodeName string
 }
 
 func isDegradedWith(conds []metav1.Condition, msgContains string, reason string) bool {
-	cond := status.FindCondition(conds, status.ConditionDegraded)
+	cond := metahelper.FindStatusCondition(conds, status.ConditionDegraded)
 	if cond == nil {
 		return false
 	}
