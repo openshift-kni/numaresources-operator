@@ -190,6 +190,14 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 		})
 
 		It("check SELinux data files have been collected", func(ctx context.Context) {
+			minVersion, err := platform.ParseVersion("4.22")
+			Expect(err).ToNot(HaveOccurred(), "failed to parse minimum version")
+			supported, err := configuration.PlatVersion.AtLeast(minVersion)
+			Expect(err).ToNot(HaveOccurred(), "failed to compare versions: %v vs %v", configuration.PlatVersion, minVersion)
+			if !supported {
+				Skip(fmt.Sprintf("SELinux data collection is only supported on cluster version %s or newer, got %s", minVersion, configuration.PlatVersion))
+			}
+
 			destDirContent, err := os.ReadDir(destDir)
 			Expect(err).NotTo(HaveOccurred(), "unable to read contents from destDir:%s. error: %w", destDir, err)
 
