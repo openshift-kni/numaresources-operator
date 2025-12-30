@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+
+. namespace
+NRO_NAMESPACE=$(nro_namespace)
+
+SELINUX_INFO_DIR="/must-gather/selinux_info"
+mkdir -p "$SELINUX_INFO_DIR"
+
+# common variables
+OC_GET_PODS="oc get pods -n $NRO_NAMESPACE"
+
+function replace_dot_with_underscore() {
+    echo $1 | sed 's/\./_/g'
+}
+
+function gather_selinux_data() {
+    local rte_pods=$($OC_GET_PODS -l name='resource-topology' -o jsonpath='{.items[*].metadata.name}')
+    
+    for pod in $rte_pods; do
+        local original_node_name=$($OC_GET_PODS $pod -o jsonpath='{.spec.nodeName}')
+        local node_name=$(replace_dot_with_underscore $original_node_name)
+        
+        echo "Gathering SELinux data from node: $node_name"
+        
+        local node_dir="$SELINUX_INFO_DIR/$node_name"
+        mkdir -p "$node_dir"
+        
+        oc debug node/$original_node_name -- bash -c "
+            chroot /host bash -c '
+                mkdir -p /tmp/selinux_data
+                
+                echo \"=== SELinux context for /var/lib/kubelet ===\" > /tmp/selinux_data/contexts
+                ls -Z /var/lib/kubelet >> /tmp/selinux_data/contexts 2>&1
+                echo \"\" >> /tmp/selinux_data/contexts
+                echo \"=== SELinux context for kubelet.sock ===\" >> /tmp/selinux_data/contexts
+                ls -Z /var/lib/kubelet/pod-resources/kubelet.sock >> /tmp/selinux_data/contexts 2>&1
+                
+                systemctl show kubelet.service > /tmp/selinux_data/kubelet_systemctl_show 2>&1
+                
+                systemctl cat kubelet.service > /tmp/selinux_data/kubelet_systemctl_cat 2>&1
+                
+                echo \"=== SELinux audit logs ===\" > /tmp/selinux_data/audit_selinux.log
+                grep -i selinux /var/log/audit/audit.log >> /tmp/selinux_data/audit_selinux.log 2>&1
+                
+                echo \"=== Pod-resources related audit logs ===\" > /tmp/selinux_data/audit_podresources.log
+                grep \"kubelet.*pod-resources\" /var/log/audit/audit.log >> /tmp/selinux_data/audit_podresources.log 2>&1
+                
+                tar czf - -C /tmp selinux_data
+            '
+        " 2>/dev/null | tar xzf - -C "$node_dir" --strip-components=1
+        
+        if [ $? -eq 0 ]; then
+            echo "Successfully collected SELinux data from node: $node_name"
+        else
+            echo "Failed to collect SELinux data from node: $node_name"
+        fi
+    done
+}
+
+if [ -z "${NRO_NAMESPACE}" ]; then
+    echo "NUMAResources Operator namespace not detected. Skipping SELinux data gathering"
+else
+    gather_selinux_data
+fi
