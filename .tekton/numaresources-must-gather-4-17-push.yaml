@@ -38,7 +38,7 @@ spec:
   - name: hermetic
     value: "true"
   - name: prefetch-input
-    value: '[{"type": "rpm", "path": ".konflux/must-gather"}]'
+    value: '[{"type": "rpm", "path": ".konflux/must-gather/"}]'
   - name: skip-sast-coverity
     value: "true"
   pipelineRef:
