@@ -1,0 +1,67 @@
+{
+    "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "config:recommended"
+    ],
+    "gomod": {
+        "enabled": false
+    },
+    "git-submodules": {
+        "enabled": true,
+        "packageRules": [
+            {
+                "addLabels": [
+                    "approved",
+                    "lgtm"
+                ],
+                "additionalBranchPrefix": "telco5g-konflux-",
+                "autoApprove": true,
+                "automerge": true,
+                "matchFileNames": [
+                    "telco5g-konflux/**"
+                ],
+                "schedule": [
+                    "at any time"
+                ]
+            },
+            {
+                "additionalBranchPrefix": "telco5g-konflux-",
+                "matchFileNames": [
+                    "telco5g-konflux/**"
+                ]
+            }
+        ]
+    },
+    "packageRules": [
+        {
+            "matchUpdateTypes": ["minor"],
+            "matchManagers": ["dockerfile"],
+            "matchPaths": [".konflux/**"],
+            "enabled": false
+        },
+        {
+            "matchManagers": ["dockerfile"],
+            "matchPaths": [".konflux/**"],
+            "matchUpdateTypes": ["digest"],
+            "platformAutomerge": true,
+            "schedule": [
+                "at any time"
+            ]
+        }
+    ],
+    "prConcurrentLimit": 0,
+    "prHourlyLimit": 0,
+    "yaml": {
+        "enabled": true,
+        "fileMatch": [
+            "\\.yaml$",
+            "\\.yml$",
+            "/.*rpms\\.in\\.yaml$/"
+        ],
+        "ignoreTests": false,
+        "includePaths": [
+            ".konflux/**"
+        ]
+    }
+}
+
