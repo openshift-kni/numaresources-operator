@@ -23,7 +23,13 @@ import (
 )
 
 const (
-	Version = "v4.22.0"
+	// Version is the version of the API, and covers data layout.
+	// The version should be bumped when the API definition changes,
+	// and is not strictly tied to the operator version.
+	// The payload (e.g. active topics) may and will changes even
+	// within the same operator version; e.g. is totally legit
+	// to add more topics during a Z stream.
+	Version = "v1.0.0"
 )
 
 type Metadata struct {
