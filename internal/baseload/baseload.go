@@ -105,3 +105,12 @@ func (nl Load) CPU() resource.Quantity {
 func (nl Load) Memory() resource.Quantity {
 	return *nl.Resources.Memory()
 }
+
+func (nl Load) Mul(factor int) corev1.ResourceList {
+	res := nl.Resources.DeepCopy()
+	for resName, resQty := range res {
+		resQty.Mul(int64(factor))
+		res[resName] = resQty
+	}
+	return res
+}
