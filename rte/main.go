@@ -160,10 +160,7 @@ func dump(parsedArgs *rteconfiguration.ProgArgs) error {
 	case ".log":
 		klog.Infof("current configuration:\n%s", conf)
 	default:
-		err := os.WriteFile(parsedArgs.DumpConfig, []byte(conf), 0644)
-		if err != nil {
-			klog.Fatalf("failed to write the config to %q: %v", parsedArgs.DumpConfig, err)
-		}
+		klog.Fatalf("dumping config to file not supported (dest=%q)", parsedArgs.DumpConfig)
 	}
 	return nil
 }
