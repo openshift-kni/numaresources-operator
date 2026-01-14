@@ -63,10 +63,21 @@
             "schedule": [
                 "at any time"
             ]
+        },
+        {
+            "matchManagers": ["rpm", "dockerfile"],
+            "groupName": "RPM and container image updates",
+            "schedule": ["before 3am on Monday"]
         }
     ],
     "prConcurrentLimit": 0,
     "pruneBranchAfterAutomerge": true,
+    "dockerfile": {
+        "postUpgradeTasks": {
+            "commands": ["rpm-lockfile-prototype rpms.in.yaml"],
+            "fileFilters": ["rpms.lock.yaml"]
+        }
+    },
     "tekton": {
         "autoApprove": true,
         "automerge": true,
