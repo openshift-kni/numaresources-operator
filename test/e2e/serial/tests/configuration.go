@@ -31,6 +31,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -997,7 +998,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					By("verify the operator is in Available condition")
 					Eventually(func(g Gomega) {
 						g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-						cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
+						cond := metahelper.FindStatusCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
 						g.Expect(cond).ToNot(BeNil(), "condition Available was not found: %+v", updatedNRO.Status.Conditions)
 						g.Expect(cond.Status).To(Equal(metav1.ConditionTrue), "Expected operators condition to be Available, but was found something else: %+v", updatedNRO.Status.Conditions)
 					}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "operator did not return to Available state in time")
@@ -1087,7 +1088,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 					By("verify the operator is in Available condition")
 					Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-					cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
+					cond := metahelper.FindStatusCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
 					Expect(cond).ToNot(BeNil(), "expected operators conditions to be Available but was found something else: %+v", updatedNRO.Status.Conditions)
 				}()
 
@@ -1195,7 +1196,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					By("verifying the operator is in Available condition")
 					Eventually(func(g Gomega) {
 						g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-						cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
+						cond := metahelper.FindStatusCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
 						g.Expect(cond).ToNot(BeNil(), "condition Available was not found: %+v", updatedNRO.Status.Conditions)
 						g.Expect(cond.Status).To(Equal(metav1.ConditionTrue), "Expected operator condition to be Available=True, but got something else: %+v", updatedNRO.Status.Conditions)
 					}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "operator did not return to Available state in time")
@@ -1257,7 +1258,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					By("verify the operator is in Available condition")
 					Eventually(func(g Gomega) {
 						g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
-						cond := status.FindCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
+						cond := metahelper.FindStatusCondition(updatedNRO.Status.Conditions, status.ConditionAvailable)
 						g.Expect(cond).ToNot(BeNil(), "condition Available was not found: %+v", updatedNRO.Status.Conditions)
 						g.Expect(cond.Status).To(Equal(metav1.ConditionTrue), "Expected operators condition to be Available=True, but was found something else: %+v", updatedNRO.Status.Conditions)
 					}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "operator did not return to Available state in time")
@@ -1496,7 +1497,7 @@ func isNROSchedAvailableAt(nrosStatus *nropv1.NUMAResourcesSchedulerStatus, gen 
 	if nrosStatus == nil {
 		return false
 	}
-	cond := status.FindCondition(nrosStatus.Conditions, status.ConditionAvailable)
+	cond := metahelper.FindStatusCondition(nrosStatus.Conditions, status.ConditionAvailable)
 	if cond == nil {
 		return false
 	}
@@ -1514,7 +1515,7 @@ func isNROOperAvailableAt(nropStatus *nropv1.NUMAResourcesOperatorStatus, gen in
 	if nropStatus == nil {
 		return false
 	}
-	cond := status.FindCondition(nropStatus.Conditions, status.ConditionAvailable)
+	cond := metahelper.FindStatusCondition(nropStatus.Conditions, status.ConditionAvailable)
 	if cond == nil {
 		return false
 	}
@@ -1582,7 +1583,7 @@ func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.Objec
 		g.Expect(isNROOperUpToDate(&updatedNRO)).To(BeTrue())
 		g.Expect(updatedNRO.Status.NodeGroups).To(HaveLen(len(appliedObj.Spec.NodeGroups)),
 			"NodeGroups Status mismatch: found %d, expected %d", len(updatedNRO.Status.NodeGroups), len(appliedObj.Spec.NodeGroups))
-		g.Expect(status.NUMAResourceOperatorNeedsUpdate(&appliedObj.Status, &updatedNRO.Status)).To(BeTrue())
+		g.Expect(status.NUMAResourceOperatorNeedsUpdate(appliedObj.Status, updatedNRO.Status)).To(BeTrue())
 	}).WithTimeout(10 * time.Minute).WithPolling(5 * time.Second).Should(Succeed())
 
 	klog.InfoS("successfully fetched NRO object", "key", key.String())

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
@@ -114,7 +115,7 @@ var _ = Describe("[Scheduler] install", func() {
 
 func isReportedAvailable(conditions []metav1.Condition) bool {
 	// conditions that should be True
-	availableCond := status.FindCondition(conditions, status.ConditionAvailable)
+	availableCond := metahelper.FindStatusCondition(conditions, status.ConditionAvailable)
 	if availableCond == nil {
 		klog.InfoS("missing available condition status")
 		return false
@@ -124,7 +125,7 @@ func isReportedAvailable(conditions []metav1.Condition) bool {
 		return false
 	}
 
-	upgradeCond := status.FindCondition(conditions, status.ConditionUpgradeable)
+	upgradeCond := metahelper.FindStatusCondition(conditions, status.ConditionUpgradeable)
 	if upgradeCond == nil {
 		klog.InfoS("missing upgradeable condition status")
 		return false
@@ -135,7 +136,7 @@ func isReportedAvailable(conditions []metav1.Condition) bool {
 	}
 
 	// conditions that should be False
-	degradedCond := status.FindCondition(conditions, status.ConditionDegraded)
+	degradedCond := metahelper.FindStatusCondition(conditions, status.ConditionDegraded)
 	if degradedCond == nil {
 		klog.Info("missing degraded condition status")
 		return false
@@ -145,7 +146,7 @@ func isReportedAvailable(conditions []metav1.Condition) bool {
 		return false
 	}
 
-	progressCond := status.FindCondition(conditions, status.ConditionProgressing)
+	progressCond := metahelper.FindStatusCondition(conditions, status.ConditionProgressing)
 	if progressCond == nil {
 		klog.Info("missing progressing condition status")
 		return false
