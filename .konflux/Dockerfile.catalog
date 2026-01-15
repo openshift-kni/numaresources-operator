@@ -1,5 +1,5 @@
 # The opm image is expected to contain /bin/opm (with a serve subcommand) and /bin/grpc_health_probe
-ARG OPM_IMAGE=registry.redhat.io/openshift4/ose-operator-registry-rhel9:v4.21
+ARG OPM_IMAGE=registry.redhat.io/openshift4/ose-operator-registry-rhel9:v4.22
 
 # Run the catalog
 FROM ${OPM_IMAGE}
