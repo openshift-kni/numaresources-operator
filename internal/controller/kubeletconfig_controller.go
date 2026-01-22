@@ -87,6 +87,11 @@ type kubeletConfigHandler struct {
 	setCtrlRef func(owner, controlled metav1.Object, scheme *runtime.Scheme, opts ...controllerutil.OwnerReferenceOption) error
 }
 
+type reconcileErrorHandler struct {
+	err           error
+	tolerateError bool
+}
+
 // Namespace Scoped
 
 // Cluster Scoped
@@ -116,18 +121,22 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 	// KubeletConfig changes are expected to be sporadic, yet are important enough
 	// to be made visible at kubernetes level. So we generate events to handle them
-	cm, err := r.reconcileConfigMap(ctx, instance, req.NamespacedName)
-	if err != nil {
+	cm, errHandler := r.reconcileConfigMap(ctx, instance, req.NamespacedName)
+	if errHandler.err != nil {
 		var klErr *InvalidKubeletConfig
-		if errors.As(err, &klErr) {
+		if errors.As(errHandler.err, &klErr) {
 			r.Recorder.Event(instance, "Normal", "ProcessSkip", "ignored kubelet config "+klErr.ObjectName)
 			return ctrl.Result{}, nil
 		}
+		if errHandler.tolerateError {
+			r.Recorder.Event(instance, "Normal", "ProcessSkip", errHandler.err.Error())
+			return ctrl.Result{}, nil
+		}
 
-		klog.ErrorS(err, "failed to reconcile configmap", "controller", "kubeletconfig")
+		klog.ErrorS(errHandler.err, "failed to reconcile configmap", "controller", "kubeletconfig")
 
 		r.Recorder.Event(instance, "Warning", "ProcessFailed", "Failed to update RTE config from kubelet config "+req.NamespacedName.String())
-		return ctrl.Result{}, err
+		return ctrl.Result{}, errHandler.err
 	}
 
 	r.Recorder.Event(instance, "Normal", "ProcessOK", fmt.Sprintf("Updated RTE config %s/%s from kubelet config %s", cm.Namespace, cm.Name, req.NamespacedName.String()))
@@ -197,25 +206,26 @@ func (e *InvalidKubeletConfig) Unwrap() error {
 	return e.Err
 }
 
-func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*corev1.ConfigMap, error) {
+func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instance *nropv1.NUMAResourcesOperator, kcKey client.ObjectKey) (*corev1.ConfigMap, reconcileErrorHandler) {
 	// first check if the ConfigMap should be deleted
 	// to save all the additional work related for create/update
 	cm, deleted, err := r.deleteConfigMap(ctx, instance, kcKey)
 	if deleted {
-		return cm, err
+		return cm, reconcileErrorHandler{err: err}
 	}
 
 	kcHandler, err := r.makeKCHandlerForPlatform(ctx, instance, kcKey)
 	if err != nil {
-		return nil, err
+		return nil, reconcileErrorHandler{err: err}
 	}
 	kubeletConfig, err := kubeletconfig.MCOKubeletConfToKubeletConf(kcHandler.mcoKc)
 	if err != nil {
 		klog.ErrorS(err, "cannot extract KubeletConfiguration from MCO KubeletConfig", "name", kcKey.Name)
-		return nil, err
+		return nil, reconcileErrorHandler{err: err}
 	}
 
-	return r.syncConfigMap(ctx, kubeletConfig, instance, kcHandler)
+	cm, err = r.syncConfigMap(ctx, kubeletConfig, instance, kcHandler)
+	return cm, reconcileErrorHandler{err: err}
 }
 
 func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, instance *nropv1.NUMAResourcesOperator, kcHandler *kubeletConfigHandler) (*corev1.ConfigMap, error) {
