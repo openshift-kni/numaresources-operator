@@ -94,8 +94,7 @@ func init() {
 	cooldownThreshold = getCooldownThresholdFromEnvVar()
 }
 
-func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList, options Options) (*Fixture, error) {
-	ctx := context.Background()
+func SetupWithOptions(ctx context.Context, name string, nrtList nrtv1alpha2.NodeResourceTopologyList, options Options) (*Fixture, error) {
 	if !e2eclient.ClientsEnabled {
 		return nil, fmt.Errorf("clients not enabled")
 	}
@@ -143,7 +142,7 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 }
 
 func Setup(baseName string, nrtList nrtv1alpha2.NodeResourceTopologyList) (*Fixture, error) {
-	return SetupWithOptions(baseName, nrtList, OptionRandomizeName)
+	return SetupWithOptions(context.Background(), baseName, nrtList, OptionRandomizeName)
 }
 
 func Teardown(ft *Fixture) error {
