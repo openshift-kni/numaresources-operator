@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -189,11 +190,22 @@ func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return equality.Semantic.DeepEqual(oldNodeGroups, newNodeGroups)
 		},
 	}
+
+	machineConfigPoolPredicate := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			mcpOld := e.ObjectOld.(*mcov1.MachineConfigPool)
+			mcpNew := e.ObjectNew.(*mcov1.MachineConfigPool)
+			return mcpOld.Spec.Paused && !mcpNew.Spec.Paused
+		},
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(o, builder.WithPredicates(p)).
 		Owns(&corev1.ConfigMap{}).
 		Watches(&nropv1.NUMAResourcesOperator{}, handler.EnqueueRequestsFromMapFunc(r.numaResourcesOperatorToKubeletConfig),
 			builder.WithPredicates(numaResourcesOperatorPredicate)).
+		Watches(&mcov1.MachineConfigPool{}, handler.EnqueueRequestsFromMapFunc(r.nodeGroupToMachineConfigPool),
+			builder.WithPredicates(machineConfigPoolPredicate)).
 		Complete(r)
 }
 
@@ -229,10 +241,7 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 	}
 
 	cm, err = r.syncConfigMap(ctx, kubeletConfig, instance, kcHandler)
-	if err != nil {
-		return nil, reconcileErrorHandler{err: err}
-	}
-	return cm, errHandler // FIXME use predicate
+	return cm, reconcileErrorHandler{err: err}
 }
 
 func (r *KubeletConfigReconciler) syncConfigMap(ctx context.Context, kubeletConfig *kubeletconfigv1beta1.KubeletConfiguration, instance *nropv1.NUMAResourcesOperator, kcHandler *kubeletConfigHandler) (*corev1.ConfigMap, error) {
@@ -347,15 +356,15 @@ func (r *KubeletConfigReconciler) makeKCHandlerForPlatform(ctx context.Context, 
 					mcoKc:       decodeKc,
 					poolName:    mcp.Name,
 					setCtrlRef:  controllerutil.SetControllerReference,
-				}, reconcileErrorHandler{result: ctrl.Result{Requeue: true, RequeueAfter: MachineConfigPoolPausedRetryPeriod}}
+				}, reconcileErrorHandler{}
 			}
 
-			klog.InfoS("MachineConfigPool of KubeletConfig %s is paused and configMap %s exists", kcKey.Name, existingCM.Name)
+			klog.InfoS("MachineConfigPool is paused and configMap exists", "KubeletConfig", kcKey.Name, "ConfigMap", existingCM.Name)
 			return nil, reconcileErrorHandler{
 				// the KubeletConfig has been already handled and we can skip the rest of reconciliation logic due to paused MCP
 				err:           fmt.Errorf("MachineConfigPool of KubeletConfig %s is paused and configMap %s already exists", kcKey.Name, existingCM.Name),
 				tolerateError: true,
-				result:        ctrl.Result{Requeue: true, RequeueAfter: MachineConfigPoolPausedRetryPeriod},
+				result:        ctrl.Result{},
 			}
 		}
 
@@ -450,6 +459,60 @@ func (r *KubeletConfigReconciler) numaResourcesOperatorToKubeletConfig(ctx conte
 			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKey{
 				Name: cm.Name,
 			}})
+		}
+	}
+	return requests
+}
+
+func (r *KubeletConfigReconciler) nodeGroupToMachineConfigPool(ctx context.Context, object client.Object) []reconcile.Request {
+	var requests []reconcile.Request
+	if r.Platform != platform.OpenShift {
+		return requests
+	}
+
+	nro := &nropv1.NUMAResourcesOperator{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nro); err != nil {
+		klog.ErrorS(err, "failed to get NUMAResourcesOperator %v")
+		return requests
+	}
+	mcpList := &mcov1.MachineConfigPoolList{}
+	if err := r.Client.List(ctx, mcpList); err != nil {
+		klog.ErrorS(err, "failed to list MachineConfigPools %v")
+	}
+	mcpMap := make(map[string]mcov1.MachineConfigPool)
+	for _, mcp := range mcpList.Items {
+		mcpMap[mcp.Name] = mcp
+	}
+
+	ngstatus := nro.Status.NodeGroups
+	targetMCPs := sets.New[string]()
+	for _, ngstatus := range ngstatus {
+		if mcp, ok := mcpMap[ngstatus.PoolName]; ok {
+			targetMCPs.Insert(mcp.Name)
+		}
+	}
+
+	kcList := &mcov1.KubeletConfigList{}
+	if err := r.Client.List(ctx, kcList); err != nil {
+		klog.ErrorS(err, "failed to list KubeletConfigs %v")
+	}
+	//map mcp to kubeletconfig requests
+	for _, mcpName := range targetMCPs.UnsortedList() {
+		mcpLabels := labels.Set(mcpMap[mcpName].Labels)
+		for _, kc := range kcList.Items {
+			if kc.Spec.MachineConfigPoolSelector == nil {
+				continue
+			}
+			selector, err := metav1.LabelSelectorAsSelector(kc.Spec.MachineConfigPoolSelector)
+			if err != nil {
+				klog.ErrorS(err, "failed to parse MachineConfigPoolSelector", "kubeletconfig", kc.Name)
+				continue
+			}
+			if selector.Matches(mcpLabels) {
+				requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKey{
+					Name: kc.Name,
+				}})
+			}
 		}
 	}
 	return requests

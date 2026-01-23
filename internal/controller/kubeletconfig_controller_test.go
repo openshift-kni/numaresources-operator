@@ -384,7 +384,7 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 			Expect(reconciler.Client.Create(context.TODO(), currentMachineConfig)).To(Succeed())
 			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: kc2Key})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result).To(Equal(reconcile.Result{Requeue: true, RequeueAfter: MachineConfigPoolPausedRetryPeriod}))
+			Expect(result).To(Equal(reconcile.Result{}))
 
 			fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
 			Expect(ok).To(BeTrue())
@@ -409,12 +409,13 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 			Expect(reconciler.Client.Create(context.TODO(), currentMachineConfig)).To(Succeed())
 			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: kc2Key})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result).To(Equal(reconcile.Result{Requeue: true, RequeueAfter: MachineConfigPoolPausedRetryPeriod}))
+			Expect(result).To(Equal(reconcile.Result{}))
 
 			clonedMCP := mcpPaused.DeepCopy()
 			clonedMCP.Spec.Paused = false
 			Expect(reconciler.Client.Update(context.TODO(), clonedMCP)).To(Succeed())
 
+			// would betriggered by MCP predicate
 			result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: kc2Key})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result).To(Equal(reconcile.Result{}))
