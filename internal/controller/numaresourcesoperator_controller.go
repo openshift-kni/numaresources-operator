@@ -663,6 +663,18 @@ func (r *NUMAResourcesOperatorReconciler) mcpToNUMAResourceOperator(ctx context.
 		nro := &nros.Items[i]
 		mcpLabels := labels.Set(mcp.Labels)
 		for _, nodeGroup := range nro.Spec.NodeGroups {
+			if nodeGroup.PoolName != nil {
+				if mcp.Name == *nodeGroup.PoolName {
+					requests = append(requests, reconcile.Request{
+						NamespacedName: client.ObjectKey{
+							Name: nro.Name,
+						},
+					})
+					break
+				}
+				continue
+			}
+
 			if nodeGroup.MachineConfigPoolSelector == nil {
 				continue
 			}
@@ -679,10 +691,10 @@ func (r *NUMAResourcesOperatorReconciler) mcpToNUMAResourceOperator(ctx context.
 						Name: nro.Name,
 					},
 				})
+				break
 			}
 		}
 	}
-
 	return requests
 }
 
