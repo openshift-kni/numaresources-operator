@@ -292,7 +292,7 @@ func TestComputeConditions(t *testing.T) {
 	}{
 		{
 			name:       "first reconcile iteration - with operator condition",
-			conditions: NewNUMAResourcesSchedulerBaseConditions(),
+			conditions: NewNUMAResourcesSchedulerConditions(),
 			condition: metav1.Condition{
 				Type:               ConditionAvailable,
 				Status:             metav1.ConditionTrue,
@@ -334,7 +334,7 @@ func TestComputeConditions(t *testing.T) {
 		},
 		{
 			name:       "first reconcile iteration - with informer condition",
-			conditions: NewNUMAResourcesSchedulerBaseConditions(),
+			conditions: NewNUMAResourcesSchedulerConditions(),
 			condition: metav1.Condition{
 				Type:               ConditionDedicatedInformerActive,
 				Status:             metav1.ConditionTrue,
