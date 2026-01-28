@@ -1007,8 +1007,9 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				By("verify degraded condition is found due to node group with multiple selectors")
 				Eventually(func(g Gomega) {
 					var updated nropv1.NUMAResourcesOperator
-					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed())
-					g.Expect(isNROOperUpToDate(&updated)).To(BeTrue())
+					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed(), "failed to get updated NRO object")
+					klog.InfoS("operator conditions", "conditions", updated.Status.Conditions)
+					g.Expect(isNROOperUpToDate(&updated)).To(BeFalse())
 					g.Expect(isDegradedWith(updated.Status.Conditions, "must have only a single specifier set", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			})
