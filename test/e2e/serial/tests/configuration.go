@@ -19,6 +19,7 @@ package tests
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -30,7 +31,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -229,7 +230,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			updatedOperObj := &nropv1.NUMAResourcesOperator{}
 			Eventually(func(g Gomega) {
 				g.Expect(fxt.Client.Get(ctx, nroKey, updatedOperObj)).To(Succeed())
-				g.Expect(isNROOperUpToDate(updatedOperObj)).To(BeTrue())
+				g.Expect(isNROOperSyncedAt(&updatedOperObj.Status, status.ConditionAvailable, updatedOperObj.Generation)).To(Succeed())
 			}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update RTE daemonset node selector")
 
 			dss, err := objects.GetDaemonSetsByNamespacedName(fxt.Client, ctx, updatedOperObj.Status.DaemonSets...)
@@ -272,10 +273,10 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 			e2efixture.By("verifying the scheduler object was updated properly with the new scheduler name %q", serialconfig.SchedulerTestName)
 			updatedSchedObj := &nropv1.NUMAResourcesScheduler{}
-			Eventually(func(g Gomega) bool {
+			Eventually(func(g Gomega) error {
 				g.Expect(fxt.Client.Get(ctx, client.ObjectKeyFromObject(nroSchedObj), updatedSchedObj)).To(Succeed())
-				return isNROSchedUpToDate(updatedSchedObj)
-			}).WithTimeout(time.Minute).WithPolling(time.Second*15).Should(BeTrue(), "failed to update the schedulerName field")
+				return isNROSchedSyncedAt(&updatedSchedObj.Status, status.ConditionAvailable, updatedSchedObj.Generation)
+			}).WithTimeout(time.Minute).WithPolling(time.Second*15).Should(Succeed(), "failed to update the schedulerName field")
 			Expect(updatedSchedObj.Status.SchedulerName).To(Equal(serialconfig.SchedulerTestName), "failed to update the schedulerName field,expected %q but found %q", serialconfig.SchedulerTestName, updatedSchedObj.Status.SchedulerName)
 
 			defer func(rctx context.Context) {
@@ -296,11 +297,11 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}(context.TODO())
 
 			By("checking there are not unexpected changes in the scheduler object")
-			Consistently(func(g Gomega) bool {
+			Consistently(func(g Gomega) error {
 				var nros nropv1.NUMAResourcesScheduler
 				g.Expect(fxt.Client.Get(ctx, client.ObjectKeyFromObject(nroSchedObj), &nros)).To(Succeed())
-				return isNROSchedAvailableAt(&nros.Status, updatedSchedObj.Generation)
-			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(BeTrue(), "unexpected mutation in NUMAResourcesScheduler")
+				return isNROSchedSyncedAt(&nros.Status, status.ConditionAvailable, nros.Generation)
+			}).WithTimeout(time.Minute).WithPolling(time.Second*5).Should(Succeed(), "unexpected mutation in NUMAResourcesScheduler")
 
 			By("schedule pod using the new scheduler name")
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, e2efixture.RandomizeName("testpod"))
@@ -978,7 +979,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					PoolName:                  &pn,
 				}
 
-				By(fmt.Sprintf("modifying the NUMAResourcesOperator by appending a node group with several pool specifiers: %+v", ng))
+				e2efixture.By("modifying the NUMAResourcesOperator by appending a node group with several pool specifiers: %v", ng.ToString())
 				var updatedNRO nropv1.NUMAResourcesOperator
 				Eventually(func(g Gomega) {
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
@@ -987,7 +988,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
 
 				defer func() {
-					By(fmt.Sprintf("revert initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name))
+					e2efixture.By("revert initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name)
 					var updatedNRO nropv1.NUMAResourcesOperator
 					Eventually(func(g Gomega) {
 						g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
@@ -1009,7 +1010,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					var updated nropv1.NUMAResourcesOperator
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed(), "failed to get updated NRO object")
 					klog.InfoS("operator conditions", "conditions", updated.Status.Conditions)
-					g.Expect(isNROOperUpToDate(&updated)).To(BeFalse())
+					g.Expect(isNROOperSyncedAt(&updated.Status, status.ConditionDegraded, updated.Generation)).To(Succeed())
 					g.Expect(isDegradedWith(updated.Status.Conditions, "must have only a single specifier set", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			})
@@ -1219,7 +1220,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Eventually(func(g Gomega) {
 					var updated nropv1.NUMAResourcesOperator
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed())
-					g.Expect(isNROOperUpToDate(&updated)).To(BeTrue())
+					g.Expect(isNROOperSyncedAt(&updated.Status, status.ConditionAvailable, updated.Generation)).To(Succeed())
 					g.Expect(isDegradedWith(updated.Status.Conditions, expectedMsg, validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected for pool name: %q", poolName)
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			},
@@ -1269,7 +1270,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Eventually(func(g Gomega) {
 					var updated nropv1.NUMAResourcesOperator
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed())
-					g.Expect(isNROOperUpToDate(&updated)).To(BeTrue())
+					g.Expect(isNROOperSyncedAt(&updated.Status, status.ConditionAvailable, updated.Generation)).To(Succeed())
 					g.Expect(isDegradedWith(updated.Status.Conditions, "Should specify PoolName only", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			})
@@ -1446,7 +1447,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					key := client.ObjectKey{Namespace: ns, Name: dsName}
 					err := e2eclient.Client.Get(ctx, client.ObjectKey{Namespace: ns, Name: dsName}, updatedConfigMap)
 					if err != nil {
-						if errors.IsNotFound(err) {
+						if apierrors.IsNotFound(err) {
 							klog.InfoS("expected RTE ConfigMap to be found", "key", key)
 							return false
 						}
@@ -1475,7 +1476,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					Eventually(func() bool {
 						updatedNrtObj := &nrtv1alpha2.NodeResourceTopology{}
 						if err := e2eclient.Client.Get(ctx, client.ObjectKey{Name: node.Name}, updatedNrtObj); err != nil {
-							if errors.IsNotFound(err) {
+							if apierrors.IsNotFound(err) {
 								klog.InfoS("NRT was not found, waiting for its creation", "nrtName", node.Name)
 								return false
 							}
@@ -1494,40 +1495,38 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 	})
 })
 
-func isNROSchedAvailableAt(nrosStatus *nropv1.NUMAResourcesSchedulerStatus, gen int64) bool {
+func isNROSchedSyncedAt(nrosStatus *nropv1.NUMAResourcesSchedulerStatus, conditionType string, gen int64) error {
 	if nrosStatus == nil {
-		return false
+		return errors.New("nil status")
 	}
-	cond := metahelper.FindStatusCondition(nrosStatus.Conditions, status.ConditionAvailable)
+	cond := metahelper.FindStatusCondition(nrosStatus.Conditions, conditionType)
 	if cond == nil {
-		return false
+		return errors.New("missing condition")
 	}
 	if cond.Status != metav1.ConditionTrue {
-		return false
+		return errors.New("condition not true")
 	}
-	return cond.ObservedGeneration == gen
+	if cond.ObservedGeneration != gen {
+		return fmt.Errorf("condition at %d expected %d", cond.ObservedGeneration, gen)
+	}
+	return nil
 }
 
-func isNROSchedUpToDate(nros *nropv1.NUMAResourcesScheduler) bool {
-	return isNROSchedAvailableAt(&nros.Status, nros.Generation)
-}
-
-func isNROOperAvailableAt(nropStatus *nropv1.NUMAResourcesOperatorStatus, gen int64) bool {
+func isNROOperSyncedAt(nropStatus *nropv1.NUMAResourcesOperatorStatus, conditionType string, gen int64) error {
 	if nropStatus == nil {
-		return false
+		return errors.New("nil status")
 	}
-	cond := metahelper.FindStatusCondition(nropStatus.Conditions, status.ConditionAvailable)
+	cond := metahelper.FindStatusCondition(nropStatus.Conditions, conditionType)
 	if cond == nil {
-		return false
+		return errors.New("missing condition")
 	}
 	if cond.Status != metav1.ConditionTrue {
-		return false
+		return errors.New("condition not true")
 	}
-	return cond.ObservedGeneration == gen
-}
-
-func isNROOperUpToDate(nrop *nropv1.NUMAResourcesOperator) bool {
-	return isNROOperAvailableAt(&nrop.Status, nrop.Generation)
+	if cond.ObservedGeneration != gen {
+		return fmt.Errorf("condition at %d expected %d", cond.ObservedGeneration, gen)
+	}
+	return nil
 }
 
 func mutateNodeCustomLabel(nodes []corev1.Node) (*corev1.Node, *corev1.Node, string) {
@@ -1581,7 +1580,7 @@ func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.Objec
 	var updatedNRO nropv1.NUMAResourcesOperator
 	Eventually(func(g Gomega) {
 		g.Expect(cli.Get(ctx, key, &updatedNRO)).To(Succeed())
-		g.Expect(isNROOperUpToDate(&updatedNRO)).To(BeTrue())
+		g.Expect(isNROOperSyncedAt(&updatedNRO.Status, status.ConditionAvailable, updatedNRO.Generation)).To(Succeed())
 		g.Expect(updatedNRO.Status.NodeGroups).To(HaveLen(len(appliedObj.Spec.NodeGroups)),
 			"NodeGroups Status mismatch: found %d, expected %d", len(updatedNRO.Status.NodeGroups), len(appliedObj.Spec.NodeGroups))
 		g.Expect(status.NUMAResourceOperatorNeedsUpdate(appliedObj.Status, updatedNRO.Status)).To(BeTrue())

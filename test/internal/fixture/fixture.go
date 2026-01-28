@@ -305,3 +305,7 @@ func getCooldownThresholdFromEnvVar() int {
 	}
 	return val
 }
+
+func By(format string, args ...any) {
+	ginkgo.By(fmt.Sprintf(format, args...))
+}
