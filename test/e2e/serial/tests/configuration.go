@@ -978,7 +978,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					PoolName:                  &pn,
 				}
 
-				By(fmt.Sprintf("modifying the NUMAResourcesOperator by appending a node group with several pool specifiers: %+v", ng))
+				e2efixture.By("modifying the NUMAResourcesOperator by appending a node group with several pool specifiers: %v", ng.ToString())
 				var updatedNRO nropv1.NUMAResourcesOperator
 				Eventually(func(g Gomega) {
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
@@ -987,7 +987,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
 
 				defer func() {
-					By(fmt.Sprintf("revert initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name))
+					e2efixture.By("revert initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name)
 					var updatedNRO nropv1.NUMAResourcesOperator
 					Eventually(func(g Gomega) {
 						g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
