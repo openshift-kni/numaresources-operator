@@ -139,7 +139,7 @@ func TestNodeGroupToString(t *testing.T) {
 					"ann1": "val1",
 				},
 			},
-			expected: "PoolName: <missingName> Config: nil Annotations: ann1=val1",
+			expected: "PoolName: <missing> MCPSelector: <missing> Config: nil Annotations: ann1=val1",
 		},
 		{
 			name: "empty fields should reflect default values",
@@ -155,7 +155,7 @@ func TestNodeGroupToString(t *testing.T) {
 					"ann2": "val2",
 				},
 			},
-			expected: "PoolName: pn Config: PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {10s} InfoRefreshPause: Disabled Tolerations: [] Annotations: ann1=val1,ann2=val2",
+			expected: "PoolName: pn MCPSelector: <missing> Config: PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {10s} InfoRefreshPause: Disabled Tolerations: [] Annotations: ann1=val1,ann2=val2",
 		},
 		{
 			name: "many annotations",
@@ -173,7 +173,7 @@ func TestNodeGroupToString(t *testing.T) {
 					"ann9": "valA",
 				},
 			},
-			expected: "PoolName: pn Config: PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {10s} InfoRefreshPause: Disabled Tolerations: [] Annotations: ann1=val1,ann2=val2,ann3=val7,ann5=val4,ann9=valA",
+			expected: "PoolName: pn MCPSelector: <missing> Config: PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {10s} InfoRefreshPause: Disabled Tolerations: [] Annotations: ann1=val1,ann2=val2,ann3=val7,ann5=val4,ann9=valA",
 		},
 	}
 	for _, tc := range testcases {
