@@ -1009,7 +1009,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					var updated nropv1.NUMAResourcesOperator
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed(), "failed to get updated NRO object")
 					klog.InfoS("operator conditions", "conditions", updated.Status.Conditions)
-					g.Expect(isNROOperUpToDate(&updated)).To(BeFalse())
+					g.Expect(isNROOperSyncedAt(&updated.Status, status.ConditionDegraded, updated.Generation)).To(BeTrue())
 					g.Expect(isDegradedWith(updated.Status.Conditions, "must have only a single specifier set", validation.NodeGroupsError)).To(BeTrue(), "Condition not degraded as expected")
 				}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "Timed out waiting for degraded condition")
 			})
@@ -1528,6 +1528,34 @@ func isNROOperAvailableAt(nropStatus *nropv1.NUMAResourcesOperatorStatus, gen in
 
 func isNROOperUpToDate(nrop *nropv1.NUMAResourcesOperator) bool {
 	return isNROOperAvailableAt(&nrop.Status, nrop.Generation)
+}
+
+func isNROSchedSyncedAt(nrosStatus *nropv1.NUMAResourcesSchedulerStatus, conditionType string, gen int64) bool {
+	if nrosStatus == nil {
+		return false
+	}
+	cond := metahelper.FindStatusCondition(nrosStatus.Conditions, conditionType)
+	if cond == nil {
+		return false
+	}
+	if cond.Status != metav1.ConditionTrue {
+		return false
+	}
+	return cond.ObservedGeneration == gen
+}
+
+func isNROOperSyncedAt(nropStatus *nropv1.NUMAResourcesOperatorStatus, conditionType string, gen int64) bool {
+	if nropStatus == nil {
+		return false
+	}
+	cond := metahelper.FindStatusCondition(nropStatus.Conditions, conditionType)
+	if cond == nil {
+		return false
+	}
+	if cond.Status != metav1.ConditionTrue {
+		return false
+	}
+	return cond.ObservedGeneration == gen
 }
 
 func mutateNodeCustomLabel(nodes []corev1.Node) (*corev1.Node, *corev1.Node, string) {
