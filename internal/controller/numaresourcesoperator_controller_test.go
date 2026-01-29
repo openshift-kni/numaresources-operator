@@ -122,11 +122,69 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 	}
 
 	DescribeTableSubtree("Running on different platforms", func(platf platform.Platform) {
-
 		Context("with unexpected NRO CR name", func() {
-			It("should updated the CR condition to degraded", func() {
+			It("should reject creating the CR", func() {
 				nro := testobjs.NewNUMAResourcesOperator("test")
-				verifyDegradedCondition(nro, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, platf)
+				err := k8sClient.Create(context.TODO(), nro)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("the object name must be 'numaresourcesoperator' or 'cluster'"))
+			})
+		})
+
+		Context("with CEL validation for singleton", func() {
+			It("should accept 'numaresourcesscheduler' as valid name - legacy", func() {
+				nro := testobjs.NewNUMAResourcesOperator("numaresourcesoperator")
+				Expect(k8sClient.Create(context.TODO(), nro)).To(Succeed())
+				Expect(k8sClient.Delete(context.TODO(), nro)).To(Succeed())
+			})
+
+			It("should accept 'cluster' as valid name - new", func() {
+				nro := testobjs.NewNUMAResourcesOperator("cluster")
+				Expect(k8sClient.Create(context.TODO(), nro)).To(Succeed())
+				Expect(k8sClient.Delete(context.TODO(), nro)).To(Succeed())
+			})
+
+			It("can allow 2 CRs but the oldest is the winner and the other one is degraded", func() {
+				nro := testobjs.NewNUMAResourcesOperator("numaresourcesoperator")
+				baseTime := time.Now()
+				nro.CreationTimestamp = metav1.NewTime(baseTime)
+				nroNew := testobjs.NewNUMAResourcesOperator("cluster")
+				nroNew.CreationTimestamp = metav1.NewTime(baseTime.Add(time.Second))
+
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platf, defaultOCPVersion, nro, nroNew)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nroNew)
+				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+				Expect(reconciler.Client.Get(context.TODO(), key, nroNew)).To(Succeed())
+				degradedCondition := getConditionByType(nroNew.Status.Conditions, status.ConditionDegraded)
+				Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+				Expect(degradedCondition.Reason).To(Equal(status.ConditionTypeMultipleNUMAResourcesOperatorResourcesFound))
+
+				// delete the oldest and create newer, nroNew should be the winner
+				Expect(reconciler.Client.Delete(context.TODO(), nro)).To(Succeed())
+				nro = testobjs.NewNUMAResourcesOperator("numaresourcesoperator")
+				nro.CreationTimestamp = metav1.NewTime(baseTime.Add(2 * time.Second))
+				Expect(reconciler.Client.Create(context.TODO(), nro)).To(Succeed())
+
+				result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+				Expect(reconciler.Client.Get(context.TODO(), key, nroNew)).To(Succeed())
+				availableCondition := getConditionByType(nroNew.Status.Conditions, status.ConditionAvailable)
+				Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue), "conditions: %+v", nroNew.Status.Conditions)
+
+				// for newer object the condition should be Degraded
+				key = client.ObjectKeyFromObject(nro)
+				result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result).To(Equal(reconcile.Result{}))
+				Expect(reconciler.Client.Get(context.TODO(), key, nro)).To(Succeed())
+				degradedCondition = getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
+				Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+				Expect(degradedCondition.Reason).To(Equal(status.ConditionTypeMultipleNUMAResourcesOperatorResourcesFound))
 			})
 		})
 
@@ -2260,6 +2318,29 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			}
 		})
 
+	})
+})
+
+var _ = Describe("Test winnerValidator", func() {
+	It("should return the oldest NRO", func() {
+		nro1 := testobjs.NewNUMAResourcesOperator("nro1")
+		nro2 := testobjs.NewNUMAResourcesOperator("nro2")
+		nro3 := testobjs.NewNUMAResourcesOperator("nro3")
+		nro1.CreationTimestamp = metav1.Now()
+		nro2.CreationTimestamp = metav1.Now()
+		nro3.CreationTimestamp = metav1.Now()
+
+		winner, err := numaresourcesOperatorWinnerValidator([]nropv1.NUMAResourcesOperator{*nro1, *nro2, *nro3}, "nro1")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(winner.Name).To(Equal("nro1"))
+
+		winner, err = numaresourcesOperatorWinnerValidator([]nropv1.NUMAResourcesOperator{*nro1, *nro2, *nro3}, "nro2")
+		Expect(err).To(HaveOccurred(), "expected error when requesting a different NRO than the winner")
+		Expect(winner.Name).To(Equal("nro1"))
+
+		winner, err = numaresourcesOperatorWinnerValidator([]nropv1.NUMAResourcesOperator{*nro1, *nro2, *nro3}, "nro3")
+		Expect(err).To(HaveOccurred(), "expected error when requesting a different NRO than the winner")
+		Expect(winner.Name).To(Equal("nro1"))
 	})
 })
 

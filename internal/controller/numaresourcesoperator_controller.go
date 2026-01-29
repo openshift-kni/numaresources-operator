@@ -61,7 +61,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
@@ -126,27 +125,32 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	klog.V(3).InfoS("Starting NUMAResourcesOperator reconcile loop", "object", req.NamespacedName)
 	defer klog.V(3).InfoS("Finish NUMAResourcesOperator reconcile loop", "object", req.NamespacedName)
 
-	instance := &nropv1.NUMAResourcesOperator{}
-	err := r.Get(ctx, req.NamespacedName, instance)
+	instance, err := validateOperatorRequest(ctx, r.Client, req.Name)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			return ctrl.Result{}, nil
+		requestedObj := &nropv1.NUMAResourcesOperator{}
+		err := r.Get(ctx, req.NamespacedName, requestedObj)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				// Request object not found, could have been deleted after reconcile request.
+				// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+				// Return and don't requeue
+				return ctrl.Result{}, nil
+			}
+			return ctrl.Result{}, err
 		}
-		// Error reading the object - requeue the request.
-		return ctrl.Result{}, err
+		klog.InfoS("reconciliation is skipped for requested object due to multiple resources found", "object", req.NamespacedName)
+		initialStatus := *requestedObj.Status.DeepCopy()
+		if len(requestedObj.Status.Conditions) == 0 {
+			requestedObj.Status.Conditions = status.DefaultBaseConditions(time.Now())
+		}
+		return r.degradeStatus(ctx, initialStatus, requestedObj, status.ConditionTypeMultipleNUMAResourcesOperatorResourcesFound, err)
 	}
+
+	// getting here means we continue to reconcile winner instance
 
 	initialStatus := *instance.Status.DeepCopy()
 	if len(initialStatus.Conditions) == 0 {
 		instance.Status.Conditions = status.DefaultBaseConditions(time.Now())
-	}
-
-	if req.Name != objectnames.DefaultNUMAResourcesOperatorCrName {
-		err := fmt.Errorf("incorrect NUMAResourcesOperator resource name: %s", instance.Name)
-		return r.degradeStatus(ctx, initialStatus, instance, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, err)
 	}
 
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
@@ -185,6 +189,35 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	return step.Result, step.Error
+}
+
+func validateOperatorRequest(ctx context.Context, r client.Client, requestedName string) (*nropv1.NUMAResourcesOperator, error) {
+	nroList := &nropv1.NUMAResourcesOperatorList{}
+	if err := r.List(ctx, nroList); err != nil {
+		return nil, err
+	}
+
+	return numaresourcesOperatorWinnerValidator(nroList.Items, requestedName)
+}
+
+func numaresourcesOperatorWinnerValidator(nroList []nropv1.NUMAResourcesOperator, requestedName string) (*nropv1.NUMAResourcesOperator, error) {
+	// the winner is the oldest
+	oldest := nroList[0]
+	for _, item := range nroList {
+		klog.InfoS("checking NUMAResourcesOperator resource", "resource", item.Name, "creationTimestamp", item.CreationTimestamp)
+		if item.CreationTimestamp.Before(&oldest.CreationTimestamp) {
+			oldest = item
+		}
+	}
+
+	klog.InfoS("checking if the requested object is the winner", "requested", requestedName, "winner", oldest.Name)
+	var err error
+	if oldest.Name != requestedName {
+		klog.InfoS("the requested object is not the winner", "requested", requestedName, "winner", oldest.Name)
+		err = fmt.Errorf("the requested object is not the winner: winner is %s vs requested %s", oldest.Name, requestedName)
+	}
+
+	return &oldest, err
 }
 
 func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesOperatorStatus, instance *nropv1.NUMAResourcesOperator) error {

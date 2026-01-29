@@ -205,6 +205,7 @@ type MachineConfigPool struct {
 
 // NUMAResourcesOperator is the Schema for the numaresourcesoperators API
 // +operator-sdk:csv:customresourcedefinitions:displayName="NUMA Resources Operator",resources={{DaemonSet,v1,rte-daemonset,ConfigMap,v1,rte-configmap}}
+// +kubebuilder:validation:XValidation:rule="has(self.metadata.name) && (self.metadata.name == 'numaresourcesoperator' || self.metadata.name == 'cluster')",message="This is a singleton resource; the object name must be 'numaresourcesoperator' or 'cluster'. 'numaresourcesoperator' will be deprecated in a future release."
 type NUMAResourcesOperator struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
