@@ -164,38 +164,6 @@ var _ = Describe("[Install] durability", Serial, func() {
 		initialized = true
 	})
 
-	Context("with deploying NUMAResourcesOperator with wrong name", func() {
-		It("should do nothing", func() {
-			nroObj := objects.TestNRO(objects.NROWithMCPSelector(objects.EmptyMatchLabels()))
-			nroObj.Name = "wrong-name"
-
-			err := e2eclient.Client.Create(context.TODO(), nroObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			By("checking that the condition Degraded=true")
-			Eventually(func() bool {
-				updatedNROObj := &nropv1.NUMAResourcesOperator{}
-				err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), updatedNROObj)
-				if err != nil {
-					klog.ErrorS(err, "failed to get the  NUMAResourcesOperator CR")
-					return false
-				}
-
-				cond := metahelper.FindStatusCondition(updatedNROObj.Status.Conditions, status.ConditionDegraded)
-				if cond == nil {
-					klog.InfoS("missing conditions", "nroObj", updatedNROObj)
-					return false
-				}
-
-				klog.InfoS("condition", "condition", cond)
-
-				return cond.Status == metav1.ConditionTrue
-			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "NUMAResourcesOperator condition did not become degraded")
-
-			deleteNROPSync(e2eclient.Client, nroObj)
-		})
-	})
-
 	Context("with a running cluster with all the components and overall deployment", func() {
 		var deployer deploy.Deployer
 		var nroObj *nropv1.NUMAResourcesOperator

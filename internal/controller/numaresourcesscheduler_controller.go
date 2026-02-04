@@ -56,9 +56,9 @@ import (
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
+	"github.com/openshift-kni/numaresources-operator/pkg/status/conditioninfo"
 )
 
 const (
@@ -102,27 +102,30 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	klog.V(3).InfoS("Starting NUMAResourcesScheduler reconcile loop", "object", req.NamespacedName)
 	defer klog.V(3).InfoS("Finish NUMAResourcesScheduler reconcile loop", "object", req.NamespacedName)
 
-	instance := &nropv1.NUMAResourcesScheduler{}
-	err := r.Get(ctx, req.NamespacedName, instance)
+	instance, err := validateSchedulerRequest(ctx, r.Client, req.Name)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
-			// Return and don't requeue
-			return ctrl.Result{}, nil
+		requestedObj := &nropv1.NUMAResourcesScheduler{}
+		err := r.Get(ctx, req.NamespacedName, requestedObj)
+		if err != nil {
+			if apierrors.IsNotFound(err) {
+				// Request object not found, could have been deleted after reconcile request.
+				// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+				// Return and don't requeue
+				return ctrl.Result{}, nil
+			}
+			return ctrl.Result{}, err
 		}
-		// Error reading the object - requeue the request.
-		return ctrl.Result{}, err
+		klog.InfoS("reconciliation is skipped for requested object due to multiple resources found", "object", req.NamespacedName)
+		initialStatus := *requestedObj.Status.DeepCopy()
+		if len(requestedObj.Status.Conditions) == 0 {
+			requestedObj.Status.Conditions = status.DefaultBaseConditions(time.Now())
+		}
+		return r.degradeStatus(ctx, initialStatus, requestedObj, status.ConditionTypeMultipleNUMAResourcesSchedulerResourcesFound, err)
 	}
 
 	initialStatus := *instance.Status.DeepCopy()
 	if len(initialStatus.Conditions) == 0 {
 		instance.Status.Conditions = status.NewNUMAResourcesSchedulerBaseConditions()
-	}
-
-	if req.Name != objectnames.DefaultNUMAResourcesSchedulerCrName {
-		message := fmt.Sprintf("incorrect NUMAResourcesScheduler resource name: %s", instance.Name)
-		return ctrl.Result{}, r.degradeStatus(ctx, initialStatus, instance, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
 	}
 
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
@@ -139,22 +142,20 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	return step.Result, step.Error
 }
 
-func (r *NUMAResourcesSchedulerReconciler) degradeStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesSchedulerStatus, instance *nropv1.NUMAResourcesScheduler, reason string, message string) error {
-	condition := metav1.Condition{
-		Type:               status.ConditionDegraded,
-		Status:             metav1.ConditionTrue,
-		Reason:             reason,
-		Message:            message,
-		ObservedGeneration: instance.Generation,
+func (r *NUMAResourcesSchedulerReconciler) degradeStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesSchedulerStatus, instance *nropv1.NUMAResourcesScheduler, reason string, stErr error) (ctrl.Result, error) {
+	info := conditioninfo.DegradedFromError(stErr)
+	if reason != "" { // intentionally overwrite
+		info.Reason = reason
 	}
 
-	instance.Status.Conditions, _ = status.ComputeConditions(instance.Status.Conditions, condition, time.Now())
+	instance.Status.Conditions, _ = status.ComputeConditions(instance.Status.Conditions, info.ToMetav1Condition(instance.Generation), time.Now())
 
 	err := r.updateStatus(ctx, initialStatus, instance)
 	if err != nil {
-		klog.InfoS("Failed to update numaresourcesoperator status", "error", err)
+		klog.InfoS("Failed to update numaresourcesscheduler status", "error", err)
 	}
-	return err
+
+	return ctrl.Result{}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -190,6 +191,35 @@ func (r *NUMAResourcesSchedulerReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Watches(&corev1.Node{}, handler.EnqueueRequestsFromMapFunc(r.nodeToNUMAResourcesScheduler),
 			builder.WithPredicates(nodesPredicate)).
 		Complete(r)
+}
+
+func validateSchedulerRequest(ctx context.Context, r client.Client, requestedName string) (*nropv1.NUMAResourcesScheduler, error) {
+	nrsList := &nropv1.NUMAResourcesSchedulerList{}
+	if err := r.List(ctx, nrsList); err != nil {
+		return nil, err
+	}
+
+	return schedulerWinnerValidator(nrsList.Items, requestedName)
+}
+
+func schedulerWinnerValidator(nrsList []nropv1.NUMAResourcesScheduler, requestedName string) (*nropv1.NUMAResourcesScheduler, error) {
+	// the winner is the oldest
+	oldest := nrsList[0]
+	for _, item := range nrsList {
+		klog.InfoS("checking NUMAResourcesScheduler resource", "resource", item.Name, "creationTimestamp", item.CreationTimestamp)
+		if item.CreationTimestamp.Before(&oldest.CreationTimestamp) {
+			oldest = item
+		}
+	}
+
+	klog.InfoS("checking if the requested object is the winner", "requested", requestedName, "winner", oldest.Name)
+	var err error
+	if oldest.Name != requestedName {
+		klog.InfoS("the requested object is not the winner", "requested", requestedName, "winner", oldest.Name)
+		err = fmt.Errorf("the requested object is not the winner: winner is %s vs requested %s", oldest.Name, requestedName)
+	}
+
+	return &oldest, err
 }
 
 func (r *NUMAResourcesSchedulerReconciler) nodeToNUMAResourcesScheduler(ctx context.Context, object client.Object) []reconcile.Request {
