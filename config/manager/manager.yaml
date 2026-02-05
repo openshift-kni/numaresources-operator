@@ -58,6 +58,13 @@ spec:
           protocol: TCP
           name: https
         image: controller:latest
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/numaresources-operator","-handle-lifecycle-event","postStart"]
+          preStop:
+            exec:
+              command: ["/bin/numaresources-operator","-handle-lifecycle-event","preStop"]
         name: manager
         volumeMounts:
         - name: metrics-tls

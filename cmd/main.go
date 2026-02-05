@@ -101,6 +101,38 @@ func init() {
 	//+kubebuilder:scaffold:scheme
 }
 
+type lifecycleEvent string
+
+const (
+	lifecycleEventNone      lifecycleEvent = ""
+	lifecycleEventPostStart lifecycleEvent = "postStart"
+	lifecycleEventPreStop   lifecycleEvent = "preStop"
+)
+
+type lifecycleEventValue struct {
+	Event *lifecycleEvent
+}
+
+func (v lifecycleEventValue) String() string {
+	if v.Event == nil {
+		return ""
+	}
+	return string(*v.Event)
+}
+
+func (v lifecycleEventValue) Set(s string) error {
+	switch s {
+	case "postStart":
+		*v.Event = lifecycleEventPostStart
+	case "preStop":
+		*v.Event = lifecycleEventPreStop
+	// note: we cannot set "none" explicitly
+	default:
+		return fmt.Errorf("unsupported mode: %q", s)
+	}
+	return nil
+}
+
 type ImageParams struct {
 	Exporter  string
 	Scheduler string
@@ -130,6 +162,7 @@ type Params struct {
 	enableMCPCondsForward bool
 	image                 ImageParams
 	inspectFeatures       bool
+	handleEvent           lifecycleEvent
 }
 
 func (pa *Params) SetDefaults() {
@@ -139,6 +172,7 @@ func (pa *Params) SetDefaults() {
 	pa.enableMetrics = defaultMetricsSupport
 	pa.enableScheduler = defaultEnableScheduler
 	pa.enableLeaderElection = defaultEnableLeaderElection
+	pa.handleEvent = lifecycleEventNone
 }
 
 func (pa *Params) Summarize() string {
@@ -173,6 +207,7 @@ func (pa *Params) FromFlags() {
 	flag.BoolVar(&pa.enableMCPCondsForward, "enable-mcp-conds-fwd", pa.enableMCPCondsForward, "enable MCP Status Condition forwarding")
 	flag.StringVar(&pa.image.Exporter, "image-exporter", pa.image.Exporter, "use this image as default for the RTE")
 	flag.StringVar(&pa.image.Scheduler, "image-scheduler", pa.image.Scheduler, "use this image as default for the scheduler")
+	flag.Var(&lifecycleEventValue{Event: &pa.handleEvent}, "handle-lifecycle-event", "execute lifecycle event handler")
 
 	flag.Parse()
 
@@ -211,6 +246,10 @@ func main() {
 	klog.InfoS("starting", "program", version.OperatorProgramName(), "version", bi.Version, "branch", bi.Branch, "gitcommit", bi.Commit, "golang", runtime.Version())
 	klog.InfoS("starting", "program", version.OperatorProgramName(), "logVerbosity", klogV, "auxVerbosity", config.Verbosity().String())
 	klog.InfoS("starting", "program", version.OperatorProgramName(), "params", params.Summarize())
+
+	if params.handleEvent != lifecycleEventNone {
+		os.Exit(manageLifecycleEvent(params.handleEvent))
+	}
 
 	ctx := context.Background()
 
@@ -480,6 +519,12 @@ func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec
 	// the best setting is "present, but disabled" vs "missing, thus implicitly disabled"
 	schedupdate.DeploymentConfigMapSettings(mf.Deployment, schedManifests.ConfigMap.Name, hash.ConfigMapData(schedManifests.ConfigMap))
 	return mf, nil
+}
+
+func manageLifecycleEvent(event lifecycleEvent) int {
+	klog.InfoS("handling", "lifecycleEvent", event)
+	defer klog.InfoS("handled", "lifecycleEvent", event)
+	return 0 // nothing to do atm
 }
 
 // SetupWebhookWithManager enables Webhooks - needed for version conversion
