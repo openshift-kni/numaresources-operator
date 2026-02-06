@@ -23,12 +23,40 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	"github.com/openshift-kni/numaresources-operator/internal/devices"
 )
+
+var (
+	/*
+	 tests that involve reboot show a difference in the memory capacity on numa nodes, e.g memory capacity
+	 is reallocated across numa nodes upon startup. This is a a kernel behavior which we have no control
+	 on thus we want to work it around. The tests failed when comapring initial (pre-reboot) NRT with the
+	 final (post reboot) NRT, and finds out a difference of 53760000 of memory (=52500Ki ~=52Mi).
+	 For those case, we allow a dev of 52Mi when comparing the memory topologies.
+	 Note: by the time this modification is done, although it is performed on reboot tests only, but we made
+	 sure that there is no memory amount request equal or less than 52Mi thus it is safe to continue with this
+	 without confusing with a real difference caused by unsettled NRTs.
+	*/
+	zoneLevelDev = resource.MustParse("54525952") // 52 Mi
+
+	/*
+	 nodeLevelDev is the allowed deviation for total node-level memory resources across all NUMA zones
+	 in reboot tests. The total memory across all zones on a node typically remains stable, with observed deviations
+	 less than 64 KB after reboots. This tolerance ensures we catch actual memory changes at the node level while allowing for minor
+	 kernel-level variations in how memory is reported after reboot.
+	*/
+	nodeLevelDev = resource.MustParse("65536") // 64 KB
+)
+
+type memoryTotals struct {
+	capacity    resource.Quantity
+	available   resource.Quantity
+	allocatable resource.Quantity
+}
 
 func EqualZones(zonesA, zonesB nrtv1alpha2.ZoneList, isRebootTest bool) (bool, error) {
 	if len(zonesA) != len(zonesB) {
@@ -38,14 +66,14 @@ func EqualZones(zonesA, zonesB nrtv1alpha2.ZoneList, isRebootTest bool) (bool, e
 	zA := SortedZoneList(zonesA)
 	zB := SortedZoneList(zonesB)
 
-	klog.Infof("ensure memory resources on node level are maintained with same amounts")
 	/*
-		the need for this came mainly because of tests requiring reboot. The reason is that in such tests it was observed that there is a slight difference
-		in the memory resources set by the kernel on NUMA zones but the total memory resources on node level is kept the same. This verification ensures that
-		is achieved on every test which is true and not only for tests that involve reboot. For now the check is for memory resources only as there were no
-		similar observations for other types of resources.
+	 the need for this came mainly because of tests requiring reboot. The reason is that in such tests it was observed that there is a slight difference
+	 in the memory resources set by the kernel on NUMA zones, and also the total memory resources on the node have been observed to be different after reboot.
+	 This verification ensures that the total memory resources on the node are not deviating more than the allowed deviation that was observed after sampling the results.
+	 For reboot tests we allow a deviation of 64 KB on node level. And for non-reboot tests we don't allow any deviation.
 	*/
-	_, err := equalMemoryNodeLevel(zonesA, zonesB)
+	klog.InfoS("comparing memory resources on node level", "isRebootTest", isRebootTest)
+	_, err := compareMemoryNodeLevel(zonesA, zonesB, isRebootTest)
 	if err != nil {
 		return false, err
 	}
@@ -67,20 +95,49 @@ func EqualZones(zonesA, zonesB nrtv1alpha2.ZoneList, isRebootTest bool) (bool, e
 	return true, nil
 }
 
-func equalMemoryNodeLevel(zonesA, zonesB nrtv1alpha2.ZoneList) (bool, error) {
+func compareMemoryNodeLevel(zonesA, zonesB nrtv1alpha2.ZoneList, isRebootTest bool) (bool, error) {
 	totalCapacityA, totalAvailableA, totalAllocatableA := getTotalMemory(zonesA)
 	totalCapacityB, totalAvailableB, totalAllocatableB := getTotalMemory(zonesB)
 
-	if totalCapacityA.Cmp(totalCapacityB) != 0 {
-		return false, fmt.Errorf("mismatched total capacity memory initial=%v vs updated=%v", totalCapacityA, totalCapacityB)
+	a := memoryTotals{capacity: totalCapacityA, available: totalAvailableA, allocatable: totalAllocatableA}
+	b := memoryTotals{capacity: totalCapacityB, available: totalAvailableB, allocatable: totalAllocatableB}
+
+	var err error
+	if isRebootTest {
+		klog.InfoS("comparing memory resources on node level within allowed deviation", "tolerance", nodeLevelDev)
+		capOK := QuantityAbsCmp(totalCapacityA, totalCapacityB, nodeLevelDev)
+		availOK := QuantityAbsCmp(totalAvailableA, totalAvailableB, nodeLevelDev)
+		allocOK := QuantityAbsCmp(totalAllocatableA, totalAllocatableB, nodeLevelDev)
+
+		capDelta := totalCapacityB.DeepCopy()
+		capDelta.Sub(totalCapacityA)
+		availDelta := totalAvailableB.DeepCopy()
+		availDelta.Sub(totalAvailableA)
+		allocDelta := totalAllocatableB.DeepCopy()
+		allocDelta.Sub(totalAllocatableA)
+
+		zeroQty := resource.Quantity{}
+		if capDelta.Cmp(zeroQty) != 0 || availDelta.Cmp(zeroQty) != 0 || allocDelta.Cmp(zeroQty) != 0 {
+			klog.InfoS("node-level memory deviation after reboot",
+				"capacityDelta", capDelta.String(),
+				"availableDelta", availDelta.String(),
+				"allocatableDelta", allocDelta.String(),
+				"tolerance", nodeLevelDev.String(),
+				"capacityOK", capOK,
+				"availableOK", availOK,
+				"allocatableOK", allocOK)
+		}
+
+		err = collectMemoryMismatchErrors(capOK, availOK, allocOK, a, b)
+	} else {
+		capOK := totalCapacityA.Cmp(totalCapacityB) == 0
+		availOK := totalAvailableA.Cmp(totalAvailableB) == 0
+		allocOK := totalAllocatableA.Cmp(totalAllocatableB) == 0
+
+		err = collectMemoryMismatchErrors(capOK, availOK, allocOK, a, b)
 	}
-	if totalAvailableA.Cmp(totalAvailableB) != 0 {
-		return false, fmt.Errorf("mismatched total available memory initial=%v vs updated=%v", totalAvailableA, totalAvailableB)
-	}
-	if totalAllocatableA.Cmp(totalAllocatableB) != 0 {
-		return false, fmt.Errorf("mismatched total allocatable memory initial=%v vs updated=%v", totalAllocatableA, totalAllocatableB)
-	}
-	return true, nil
+
+	return err == nil, err
 }
 
 func getTotalMemory(zoneList nrtv1alpha2.ZoneList) (resource.Quantity, resource.Quantity, resource.Quantity) {
@@ -198,28 +255,16 @@ func resourceIsDevice(resName string) bool {
 }
 
 func EqualMemoryWithDeviation(resInfoA, resInfoB nrtv1alpha2.ResourceInfo) (bool, error) {
-	/*
-		tests that involve reboot show a difference in the memory capacity on numa nodes, e.g memory capacity
-		 is reallocated across numa nodes upon startup. This is a a kernel behavior which we have no control
-		 on thus we want to work it around. The tests failed when comapring initial (pre-reboot) NRT with the
-		 final (post reboot) NRT, and finds out a difference of 53760000 of memory (=52500Ki ~=52Mi).
-		 For those case, we allow a deviation of 52Mi when comparing the memory topologies.
-		 Note: by the time this modification is done, although it is performed on reboot tests only, but we made
-		 sure that there is no memory amount request equal or less than 52Mi thus it is safe to continue with this
-		  without confusing with a real difference caused by unsettled NRTs.
-	*/
-	dev, _ := resource.ParseQuantity("54525952") //52 Mi
-
 	if resInfoA.Name != resInfoB.Name {
 		return false, fmt.Errorf("mismatched resource name initial=%q vs updated=%q", resInfoA.Name, resInfoB.Name)
 	}
-	if !QuantityAbsCmp(resInfoA.Capacity, resInfoB.Capacity, dev) {
+	if !QuantityAbsCmp(resInfoA.Capacity, resInfoB.Capacity, zoneLevelDev) {
 		return false, fmt.Errorf("resource %q: mismatched resource Capacity initial=%v vs updated=%v", resInfoA.Name, resInfoA.Capacity, resInfoB.Capacity)
 	}
-	if !QuantityAbsCmp(resInfoA.Allocatable, resInfoB.Allocatable, dev) {
+	if !QuantityAbsCmp(resInfoA.Allocatable, resInfoB.Allocatable, zoneLevelDev) {
 		return false, fmt.Errorf("resource %q: mismatched resource Allocatable initial=%v vs updated=%v", resInfoA.Name, resInfoA.Allocatable, resInfoB.Allocatable)
 	}
-	if !QuantityAbsCmp(resInfoA.Available, resInfoB.Available, dev) {
+	if !QuantityAbsCmp(resInfoA.Available, resInfoB.Available, zoneLevelDev) {
 		return false, fmt.Errorf("resource %q: mismatched resource Available initial=%v vs updated=%v", resInfoA.Name, resInfoA.Available, resInfoB.Available)
 	}
 	return true, nil
@@ -230,4 +275,21 @@ func QuantityAbsCmp(a, b, dev resource.Quantity) bool {
 	z, _ := resource.ParseQuantity("0")
 	z.Sub(dev)
 	return dev.Cmp(a) == 1 && z.Cmp(a) <= 0
+}
+
+func collectMemoryMismatchErrors(capOK, availOK, allocOK bool, a, b memoryTotals) error {
+	var errMsgs []string
+	if !capOK {
+		errMsgs = append(errMsgs, fmt.Sprintf("capacity: initial=%v updated=%v", a.capacity, b.capacity))
+	}
+	if !availOK {
+		errMsgs = append(errMsgs, fmt.Sprintf("available: initial=%v updated=%v", a.available, b.available))
+	}
+	if !allocOK {
+		errMsgs = append(errMsgs, fmt.Sprintf("allocatable: initial=%v updated=%v", a.allocatable, b.allocatable))
+	}
+	if len(errMsgs) > 0 {
+		return fmt.Errorf("mismatched total memory: %s", strings.Join(errMsgs, "; "))
+	}
+	return nil
 }
