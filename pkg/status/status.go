@@ -47,11 +47,8 @@ const (
 )
 
 const (
-	ConditionTypeIncorrectNUMAResourcesOperatorResourceName = "IncorrectNUMAResourcesOperatorResourceName"
-)
-
-const (
-	ConditionTypeIncorrectNUMAResourcesSchedulerResourceName = "IncorrectNUMAResourcesSchedulerResourceName"
+	ConditionTypeMultipleNUMAResourcesOperatorResourcesFound  = "MultipleNUMAResourcesOperatorResourcesFound"
+	ConditionTypeMultipleNUMAResourcesSchedulerResourcesFound = "MultipleNUMAResourcesSchedulerResourcesFound"
 )
 
 // NUMAResourceOperatorNeedsUpdate returns true if the status changed, so if it should be sent to the apiserver, false otherwise.

@@ -80,26 +80,73 @@ func NewFakeNUMAResourcesSchedulerReconciler(initObjects ...runtime.Object) (*NU
 }
 
 var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
-	verifyDegradedCondition := func(nrs *nropv1.NUMAResourcesScheduler, reason string) {
-		reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nrs)
-		Expect(err).ToNot(HaveOccurred())
-
-		key := client.ObjectKeyFromObject(nrs)
-		result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-		Expect(err).ToNot(HaveOccurred())
-		Expect(result).To(Equal(reconcile.Result{}))
-
-		Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(HaveOccurred())
-		degradedCondition := getConditionByType(nrs.Status.Conditions, status.ConditionDegraded)
-		Expect(degradedCondition).ToNot(BeNil())
-		Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
-		Expect(degradedCondition.Reason).To(Equal(reason))
-	}
-
 	Context("with unexpected NRS CR name", func() {
-		It("should updated the CR condition to degraded", func() {
+		It("should reject creating the CR", func() {
 			nrs := testobjs.NewNUMAResourcesScheduler("test", "some/url:latest", testSchedulerName, 9*time.Second)
-			verifyDegradedCondition(nrs, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName)
+			err := k8sClient.Create(context.TODO(), nrs)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("the object name must be 'numaresourcesscheduler' or 'cluster'"))
+		})
+	})
+
+	Context("with CEL validation for singleton", func() {
+		It("should accept 'numaresourcesscheduler' as valid name - legacy", func() {
+			nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 9*time.Second)
+			Expect(k8sClient.Create(context.TODO(), nrs)).To(Succeed())
+			Expect(k8sClient.Delete(context.TODO(), nrs)).To(Succeed())
+		})
+
+		It("should accept 'cluster' as valid name - new", func() {
+			nrs := testobjs.NewNUMAResourcesScheduler("cluster", "some/url:latest", testSchedulerName, 9*time.Second)
+			Expect(k8sClient.Create(context.TODO(), nrs)).To(Succeed())
+			Expect(k8sClient.Delete(context.TODO(), nrs)).To(Succeed())
+		})
+
+		It("can allow 2 CRs but the oldest is the winner and the other one is degraded", func() {
+			nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 9*time.Second)
+			baseTime := time.Now()
+			nrs.CreationTimestamp = metav1.NewTime(baseTime)
+			nrsNew := testobjs.NewNUMAResourcesScheduler("cluster", "some/url:latest", testSchedulerName, 9*time.Second)
+			nrsNew.CreationTimestamp = metav1.NewTime(baseTime.Add(time.Second))
+
+			initObjects := []runtime.Object{nrs, nrsNew}
+			initObjects = append(initObjects, fakeNodes(3, 2)...)
+
+			reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
+			Expect(err).ToNot(HaveOccurred())
+
+			key := client.ObjectKeyFromObject(nrsNew)
+			result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(reconcile.Result{}))
+			Expect(reconciler.Client.Get(context.TODO(), key, nrsNew)).To(Succeed())
+			degradedCondition := getConditionByType(nrsNew.Status.Conditions, status.ConditionDegraded)
+			Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+			Expect(degradedCondition.Reason).To(Equal(status.ConditionTypeMultipleNUMAResourcesSchedulerResourcesFound))
+
+			// delete the oldest and create newer, nroNew should be the winner
+			Expect(reconciler.Client.Delete(context.TODO(), nrs)).To(Succeed())
+			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 9*time.Second)
+			nrs.CreationTimestamp = metav1.NewTime(baseTime.Add(2 * time.Second))
+			Expect(reconciler.Client.Create(context.TODO(), nrs)).To(Succeed())
+
+			result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			// scheduler Deployment is awaiting to run so expected to requeue and the condition should be Progressing
+			Expect(result).To(Equal(reconcile.Result{RequeueAfter: 5 * time.Second}))
+			Expect(reconciler.Client.Get(context.TODO(), key, nrsNew)).To(Succeed())
+			progressingCondition := getConditionByType(nrsNew.Status.Conditions, status.ConditionProgressing)
+			Expect(progressingCondition.Status).To(Equal(metav1.ConditionTrue), "conditions: %+v", nrsNew.Status.Conditions)
+
+			//for newer object the condition should be Degraded
+			key = client.ObjectKeyFromObject(nrs)
+			result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(reconcile.Result{}))
+			Expect(reconciler.Client.Get(context.TODO(), key, nrs)).To(Succeed())
+			degradedCondition = getConditionByType(nrs.Status.Conditions, status.ConditionDegraded)
+			Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+			Expect(degradedCondition.Reason).To(Equal(status.ConditionTypeMultipleNUMAResourcesSchedulerResourcesFound))
 		})
 	})
 
@@ -1109,6 +1156,29 @@ var _ = Describe("Test computeSchedulerReplicas", func() {
 			Expect(result).ToNot(BeNil())
 			Expect(*result).To(Equal(explicitReplicas))
 		})
+	})
+})
+
+var _ = Describe("Test schedulerWinnerValidator", func() {
+	It("should return the oldest NRS", func() {
+		nrs1 := testobjs.NewNUMAResourcesScheduler("nrs1", "some/url:latest", testSchedulerName, 9*time.Second)
+		nrs2 := testobjs.NewNUMAResourcesScheduler("nrs2", "some/url:latest", testSchedulerName, 9*time.Second)
+		nrs3 := testobjs.NewNUMAResourcesScheduler("nrs3", "some/url:latest", testSchedulerName, 9*time.Second)
+		nrs1.CreationTimestamp = metav1.Now()
+		nrs2.CreationTimestamp = metav1.Now()
+		nrs3.CreationTimestamp = metav1.Now()
+
+		winner, err := schedulerWinnerValidator([]nropv1.NUMAResourcesScheduler{*nrs1, *nrs2, *nrs3}, "nrs1")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(winner.Name).To(Equal("nrs1"))
+
+		winner, err = schedulerWinnerValidator([]nropv1.NUMAResourcesScheduler{*nrs1, *nrs2, *nrs3}, "nrs2")
+		Expect(err).To(HaveOccurred(), "expected error when requesting a different NRS than the winner")
+		Expect(winner.Name).To(Equal("nrs1"))
+
+		winner, err = schedulerWinnerValidator([]nropv1.NUMAResourcesScheduler{*nrs1, *nrs2, *nrs3}, "nrs3")
+		Expect(err).To(HaveOccurred(), "expected error when requesting a different NRS than the winner")
+		Expect(winner.Name).To(Equal("nrs1"))
 	})
 })
 
