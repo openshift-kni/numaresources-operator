@@ -573,6 +573,12 @@ spec:
                     memory: 20Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+                startupProbe:
+                  failureThreshold: 30
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  periodSeconds: 10
                 terminationMessagePolicy: FallbackToLogsOnError
                 volumeMounts:
                 - mountPath: /certs
