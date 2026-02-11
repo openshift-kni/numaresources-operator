@@ -60,6 +60,11 @@ LABEL operators.operatorframework.io.bundle.channels.v1="${OPENSHIFT_VERSION}"
 #TODO - consider default to stable
 LABEL operators.operatorframework.io.bundle.channel.default.v1="${OPENSHIFT_VERSION}"
 
+# Labels for metrics.
+LABEL operators.operatorframework.io.metrics.builder=operator-sdk-v1.12.0+git
+LABEL operators.operatorframework.io.metrics.mediatype.v1=metrics+v1
+LABEL operators.operatorframework.io.metrics.project_layout=go.kubebuilder.io/v3
+
 # Labels for testing.
 LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
 LABEL operators.operatorframework.io.test.config.v1=tests/scorecard/
