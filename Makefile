@@ -30,8 +30,6 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 # Konflux catalog configuration
 PACKAGE_NAME_KONFLUX = numaresources-operator
-CATALOG_TEMPLATE_KONFLUX = .konflux/catalog/catalog-template.in.yaml
-# Telco5g-konflux uses distinct input/output paths when updating the catalog template
 CATALOG_TEMPLATE_KONFLUX_INPUT = .konflux/catalog/catalog-template.in.yaml
 CATALOG_TEMPLATE_KONFLUX_OUTPUT = .konflux/catalog/catalog-template.out.yaml
 CATALOG_OUTPUT_FORMAT = json
@@ -477,7 +475,7 @@ konflux-validate-catalog: sync-git-submodules opm ## validate the current catalo
 
 .PHONY: konflux-generate-catalog
 konflux-generate-catalog: sync-git-submodules yq opm ## generate a quay.io catalog
-	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/catalog konflux-generate-catalog \
+	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/catalog konflux-generate-catalog-legacy \
 		CATALOG_TEMPLATE_KONFLUX_INPUT=$(PROJECT_DIR)/$(CATALOG_TEMPLATE_KONFLUX_INPUT) \
 		CATALOG_TEMPLATE_KONFLUX_OUTPUT=$(PROJECT_DIR)/$(CATALOG_TEMPLATE_KONFLUX_OUTPUT) \
 		CATALOG_KONFLUX=$(PROJECT_DIR)/$(CATALOG_KONFLUX) \
@@ -490,7 +488,7 @@ konflux-generate-catalog: sync-git-submodules yq opm ## generate a quay.io catal
 
 .PHONY: konflux-generate-catalog-production
 konflux-generate-catalog-production: sync-git-submodules yq opm ## generate a registry.redhat.io catalog
-	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/catalog konflux-generate-catalog-production \
+	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/catalog konflux-generate-catalog-production-legacy \
 		CATALOG_TEMPLATE_KONFLUX_INPUT=$(PROJECT_DIR)/$(CATALOG_TEMPLATE_KONFLUX_INPUT) \
 		CATALOG_TEMPLATE_KONFLUX_OUTPUT=$(PROJECT_DIR)/$(CATALOG_TEMPLATE_KONFLUX_OUTPUT) \
 		CATALOG_KONFLUX=$(PROJECT_DIR)/$(CATALOG_KONFLUX) \
