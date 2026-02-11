@@ -30,6 +30,7 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 # Konflux catalog configuration
 PACKAGE_NAME_KONFLUX = numaresources-operator
+CATALOG_TEMPLATE_KONFLUX = .konflux/catalog/catalog-template.in.yaml
 CATALOG_TEMPLATE_KONFLUX_INPUT = .konflux/catalog/catalog-template.in.yaml
 CATALOG_TEMPLATE_KONFLUX_OUTPUT = .konflux/catalog/catalog-template.out.yaml
 CATALOG_OUTPUT_FORMAT = json
