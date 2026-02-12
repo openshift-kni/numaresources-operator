@@ -220,8 +220,15 @@ spec:
       value: $(tasks.init.results.http-proxy)
     - name: NO_PROXY
       value: $(tasks.init.results.no-proxy)
+    # this param must be defined in the task, see
+    # https://github.com/konflux-ci/build-definitions/blob/main/task/buildah-remote-oci-ta/0.8/buildah-remote-oci-ta.yaml 
+    # be mindful to the versions changes.
+    - name: LABELS
+      value:
+      - "base.image.digest=$(tasks.get-base-sha.results.sha)"
     runAfter:
     - prefetch-dependencies
+    - get-base-sha
     taskRef:
       params:
       - name: name
@@ -231,6 +238,9 @@ spec:
       - name: kind
         value: task
       resolver: bundles
+    workspaces:
+    - name: source
+      workspace: source
   - name: build-image-index
     params:
     - name: IMAGE
@@ -593,6 +603,24 @@ spec:
       operator: in
       values:
       - "false"
+  - name: get-base-sha
+    retries: 3
+    params:
+    - name: dockerfile-path
+      value: $(params.dockerfile)
+    taskSpec:
+      results:
+        - name: sha
+      steps:
+        - name: extract
+          image: quay.io/containers/skopeo:latest
+          script: |
+            # we assume it's the last FROM statement
+            BASE_IMG=$(grep '^FROM' $(workspaces.source.path)/$(params.dockerfile-path) | tail -n 1 | awk '{print $2}')
+            skopeo inspect --inspect-raw docker://$BASE_IMG | jq -r '.digest' | tr -d '\n' > $(results.sha.path)
+    workspaces:
+      - name: source
+        workspace: source
   workspaces:
   - name: git-auth
     optional: true
