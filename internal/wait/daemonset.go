@@ -41,12 +41,14 @@ func (wt Waiter) ForDaemonSetReadyByKey(ctx context.Context, key ObjectKey) (*ap
 		}
 
 		if !AreDaemonSetPodsReady(&updatedDs.Status) {
-			klog.Warningf("daemonset %s desired %d scheduled %d ready %d up-to-date %d",
+			klog.Warningf("daemonset %s not ready: desired=%d current=%d ready=%d updated=%d available=%d unavailable=%d",
 				key.String(),
 				updatedDs.Status.DesiredNumberScheduled,
 				updatedDs.Status.CurrentNumberScheduled,
 				updatedDs.Status.NumberReady,
-				updatedDs.Status.UpdatedNumberScheduled)
+				updatedDs.Status.UpdatedNumberScheduled,
+				updatedDs.Status.NumberAvailable,
+				updatedDs.Status.NumberUnavailable)
 			return false, nil
 		}
 
@@ -62,7 +64,9 @@ func (wt Waiter) ForDaemonSetReady(ctx context.Context, ds *appsv1.DaemonSet) (*
 
 func AreDaemonSetPodsReady(newStatus *appsv1.DaemonSetStatus) bool {
 	return newStatus.DesiredNumberScheduled > 0 &&
-		newStatus.DesiredNumberScheduled == newStatus.NumberReady && newStatus.UpdatedNumberScheduled == newStatus.NumberReady
+		newStatus.CurrentNumberScheduled == newStatus.DesiredNumberScheduled &&
+		newStatus.NumberAvailable == newStatus.DesiredNumberScheduled &&
+		newStatus.NumberUnavailable == 0
 }
 
 func (wt Waiter) ForDaemonsetPodsCreation(ctx context.Context, key ObjectKey, expectedPods int) (*appsv1.DaemonSet, error) {
