@@ -481,10 +481,11 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 				// NoExecute promises the pod will be evicted "immediately" but the system will still need nonzero time to notice
 				// and the pod will take nonzero time to terminate, so we need a Eventually block.
+				By(fmt.Sprintf("ensuring the RTE DS is running with less pods because taints (expected pods=%v)", len(workers)-1))
 				Eventually(func(g Gomega) {
+					Expect(fxt.Client.Get(ctx, dsKey.AsKey(), updatedDs)).To(Succeed())
 					pods, err = podlist.With(fxt.Client).ByDaemonset(ctx, *updatedDs)
 					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset pods %s: %v", dsKey.String(), err)
-					By(fmt.Sprintf("ensuring the RTE DS is running with less pods because taints (expected pods=%v)", len(workers)-1))
 					g.Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)-1), "updated DS ready=%v original worker nodes=%v", updatedDs.Status.NumberReady, len(workers)-1)
 					g.Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(pods)), "updated DS ready=%v expected pods", updatedDs.Status.NumberReady, len(pods))
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())

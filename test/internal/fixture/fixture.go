@@ -36,6 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
+
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
@@ -102,6 +104,7 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 	randomizeName := (options & OptionRandomizeName) == OptionRandomizeName
 	avoidCooldown := (options & OptionAvoidCooldown) == OptionAvoidCooldown
 	staticClusterData := (options & OptionStaticClusterData) == OptionStaticClusterData
+
 	ginkgo.By("set up the test namespace")
 	ns, err := setupNamespace(e2eclient.Client, name, randomizeName)
 	if err != nil {
@@ -132,6 +135,44 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 		nrtList = nrtAtTestSetup
 	}
 	klog.Infof("set up the fixture reference NRT List: %s", intnrt.ListToString(nrtList.Items, " fixture initial"))
+
+	ginkgo.By("warn about not updated MCPs")
+	var mcps machineconfigv1.MachineConfigPoolList
+	err = wait.PollUntilContextTimeout(ctx, 10*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		err := e2eclient.Client.List(ctx, &mcps)
+		return err == nil, nil
+	})
+	if err != nil {
+		klog.Errorf("failed to pull MCP items: %v", err)
+	} else {
+		for _, mcp := range mcps.Items {
+			conditions := mcp.Status.Conditions
+			for _, condition := range conditions {
+				if condition.Type == machineconfigv1.MachineConfigPoolUpdated {
+					if condition.Status != corev1.ConditionTrue {
+						klog.Warningf("MCP %q is not updated", mcp.Name)
+						klog.InfoS("MCP status", "name", mcp.Name, "conditions", conditions)
+					}
+					break
+				}
+			}
+		}
+	}
+	ginkgo.By("warn about unschedulable nodes")
+	var nodes corev1.NodeList
+	err = wait.PollUntilContextTimeout(ctx, 10*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		err := e2eclient.Client.List(ctx, &nodes)
+		return err == nil, nil
+	})
+	if err != nil {
+		klog.Errorf("failed to pull cluster nodes: %v", err)
+	} else {
+		for _, node := range nodes.Items {
+			if node.Spec.Unschedulable {
+				klog.Warningf("Node %q is unschedulable", node.Name)
+			}
+		}
+	}
 
 	return &Fixture{
 		Client:         e2eclient.Client,
