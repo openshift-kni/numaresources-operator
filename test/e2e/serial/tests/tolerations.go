@@ -475,19 +475,24 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 				By("applying the taint 2 - NoExecute")
 				applyTaintToNode(ctx, fxt.Client, targetNode, &tntNoExec[0])
-				By("waiting for DaemonSet to be ready")
-				updatedDs, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
-				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
 				// NoExecute promises the pod will be evicted "immediately" but the system will still need nonzero time to notice
-				// and the pod will take nonzero time to terminate, so we need a Eventually block.
+				// and the pod will take nonzero time to terminate, so we need a Eventually block. Count only non-terminating pods:
+				// the list can still include the evicted pod until deletion finishes.
 				e2efixture.By("ensuring the RTE DS is running with less pods because taints (expected pods=%v)", len(workers)-1)
 				Eventually(func(g Gomega) {
-					Expect(fxt.Client.Get(ctx, dsKey.AsKey(), updatedDs)).To(Succeed())
-					pods, err = podlist.With(fxt.Client).ByDaemonset(ctx, *updatedDs)
-					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset pods %s: %v", dsKey.String(), err)
+					g.Expect(fxt.Client.Get(ctx, dsKey.AsKey(), updatedDs)).To(Succeed())
+					allPods, err := podlist.With(fxt.Client).ByDaemonset(ctx, *updatedDs)
+					g.Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset pods %s: %v", dsKey.String(), err)
+					var runningPods []corev1.Pod
+					for _, pod := range allPods {
+						if pod.DeletionTimestamp == nil {
+							runningPods = append(runningPods, pod)
+						}
+					}
+					klog.InfoS("pod count after eviction", "all", len(allPods), "running", len(runningPods), "expected", len(workers)-1)
 					g.Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)-1), "updated DS ready=%v original worker nodes=%v", updatedDs.Status.NumberReady, len(workers)-1)
-					g.Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(pods)), "updated DS ready=%v expected pods", updatedDs.Status.NumberReady, len(pods))
+					g.Expect(runningPods).To(HaveLen(len(workers)-1), "running DS pods=%d expected=%d (total including terminating=%d)", len(runningPods), len(workers)-1, len(allPods))
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 			})
 
