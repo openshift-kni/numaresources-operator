@@ -114,6 +114,13 @@ spec:
   - description: ""
     name: CHAINS-GIT_COMMIT
     value: $(tasks.clone-repository.results.commit)
+  workspaces:
+  - name: git-auth
+    optional: true
+  - name: netrc
+    optional: true
+  - name: source
+    description: scratch space for get-base-sha to clone the repo and read the Dockerfile
   tasks:
   - name: init
     params:
@@ -238,9 +245,6 @@ spec:
       - name: kind
         value: task
       resolver: bundles
-    workspaces:
-    - name: source
-      workspace: source
   - name: build-image-index
     params:
     - name: IMAGE
@@ -608,21 +612,42 @@ spec:
     params:
     - name: dockerfile-path
       value: $(params.dockerfile)
+    - name: git-url
+      value: $(params.git-url)
+    - name: revision
+      value: $(params.revision)
     taskSpec:
+      params:
+      - name: dockerfile-path
+        type: string
+      - name: git-url
+        type: string
+      - name: revision
+        type: string
       results:
         - name: sha
       steps:
-        - name: extract
+        - name: clone-and-extract-base
+          image: quay.io/konflux-ci/git-clone:0.9
+          script: |
+            set -e
+            set -o pipefail
+            cd $(workspaces.source.path)
+            git clone --depth 1 "$(params.git-url)" repo
+            cd repo && git checkout "$(params.revision)"
+            # we assume it's the last FROM statement
+            grep '^FROM' "$(workspaces.source.path)/repo/$(params.dockerfile-path)" | tail -n 1 | awk '{print $2}' > $(workspaces.source.path)/base_img
+        - name: inspect-digest
           image: quay.io/containers/skopeo:latest
           script: |
-            # we assume it's the last FROM statement
-            BASE_IMG=$(grep '^FROM' $(workspaces.source.path)/$(params.dockerfile-path) | tail -n 1 | awk '{print $2}')
+            set -e
+            set -o pipefail
+            BASE_IMG=$(cat $(workspaces.source.path)/base_img)
             skopeo inspect --inspect-raw docker://$BASE_IMG | jq -r '.digest' | tr -d '\n' > $(results.sha.path)
     workspaces:
-      - name: source
-        workspace: source
-  workspaces:
-  - name: git-auth
-    optional: true
-  - name: netrc
-    optional: true
+    - name: source
+      workspace: source
+    - name: git-auth
+      workspace: git-auth
+    - name: netrc
+      workspace: netrc
