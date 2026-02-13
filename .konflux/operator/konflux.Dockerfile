@@ -21,7 +21,7 @@ RUN microdnf install -y hwdata && \
 USER 65532:65532
 ENTRYPOINT ["/bin/numaresources-operator"]
 LABEL com.redhat.component="numaresources-operator-container" \
-      name="openshift4/numaresources-operator" \
+      name="openshift4/numaresources-rhel8-operator" \
       summary="numaresources-operator" \
       io.openshift.expose-services="" \
       io.openshift.tags="operator" \
