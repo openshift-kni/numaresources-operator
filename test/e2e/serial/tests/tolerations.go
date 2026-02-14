@@ -475,18 +475,21 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 				By("applying the taint 2 - NoExecute")
 				applyTaintToNode(ctx, fxt.Client, targetNode, &tntNoExec[0])
-				By("waiting for DaemonSet to be ready")
-				updatedDs, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
-				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
-
 				// NoExecute promises the pod will be evicted "immediately" but the system will still need nonzero time to notice
 				// and the pod will take nonzero time to terminate, so we need a Eventually block.
+
+				By("waiting for the eviction to be reflected in the DaemonSet")
 				Eventually(func(g Gomega) {
-					pods, err = podlist.With(fxt.Client).ByDaemonset(ctx, *updatedDs)
-					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset pods %s: %v", dsKey.String(), err)
-					By(fmt.Sprintf("ensuring the RTE DS is running with less pods because taints (expected pods=%v)", len(workers)-1))
-					g.Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)-1), "updated DS ready=%v original worker nodes=%v", updatedDs.Status.NumberReady, len(workers)-1)
-					g.Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(pods)), "updated DS ready=%v expected pods", updatedDs.Status.NumberReady, len(pods))
+					// Always refresh the DaemonSet object: using a stale copy here makes this check flaky
+					// (it may pass/fail depending on whether the DS controller already updated its status).
+					latestDs := &appsv1.DaemonSet{}
+					err := fxt.Client.Get(ctx, dsKey.AsKey(), latestDs)
+					g.Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+					pods, err = podlist.With(fxt.Client).ByDaemonset(ctx, *latestDs)
+					g.Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset pods %s: %v", dsKey.String(), err)
+					klog.InfoS("ensuring the RTE DS is running with less pods because taints", "expected", len(workers)-1, "running", len(pods))
+					g.Expect(int(latestDs.Status.NumberReady)).To(Equal(len(workers)-1), "updated DS ready=%v original worker nodes=%v", latestDs.Status.NumberReady, len(workers)-1)
+					g.Expect(int(latestDs.Status.NumberReady)).To(Equal(len(pods)), "updated DS ready=%v expected pods", latestDs.Status.NumberReady, len(pods))
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 			})
 
