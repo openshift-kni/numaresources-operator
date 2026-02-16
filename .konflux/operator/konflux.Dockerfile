@@ -1,4 +1,4 @@
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.22@sha256:5ddcdd7bba32ff11d6539e5c01131eecb9ab2b7c5e36ccf82585fa1c944c8909 as builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.22@sha256:05701005c47c99ade6d022b99a84648e01551e01816f8b399865e6d2d5fed197 as builder
 
 WORKDIR /go/src/github.com/openshift-kni/numaresources-operator
 COPY . .
@@ -10,7 +10,7 @@ ENV GOTAGS="strictfipsruntime"
 # Build
 RUN make binary-all
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:6fc28bcb6776e387d7a35a2056d9d2b985dc4e26031e98a2bd35a7137cd6fd71
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:759f5f42d9d6ce2a705e290b7fc549e2d2cd39312c4fa345f93c02e4abb8da95
 
 ARG OPENSHIFT_VERSION
 
