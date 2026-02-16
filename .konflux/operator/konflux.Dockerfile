@@ -1,4 +1,4 @@
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.23@sha256:6088f98bb99c94687824159ecc79c1368552a4fe6876be78fe9ebc2d69d9196e as builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.23@sha256:1895c58008bb29bc1813ceef6768af313c2c5a061d40bf75d6aa5449db397811 as builder
 
 WORKDIR /go/src/github.com/openshift-kni/numaresources-operator
 COPY . .
