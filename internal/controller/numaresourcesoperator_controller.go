@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -622,10 +623,12 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 		handler.EnqueueRequestsFromMapFunc(r.configMapToNUMAResourceOperator),
 		builder.WithPredicates(configMapPredicates)).
 		Owns(&apiextensionv1.CustomResourceDefinition{}).
+		Owns(&corev1.Service{}, builder.WithPredicates(p)).
 		Owns(&corev1.ServiceAccount{}, builder.WithPredicates(p)).
 		Owns(&rbacv1.RoleBinding{}, builder.WithPredicates(p)).
 		Owns(&rbacv1.Role{}, builder.WithPredicates(p)).
 		Owns(&appsv1.DaemonSet{}, builder.WithPredicates(p)).
+		Owns(&networkingv1.NetworkPolicy{}, builder.WithPredicates(p)).
 		Complete(r)
 }
 

@@ -23,6 +23,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -187,6 +188,7 @@ func (r *NUMAResourcesSchedulerReconciler) SetupWithManager(mgr ctrl.Manager) er
 		Owns(&corev1.ServiceAccount{}, builder.WithPredicates(p)).
 		Owns(&corev1.ConfigMap{}, builder.WithPredicates(p)).
 		Owns(&appsv1.Deployment{}, builder.WithPredicates(p)).
+		Owns(&networkingv1.NetworkPolicy{}, builder.WithPredicates(p)).
 		Watches(&corev1.Node{}, handler.EnqueueRequestsFromMapFunc(r.nodeToNUMAResourcesScheduler),
 			builder.WithPredicates(nodesPredicate)).
 		Complete(r)
