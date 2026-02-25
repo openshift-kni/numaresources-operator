@@ -219,6 +219,9 @@ spec:
                 type: string
             type: object
         type: object
+        x-kubernetes-validations:
+        - message: This is a singleton resource and the object name must be 'numaresourcesscheduler'.
+          rule: has(self.metadata.name) && self.metadata.name == 'numaresourcesscheduler'
     served: true
     storage: true
     subresources:

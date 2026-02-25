@@ -544,6 +544,9 @@ spec:
                 type: array
             type: object
         type: object
+        x-kubernetes-validations:
+        - message: This is a singleton resource and the object name must be 'numaresourcesoperator'.
+          rule: has(self.metadata.name) && self.metadata.name == 'numaresourcesoperator'
     served: true
     storage: true
     subresources:

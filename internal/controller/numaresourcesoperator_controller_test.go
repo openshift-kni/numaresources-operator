@@ -122,11 +122,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 	}
 
 	DescribeTableSubtree("Running on different platforms", func(platf platform.Platform) {
-
 		Context("with unexpected NRO CR name", func() {
-			It("should updated the CR condition to degraded", func() {
-				nro := testobjs.NewNUMAResourcesOperator("test")
-				verifyDegradedCondition(nro, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, platf)
+			It("should reject creating the CR", func() {
+				nro := testobjs.NewNUMAResourcesOperator("wrong-name")
+				err := k8sClient.Create(context.TODO(), nro)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("the object name must be 'numaresourcesoperator'."))
 			})
 		})
 
