@@ -204,6 +204,7 @@ spec:
     - name: BUILD_ARGS
       value:
       - $(params.build-args[*])
+      - "BASE_IMAGE=$(tasks.get-base-sha.results.base)@$(tasks.get-base-sha.results.sha)"
     - name: BUILD_ARGS_FILE
       value: $(params.build-args-file)
     - name: PRIVILEGED_NESTED
@@ -220,8 +221,15 @@ spec:
       value: $(tasks.init.results.http-proxy)
     - name: NO_PROXY
       value: $(tasks.init.results.no-proxy)
+    # this param must be defined in the task, see
+    # https://github.com/konflux-ci/build-definitions/blob/main/task/buildah-remote-oci-ta/0.8/buildah-remote-oci-ta.yaml 
+    # be mindful to the versions changes.
+    - name: LABELS
+      value:
+      - "base.image.digest=$(tasks.get-base-sha.results.sha)"
     runAfter:
     - prefetch-dependencies
+    - get-base-sha
     taskRef:
       params:
       - name: name
@@ -593,6 +601,51 @@ spec:
       operator: in
       values:
       - "false"
+  - name: get-base-sha
+    retries: 3
+    params:
+      - name: dockerfile-path
+        value: $(params.dockerfile)
+      # New parameter to use the Trusted Artifact from the git-clone Task.
+      - name: SOURCE_ARTIFACT
+        value: $(tasks.clone-repository.results.SOURCE_ARTIFACT)
+    runAfter:
+    - clone-repository
+    taskSpec:
+      results:
+        - name: sha
+        - name: base
+      params:
+        # https://konflux-ci.dev/docs/building/using-trusted-artifacts/#migrate-to-trusted-artifacts
+        - description: The Trusted Artifact URI pointing to the artifact with the application source code.
+          name: SOURCE_ARTIFACT
+          type: string
+      stepTemplate:
+        volumeMounts:
+          - mountPath: /var/workdir
+            name: workdir
+      steps:
+        # New step to fetch the Trusted Artifact and make it available to the next steps.
+        - name: use-trusted-artifact
+          image: quay.io/redhat-appstudio/build-trusted-artifacts:latest@sha256:8391272c4e5011120e9e7fee2c1f339e9405366110bf239dadcbc21e953ce099
+          args:
+            - use
+            - $(params.SOURCE_ARTIFACT)=/var/workdir/source
+        - name: extract-digest
+          image: quay.io/containers/skopeo:latest
+          workingDir: /var/workdir/source
+          script: |
+            #!/usr/bin/env bash
+            set -e
+            set -o pipefail
+
+            url=$(grep '^ARG BASE_IMAGE=' /var/workdir/source/$(params.dockerfile-path) | cut -d= -f2- | sed 's/[[:space:]]*#.*//'| tr -d '\n')
+            echo -n "$url" > $(results.base.path)
+            skopeo inspect --format='{{.Digest}}' docker://$url | tr -d '\n' > $(results.sha.path)
+      volumes:
+        # New volume to store a copy of the source code accessible only to this Task.
+        - name: workdir
+          emptyDir: {}
   workspaces:
   - name: git-auth
     optional: true
