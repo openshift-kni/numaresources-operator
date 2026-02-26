@@ -98,6 +98,7 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=*,namespace="numaresources"
 
 // Cluster Scoped
+//+kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get;list;watch
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=list
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusteroperators,verbs=get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=get
