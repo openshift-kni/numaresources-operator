@@ -33,8 +33,10 @@ import (
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
+	ctrltls "github.com/openshift/controller-runtime-common/pkg/tls"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -96,6 +98,7 @@ func init() {
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 	utilruntime.Must(nropv1.AddToScheme(scheme))
 	utilruntime.Must(nropv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(configv1.Install(scheme))
 	utilruntime.Must(machineconfigv1.Install(scheme))
 	utilruntime.Must(securityv1.Install(scheme))
 	//+kubebuilder:scaffold:scheme
@@ -251,10 +254,12 @@ func main() {
 		os.Exit(manageLifecycleEvent(params.handleEvent))
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
+	defer cancel()
 
 	discoveredCluster, err := version.DiscoverCluster(ctx, params.platformName, params.platformVersion)
 	if err != nil {
+		cancel()
 		os.Exit(1)
 	}
 
@@ -266,6 +271,7 @@ func main() {
 	apiManifests, err := apimanifests.GetManifests(discoveredCluster.Platform)
 	if err != nil {
 		klog.ErrorS(err, "unable to load the API manifests")
+		cancel()
 		os.Exit(1)
 	}
 	klog.InfoS("manifests loaded", "component", "API")
@@ -280,6 +286,7 @@ func main() {
 	rteManifests, err := rtemanifests.GetManifests(discoveredCluster.Platform, discoveredCluster.ShortVersion, namespace, false, true)
 	if err != nil {
 		klog.ErrorS(err, "unable to load the RTE manifests")
+		cancel()
 		os.Exit(1)
 	}
 	klog.InfoS("manifests loaded", "component", "RTE")
@@ -287,6 +294,7 @@ func main() {
 	rteMetricsManifests, err := rtemetricsmanifests.GetManifests(namespace)
 	if err != nil {
 		klog.ErrorS(err, "unable to load the RTE metrics manifests")
+		cancel()
 		os.Exit(1)
 	}
 	klog.InfoS("manifests loaded", "component", "RTEMetrics")
@@ -300,8 +308,29 @@ func main() {
 	}
 
 	klog.InfoS("metrics server", "enabled", params.enableMetrics, "addr", params.metricsAddr)
+	restConfig := ctrl.GetConfigOrDie()
+	k8sClient, err := client.New(restConfig, client.Options{Scheme: scheme})
+	if err != nil {
+		klog.ErrorS(err, "unable to create Kubernetes client for TLS profile")
+		cancel()
+		os.Exit(1)
+	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	tlsSecurityProfileSpec, err := ctrltls.FetchAPIServerTLSProfile(ctx, k8sClient)
+	if err != nil {
+		klog.ErrorS(err, "unable to get TLS profile from APIServer")
+		cancel()
+		os.Exit(1)
+	}
+
+	tlsConfig, unsupportedCiphers := ctrltls.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
+	if len(unsupportedCiphers) > 0 {
+		klog.InfoS("TLS profile configuration contains unsupported ciphers that will be ignored", "unsupported", unsupportedCiphers)
+	}
+
+	webhookTLSOpts := append(webhookTLSOpts(params.enableHTTP2), tlsConfig)
+
+	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Cache: cache.Options{
 			DefaultNamespaces: map[string]cache.Config{
 				namespace:            {},
@@ -313,10 +342,11 @@ func main() {
 			BindAddress:   params.metricsAddr,
 			SecureServing: true,
 			CertDir:       "/certs",
+			TLSOpts:       []func(*tls.Config){tlsConfig},
 		},
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port:    params.webhookPort,
-			TLSOpts: webhookTLSOpts(params.enableHTTP2),
+			TLSOpts: webhookTLSOpts,
 		}),
 		HealthProbeBindAddress:  params.probeAddr,
 		LeaderElection:          params.enableLeaderElection,
@@ -325,6 +355,22 @@ func main() {
 	})
 	if err != nil {
 		klog.ErrorS(err, "unable to start manager")
+		cancel()
+		os.Exit(1)
+	}
+
+	watcher := &ctrltls.SecurityProfileWatcher{
+		Client:                mgr.GetClient(),
+		InitialTLSProfileSpec: tlsSecurityProfileSpec,
+		OnProfileChange: func(ctx context.Context, oldSpec, newSpec configv1.TLSProfileSpec) {
+			klog.InfoS("TLS profile changed, triggering graceful shutdown to reload", "old profile", oldSpec, "new profile", newSpec)
+			cancel()
+		},
+	}
+
+	if err := watcher.SetupWithManager(mgr); err != nil {
+		klog.ErrorS(err, "unable to set up TLS security profile watcher")
+		cancel()
 		os.Exit(1)
 	}
 
@@ -333,6 +379,7 @@ func main() {
 	rteManifestsRendered, err := renderRTEManifests(rteManifests, namespace, imgs)
 	if err != nil {
 		klog.ErrorS(err, "unable to render RTE manifests", "controller", "NUMAResourcesOperator")
+		cancel()
 		os.Exit(1)
 	}
 
@@ -352,6 +399,7 @@ func main() {
 		ForwardMCPConds: params.enableMCPCondsForward,
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesOperator")
+		cancel()
 		os.Exit(1)
 	}
 	if err = (&controller.KubeletConfigReconciler{
@@ -362,6 +410,7 @@ func main() {
 		Platform:  discoveredCluster.Platform,
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "KubeletConfig")
+		cancel()
 		os.Exit(1)
 	}
 
@@ -369,6 +418,7 @@ func main() {
 		schedMf, err := schedmanifests.GetManifests(namespace)
 		if err != nil {
 			klog.ErrorS(err, "unable to load the Scheduler manifests")
+			cancel()
 			os.Exit(1)
 		}
 		klog.InfoS("manifests loaded", "component", "Scheduler")
@@ -381,6 +431,7 @@ func main() {
 			PlatformInfo:       platforminfo.New(discoveredCluster.Platform, discoveredCluster.LongVersion),
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
+			cancel()
 			os.Exit(1)
 		}
 	}
@@ -398,16 +449,19 @@ func main() {
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		klog.ErrorS(err, "unable to set up health check")
+		cancel()
 		os.Exit(1)
 	}
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		klog.ErrorS(err, "unable to set up ready check")
+		cancel()
 		os.Exit(1)
 	}
 
 	klog.InfoS("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		klog.ErrorS(err, "problem running manager")
+		cancel()
 		os.Exit(1)
 	}
 }
