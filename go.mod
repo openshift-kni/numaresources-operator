@@ -109,6 +109,7 @@ require (
 	golang.org/x/text v0.33.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	golang.org/x/tools v0.41.0 // indirect
+	golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.4.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250303144028-a0af3efb3deb // indirect
@@ -145,6 +146,9 @@ replace (
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.33.2
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.33.2
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.33.2
+	// Pin kube-openapi to a version that uses structured-merge-diff v4 (required by apimachinery 0.33.2).
+	// Newer kube-openapi uses v6, causing: typeSchema.Types (v6 TypeDef) used as v4 TypeDef in typeconverter.go.
+	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a9a2ff
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.33.2
 	k8s.io/kube-scheduler => k8s.io/kube-scheduler v0.33.2
 	k8s.io/kubectl => k8s.io/kubectl v0.33.2
