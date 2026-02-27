@@ -74,7 +74,8 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2025-08-08T10:00:51Z"
+    createdAt: "2026-02-27T11:38:10Z"
+    features.operators.openshift.io/tls-profiles: "true"
     olm.skipRange: '>=4.21.0 <4.22.0'
     operatorframework.io/cluster-monitoring: "true"
     operators.operatorframework.io/builder: operator-sdk-v1.40.0
@@ -424,6 +425,14 @@ spec:
           - deployments
           verbs:
           - '*'
+        - apiGroups:
+          - config.openshift.io
+          resources:
+          - apiservers
+          verbs:
+          - get
+          - list
+          - watch
         - apiGroups:
           - config.openshift.io
           resources:
