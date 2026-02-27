@@ -33,8 +33,10 @@ import (
 
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	configv1 "github.com/openshift/api/config/v1"
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
+	ctrltls "github.com/openshift/controller-runtime-common/pkg/tls"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
@@ -96,6 +98,7 @@ func init() {
 	utilruntime.Must(apiextensionsv1.AddToScheme(scheme))
 	utilruntime.Must(nropv1.AddToScheme(scheme))
 	utilruntime.Must(nropv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(configv1.Install(scheme))
 	utilruntime.Must(machineconfigv1.Install(scheme))
 	utilruntime.Must(securityv1.Install(scheme))
 	//+kubebuilder:scaffold:scheme
@@ -261,8 +264,31 @@ func main() {
 	}
 
 	klog.InfoS("metrics server", "enabled", params.enableMetrics, "addr", params.metricsAddr)
+	restConfig := ctrl.GetConfigOrDie()
+	k8sClient, err := client.New(restConfig, client.Options{Scheme: scheme})
+	if err != nil {
+		klog.ErrorS(err, "unable to create Kubernetes client for TLS profile")
+		os.Exit(1)
+	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	tlsProfileCtx := context.Background()
+	tlsSecurityProfileSpec, err := ctrltls.FetchAPIServerTLSProfile(tlsProfileCtx, k8sClient)
+	if err != nil {
+		klog.ErrorS(err, "unable to get TLS profile from APIServer")
+		os.Exit(1)
+	}
+
+	tlsConfig, unsupportedCiphers := ctrltls.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
+	if len(unsupportedCiphers) > 0 {
+		klog.InfoS("TLS profile configuration contains unsupported ciphers that will be ignored", "unsupported", unsupportedCiphers)
+	}
+
+	runCtx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
+	defer cancel()
+
+	webhookTLSOpts := append(webhookTLSOpts(params.enableHTTP2), tlsConfig)
+
+	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Cache: cache.Options{
 			DefaultNamespaces: map[string]cache.Config{
 				namespace:            {},
@@ -274,10 +300,11 @@ func main() {
 			BindAddress:   params.metricsAddr,
 			SecureServing: true,
 			CertDir:       "/certs",
+			TLSOpts:       []func(*tls.Config){tlsConfig},
 		},
 		WebhookServer: webhook.NewServer(webhook.Options{
 			Port:    params.webhookPort,
-			TLSOpts: webhookTLSOpts(params.enableHTTP2),
+			TLSOpts: webhookTLSOpts,
 		}),
 		HealthProbeBindAddress:  params.probeAddr,
 		LeaderElection:          params.enableLeaderElection,
@@ -286,6 +313,20 @@ func main() {
 	})
 	if err != nil {
 		klog.ErrorS(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	watcher := &ctrltls.SecurityProfileWatcher{
+		Client:                mgr.GetClient(),
+		InitialTLSProfileSpec: tlsSecurityProfileSpec,
+		OnProfileChange: func(ctx context.Context, oldSpec, newSpec configv1.TLSProfileSpec) {
+			klog.InfoS("TLS profile changed, triggering graceful shutdown to reload", "old profile", oldSpec, "new profile", newSpec)
+			cancel()
+		},
+	}
+
+	if err := watcher.SetupWithManager(mgr); err != nil {
+		klog.ErrorS(err, "unable to set up TLS security profile watcher")
 		os.Exit(1)
 	}
 
@@ -367,7 +408,7 @@ func main() {
 	}
 
 	klog.InfoS("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(runCtx); err != nil {
 		klog.ErrorS(err, "problem running manager")
 		os.Exit(1)
 	}

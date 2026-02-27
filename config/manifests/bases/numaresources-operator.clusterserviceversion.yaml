@@ -4,6 +4,7 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Basic Install
+    features.operators.openshift.io/tls-profiles: "true"
     olm.skipRange: '>=4.21.0 <4.22.0'
     operatorframework.io/cluster-monitoring: "true"
   name: numaresources-operator.v0.0.0
