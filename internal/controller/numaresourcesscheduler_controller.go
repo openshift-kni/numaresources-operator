@@ -56,7 +56,6 @@ import (
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 )
@@ -120,11 +119,6 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 		instance.Status.Conditions = status.NewNUMAResourcesSchedulerBaseConditions()
 	}
 
-	if req.Name != objectnames.DefaultNUMAResourcesSchedulerCrName {
-		message := fmt.Sprintf("incorrect NUMAResourcesScheduler resource name: %s", instance.Name)
-		return ctrl.Result{}, r.degradeStatus(ctx, initialStatus, instance, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
-	}
-
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
 		klog.InfoS("Pause reconciliation enabled", "object", req.NamespacedName)
 		return ctrl.Result{}, nil
@@ -137,24 +131,6 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	}
 
 	return step.Result, step.Error
-}
-
-func (r *NUMAResourcesSchedulerReconciler) degradeStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesSchedulerStatus, instance *nropv1.NUMAResourcesScheduler, reason string, message string) error {
-	condition := metav1.Condition{
-		Type:               status.ConditionDegraded,
-		Status:             metav1.ConditionTrue,
-		Reason:             reason,
-		Message:            message,
-		ObservedGeneration: instance.Generation,
-	}
-
-	instance.Status.Conditions, _ = status.ComputeConditions(instance.Status.Conditions, condition, time.Now())
-
-	err := r.updateStatus(ctx, initialStatus, instance)
-	if err != nil {
-		klog.InfoS("Failed to update numaresourcesoperator status", "error", err)
-	}
-	return err
 }
 
 // SetupWithManager sets up the controller with the Manager.

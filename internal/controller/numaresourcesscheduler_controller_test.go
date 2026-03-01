@@ -80,26 +80,12 @@ func NewFakeNUMAResourcesSchedulerReconciler(initObjects ...runtime.Object) (*NU
 }
 
 var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
-	verifyDegradedCondition := func(nrs *nropv1.NUMAResourcesScheduler, reason string) {
-		reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nrs)
-		Expect(err).ToNot(HaveOccurred())
-
-		key := client.ObjectKeyFromObject(nrs)
-		result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-		Expect(err).ToNot(HaveOccurred())
-		Expect(result).To(Equal(reconcile.Result{}))
-
-		Expect(reconciler.Client.Get(context.TODO(), key, nrs)).ToNot(HaveOccurred())
-		degradedCondition := getConditionByType(nrs.Status.Conditions, status.ConditionDegraded)
-		Expect(degradedCondition).ToNot(BeNil())
-		Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
-		Expect(degradedCondition.Reason).To(Equal(reason))
-	}
-
 	Context("with unexpected NRS CR name", func() {
-		It("should updated the CR condition to degraded", func() {
+		It("should reject creating the CR", func() {
 			nrs := testobjs.NewNUMAResourcesScheduler("test", "some/url:latest", testSchedulerName, 9*time.Second)
-			verifyDegradedCondition(nrs, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName)
+			err := k8sClient.Create(context.TODO(), nrs)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("the object name must be 'numaresourcesscheduler'."))
 		})
 	})
 
