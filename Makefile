@@ -423,7 +423,7 @@ goversion:
 build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform update-buildinfo
 
 .PHONY: build-tools-all
-build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap bin/watchnrtattr bin/mkginkgolabelfilter bin/pfpsyncchk update-buildinfo
+build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap bin/watchnrtattr bin/mkginkgolabelfilter bin/pfpsyncchk bin/make-job-foreach-ds update-buildinfo
 
 pkg/version/_buildinfo.json: bin/buildhelper
 	@bin/buildhelper inspect > pkg/version/_buildinfo.json
@@ -453,6 +453,9 @@ bin/mkginkgolabelfilter: tools/mkginkgolabelfilter/mkginkgolabelfilter.go
 
 bin/pfpsyncchk: tools/pfpsyncchk/pfpsyncchk.go 
 	LDFLAGS="-s -w" go build -mod=vendor -o $@ -ldflags "$$LDFLAGS" -tags "$$GOTAGS" $<
+
+bin/make-job-foreach-ds: tools/make-job-foreach-ds/main.go
+	@go build -o $@ $<
 
 verify-generated: bundle generate
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
