@@ -61,7 +61,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
-	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
@@ -142,11 +141,6 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	initialStatus := *instance.Status.DeepCopy()
 	if len(initialStatus.Conditions) == 0 {
 		instance.Status.Conditions = status.DefaultBaseConditions(time.Now())
-	}
-
-	if req.Name != objectnames.DefaultNUMAResourcesOperatorCrName {
-		err := fmt.Errorf("incorrect NUMAResourcesOperator resource name: %s", instance.Name)
-		return r.degradeStatus(ctx, initialStatus, instance, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, err)
 	}
 
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
