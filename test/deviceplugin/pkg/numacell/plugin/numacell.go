@@ -54,6 +54,7 @@ type message struct{}
 
 // NUMACellDevicePlugin is an implementation of DevicePlugin that is capable of exposing devices to containers.
 type NUMACellDevicePlugin struct {
+	pluginapi.UnimplementedDevicePluginServer
 	deviceID    string
 	numacellID  int64
 	deviceCount int
@@ -140,11 +141,11 @@ func (dpi *NUMACellDevicePlugin) Allocate(ctx context.Context, r *pluginapi.Allo
 
 	klog.V(4).InfoS("Allocate()", "request", r)
 	for _, container := range r.ContainerRequests {
-		if len(container.DevicesIDs) != 1 {
+		if len(container.DevicesIds) != 1 {
 			return nil, fmt.Errorf("can't allocate more than 1 numacell")
 		}
-		if !strings.HasPrefix(container.DevicesIDs[0], numacellapi.NUMACellResourceName) {
-			return nil, fmt.Errorf("cannot allocate numacell %q", container.DevicesIDs[0])
+		if !strings.HasPrefix(container.DevicesIds[0], numacellapi.NUMACellResourceName) {
+			return nil, fmt.Errorf("cannot allocate numacell %q", container.DevicesIds[0])
 		}
 
 		dev := new(pluginapi.DeviceSpec)
@@ -161,7 +162,7 @@ func (dpi *NUMACellDevicePlugin) Allocate(ctx context.Context, r *pluginapi.Allo
 
 		response.ContainerResponses = append(response.ContainerResponses, containerResp)
 	}
-	klog.V(4).InfoS("Allocate", "response", response)
+	klog.V(4).InfoS("Allocate", "response", &response)
 	return &response, nil
 }
 
