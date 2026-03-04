@@ -17,6 +17,7 @@ exclude:
     - "vendor/github.com/gorilla/websocket/util.go"
     - "vendor/github.com/go-task/slim-sprig/**"
     - "vendor/github.com/openshift/**"
+    - "vendor/github.com/prometheus/**"
     - "vendor/github.com/onsi/gomega**"
     - "vendor/github.com/onsi/ginkgo/**"
     - "vendor/golang.org/**"
