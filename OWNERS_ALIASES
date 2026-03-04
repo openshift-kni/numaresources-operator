@@ -13,6 +13,7 @@ aliases:
     - Tal-or
     - yanirq
   konflux-approvers:
+    - by2waysprojects
     - yanirq
     - shajmakh
     - rbaturov
