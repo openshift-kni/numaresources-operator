@@ -550,6 +550,19 @@ spec:
                     fieldRef:
                       fieldPath: metadata.namespace
                 image: quay.io/openshift-kni/numaresources-operator:4.22.999-snapshot
+                lifecycle:
+                  postStart:
+                    exec:
+                      command:
+                      - /bin/numaresources-operator
+                      - -handle-lifecycle-event
+                      - postStart
+                  preStop:
+                    exec:
+                      command:
+                      - /bin/numaresources-operator
+                      - -handle-lifecycle-event
+                      - preStop
                 livenessProbe:
                   httpGet:
                     path: /healthz
