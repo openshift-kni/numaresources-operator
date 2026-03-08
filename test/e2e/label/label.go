@@ -36,6 +36,24 @@ const (
 	Reboot Kind = "reboot_required"
 )
 
+// ClusterType is a label that specifies the cluster topology
+// required by the test
+type ClusterType = string
+
+const (
+	// MNO is a multi-node OpenShift cluster with dedicated worker nodes
+	// and unschedulable control-plane nodes.
+	MNO ClusterType = "mno"
+
+	// MNOMastersSchedulable is a multi-node OpenShift cluster with
+	// schedulable control-plane nodes and dedicated worker nodes.
+	MNOMastersSchedulable ClusterType = "mno-masters-schedulable"
+
+	// Compact is a cluster where control-plane and worker roles
+	// are on the same nodes, with control-plane scheduling enabled.
+	Compact ClusterType = "compact"
+)
+
 // Tier is a label to classify tests under specific grade/level
 // that should roughly describe the execution complexity, maintainer identity and processing criteria.
 type Tier = string
