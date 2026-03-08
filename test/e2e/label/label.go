@@ -36,6 +36,20 @@ const (
 	Reboot Kind = "reboot_required"
 )
 
+// ClusterType is a label that specifies the cluster topology
+// required by the test
+type ClusterType = string
+
+const (
+	// Compact means the test requires a compact cluster where
+	// all nodes are control-planes with scheduling enabled
+	Compact ClusterType = "compact"
+
+	// MNOMastersSchedulable means the test requires a multi-node OpenShift cluster
+	// with schedulable control-plane nodes and dedicated worker nodes
+	MNOMastersSchedulable ClusterType = "mno-masters-schedulable"
+)
+
 // Tier is a label to classify tests under specific grade/level
 // that should roughly describe the execution complexity, maintainer identity and processing criteria.
 type Tier = string
