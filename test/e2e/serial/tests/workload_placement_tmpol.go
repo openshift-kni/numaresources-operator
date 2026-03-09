@@ -113,8 +113,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 
 			nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtCandidates, tmPolicy, tmScope)
-			if len(nrts) != len(nrtCandidates) {
-				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", tmPolicy, len(nrts))
+			nrtsRequiredNum, nrtsFoundNum := len(nrtCandidates), len(nrts)
+			if nrtsFoundNum != nrtsRequiredNum {
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q and scope %q - required %d, found %d", tmPolicy, tmScope, nrtsRequiredNum, nrtsFoundNum)
 			}
 
 			By("filtering available nodes with allocatable resources on at least one NUMA zone that can match request")
@@ -376,8 +377,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			hostsRequired := 2
 
 			nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtList.Items, policyFuncs.policyName(), policyFuncs.scopeName())
-			if len(nrts) < hostsRequired {
-				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", policyFuncs.policyName(), len(nrts))
+			nrtsFoundNum := len(nrts)
+			if nrtsFoundNum < hostsRequired {
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q and scope %q - required %d, found %d", policyFuncs.policyName(), policyFuncs.scopeName(), hostsRequired, nrtsFoundNum)
 			}
 
 			Expect(unsuitableFreeRes).To(HaveLen(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))
@@ -1302,8 +1304,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			hostsRequired := 2
 
 			nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtList.Items, policyFuncs.policyName(), policyFuncs.scopeName())
-			if len(nrts) < hostsRequired {
-				e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", policyFuncs.policyName(), len(nrts))
+			nrtsFoundNum := len(nrts)
+			if nrtsFoundNum < hostsRequired {
+				e2efixture.Skipf(fxt, "not enough nodes with policy %q and scope %q - required %d, found %d", policyFuncs.policyName(), policyFuncs.scopeName(), hostsRequired, nrtsFoundNum)
 			}
 
 			Expect(unsuitableFreeRes).To(HaveLen(hostsRequired), "mismatch unsuitable resource declarations expected %d items, but found %d", hostsRequired, len(unsuitableFreeRes))

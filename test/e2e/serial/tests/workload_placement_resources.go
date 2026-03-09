@@ -95,8 +95,9 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 					RequiredResources: requiredRes,
 				})
 				nrts := e2enrt.FilterByTopologyManagerPolicyAndScope(nrtCandidates, tmPolicy, tmScope)
-				if len(nrts) != len(nrtCandidates) {
-					e2efixture.Skipf(fxt, "not enough nodes with policy %q - found %d", tmPolicy, len(nrts))
+				nrtsRequiredNum, nrtsFoundNum := len(nrtCandidates), len(nrts)
+				if nrtsFoundNum != nrtsRequiredNum {
+					e2efixture.Skipf(fxt, "not enough nodes with policy %q and scope %q - required %d, found %d", tmPolicy, tmScope, nrtsRequiredNum, nrtsFoundNum)
 				}
 
 				targetNodeName := setupNodes(fxt, ctx, nrtCandidates, requiredRes, expectedFreeRes)
