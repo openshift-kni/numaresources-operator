@@ -69,6 +69,15 @@ In case RTE pods are stuck in `CrashLoopBackOff` state after upgrade, and the fo
 
 Try the following steps to recover the pod's state:
 1. Upgrade the operator to latest minor release (x.y → x.z)
-2. Run [restore-selinux-context.sh](hack/restore-selinux-context.sh) script to restore the right security context.
+2. Run [restore-selinux-context-job.sh](hack/restore-selinux-context-job.sh) script to restore the right security context.
+3. Alternatively, you can use
+```bash
+./bin/make-job-foreach-ds \
+    -name "restore-selinux" \
+    -script hack/restore-selinux-context.sh \
+    -serviceaccount build-controller \
+    -namespace openshift-infra \
+    | oc create -f -
+```
 
 
