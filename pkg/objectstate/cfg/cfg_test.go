@@ -18,8 +18,10 @@ package cfg
 
 import (
 	"context"
-	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,8 +56,14 @@ func TestFromClient(t *testing.T) {
 		return
 	}
 
-	if !reflect.DeepEqual(mf.Existing.Config, &cm) {
-		t.Errorf("mismatching configs expected %v, got %v", cm, mf.Existing.Config)
+	// Compare ConfigMap, ignoring metadata fields the fake client may set and treating nil/empty maps as equal
+	opts := cmp.Options{
+		cmpopts.IgnoreFields(corev1.ConfigMap{}, "TypeMeta"),
+		cmpopts.IgnoreFields(metav1.ObjectMeta{}, "ResourceVersion", "UID", "Generation", "CreationTimestamp", "ManagedFields", "SelfLink"),
+		cmpopts.EquateEmpty(),
+	}
+	if !cmp.Equal(&cm, mf.Existing.Config, opts) {
+		t.Errorf("Config mismatch: want %+v, got %+v", &cm, mf.Existing.Config)
 	}
 
 	mf = FromClient(context.TODO(), fakeClient, "ns", "not-found")
