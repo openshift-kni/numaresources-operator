@@ -13,6 +13,7 @@ import (
 
 // define a fake device plugin
 type FakeDevicePlugin struct {
+	pluginapi.UnimplementedDevicePluginServer
 	Name string
 }
 
@@ -64,7 +65,8 @@ func (l FakeLister) Discover(pluginListCh chan dpm.PluginNameList) {
 
 func (l FakeLister) NewPlugin(name string) dpm.PluginInterface {
 	return &FakeDevicePlugin{
-		Name: name,
+		UnimplementedDevicePluginServer: pluginapi.UnimplementedDevicePluginServer{},
+		Name:                            name,
 	}
 }
 

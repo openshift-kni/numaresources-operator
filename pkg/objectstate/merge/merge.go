@@ -18,6 +18,7 @@ package merge
 
 import (
 	"errors"
+	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -146,7 +147,16 @@ func Labels(current, updated client.Object) (client.Object, error) {
 }
 
 func isSameKind(a, b client.Object) bool {
-	return a.GetObjectKind().GroupVersionKind().Kind == b.GetObjectKind().GroupVersionKind().Kind
+	if a == nil || b == nil {
+		return false
+	}
+	gvkA := a.GetObjectKind().GroupVersionKind()
+	gvkB := b.GetObjectKind().GroupVersionKind()
+	if gvkA.Kind != "" && gvkB.Kind != "" {
+		return gvkA == gvkB
+	}
+	// Fallback when either has empty GVK
+	return reflect.TypeOf(a) == reflect.TypeOf(b)
 }
 
 func preserveServiceAccountPullSecrets(original, mutated *corev1.ServiceAccount) {
