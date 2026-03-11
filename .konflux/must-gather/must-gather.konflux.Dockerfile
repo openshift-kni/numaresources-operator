@@ -1,3 +1,6 @@
+# this is used to prefetch the base image in the build pipeline
+ARG BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+
 # follow https://brewweb.engineering.redhat.com/brew/packageinfo?packageID=70135
 FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.24@sha256:3b2a8007ea0d48ce5a15127479cabfa226e55635b92f9012b5752f92c5293e61 as tool-builder
 
@@ -16,7 +19,7 @@ RUN mv /usr/bin/gather /usr/bin/gather_original
 RUN mkdir -p /usr/libexec/must-gather/numaresources-operator && \
     cp /must-gather/collection-scripts/* /usr/libexec/must-gather/numaresources-operator/
 
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:c7d44146f826037f6873d99da479299b889473492d3c1ab8af86f08af04ec8a0
+FROM ${BASE_IMAGE}
 
 ARG OPENSHIFT_VERSION
 
