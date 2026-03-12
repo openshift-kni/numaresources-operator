@@ -74,7 +74,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2026-02-27T11:38:10Z"
+    createdAt: "2026-03-12T10:30:16Z"
     features.operators.openshift.io/tls-profiles: "true"
     olm.skipRange: '>=4.21.0 <4.22.0'
     operatorframework.io/cluster-monitoring: "true"
@@ -576,8 +576,7 @@ spec:
                   httpGet:
                     path: /healthz
                     port: 8081
-                  initialDelaySeconds: 15
-                  periodSeconds: 20
+                  periodSeconds: 10
                 name: manager
                 ports:
                 - containerPort: 8080
@@ -595,6 +594,12 @@ spec:
                     memory: 20Mi
                 securityContext:
                   allowPrivilegeEscalation: false
+                startupProbe:
+                  failureThreshold: 3
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  periodSeconds: 10
                 terminationMessagePolicy: FallbackToLogsOnError
                 volumeMounts:
                 - mountPath: /certs
