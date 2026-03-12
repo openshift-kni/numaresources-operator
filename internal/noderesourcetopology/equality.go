@@ -17,6 +17,7 @@
 package noderesourcetopology
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -102,12 +103,15 @@ func compareMemoryNodeLevel(zonesA, zonesB nrtv1alpha2.ZoneList, isRebootTest bo
 	a := memoryTotals{capacity: totalCapacityA, available: totalAvailableA, allocatable: totalAllocatableA}
 	b := memoryTotals{capacity: totalCapacityB, available: totalAvailableB, allocatable: totalAllocatableB}
 
-	var err error
+	capOK := totalCapacityA.Cmp(totalCapacityB) == 0
+	availOK := totalAvailableA.Cmp(totalAvailableB) == 0
+	allocOK := totalAllocatableA.Cmp(totalAllocatableB) == 0
+
 	if isRebootTest {
 		klog.InfoS("comparing memory resources on node level within allowed deviation", "tolerance", nodeLevelDev)
-		capOK := QuantityAbsCmp(totalCapacityA, totalCapacityB, nodeLevelDev)
-		availOK := QuantityAbsCmp(totalAvailableA, totalAvailableB, nodeLevelDev)
-		allocOK := QuantityAbsCmp(totalAllocatableA, totalAllocatableB, nodeLevelDev)
+		capOK = QuantityAbsCmp(totalCapacityA, totalCapacityB, nodeLevelDev)
+		availOK = QuantityAbsCmp(totalAvailableA, totalAvailableB, nodeLevelDev)
+		allocOK = QuantityAbsCmp(totalAllocatableA, totalAllocatableB, nodeLevelDev)
 
 		capDelta := totalCapacityB.DeepCopy()
 		capDelta.Sub(totalCapacityA)
@@ -127,16 +131,9 @@ func compareMemoryNodeLevel(zonesA, zonesB nrtv1alpha2.ZoneList, isRebootTest bo
 				"availableOK", availOK,
 				"allocatableOK", allocOK)
 		}
-
-		err = collectMemoryMismatchErrors(capOK, availOK, allocOK, a, b)
-	} else {
-		capOK := totalCapacityA.Cmp(totalCapacityB) == 0
-		availOK := totalAvailableA.Cmp(totalAvailableB) == 0
-		allocOK := totalAllocatableA.Cmp(totalAllocatableB) == 0
-
-		err = collectMemoryMismatchErrors(capOK, availOK, allocOK, a, b)
 	}
 
+	err := collectMemoryMismatchErrors(capOK, availOK, allocOK, a, b)
 	return err == nil, err
 }
 
@@ -278,18 +275,15 @@ func QuantityAbsCmp(a, b, dev resource.Quantity) bool {
 }
 
 func collectMemoryMismatchErrors(capOK, availOK, allocOK bool, a, b memoryTotals) error {
-	var errMsgs []string
+	var errs []error
 	if !capOK {
-		errMsgs = append(errMsgs, fmt.Sprintf("capacity: initial=%v updated=%v", a.capacity, b.capacity))
+		errs = append(errs, fmt.Errorf("mismatched total memory capacity: initial=%v updated=%v", a.capacity, b.capacity))
 	}
 	if !availOK {
-		errMsgs = append(errMsgs, fmt.Sprintf("available: initial=%v updated=%v", a.available, b.available))
+		errs = append(errs, fmt.Errorf("mismatched total memory available: initial=%v updated=%v", a.available, b.available))
 	}
 	if !allocOK {
-		errMsgs = append(errMsgs, fmt.Sprintf("allocatable: initial=%v updated=%v", a.allocatable, b.allocatable))
+		errs = append(errs, fmt.Errorf("mismatched total memory allocatable: initial=%v updated=%v", a.allocatable, b.allocatable))
 	}
-	if len(errMsgs) > 0 {
-		return fmt.Errorf("mismatched total memory: %s", strings.Join(errMsgs, "; "))
-	}
-	return nil
+	return errors.Join(errs...)
 }
