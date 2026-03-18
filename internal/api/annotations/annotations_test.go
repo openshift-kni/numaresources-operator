@@ -170,23 +170,30 @@ func TestIsSchedulerQOSRequestBurstable(t *testing.T) {
 			expected:    false,
 		},
 		{
-			description: "annotation set to anything but not \"burstable\" means the requested QoS is guaranteed",
+			description: "annotation set to \"guaranteed\" means the requested QoS is Guaranteed like pre-4.22 defaults",
 			annotations: map[string]string{
-				SchedulerQOSRequestAnnotation: "guaranteed",
+				SchedulerQOSRequestAnnotation: SchedulerQOSRequestGuaranteed,
+			},
+			expected: true,
+		},
+		{
+			description: "request burstable QoS is a NOP",
+			annotations: map[string]string{
+				SchedulerQOSRequestAnnotation: "burstable",
 			},
 			expected: false,
 		},
 		{
-			description: "request burstable QoS",
+			description: "any unrecognized annotation makes for burstable QoS",
 			annotations: map[string]string{
-				SchedulerQOSRequestAnnotation: SchedulerQOSRequestBurstable,
+				SchedulerQOSRequestAnnotation: "foobar",
 			},
-			expected: true,
+			expected: false,
 		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
-			if got := IsSchedulerQOSRequestBurstable(tc.annotations); got != tc.expected {
+			if got := IsSchedulerQOSRequestGuaranteed(tc.annotations); got != tc.expected {
 				t.Errorf("expected %v got %v", tc.expected, got)
 			}
 		})

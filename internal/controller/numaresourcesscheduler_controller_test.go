@@ -797,19 +797,15 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("should keep setting the legacy guaranteed values by default", func(ctx context.Context) {
+		It("should set QOS burstable values by default", func(ctx context.Context) {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
 
 			expectedRR := corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    mustParseResource("600m"),
-					corev1.ResourceMemory: mustParseResource("1200Mi"),
-				},
-				Limits: corev1.ResourceList{
-					corev1.ResourceCPU:    mustParseResource("600m"),
-					corev1.ResourceMemory: mustParseResource("1200Mi"),
+					corev1.ResourceCPU:    mustParseResource("150m"),
+					corev1.ResourceMemory: mustParseResource("500Mi"),
 				},
 			}
 
@@ -818,37 +814,10 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			Expect(dp).To(HaveTheSameResourceRequirements(expectedRR))
 		})
 
-		It("should keep setting the legacy guaranteed values explicitly", func(ctx context.Context) {
+		It("should set the burstable QOS explicitly", func(ctx context.Context) {
 			nrs := nrs.DeepCopy()
 			nrs.Annotations = map[string]string{
-				annotations.SchedulerQOSRequestAnnotation: "guaranteed",
-			}
-			Eventually(reconciler.Client.Update).WithArguments(ctx, nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(Succeed())
-
-			key := client.ObjectKeyFromObject(nrs)
-			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
-			Expect(err).ToNot(HaveOccurred())
-
-			expectedRR := corev1.ResourceRequirements{
-				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    mustParseResource("600m"),
-					corev1.ResourceMemory: mustParseResource("1200Mi"),
-				},
-				Limits: corev1.ResourceList{
-					corev1.ResourceCPU:    mustParseResource("600m"),
-					corev1.ResourceMemory: mustParseResource("1200Mi"),
-				},
-			}
-
-			dp := &appsv1.Deployment{}
-			Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
-			Expect(dp).To(HaveTheSameResourceRequirements(expectedRR))
-		})
-
-		It("should setting the burstable values only if requested", func(ctx context.Context) {
-			nrs := nrs.DeepCopy()
-			nrs.Annotations = map[string]string{
-				annotations.SchedulerQOSRequestAnnotation: annotations.SchedulerQOSRequestBurstable,
+				annotations.SchedulerQOSRequestAnnotation: "burstable",
 			}
 			Eventually(reconciler.Client.Update).WithArguments(ctx, nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(Succeed())
 
@@ -860,6 +829,33 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				Requests: corev1.ResourceList{
 					corev1.ResourceCPU:    mustParseResource("150m"),
 					corev1.ResourceMemory: mustParseResource("500Mi"),
+				},
+			}
+
+			dp := &appsv1.Deployment{}
+			Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
+			Expect(dp).To(HaveTheSameResourceRequirements(expectedRR))
+		})
+
+		It("should setting the legacy guaranteed QOS values only if requested", func(ctx context.Context) {
+			nrs := nrs.DeepCopy()
+			nrs.Annotations = map[string]string{
+				annotations.SchedulerQOSRequestAnnotation: annotations.SchedulerQOSRequestGuaranteed,
+			}
+			Eventually(reconciler.Client.Update).WithArguments(ctx, nrs).WithPolling(30 * time.Second).WithTimeout(5 * time.Minute).Should(Succeed())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			expectedRR := corev1.ResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource("600m"),
+					corev1.ResourceMemory: mustParseResource("1200Mi"),
+				},
+				Limits: corev1.ResourceList{
+					corev1.ResourceCPU:    mustParseResource("600m"),
+					corev1.ResourceMemory: mustParseResource("1200Mi"),
 				},
 			}
 

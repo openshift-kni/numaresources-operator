@@ -40,9 +40,10 @@ const (
 	NRTAPIFromCluster          = "cluster" // trust whatever it is already in the cluster, if at all
 
 	// introduced in: 4.20
-	// remove in: 4.22 (tentative)
+	// burstable by default in: 4.22
+	// remove (only burstable, always) in: 4.24
 	SchedulerQOSRequestAnnotation = "config.numa-operator.openshift.io/scheduler-qos-request"
-	SchedulerQOSRequestBurstable  = "burstable"
+	SchedulerQOSRequestGuaranteed = "guaranteed"
 )
 
 func IsCustomPolicyEnabled(annot map[string]string) bool {
@@ -73,8 +74,8 @@ func IsNRTAPIDefinitionCluster(annot map[string]string) bool {
 	return false
 }
 
-func IsSchedulerQOSRequestBurstable(annot map[string]string) bool {
-	if v, ok := annot[SchedulerQOSRequestAnnotation]; ok && v == SchedulerQOSRequestBurstable {
+func IsSchedulerQOSRequestGuaranteed(annot map[string]string) bool {
+	if v, ok := annot[SchedulerQOSRequestAnnotation]; ok && v == SchedulerQOSRequestGuaranteed {
 		return true
 	}
 	return false

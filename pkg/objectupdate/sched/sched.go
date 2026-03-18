@@ -112,16 +112,16 @@ func SchedulerResourcesRequest(dp *appsv1.Deployment, instance *nropv1.NUMAResou
 	defer func(c *corev1.Container) {
 		klog.V(2).InfoS("scheduler resources", "requests", intreslist.ToString(c.Resources.Requests), "limits", intreslist.ToString(c.Resources.Limits))
 	}(cnt)
-	// legacy values
-	cpuVal := "600m"
-	memVal := "1200Mi"
-	enforceLimits := true
-	if annotations.IsSchedulerQOSRequestBurstable(instance.Annotations) {
-		cpuVal = "150m"
-		memVal = "500Mi"
-		enforceLimits = false
+	cpuVal := "150m"
+	memVal := "500Mi"
+	desiredQOS := corev1.PodQOSBurstable
+	if annotations.IsSchedulerQOSRequestGuaranteed(instance.Annotations) {
+		// legacy values
+		cpuVal = "600m"
+		memVal = "1200Mi"
+		desiredQOS = corev1.PodQOSGuaranteed
 	}
-	rr, err := makeResourceRequirements(cpuVal, memVal, enforceLimits)
+	rr, err := makeResourceRequirements(cpuVal, memVal, desiredQOS)
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,7 @@ func SchedulerResourcesRequest(dp *appsv1.Deployment, instance *nropv1.NUMAResou
 	return nil
 }
 
-func makeResourceRequirements(cpuVal, memVal string, enforceLimits bool) (corev1.ResourceRequirements, error) {
+func makeResourceRequirements(cpuVal, memVal string, desiredQOS corev1.PodQOSClass) (corev1.ResourceRequirements, error) {
 	rr := corev1.ResourceRequirements{}
 	cpuQty, err := resource.ParseQuantity(cpuVal)
 	if err != nil {
@@ -143,11 +143,9 @@ func makeResourceRequirements(cpuVal, memVal string, enforceLimits bool) (corev1
 		corev1.ResourceCPU:    cpuQty,
 		corev1.ResourceMemory: memQty,
 	}
-	if !enforceLimits {
-		rr.Requests = res
-		return rr, nil
+	rr.Requests = res
+	if desiredQOS == corev1.PodQOSGuaranteed {
+		rr.Limits = res.DeepCopy()
 	}
-	rr.Limits = res
-	rr.Requests = res.DeepCopy() // non necessary, added as nicety
 	return rr, nil
 }

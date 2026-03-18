@@ -432,12 +432,8 @@ func TestSchedulerResourcesRequest(t *testing.T) {
 			initialDp: dpMinimal,
 			expectedRR: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    mustParseResource(t, "600m"),
-					corev1.ResourceMemory: mustParseResource(t, "1200Mi"),
-				},
-				Limits: corev1.ResourceList{
-					corev1.ResourceCPU:    mustParseResource(t, "600m"),
-					corev1.ResourceMemory: mustParseResource(t, "1200Mi"),
+					corev1.ResourceCPU:    mustParseResource(t, "150m"),
+					corev1.ResourceMemory: mustParseResource(t, "500Mi"),
 				},
 			},
 		},
@@ -451,12 +447,8 @@ func TestSchedulerResourcesRequest(t *testing.T) {
 			initialDp: dpMinimal,
 			expectedRR: corev1.ResourceRequirements{
 				Requests: corev1.ResourceList{
-					corev1.ResourceCPU:    mustParseResource(t, "600m"),
-					corev1.ResourceMemory: mustParseResource(t, "1200Mi"),
-				},
-				Limits: corev1.ResourceList{
-					corev1.ResourceCPU:    mustParseResource(t, "600m"),
-					corev1.ResourceMemory: mustParseResource(t, "1200Mi"),
+					corev1.ResourceCPU:    mustParseResource(t, "150m"),
+					corev1.ResourceMemory: mustParseResource(t, "500Mi"),
 				},
 			},
 		},
