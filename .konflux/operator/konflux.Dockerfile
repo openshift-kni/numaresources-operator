@@ -6,7 +6,7 @@ COPY . .
 # Build
 RUN make binary-all
 
-FROM registry.redhat.io/ubi8/ubi-minimal:latest@sha256:bfbbc560b34efa2c009a6a000d9b428c201df072b39635f2360e71906ec2011f
+FROM registry.redhat.io/ubi8/ubi-minimal:latest@sha256:1352e7792cd20b906b6f3326f2ce714ae9f2ccf6ba06e7132759afa5efe26e3b
 
 ARG OPENSHIFT_VERSION
 
