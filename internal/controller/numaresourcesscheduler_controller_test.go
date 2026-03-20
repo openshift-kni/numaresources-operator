@@ -18,8 +18,10 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -50,6 +52,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
+	inttls "github.com/openshift-kni/numaresources-operator/internal/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
@@ -76,6 +79,10 @@ func NewFakeNUMAResourcesSchedulerReconciler(initObjects ...runtime.Object) (*NU
 		Scheme:             scheme.Scheme,
 		SchedulerManifests: schedMf,
 		Namespace:          testNamespace,
+		TLSConfig: func(tlsconfig *tls.Config) {
+			tlsconfig.MinVersion = tls.VersionTLS13
+			tlsconfig.CipherSuites = []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256}
+		},
 	}, nil
 }
 
@@ -984,6 +991,50 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 					Platform: platform.HyperShift,
 					Version:  fixedVersion,
 				}))
+		})
+	})
+
+	Context("with TLS settings in deployment", func() {
+		var nrs *nropv1.NUMAResourcesScheduler
+		var nrsKey client.ObjectKey
+		var reconciler *NUMAResourcesSchedulerReconciler
+
+		BeforeEach(func() {
+			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 5*time.Second)
+			nrsKey = client.ObjectKeyFromObject(nrs)
+			initObjects := []runtime.Object{nrs}
+			initObjects = append(initObjects, fakeNodes(3, 3)...)
+			var err error
+			reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
+			Expect(err).ToNot(HaveOccurred())
+
+		})
+
+		It("should set the TLS arguments in the deployment by default and reflect updates", func() {
+			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nrsKey})
+			Expect(err).ToNot(HaveOccurred())
+
+			tlsconfig := &tls.Config{}
+			reconciler.TLSConfig(tlsconfig)
+
+			dp := &appsv1.Deployment{}
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
+			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-min-version=" + inttls.VersionToString(tlsconfig.MinVersion)))
+			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-cipher-suites=" + strings.Join(inttls.CipherSuitesToString(tlsconfig.CipherSuites), ",")))
+
+			minVersion := uint16(tls.VersionTLS13)
+			cipherSuites := []uint16{tls.TLS_AES_128_GCM_SHA256, tls.TLS_AES_256_GCM_SHA384}
+
+			reconciler.TLSConfig = func(tlsconfig *tls.Config) {
+				tlsconfig.MinVersion = minVersion
+				tlsconfig.CipherSuites = cipherSuites
+			}
+			_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nrsKey})
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
+			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-min-version=" + inttls.VersionToString(minVersion)))
+			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-cipher-suites=" + strings.Join(inttls.CipherSuitesToString(cipherSuites), ",")))
 		})
 	})
 })

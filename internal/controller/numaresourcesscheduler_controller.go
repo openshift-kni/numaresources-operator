@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"time"
 
@@ -73,6 +74,7 @@ type NUMAResourcesSchedulerReconciler struct {
 	SchedulerManifests schedmanifests.Manifests
 	Namespace          string
 	PlatformInfo       platforminfo.PlatformInfo
+	TLSConfig          func(*tls.Config)
 }
 
 // Namespace Scoped
@@ -351,6 +353,12 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	}
 
 	if err := schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec); err != nil {
+		return nropv1.NUMAResourcesSchedulerStatus{}, err
+	}
+
+	tlsconfig := &tls.Config{}
+	r.TLSConfig(tlsconfig)
+	if err := schedupdate.DeploymentTLSSettings(r.SchedulerManifests.Deployment, tlsconfig); err != nil {
 		return nropv1.NUMAResourcesSchedulerStatus{}, err
 	}
 

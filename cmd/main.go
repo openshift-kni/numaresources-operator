@@ -63,6 +63,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/controller"
 	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
+	inttls "github.com/openshift-kni/numaresources-operator/internal/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
@@ -325,8 +326,10 @@ func main() {
 	}
 
 	tlsConfig, unsupportedCiphers := ctrltls.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
-	if len(unsupportedCiphers) > 0 {
-		klog.InfoS("TLS profile configuration contains unsupported ciphers that will be ignored", "unsupported", unsupportedCiphers)
+	err = inttls.ValidateConfig(tlsConfig, unsupportedCiphers)
+	if err != nil {
+		klog.ErrorS(err, "invalid TLS config")
+		exitWithCancel(cancel, 1)
 	}
 
 	webhookTLSOpts := append(webhookTLSOpts(params.enableHTTP2), tlsConfig)
@@ -424,6 +427,7 @@ func main() {
 			SchedulerManifests: schedMf,
 			Namespace:          namespace,
 			PlatformInfo:       platforminfo.New(discoveredCluster.Platform, discoveredCluster.LongVersion),
+			TLSConfig:          tlsConfig,
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
 			exitWithCancel(cancel, 1)
