@@ -30,6 +30,7 @@ import (
 	k8swgschedupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/sched"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	intaff "github.com/openshift-kni/numaresources-operator/internal/affinity"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	intreslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
@@ -99,6 +100,38 @@ func DeploymentTLSSettings(dp *appsv1.Deployment, tlsSettings objtls.Settings) e
 	cnt.Args = flags.Argv()
 
 	klog.V(3).InfoS("Scheduler TLS settings", "minVersion", tlsSettings.MinVersion, "cipherSuites", tlsSettings.CipherSuites)
+	return nil
+}
+
+// DeploymentAffinitySettings configures required pod anti-affinity on the scheduler
+// deployment only when the CR leaves replica count to autodetection (Replicas unset or 0).
+// An explicit non-zero Replicas value means the user chose a replica count and keeps
+// full control (no required pod anti-affinity).
+func DeploymentAffinitySettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) error {
+	affinityCopy := dp.Spec.Template.Spec.Affinity.DeepCopy()
+	if spec.Replicas != nil && *spec.Replicas != 0 {
+		if affinityCopy != nil && affinityCopy.PodAntiAffinity != nil {
+			dp.Spec.Template.Spec.Affinity.PodAntiAffinity = nil
+		}
+		return nil
+	}
+
+	labels := dp.Spec.Template.Labels
+	if len(labels) == 0 {
+		return intaff.ErrNoPodTemplateLabels
+	}
+
+	if affinityCopy == nil {
+		dp.Spec.Template.Spec.Affinity = &corev1.Affinity{}
+	}
+
+	podAntiAffinity, err := intaff.GetPodAntiAffinity(labels)
+	if err != nil {
+		return err
+	}
+
+	dp.Spec.Template.Spec.Affinity.PodAntiAffinity = podAntiAffinity
+	klog.V(3).InfoS("Scheduler affinity", "podAntiAffinity", dp.Spec.Template.Spec.Affinity.PodAntiAffinity)
 	return nil
 }
 

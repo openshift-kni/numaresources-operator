@@ -48,6 +48,7 @@ import (
 	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	intaff "github.com/openshift-kni/numaresources-operator/internal/affinity"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
@@ -1031,6 +1032,55 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-cipher-suites=" + updatedSettings.CipherSuites))
 		})
 	})
+
+	Context("when setting the scheduler pod anti affinity", func() {
+		type testCase struct {
+			replicasCount  *int32
+			expectAffinity bool
+		}
+
+		DescribeTable("should have PodAntiAffinity for scheduler Deployment when replicas are not set", func(ctx context.Context, tc testCase) {
+			nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+
+			nrs.Spec.Replicas = tc.replicasCount
+			initObjects := []runtime.Object{nrs}
+			initObjects = append(initObjects, fakeNodes(3, 3)...)
+			reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
+			Expect(err).ToNot(HaveOccurred())
+			// Baseline node affinity comes from the scheduler deployment manifest; reconcile must preserve it.
+			expectedNodeAff := reconciler.SchedulerManifests.Deployment.Spec.Template.Spec.Affinity.NodeAffinity.DeepCopy()
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			dp := &appsv1.Deployment{}
+			Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
+			Expect(dp.Spec.Template.Labels).ToNot(BeEmpty())
+
+			affinity := dp.Spec.Template.Spec.Affinity
+			Expect(affinity).ToNot(BeNil())
+			Expect(affinity.NodeAffinity).To(BeEquivalentTo(expectedNodeAff))
+
+			if !tc.expectAffinity {
+				Expect(affinity.PodAntiAffinity).To(BeNil())
+				return
+			}
+
+			expectedPodAntiAff, err := intaff.GetPodAntiAffinity(dp.Spec.Template.Labels)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(expectedPodAntiAff).ToNot(BeNil())
+
+			podAntiAffinity := affinity.PodAntiAffinity
+			Expect(podAntiAffinity).ToNot(BeNil())
+			Expect(podAntiAffinity).To(BeEquivalentTo(expectedPodAntiAff))
+		},
+			Entry("when replicas are not set, expected affinity", testCase{expectAffinity: true}),
+			Entry("when replicas are set and zero, expected affinity", testCase{replicasCount: ptr.To(int32(0)), expectAffinity: true}),
+			Entry("when replicas are set and non-zero, expected no affinity", testCase{replicasCount: ptr.To(int32(1)), expectAffinity: false}),
+		)
+	})
+
 })
 
 var _ = Describe("Test computeSchedulerReplicas", func() {
