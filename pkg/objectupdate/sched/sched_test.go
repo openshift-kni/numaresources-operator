@@ -24,6 +24,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -628,6 +630,123 @@ func TestDeploymentTLSSettingsRepeated(t *testing.T) {
 
 	if !reflect.DeepEqual(firstArgs, secondArgs) {
 		t.Errorf("duplicates found in TLS args\nfirst:  %v\nsecond: %v", firstArgs, secondArgs)
+	}
+}
+
+func TestDeploymentAffinitySettings(t *testing.T) {
+	explicitReplicas := int32(3)
+	autodetectReplicas := int32(0)
+	expectedAffinity := &corev1.Affinity{
+		PodAntiAffinity: &corev1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchLabels: map[string]string{"app": "scheduler"},
+					},
+					TopologyKey: "kubernetes.io/hostname",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		name             string
+		dp               *appsv1.Deployment
+		spec             nropv1.NUMAResourcesSchedulerSpec
+		expectedAffinity bool
+		expectedErr      error
+	}{
+		{
+			name: "replicas set and non-zero skips affinity",
+			dp: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "dp1",
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "scheduler"},
+						},
+					},
+				},
+			},
+			spec:             nropv1.NUMAResourcesSchedulerSpec{Replicas: &explicitReplicas},
+			expectedAffinity: false,
+		},
+		{
+			name: "replicas nil sets affinity",
+			dp: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "dp1",
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "scheduler"},
+						},
+					},
+				},
+			},
+			spec:             nropv1.NUMAResourcesSchedulerSpec{},
+			expectedAffinity: true,
+		},
+		{
+			name: "replicas zero sets affinity",
+			dp: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "dp1",
+				},
+				Spec: appsv1.DeploymentSpec{
+					Template: corev1.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"app": "scheduler"},
+						},
+					},
+				},
+			},
+			spec:             nropv1.NUMAResourcesSchedulerSpec{Replicas: &autodetectReplicas},
+			expectedAffinity: true,
+		},
+		{
+			name: "no template labels returns error",
+			dp: &appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "dp1",
+				},
+			},
+			spec:        nropv1.NUMAResourcesSchedulerSpec{},
+			expectedErr: fmt.Errorf("no labels provided for PodAffinity"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := DeploymentAffinitySettings(tt.dp, tt.spec)
+
+			if err == nil && tt.expectedErr != nil {
+				t.Fatalf("expected error %v but received nil", tt.expectedErr)
+			}
+
+			if err != nil && tt.expectedErr == nil {
+				t.Fatalf("unexpected error %v", err)
+			}
+
+			if tt.expectedErr != nil {
+				if err.Error() != tt.expectedErr.Error() {
+					t.Fatalf("mismatching errors: expected %v got %v", tt.expectedErr, err)
+				}
+			}
+			if !tt.expectedAffinity {
+				if tt.dp.Spec.Template.Spec.Affinity != nil {
+					t.Fatalf("expected no affinity but got %v", tt.dp.Spec.Template.Spec.Affinity)
+				}
+				return
+			}
+
+			if diff := cmp.Diff(expectedAffinity, tt.dp.Spec.Template.Spec.Affinity); diff != "" {
+				t.Errorf("affinity mismatch (-expected +got):\n%s", diff)
+			}
+		})
 	}
 }
 

@@ -1031,6 +1031,71 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-cipher-suites=" + updatedSettings.CipherSuites))
 		})
 	})
+
+	Context("when setting the scheduler pod anti affinity", func() {
+		DescribeTable("should have PodAntiAffinity for scheduler Deployment when replicas are not set", func(ctx context.Context, replicas *int32) {
+			nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+			expectAffinity := true
+			if replicas != nil && *replicas != 0 {
+				expectAffinity = false
+			}
+			nrs.Spec.Replicas = replicas
+			initObjects := []runtime.Object{nrs}
+			initObjects = append(initObjects, fakeNodes(3, 3)...)
+			reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
+			Expect(err).ToNot(HaveOccurred())
+
+			key := client.ObjectKeyFromObject(nrs)
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			dp := &appsv1.Deployment{}
+			Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
+			Expect(dp.Spec.Template.Labels).ToNot(BeEmpty())
+
+			Expect(dp.Spec.Template.Spec.Affinity).ToNot(BeNil())
+			// should preservenode affinity
+			expectedNodeAff := &corev1.NodeAffinity{
+				PreferredDuringSchedulingIgnoredDuringExecution: []corev1.PreferredSchedulingTerm{
+					{
+						Weight: 1,
+						Preference: corev1.NodeSelectorTerm{
+							MatchExpressions: []corev1.NodeSelectorRequirement{
+								{
+									Key:      "node-role.kubernetes.io/control-plane",
+									Operator: corev1.NodeSelectorOpExists,
+								},
+							},
+						},
+					},
+				},
+			}
+			Expect(dp.Spec.Template.Spec.Affinity.NodeAffinity).To(Equal(expectedNodeAff))
+
+			if !expectAffinity {
+				Expect(dp.Spec.Template.Spec.Affinity.PodAntiAffinity).To(BeNil())
+				return
+			}
+
+			expectedPodAntiAff := corev1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: dp.Spec.Template.Labels,
+						},
+						TopologyKey: "kubernetes.io/hostname",
+					},
+				},
+			}
+			Expect(dp.Spec.Template.Spec.Affinity.PodAntiAffinity).ToNot(BeNil())
+			Expect(*dp.Spec.Template.Spec.Affinity.PodAntiAffinity).To(Equal(expectedPodAntiAff))
+		},
+			Entry("when replicas are not set, expected affinity", nil),
+			Entry("when replicas are set and zero, expected affinity", ptr.To(int32(0))),
+			Entry("when replicas are set and non-zero, expected no affinity", ptr.To(int32(1))),
+		)
+	})
+
 })
 
 var _ = Describe("Test computeSchedulerReplicas", func() {

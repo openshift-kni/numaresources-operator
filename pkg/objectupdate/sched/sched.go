@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
@@ -99,6 +100,33 @@ func DeploymentTLSSettings(dp *appsv1.Deployment, tlsSettings objtls.Settings) e
 	cnt.Args = flags.Argv()
 
 	klog.V(3).InfoS("Scheduler TLS settings", "minVersion", tlsSettings.MinVersion, "cipherSuites", tlsSettings.CipherSuites)
+	return nil
+}
+
+func DeploymentAffinitySettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) error {
+	if spec.Replicas != nil && *spec.Replicas != 0 {
+		return nil
+	}
+
+	labels := dp.Spec.Template.Labels
+	if len(labels) == 0 {
+		return fmt.Errorf("no labels provided for PodAffinity")
+	}
+
+	if dp.Spec.Template.Spec.Affinity == nil {
+		dp.Spec.Template.Spec.Affinity = &corev1.Affinity{}
+	}
+
+	dp.Spec.Template.Spec.Affinity.PodAntiAffinity = &corev1.PodAntiAffinity{
+		RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+			{
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: labels,
+				},
+				TopologyKey: "kubernetes.io/hostname",
+			},
+		},
+	}
 	return nil
 }
 
