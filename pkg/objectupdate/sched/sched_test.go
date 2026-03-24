@@ -106,10 +106,17 @@ func TestUpdateDeploymentImageSettings(t *testing.T) {
 	dp := dpMinimal.DeepCopy()
 	podSpec := &dp.Spec.Template.Spec
 	for _, tc := range testCases {
-		DeploymentImageSettings(dp, tc.imageSpec)
+		if err := DeploymentImageSettings(dp, tc.imageSpec); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		if podSpec.Containers[0].Image != tc.imageSpec {
 			t.Errorf("failed to update deployemt image, expected: %q actual: %q", tc.imageSpec, podSpec.Containers[0].Image)
 		}
+	}
+
+	dp.Spec.Template.Spec.Containers[0].Name = "other"
+	if err := DeploymentImageSettings(dp, "quay.io/bar/image:v2"); err == nil {
+		t.Fatalf("expected error but got nil")
 	}
 }
 
@@ -409,11 +416,19 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dp := tc.initialDp.DeepCopy()
-			DeploymentEnvVarSettings(dp, tc.spec)
+			if err := DeploymentEnvVarSettings(dp, tc.spec); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 			if !reflect.DeepEqual(*dp, tc.expectedDp) {
 				t.Errorf("got=%s expected %s", toJSON(dp), toJSON(tc.expectedDp))
 			}
 		})
+	}
+
+	dp := dpMinimal.DeepCopy()
+	dp.Spec.Template.Spec.Containers[0].Name = "other"
+	if err := DeploymentEnvVarSettings(dp, nropv1.NUMAResourcesSchedulerSpec{}); err == nil {
+		t.Fatalf("expected error but got nil")
 	}
 }
 

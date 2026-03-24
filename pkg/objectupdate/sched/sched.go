@@ -45,21 +45,20 @@ const (
 // TODO: we should inject also the mount point. As it is now, the information is split between the manifest
 // and the updating logic, causing unnecessary friction. This code needs to know too much what's in the manifest.
 
-func DeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) {
+func DeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) error {
 	cnt := k8swgobjupdate.FindContainerByName(dp.Spec.Template.Spec.Containers, MainContainerName)
 	if cnt == nil {
-		klog.ErrorS(nil, "cannot find container", "name", MainContainerName)
-		return
+		return fmt.Errorf("cannot find container %q", MainContainerName)
 	}
 	cnt.Image = userImageSpec
 	klog.V(3).InfoS("Scheduler image", "reason", "user-provided", "pullSpec", userImageSpec)
+	return nil
 }
 
-func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) {
+func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) error {
 	cnt := k8swgobjupdate.FindContainerByName(dp.Spec.Template.Spec.Containers, MainContainerName)
 	if cnt == nil {
-		klog.ErrorS(nil, "cannot find container", "name", MainContainerName)
-		return
+		return fmt.Errorf("cannot find container %q", MainContainerName)
 	}
 
 	cacheResyncDebug := *spec.CacheResyncDebug
@@ -68,6 +67,7 @@ func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSc
 	} else {
 		envvar.DeleteFromContainer(cnt, envvar.PFPStatusDump)
 	}
+	return nil
 }
 
 func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
