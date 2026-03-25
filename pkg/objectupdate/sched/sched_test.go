@@ -35,6 +35,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
+	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
 
 var dpMinimal = &appsv1.Deployment{
@@ -530,7 +531,7 @@ func TestDeploymentTLSSettings(t *testing.T) {
 	type testCase struct {
 		name         string
 		initialArgs  []string
-		tlsConfig    *tls.Config
+		tlsSettings  objtls.Settings
 		expectedArgs []string
 	}
 
@@ -538,10 +539,10 @@ func TestDeploymentTLSSettings(t *testing.T) {
 		{
 			name:        "MinVersion and CipherSuites",
 			initialArgs: baseArgs,
-			tlsConfig: &tls.Config{
+			tlsSettings: objtls.NewSettings(&tls.Config{
 				MinVersion:   tls.VersionTLS12,
 				CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384},
-			},
+			}),
 			expectedArgs: []string{
 				"--config=/etc/kubernetes/config.yaml",
 				"--tls-min-version=VersionTLS12",
@@ -551,10 +552,10 @@ func TestDeploymentTLSSettings(t *testing.T) {
 		{
 			name:        "TLS 1.3 with ciphers",
 			initialArgs: baseArgs,
-			tlsConfig: &tls.Config{
+			tlsSettings: objtls.NewSettings(&tls.Config{
 				MinVersion:   tls.VersionTLS13,
 				CipherSuites: []uint16{tls.TLS_AES_128_GCM_SHA256},
-			},
+			}),
 			expectedArgs: []string{
 				"--config=/etc/kubernetes/config.yaml",
 				"--tls-min-version=VersionTLS13",
@@ -568,10 +569,10 @@ func TestDeploymentTLSSettings(t *testing.T) {
 				"--tls-min-version=VersionTLS10",
 				"--tls-cipher-suites=TLS_RSA_WITH_AES_128_CBC_SHA",
 			},
-			tlsConfig: &tls.Config{
+			tlsSettings: objtls.NewSettings(&tls.Config{
 				MinVersion:   tls.VersionTLS13,
 				CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
-			},
+			}),
 			expectedArgs: []string{
 				"--config=/etc/kubernetes/config.yaml",
 				"--tls-min-version=VersionTLS13",
@@ -585,7 +586,7 @@ func TestDeploymentTLSSettings(t *testing.T) {
 			dp := dpMinimal.DeepCopy()
 			dp.Spec.Template.Spec.Containers[0].Args = append([]string{}, tc.initialArgs...)
 
-			if err := DeploymentTLSSettings(dp, tc.tlsConfig); err != nil {
+			if err := DeploymentTLSSettings(dp, tc.tlsSettings); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
@@ -598,10 +599,10 @@ func TestDeploymentTLSSettings(t *testing.T) {
 
 	dp := dpMinimal.DeepCopy()
 	dp.Spec.Template.Spec.Containers[0].Name = "other"
-	if err := DeploymentTLSSettings(dp, &tls.Config{
+	if err := DeploymentTLSSettings(dp, objtls.NewSettings(&tls.Config{
 		MinVersion:   tls.VersionTLS12,
 		CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
-	}); err == nil {
+	})); err == nil {
 		t.Fatalf("expected error but got nil")
 	}
 }
@@ -610,17 +611,17 @@ func TestDeploymentTLSSettingsRepeated(t *testing.T) {
 	dp := dpMinimal.DeepCopy()
 	dp.Spec.Template.Spec.Containers[0].Args = []string{"--config=/etc/kubernetes/config.yaml"}
 
-	tlsConfig := &tls.Config{
+	tlsSettings := objtls.NewSettings(&tls.Config{
 		MinVersion:   tls.VersionTLS12,
 		CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
-	}
+	})
 
-	if err := DeploymentTLSSettings(dp, tlsConfig); err != nil {
+	if err := DeploymentTLSSettings(dp, tlsSettings); err != nil {
 		t.Fatalf("first call: unexpected error: %v", err)
 	}
 	firstArgs := append([]string{}, dp.Spec.Template.Spec.Containers[0].Args...)
 
-	if err := DeploymentTLSSettings(dp, tlsConfig); err != nil {
+	if err := DeploymentTLSSettings(dp, tlsSettings); err != nil {
 		t.Fatalf("second call: unexpected error: %v", err)
 	}
 	secondArgs := dp.Spec.Template.Spec.Containers[0].Args

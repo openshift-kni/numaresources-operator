@@ -17,9 +17,7 @@
 package sched
 
 import (
-	"crypto/tls"
 	"fmt"
-	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,10 +32,10 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	intreslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
-	inttls "github.com/openshift-kni/numaresources-operator/internal/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
+	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
 
 // these should be provided by a deployer API
@@ -86,7 +84,7 @@ func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
 }
 
-func DeploymentTLSSettings(dp *appsv1.Deployment, validTLSconfig *tls.Config) error {
+func DeploymentTLSSettings(dp *appsv1.Deployment, tlsSettings objtls.Settings) error {
 	cnt := k8swgobjupdate.FindContainerByName(dp.Spec.Template.Spec.Containers, MainContainerName)
 	if cnt == nil {
 		return fmt.Errorf("cannot find container %q", MainContainerName)
@@ -96,13 +94,11 @@ func DeploymentTLSSettings(dp *appsv1.Deployment, validTLSconfig *tls.Config) er
 	if flags == nil {
 		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
 	}
-	minVersionVal := inttls.VersionToString(validTLSconfig.MinVersion)
-	ciphersVal := strings.Join(inttls.CipherSuitesToString(validTLSconfig.CipherSuites), ",")
-	flags.SetOption("--tls-min-version", minVersionVal)
-	flags.SetOption("--tls-cipher-suites", ciphersVal)
+	flags.SetOption("--tls-min-version", tlsSettings.MinVersion)
+	flags.SetOption("--tls-cipher-suites", tlsSettings.CipherSuites)
 	cnt.Args = flags.Argv()
 
-	klog.V(3).InfoS("Scheduler TLS settings", "minVersion", minVersionVal, "cipherSuites", ciphersVal)
+	klog.V(3).InfoS("Scheduler TLS settings", "minVersion", tlsSettings.MinVersion, "cipherSuites", tlsSettings.CipherSuites)
 	return nil
 }
 

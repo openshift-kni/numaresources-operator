@@ -21,7 +21,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -52,13 +51,13 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
-	inttls "github.com/openshift-kni/numaresources-operator/internal/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
+	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -79,10 +78,10 @@ func NewFakeNUMAResourcesSchedulerReconciler(initObjects ...runtime.Object) (*NU
 		Scheme:             scheme.Scheme,
 		SchedulerManifests: schedMf,
 		Namespace:          testNamespace,
-		TLSConfig: func(tlsconfig *tls.Config) {
-			tlsconfig.MinVersion = tls.VersionTLS13
-			tlsconfig.CipherSuites = []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256}
-		},
+		TLSSettings: objtls.NewSettings(&tls.Config{
+			MinVersion:   tls.VersionTLS13,
+			CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
+		}),
 	}, nil
 }
 
@@ -1014,27 +1013,22 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nrsKey})
 			Expect(err).ToNot(HaveOccurred())
 
-			tlsconfig := &tls.Config{}
-			reconciler.TLSConfig(tlsconfig)
-
 			dp := &appsv1.Deployment{}
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
-			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-min-version=" + inttls.VersionToString(tlsconfig.MinVersion)))
-			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-cipher-suites=" + strings.Join(inttls.CipherSuitesToString(tlsconfig.CipherSuites), ",")))
+			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-min-version=" + reconciler.TLSSettings.MinVersion))
+			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-cipher-suites=" + reconciler.TLSSettings.CipherSuites))
 
-			minVersion := uint16(tls.VersionTLS13)
-			cipherSuites := []uint16{tls.TLS_AES_128_GCM_SHA256, tls.TLS_AES_256_GCM_SHA384}
-
-			reconciler.TLSConfig = func(tlsconfig *tls.Config) {
-				tlsconfig.MinVersion = minVersion
-				tlsconfig.CipherSuites = cipherSuites
-			}
+			updatedSettings := objtls.NewSettings(&tls.Config{
+				MinVersion:   tls.VersionTLS13,
+				CipherSuites: []uint16{tls.TLS_AES_128_GCM_SHA256, tls.TLS_AES_256_GCM_SHA384},
+			})
+			reconciler.TLSSettings = updatedSettings
 			_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nrsKey})
 			Expect(err).ToNot(HaveOccurred())
 
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
-			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-min-version=" + inttls.VersionToString(minVersion)))
-			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-cipher-suites=" + strings.Join(inttls.CipherSuitesToString(cipherSuites), ",")))
+			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-min-version=" + updatedSettings.MinVersion))
+			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-cipher-suites=" + updatedSettings.CipherSuites))
 		})
 	})
 })

@@ -63,7 +63,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/controller"
 	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
-	inttls "github.com/openshift-kni/numaresources-operator/internal/tls"
+
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
@@ -71,6 +71,7 @@ import (
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
+	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
 )
@@ -326,11 +327,15 @@ func main() {
 	}
 
 	tlsConfig, unsupportedCiphers := ctrltls.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
-	err = inttls.ValidateConfig(tlsConfig, unsupportedCiphers)
-	if err != nil {
-		klog.ErrorS(err, "invalid TLS config")
-		exitWithCancel(cancel, 1)
+	if len(unsupportedCiphers) > 0 {
+		klog.InfoS("TLS profile configuration contains unsupported ciphers that will be ignored", "unsupported", unsupportedCiphers)
 	}
+
+	// Pre-compute TLS settings for the scheduler deployment once at startup.
+	// TLS config is immutable for the operator's lifetime: if it changes, the operator restarts.
+	tlsCfg := &tls.Config{}
+	tlsConfig(tlsCfg)
+	tlsSettings := objtls.NewSettings(tlsCfg)
 
 	webhookTLSOpts := append(webhookTLSOpts(params.enableHTTP2), tlsConfig)
 
@@ -427,7 +432,7 @@ func main() {
 			SchedulerManifests: schedMf,
 			Namespace:          namespace,
 			PlatformInfo:       platforminfo.New(discoveredCluster.Platform, discoveredCluster.LongVersion),
-			TLSConfig:          tlsConfig,
+			TLSSettings:        tlsSettings,
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
 			exitWithCancel(cancel, 1)
