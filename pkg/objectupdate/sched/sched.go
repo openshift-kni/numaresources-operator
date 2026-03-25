@@ -17,13 +17,16 @@
 package sched
 
 import (
+	"crypto/tls"
 	"fmt"
+	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog/v2"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	k8swgschedupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/sched"
@@ -31,6 +34,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	intreslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+	inttls "github.com/openshift-kni/numaresources-operator/internal/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
@@ -45,21 +49,20 @@ const (
 // TODO: we should inject also the mount point. As it is now, the information is split between the manifest
 // and the updating logic, causing unnecessary friction. This code needs to know too much what's in the manifest.
 
-func DeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) {
+func DeploymentImageSettings(dp *appsv1.Deployment, userImageSpec string) error {
 	cnt := k8swgobjupdate.FindContainerByName(dp.Spec.Template.Spec.Containers, MainContainerName)
 	if cnt == nil {
-		klog.ErrorS(nil, "cannot find container", "name", MainContainerName)
-		return
+		return fmt.Errorf("cannot find container %q", MainContainerName)
 	}
 	cnt.Image = userImageSpec
 	klog.V(3).InfoS("Scheduler image", "reason", "user-provided", "pullSpec", userImageSpec)
+	return nil
 }
 
-func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) {
+func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) error {
 	cnt := k8swgobjupdate.FindContainerByName(dp.Spec.Template.Spec.Containers, MainContainerName)
 	if cnt == nil {
-		klog.ErrorS(nil, "cannot find container", "name", MainContainerName)
-		return
+		return fmt.Errorf("cannot find container %q", MainContainerName)
 	}
 
 	cacheResyncDebug := *spec.CacheResyncDebug
@@ -68,6 +71,7 @@ func DeploymentEnvVarSettings(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSc
 	} else {
 		envvar.DeleteFromContainer(cnt, envvar.PFPStatusDump)
 	}
+	return nil
 }
 
 func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
@@ -80,6 +84,26 @@ func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
 		template.Annotations = map[string]string{}
 	}
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
+}
+
+func DeploymentTLSSettings(dp *appsv1.Deployment, validTLSconfig *tls.Config) error {
+	cnt := k8swgobjupdate.FindContainerByName(dp.Spec.Template.Spec.Containers, MainContainerName)
+	if cnt == nil {
+		return fmt.Errorf("cannot find container %q", MainContainerName)
+	}
+
+	flags := flagcodec.ParseArgvKeyValue(cnt.Args, flagcodec.WithFlagNormalization)
+	if flags == nil {
+		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
+	}
+	minVersionVal := inttls.VersionToString(validTLSconfig.MinVersion)
+	ciphersVal := strings.Join(inttls.CipherSuitesToString(validTLSconfig.CipherSuites), ",")
+	flags.SetOption("--tls-min-version", minVersionVal)
+	flags.SetOption("--tls-cipher-suites", ciphersVal)
+	cnt.Args = flags.Argv()
+
+	klog.V(3).InfoS("Scheduler TLS settings", "minVersion", minVersionVal, "cipherSuites", ciphersVal)
+	return nil
 }
 
 func SchedulerConfig(cm *corev1.ConfigMap, name string, params *k8swgmanifests.ConfigParams) error {

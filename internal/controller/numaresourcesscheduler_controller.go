@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"time"
 
@@ -73,6 +74,7 @@ type NUMAResourcesSchedulerReconciler struct {
 	SchedulerManifests schedmanifests.Manifests
 	Namespace          string
 	PlatformInfo       platforminfo.PlatformInfo
+	TLSConfig          func(*tls.Config)
 }
 
 // Namespace Scoped
@@ -341,14 +343,24 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		klog.ErrorS(err, "failed to enforce the scheduler resources, continuing with manifests defaults")
 	}
 
-	schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, schedSpec.SchedulerImage)
+	if err := schedupdate.DeploymentImageSettings(r.SchedulerManifests.Deployment, schedSpec.SchedulerImage); err != nil {
+		return nropv1.NUMAResourcesSchedulerStatus{}, err
+	}
 	cmHash := hash.ConfigMapData(r.SchedulerManifests.ConfigMap)
 	schedupdate.DeploymentConfigMapSettings(r.SchedulerManifests.Deployment, r.SchedulerManifests.ConfigMap.Name, cmHash)
 	if err := loglevel.UpdatePodSpec(&r.SchedulerManifests.Deployment.Spec.Template.Spec, "", schedSpec.LogLevel); err != nil {
 		return schedStatus, err
 	}
 
-	schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec)
+	if err := schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec); err != nil {
+		return nropv1.NUMAResourcesSchedulerStatus{}, err
+	}
+
+	tlsconfig := &tls.Config{}
+	r.TLSConfig(tlsconfig)
+	if err := schedupdate.DeploymentTLSSettings(r.SchedulerManifests.Deployment, tlsconfig); err != nil {
+		return nropv1.NUMAResourcesSchedulerStatus{}, err
+	}
 
 	k8swgrbacupdate.RoleForLeaderElection(r.SchedulerManifests.Role, r.Namespace, nrosched.LeaderElectionResourceName)
 	k8swgrbacupdate.RoleBinding(r.SchedulerManifests.RoleBinding, r.SchedulerManifests.ServiceAccount.Name, r.Namespace)

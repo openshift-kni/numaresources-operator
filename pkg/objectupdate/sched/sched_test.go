@@ -17,6 +17,7 @@
 package sched
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -106,10 +107,17 @@ func TestUpdateDeploymentImageSettings(t *testing.T) {
 	dp := dpMinimal.DeepCopy()
 	podSpec := &dp.Spec.Template.Spec
 	for _, tc := range testCases {
-		DeploymentImageSettings(dp, tc.imageSpec)
+		if err := DeploymentImageSettings(dp, tc.imageSpec); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 		if podSpec.Containers[0].Image != tc.imageSpec {
 			t.Errorf("failed to update deployemt image, expected: %q actual: %q", tc.imageSpec, podSpec.Containers[0].Image)
 		}
+	}
+
+	dp.Spec.Template.Spec.Containers[0].Name = "other"
+	if err := DeploymentImageSettings(dp, "quay.io/bar/image:v2"); err == nil {
+		t.Fatalf("expected error but got nil")
 	}
 }
 
@@ -409,11 +417,19 @@ func TestDeploymentEnvVarSettings(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dp := tc.initialDp.DeepCopy()
-			DeploymentEnvVarSettings(dp, tc.spec)
+			if err := DeploymentEnvVarSettings(dp, tc.spec); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
 			if !reflect.DeepEqual(*dp, tc.expectedDp) {
 				t.Errorf("got=%s expected %s", toJSON(dp), toJSON(tc.expectedDp))
 			}
 		})
+	}
+
+	dp := dpMinimal.DeepCopy()
+	dp.Spec.Template.Spec.Containers[0].Name = "other"
+	if err := DeploymentEnvVarSettings(dp, nropv1.NUMAResourcesSchedulerSpec{}); err == nil {
+		t.Fatalf("expected error but got nil")
 	}
 }
 
@@ -505,6 +521,112 @@ func TestSchedulerResourcesRequest(t *testing.T) {
 				t.Errorf("got=%s expected %s", toJSON(rr), toJSON(tc.expectedRR))
 			}
 		})
+	}
+}
+
+func TestDeploymentTLSSettings(t *testing.T) {
+	baseArgs := []string{"--config=/etc/kubernetes/config.yaml"}
+
+	type testCase struct {
+		name         string
+		initialArgs  []string
+		tlsConfig    *tls.Config
+		expectedArgs []string
+	}
+
+	testCases := []testCase{
+		{
+			name:        "MinVersion and CipherSuites",
+			initialArgs: baseArgs,
+			tlsConfig: &tls.Config{
+				MinVersion:   tls.VersionTLS12,
+				CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384},
+			},
+			expectedArgs: []string{
+				"--config=/etc/kubernetes/config.yaml",
+				"--tls-min-version=VersionTLS12",
+				"--tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+			},
+		},
+		{
+			name:        "TLS 1.3 with ciphers",
+			initialArgs: baseArgs,
+			tlsConfig: &tls.Config{
+				MinVersion:   tls.VersionTLS13,
+				CipherSuites: []uint16{tls.TLS_AES_128_GCM_SHA256},
+			},
+			expectedArgs: []string{
+				"--config=/etc/kubernetes/config.yaml",
+				"--tls-min-version=VersionTLS13",
+				"--tls-cipher-suites=TLS_AES_128_GCM_SHA256",
+			},
+		},
+		{
+			name: "replaces existing TLS args",
+			initialArgs: []string{
+				"--config=/etc/kubernetes/config.yaml",
+				"--tls-min-version=VersionTLS10",
+				"--tls-cipher-suites=TLS_RSA_WITH_AES_128_CBC_SHA",
+			},
+			tlsConfig: &tls.Config{
+				MinVersion:   tls.VersionTLS13,
+				CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
+			},
+			expectedArgs: []string{
+				"--config=/etc/kubernetes/config.yaml",
+				"--tls-min-version=VersionTLS13",
+				"--tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dp := dpMinimal.DeepCopy()
+			dp.Spec.Template.Spec.Containers[0].Args = append([]string{}, tc.initialArgs...)
+
+			if err := DeploymentTLSSettings(dp, tc.tlsConfig); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			gotArgs := dp.Spec.Template.Spec.Containers[0].Args
+			if !reflect.DeepEqual(gotArgs, tc.expectedArgs) {
+				t.Errorf("args mismatch\ngot:      %v\nexpected: %v", gotArgs, tc.expectedArgs)
+			}
+		})
+	}
+
+	dp := dpMinimal.DeepCopy()
+	dp.Spec.Template.Spec.Containers[0].Name = "other"
+	if err := DeploymentTLSSettings(dp, &tls.Config{
+		MinVersion:   tls.VersionTLS12,
+		CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
+	}); err == nil {
+		t.Fatalf("expected error but got nil")
+	}
+}
+
+func TestDeploymentTLSSettingsRepeated(t *testing.T) {
+	dp := dpMinimal.DeepCopy()
+	dp.Spec.Template.Spec.Containers[0].Args = []string{"--config=/etc/kubernetes/config.yaml"}
+
+	tlsConfig := &tls.Config{
+		MinVersion:   tls.VersionTLS12,
+		CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
+	}
+
+	if err := DeploymentTLSSettings(dp, tlsConfig); err != nil {
+		t.Fatalf("first call: unexpected error: %v", err)
+	}
+	firstArgs := append([]string{}, dp.Spec.Template.Spec.Containers[0].Args...)
+
+	if err := DeploymentTLSSettings(dp, tlsConfig); err != nil {
+		t.Fatalf("second call: unexpected error: %v", err)
+	}
+	secondArgs := dp.Spec.Template.Spec.Containers[0].Args
+
+	if !reflect.DeepEqual(firstArgs, secondArgs) {
+		t.Errorf("duplicates found in TLS args\nfirst:  %v\nsecond: %v", firstArgs, secondArgs)
 	}
 }
 

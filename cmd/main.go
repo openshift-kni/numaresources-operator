@@ -63,6 +63,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/controller"
 	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
+	inttls "github.com/openshift-kni/numaresources-operator/internal/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
@@ -325,8 +326,10 @@ func main() {
 	}
 
 	tlsConfig, unsupportedCiphers := ctrltls.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
-	if len(unsupportedCiphers) > 0 {
-		klog.InfoS("TLS profile configuration contains unsupported ciphers that will be ignored", "unsupported", unsupportedCiphers)
+	err = inttls.ValidateConfig(tlsConfig, unsupportedCiphers)
+	if err != nil {
+		klog.ErrorS(err, "invalid TLS config")
+		exitWithCancel(cancel, 1)
 	}
 
 	webhookTLSOpts := append(webhookTLSOpts(params.enableHTTP2), tlsConfig)
@@ -424,6 +427,7 @@ func main() {
 			SchedulerManifests: schedMf,
 			Namespace:          namespace,
 			PlatformInfo:       platforminfo.New(discoveredCluster.Platform, discoveredCluster.LongVersion),
+			TLSConfig:          tlsConfig,
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
 			exitWithCancel(cancel, 1)
@@ -558,7 +562,9 @@ func renderRTEManifests(rteManifests rtemanifests.Manifests, namespace string, i
 func renderSchedulerManifests(schedManifests schedmanifests.Manifests, imageSpec string) (schedmanifests.Manifests, error) {
 	klog.InfoS("Updating scheduler manifests")
 	mf := schedManifests.Clone()
-	schedupdate.DeploymentImageSettings(mf.Deployment, imageSpec)
+	if err := schedupdate.DeploymentImageSettings(mf.Deployment, imageSpec); err != nil {
+		return mf, err
+	}
 	// empty string is fine. Will be handled as "disabled".
 	// We only care about setting the environ variable to declare it exists,
 	// the best setting is "present, but disabled" vs "missing, thus implicitly disabled"
