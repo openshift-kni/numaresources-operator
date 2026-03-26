@@ -18,6 +18,7 @@ package tests
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
@@ -52,6 +54,8 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
+	ctrltls "github.com/openshift/controller-runtime-common/pkg/tls"
+	libgocrypto "github.com/openshift/library-go/pkg/crypto"
 
 	depnodes "github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
@@ -71,6 +75,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
@@ -1493,8 +1498,140 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			})
 		})
 	})
+
+	Context("scheduler complies with TLS profile modifications", Label(label.Tier0, "feature:tlscompliance"), func() {
+		It("should update scheduler deployment TLS args to adhere to modified TLS profile", func(ctx context.Context) {
+			By("getting the initial OCP TLS profile")
+			tlsProfileSpec, err := ctrltls.FetchAPIServerTLSProfile(ctx, fxt.Client)
+			Expect(err).ToNot(HaveOccurred(), "unable to get TLS profile from APIServer")
+
+			tlsConfig, _ := ctrltls.NewTLSConfigFromProfile(tlsProfileSpec)
+			tlsCfg := &tls.Config{}
+			tlsConfig(tlsCfg)
+			initialTLStlsSettings := NewSettings(tlsCfg)
+			klog.InfoS("initial TLS settings", "tlsSettings", initialTLStlsSettings)
+
+			By("getting the initial scheduler object")
+			initialNroSchedObj := &nropv1.NUMAResourcesScheduler{}
+			nroSchedKey := objects.NROSchedObjectKey()
+			Expect(fxt.Client.Get(ctx, nroSchedKey, initialNroSchedObj)).To(Succeed(), "failed to get %q in the cluster", nroSchedKey.String())
+
+			deployment, err := podlist.With(fxt.Client).DeploymentByOwnerReference(ctx, initialNroSchedObj.GetUID())
+			Expect(err).ToNot(HaveOccurred(), "failed to get the deployment")
+			Expect(deployment).ToNot(BeNil(), "scheduler deployment not found")
+			schedulerContainer := &corev1.Container{}
+			for _, container := range deployment.Spec.Template.Spec.Containers {
+				if container.Name == schedupdate.MainContainerName {
+					schedulerContainer = &container
+					break
+				}
+			}
+			By("verify the scheduler deployment uses the initial TLS settings")
+			Expect(schedulerContainer.Args).To(ContainElement("--tls-min-version=" + initialTLStlsSettings.MinVersion))
+			Expect(schedulerContainer.Args).To(ContainElement("--tls-cipher-suites=" + initialTLStlsSettings.CipherSuites))
+
+			pods, err := podlist.With(fxt.Client).ByDeployment(ctx, *deployment)
+			Expect(err).ToNot(HaveOccurred(), "failed to get the pods")
+			Expect(pods).ToNot(BeEmpty(), "no pods found for the deployment")
+
+			initialUIDs := make([]types.UID, 0, len(pods))
+			for _, pod := range pods {
+				initialUIDs = append(initialUIDs, pod.GetUID())
+			}
+
+			By("updating the TLS profile to new settings")
+			klog.InfoS("determining a different TLS profile to apply")
+			apiServer := &configv1.APIServer{}
+			Expect(fxt.Client.Get(ctx, client.ObjectKey{Name: ctrltls.APIServerName}, apiServer)).To(Succeed(), "failed to get APIServer object")
+			originalTLSProfile := apiServer.Spec.TLSSecurityProfile
+
+			newProfileType := configv1.TLSProfileOldType
+			if tlsProfileSpec.MinTLSVersion == configv1.TLSProfiles[configv1.TLSProfileOldType].MinTLSVersion {
+				newProfileType = configv1.TLSProfileModernType
+			}
+			klog.InfoS("switching TLS profile", "from", tlsProfileSpec.MinTLSVersion, "to", newProfileType)
+
+			By(fmt.Sprintf("updating the APIServer TLS profile to %q", newProfileType))
+			apiServer.Spec.TLSSecurityProfile = &configv1.TLSSecurityProfile{
+				Type: newProfileType,
+			}
+			Expect(fxt.Client.Update(ctx, apiServer)).To(Succeed(), "failed to update APIServer TLS profile")
+
+			defer func() {
+				By("reverting the APIServer TLS profile to the original setting")
+				updatedAPIServer := &configv1.APIServer{}
+				Expect(fxt.Client.Get(ctx, client.ObjectKey{Name: ctrltls.APIServerName}, updatedAPIServer)).To(Succeed())
+				updatedAPIServer.Spec.TLSSecurityProfile = originalTLSProfile
+				Expect(fxt.Client.Update(ctx, updatedAPIServer)).To(Succeed(), "failed to revert APIServer TLS profile")
+			}()
+
+			newTLSProfileSpec := *configv1.TLSProfiles[newProfileType]
+			newTLSConfigFn, _ := ctrltls.NewTLSConfigFromProfile(newTLSProfileSpec)
+			newTLSCfg := &tls.Config{}
+			newTLSConfigFn(newTLSCfg)
+			expectedTLSSettings := NewSettings(newTLSCfg)
+			klog.InfoS("expected TLS settings after update", "tlsSettings", expectedTLSSettings)
+
+			By("waiting for the scheduler deployment to be updated with the new TLS args")
+			Eventually(func(g Gomega) {
+				updatedDeployment := &appsv1.Deployment{}
+				g.Expect(fxt.Client.Get(ctx, client.ObjectKeyFromObject(deployment), updatedDeployment)).To(Succeed())
+
+				var updatedContainer *corev1.Container
+				for i := range updatedDeployment.Spec.Template.Spec.Containers {
+					if updatedDeployment.Spec.Template.Spec.Containers[i].Name == schedupdate.MainContainerName {
+						updatedContainer = &updatedDeployment.Spec.Template.Spec.Containers[i]
+						break
+					}
+				}
+				g.Expect(updatedContainer).ToNot(BeNil(), "scheduler container not found in updated deployment")
+				g.Expect(updatedContainer.Args).To(ContainElement("--tls-min-version="+expectedTLSSettings.MinVersion),
+					"tls-min-version mismatch: got args %v", updatedContainer.Args)
+				g.Expect(updatedContainer.Args).To(ContainElement("--tls-cipher-suites="+expectedTLSSettings.CipherSuites),
+					"tls-cipher-suites mismatch: got args %v", updatedContainer.Args)
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+
+			By("waiting for the scheduler deployment rollout to complete")
+			_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(5*time.Minute).ForDeploymentComplete(ctx, deployment)
+			Expect(err).ToNot(HaveOccurred(), "scheduler deployment rollout did not complete")
+
+			By("verifying the scheduler pods have been restarted with new UIDs")
+			newPods, err := podlist.With(fxt.Client).ByDeployment(ctx, *deployment)
+			Expect(err).ToNot(HaveOccurred(), "failed to get pods after TLS profile update")
+			Expect(newPods).ToNot(BeEmpty(), "no pods found after TLS profile update")
+
+			newUIDs := make([]types.UID, 0, len(newPods))
+			for _, pod := range newPods {
+				newUIDs = append(newUIDs, pod.GetUID())
+			}
+
+			for _, newUID := range newUIDs {
+				for _, initialUID := range initialUIDs {
+					Expect(newUID).ToNot(Equal(initialUID), "scheduler pod was not restarted: UID %s still present", initialUID)
+				}
+			}
+		})
+	})
 })
 
+// Settings holds pre-computed string representations of TLS configuration.
+type Settings struct {
+	MinVersion   string
+	CipherSuites string
+}
+
+// NewSettings creates Settings from a tls.Config by converting the
+// numeric TLS version and cipher suite IDs to their string names.
+func NewSettings(cfg *tls.Config) Settings {
+	cipherNames := make([]string, 0, len(cfg.CipherSuites))
+	for _, id := range cfg.CipherSuites {
+		cipherNames = append(cipherNames, tls.CipherSuiteName(id))
+	}
+	return Settings{
+		MinVersion:   libgocrypto.TLSVersionToNameOrDie(cfg.MinVersion),
+		CipherSuites: strings.Join(cipherNames, ","),
+	}
+}
 func isNROSchedSyncedAt(nrosStatus *nropv1.NUMAResourcesSchedulerStatus, conditionType string, gen int64) error {
 	if nrosStatus == nil {
 		return errors.New("nil status")
