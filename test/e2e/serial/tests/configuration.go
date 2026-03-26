@@ -71,6 +71,7 @@ import (
 	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
+	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
@@ -139,7 +140,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 		// we're ok with any TM policy as long as the updater can handle it,
 		// we use this as proxy for "there is valid NRT data for at least X nodes
 		nrts = e2enrt.FilterByTopologyManagerPolicy(nrtList.Items, intnrt.SingleNUMANode)
-		if len(nrts) < 2 {
+		if len(nrts) < 1 {
 			Skip(fmt.Sprintf("not enough nodes with valid policy - found %d", len(nrts)))
 		}
 
@@ -1499,7 +1500,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 		})
 	})
 
-	Context("scheduler complies with TLS profile modifications", Label(label.Tier0, "feature:tlscompliance"), func() {
+	FContext("scheduler complies with TLS profile modifications", Label(label.Tier0, "feature:tlscompliance"), func() {
 		It("should update scheduler deployment TLS args to adhere to modified TLS profile", func(ctx context.Context) {
 			By("getting the initial OCP TLS profile")
 			tlsProfileSpec, err := ctrltls.FetchAPIServerTLSProfile(ctx, fxt.Client)
@@ -1611,6 +1612,115 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}
 			}
 		})
+
+		It("should verify the scheduler server enforces the updated TLS profile on its HTTPS endpoint", func(ctx context.Context) {
+			By("getting the initial OCP TLS profile")
+			tlsProfileSpec, err := ctrltls.FetchAPIServerTLSProfile(ctx, fxt.Client)
+			Expect(err).ToNot(HaveOccurred(), "unable to get TLS profile from APIServer")
+
+			tlsConfigFn, _ := ctrltls.NewTLSConfigFromProfile(tlsProfileSpec)
+			tlsCfg := &tls.Config{}
+			tlsConfigFn(tlsCfg)
+			initialMinVersion := tlsCfg.MinVersion
+			klog.InfoS("initial TLS min version", "version", libgocrypto.TLSVersionToNameOrDie(initialMinVersion))
+
+			By("getting the scheduler deployment and pods")
+			nroSchedObj := &nropv1.NUMAResourcesScheduler{}
+			nroSchedKey := objects.NROSchedObjectKey()
+			Expect(fxt.Client.Get(ctx, nroSchedKey, nroSchedObj)).To(Succeed(), "failed to get %q in the cluster", nroSchedKey.String())
+
+			deployment, err := podlist.With(fxt.Client).DeploymentByOwnerReference(ctx, nroSchedObj.GetUID())
+			Expect(err).ToNot(HaveOccurred(), "failed to get the deployment")
+			Expect(deployment).ToNot(BeNil(), "scheduler deployment not found")
+
+			pods, err := podlist.With(fxt.Client).ByDeployment(ctx, *deployment)
+			Expect(err).ToNot(HaveOccurred(), "failed to get the pods")
+			Expect(pods).ToNot(BeEmpty(), "no pods found for the deployment")
+
+			By("probing the scheduler HTTPS endpoint to verify initial TLS enforcement")
+			schedulerPod := &pods[0]
+			initialVersion := probeSchedulerTLSVersion(ctx, schedulerPod)
+			klog.InfoS("initial TLS version from server probe", "negotiated", initialVersion)
+			Expect(curlTLSVersionOrdinal(initialVersion)).To(BeNumerically(">=", initialMinVersion),
+				"negotiated TLS version %q is below the expected minimum", initialVersion)
+
+			By("determining a different TLS profile to apply")
+			apiServer := &configv1.APIServer{}
+			Expect(fxt.Client.Get(ctx, client.ObjectKey{Name: ctrltls.APIServerName}, apiServer)).To(Succeed(), "failed to get APIServer object")
+			originalTLSProfile := apiServer.Spec.TLSSecurityProfile
+
+			newProfileType := configv1.TLSProfileOldType
+			if tlsProfileSpec.MinTLSVersion == configv1.TLSProfiles[configv1.TLSProfileOldType].MinTLSVersion {
+				newProfileType = configv1.TLSProfileModernType
+			}
+			klog.InfoS("switching TLS profile", "from", tlsProfileSpec.MinTLSVersion, "to", newProfileType)
+
+			By(fmt.Sprintf("updating the APIServer TLS profile to %q", newProfileType))
+			apiServer.Spec.TLSSecurityProfile = &configv1.TLSSecurityProfile{
+				Type: newProfileType,
+			}
+			Expect(fxt.Client.Update(ctx, apiServer)).To(Succeed(), "failed to update APIServer TLS profile")
+
+			defer func() {
+				By("reverting the APIServer TLS profile to the original setting")
+				updatedAPIServer := &configv1.APIServer{}
+				Expect(fxt.Client.Get(ctx, client.ObjectKey{Name: ctrltls.APIServerName}, updatedAPIServer)).To(Succeed())
+				updatedAPIServer.Spec.TLSSecurityProfile = originalTLSProfile
+				Expect(fxt.Client.Update(ctx, updatedAPIServer)).To(Succeed(), "failed to revert APIServer TLS profile")
+			}()
+
+			newTLSProfileSpec := *configv1.TLSProfiles[newProfileType]
+			newTLSConfigFn, _ := ctrltls.NewTLSConfigFromProfile(newTLSProfileSpec)
+			newTLSCfg := &tls.Config{}
+			newTLSConfigFn(newTLSCfg)
+			expectedSettings := NewSettings(newTLSCfg)
+			expectedMinVersion := newTLSCfg.MinVersion
+			klog.InfoS("expected TLS settings after update", "minVersion", expectedSettings.MinVersion, "cipherSuites", expectedSettings.CipherSuites)
+
+			By("waiting for the scheduler deployment to be updated with the new TLS args")
+			Eventually(func(g Gomega) {
+				updatedDeployment := &appsv1.Deployment{}
+				g.Expect(fxt.Client.Get(ctx, client.ObjectKeyFromObject(deployment), updatedDeployment)).To(Succeed())
+
+				var updatedContainer *corev1.Container
+				for i := range updatedDeployment.Spec.Template.Spec.Containers {
+					if updatedDeployment.Spec.Template.Spec.Containers[i].Name == schedupdate.MainContainerName {
+						updatedContainer = &updatedDeployment.Spec.Template.Spec.Containers[i]
+						break
+					}
+				}
+				g.Expect(updatedContainer).ToNot(BeNil(), "scheduler container not found in updated deployment")
+				g.Expect(updatedContainer.Args).To(ContainElement("--tls-min-version="+expectedSettings.MinVersion),
+					"tls-min-version mismatch: got args %v", updatedContainer.Args)
+				g.Expect(updatedContainer.Args).To(ContainElement("--tls-cipher-suites="+expectedSettings.CipherSuites),
+					"tls-cipher-suites mismatch: got args %v", updatedContainer.Args)
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+
+			By("waiting for the scheduler deployment rollout to complete")
+			_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(5*time.Minute).ForDeploymentComplete(ctx, deployment)
+			Expect(err).ToNot(HaveOccurred(), "scheduler deployment rollout did not complete")
+
+			By("getting the new scheduler pods after rollout")
+			newPods, err := podlist.With(fxt.Client).ByDeployment(ctx, *deployment)
+			Expect(err).ToNot(HaveOccurred(), "failed to get pods after TLS profile update")
+			Expect(newPods).ToNot(BeEmpty(), "no pods found after TLS profile update")
+			newSchedulerPod := &newPods[0]
+
+			By("probing the scheduler HTTPS endpoint to verify the updated TLS version is enforced by the server")
+			newVersion := probeSchedulerTLSVersion(ctx, newSchedulerPod)
+			klog.InfoS("negotiated TLS version after profile update", "version", newVersion)
+			Expect(curlTLSVersionOrdinal(newVersion)).To(BeNumerically(">=", expectedMinVersion),
+				"negotiated TLS version %q is below the expected minimum %q", newVersion, expectedSettings.MinVersion)
+
+			belowMinVersion := tlsVersionBelow(expectedMinVersion)
+			if belowMinVersion > 0 {
+				By(fmt.Sprintf("verifying that TLS connections at version %s are rejected by the server", curlTLSMaxValue(belowMinVersion)))
+				rejected := probeSchedulerTLSVersionRejected(ctx, newSchedulerPod, belowMinVersion)
+				Expect(rejected).To(BeTrue(),
+					"scheduler server should reject TLS %s connections when minimum is %s",
+					curlTLSMaxValue(belowMinVersion), expectedSettings.MinVersion)
+			}
+		})
 	})
 })
 
@@ -1632,6 +1742,94 @@ func NewSettings(cfg *tls.Config) Settings {
 		CipherSuites: strings.Join(cipherNames, ","),
 	}
 }
+
+const schedulerSecurePort = "10259"
+
+// probeSchedulerTLSVersion execs curl inside the scheduler pod to perform a TLS
+// handshake against the scheduler's HTTPS endpoint and returns the negotiated
+// TLS version string as reported by curl (e.g., "TLSv1.3").
+func probeSchedulerTLSVersion(ctx context.Context, pod *corev1.Pod) string {
+	GinkgoHelper()
+	endpoint := fmt.Sprintf("https://localhost:%s/healthz", schedulerSecurePort)
+	cmd := []string{
+		"curl", "-k", "-s", "-o", "/dev/null",
+		"--connect-timeout", "5",
+		"-w", "%{ssl_version}",
+		endpoint,
+	}
+	key := client.ObjectKeyFromObject(pod)
+	klog.V(2).InfoS("probing scheduler TLS endpoint", "pod", key.String())
+	stdout, stderr, err := remoteexec.CommandOnPod(ctx, e2eclient.K8sClient, pod, cmd...)
+	Expect(err).ToNot(HaveOccurred(), "failed to probe TLS endpoint on pod %q: stderr=%q", key.String(), string(stderr))
+	version := strings.TrimSpace(string(stdout))
+	Expect(version).ToNot(BeEmpty(), "empty TLS version from curl on pod %q", key.String())
+	return version
+}
+
+// probeSchedulerTLSVersionRejected checks whether the scheduler server rejects
+// TLS connections capped at the given maximum version.
+func probeSchedulerTLSVersionRejected(ctx context.Context, pod *corev1.Pod, maxVersion uint16) bool {
+	GinkgoHelper()
+	endpoint := fmt.Sprintf("https://localhost:%s/healthz", schedulerSecurePort)
+	cmd := []string{
+		"curl", "-k", "-s", "-o", "/dev/null",
+		"--connect-timeout", "5",
+		"--tls-max", curlTLSMaxValue(maxVersion),
+		endpoint,
+	}
+	key := client.ObjectKeyFromObject(pod)
+	klog.V(2).InfoS("probing scheduler TLS rejection", "pod", key.String(), "maxTLSVersion", curlTLSMaxValue(maxVersion))
+	_, _, err := remoteexec.CommandOnPod(ctx, e2eclient.K8sClient, pod, cmd...)
+	if err != nil {
+		klog.V(2).InfoS("TLS connection rejected as expected", "pod", key.String(), "err", err)
+		return true
+	}
+	return false
+}
+
+func curlTLSVersionOrdinal(curlVersion string) uint16 {
+	switch curlVersion {
+	case "TLSv1", "TLSv1.0":
+		return tls.VersionTLS10
+	case "TLSv1.1":
+		return tls.VersionTLS11
+	case "TLSv1.2":
+		return tls.VersionTLS12
+	case "TLSv1.3":
+		return tls.VersionTLS13
+	default:
+		return 0
+	}
+}
+
+func curlTLSMaxValue(v uint16) string {
+	switch v {
+	case tls.VersionTLS10:
+		return "1.0"
+	case tls.VersionTLS11:
+		return "1.1"
+	case tls.VersionTLS12:
+		return "1.2"
+	case tls.VersionTLS13:
+		return "1.3"
+	default:
+		return ""
+	}
+}
+
+func tlsVersionBelow(v uint16) uint16 {
+	switch v {
+	case tls.VersionTLS13:
+		return tls.VersionTLS12
+	case tls.VersionTLS12:
+		return tls.VersionTLS11
+	case tls.VersionTLS11:
+		return tls.VersionTLS10
+	default:
+		return 0
+	}
+}
+
 func isNROSchedSyncedAt(nrosStatus *nropv1.NUMAResourcesSchedulerStatus, conditionType string, gen int64) error {
 	if nrosStatus == nil {
 		return errors.New("nil status")

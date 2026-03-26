@@ -21,7 +21,7 @@ const (
 	SchedTestImageCI = "quay.io/openshift-kni/scheduler-plugins:test-ci"
 
 	// NEVER EVER USE THIS OUTSIDE CI or (early) DEVELOPMENT ENVIRONMENTS
-	NUMACellDevicePluginTestImageCI = "quay.io/openshift-kni/numacell-device-plugin:test-ci"
+	NUMACellDevicePluginTestImageCI = "quay.io/rhn_support_shajmakh/nrop:numacell" // "quay.io/openshift-kni/numacell-device-plugin:test-ci"
 
 	// the default image used for test pods
 	PauseImage   = "quay.io/openshift-kni/pause:test-ci"

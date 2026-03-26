@@ -29,7 +29,7 @@ import (
 
 const (
 	RoleControlPlane = "control-plane"
-	RoleWorker       = "worker"
+	RoleWorker       = "worker-cnf"
 )
 
 const (
