@@ -6,9 +6,9 @@ spec:
   schedulerName: topo-aware-scheduler
   containers:
   - name: ctrreschk
-    image: quay.io/fromani/ctrreschk:v0.0.3
+    image: quay.io/fromani/ctrreschk:v0.0.11
     imagePullPolicy: Always
-    command: ["/usr/local/bin/ctrreschk", "-S", "align"]
+    command: ["/ctrreschk", "-w", "align"]
     resources:
       limits:
         cpu: 1
