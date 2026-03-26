@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"time"
 
@@ -59,6 +58,7 @@ import (
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
+	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 )
 
@@ -74,7 +74,7 @@ type NUMAResourcesSchedulerReconciler struct {
 	SchedulerManifests schedmanifests.Manifests
 	Namespace          string
 	PlatformInfo       platforminfo.PlatformInfo
-	TLSConfig          func(*tls.Config)
+	TLSSettings        objtls.Settings
 }
 
 // Namespace Scoped
@@ -356,9 +356,7 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		return nropv1.NUMAResourcesSchedulerStatus{}, err
 	}
 
-	tlsconfig := &tls.Config{}
-	r.TLSConfig(tlsconfig)
-	if err := schedupdate.DeploymentTLSSettings(r.SchedulerManifests.Deployment, tlsconfig); err != nil {
+	if err := schedupdate.DeploymentTLSSettings(r.SchedulerManifests.Deployment, r.TLSSettings); err != nil {
 		return nropv1.NUMAResourcesSchedulerStatus{}, err
 	}
 
