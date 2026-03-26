@@ -37,6 +37,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
+	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
 
 // these should be provided by a deployer API
@@ -168,7 +169,7 @@ func DaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
 
 const _MiB = 1024 * 1024
 
-func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
+func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig, metricsTLS objtls.Settings) error {
 	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
 	if cnt == nil {
 		return fmt.Errorf("cannot find container data for %q", MainContainerName)
@@ -178,6 +179,16 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
 		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
 	}
 	flags.SetOption("--metrics-mode", "httptls")
+	if metricsTLS.MinVersion != "" {
+		flags.SetOption("--metrics-tls-min-version", metricsTLS.MinVersion)
+	} else {
+		flags.Delete("--metrics-tls-min-version")
+	}
+	if metricsTLS.CipherSuites != "" {
+		flags.SetOption("--metrics-tls-cipher-suites", metricsTLS.CipherSuites)
+	} else {
+		flags.Delete("--metrics-tls-cipher-suites")
+	}
 
 	infoRefreshPauseEnabled := isInfoRefreshPauseEnabled(&conf)
 	klog.V(2).InfoS("DaemonSet update: InfoRefreshPause status", "daemonset", ds.Name, "enabled", infoRefreshPauseEnabled)

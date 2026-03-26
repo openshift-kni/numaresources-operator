@@ -65,6 +65,7 @@ import (
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
+	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/status/conditioninfo"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
@@ -91,6 +92,9 @@ type NUMAResourcesOperatorReconciler struct {
 	ImagePullPolicy corev1.PullPolicy
 	Recorder        record.EventRecorder
 	ForwardMCPConds bool
+	// RTEMetricsTLS is derived from apiserver.config.openshift.io/cluster TLS profile at operator
+	// startup (same source as the operator metrics server and scheduler).
+	RTEMetricsTLS objtls.Settings
 }
 
 // Namespace Scoped
@@ -537,7 +541,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	// SCC v2 needs no updates
 
 	existing = existing.WithManifestsUpdater(func(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
-		err := daemonsetUpdater(poolName, gdm)
+		err := daemonsetUpdater(poolName, gdm, r.RTEMetricsTLS)
 		if err != nil {
 			return err
 		}
@@ -749,11 +753,11 @@ func validateMachineConfigLabels(mc client.Object, trees []nodegroupv1.Tree) err
 	return nil
 }
 
-func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
+func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest, rteMetricsTLS objtls.Settings) error {
 	rteupdate.AllContainersTerminationMessagePolicy(gdm.DaemonSet)
 	rteupdate.DaemonSetTolerations(gdm.DaemonSet, gdm.NodeGroup.Config.Tolerations)
 
-	err := rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config)
+	err := rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config, rteMetricsTLS)
 	if err != nil {
 		klog.V(5).InfoS("DaemonSet update: cannot update arguments", "pool name", poolName, "daemonset", gdm.DaemonSet.Name, "error", err)
 		return err
