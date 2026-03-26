@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -60,6 +61,7 @@ import (
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
+	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 
@@ -504,6 +506,56 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					args := ds.Spec.Template.Spec.Containers[0].Args
 					Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
 					Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
+				})
+
+				It("should apply RTEMetricsTLS to RTE DaemonSet metrics arguments", func() {
+					tlsMetrics := objtls.NewSettings(&tls.Config{
+						MinVersion:   tls.VersionTLS12,
+						CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256},
+					})
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, nil)
+
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershiftWithMetricsTLS(nro, tlsMetrics)
+					} else {
+						reconciler = reconcileObjectsOpenshiftWithMetricsTLS(nro, mcp, tlsMetrics)
+					}
+
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+						Namespace: testNamespace,
+					}
+					ds := &appsv1.DaemonSet{}
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
+
+					args := ds.Spec.Template.Spec.Containers[0].Args
+					Expect(args).To(ContainElement(ContainSubstring("--metrics-mode=httptls")))
+					Expect(args).To(ContainElement(ContainSubstring("--metrics-tls-min-version=" + tlsMetrics.MinVersion)))
+					Expect(args).To(ContainElement(ContainSubstring("--metrics-tls-cipher-suites=" + tlsMetrics.CipherSuites)))
+				})
+
+				It("should not set metrics TLS min version or ciphers when RTEMetricsTLS is empty", func() {
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, nil)
+
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
+					}
+
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+						Namespace: testNamespace,
+					}
+					ds := &appsv1.DaemonSet{}
+					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
+
+					args := ds.Spec.Template.Spec.Containers[0].Args
+					Expect(args).To(ContainElement(ContainSubstring("--metrics-mode=httptls")))
+					Expect(args).ToNot(ContainElement(ContainSubstring("--metrics-tls-min-version")))
+					Expect(args).ToNot(ContainElement(ContainSubstring("--metrics-tls-cipher-suites")))
 				})
 
 				It("should report the observed values per Node Group in status", func() {
@@ -2317,10 +2369,15 @@ func getConditionByType(conditions []metav1.Condition, conditionType string) *me
 }
 
 func reconcileObjectsOpenshift(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.MachineConfigPool) *NUMAResourcesOperatorReconciler {
+	return reconcileObjectsOpenshiftWithMetricsTLS(nro, mcp, objtls.Settings{})
+}
+
+func reconcileObjectsOpenshiftWithMetricsTLS(nro *nropv1.NUMAResourcesOperator, mcp *machineconfigv1.MachineConfigPool, tlsMetrics objtls.Settings) *NUMAResourcesOperatorReconciler {
 	GinkgoHelper()
 
 	reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp)
 	Expect(err).ToNot(HaveOccurred())
+	reconciler.RTEMetricsTLS = tlsMetrics
 
 	key := client.ObjectKeyFromObject(nro)
 
@@ -2370,10 +2427,15 @@ func reconcileObjectsOpenshift(nro *nropv1.NUMAResourcesOperator, mcp *machineco
 }
 
 func reconcileObjectsHypershift(nro *nropv1.NUMAResourcesOperator) *NUMAResourcesOperatorReconciler {
+	return reconcileObjectsHypershiftWithMetricsTLS(nro, objtls.Settings{})
+}
+
+func reconcileObjectsHypershiftWithMetricsTLS(nro *nropv1.NUMAResourcesOperator, tlsMetrics objtls.Settings) *NUMAResourcesOperatorReconciler {
 	GinkgoHelper()
 
 	reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platform.HyperShift, defaultOCPVersion, nro)
 	Expect(err).ToNot(HaveOccurred())
+	reconciler.RTEMetricsTLS = tlsMetrics
 
 	key := client.ObjectKeyFromObject(nro)
 

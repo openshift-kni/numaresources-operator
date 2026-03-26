@@ -403,6 +403,7 @@ func main() {
 		ImagePullPolicy: pullPolicy,
 		Namespace:       namespace,
 		ForwardMCPConds: params.enableMCPCondsForward,
+		RTEMetricsTLS:   tlsSettings,
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesOperator")
 		exitWithCancel(cancel, 1)
