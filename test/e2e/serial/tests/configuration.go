@@ -1500,8 +1500,8 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 		})
 	})
 
-	FContext("scheduler complies with TLS profile modifications", Label(label.Tier0, "feature:tlscompliance"), func() {
-		It("should update scheduler deployment TLS args to adhere to modified TLS profile", func(ctx context.Context) {
+	Context("scheduler complies with TLS profile modifications", Label(label.Tier0, "feature:tlscompliance"), func() {
+		FIt("should update scheduler deployment TLS args to adhere to modified TLS profile", func(ctx context.Context) {
 			By("getting the initial OCP TLS profile")
 			tlsProfileSpec, err := ctrltls.FetchAPIServerTLSProfile(ctx, fxt.Client)
 			Expect(err).ToNot(HaveOccurred(), "unable to get TLS profile from APIServer")
@@ -1550,9 +1550,11 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			if tlsProfileSpec.MinTLSVersion == configv1.TLSProfiles[configv1.TLSProfileOldType].MinTLSVersion {
 				newProfileType = configv1.TLSProfileModernType
 			}
-			klog.InfoS("switching TLS profile", "from", tlsProfileSpec.MinTLSVersion, "to", newProfileType)
+			klog.InfoS("switching TLS profile", "from", originalTLSProfile.Type, "to", newProfileType)
 
 			By(fmt.Sprintf("updating the APIServer TLS profile to %q", newProfileType))
+			newTLSProfileSpec := *configv1.TLSProfiles[newProfileType]
+
 			apiServer.Spec.TLSSecurityProfile = &configv1.TLSSecurityProfile{
 				Type: newProfileType,
 			}
@@ -1566,7 +1568,6 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Expect(fxt.Client.Update(ctx, updatedAPIServer)).To(Succeed(), "failed to revert APIServer TLS profile")
 			}()
 
-			newTLSProfileSpec := *configv1.TLSProfiles[newProfileType]
 			newTLSConfigFn, _ := ctrltls.NewTLSConfigFromProfile(newTLSProfileSpec)
 			newTLSCfg := &tls.Config{}
 			newTLSConfigFn(newTLSCfg)
