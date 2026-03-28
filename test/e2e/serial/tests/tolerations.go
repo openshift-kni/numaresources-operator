@@ -475,19 +475,25 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 				By("applying the taint 2 - NoExecute")
 				applyTaintToNode(ctx, fxt.Client, targetNode, &tntNoExec[0])
-				By("waiting for DaemonSet to be ready")
-				updatedDs, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
-				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
-				// NoExecute promises the pod will be evicted "immediately" but the system will still need nonzero time to notice
-				// and the pod will take nonzero time to terminate, so we need a Eventually block.
-				Eventually(func(g Gomega) {
-					pods, err = podlist.With(fxt.Client).ByDaemonset(ctx, *updatedDs)
-					Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset pods %s: %v", dsKey.String(), err)
-					By(fmt.Sprintf("ensuring the RTE DS is running with less pods because taints (expected pods=%v)", len(workers)-1))
-					g.Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(workers)-1), "updated DS ready=%v original worker nodes=%v", updatedDs.Status.NumberReady, len(workers)-1)
-					g.Expect(int(updatedDs.Status.NumberReady)).To(Equal(len(pods)), "updated DS ready=%v expected pods", updatedDs.Status.NumberReady, len(pods))
-				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+				By(fmt.Sprintf("waiting for DaemonSet to reflect the eviction - expected pods=%d", len(workers)-1))
+				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(5*time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
+				Expect(err).ToNot(HaveOccurred(), "daemonset %s did not scale down to %d: %v", dsKey.String(), len(workers)-1, err)
+
+				updatedDs, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s ready: %v", dsKey.String(), err)
+
+				By("verifying running pod count matches DaemonSet status")
+				allPods, err := podlist.With(fxt.Client).ByDaemonset(ctx, *updatedDs)
+				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset pods %s: %v", dsKey.String(), err)
+				var runningPods []corev1.Pod
+				for _, pod := range allPods {
+					if pod.DeletionTimestamp == nil {
+						runningPods = append(runningPods, pod)
+					}
+				}
+				klog.InfoS("pod count after eviction", "all", len(allPods), "running", len(runningPods), "expected", len(workers)-1)
+				Expect(runningPods).To(HaveLen(len(workers)-1), "running DS pods=%d expected=%d (total including terminating=%d)", len(runningPods), len(workers)-1, len(allPods))
 			})
 
 			It("[test_id:72859] should not restart a running RTE pod on tainted node with NoSchedule effect", Label(label.Tier3), func(ctx context.Context) {
