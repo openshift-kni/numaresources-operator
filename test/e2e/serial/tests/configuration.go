@@ -1276,6 +1276,230 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			})
 		})
 
+		Context("schedulable control-plane node group configuration", func() {
+			var initialOperObj *nropv1.NUMAResourcesOperator
+			var nroKey client.ObjectKey
+
+			BeforeEach(func(ctx context.Context) {
+				initialOperObj = &nropv1.NUMAResourcesOperator{}
+				nroKey = objects.NROObjectKey()
+				Expect(fxt.Client.Get(ctx, nroKey, initialOperObj)).To(Succeed(), "cannot get %q in the cluster", nroKey.String())
+			})
+
+			It("[test_id:83869] should configure NRO CR with multiple non-overlapping node groups and check e2e results", Label(label.Tier2, label.OpenShift, label.MNOMastersSchedulable), func(ctx context.Context) {
+				workerCnfRole := "worker-cnf"
+				workerCnfRoleLabel := fmt.Sprintf("%s/%s", depnodes.LabelRole, workerCnfRole)
+				masterPoolName := "master"
+
+				By("finding dedicated worker nodes (worker role without master role)")
+				allNodes := &corev1.NodeList{}
+				Expect(fxt.Client.List(ctx, allNodes)).To(Succeed())
+
+				var dedicatedWorkers []corev1.Node
+				masterRoleLabel := fmt.Sprintf("%s/%s", depnodes.LabelRole, "master")
+				workerRoleLabel := fmt.Sprintf("%s/%s", depnodes.LabelRole, depnodes.RoleWorker)
+				for _, node := range allNodes.Items {
+					_, hasMaster := node.Labels[masterRoleLabel]
+					_, hasWorker := node.Labels[workerRoleLabel]
+					if hasWorker && !hasMaster {
+						dedicatedWorkers = append(dedicatedWorkers, node)
+					}
+				}
+				Expect(dedicatedWorkers).ToNot(BeEmpty(), "no dedicated worker nodes found (nodes with worker role but not master role)")
+
+				By(fmt.Sprintf("labeling one dedicated worker node with %q", workerCnfRoleLabel))
+				targetNode := &dedicatedWorkers[0]
+				targetNodeInitial := targetNode.DeepCopy()
+				targetNode.Labels[workerCnfRoleLabel] = ""
+				Expect(fxt.Client.Patch(ctx, targetNode, client.MergeFrom(targetNodeInitial))).To(Succeed())
+				klog.InfoS("labeled node", "name", targetNode.Name, "label", workerCnfRoleLabel)
+
+				By(fmt.Sprintf("creating %q MCP", workerCnfRole))
+				mcp := objects.TestMCP()
+				mcp.Name = workerCnfRole
+				mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": workerCnfRole}
+				mcp.Spec.MachineConfigSelector = &metav1.LabelSelector{
+					MatchExpressions: []metav1.LabelSelectorRequirement{
+						{
+							Key:      "machineconfiguration.openshift.io/role",
+							Operator: metav1.LabelSelectorOpIn,
+							Values:   []string{depnodes.RoleWorker, workerCnfRole},
+						},
+					},
+				}
+				mcp.Spec.NodeSelector = &metav1.LabelSelector{
+					MatchLabels: map[string]string{workerCnfRoleLabel: ""},
+				}
+				Expect(fxt.Client.Create(ctx, mcp)).To(Succeed())
+
+				defer func() {
+					By(fmt.Sprintf("CLEANUP: removing %q label from node %q", workerCnfRoleLabel, targetNode.Name))
+					nodeBase := targetNode.DeepCopy()
+					delete(targetNode.Labels, workerCnfRoleLabel)
+					Expect(fxt.Client.Patch(ctx, targetNode, client.MergeFrom(nodeBase))).To(Succeed())
+
+					By("waiting for worker MCP to stabilize after node returns to worker pool")
+					workerMCP := &machineconfigv1.MachineConfigPool{}
+					Expect(fxt.Client.Get(ctx, client.ObjectKey{Name: "worker"}, workerMCP)).To(Succeed())
+					_ = wait.With(fxt.Client).
+						Interval(configuration.MachineConfigPoolUpdateInterval).
+						Timeout(configuration.MachineConfigPoolUpdateTimeout).
+						ForMachineConfigPoolCondition(ctx, workerMCP, machineconfigv1.MachineConfigPoolUpdated)
+
+					By(fmt.Sprintf("CLEANUP: deleting MCP %q", mcp.Name))
+					Expect(fxt.Client.Delete(ctx, mcp)).To(Succeed())
+					err := wait.With(fxt.Client).
+						Interval(configuration.MachineConfigPoolUpdateInterval).
+						Timeout(configuration.MachineConfigPoolUpdateTimeout).
+						ForMachineConfigPoolDeleted(ctx, mcp)
+					Expect(err).ToNot(HaveOccurred())
+				}()
+
+				By(fmt.Sprintf("waiting for MCP %q to be updated", mcp.Name))
+				err := wait.With(fxt.Client).
+					Interval(configuration.MachineConfigPoolUpdateInterval).
+					Timeout(configuration.MachineConfigPoolUpdateTimeout).
+					ForMachineConfigPoolCondition(ctx, mcp, machineconfigv1.MachineConfigPoolUpdated)
+				Expect(err).ToNot(HaveOccurred(), "MCP %q did not reach Updated state", mcp.Name)
+
+				By(fmt.Sprintf("setting NROP NodeGroups to [%q, %q]", masterPoolName, workerCnfRole))
+				origNodeGroups := nodegroup.CloneList(initialOperObj.Spec.NodeGroups)
+				newNodeGroups := []nropv1.NodeGroup{
+					{PoolName: &masterPoolName},
+					{PoolName: &workerCnfRole},
+				}
+
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Eventually(func(g Gomega) {
+					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+					updatedNRO.Spec.NodeGroups = newNodeGroups
+					g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
+				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
+
+				defer func() {
+					By(fmt.Sprintf("CLEANUP: reverting NodeGroups in NUMAResourcesOperator object %q", initialOperObj.Name))
+					var revertNRO nropv1.NUMAResourcesOperator
+					Eventually(func(g Gomega) {
+						g.Expect(fxt.Client.Get(ctx, nroKey, &revertNRO)).To(Succeed())
+						revertNRO.Spec.NodeGroups = origNodeGroups
+						g.Expect(fxt.Client.Update(ctx, &revertNRO)).To(Succeed())
+					}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+					By("verifying the operator returns to Available condition")
+					Eventually(func(g Gomega) {
+						g.Expect(fxt.Client.Get(ctx, nroKey, &revertNRO)).To(Succeed())
+						cond := metahelper.FindStatusCondition(revertNRO.Status.Conditions, status.ConditionAvailable)
+						g.Expect(cond).ToNot(BeNil(), "condition Available was not found: %+v", revertNRO.Status.Conditions)
+						g.Expect(cond.Status).To(Equal(metav1.ConditionTrue), "expected operator Available=True, got: %+v", revertNRO.Status.Conditions)
+					}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "operator did not return to Available state in time")
+				}()
+
+				By("waiting for operator to reconcile with the new node groups")
+				Eventually(func(g Gomega) {
+					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+					g.Expect(isNROOperSyncedAt(&updatedNRO.Status, status.ConditionAvailable, updatedNRO.Generation)).To(Succeed())
+				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "operator did not become Available after adding node group")
+
+				By("verifying DaemonSets: one per node group, both with active pods")
+				Expect(updatedNRO.Status.DaemonSets).To(HaveLen(len(updatedNRO.Spec.NodeGroups)), "expected one DaemonSet per NodeGroup")
+
+				dss, err := objects.GetDaemonSetsByNamespacedName(fxt.Client, ctx, updatedNRO.Status.DaemonSets...)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(dss).To(HaveLen(len(updatedNRO.Spec.NodeGroups)), "DaemonSets count mismatch with NodeGroups")
+
+				for _, ds := range dss {
+					klog.InfoS("checking DaemonSet", "name", ds.Name,
+						"desiredScheduled", ds.Status.DesiredNumberScheduled,
+						"ready", ds.Status.NumberReady,
+						"misscheduled", ds.Status.NumberMisscheduled)
+					Expect(ds.Status.DesiredNumberScheduled).To(BeNumerically(">", 0),
+						"DaemonSet %q has no scheduled pods", ds.Name)
+					Expect(ds.Status.NumberReady).To(Equal(ds.Status.DesiredNumberScheduled),
+						"DaemonSet %q not all pods ready", ds.Name)
+					Expect(ds.Status.NumberMisscheduled).To(Equal(int32(0)),
+						"DaemonSet %q has misscheduled pods", ds.Name)
+				}
+
+				By("verifying NRTs exist for all targeted nodes")
+				nrtList := nrtv1alpha2.NodeResourceTopologyList{}
+				Expect(fxt.Client.List(ctx, &nrtList)).To(Succeed())
+				Expect(nrtList.Items).ToNot(BeEmpty(), "expected at least one NRT for the active node groups")
+
+				for _, nrt := range nrtList.Items {
+					klog.InfoS("found NRT", "name", nrt.Name)
+				}
+			})
+
+			It("[test_id:83870] should handle overlapping node group pools by keeping the duplicate RTE pods pending", Label(label.Tier2, label.OpenShift, label.Compact, label.MNOMastersSchedulable), func(ctx context.Context) {
+				masterPoolName := "master"
+				workerPoolName := "worker"
+
+				origNodeGroups := nodegroup.CloneList(initialOperObj.Spec.NodeGroups)
+
+				By(fmt.Sprintf("setting NROP NodeGroups to [%q, %q] to create overlapping pools", masterPoolName, workerPoolName))
+				newNodeGroups := []nropv1.NodeGroup{
+					{PoolName: &masterPoolName},
+					{PoolName: &workerPoolName},
+				}
+
+				var updatedNRO nropv1.NUMAResourcesOperator
+				Eventually(func(g Gomega) {
+					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
+					updatedNRO.Spec.NodeGroups = newNodeGroups
+					g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
+				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
+
+				defer func() {
+					By(fmt.Sprintf("reverting NodeGroups in NUMAResourcesOperator object %q", initialOperObj.Name))
+					var revertNRO nropv1.NUMAResourcesOperator
+					Eventually(func(g Gomega) {
+						g.Expect(fxt.Client.Get(ctx, nroKey, &revertNRO)).To(Succeed())
+						revertNRO.Spec.NodeGroups = origNodeGroups
+						g.Expect(fxt.Client.Update(ctx, &revertNRO)).To(Succeed())
+					}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+					By("verifying the operator returns to Available condition")
+					Eventually(func(g Gomega) {
+						g.Expect(fxt.Client.Get(ctx, nroKey, &revertNRO)).To(Succeed())
+						cond := metahelper.FindStatusCondition(revertNRO.Status.Conditions, status.ConditionAvailable)
+						g.Expect(cond).ToNot(BeNil(), "condition Available was not found: %+v", revertNRO.Status.Conditions)
+						g.Expect(cond.Status).To(Equal(metav1.ConditionTrue), "expected operator Available=True, got: %+v", revertNRO.Status.Conditions)
+					}).WithTimeout(5*time.Minute).WithPolling(5*time.Second).Should(Succeed(), "operator did not return to Available state in time")
+				}()
+
+				nroNamespace := initialOperObj.Status.DaemonSets[0].Namespace
+				masterDSKey := client.ObjectKey{Namespace: nroNamespace, Name: objectnames.GetComponentName(updatedNRO.Name, masterPoolName)}
+				workerDSKey := client.ObjectKey{Namespace: nroNamespace, Name: objectnames.GetComponentName(updatedNRO.Name, workerPoolName)}
+
+				By(fmt.Sprintf("waiting for both DaemonSets to be created (%q and %q)", masterDSKey.Name, workerDSKey.Name))
+				Eventually(func(g Gomega) {
+					var masterDS, workerDS appsv1.DaemonSet
+					g.Expect(fxt.Client.Get(ctx, masterDSKey, &masterDS)).To(Succeed())
+					g.Expect(fxt.Client.Get(ctx, workerDSKey, &workerDS)).To(Succeed())
+					g.Expect(masterDS.Status.DesiredNumberScheduled+workerDS.Status.DesiredNumberScheduled).To(BeNumerically(">", 0),
+						"DaemonSets have no desired pods yet")
+				}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "DaemonSets were not created")
+
+				By("verifying that some RTE pods are pending due to overlapping node groups")
+				Consistently(func(g Gomega) {
+					var masterDS, workerDS appsv1.DaemonSet
+					g.Expect(fxt.Client.Get(ctx, masterDSKey, &masterDS)).To(Succeed())
+					g.Expect(fxt.Client.Get(ctx, workerDSKey, &workerDS)).To(Succeed())
+
+					totalDesired := masterDS.Status.DesiredNumberScheduled + workerDS.Status.DesiredNumberScheduled
+					totalReady := masterDS.Status.NumberReady + workerDS.Status.NumberReady
+
+					klog.InfoS("DaemonSet status", "masterDS", masterDSKey.Name,
+						"masterDesired", masterDS.Status.DesiredNumberScheduled, "masterReady", masterDS.Status.NumberReady,
+						"workerDS", workerDSKey.Name,
+						"workerDesired", workerDS.Status.DesiredNumberScheduled, "workerReady", workerDS.Status.NumberReady)
+
+					g.Expect(totalDesired).To(BeNumerically(">", totalReady),
+						"expected some pods to be pending due to anti-affinity, but all %d desired pods are ready", totalDesired)
+				}).WithTimeout(1*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "overlapping DaemonSets should have pending pods")
+			})
+		})
+
 		Context("KubeletConfig changes are being tracked correctly by the operator", func() {
 			var nroObj *nropv1.NUMAResourcesOperator
 
