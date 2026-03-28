@@ -118,6 +118,8 @@ github.com/k8stopologyawareschedwg/podfingerprint v0.2.3 h1:nVKmzn6g7CHhDtB+jG85
 github.com/k8stopologyawareschedwg/podfingerprint v0.2.3/go.mod h1:E0bjgihZTSwRIJVjNV45Lm0C/j5w+YkGSnfpYXoI8Ws=
 github.com/k8stopologyawareschedwg/resource-topology-exporter v0.23.0 h1:kgvd9Gtnm77Tkasx+YYTEKJBJTqxu0vQamJtyXP8BXU=
 github.com/k8stopologyawareschedwg/resource-topology-exporter v0.23.0/go.mod h1:tRe/7uXgVKHre3VpS/vrTU7yrGbbgIyPdhUOJhxLaeU=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.23.1-0.20260326121828-b1ae87c8617e h1:RFyvuJF/Z/3QNiiUhVC/KeFFxtBRLWCwT43fbSD7Zfw=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.23.1-0.20260326121828-b1ae87c8617e/go.mod h1:rO489hWBoIJsH28W2Ma0RDg0m+Crpw34l/AibtUz/dU=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=

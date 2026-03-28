@@ -207,6 +207,9 @@ var _ = Describe("[Install] durability", Serial, func() {
 			ds, err := nrowait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(context.TODO(), dsKey)
 			Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
 
+			_, err = findContainerByName(*ds, containerNameRTE)
+			Expect(err).ToNot(HaveOccurred())
+
 			By("Update RTE image in NRO")
 			Eventually(func() error {
 				err := e2eclient.Client.Get(context.TODO(), nroKey, nroObj)
@@ -227,20 +230,27 @@ var _ = Describe("[Install] durability", Serial, func() {
 				}
 
 				if !nrowait.AreDaemonSetPodsReady(&updatedDs.Status) {
-					klog.InfoS("daemonset not ready", "key", dsKey.String(), "desired", updatedDs.Status.DesiredNumberScheduled, "scheduled", updatedDs.Status.CurrentNumberScheduled, "ready", updatedDs.Status.NumberReady)
+					klog.InfoS("daemonset not ready", "key", dsKey.String(), "desired", updatedDs.Status.DesiredNumberScheduled, "scheduled", updatedDs.Status.CurrentNumberScheduled, "ready", updatedDs.Status.NumberReady, "updated", updatedDs.Status.UpdatedNumberScheduled)
 					return false
 				}
 
 				klog.InfoS("daemonset ready", "key", dsKey.String())
 
-				klog.InfoS("daemonset Generation", "observedGeneration", updatedDs.Status.ObservedGeneration, "currentGeneration", ds.Generation)
-				isUpdated := updatedDs.Status.ObservedGeneration > ds.Generation
-				if !isUpdated {
+				updatedRTE, err := findContainerByName(*updatedDs, containerNameRTE)
+				if err != nil {
+					klog.ErrorS(err, "failed to find RTE container", "key", dsKey.String())
 					return false
 				}
+				if updatedRTE.Image != e2eimages.RTETestImageCI {
+					klog.InfoS("daemonset template image not target yet", "key", dsKey.String(), "image", updatedRTE.Image)
+					return false
+				}
+
+				// Rely on AreDaemonSetPodsReady (Desired/Ready/Updated aligned), not ObservedGeneration vs a
+				// stale baseline: the latter can fail on HyperShift/slow rollouts even when the template is correct.
 				ds = updatedDs
 				return true
-			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to get up to date DaemonSet")
+			}).WithTimeout(15*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to get up to date DaemonSet")
 
 			rteContainer, err := findContainerByName(*ds, containerNameRTE)
 			Expect(err).ToNot(HaveOccurred())
