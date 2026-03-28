@@ -74,10 +74,11 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2026-03-12T10:30:16Z"
+    createdAt: "2026-03-24T15:39:23Z"
     features.operators.openshift.io/tls-profiles: "true"
     olm.skipRange: '>=4.21.0 <4.22.0'
     operatorframework.io/cluster-monitoring: "true"
+    operators.openshift.io/must-gather-image: registry.redhat.io/openshift4/numaresources-must-gather-rhel9:v4.22
     operators.operatorframework.io/builder: operator-sdk-v1.40.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
     features.operators.openshift.io/disconnected: "true"

@@ -7,6 +7,7 @@ metadata:
     features.operators.openshift.io/tls-profiles: "true"
     olm.skipRange: '>=4.21.0 <4.22.0'
     operatorframework.io/cluster-monitoring: "true"
+    operators.openshift.io/must-gather-image: registry.redhat.io/openshift4/numaresources-must-gather-rhel9:v4.22
   name: numaresources-operator.v0.0.0
   namespace: placeholder
 spec:
