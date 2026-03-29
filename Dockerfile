@@ -13,7 +13,7 @@ COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/buildinfo.json /usr/local/share
 RUN mkdir /etc/resource-topology-exporter/ && \
     touch /etc/resource-topology-exporter/config.yaml
-RUN microdnf install -y hwdata && \
+RUN microdnf install -y --disablerepo='rhel-*' hwdata && \
     microdnf clean -y all
 USER 65532:65532
 ENTRYPOINT ["/bin/numaresources-operator"]
