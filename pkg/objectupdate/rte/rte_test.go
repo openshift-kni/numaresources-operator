@@ -17,6 +17,7 @@ limitations under the License.
 package rte
 
 import (
+	"crypto/tls"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -29,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
 
 var commonArgs = []string{
@@ -69,6 +71,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 	type testCase struct {
 		name         string
 		conf         nropv1.NodeGroupConfig
+		metricsTLS   objtls.Settings
 		expectedArgs []string
 	}
 
@@ -87,6 +90,15 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			conf: nropv1.DefaultNodeGroupConfig(),
 			expectedArgs: []string{
 				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+			},
+		},
+		{
+			name:       "cluster TLS profile on metrics",
+			conf:       nropv1.DefaultNodeGroupConfig(),
+			metricsTLS: objtls.NewSettings(&tls.Config{MinVersion: tls.VersionTLS12, CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256}}),
+			expectedArgs: []string{
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+				"--metrics-tls-min-version=VersionTLS12", "--metrics-tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
 			},
 		},
 		{
@@ -161,7 +173,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			origDs := testDs.DeepCopy()
 			ds := testDs.DeepCopy()
 
-			err := DaemonSetArgs(ds, tc.conf)
+			err := DaemonSetArgs(ds, tc.conf, tc.metricsTLS)
 			if err != nil {
 				t.Fatalf("update failed: %v", err)
 			}
