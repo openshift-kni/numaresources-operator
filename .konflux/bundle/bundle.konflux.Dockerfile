@@ -2,7 +2,7 @@
 
 # yq is required for merging the yaml files
 # Run the overlay in a container
-FROM quay.io/konflux-ci/yq:latest@sha256:9264d52ac6d69bfe92617f309466a0c531990a4c07e63fe73748f44a42e0d1d2 AS overlay
+FROM quay.io/konflux-ci/yq:latest@sha256:2e7d0e277f98c1f3c891dc1cbd05ed1b14fd9c8cf93582f05a65656dfbe31138 AS overlay
 
 # Set work dir
 WORKDIR /tmp
