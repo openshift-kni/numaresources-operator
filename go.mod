@@ -10,15 +10,15 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/google/go-cmp v0.7.0
 	github.com/jaypipes/ghw v0.21.3-0.20260109185716-ee0aed93f45d
-	github.com/k8stopologyawareschedwg/deployer v0.23.0
+	github.com/k8stopologyawareschedwg/deployer v0.24.0
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2
 	github.com/k8stopologyawareschedwg/podfingerprint v0.2.3
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.23.1-0.20260326121828-b1ae87c8617e
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.24.0
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
 	github.com/openshift-kni/debug-tools v0.2.5
-	github.com/openshift/api v0.0.0-20260213155647-8fe9fe363807 // release-4.18
+	github.com/openshift/api v0.0.0-20260326111139-30c2ef7a272e // release-4.18
 	github.com/openshift/controller-runtime-common v0.0.0-20260213175913-767fef058eca
 	github.com/openshift/hypershift/api v0.0.0-20241115183703-d41904871380 // release-4.18
 	github.com/sergi/go-diff v1.1.0
@@ -36,7 +36,7 @@ require (
 	k8s.io/kubectl v0.35.3
 	k8s.io/kubelet v0.35.3
 	k8s.io/utils v0.0.0-20260108192941-914a6e750570
-	sigs.k8s.io/controller-runtime v0.22.5
+	sigs.k8s.io/controller-runtime v0.23.3
 	sigs.k8s.io/yaml v1.6.0
 )
 
@@ -84,7 +84,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
-	github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13 // indirect
+	github.com/openshift/client-go v0.0.0-20260320040014-4b5fc2cdad98 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.23.2 // indirect

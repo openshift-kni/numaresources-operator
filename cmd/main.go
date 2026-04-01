@@ -586,16 +586,12 @@ func manageLifecycleEvent(event lifecycleEvent) int {
 
 // SetupWebhookWithManager enables Webhooks - needed for version conversion
 func SetupOperatorWebhookWithManager(mgr ctrl.Manager, r *nropv1.NUMAResourcesOperator) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
-		Complete()
+	return ctrl.NewWebhookManagedBy(mgr, r).Complete()
 }
 
 // SetupWebhookWithManager enables Webhooks - needed for version conversion
 func SetupSchedulerWebhookWithManager(mgr ctrl.Manager, r *nropv1.NUMAResourcesScheduler) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
-		Complete()
+	return ctrl.NewWebhookManagedBy(mgr, r).Complete()
 }
 
 func webhookTLSOpts(enableHTTP2 bool) []func(config *tls.Config) {
