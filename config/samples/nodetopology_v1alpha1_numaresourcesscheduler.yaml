@@ -4,3 +4,5 @@ metadata:
   name: numaresourcesscheduler
 spec:
   imageSpec: "quay.io/openshift-kni/scheduler-plugins:4.22-snapshot"
+  logLevel: "Normal"
+  schedulerName: "topo-aware-scheduler"
