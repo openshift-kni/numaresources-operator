@@ -18,9 +18,11 @@ package tests
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"reflect"
 	"sort"
 	"strconv"
@@ -28,6 +30,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/sync/errgroup"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -52,6 +55,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
+	ctrltls "github.com/openshift/controller-runtime-common/pkg/tls"
 
 	depnodes "github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
@@ -72,6 +76,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
@@ -84,6 +89,7 @@ import (
 	e2enrt "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/internal/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
+	intls "github.com/openshift-kni/numaresources-operator/test/internal/tls"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -1575,6 +1581,101 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			})
 		})
 	})
+
+	Context("[tlscompliance][rte] rte complies with TLS Profile modifications", Label(label.Tier2, "feature:tlscompliance"), func() {
+		const (
+			rteDaemonSetCheckTimeout  = 30 * time.Second
+			rteDaemonSetCheckInterval = 5 * time.Second
+			apiServerUpdateTimeout    = 10 * time.Minute
+			apiServerUpdateInterval   = 10 * time.Second
+		)
+		It("[test_id:88383] should update RTE daemonset TLS args to adhere to modified TLS profile", Label(label.Reboot, label.Slow), func(ctx context.Context) {
+			fxt.IsRebootTest = true
+			mcpUpdateTimeout := 40 * time.Minute
+			mcpUpdatePolling := 20 * time.Second
+
+			waitForMCPsAndVerifyNodes := func(ctx context.Context, reason string) {
+				e2efixture.By("waiting for all MCPs to get updated")
+				eg := errgroup.Group{}
+				allMCPs := &machineconfigv1.MachineConfigPoolList{}
+				Expect(e2eclient.Client.List(ctx, allMCPs)).To(Succeed())
+				for _, mcp := range allMCPs.Items {
+					eg.Go(func() error {
+						err := waitForMCPConditionWithRetry(ctx, &mcp, machineconfigv1.MachineConfigPoolUpdating, mcpUpdateTimeout, mcpUpdatePolling)
+						if err != nil {
+							klog.InfoS("failed to wait for MCP to start updating", "mcp", mcp.Name, "err", err)
+							return err
+						}
+						klog.InfoS("MCP started updating; waiting for it to complete", "mcp", mcp.Name)
+						return waitForMCPConditionWithRetry(ctx, &mcp, machineconfigv1.MachineConfigPoolUpdated, mcpUpdateTimeout, mcpUpdatePolling)
+					})
+				}
+				Expect(eg.Wait()).To(Succeed(), "failed while waiting for mcp update")
+
+				e2efixture.By("verifying per-node MachineConfig alignment %s", reason)
+				for i := range allMCPs.Items {
+					Expect(verifyNodesMatchMCPConfig(ctx, &allMCPs.Items[i])).To(Succeed(),
+						"node config mismatch for MCP %q", allMCPs.Items[i].Name)
+				}
+			}
+
+			e2efixture.By("determining a different TLS profile to apply")
+			apiServerObj := &configv1.APIServer{}
+			apiServerKey := client.ObjectKey{Name: ctrltls.APIServerName}
+			Expect(e2eclient.Client.Get(ctx, apiServerKey, apiServerObj)).To(Succeed(), "failed to get APIServer object")
+			originalTLSProfile := apiServerObj.Spec.TLSSecurityProfile
+			// OpenShift defaults to Intermediate when no profile is explicitly set.
+			originalTLSProfileType := configv1.TLSProfileIntermediateType
+			if originalTLSProfile != nil {
+				originalTLSProfileType = originalTLSProfile.Type
+			}
+
+			newProfile := &configv1.TLSSecurityProfile{
+				Type:   configv1.TLSProfileModernType,
+				Modern: &configv1.ModernTLSProfile{},
+			}
+
+			if originalTLSProfileType == newProfile.Type {
+				newProfile = &configv1.TLSSecurityProfile{
+					Type:         configv1.TLSProfileIntermediateType,
+					Intermediate: &configv1.IntermediateTLSProfile{},
+				}
+			}
+
+			e2efixture.By("updating APIServer TLS profile from %v to %v", originalTLSProfileType, newProfile.Type)
+			Eventually(func(g Gomega) {
+				updatedAPIServer := &configv1.APIServer{}
+				g.Expect(e2eclient.Client.Get(ctx, apiServerKey, updatedAPIServer)).To(Succeed(), "failed to get APIServer object")
+				updatedAPIServer.Spec = apiServerObj.Spec
+				updatedAPIServer.Spec.TLSSecurityProfile = newProfile
+				g.Expect(e2eclient.Client.Update(ctx, updatedAPIServer)).To(Succeed(), "failed to update APIServer TLS profile")
+			}).WithTimeout(apiServerUpdateTimeout).WithPolling(apiServerUpdateInterval).Should(Succeed())
+
+			DeferCleanup(func(ctx context.Context) {
+				e2efixture.By("reverting APIServer TLS profile from %v to %v", newProfile.Type, originalTLSProfileType)
+				Eventually(func(g Gomega) {
+					updatedAPIServer := &configv1.APIServer{}
+					g.Expect(e2eclient.Client.Get(ctx, apiServerKey, updatedAPIServer)).To(Succeed(), "failed to get APIServer object")
+					updatedAPIServer.Spec = apiServerObj.Spec
+					g.Expect(e2eclient.Client.Update(ctx, updatedAPIServer)).To(Succeed(), "failed to update APIServer TLS profile")
+				}).WithTimeout(apiServerUpdateTimeout).WithPolling(apiServerUpdateInterval).Should(Succeed())
+
+				waitForMCPsAndVerifyNodes(ctx, "after MCP rollback")
+			})
+
+			waitForMCPsAndVerifyNodes(ctx, "after MCP rollout")
+
+			newTLSProfileSpec := *configv1.TLSProfiles[newProfile.Type]
+			newTLSConfigFn, _ := ctrltls.NewTLSConfigFromProfile(newTLSProfileSpec)
+			newTLSCfg := &tls.Config{}
+			newTLSConfigFn(newTLSCfg)
+			expectedTLSSettings := objtls.NewSettings(newTLSCfg)
+			e2efixture.By("verifying RTE DaemonSet TLS flags match the updated profile: %v", expectedTLSSettings)
+			Eventually(func(g Gomega) {
+				g.Expect(intls.CheckRTEDaemonSetTLSFlags(ctx, e2eclient.Client, expectedTLSSettings)).To(Succeed())
+			}).WithTimeout(rteDaemonSetCheckTimeout).WithPolling(rteDaemonSetCheckInterval).Should(Succeed())
+		})
+	})
 })
 
 func isNROSchedSyncedAt(nrosStatus *nropv1.NUMAResourcesSchedulerStatus, conditionType string, gen int64) error {
@@ -1886,4 +1987,93 @@ func rteConfigFrom(data string) (*rteconfig.Config, error) {
 		return nil, err
 	}
 	return conf, nil
+}
+
+// waitForMCPConditionWithRetry wraps ForMachineConfigPoolCondition with automatic
+// retries for transient network errors (e.g. connection resets, HTTP/2 stream errors,
+// 504 gateway timeouts) that are common during control-plane churn.
+// Unlike the plain ForMachineConfigPoolCondition call, which treats any API error as
+// terminal, this function distinguishes transient transport-level failures from real
+// condition failures and retries only the former.
+// The overall wall-clock time is bounded by timeout; each retry consumes the remaining
+// budget rather than resetting it.
+func waitForMCPConditionWithRetry(ctx context.Context, mcp *machineconfigv1.MachineConfigPool, condType machineconfigv1.MachineConfigPoolConditionType, timeout, interval time.Duration) error {
+	deadline := time.Now().Add(timeout)
+	var lastErr error
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			if lastErr != nil {
+				return fmt.Errorf("timed out waiting for MCP %q condition %q: %w", mcp.Name, condType, lastErr)
+			}
+			return fmt.Errorf("timed out waiting for MCP %q condition %q", mcp.Name, condType)
+		}
+
+		err := wait.With(e2eclient.Client).Timeout(remaining).Interval(interval).ForMachineConfigPoolCondition(ctx, mcp, condType)
+		if err == nil {
+			return nil
+		}
+		if !isTransientMCPError(err) {
+			return err
+		}
+
+		lastErr = err
+		klog.InfoS("transient MCP wait error; retrying", "mcp", mcp.Name, "condition", condType, "err", err)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(interval):
+		}
+	}
+}
+
+// isTransientMCPError returns true for transport-level errors (url.Error, HTTP/2
+// stream errors, 504 gateway timeouts) that are expected during MCP transitions
+// when the API server is temporarily overloaded or unreachable, and are safe to retry.
+func isTransientMCPError(err error) bool {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return true
+	}
+	if apierrors.IsTimeout(err) || apierrors.IsServerTimeout(err) || apierrors.IsServiceUnavailable(err) {
+		return true
+	}
+	// API transport hiccups seen during control-plane churn may be wrapped.
+	return strings.Contains(err.Error(), "stream error") || strings.Contains(err.Error(), "INTERNAL_ERROR")
+}
+
+// verifyNodesMatchMCPConfig re-reads the given MCP, lists the nodes matching
+// its NodeSelector, and checks that every node's currentConfig annotation
+// matches the MCP's rendered configuration (status.configuration.name).
+// This provides per-node confidence that the rollout actually happened.
+func verifyNodesMatchMCPConfig(ctx context.Context, mcp *machineconfigv1.MachineConfigPool) error {
+	updatedMCP := &machineconfigv1.MachineConfigPool{}
+	if err := e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(mcp), updatedMCP); err != nil {
+		return fmt.Errorf("failed to re-read MCP %q: %w", mcp.Name, err)
+	}
+	renderedConfig := updatedMCP.Status.Configuration.Name
+	if renderedConfig == "" {
+		return fmt.Errorf("MCP %q has empty status.configuration.name", mcp.Name)
+	}
+
+	if updatedMCP.Spec.NodeSelector == nil {
+		return fmt.Errorf("MCP %q has nil NodeSelector", mcp.Name)
+	}
+	nodeList := &corev1.NodeList{}
+	if err := e2eclient.Client.List(ctx, nodeList, &client.ListOptions{
+		LabelSelector: labels.SelectorFromSet(updatedMCP.Spec.NodeSelector.MatchLabels),
+	}); err != nil {
+		return fmt.Errorf("failed to list nodes for MCP %q: %w", mcp.Name, err)
+	}
+
+	for i := range nodeList.Items {
+		node := &nodeList.Items[i]
+		currentConfig := node.Annotations[wait.CurrentConfigNodeAnnotation]
+		if currentConfig != renderedConfig {
+			return fmt.Errorf("node %q currentConfig=%q does not match MCP %q rendered config=%q",
+				node.Name, currentConfig, mcp.Name, renderedConfig)
+		}
+	}
+	klog.InfoS("all nodes match MCP config", "mcp", mcp.Name, "config", renderedConfig, "nodeCount", len(nodeList.Items))
+	return nil
 }
