@@ -18,6 +18,7 @@ package rte
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,6 +39,7 @@ import (
 
 	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
+	ctrltls "github.com/openshift/controller-runtime-common/pkg/tls"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
@@ -53,7 +55,9 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
+	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
+	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	"github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 
@@ -61,10 +65,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var (
+	timeout  = 30 * time.Second
+	interval = 5 * time.Second
+)
+
 var _ = Describe("with a running cluster with all the components", func() {
 	When("[config][rte] NRO CR configured with LogLevel", func() {
-		timeout := 30 * time.Second
-		interval := 5 * time.Second
 		It("should have the corresponding klog under RTE container", func() {
 			nropObj := &nropv1.NUMAResourcesOperator{}
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
@@ -322,6 +329,53 @@ var _ = Describe("with a running cluster with all the components", func() {
 			}
 		}
 	})
+	Context("[tlscompliance][rte] rte complies with TLS Profile modifications", Label(label.Tier0, "feature:tlscompliance"), func() {
+		It("should have RTE DaemonSet args aligned with the cluster TLS profile", func() {
+			var ctx context.Context = context.Background()
+			By("Getting initial OCP TLS profile")
+			tlsProfileSpec, err := ctrltls.FetchAPIServerTLSProfile(ctx, clients.Client)
+			Expect(err).ToNot(HaveOccurred(), "Unable to get TLS Profile from APIServer")
+			tlsConfig, _ := ctrltls.NewTLSConfigFromProfile(tlsProfileSpec)
+			tlsCfg := &tls.Config{}
+			tlsConfig(tlsCfg)
+			tlsSettings := objtls.NewSettings(tlsCfg)
+			klog.InfoS("Initial TLS Settings", "tlsSettings", tlsSettings)
+			By("Getting the initial NRO operator object")
+			nropObj := &nropv1.NUMAResourcesOperator{}
+			err = clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
+			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() bool {
+				rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
+				if err != nil {
+					klog.ErrorS(err, "failed to get the owned DaemonSets")
+					return false
+				}
+				if len(rteDss) == 0 {
+					klog.InfoS("expect the numaresourcesoperator to own at least one DaemonSet")
+					return false
+				}
+				for _, ds := range rteDss {
+					rteCnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, rteupdate.MainContainerName)
+					if rteCnt == nil {
+						klog.InfoS("main container not found", "daemonsetName", ds.Name)
+						return false
+					}
+					matchFn := getFlagMapper(rteCnt)
+					if matchFn("--metrics-tls-min-version") != tlsSettings.MinVersion {
+						klog.InfoS("TLS min version mismatch", "daemonsetName", ds.Name,
+							"expected", tlsSettings.MinVersion, "got", matchFn("--metrics-tls-min-version"))
+						return false
+					}
+					if matchFn("--metrics-tls-cipher-suites") != tlsSettings.CipherSuites {
+						klog.InfoS("TLS cipher suites mismatch", "daemonsetName", ds.Name,
+							"expected", tlsSettings.CipherSuites, "got", matchFn("--metrics-tls-cipher-suites"))
+						return false
+					}
+				}
+				return true
+			}).WithTimeout(timeout).WithPolling(interval).Should(BeTrue())
+		})
+	})
 })
 
 func getOwnedDss(cs kubernetes.Interface, owner metav1.ObjectMeta) ([]appsv1.DaemonSet, error) {
@@ -346,6 +400,17 @@ func matchLogLevelToKlog(cnt *corev1.Container, level operatorv1.LogLevel) (bool
 
 	val, found := rteFlags.GetFlag("--")
 	return found, val.Data == kLvl.String()
+}
+
+func getFlagMapper(cnt *corev1.Container) func(string) string {
+	rteFlags := flagcodec.ParseArgvKeyValue(cnt.Args, flagcodec.WithFlagNormalization)
+	return func(flagName string) string {
+		val, found := rteFlags.GetFlag(flagName)
+		if !found {
+			return ""
+		}
+		return val.Data
+	}
 }
 
 func mcoKubeletConfToKubeletConf(mcoKc *mcov1.KubeletConfig) (*kubeletconfigv1beta1.KubeletConfiguration, error) {
