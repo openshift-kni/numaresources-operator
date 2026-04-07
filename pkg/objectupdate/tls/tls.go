@@ -18,6 +18,7 @@ package tls
 
 import (
 	"crypto/tls"
+	"fmt"
 	"strings"
 
 	libgocrypto "github.com/openshift/library-go/pkg/crypto"
@@ -27,6 +28,10 @@ import (
 type Settings struct {
 	MinVersion   string
 	CipherSuites string
+}
+
+func (s Settings) String() string {
+	return fmt.Sprintf("MinVersion: %s, CipherSuites: %s", s.MinVersion, s.CipherSuites)
 }
 
 // NewSettings creates Settings from a tls.Config by converting the

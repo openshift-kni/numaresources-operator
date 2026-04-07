@@ -336,6 +336,7 @@ func main() {
 	tlsCfg := &tls.Config{}
 	tlsConfig(tlsCfg)
 	tlsSettings := objtls.NewSettings(tlsCfg)
+	klog.InfoS("found TLS settings from APIServer", "settings", tlsSettings.String())
 
 	webhookTLSOpts := append(webhookTLSOpts(params.enableHTTP2), tlsConfig)
 
