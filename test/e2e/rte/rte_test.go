@@ -332,7 +332,6 @@ var _ = Describe("with a running cluster with all the components", func() {
 	Context("[tlscompliance][rte] rte complies with TLS Profile modifications", Label(label.Tier0, "feature:tlscompliance"), func() {
 
 		It("should have RTE DaemonSet args aligned with the cluster TLS profile", func(ctx context.Context) {
-			ctx = context.Background()
 			By("Getting initial OCP TLS profile")
 			tlsProfileSpec, err := ctrltls.FetchAPIServerTLSProfile(ctx, clients.Client)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get TLS Profile from APIServer")
@@ -344,36 +343,36 @@ var _ = Describe("with a running cluster with all the components", func() {
 			By("Getting the initial NRO operator object")
 			nropObj := &nropv1.NUMAResourcesOperator{}
 			Expect(clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)).To(Succeed())
-		Eventually(func() error {
-			if err := clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj); err != nil {
-				return fmt.Errorf("failed to get NUMAResourcesOperator: %w", err)
-			}
-			if len(nropObj.Status.NodeGroups) == 0 {
-				return fmt.Errorf("expect the numaresourcesoperator to have at least one NodeGroup in status")
-			}
-			for _, ng := range nropObj.Status.NodeGroups {
-				ds, err := clients.K8sClient.AppsV1().DaemonSets(ng.DaemonSet.Namespace).Get(ctx, ng.DaemonSet.Name, metav1.GetOptions{})
-				if err != nil {
-					return fmt.Errorf("failed to get DaemonSet %s/%s: %w", ng.DaemonSet.Namespace, ng.DaemonSet.Name, err)
+			Eventually(func() error {
+				if err := clients.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj); err != nil {
+					return fmt.Errorf("failed to get NUMAResourcesOperator: %w", err)
 				}
-				rteCnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, rteupdate.MainContainerName)
-				if rteCnt == nil {
-					return fmt.Errorf("main container not found daemonsetName=%q", ds.Name)
+				if len(nropObj.Status.NodeGroups) == 0 {
+					return fmt.Errorf("expect the numaresourcesoperator to have at least one NodeGroup in status")
 				}
-				rteFlags := flagcodec.ParseArgvKeyValue(rteCnt.Args, flagcodec.WithFlagNormalization)
-				minVer, found := rteFlags.GetFlag("--metrics-tls-min-version")
-				if !found || minVer.Data != tlsSettings.MinVersion {
-					return fmt.Errorf("TLS min version mismatch daemonsetName=%q expected=%q got=%q",
-						ds.Name, tlsSettings.MinVersion, minVer.Data)
+				for _, ng := range nropObj.Status.NodeGroups {
+					ds, err := clients.K8sClient.AppsV1().DaemonSets(ng.DaemonSet.Namespace).Get(ctx, ng.DaemonSet.Name, metav1.GetOptions{})
+					if err != nil {
+						return fmt.Errorf("failed to get DaemonSet %s/%s: %w", ng.DaemonSet.Namespace, ng.DaemonSet.Name, err)
+					}
+					rteCnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, rteupdate.MainContainerName)
+					if rteCnt == nil {
+						return fmt.Errorf("main container not found daemonsetName=%q", ds.Name)
+					}
+					rteFlags := flagcodec.ParseArgvKeyValue(rteCnt.Args, flagcodec.WithFlagNormalization)
+					minVer, found := rteFlags.GetFlag("--metrics-tls-min-version")
+					if !found || minVer.Data != tlsSettings.MinVersion {
+						return fmt.Errorf("TLS min version mismatch daemonsetName=%q expected=%q got=%q",
+							ds.Name, tlsSettings.MinVersion, minVer.Data)
+					}
+					ciphers, found := rteFlags.GetFlag("--metrics-tls-cipher-suites")
+					if !found || ciphers.Data != tlsSettings.CipherSuites {
+						return fmt.Errorf("TLS cipher suites mismatch daemonsetName=%q expected=%q got=%q",
+							ds.Name, tlsSettings.CipherSuites, ciphers.Data)
+					}
 				}
-				ciphers, found := rteFlags.GetFlag("--metrics-tls-cipher-suites")
-				if !found || ciphers.Data != tlsSettings.CipherSuites {
-					return fmt.Errorf("TLS cipher suites mismatch daemonsetName=%q expected=%q got=%q",
-						ds.Name, tlsSettings.CipherSuites, ciphers.Data)
-				}
-			}
-			return nil
-		}).WithTimeout(timeout).WithPolling(interval).Should(Succeed())
+				return nil
+			}).WithTimeout(timeout).WithPolling(interval).Should(Succeed())
 		})
 	})
 })
