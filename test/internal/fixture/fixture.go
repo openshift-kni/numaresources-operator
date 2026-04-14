@@ -36,6 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
+
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
@@ -102,11 +104,11 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 	randomizeName := (options & OptionRandomizeName) == OptionRandomizeName
 	avoidCooldown := (options & OptionAvoidCooldown) == OptionAvoidCooldown
 	staticClusterData := (options & OptionStaticClusterData) == OptionStaticClusterData
+
 	ginkgo.By("set up the test namespace")
 	ns, err := setupNamespace(e2eclient.Client, name, randomizeName)
 	if err != nil {
-		klog.Errorf("cannot setup namespace %q: %v", name, err)
-		return nil, err
+		return nil, fmt.Errorf("cannot setup namespace %q: %v", name, err)
 	}
 	klog.Infof("test namespace %q was set up successfully", ns.Name)
 	if !staticClusterData {
@@ -132,6 +134,47 @@ func SetupWithOptions(name string, nrtList nrtv1alpha2.NodeResourceTopologyList,
 		nrtList = nrtAtTestSetup
 	}
 	klog.Infof("set up the fixture reference NRT List: %s", intnrt.ListToString(nrtList.Items, " fixture initial"))
+
+	ginkgo.By("checking MCPs update status")
+	var mcps machineconfigv1.MachineConfigPoolList
+	err = wait.PollUntilContextTimeout(ctx, 10*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		err := e2eclient.Client.List(ctx, &mcps)
+		return err == nil, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list MCPs: %w", err)
+	}
+	for _, mcp := range mcps.Items {
+		conditions := mcp.Status.Conditions
+		for _, condition := range conditions {
+			if condition.Type == machineconfigv1.MachineConfigPoolUpdated {
+				if condition.Status != corev1.ConditionTrue {
+					klog.InfoS("MCP not updated", "name", mcp.Name, "conditions", conditions)
+				}
+				break
+			}
+		}
+	}
+
+	ginkgo.By("Checking unschedulable nodes")
+	var nodes corev1.NodeList
+	err = wait.PollUntilContextTimeout(ctx, 10*time.Second, 30*time.Second, true, func(ctx context.Context) (bool, error) {
+		err := e2eclient.Client.List(ctx, &nodes)
+		return err == nil, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list cluster nodes: %w", err)
+	}
+	unschedulableCount := 0
+	for _, node := range nodes.Items {
+		if node.Spec.Unschedulable {
+			klog.Warningf("Node %q is unschedulable", node.Name)
+			unschedulableCount += 1
+		}
+	}
+	if len(nodes.Items) == unschedulableCount {
+		return nil, fmt.Errorf("all nodes unschedulable")
+	}
 
 	return &Fixture{
 		Client:         e2eclient.Client,
