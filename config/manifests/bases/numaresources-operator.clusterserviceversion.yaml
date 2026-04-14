@@ -4,7 +4,7 @@ metadata:
   annotations:
     alm-examples: '[]'
     capabilities: Basic Install
-    olm.skipRange: '>=4.20.0 <4.21.0'
+    olm.skipRange: '>=4.21.0 <4.22.0'
     operatorframework.io/cluster-monitoring: "true"
   name: numaresources-operator.v0.0.0
   namespace: placeholder
@@ -315,5 +315,5 @@ spec:
   minKubeVersion: 1.23.0
   provider:
     name: Red Hat
-  replaces: numaresources-operator.v4.20.999-snapshot
-  version: 4.21.0
+  replaces: numaresources-operator.v4.21.999-snapshot
+  version: 4.22.0

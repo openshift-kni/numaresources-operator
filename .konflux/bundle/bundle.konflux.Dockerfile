@@ -2,7 +2,7 @@
 
 # yq is required for merging the yaml files
 # Run the overlay in a container
-FROM quay.io/konflux-ci/yq:latest@sha256:d007048d29fc22f9a81524173eeb9131b5b78253a4ab18f6331400c88d78ea47 AS overlay
+FROM quay.io/konflux-ci/yq:latest@sha256:eb5b7311cff72c42f1d816fcf4f565829f58bbbd4c51503ed390b8f4e7a3fe89 AS overlay
 
 # Set work dir
 WORKDIR /tmp
@@ -47,7 +47,7 @@ LABEL distribution-scope="public"
 LABEL release="${OPENSHIFT_VERSION}"
 LABEL url="https://github.com/openshift-kni/numaresources-operator"
 LABEL vendor="Red Hat, Inc."
-LABEL cpe="cpe:/a:redhat:openshift:4.21::el9"
+LABEL cpe="cpe:/a:redhat:openshift:4.22::el9"
 
 LABEL io.openshift.expose-services=""
 LABEL io.openshift.tags="numa,topology,node"
@@ -58,7 +58,7 @@ LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
 LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
 LABEL operators.operatorframework.io.bundle.package.v1=numaresources-operator
-#TODO - consider adding stable channel (e.g. stable,4.21)
+#TODO - consider adding stable channel (e.g. stable,4.22)
 LABEL operators.operatorframework.io.bundle.channels.v1="${OPENSHIFT_VERSION}"
 #TODO - consider default to stable
 LABEL operators.operatorframework.io.bundle.channel.default.v1="${OPENSHIFT_VERSION}"
