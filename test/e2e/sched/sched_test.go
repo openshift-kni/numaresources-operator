@@ -98,12 +98,15 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 
 			Eventually(func() error {
 				// find deployment by the ownerReference
-				deploy, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), uid)
+				dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), uid)
 				if err != nil {
 					return fmt.Errorf("deployment pod listing failed: %w", err)
 				}
-				if deploy.Spec.Template.Spec.Containers[0].Image != e2eimages.SchedTestImageCI {
-					return fmt.Errorf("image mismatch: got %q, want %q", deploy.Spec.Template.Spec.Containers[0].Image, e2eimages.SchedTestImageCI)
+				if len(dp.Spec.Template.Spec.Containers) < 1 {
+					return fmt.Errorf("missing containers in deployment")
+				}
+				if dp.Spec.Template.Spec.Containers[0].Image != e2eimages.SchedTestImageCI {
+					return fmt.Errorf("image mismatch: got %q, want %q", dp.Spec.Template.Spec.Containers[0].Image, e2eimages.SchedTestImageCI)
 				}
 				return nil
 			}).WithTimeout(time.Minute).WithPolling(time.Second * 10).Should(Succeed())

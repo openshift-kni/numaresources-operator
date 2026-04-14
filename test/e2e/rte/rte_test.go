@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"strings"
 	"time"
@@ -99,12 +100,18 @@ var _ = Describe("with a running cluster with all the components", func() {
 
 		It("can modify the LogLevel in NRO CR and klog under RTE container should change respectively", func() {
 			nropObj := &nropv1.NUMAResourcesOperator{}
-			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
-			Expect(err).ToNot(HaveOccurred())
-
-			nropObj.Spec.LogLevel = operatorv1.Trace
-			err = clients.Client.Update(context.TODO(), nropObj)
-			Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
+				if err != nil {
+					return err
+				}
+				nropObj.Spec.LogLevel = operatorv1.Trace
+				err = clients.Client.Update(context.TODO(), nropObj)
+				if err != nil {
+					return err
+				}
+				return nil
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to update LogLevel in NRO CR")
 
 			Eventually(func() error {
 				rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
@@ -222,28 +229,33 @@ var _ = Describe("with a running cluster with all the components", func() {
 
 			generatedName := objectnames.GetComponentName(nropObj.Name, mcp.Name)
 			klog.InfoS("generated config map", "name", generatedName)
-			cm, err := clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
-			Expect(err).ToNot(HaveOccurred())
 
-			desiredMapState := make(map[string]string)
-			for k, v := range cm.Data {
-				desiredMapState[k] = v
-			}
+			var desiredMapState map[string]string
+			Eventually(func() error {
+				cm, err := clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("failed to get ConfigMap %q: %w", generatedName, err)
+				}
+				desiredMapState = maps.Clone(cm.Data)
+				cm.Data = nil
+				_, err = clients.K8sClient.CoreV1().ConfigMaps(namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
+				if err != nil {
+					return fmt.Errorf("failed to update ConfigMap %q: %w", generatedName, err)
+				}
+				return nil
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to clear ConfigMap data")
 
-			cm.Data = nil
-			cm, err = clients.K8sClient.CoreV1().ConfigMaps(namespace).Update(context.TODO(), cm, metav1.UpdateOptions{})
-			Expect(err).ToNot(HaveOccurred())
-
-			Eventually(func() bool {
-				cm, err = clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
-				Expect(err).ToNot(HaveOccurred())
+			Eventually(func() error {
+				cm, err := clients.K8sClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(), generatedName, metav1.GetOptions{})
+				if err != nil {
+					return fmt.Errorf("failed to get ConfigMap %q: %w", generatedName, err)
+				}
 
 				if !reflect.DeepEqual(cm.Data, desiredMapState) {
-					klog.InfoS("ConfigMap data is not in it's desired state, waiting for controller to update it", "configMapName", cm.Name)
-					return false
+					return fmt.Errorf("ConfigMap %q data is not in its desired state, waiting for controller to update it", cm.Name)
 				}
-				return true
-			}).WithTimeout(time.Minute * 5).WithPolling(time.Second * 30).Should(BeTrue())
+				return nil
+			}).WithTimeout(time.Minute * 5).WithPolling(time.Second * 30).Should(Succeed())
 		})
 	})
 
