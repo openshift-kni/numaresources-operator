@@ -23,10 +23,10 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -56,21 +56,15 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 		Expect(e2eclient.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)).ToNot(HaveOccurred(), "cannot get %q in the cluster", nroSchedKey.String())
 
 		DeferCleanup(func() {
-			Eventually(func() bool {
+			Eventually(func() error {
 				err := e2eclient.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
 				if err != nil {
-					klog.ErrorS(err, "failed to get NUMAResourcesScheduler", "name", nroSchedObj.Name)
-					return false
+					return err
 				}
 
 				nroSchedObj.Spec = objects.TestNROScheduler().Spec
-				err = e2eclient.Client.Update(context.TODO(), nroSchedObj)
-				if err != nil {
-					klog.ErrorS(err, "failed to update NUMAResourcesScheduler", "name", nroSchedObj.Name)
-					return false
-				}
-				return true
-			}).Should(BeTrue(), "failed to revert changes to %q during cleanup", nroSchedKey)
+				return e2eclient.Client.Update(context.TODO(), nroSchedObj)
+			}).Should(Succeed(), "failed to revert changes to %q during cleanup", nroSchedKey)
 
 			dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.UID)
 			Expect(err).ToNot(HaveOccurred(), "unable to get deployment by owner reference")
@@ -86,47 +80,42 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 
 			var uid types.UID
 			By(fmt.Sprintf("switching the NROS image to %s", e2eimages.SchedTestImageCI))
-			Eventually(func() bool {
+			Eventually(func() error {
 				if err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj); err != nil {
-					klog.ErrorS(err, "failed to get NUMAResourcesScheduler", "name", nroSchedObj.Name)
-					return false
+					return err
 				}
 				nroSchedObj.Spec.SchedulerImage = e2eimages.SchedTestImageCI
 				if err := e2eclient.Client.Update(context.TODO(), nroSchedObj); err != nil {
-					klog.ErrorS(err, "failed to update NUMAResourcesScheduler", "name", nroSchedObj.Name)
-					return false
+					return err
 				}
 				uid = nroSchedObj.GetUID()
-				return true
-			}).WithTimeout(time.Minute).WithPolling(time.Second * 10).Should(BeTrue())
+				return nil
+			}).WithTimeout(time.Minute).WithPolling(time.Second * 10).Should(Succeed())
 
 			err = e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(nroSchedObj.GetUID()).To(BeEquivalentTo(uid))
 
-			Eventually(func() bool {
+			Eventually(func() error {
 				// find deployment by the ownerReference
 				deploy, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), uid)
 				if err != nil {
-					klog.ErrorS(err, "deployment pod listing failed")
-					return false
+					return fmt.Errorf("deployment pod listing failed: %w", err)
 				}
-				return deploy.Spec.Template.Spec.Containers[0].Image == e2eimages.SchedTestImageCI
-			}).WithTimeout(time.Minute).WithPolling(time.Second * 10).Should(BeTrue())
+				if deploy.Spec.Template.Spec.Containers[0].Image != e2eimages.SchedTestImageCI {
+					return fmt.Errorf("image mismatch: got %q, want %q", deploy.Spec.Template.Spec.Containers[0].Image, e2eimages.SchedTestImageCI)
+				}
+				return nil
+			}).WithTimeout(time.Minute).WithPolling(time.Second * 10).Should(Succeed())
 
 			By("reverting NROS changes")
-			Eventually(func() bool {
+			Eventually(func() error {
 				if err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroSchedObj), nroSchedObj); err != nil {
-					klog.ErrorS(err, "failed to get NUMAResourcesScheduler", "name", nroSchedObj.Name)
-					return false
+					return err
 				}
 				nroSchedObj.Spec = objects.TestNROScheduler().Spec
-				if err = e2eclient.Client.Update(context.TODO(), nroSchedObj); err != nil {
-					klog.ErrorS(err, "failed to update NUMAResourcesScheduler", "name", nroSchedObj.Name)
-					return false
-				}
-				return true
-			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(BeTrue())
+				return e2eclient.Client.Update(context.TODO(), nroSchedObj)
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
 
 			// find deployment by the ownerReference
 			dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.GetUID())
@@ -146,11 +135,10 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			var nroCM *corev1.ConfigMap
 			var initialCM *corev1.ConfigMap
 
-			Eventually(func() bool {
+			Eventually(func() error {
 				cmList := &corev1.ConfigMapList{}
 				if err := e2eclient.Client.List(context.TODO(), cmList); err != nil {
-					klog.ErrorS(err, "failed to list ConfigMaps")
-					return false
+					return fmt.Errorf("failed to list ConfigMaps: %w", err)
 				}
 
 				for i := 0; i < len(cmList.Items); i++ {
@@ -159,70 +147,55 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 					}
 				}
 				if nroCM == nil {
-					klog.InfoS("cannot match ConfigMap affecting scheduler", "schedulerName", nroSchedObj.Spec.SchedulerName, "schedulerImage", nroSchedObj.Spec.SchedulerImage)
-					return false
+					return fmt.Errorf("cannot match ConfigMap affecting scheduler %q image %q", nroSchedObj.Spec.SchedulerName, nroSchedObj.Spec.SchedulerImage)
 				}
 
 				initialCM = nroCM.DeepCopy()
 				nroCM.Data["somekey"] = "somevalue"
 
-				err = e2eclient.Client.Update(context.TODO(), nroCM)
-				if err != nil {
-					klog.ErrorS(err, "failed to update ConfigMap", "namespace", nroCM.Namespace, "name", nroCM.Name)
-					return false
-				}
-				return true
-			}).WithTimeout(60 * time.Second).WithPolling(10 * time.Second).Should(BeTrue())
+				return e2eclient.Client.Update(context.TODO(), nroCM)
+			}).WithTimeout(60 * time.Second).WithPolling(10 * time.Second).Should(Succeed())
 
 			key := client.ObjectKeyFromObject(nroCM)
-			Eventually(func() bool {
+			Eventually(func() error {
 				err = e2eclient.Client.Get(context.TODO(), key, nroCM)
 				if err != nil {
-					klog.ErrorS(err, "failed to obtain ConfigMap")
-					return false
+					return fmt.Errorf("failed to get ConfigMap: %w", err)
 				}
 
 				if diff := cmp.Diff(nroCM.Data, initialCM.Data); diff != "" {
-					// TODO: multi-line value in structured log
-					klog.InfoS("updated ConfigMap data is not equal to the expected", "diff", diff)
-					return false
+					return fmt.Errorf("updated ConfigMap data is not equal to the expected: %s", diff)
 				}
-				return true
-			}).WithTimeout(time.Minute * 2).WithPolling(time.Second * 30).Should(BeTrue())
+				return nil
+			}).WithTimeout(time.Minute * 2).WithPolling(time.Second * 30).Should(Succeed())
 
-			dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.GetUID())
-			Expect(err).ToNot(HaveOccurred())
-
-			initialDP := dp.DeepCopy()
-
-			dp.Spec.Template.Spec.Hostname = "newhostname"
-			c := objects.NewTestPodPause("", "newcontainer").Spec.Containers[0]
-			dp.Spec.Template.Spec.Containers = append(dp.Spec.Template.Spec.Containers, c)
-
-			Eventually(func() bool {
-				if err = e2eclient.Client.Update(context.TODO(), dp); err != nil {
-					klog.ErrorS(err, "failed to update Deployment", "namespace", dp.Namespace, "name", dp.Name)
-					return false
-				}
-				return true
-			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(BeTrue())
-			Expect(err).ToNot(HaveOccurred())
-
-			key = client.ObjectKeyFromObject(dp)
-			Eventually(func() bool {
-				err = e2eclient.Client.Get(context.TODO(), key, dp)
+			var initialDP *appsv1.Deployment
+			var dpKey client.ObjectKey
+			Eventually(func() error {
+				dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.GetUID())
 				if err != nil {
-					klog.ErrorS(err, "failed to obtain ConfigMap")
-					return false
+					return fmt.Errorf("failed to get Deployment: %w", err)
+				}
+				initialDP = dp.DeepCopy()
+				dpKey = client.ObjectKeyFromObject(dp)
+				dp.Spec.Template.Spec.Hostname = "newhostname"
+				c := objects.NewTestPodPause("", "newcontainer").Spec.Containers[0]
+				dp.Spec.Template.Spec.Containers = append(dp.Spec.Template.Spec.Containers, c)
+				return e2eclient.Client.Update(context.TODO(), dp)
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+
+			dp := &appsv1.Deployment{}
+			Eventually(func() error {
+				err = e2eclient.Client.Get(context.TODO(), dpKey, dp)
+				if err != nil {
+					return fmt.Errorf("failed to get Deployment: %w", err)
 				}
 
 				if diff := cmp.Diff(dp.Spec.Template.Spec, initialDP.Spec.Template.Spec); diff != "" {
-					// TODO: multi-line value in structured log
-					klog.InfoS("updated Deployment is not equal to the expected", "diff", diff)
-					return false
+					return fmt.Errorf("updated Deployment is not equal to the expected: %s", diff)
 				}
-				return true
-			}).WithTimeout(time.Minute * 2).WithPolling(time.Second * 30).Should(BeTrue())
+				return nil
+			}).WithTimeout(time.Minute * 2).WithPolling(time.Second * 30).Should(Succeed())
 		})
 		It("should reflect changes in cacheResyncPeriod when configured", func() {
 			deployment, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.UID)
@@ -241,21 +214,14 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 			}
 
 			nroSchedKey := objects.NROSchedObjectKey()
-			Eventually(func() bool {
+			Eventually(func() error {
 				err := e2eclient.Client.Get(context.TODO(), nroSchedKey, nroSchedObj)
 				if err != nil {
-					klog.ErrorS(err, "failed to get", "key", nroSchedKey)
-					return false
+					return err
 				}
 				nroSchedObj.Spec.CacheResyncPeriod = &metav1.Duration{Duration: t}
-
-				err = e2eclient.Client.Update(context.TODO(), nroSchedObj)
-				if err != nil {
-					klog.ErrorS(err, "failed to update", "key", nroSchedKey)
-					return false
-				}
-				return true
-			}).Should(BeTrue(), "failed to update %s's CacheResyncPeriod value", nroSchedKey)
+				return e2eclient.Client.Update(context.TODO(), nroSchedObj)
+			}).Should(Succeed(), "failed to update %s's CacheResyncPeriod value", nroSchedKey)
 
 			By("checking cacheResyncPeriod under the CR's Status")
 			Eventually(func(g Gomega) bool {

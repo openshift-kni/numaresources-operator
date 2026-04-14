@@ -19,6 +19,7 @@ package rte
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -68,34 +69,32 @@ var _ = Describe("with a running cluster with all the components", func() {
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 			Expect(err).ToNot(HaveOccurred())
 
-			Eventually(func() bool {
+			Eventually(func() error {
 				rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
 				if err != nil {
-					klog.ErrorS(err, "failed to get the owned DaemonSets")
-					return false
+					return fmt.Errorf("failed to get the owned DaemonSets: %w", err)
 				}
 				if len(rteDss) == 0 {
-					klog.InfoS("expect the numaresourcesoperator to own at least one DaemonSet")
-					return false
+					return fmt.Errorf("expect the numaresourcesoperator to own at least one DaemonSet")
 				}
 
 				for _, ds := range rteDss {
 					rteCnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, rteupdate.MainContainerName)
-					Expect(rteCnt).ToNot(BeNil())
+					if rteCnt == nil {
+						return fmt.Errorf("no container %q found in DaemonSet %q", rteupdate.MainContainerName, ds.Name)
+					}
 
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
-						klog.InfoS("-v flag doesn't exist in container args managed by DaemonSet", "containerName", rteCnt.Name, "daemonsetName", ds.Name)
-						return false
+						return fmt.Errorf("-v flag doesn't exist in container %q args managed by DaemonSet %q", rteCnt.Name, ds.Name)
 					}
 					if !match {
-						klog.InfoS("LogLevel doesn't match the existing -v flag in container under DaemonSet", "logLevel", nropObj.Spec.LogLevel, "containerName", rteCnt.Name, "daemonsetName", ds.Name)
-						return false
+						return fmt.Errorf("LogLevel doesn't match the existing -v flag in container %q under DaemonSet %q", rteCnt.Name, ds.Name)
 					}
 				}
-				return true
+				return nil
 
-			}).WithTimeout(timeout).WithPolling(interval).Should(BeTrue())
+			}).WithTimeout(timeout).WithPolling(interval).Should(Succeed())
 		})
 
 		It("can modify the LogLevel in NRO CR and klog under RTE container should change respectively", func() {
@@ -107,35 +106,33 @@ var _ = Describe("with a running cluster with all the components", func() {
 			err = clients.Client.Update(context.TODO(), nropObj)
 			Expect(err).ToNot(HaveOccurred())
 
-			Eventually(func() bool {
+			Eventually(func() error {
 				rteDss, err := getOwnedDss(clients.K8sClient, nropObj.ObjectMeta)
 				if err != nil {
-					klog.ErrorS(err, "failed to get the owned DaemonSets")
-					return false
+					return fmt.Errorf("failed to get the owned DaemonSets: %w", err)
 				}
 				if len(rteDss) == 0 {
-					klog.InfoS("expect the numaresourcesoperator to own at least one DaemonSet")
-					return false
+					return errors.New("expect the numaresourcesoperator to own at least one DaemonSet")
 				}
 
 				for _, ds := range rteDss {
 					rteCnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, rteupdate.MainContainerName)
-					Expect(rteCnt).ToNot(BeNil())
+					if rteCnt == nil {
+						return fmt.Errorf("no container %q found", rteupdate.MainContainerName)
+					}
 
 					found, match := matchLogLevelToKlog(rteCnt, nropObj.Spec.LogLevel)
 					if !found {
-						klog.InfoS("-v flag doesn't exist in container args under DaemonSet", "containerName", rteCnt.Name, "daemonsetName", ds.Name)
-						return false
+						return fmt.Errorf("-v flag doesn't exist in container %q args  DaemonSet %q", rteCnt.Name, ds.Name)
 					}
 
 					if !match {
-						klog.InfoS("LogLevel doesn't match the existing -v flag in container managed by DaemonSet", "logLevel", nropObj.Spec.LogLevel, "containerName", rteCnt.Name, "daemonsetName", ds.Name)
-						return false
+						return fmt.Errorf("LogLevel doesn't match the existing -v=%v flag in container %q managed by DaemonSet %q", nropObj.Spec.LogLevel, rteCnt.Name, ds.Name)
 					}
 				}
-				return true
+				return nil
 
-			}).WithTimeout(timeout).WithPolling(interval).Should(BeTrue())
+			}).WithTimeout(timeout).WithPolling(interval).Should(Succeed())
 		})
 	})
 
