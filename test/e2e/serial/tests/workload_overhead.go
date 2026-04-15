@@ -18,7 +18,6 @@ package tests
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -99,7 +98,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 			const requiredNodeNumber int = 1
 			// TODO: we need AT LEAST 2 (so 4, 8 is fine...) but we hardcode the padding logic to keep the test simple,
 			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNumaZones))
+			e2efixture.By("filtering available nodes with at least %d NUMA zones", requiredNumaZones)
 			nrtTwoZoneCandidates = e2enrt.FilterZoneCountEqual(nrts, requiredNumaZones)
 			if len(nrtTwoZoneCandidates) < requiredNodeNumber {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtTwoZoneCandidates))
@@ -216,12 +215,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				failedPodIds := e2efixture.WaitForPaddingPodsRunning(context.Background(), fxt, paddingPods)
 				Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
 
-				By(fmt.Sprintf("checking the resource allocation on %q as the test starts", targetNodeName))
+				e2efixture.By("checking the resource allocation on %q as the test starts", targetNodeName)
 				var nrtInitial nrtv1alpha2.NodeResourceTopology
 				err := fxt.Client.Get(context.TODO(), client.ObjectKey{Name: targetNodeName}, &nrtInitial)
 				Expect(err).ToNot(HaveOccurred())
 
-				By(fmt.Sprintf("Scheduling the testing deployment with RuntimeClass=%q", rtClass.Name))
+				e2efixture.By("Scheduling the testing deployment with RuntimeClass=%q", rtClass.Name)
 				var deploymentName string = "test-dp"
 				var replicas int32 = 1
 
@@ -247,7 +246,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				nrtPostCreate, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), nrtInitial, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
 
-				By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
+				e2efixture.By("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName)
 				pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *deployment)
 				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 				Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
@@ -261,7 +260,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					Expect(err).ToNot(HaveOccurred())
 					Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 
-					By(fmt.Sprintf("checking the resources are accounted as expected on %q", pod.Spec.NodeName))
+					e2efixture.By("checking the resources are accounted as expected on %q", pod.Spec.NodeName)
 					match, err := e2enrt.CheckZoneConsumedResourcesAtLeast(nrtInitial, nrtPostCreate, podResources, corev1qos.GetPodQOS(&pod))
 					Expect(err).ToNot(HaveOccurred())
 					// If the pods are running, and they are because we reached this far, then the resources must have been accounted SOMEWHERE!
@@ -304,7 +303,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				var ok bool
 				targetNodeName, ok = e2efixture.PopNodeName(candidateNodeNames)
 				Expect(ok).To(BeTrue(), "cannot select a node among %#v", e2efixture.ListNodeNames(candidateNodeNames))
-				By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
+				e2efixture.By("selecting node to schedule the test pod: %q", targetNodeName)
 
 				err = fxt.Client.List(context.TODO(), &targetNrtListInitial)
 				Expect(err).ToNot(HaveOccurred())
@@ -405,7 +404,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				nrtListInitial, err := e2enrt.GetUpdated(fxt.Client, nrtList, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
 
-				By(fmt.Sprintf("Scheduling the testing deployment with RuntimeClass=%q", rtClass.Name))
+				e2efixture.By("Scheduling the testing deployment with RuntimeClass=%q", rtClass.Name)
 				var deploymentName string = "test-dp"
 				var replicas int32 = 1
 

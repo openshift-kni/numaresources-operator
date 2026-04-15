@@ -132,7 +132,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 					_, err := pinPodToNode(testPod, targetNodeName)
 					Expect(err).ToNot(HaveOccurred())
 
-					By(fmt.Sprintf("creating pod %s/%s", testPod.Namespace, testPod.Name))
+					e2efixture.By("creating pod %s/%s", testPod.Namespace, testPod.Name)
 					err = fxt.Client.Create(context.TODO(), testPod)
 					Expect(err).ToNot(HaveOccurred())
 
@@ -229,7 +229,7 @@ var _ = Describe("numaresources fundamentals non-regression", Serial, Label("ser
 						serialconfig.MultiNUMALabel: "2",
 					}
 
-					By(fmt.Sprintf("creating pod %s/%s", testPod.Namespace, testPod.Name))
+					e2efixture.By("creating pod %s/%s", testPod.Namespace, testPod.Name)
 					err = fxt.Client.Create(context.TODO(), testPod)
 					Expect(err).ToNot(HaveOccurred())
 

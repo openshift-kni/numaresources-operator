@@ -199,7 +199,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				RestartPolicy: corev1.RestartPolicyAlways,
 			}
 
-			By(fmt.Sprintf("creating a deployment with a guaranteed pod with two containers requiring total %s", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers))))
+			e2efixture.By("creating a deployment with a guaranteed pod with two containers requiring total %s", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)))
 			dp := objects.NewTestDeploymentWithPodSpec(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp47591", *podSpec)
 
 			err = fxt.Client.Create(context.TODO(), dp)
@@ -213,11 +213,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(pods).To(HaveLen(1))
 
 			updatedPod := pods[0]
-			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
+			e2efixture.By("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName)
 			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
 				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			e2efixture.By("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName)
 			schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
@@ -246,7 +246,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			policyFuncs := tmSingleNUMANodeFuncsHandler[scope.Value]
 
-			By(fmt.Sprintf("checking post-create NRT for target node %q updated correctly", targetNodeName))
+			e2efixture.By("checking post-create NRT for target node %q updated correctly", targetNodeName)
 			dataBefore, err := yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err := yaml.Marshal(nrtPostCreate)
@@ -266,7 +266,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			podSpec.Containers[0].Resources.Requests = requiredRes
 			podSpec.Containers[0].Resources.Limits = requiredRes
 
-			By(fmt.Sprintf("updating the deployment to require total %s", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers))))
+			e2efixture.By("updating the deployment to require total %s", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)))
 
 			Eventually(func() error {
 				return fxt.Client.Update(context.TODO(), updatedDp)
@@ -304,11 +304,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			updatedPod = pods[0]
-			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
+			e2efixture.By("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName)
 			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
 				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			e2efixture.By("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName)
 			schedOK, err = nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
@@ -323,7 +323,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostUpdate, err := e2enrt.FindFromList(nrtPostUpdateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking post-update NRT for target node %q updated correctly", targetNodeName))
+			e2efixture.By("checking post-update NRT for target node %q updated correctly", targetNodeName)
 			// it's simpler (no resource subtraction/difference) to check against initial than compute
 			// the delta between postUpdate and postCreate. Both must yield the same result anyway.
 			dataBefore, err = yaml.Marshal(nrtInitial)
@@ -414,13 +414,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			updatedPod = pods[0]
-			By(fmt.Sprintf("checking the pod landed on a node which is different than target node %q vs %q", targetNodeName, updatedPod.Spec.NodeName))
+			e2efixture.By("checking the pod landed on a node which is different than target node %q vs %q", targetNodeName, updatedPod.Spec.NodeName)
 			if updatedPod.Spec.NodeName == targetNodeName {
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
 			Expect(updatedPod.Spec.NodeName).ToNot(Equal(targetNodeName), "pod should not land on node %q", targetNodeName)
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			e2efixture.By("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName)
 			schedOK, err = nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
@@ -438,7 +438,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtLastUpdate, err := e2enrt.FindFromList(nrtLastUpdateDeploymentList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking rerouted NRT for target node %q updated correctly", targetNodeName))
+			e2efixture.By("checking rerouted NRT for target node %q updated correctly", targetNodeName)
 			dataBefore, err = yaml.Marshal(nrtReorganized)
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err = yaml.Marshal(nrtLastUpdate)
@@ -454,7 +454,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
 			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			Eventually(func() bool {
-				By(fmt.Sprintf("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName))
+				e2efixture.By("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName)
 
 				nrtListPostDelete, err := e2enrt.GetUpdated(fxt.Client, nrtLastUpdateDeploymentList, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
@@ -495,7 +495,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 		BeforeEach(func() {
 			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
+			e2efixture.By("filtering available nodes with at least %d NUMA zones", 2)
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
 			if len(nrtCandidates) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
@@ -582,7 +582,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				serialconfig.MultiNUMALabel: "2",
 			}
 
-			By(fmt.Sprintf("creating a deployment with a deployment pod with two replicas requiring %s", e2ereslist.ToString(reqResources)))
+			e2efixture.By("creating a deployment with a deployment pod with two replicas requiring %s", e2ereslist.ToString(reqResources))
 			dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, "testdp48746", images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 			dp.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			dp.Spec.Template.Spec.Containers[0].Resources.Limits = reqResources
@@ -625,7 +625,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			// We need to determine total resources consumed on the node
 			checkConsumedRes := e2enrt.CheckNodeConsumedResourcesAtLeast
-			By(fmt.Sprintf("checking post-create NRT after pod: %q for target node %q updated correctly", updatedPod0.Name, targetNodeName))
+			e2efixture.By("checking post-create NRT after pod: %q for target node %q updated correctly", updatedPod0.Name, targetNodeName)
 			dataBefore, err := yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err := yaml.Marshal(nrtPostCreate)
@@ -651,7 +651,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			updatedDp.Spec.Template.Spec.Containers[0].Resources.Requests = reqResources
 			updatedDp.Spec.Template.Spec.Containers[0].Resources.Limits = reqResources
 
-			By(fmt.Sprintf("updating the deployment to require total %s", e2ereslist.ToString(reqResources)))
+			e2efixture.By("updating the deployment to require total %s", e2ereslist.ToString(reqResources))
 
 			Eventually(func() error {
 				return fxt.Client.Update(context.TODO(), updatedDp)
@@ -691,7 +691,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtPostUpdate, err := e2enrt.FindFromList(nrtPostCreateDeploymentList.Items, targetNodeName)
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking post-create NRT after pod: %q for target node %q updated correctly", updatedPod0.Name, targetNodeName))
+			e2efixture.By("checking post-create NRT after pod: %q for target node %q updated correctly", updatedPod0.Name, targetNodeName)
 			dataBefore, err = yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
 			dataAfterUpdate, err := yaml.Marshal(nrtPostUpdate)
@@ -714,7 +714,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
 			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			Eventually(func() bool {
-				By(fmt.Sprintf("checking the resources are restored as expected on %q", targetNodeName))
+				e2efixture.By("checking the resources are restored as expected on %q", targetNodeName)
 
 				nrtListPostDelete, err := e2enrt.GetUpdated(fxt.Client, nrtPostUpdateDeploymentList, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
@@ -735,7 +735,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 		BeforeEach(func() {
 			// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
+			e2efixture.By("filtering available nodes with at least %d NUMA zones", 2)
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
 			if len(nrtCandidates) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
@@ -822,7 +822,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			})
 
 			rsCreateStart := time.Now()
-			By(fmt.Sprintf("creating a replicaset %s/%s with %d replicas scheduling with scheduler: %s", fxt.Namespace.Name, rsName, replicaNumber, corev1.DefaultSchedulerName))
+			e2efixture.By("creating a replicaset %s/%s with %d replicas scheduling with scheduler: %s", fxt.Namespace.Name, rsName, replicaNumber, corev1.DefaultSchedulerName)
 			err = fxt.Client.Create(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -849,7 +849,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}, time.Minute, time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
 			schedTimeWithDefaultScheduler := time.Since(rsCreateStart)
 
-			By(fmt.Sprintf("checking the pods were scheduled with scheduler %q", corev1.DefaultSchedulerName))
+			e2efixture.By("checking the pods were scheduled with scheduler %q", corev1.DefaultSchedulerName)
 			for _, pod := range pods {
 				schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, corev1.DefaultSchedulerName)
 				Expect(err).ToNot(HaveOccurred())
@@ -857,7 +857,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			}
 
-			By(fmt.Sprintf("checking the pods were scheduled on the target node %q", targetNodeName))
+			e2efixture.By("checking the pods were scheduled on the target node %q", targetNodeName)
 			for _, pod := range pods {
 				Expect(pod.Spec.NodeName).To(Equal(targetNodeName), "pod landed on %q instead of on %v", pod.Spec.NodeName, targetNodeName)
 			}
@@ -865,7 +865,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("Waiting for the NRT data to stabilize")
 			e2efixture.MustSettleNRT(fxt)
 
-			By(fmt.Sprintf("verifying resources allocation correctness for NRT target: %q", targetNodeName))
+			e2efixture.By("verifying resources allocation correctness for NRT target: %q", targetNodeName)
 			var nrtAfterRSCreation nrtv1alpha2.NodeResourceTopologyList
 			nrtAfterRSCreation, err = e2enrt.GetUpdated(fxt.Client, nrtInitial, timeout)
 			Expect(err).ToNot(HaveOccurred())
@@ -884,7 +884,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(BeEmpty(), "inconsistent accounting when checking NRTs consumed resources")
 
-			By(fmt.Sprintf("deleting replicaset %s/%s", fxt.Namespace.Name, rsName))
+			e2efixture.By("deleting replicaset %s/%s", fxt.Namespace.Name, rsName)
 			err = fxt.Client.Delete(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -898,7 +898,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("Waiting for the NRT data to stabilize")
 			e2efixture.MustSettleNRT(fxt)
 
-			By(fmt.Sprintf("checking the resources are restored as expected on %q", targetNodeName))
+			e2efixture.By("checking the resources are restored as expected on %q", targetNodeName)
 
 			nrtListPostDelete, err := e2enrt.GetUpdated(fxt.Client, nrtAfterRSCreation, 1*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
@@ -920,7 +920,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			nrtInitial, err = e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, timeout)
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("creating a replicaset %s/%s with %d replicas scheduling with: %s", fxt.Namespace.Name, rsName, replicaNumber, serialconfig.Config.SchedulerName))
+			e2efixture.By("creating a replicaset %s/%s with %d replicas scheduling with: %s", fxt.Namespace.Name, rsName, replicaNumber, serialconfig.Config.SchedulerName)
 			rsCreateStart = time.Now()
 			err = fxt.Client.Create(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
@@ -947,12 +947,12 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}, time.Minute, time.Second).Should(BeTrue(), "there should be %d pods under replicaset: %q", replicaNumber, namespacedRsName.String())
 			schedTimeWithTopologyScheduler := time.Since(rsCreateStart)
 
-			By(fmt.Sprintf("checking the pods were scheduled on the target node %q", targetNodeName))
+			e2efixture.By("checking the pods were scheduled on the target node %q", targetNodeName)
 			for _, pod := range pods {
 				Expect(pod.Spec.NodeName).To(Equal(targetNodeName), "pod landed on %q instead of on %v", pod.Spec.NodeName, targetNodeName)
 			}
 
-			By(fmt.Sprintf("checking the pods were scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			e2efixture.By("checking the pods were scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName)
 			for _, pod := range pods {
 				schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 				Expect(err).ToNot(HaveOccurred())
@@ -962,7 +962,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("Waiting for the NRT data to stabilize")
 			e2efixture.MustSettleNRT(fxt)
 
-			By(fmt.Sprintf("verifying resources allocation correctness for NRT target: %q", targetNodeName))
+			e2efixture.By("verifying resources allocation correctness for NRT target: %q", targetNodeName)
 			nrtAfterDPCreation, err := e2enrt.GetUpdated(fxt.Client, nrtInitial, timeout)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -980,13 +980,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 			Expect(match).ToNot(BeEmpty(), "inconsistent accounting when checking NRTs consumed resources")
 
-			By(fmt.Sprintf("comparing scheduling times between %q and %q", corev1.DefaultSchedulerName, serialconfig.Config.SchedulerName))
+			e2efixture.By("comparing scheduling times between %q and %q", corev1.DefaultSchedulerName, serialconfig.Config.SchedulerName)
 			diff := int64(math.Abs(float64(schedTimeWithTopologyScheduler.Milliseconds() - schedTimeWithDefaultScheduler.Milliseconds())))
 			// 2000 milliseconds diff seems reasonable, but can evaluate later if needed.
 			d := time.Millisecond * 2000
 			Expect(diff).To(BeNumerically("<", d.Milliseconds()), "expected the difference between scheduling times to be %d at max; actual diff: %d milliseconds", d.Milliseconds(), diff)
 
-			By(fmt.Sprintf("deleting deployment %s/%s", fxt.Namespace.Name, rsName))
+			e2efixture.By("deleting deployment %s/%s", fxt.Namespace.Name, rsName)
 			err = fxt.Client.Delete(context.TODO(), rs)
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -1192,11 +1192,11 @@ func matchLogLevelToKlog(cnt *corev1.Container, level operatorv1.LogLevel) (bool
 }
 
 func checkReplica(pod corev1.Pod, targetNodeName string, k8sClient *kubernetes.Clientset) {
-	By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", pod.Spec.NodeName, targetNodeName))
+	e2efixture.By("checking the pod landed on the target node %q vs %q", pod.Spec.NodeName, targetNodeName)
 	Expect(pod.Spec.NodeName).To(Equal(targetNodeName),
 		"node landed on %q instead of on %v", pod.Spec.NodeName, targetNodeName)
 
-	By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+	e2efixture.By("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName)
 	schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), k8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 	Expect(err).ToNot(HaveOccurred())
 	Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)

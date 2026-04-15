@@ -132,7 +132,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 				Expect(desiredPods).To(BeNumerically(">", hostsRequired)) // this is more like a C assert. Should never ever fail.
 
-				By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
+				e2efixture.By("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired)
 				nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
@@ -228,7 +228,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 					// TODO: should it be desiredPodsPerNode?
 					Expect(interference.ratio).To(BeNumerically("<=", desiredPods)) // this is more like a C assert. Should never ever fail.
 
-					By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
+					e2efixture.By("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired)
 					nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
 					if len(nrtCandidates) < hostsRequired {
 						e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
@@ -364,7 +364,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 				// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
 				// TODO: when we support NUMA zones > 2, switch to FilterZoneCountAtLeast
-				By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
+				e2efixture.By("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired)
 				nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
@@ -372,7 +372,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				klog.InfoS("Found nodes", "count", len(nrtCandidates), "NUMAZoneCount", NUMAZonesRequired)
 
 				NUMAZonesWithDevice := 1
-				By(fmt.Sprintf("filtering available nodes which provide %q on exactly %d zones", deviceName, NUMAZonesWithDevice))
+				e2efixture.By("filtering available nodes which provide %q on exactly %d zones", deviceName, NUMAZonesWithDevice)
 				nrtCandidates = filterAnyZoneProvidingResourcesAtMost(nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with at most %d NUMA Zones offering %q: found %d", NUMAZonesWithDevice, deviceName, len(nrtCandidates))
@@ -485,7 +485,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 
 				// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
 				// TODO: when we support NUMA zones > 2, switch to FilterZoneCountAtLeast
-				By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
+				e2efixture.By("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired)
 				nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
@@ -493,7 +493,7 @@ var _ = Describe("scheduler cache", Serial, Label(label.Tier0, "scheduler", "cac
 				klog.InfoS("Found nodes", "count", len(nrtCandidates), "NUMAZoneCount", NUMAZonesRequired)
 
 				NUMAZonesWithDevice := 1
-				By(fmt.Sprintf("filtering available nodes which provide %q on exactly %d zones", deviceName, NUMAZonesWithDevice))
+				e2efixture.By("filtering available nodes which provide %q on exactly %d zones", deviceName, NUMAZonesWithDevice)
 				nrtCandidates = filterAnyZoneProvidingResourcesAtMost(nrtCandidates, deviceName, int64(desiredPods), NUMAZonesWithDevice)
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with at most %d NUMA Zones offering %q: found %d", NUMAZonesWithDevice, deviceName, len(nrtCandidates))

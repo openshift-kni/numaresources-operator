@@ -117,7 +117,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 		BeforeEach(func() {
 			neededNodes := 1
 
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
+			e2efixture.By("filtering available nodes with at least %d NUMA zones", requiredNUMAZones)
 			nrtCandidates = e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
 			if len(nrtCandidates) < neededNodes {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes)
@@ -197,7 +197,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			By("waiting for the NRT data to settle")
 			e2efixture.MustSettleNRT(fxt)
 
-			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
+			e2efixture.By("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName)
 			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
@@ -224,7 +224,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			deployment, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDeploymentReplicasCreation(context.TODO(), deployment, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
-			By(fmt.Sprintf("checking deployment pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
+			e2efixture.By("checking deployment pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName)
 			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *deployment)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
@@ -264,7 +264,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			ds, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(context.TODO(), wait.ObjectKeyFromObject(ds), len(nrtCandidates))
 			Expect(err).NotTo(HaveOccurred())
 
-			By(fmt.Sprintf("checking daemonset pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
+			e2efixture.By("checking daemonset pods have been handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName)
 			pods, err := podlist.With(fxt.Client).ByDaemonset(context.TODO(), *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
@@ -303,7 +303,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			deployment, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDeploymentReplicasCreation(context.TODO(), deployment, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
-			By(fmt.Sprintf("checking deployment pods have been handled by the default scheduler %q but failed to be scheduled", corev1.DefaultSchedulerName))
+			e2efixture.By("checking deployment pods have been handled by the default scheduler %q but failed to be scheduled", corev1.DefaultSchedulerName)
 			pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *deployment)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
@@ -323,7 +323,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 	Context("with at least two nodes with two numa zones and enough resources in one numa zone", func() {
 		It("[test_id:47592] a daemonset with a guaranteed pod resources available on one node/one single numa zone but not in any other node", Label(label.Tier2, "unsched", "failalign"), func() {
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
+			e2efixture.By("filtering available nodes with at least %d NUMA zones", requiredNUMAZones)
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
 
 			neededNodes := 2
@@ -410,7 +410,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			ds, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(context.TODO(), wait.ObjectKeyFromObject(ds), len(nrtCandidates))
 			Expect(err).NotTo(HaveOccurred())
 
-			By(fmt.Sprintf("checking daemonset pods have been scheduled with the topology aware scheduler %q ", serialconfig.Config.SchedulerName))
+			e2efixture.By("checking daemonset pods have been scheduled with the topology aware scheduler %q ", serialconfig.Config.SchedulerName)
 			pods, err := podlist.With(fxt.Client).ByDaemonset(context.TODO(), *ds)
 			Expect(err).ToNot(HaveOccurred(), "Unable to get pods from daemonset %q:  %v", ds.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DS %s/%s", ds.Namespace, ds.Name)
@@ -418,11 +418,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			By("waiting for the NRT data to settle")
 			e2efixture.MustSettleNRT(fxt)
 
-			By(fmt.Sprintf("checking only daemonset pod in targetNode:%q is up and running", targetNodeName))
+			e2efixture.By("checking only daemonset pod in targetNode:%q is up and running", targetNodeName)
 			podRunningTimeout := 3 * time.Minute
 			for _, pod := range pods {
 				if pod.Spec.NodeName == targetNodeName {
-					By(fmt.Sprintf("verify events for pod %s/%s node: %q", pod.Namespace, pod.Name, pod.Spec.NodeName))
+					e2efixture.By("verify events for pod %s/%s node: %q", pod.Namespace, pod.Name, pod.Spec.NodeName)
 					scheduledWithTAS, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 					if err != nil {
 						_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
@@ -466,7 +466,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			}
 
 			// Filter by number of numa zones
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
+			e2efixture.By("filtering available nodes with at least %d NUMA zones", requiredNUMAZones)
 			nrtCandidates = e2enrt.FilterZoneCountEqual(nrtCandidates, requiredNUMAZones)
 			if len(nrtCandidates) < neededNodes {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrtCandidates), neededNodes)
@@ -493,7 +493,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			nrtCandidateNames := e2enrt.AccumulateNames(nrtCandidates)
 			targetNodeName, ok := e2efixture.PopNodeName(nrtCandidateNames)
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
-			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
+			e2efixture.By("selecting node to schedule the pod: %q", targetNodeName)
 
 			By("Padding all other candidate nodes")
 			var paddingPods []*corev1.Pod
@@ -585,14 +585,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
 
 			interval := 10 * time.Second
-			By(fmt.Sprintf("Checking pod %q keeps in %q state for at least %v seconds ...", pod.Name, string(corev1.PodPending), interval*3))
+			e2efixture.By("Checking pod %q keeps in %q state for at least %v seconds ...", pod.Name, string(corev1.PodPending), interval*3)
 			_, err = wait.With(fxt.Client).Interval(interval).Steps(3).WhileInPodPhase(context.TODO(), pod.Namespace, pod.Name, corev1.PodPending)
 			if err != nil {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 			}
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled", serialconfig.Config.SchedulerName))
+			e2efixture.By("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled", serialconfig.Config.SchedulerName)
 			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
 			Expect(err).ToNot(HaveOccurred())
 			if !isFailed {
@@ -671,7 +671,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			dpName := "test-dp-47615"
 			replicas := int32(len(nrts)*requiredNUMAZones + 1) // at least 1 replica won't fit
-			By(fmt.Sprintf("creating a deployment %q with replicas %d candidate nodes %d", dpName, replicas, len(nrts)))
+			e2efixture.By("creating a deployment %q with replicas %d candidate nodes %d", dpName, replicas, len(nrts))
 
 			nroSchedObj := nrosched.CheckNROSchedulerAvailable(ctx, fxt.Client, objectnames.DefaultNUMAResourcesSchedulerCrName)
 
@@ -709,7 +709,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			dp, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDeploymentReplicasCreation(ctx, dp, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
-			By(fmt.Sprintf("checking deployment pods failed to be scheduled by %q ", schedulerName))
+			e2efixture.By("checking deployment pods failed to be scheduled by %q ", schedulerName)
 			pods, err := podlist.With(fxt.Client).ByDeployment(ctx, *dp)
 			Expect(err).ToNot(HaveOccurred(), "unable to get pods from deployment %q:  %v", dp.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", dp.Namespace, dp.Name)
@@ -830,7 +830,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 		var err error
 
 		BeforeEach(func() {
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
+			e2efixture.By("filtering available nodes with at least %d NUMA zones", requiredNUMAZones)
 			nrtCandidates = e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
 
 			const neededNodes = 1
@@ -842,7 +842,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			var ok bool
 			targetNodeName, ok = e2efixture.PopNodeName(nrtCandidateNames)
 			Expect(ok).To(BeTrue(), "cannot select a node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
-			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
+			e2efixture.By("selecting node to schedule the test pod: %q", targetNodeName)
 
 			err = fxt.Client.Get(context.TODO(), client.ObjectKey{Name: targetNodeName}, &targetNrtInitial)
 			Expect(err).ToNot(HaveOccurred())
@@ -872,7 +872,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				Expect(err).ToNot(HaveOccurred(), "could not get padding resources for node %q", nrtInfo.Name)
 
 				for _, zone := range nrtInfo.Zones {
-					By(fmt.Sprintf("fully padding node %q zone %q ", nrtInfo.Name, zone.Name))
+					e2efixture.By("fully padding node %q zone %q ", nrtInfo.Name, zone.Name)
 					padPod := newPaddingPod(nrtInfo.Name, zone.Name, fxt.Namespace.Name, paddingRes[zone.Name])
 
 					padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)

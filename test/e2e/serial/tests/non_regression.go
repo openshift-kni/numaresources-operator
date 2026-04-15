@@ -78,7 +78,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		Expect(err).ToNot(HaveOccurred())
 
 		// so we can't support ATM zones > 2. HW with zones > 2 is rare anyway, so not to big of a deal now.
-		By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", 2))
+		e2efixture.By("filtering available nodes with at least %d NUMA zones", 2)
 		nrtCandidates := e2enrt.FilterZoneCountEqual(nrtList.Items, 2)
 		if len(nrtCandidates) < 2 {
 			e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
@@ -153,7 +153,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			pSpec := &testPod.Spec
 
-			By(fmt.Sprintf("explicitly mentioning which node we want the pod to land on: %q", targetNodeName))
+			e2efixture.By("explicitly mentioning which node we want the pod to land on: %q", targetNodeName)
 			pSpec.NodeName = targetNodeName
 
 			By("setting a fake schedule name under the pod to make sure pod not scheduled by any scheduler")
@@ -168,7 +168,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			cnt.Resources.Requests = requiredRes
 			cnt.Resources.Limits = requiredRes
 
-			By(fmt.Sprintf("creating pod %s/%s", testPod.Namespace, testPod.Name))
+			e2efixture.By("creating pod %s/%s", testPod.Namespace, testPod.Name)
 			err = fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -178,14 +178,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
+			e2efixture.By("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName)
 			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
 				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
 
 			By("Waiting for the NRT data to stabilize")
 			e2efixture.MustSettleNRT(fxt)
 
-			By(fmt.Sprintf("checking NRT for target node %q updated correctly", targetNodeName))
+			e2efixture.By("checking NRT for target node %q updated correctly", targetNodeName)
 			rl := e2ereslist.FromGuaranteedPod(*updatedPod)
 			nrtPostCreate := expectNRTConsumedResources(fxt, nrtInitial, rl, updatedPod)
 
@@ -195,7 +195,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
 			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
-			By(fmt.Sprintf("checking the resources are restored as expected on %q", targetNodeName))
+			e2efixture.By("checking the resources are restored as expected on %q", targetNodeName)
 			nrtPostDelete, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), nrtPostCreate, 1*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 			ok, err = e2enrt.CheckEqualAvailableResources(nrtInitial, nrtPostDelete)
@@ -216,7 +216,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(ok).To(BeTrue())
 			targetNodeName := workers[targetIdx].Name
 
-			By(fmt.Sprintf("explicitly specfying the node where the pod should land: %q. Scheduler Name does not matter in this case", targetNodeName))
+			e2efixture.By("explicitly specfying the node where the pod should land: %q. Scheduler Name does not matter in this case", targetNodeName)
 			nonExistingSchedulerName := "foo"
 
 			var replicas int32 = 1
@@ -249,7 +249,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				RestartPolicy: corev1.RestartPolicyAlways,
 			}
 
-			By(fmt.Sprintf("creating a deployment with a guaranteed pod with two containers requiring total %s", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers))))
+			e2efixture.By("creating a deployment with a guaranteed pod with two containers requiring total %s", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)))
 			dp := objects.NewTestDeploymentWithPodSpec(replicas, podLabels, nil, fxt.Namespace.Name, "testdp", *podSpec)
 
 			err = fxt.Client.Create(context.TODO(), dp)
@@ -267,11 +267,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			updatedPod := pods[0]
 
-			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
+			e2efixture.By("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName)
 			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
 				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
 
-			By(fmt.Sprintf("checking the pod was assigned to a specific node and not scheduled by a scheduler %q", nonExistingSchedulerName))
+			e2efixture.By("checking the pod was assigned to a specific node and not scheduled by a scheduler %q", nonExistingSchedulerName)
 			schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, nonExistingSchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeFalse(), "pod %s/%s not assigned to a specific node without a scheduler %s", updatedPod.Namespace, updatedPod.Name, nonExistingSchedulerName)
@@ -294,7 +294,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			policyFuncs := tmSingleNUMANodeFuncsHandler[scope.Value]
 
-			By(fmt.Sprintf("checking post-create NRT for target node %q updated correctly", targetNodeName))
+			e2efixture.By("checking post-create NRT for target node %q updated correctly", targetNodeName)
 			dataBefore, err := yaml.Marshal(nrtInitial)
 			Expect(err).ToNot(HaveOccurred())
 			dataAfter, err := yaml.Marshal(nrtPostCreate)
@@ -310,7 +310,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
 			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			Eventually(func() bool {
-				By(fmt.Sprintf("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName))
+				e2efixture.By("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName)
 
 				nrtListPostDelete, err := e2enrt.GetUpdated(fxt.Client, nrtPostCreateDeploymentList, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
@@ -333,7 +333,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			//select target node
 			targetNodeName, ok := e2efixture.PopNodeName(nrtNames)
 			Expect(ok).To(BeTrue(), "cannot select a node among %#v", e2efixture.ListNodeNames(nrtNames))
-			By(fmt.Sprintf("selecting node to schedule the test pod: %q", targetNodeName))
+			e2efixture.By("selecting node to schedule the test pod: %q", targetNodeName)
 
 			//pad non target nodes
 			By("padding non target nodes leaving room for the baseload only")
@@ -355,7 +355,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				Expect(err).ToNot(HaveOccurred(), "could not get padding resources for node %q", nrtInfo.Name)
 
 				for _, zone := range nrtInfo.Zones {
-					By(fmt.Sprintf("fully padding node %q zone %q ", nrtInfo.Name, zone.Name))
+					e2efixture.By("fully padding node %q zone %q ", nrtInfo.Name, zone.Name)
 					padPod := newPaddingPod(nrtInfo.Name, zone.Name, fxt.Namespace.Name, paddingRes[zone.Name])
 
 					padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
@@ -397,7 +397,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			pod.Spec.SchedulerName = serialconfig.Config.SchedulerName
 			pod.Spec.Containers[0].Resources.Limits = requiredRes
 
-			By(fmt.Sprintf("Scheduling the testing pod with resources that are not allocatable on any numa zone of the target node. requested resources of the test pod: %s", e2ereslist.ToString(e2ereslist.FromContainerLimits(pod.Spec.Containers))))
+			e2efixture.By("Scheduling the testing pod with resources that are not allocatable on any numa zone of the target node. requested resources of the test pod: %s", e2ereslist.ToString(e2ereslist.FromContainerLimits(pod.Spec.Containers)))
 			err = fxt.Client.Create(context.TODO(), pod)
 			Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
 
@@ -458,7 +458,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			dpName := "test-dp-scaleup"
 			replicas := int32(len(nrtCandidates)) // initially. Then the final value will be 1 replica per NUMA node
-			By(fmt.Sprintf("creating a deployment %q with replicas %d candidate nodes %d", dpName, replicas, len(nrtCandidates)))
+			e2efixture.By("creating a deployment %q with replicas %d candidate nodes %d", dpName, replicas, len(nrtCandidates))
 
 			nroSchedObj := nrosched.CheckNROSchedulerAvailable(ctx, fxt.Client, objectnames.DefaultNUMAResourcesSchedulerCrName)
 
@@ -493,7 +493,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			dp, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDeploymentReplicasReadiness(ctx, dp, replicas)
 			Expect(err).NotTo(HaveOccurred())
 
-			By(fmt.Sprintf("checking deployment pods have been scheduled by %q ", schedulerName))
+			e2efixture.By("checking deployment pods have been scheduled by %q ", schedulerName)
 			pods, err := podlist.With(fxt.Client).ByDeployment(ctx, *dp)
 			Expect(err).ToNot(HaveOccurred(), "unable to get pods from deployment %q:  %v", dp.Name, err)
 			Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", dp.Namespace, dp.Name)
