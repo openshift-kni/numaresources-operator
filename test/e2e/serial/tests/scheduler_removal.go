@@ -18,7 +18,6 @@ package tests
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -78,7 +77,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 
 			dp := createDeploymentSync(fxt, "testdp", serialconfig.Config.SchedulerName)
 
-			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name))
+			e2efixture.By("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name)
 			err = fxt.Client.Delete(context.TODO(), serialconfig.Config.NROSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -90,7 +89,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 			for step := 0; step < maxStep; step++ {
 				time.Sleep(10 * time.Second)
 
-				By(fmt.Sprintf("ensuring the deployment %q keep being ready %d/%d", dp.Name, step+1, maxStep))
+				e2efixture.By("ensuring the deployment %q keep being ready %d/%d", dp.Name, step+1, maxStep)
 
 				updatedDp := &appsv1.Deployment{}
 				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
@@ -103,7 +102,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 		It("[test_id:49093][case:2] should keep new scheduled workloads pending", Label(label.Tier1, "unsched", "feature:unsched"), func() {
 			var err error
 
-			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name))
+			e2efixture.By("deleting the NRO Scheduler object: %s", serialconfig.Config.NROSchedObj.Name)
 			err = fxt.Client.Delete(context.TODO(), serialconfig.Config.NROSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -117,7 +116,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 			for step := 0; step < maxStep; step++ {
 				time.Sleep(10 * time.Second)
 
-				By(fmt.Sprintf("ensuring the deployment %q keep being pending %d/%d", dp.Name, step+1, maxStep))
+				e2efixture.By("ensuring the deployment %q keep being pending %d/%d", dp.Name, step+1, maxStep)
 
 				updatedDp := &appsv1.Deployment{}
 				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
@@ -134,7 +133,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 
 			ctx := context.TODO()
 
-			By(fmt.Sprintf("deleting the NRO Scheduler object: %s", nroSchedObj.Name))
+			e2efixture.By("deleting the NRO Scheduler object: %s", nroSchedObj.Name)
 			err = fxt.Client.Delete(ctx, nroSchedObj)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -149,7 +148,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 			for step := 0; step < maxStep; step++ {
 				time.Sleep(10 * time.Second)
 
-				By(fmt.Sprintf("ensuring the deployment %q keep being pending %d/%d", dp.Name, step+1, maxStep))
+				e2efixture.By("ensuring the deployment %q keep being pending %d/%d", dp.Name, step+1, maxStep)
 
 				err = fxt.Client.Get(ctx, client.ObjectKeyFromObject(dp), updatedDp)
 				Expect(err).ToNot(HaveOccurred())
@@ -160,7 +159,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 			restoreScheduler(fxt, nroSchedObj)
 			nroSchedObj = nrosched.CheckNROSchedulerAvailable(ctx, fxt.Client, nroSchedObj.Name)
 
-			By(fmt.Sprintf("waiting for the test deployment %q to become complete and ready", updatedDp.Name))
+			e2efixture.By("waiting for the test deployment %q to become complete and ready", updatedDp.Name)
 			_, err = wait.With(fxt.Client).Interval(2*time.Second).Interval(30*time.Second).ForDeploymentComplete(ctx, updatedDp)
 			Expect(err).ToNot(HaveOccurred())
 		})
@@ -169,7 +168,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 })
 
 func restoreScheduler(fxt *e2efixture.Fixture, nroSchedObj *nropv1.NUMAResourcesScheduler) {
-	By(fmt.Sprintf("re-creating the NRO Scheduler object: %s", nroSchedObj.Name))
+	e2efixture.By("re-creating the NRO Scheduler object: %s", nroSchedObj.Name)
 	nroSched := &nropv1.NUMAResourcesScheduler{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "NUMAResourcesScheduler",
@@ -196,7 +195,7 @@ func createDeployment(fxt *e2efixture.Fixture, name, schedulerName string) *apps
 	dp := objects.NewTestDeployment(replicas, podLabels, nodeSelector, fxt.Namespace.Name, name, images.GetPauseImage(), []string{images.PauseCommand}, []string{})
 	dp.Spec.Template.Spec.SchedulerName = schedulerName
 
-	By(fmt.Sprintf("creating a test deployment %q", name))
+	e2efixture.By("creating a test deployment %q", name)
 	err = fxt.Client.Create(context.TODO(), dp)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -205,7 +204,7 @@ func createDeployment(fxt *e2efixture.Fixture, name, schedulerName string) *apps
 
 func createDeploymentSync(fxt *e2efixture.Fixture, name, schedulerName string) *appsv1.Deployment {
 	dp := createDeployment(fxt, name, schedulerName)
-	By(fmt.Sprintf("waiting for the test deployment %q to be complete and ready", name))
+	e2efixture.By("waiting for the test deployment %q to be complete and ready", name)
 	_, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(context.TODO(), dp)
 	Expect(err).ToNot(HaveOccurred(), "Deployment %q is not up & running after %v", dp.Name, time.Minute)
 	return dp

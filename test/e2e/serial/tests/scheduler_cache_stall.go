@@ -130,7 +130,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 				NUMAZonesRequired = 2
 				cpusPerPod = 2 // must be even. Must be >= 2
 
-				By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
+				e2efixture.By("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired)
 				nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
@@ -414,7 +414,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 				NUMAZonesRequired = 2
 				cpusPerPod = 2 // must be even. Must be >= 2
 
-				By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
+				e2efixture.By("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired)
 				nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
 				if len(nrtCandidates) < hostsRequired {
 					e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", NUMAZonesRequired, len(nrtCandidates))
@@ -644,7 +644,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 							serialconfig.MultiNUMALabel: "2",
 						}
 
-						By(fmt.Sprintf("creating pod %s/%s", testPod.Namespace, testPod.Name))
+						e2efixture.By("creating pod %s/%s", testPod.Namespace, testPod.Name)
 						err = fxt.Client.Create(ctx, testPod)
 						Expect(err).ToNot(HaveOccurred())
 

@@ -108,7 +108,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				klog.InfoS("pod resources", "namespace", updatedPod.Namespace, "name", updatedPod.Name, "resources", intreslist.ToString(intreslist.FromContainerRequests(pod.Spec.Containers)))
 				Expect(updatedPod.Status.QOSClass).To(Equal(expectedQOS), "pod QOS mismatch")
 
-				By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+				e2efixture.By("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName)
 				schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
@@ -342,7 +342,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				// TODO: multi-line value in structured log
 				klog.InfoS("pod resources", "namespace", updatedPod.Namespace, "name", updatedPod.Name, "resources", intreslist.ToString(intreslist.FromContainerRequests(pod.Spec.Containers)))
 				Expect(updatedPod.Status.QOSClass).To(Equal(expectedQOS), "pod QoS mismatch")
-				By(fmt.Sprintf("checking the pod is handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
+				e2efixture.By("checking the pod is handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName)
 				isFailed, err := nrosched.CheckPodSchedulingFailedWithMsg(context.TODO(), fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName, fmt.Sprintf("%d Insufficient ephemeral-storage", len(candidateNodeNames)))
 				if err != nil {
 					_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
@@ -415,7 +415,7 @@ type desiredNodesState struct {
 }
 
 func filterNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) []nrtv1alpha2.NodeResourceTopology {
-	By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", nodesState.RequiredNUMAZones))
+	e2efixture.By("filtering available nodes with at least %d NUMA zones", nodesState.RequiredNUMAZones)
 	nrtCandidates := e2enrt.FilterZoneCountEqual(nodesState.NRTList.Items, nodesState.RequiredNUMAZones)
 
 	if len(nrtCandidates) < nodesState.RequiredNodes {

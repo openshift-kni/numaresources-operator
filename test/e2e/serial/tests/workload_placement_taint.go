@@ -137,14 +137,14 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			taintedNodeNames = updatedNodeNames
 
-			By(fmt.Sprintf("considering nodes: %v tainted with %q", updatedNodeNames, tnt.String()))
+			e2efixture.By("considering nodes: %v tainted with %q", updatedNodeNames, tnt.String())
 		})
 
 		AfterEach(func() {
 			tnt := &appliedTaints[0] // shortcut
 			// first untaint the nodes we know we tainted
 			untaintedNodeNames := untaintNodes(fxt.Client, taintedNodeNames, tnt)
-			By(fmt.Sprintf("cleaned taint %q from the nodes %v", tnt.String(), untaintedNodeNames))
+			e2efixture.By("cleaned taint %q from the nodes %v", tnt.String(), untaintedNodeNames)
 
 			// leaking taints is especially bad AND we had some bugs in the pass, so let's try our very bes
 			// to be really really sure we didn't pollute the cluster.
@@ -153,7 +153,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			nodeNames := objectnames.Nodes(nodes)
 			doubleCheckedNodeNames := untaintNodes(fxt.Client, nodeNames, tnt)
-			By(fmt.Sprintf("cleaned taint %q from the nodes %v", tnt.String(), doubleCheckedNodeNames))
+			e2efixture.By("cleaned taint %q from the nodes %v", tnt.String(), doubleCheckedNodeNames)
 
 			By("unpadding the nodes after test finish")
 			err = padder.Clean()
@@ -206,11 +206,11 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			}
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName))
+			e2efixture.By("checking the pod landed on the target node %q vs %q", updatedPod.Spec.NodeName, targetNodeName)
 			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName),
 				"node landed on %q instead of on %v", updatedPod.Spec.NodeName, targetNodeName)
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			e2efixture.By("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName)
 			schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
@@ -236,7 +236,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
 			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			Eventually(func() bool {
-				By(fmt.Sprintf("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName))
+				e2efixture.By("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName)
 
 				nrtPostDelete, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), nrtPostCreate, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())

@@ -35,6 +35,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
+	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -188,7 +189,7 @@ func trafficTest(cli *kubernetes.Clientset, ctx context.Context, sourcePod *core
 	endpoint := net.JoinHostPort(destinationIP, destinationPort)
 
 	key := client.ObjectKeyFromObject(sourcePod)
-	By(fmt.Sprintf("verifying HTTP egress connectivity from pod %q to endpoint %s", key.String(), endpoint))
+	e2efixture.By("verifying HTTP egress connectivity from pod %q to endpoint %s", key.String(), endpoint)
 
 	cmd := []string{"sh", "-c", fmt.Sprintf("curl --connect-timeout 5 http://%s", endpoint)}
 

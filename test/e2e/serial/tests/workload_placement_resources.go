@@ -120,7 +120,7 @@ var _ = Describe("[serial][disruptive][scheduler][byres] numaresources workload 
 				By("checking the pod has been scheduled in the proper node")
 				Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName))
 
-				By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+				e2efixture.By("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName)
 				schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
@@ -175,7 +175,7 @@ func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nrtCandidates []nr
 	var ok bool
 	targetNodeName, ok := e2efixture.PopNodeName(nrtCandidateNames)
 	Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
-	By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
+	e2efixture.By("selecting node to schedule the pod: %q", targetNodeName)
 	// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
 	// but have enough allocatable resources at node level to shedule the pod on it.
 	// If we pad each zone with a pod with 3/4 of the required resources, as those nodes have at least
@@ -190,7 +190,7 @@ func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nrtCandidates []nr
 
 		baseload, err := intbaseload.ForNode(fxt.Client, ctx, nodeName)
 		Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
-		By(fmt.Sprintf("computed base load: %s", baseload))
+		e2efixture.By("computed base load: %s", baseload)
 
 		for zIdx, zone := range nrtInfo.Zones {
 			padRes := expectedFreeResources.DeepCopy()
@@ -207,7 +207,7 @@ func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nrtCandidates []nr
 
 	baseload, err := intbaseload.ForNode(fxt.Client, ctx, targetNodeName)
 	Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
-	By(fmt.Sprintf("computed base load: %s", baseload))
+	e2efixture.By("computed base load: %s", baseload)
 
 	targetNrtInfo, err := e2enrt.FindFromList(nrtCandidates, targetNodeName)
 	Expect(err).NotTo(HaveOccurred(), "missing NRT info for target node %q", targetNodeName)
@@ -228,7 +228,7 @@ func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nrtCandidates []nr
 
 func createPaddingPod(fxt *e2efixture.Fixture, ctx context.Context, podName, nodeName string, zone nrtv1alpha2.Zone, expectedFreeRes corev1.ResourceList) *corev1.Pod {
 	GinkgoHelper()
-	By(fmt.Sprintf("creating padding pod %q for node %q zone %q with resource target %s", podName, nodeName, zone.Name, e2ereslist.ToString(expectedFreeRes)))
+	e2efixture.By("creating padding pod %q for node %q zone %q with resource target %s", podName, nodeName, zone.Name, e2ereslist.ToString(expectedFreeRes))
 
 	padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, expectedFreeRes)
 	Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)

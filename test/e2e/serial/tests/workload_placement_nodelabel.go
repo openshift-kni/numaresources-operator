@@ -104,7 +104,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		var targetNrtListInitial nrtv1alpha2.NodeResourceTopologyList
 		BeforeEach(func() {
 			requiredNUMAZones := 2
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
+			e2efixture.By("filtering available nodes with at least %d NUMA zones", requiredNUMAZones)
 			nrtCandidates = e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones)
 
 			neededNodes := 2
@@ -133,15 +133,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			var ok bool
 			targetNodeName, ok = e2efixture.PopNodeName(nrtCandidateNames)
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
-			By(fmt.Sprintf("selecting target node we expect the pod will be scheduled into: %q", targetNodeName))
+			e2efixture.By("selecting target node we expect the pod will be scheduled into: %q", targetNodeName)
 
 			alternativeNodeName, ok = nrtCandidateNames.PopAny()
 			Expect(ok).To(BeTrue(), "cannot select an alternative target node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
-			By(fmt.Sprintf("selecting alternative node candidate for the scheduling: %q", alternativeNodeName))
+			e2efixture.By("selecting alternative node candidate for the scheduling: %q", alternativeNodeName)
 
 			// we need to also pad one of the labeled nodes.
 			nrtToPadNames := append(e2efixture.ListNodeNames(nrtCandidateNames), alternativeNodeName)
-			By(fmt.Sprintf("Padding all other candidate nodes: %v", nrtToPadNames))
+			e2efixture.By("Padding all other candidate nodes: %v", nrtToPadNames)
 
 			var paddingPods []*corev1.Pod
 			for nIdx, nodeName := range nrtToPadNames {
@@ -183,7 +183,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		})
 
 		It("[test_id:47598] should place the pod in the node with available resources in one NUMA zone and fulfilling node selector", Label(label.Tier2), func() {
-			By(fmt.Sprintf("Labeling nodes %q and %q with label %q:%q", targetNodeName, alternativeNodeName, labelName, labelValueMedium))
+			e2efixture.By("Labeling nodes %q and %q with label %q:%q", targetNodeName, alternativeNodeName, labelName, labelValueMedium)
 
 			unlabelTarget, err := labelNodeWithValue(fxt.Client, labelName, labelValueMedium, targetNodeName)
 			Expect(err).NotTo(HaveOccurred(), "unable to label node %q", targetNodeName)
@@ -223,7 +223,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("checking the pod has been scheduled in the proper node")
 			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName))
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+			e2efixture.By("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName)
 			schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
@@ -249,7 +249,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			var unlabelTarget, unlabelAlternative func() error
 			nodesUnlabeled := false
 			BeforeEach(func() {
-				By(fmt.Sprintf("Labeling target node %q with label %q:%q and the alternative node %q with label %q:%q", targetNodeName, labelName, labelValueLarge, alternativeNodeName, labelName, labelValueMedium))
+				e2efixture.By("Labeling target node %q with label %q:%q and the alternative node %q with label %q:%q", targetNodeName, labelName, labelValueLarge, alternativeNodeName, labelName, labelValueMedium)
 
 				var err error
 				unlabelTarget, err = labelNodeWithValue(fxt.Client, labelName, labelValueLarge, targetNodeName)
@@ -281,7 +281,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			DescribeTable("a guaranteed deployment pod with nodeAffinity should be scheduled on one NUMA zone on a matching labeled node with enough resources", Serial, Label(label.Tier2),
 				func(getNodeAffFunc getNodeAffinityFunc) {
 					affinity := getNodeAffFunc(labelName, []string{labelValueLarge, labelValueMedium}, corev1.NodeSelectorOpIn)
-					By(fmt.Sprintf("create a deployment with one guaranteed pod with node affinity property: %+v ", affinity.NodeAffinity))
+					e2efixture.By("create a deployment with one guaranteed pod with node affinity property: %+v ", affinity.NodeAffinity)
 					deploymentName := "test-dp"
 					var replicas int32 = 1
 
@@ -301,7 +301,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(2*time.Minute).ForDeploymentComplete(context.TODO(), deployment)
 					Expect(err).NotTo(HaveOccurred(), "Deployment %q not up & running after %v", deployment.Name, 2*time.Minute)
 
-					By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
+					e2efixture.By("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName)
 					pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *deployment)
 					Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q: %v", deployment.Name, err)
 					Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
@@ -343,7 +343,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					}
 
 					//check that it didn't stop running for some time
-					By(fmt.Sprintf("ensuring the deployment %q keep being ready", deployment.Name))
+					e2efixture.By("ensuring the deployment %q keep being ready", deployment.Name)
 					Eventually(func() bool {
 						updatedDp := &appsv1.Deployment{}
 						err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(deployment), updatedDp)

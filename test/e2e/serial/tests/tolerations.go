@@ -240,7 +240,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{})
 				}
 
-				By(fmt.Sprintf("ensuring the RTE DS was restored - expected pods=%d", len(workers)))
+				e2efixture.By("ensuring the RTE DS was restored - expected pods=%d", len(workers))
 				ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
 				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
 				updatedDs, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
@@ -258,7 +258,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				workers, err = nodes.GetWorkers(fxt.DEnv())
 				Expect(err).ToNot(HaveOccurred())
 
-				By(fmt.Sprintf("randomly picking the target node (among %d)", len(workers)))
+				e2efixture.By("randomly picking the target node (among %d)", len(workers))
 				targetIdx, ok := e2efixture.PickNodeIndex(workers)
 				Expect(ok).To(BeTrue())
 				targetNode := &workers[targetIdx]
@@ -272,7 +272,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				updatedNode := applyTaintToNode(ctx, fxt.Client, targetNode, tnt)
 				targetNodeNames = append(targetNodeNames, updatedNode.Name)
 
-				By(fmt.Sprintf("waiting for DaemonSet to be ready - should match worker nodes count %d", len(workers)))
+				e2efixture.By("waiting for DaemonSet to be ready - should match worker nodes count %d", len(workers))
 				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(1*time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
 				Expect(err).ToNot(HaveOccurred(), "daemonset %s did not start updated: %v", dsKey.String(), err)
 				updatedDs, err := wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
@@ -282,7 +282,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				By("deleting the DS to force the system recreate the pod")
 				// hack! remove the DS object to make the operator recreate the DS and thus restart all the pods
 				Expect(fxt.Client.Delete(ctx, updatedDs)).Should(Succeed())
-				By(fmt.Sprintf("checking that the DaemonSet is recreated with matching worker nodes count %d", len(workers)))
+				e2efixture.By("checking that the DaemonSet is recreated with matching worker nodes count %d", len(workers))
 				ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(2*time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
 				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
 				// the key will remain the same, the DS namespaced name is predictable and fixed
@@ -333,7 +333,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				targetNodeNames = append(targetNodeNames, taintedNode.Name)
 				klog.InfoS("considering node tainted", "node", taintedNode.Name, "taint", tnt.String())
 
-				By(fmt.Sprintf("ensuring the RTE DS was created with expected pods count=%d", len(workers)))
+				e2efixture.By("ensuring the RTE DS was created with expected pods count=%d", len(workers))
 				ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(3*time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
 				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
 				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
@@ -346,7 +346,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				tolerateVal.Value = "val2"
 				_ = setRTETolerations(ctx, fxt.Client, nroKey, []corev1.Toleration{tolerateVal})
 
-				By(fmt.Sprintf("ensuring the RTE DS was created with expected pods count=%d", len(workers)-1))
+				e2efixture.By("ensuring the RTE DS was created with expected pods count=%d", len(workers)-1)
 				ds, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
 				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers)-1, ds.Status.CurrentNumberScheduled)
 				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
@@ -389,7 +389,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				_ = setRTETolerations(ctx, fxt.Client, nroKey, tolerateVal1)
 				extraTols = true
 
-				By(fmt.Sprintf("ensuring the RTE DS was created with expected pods count=%d", len(workers)))
+				e2efixture.By("ensuring the RTE DS was created with expected pods count=%d", len(workers))
 				ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(3*time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
 				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
 				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
@@ -407,7 +407,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				applyTaintToNode(ctx, fxt.Client, taintedNode, tnt)
 				klog.InfoS("considering node tainted", "node", taintedNode.Name, "taint", tnt.String())
 
-				By(fmt.Sprintf("waiting for daemonset %v to report correct pods' number", dsKey.String()))
+				e2efixture.By("waiting for daemonset %v to report correct pods' number", dsKey.String())
 				updatedDs, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
 				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers)-1, updatedDs.Status.CurrentNumberScheduled)
 				_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
@@ -429,12 +429,12 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				if len(tnts) > 0 && len(targetNodeNames) > 0 {
 					By("untainting nodes")
 					for idx := range tnts {
-						By(fmt.Sprintf("removing taint: %v", tnts[idx]))
+						e2efixture.By("removing taint: %v", tnts[idx])
 						untaintNodes(fxt.Client, targetNodeNames, &tnts[idx])
 					}
 				}
 
-				By(fmt.Sprintf("ensuring the RTE DS was restored - expected pods=%d", len(workers)))
+				e2efixture.By("ensuring the RTE DS was restored - expected pods=%d", len(workers))
 				ds, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
 				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for daemonset: expected %d found %d", len(workers), ds.Status.CurrentNumberScheduled)
 				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
@@ -447,7 +447,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				workers, err = nodes.GetWorkers(fxt.DEnv())
 				Expect(err).ToNot(HaveOccurred())
 
-				By(fmt.Sprintf("randomly picking the target node (among %d)", len(workers)))
+				e2efixture.By("randomly picking the target node (among %d)", len(workers))
 				targetIdx, ok := e2efixture.PickNodeIndex(workers)
 				Expect(ok).To(BeTrue())
 				targetNode := &workers[targetIdx]
@@ -470,7 +470,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 				pods, err := podlist.With(fxt.Client).ByDaemonset(ctx, *updatedDs)
 				Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset pods %s: %v", dsKey.String(), err)
-				By(fmt.Sprintf("ensuring the RTE DS is running with the same pods count (expected pods=%d)", len(workers)))
+				e2efixture.By("ensuring the RTE DS is running with the same pods count (expected pods=%d)", len(workers))
 				Expect(pods).To(HaveLen(len(workers)), "updated DS ready=%v original worker nodes=%d", len(pods), len(workers))
 
 				By("applying the taint 2 - NoExecute")
@@ -481,7 +481,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 				// NoExecute promises the pod will be evicted "immediately" but the system will still need nonzero time to notice
 				// and the pod will take nonzero time to terminate, so we need a Eventually block.
-				By(fmt.Sprintf("ensuring the RTE DS is running with less pods because taints (expected pods=%v)", len(workers)-1))
+				e2efixture.By("ensuring the RTE DS is running with less pods because taints (expected pods=%v)", len(workers)-1)
 				Eventually(func(g Gomega) {
 					Expect(fxt.Client.Get(ctx, dsKey.AsKey(), updatedDs)).To(Succeed())
 					pods, err = podlist.With(fxt.Client).ByDaemonset(ctx, *updatedDs)
@@ -502,7 +502,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 				tnt := &tnts[0]
 
-				By(fmt.Sprintf("randomly picking the target node (among %d)", len(workers)))
+				e2efixture.By("randomly picking the target node (among %d)", len(workers))
 				targetIdx, ok := e2efixture.PickNodeIndex(workers)
 				Expect(ok).To(BeTrue())
 				taintedNode := &workers[targetIdx]
@@ -598,7 +598,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 					tnt := &tnts[0]
 
-					By(fmt.Sprintf("randomly picking the target node (among %d)", len(workers)))
+					e2efixture.By("randomly picking the target node (among %d)", len(workers))
 					targetIdx, ok := e2efixture.PickNodeIndex(workers)
 					Expect(ok).To(BeTrue())
 					taintedNode = &workers[targetIdx]
@@ -733,7 +733,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 
 				tnt := &tnts[0]
 
-				By(fmt.Sprintf("randomly picking the target node (among %d)", len(workers)))
+				e2efixture.By("randomly picking the target node (among %d)", len(workers))
 				targetIdx, ok := e2efixture.PickNodeIndex(workers)
 				Expect(ok).To(BeTrue())
 				taintedNode := &workers[targetIdx]
@@ -742,7 +742,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 				targetNodeNames = append(targetNodeNames, taintedNode.Name)
 				klog.InfoS("considering node tainted", "node", taintedNode.Name, "taint", tnt.String())
 
-				By(fmt.Sprintf("waiting for daemonset %v to report correct pods' number", dsKey.String()))
+				e2efixture.By("waiting for daemonset %v to report correct pods' number", dsKey.String())
 				updatedDs, err := wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers)-1)
 				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers)-1, updatedDs.Status.CurrentNumberScheduled)
 				_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
@@ -761,11 +761,11 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 					}
 				}
 
-				By(fmt.Sprintf("un-tainting node %s", taintedNode.Name))
+				e2efixture.By("un-tainting node %s", taintedNode.Name)
 				untaintNodes(fxt.Client, []string{taintedNode.Name}, &tnts[0])
 				targetNodeNames = []string{}
 
-				By(fmt.Sprintf("watch for daemonset %v pods scale up", dsKey.String()))
+				e2efixture.By("watch for daemonset %v pods scale up", dsKey.String())
 				updatedDs, err = wait.With(fxt.Client).Interval(time.Second).Timeout(time.Minute).ForDaemonsetPodsCreation(ctx, dsKey, len(workers))
 				Expect(err).NotTo(HaveOccurred(), "pods number is not as expected for RTE daemonset: expected %d found %d", len(workers), updatedDs.Status.CurrentNumberScheduled)
 				_, err = wait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)

@@ -176,7 +176,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 			Expect(fxt.Client.Create(ctx, testMCP)).To(Succeed())
 			defer func(dctx context.Context) {
-				By(fmt.Sprintf("CLEANUP: deleting mcp: %q", testMCP.Name))
+				e2efixture.By("CLEANUP: deleting mcp: %q", testMCP.Name)
 				Expect(fxt.Client.Delete(dctx, testMCP)).To(Succeed())
 
 				err := wait.With(fxt.Client).
@@ -666,7 +666,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			}
 			Expect(err).ToNot(HaveOccurred())
 
-			By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", schedulerName))
+			e2efixture.By("checking the pod was scheduled with the topology aware scheduler %q", schedulerName)
 			schedOK, err := nrosched.CheckPODWasScheduledWith(ctx, fxt.K8sClient, testPod.Namespace, testPod.Name, schedulerName)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", testPod.Namespace, testPod.Name, schedulerName)
@@ -679,7 +679,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			By("Waiting for the NRT data to stabilize")
 			e2efixture.MustSettleNRT(fxt)
 
-			By(fmt.Sprintf("checking NRT for target node %q updated correctly", testPod.Spec.NodeName))
+			e2efixture.By("checking NRT for target node %q updated correctly", testPod.Spec.NodeName)
 			// TODO: this is only partially correct. We should check with NUMA zone granularity (not with NODE granularity)
 			expectNRTConsumedResources(fxt, *nrtPreCreate, rl, testPod)
 		})
@@ -698,7 +698,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				cpuResourcePercentage = 1.5 // 1.5 meaning 150 percent
 			)
 			var nrtCandidates []nrtv1alpha2.NodeResourceTopology
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired))
+			e2efixture.By("filtering available nodes with at least %d NUMA zones", NUMAZonesRequired)
 			nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, NUMAZonesRequired)
 			if len(nrtCandidates) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d", len(nrtCandidates))
@@ -863,7 +863,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			schedulerName = nroSchedObj.Status.SchedulerName
 			Expect(schedulerName).ToNot(BeEmpty(), "cannot autodetect the TAS scheduler name from the cluster")
 
-			By(fmt.Sprintf("deleting the NRO Scheduler object to trigger the pod to restart: %s", nroSchedObj.Name))
+			e2efixture.By("deleting the NRO Scheduler object to trigger the pod to restart: %s", nroSchedObj.Name)
 			Expect(fxt.Client.Delete(ctx, &schedPods[0])).ToNot(HaveOccurred())
 
 			_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(ctx, schedDeployment)
@@ -917,7 +917,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			updatedDeployment := appsv1.Deployment{}
 			for step := 0; step < maxStep; step++ {
 				time.Sleep(10 * time.Second)
-				By(fmt.Sprintf("ensuring the deployment %q keep being pending %d/%d", deployment.Name, step+1, maxStep))
+				e2efixture.By("ensuring the deployment %q keep being pending %d/%d", deployment.Name, step+1, maxStep)
 				err = fxt.Client.Get(ctx, client.ObjectKeyFromObject(deployment), &updatedDeployment)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(wait.IsDeploymentComplete(deployment, &updatedDeployment.Status)).To(BeFalse(), "deployment %q become ready", deployment.Name)
@@ -1017,7 +1017,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 			It("[test_id:84312] should report the NodeGroupConfig in the NodeGroupStatus with NodePool set and allow updates", Label(label.Tier1, label.OpenShift), func(ctx context.Context) {
 				mcp := objects.TestMCP()
-				By(fmt.Sprintf("create new MCP %q", mcp.Name))
+				e2efixture.By("create new MCP %q", mcp.Name)
 				// we rely on the fact that RTE DS will be created for a valid MCP even with machine count 0, that will
 				// save the reboot, so create a temporary MCP just to test this
 
@@ -1037,7 +1037,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				Expect(fxt.Client.Create(ctx, mcp)).To(Succeed())
 
 				defer func() {
-					By(fmt.Sprintf("CLEANUP: deleting mcp: %q", mcp.Name))
+					e2efixture.By("CLEANUP: deleting mcp: %q", mcp.Name)
 					Expect(fxt.Client.Delete(ctx, mcp)).To(Succeed())
 
 					err := wait.With(fxt.Client).
@@ -1077,7 +1077,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
 
 				defer func() {
-					By(fmt.Sprintf("revert initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name))
+					e2efixture.By("revert initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name)
 					var updatedNRO nropv1.NUMAResourcesOperator
 					Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
 					if !reflect.DeepEqual(updatedNRO.Spec.NodeGroups, initialOperObj.Spec.NodeGroups) {
@@ -1186,7 +1186,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}
 
 				defer func() {
-					By(fmt.Sprintf("reverting initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name))
+					e2efixture.By("reverting initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name)
 					var updatedNRO nropv1.NUMAResourcesOperator
 
 					Eventually(func(g Gomega) {
@@ -1208,7 +1208,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					PoolName: &poolName,
 				}
 
-				By(fmt.Sprintf("modifying the NUMAResourcesOperator by appending a node group with pool name: %q", poolName))
+				e2efixture.By("modifying the NUMAResourcesOperator by appending a node group with pool name: %q", poolName)
 				var updatedNRO nropv1.NUMAResourcesOperator
 				Eventually(func(g Gomega) {
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
@@ -1216,7 +1216,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					g.Expect(fxt.Client.Update(ctx, &updatedNRO)).To(Succeed())
 				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
 
-				By(fmt.Sprintf("verifying degraded condition due to pool name: %q", poolName))
+				e2efixture.By("verifying degraded condition due to pool name: %q", poolName)
 				Eventually(func(g Gomega) {
 					var updated nropv1.NUMAResourcesOperator
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updated)).To(Succeed())
@@ -1240,7 +1240,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					MachineConfigPoolSelector: labelSel,
 				}
 
-				By(fmt.Sprintf("modifying the NUMAResourcesOperator by appending a node group with MCP selector specifier only: %+v", ng))
+				e2efixture.By("modifying the NUMAResourcesOperator by appending a node group with MCP selector specifier only: %+v", ng)
 				var updatedNRO nropv1.NUMAResourcesOperator
 				Eventually(func(g Gomega) {
 					g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
@@ -1249,7 +1249,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update node groups")
 
 				defer func() {
-					By(fmt.Sprintf("revert initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name))
+					e2efixture.By("revert initial NodeGroup in NUMAResourcesOperator object %q", initialOperObj.Name)
 					var updatedNRO nropv1.NUMAResourcesOperator
 					Eventually(func(g Gomega) {
 						g.Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
@@ -1351,7 +1351,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 						ForMachineConfigPoolCondition(ctx, mcp, machineconfigv1.MachineConfigPoolUpdated)
 				}
 				mcp := objects.TestMCP()
-				By(fmt.Sprintf("create new MCP %q", mcp.Name))
+				e2efixture.By("create new MCP %q", mcp.Name)
 
 				mcp.Labels = map[string]string{"machineconfiguration.openshift.io/role": roleMCPTest}
 				mcp.Spec.MachineConfigSelector = &metav1.LabelSelector{
@@ -1436,7 +1436,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				ns := nroObj.Status.DaemonSets[0].Namespace
 				dsName := objectnames.GetComponentName(nroObj.Name, mcp.Name)
 				dsKey := wait.ObjectKey{Namespace: ns, Name: dsName}
-				By(fmt.Sprintf("waiting for DaemonSet %q to be ready", dsKey))
+				e2efixture.By("waiting for DaemonSet %q to be ready", dsKey)
 				_, err = wait.With(fxt.Client).ForDaemonSetReadyByKey(ctx, dsKey)
 				Expect(err).ToNot(HaveOccurred())
 
@@ -1719,7 +1719,7 @@ func createTAEDeployment(fxt *e2efixture.Fixture, ctx context.Context, name, sch
 		corev1.ResourceMemory: resource.MustParse("256Mi"),
 	}
 
-	By(fmt.Sprintf("creating a topology affinity error deployment %q", name))
+	e2efixture.By("creating a topology affinity error deployment %q", name)
 	err = fxt.Client.Create(ctx, deployment)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -1739,7 +1739,7 @@ func updatePerformanceProfileFieldUnstructured(dynamicClient dynamic.Interface, 
 	profile, err := dynamicClient.Resource(performanceProfileGVR).Get(ctx, name, metav1.GetOptions{})
 	Expect(err).ToNot(HaveOccurred(), "Failed to fetch PerformanceProfile using the dynamic client: %v", err)
 
-	By(fmt.Sprintf("checking if the field path %v exists in PerformanceProfile %s", fieldPath, name))
+	e2efixture.By("checking if the field path %v exists in PerformanceProfile %s", fieldPath, name)
 	lenFieldPath := len(fieldPath)
 	fieldToUpdate := fieldPath[lenFieldPath-1]
 	current := profile.Object
@@ -1751,7 +1751,7 @@ func updatePerformanceProfileFieldUnstructured(dynamicClient dynamic.Interface, 
 	_, found, _ := unstructured.NestedFieldNoCopy(current, fieldToUpdate)
 	Expect(found).To(BeTrue(), fmt.Sprintf("Final field '%s' in path %v does not exist in PerformanceProfile %s. Current object: %v", fieldToUpdate, fieldPath, name, current))
 
-	By(fmt.Sprintf("updating field %v in PerformanceProfile %s", fieldPath, name))
+	e2efixture.By("updating field %v in PerformanceProfile %s", fieldPath, name)
 	Eventually(func(g Gomega) {
 		profile, err := dynamicClient.Resource(performanceProfileGVR).Get(ctx, name, metav1.GetOptions{})
 		Expect(err).ToNot(HaveOccurred(), "Failed to fetch PerformanceProfile using the dynamic client: %v", err)

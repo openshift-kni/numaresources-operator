@@ -104,7 +104,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			GinkgoHelper()
 
 			requiredNUMAZones := 2
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", requiredNUMAZones))
+			e2efixture.By("filtering available nodes with at least %d NUMA zones", requiredNUMAZones)
 			nrtCandidates = e2enrt.FilterZoneCountEqual(nrtList.Items, requiredNUMAZones)
 
 			neededNodes := 2
@@ -128,7 +128,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			var ok bool
 			targetNodeName, ok = e2efixture.PopNodeName(nrtCandidateNames)
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(nrtCandidateNames))
-			By(fmt.Sprintf("selecting node to schedule the pod: %q", targetNodeName))
+			e2efixture.By("selecting node to schedule the pod: %q", targetNodeName)
 			// need to prepare all the other nodes so they cannot have any one NUMA zone with enough resources
 			// but have enough allocatable resources at node level to shedule the pod on it.
 			// If we pad each zone with a pod with 3/4 of the required resources, as those nodes have at least
@@ -202,7 +202,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				By("checking the pod has been scheduled in the proper node")
 				Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName))
 
-				By(fmt.Sprintf("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName))
+				e2efixture.By("checking the pod was scheduled with the topology aware scheduler %q", serialconfig.Config.SchedulerName)
 				schedOK, err := nrosched.CheckPODWasScheduledWith(context.TODO(), fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
@@ -301,7 +301,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				_, err = wait.With(fxt.Client).Interval(10*time.Second).Timeout(time.Minute).ForDeploymentComplete(context.TODO(), deployment)
 				Expect(err).NotTo(HaveOccurred(), "Deployment %q not up & running after %v", deployment.Name, time.Minute)
 
-				By(fmt.Sprintf("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName))
+				e2efixture.By("checking deployment pods have been scheduled with the topology aware scheduler %q and in the proper node %q", serialconfig.Config.SchedulerName, targetNodeName)
 				pods, err := podlist.With(fxt.Client).ByDeployment(context.TODO(), *deployment)
 				Expect(err).NotTo(HaveOccurred(), "Unable to get pods from Deployment %q:  %v", deployment.Name, err)
 				Expect(pods).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
@@ -491,7 +491,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			By("wait for NRT data to settle")
 			e2efixture.MustSettleNRT(fxt)
 
-			By(fmt.Sprintf("checking the resources are accounted as expected on %q", updatedPod.Spec.NodeName))
+			e2efixture.By("checking the resources are accounted as expected on %q", updatedPod.Spec.NodeName)
 			nrtPostCreate, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), nrtInitial, 1*time.Minute)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -511,7 +511,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// the NRT updaters MAY be slow to react for a number of reasons including factors out of our control
 			// (kubelet, runtime). This is a known behavior. We can only tolerate some delay in reporting on pod removal.
 			Eventually(func() bool {
-				By(fmt.Sprintf("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName))
+				e2efixture.By("checking the resources are restored as expected on %q", updatedPod.Spec.NodeName)
 
 				nrtPostDelete, err := e2enrt.GetUpdatedForNode(fxt.Client, context.TODO(), nrtPostCreate, 1*time.Minute)
 				Expect(err).ToNot(HaveOccurred())
@@ -1345,7 +1345,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 
 			numaZonesRequired := 2
 
-			By(fmt.Sprintf("filtering available nodes with at least %d NUMA zones", numaZonesRequired))
+			e2efixture.By("filtering available nodes with at least %d NUMA zones", numaZonesRequired)
 			nrtCandidates := e2enrt.FilterZoneCountEqual(nrts, numaZonesRequired)
 			if len(nrtCandidates) < hostsRequired {
 				e2efixture.Skipf(fxt, "not enough nodes with %d NUMA Zones: found %d", numaZonesRequired, len(nrtCandidates))
@@ -1362,7 +1362,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(ok).To(BeTrue(), "cannot select a target node among %#v", e2efixture.ListNodeNames(candidateNodeNames))
 			unsuitableNodeNames := e2efixture.ListNodeNames(candidateNodeNames)
 
-			By(fmt.Sprintf("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames))
+			e2efixture.By("selecting target node %q and unsuitable nodes %#v (random pick)", targetNodeName, unsuitableNodeNames)
 
 			// make targetFreeResPerNUMA the complement of the test pod's resources
 			// IOW targetFreeResPerNUMA + baseload + podResourcesRequest equals to all node's allocatable resources
@@ -2113,9 +2113,9 @@ func setupPadding(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopol
 
 	baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), padInfo.targetNodeName)
 	Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", padInfo.targetNodeName)
-	By(fmt.Sprintf("computed base load: %s", baseload))
+	e2efixture.By("computed base load: %s", baseload)
 
-	By(fmt.Sprintf("preparing target node %q to fit the test case", padInfo.targetNodeName))
+	e2efixture.By("preparing target node %q to fit the test case", padInfo.targetNodeName)
 	// first, let's make sure that ONLY the required res can fit in either zone on the target node
 	nrtInfo, err := e2enrt.FindFromList(nrtList.Items, padInfo.targetNodeName)
 	Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", padInfo.targetNodeName)
@@ -2133,7 +2133,7 @@ func setupPadding(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopol
 			baseload.Apply(numaRes)
 		}
 
-		By(fmt.Sprintf("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(numaRes)))
+		e2efixture.By("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(numaRes))
 		padPod, err := makePaddingPod(fxt.Namespace.Name, "target", zone, numaRes)
 		Expect(err).ToNot(HaveOccurred())
 
@@ -2160,16 +2160,16 @@ func setupPaddingForUnsuitableNodes(fxt *e2efixture.Fixture, nrtList nrtv1alpha2
 
 		baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), unsuitableNodeName)
 		Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", unsuitableNodeName)
-		By(fmt.Sprintf("computed base load: %s", baseload))
+		e2efixture.By("computed base load: %s", baseload)
 
 		for zoneIdx, zone := range nrtInfo.Zones {
 			padRes := padInfo.unsuitableFreeRes[zoneIdx].DeepCopy()
 			name := fmt.Sprintf("unsuitable%d", nodeIdx)
 
-			By(fmt.Sprintf("saturating node %q -> %q zone %q to fit only (vanilla) %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes)))
+			e2efixture.By("saturating node %q -> %q zone %q to fit only (vanilla) %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes))
 			if zoneIdx == 0 { // any random zone is actually fine
 				baseload.Apply(padRes)
-				By(fmt.Sprintf("saturating node %q -> %q zone %q to fit only (adjusted) %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes)))
+				e2efixture.By("saturating node %q -> %q zone %q to fit only (adjusted) %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes))
 			}
 
 			padPod, err := makePaddingPod(fxt.Namespace.Name, name, zone, padRes)
