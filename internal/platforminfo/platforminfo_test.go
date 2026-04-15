@@ -60,7 +60,7 @@ func TestNewWithDiscover(t *testing.T) {
 		{
 			description: "next major fixed, must never regress", // at time of writing
 			plat:        platform.OpenShift,
-			ver:         mustParseVersion("4.22.0"),
+			ver:         mustParseVersion("5.0.0"),
 			expected: PlatformProperties{
 				PodResourcesListFilterActivePods: true,
 			},
