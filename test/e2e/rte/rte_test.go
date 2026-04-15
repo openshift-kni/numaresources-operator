@@ -65,13 +65,10 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var (
-	timeout  = 30 * time.Second
-	interval = 5 * time.Second
-)
-
 var _ = Describe("with a running cluster with all the components", func() {
 	When("[config][rte] NRO CR configured with LogLevel", func() {
+		timeout := 30 * time.Second
+		interval := 5 * time.Second
 		It("should have the corresponding klog under RTE container", func() {
 			nropObj := &nropv1.NUMAResourcesOperator{}
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
@@ -330,7 +327,8 @@ var _ = Describe("with a running cluster with all the components", func() {
 		}
 	})
 	Context("[tlscompliance][rte] rte complies with TLS Profile modifications", Label(label.Tier0, "feature:tlscompliance"), func() {
-
+		timeout := 30 * time.Second
+		interval := 5 * time.Second
 		It("should have RTE DaemonSet args aligned with the cluster TLS profile", func(ctx context.Context) {
 			By("Getting initial OCP TLS profile")
 			tlsProfileSpec, err := ctrltls.FetchAPIServerTLSProfile(ctx, clients.Client)
@@ -351,7 +349,8 @@ var _ = Describe("with a running cluster with all the components", func() {
 					return fmt.Errorf("expect the numaresourcesoperator to have at least one NodeGroup in status")
 				}
 				for _, ng := range nropObj.Status.NodeGroups {
-					ds, err := clients.K8sClient.AppsV1().DaemonSets(ng.DaemonSet.Namespace).Get(ctx, ng.DaemonSet.Name, metav1.GetOptions{})
+					ds := &appsv1.DaemonSet{}
+					err := clients.Client.Get(ctx, client.ObjectKey{Namespace: ng.DaemonSet.Namespace, Name: ng.DaemonSet.Name}, ds)
 					if err != nil {
 						return fmt.Errorf("failed to get DaemonSet %s/%s: %w", ng.DaemonSet.Namespace, ng.DaemonSet.Name, err)
 					}
