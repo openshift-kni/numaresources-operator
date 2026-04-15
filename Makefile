@@ -423,7 +423,7 @@ goversion:
 build-tools: goversion bin/buildhelper bin/envsubst bin/lsplatform update-buildinfo ## create the helper tools necessary for building the project
 
 .PHONY: build-tools-all
-build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap bin/watchnrtattr bin/mkginkgolabelfilter bin/pfpsyncchk bin/make-job-foreach-ds update-buildinfo ## create all the helper tools
+build-tools-all: goversion bin/buildhelper bin/envsubst bin/lsplatform bin/catkubeletconfmap bin/watchnrtattr bin/mkginkgolabelfilter bin/pfpsyncchk bin/make-job-foreach-ds bin/schedlogs update-buildinfo ## create all the helper tools
 
 pkg/version/_buildinfo.json: bin/buildhelper
 	@bin/buildhelper inspect > pkg/version/_buildinfo.json
@@ -455,6 +455,9 @@ bin/pfpsyncchk: tools/pfpsyncchk/pfpsyncchk.go
 	LDFLAGS="-s -w" go build -mod=vendor -o $@ -ldflags "$$LDFLAGS" -tags "$$GOTAGS" $<
 
 bin/make-job-foreach-ds: tools/make-job-foreach-ds/main.go
+	@go build -o $@ $<
+
+bin/schedlogs: tools/schedlogs/schedlogs.go
 	@go build -o $@ $<
 
 verify-generated: bundle generate
