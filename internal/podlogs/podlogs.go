@@ -21,6 +21,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -39,6 +40,17 @@ func GetSince(ctx context.Context, k8sCli *kubernetes.Clientset, podNamespace, p
 	opts := &corev1.PodLogOptions{
 		Container:    containerName,
 		SinceSeconds: &sinceSeconds,
+	}
+	return get(ctx, k8sCli, podNamespace, podName, opts)
+}
+
+// GetSinceTime fetches log output for a pod container starting from the given absolute time,
+// using the server-side sinceTime filter to avoid transferring the full log.
+func GetSinceTime(ctx context.Context, k8sCli *kubernetes.Clientset, podNamespace, podName, containerName string, since time.Time) (string, error) {
+	sinceTime := metav1.NewTime(since)
+	opts := &corev1.PodLogOptions{
+		Container: containerName,
+		SinceTime: &sinceTime,
 	}
 	return get(ctx, k8sCli, podNamespace, podName, opts)
 }

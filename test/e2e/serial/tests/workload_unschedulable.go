@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	corev1qos "k8s.io/kubectl/pkg/util/qos"
 	"k8s.io/utils/ptr"
@@ -38,9 +39,12 @@ import (
 	intbaseload "github.com/openshift-kni/numaresources-operator/internal/baseload"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
+	"github.com/openshift-kni/numaresources-operator/internal/podlogs"
 	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	schedcp "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/controlplane"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
@@ -200,6 +204,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			By(fmt.Sprintf("checking the pod was handled by the topology aware scheduler %q but failed to be scheduled on any node", serialconfig.Config.SchedulerName))
 			isFailed, err := nrosched.CheckPODSchedulingFailedForAlignment(context.TODO(), fxt.K8sClient, pod.Namespace, pod.Name, serialconfig.Config.SchedulerName, tmScope)
 			Expect(err).ToNot(HaveOccurred())
+			if !isFailed {
+				dumpSchedulerLogs(context.TODO(), fxt.K8sClient, serialconfig.Config.NROSchedObj.Status.Deployment.Namespace, *pod)
+			}
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 		})
 
@@ -238,6 +245,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
 				Expect(err).ToNot(HaveOccurred())
+				if !isFailed {
+					dumpSchedulerLogs(context.TODO(), fxt.K8sClient, serialconfig.Config.NROSchedObj.Status.Deployment.Namespace, pod)
+				}
 				Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 			}
 		})
@@ -278,6 +288,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 				}
 				Expect(err).ToNot(HaveOccurred())
+				if !isFailed {
+					dumpSchedulerLogs(context.TODO(), fxt.K8sClient, serialconfig.Config.NROSchedObj.Status.Deployment.Namespace)
+				}
 				Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 			}
 		})
@@ -439,6 +452,9 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 						_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
 					}
 					Expect(err).ToNot(HaveOccurred())
+					if !isFailed {
+						dumpSchedulerLogs(context.TODO(), fxt.K8sClient, serialconfig.Config.NROSchedObj.Status.Deployment.Namespace)
+					}
 					Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 				}
 
@@ -597,6 +613,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			Expect(err).ToNot(HaveOccurred())
 			if !isFailed {
 				_ = objects.LogEventsForPod(fxt.K8sClient, pod.Namespace, pod.Name)
+				dumpSchedulerLogs(context.TODO(), fxt.K8sClient, serialconfig.Config.NROSchedObj.Status.Deployment.Namespace, *pod)
 			}
 			Expect(isFailed).To(BeTrue(), "pod %s/%s with scheduler %s did NOT fail", pod.Namespace, pod.Name, serialconfig.Config.SchedulerName)
 
@@ -981,6 +998,48 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 		})
 	})
 })
+
+// educated guess. "far enough" in the past but without dumping too much. Subjected to further review.
+const schedLogWindow = 30 * time.Second
+
+// schedLogSafetyMargin is the margin subtracted from the earliest pod creation timestamp
+// to account for clock skew between the API server and test runner.
+const schedLogSafetyMargin = 5 * time.Second
+
+// dumpSchedulerLogs fetches and logs the scheduler leader's recent logs.
+// When targetPods are provided, the log window is anchored to the earliest pod creation
+// timestamp (minus a safety margin), giving a precise lower bound instead of an arbitrary duration.
+// When no targetPods are provided, it falls back to fetching the last schedLogWindow.
+func dumpSchedulerLogs(ctx context.Context, k8sCli *kubernetes.Clientset, schedNamespace string, targetPods ...corev1.Pod) {
+	leaderPod, err := schedcp.GetLeaderPod(ctx, k8sCli, schedNamespace)
+	if err != nil {
+		klog.ErrorS(err, "cannot find scheduler leader pod")
+		return
+	}
+	klog.Infof("scheduler leader pod: %s/%s", leaderPod.Namespace, leaderPod.Name)
+
+	var logs string
+	var logRef string
+	if len(targetPods) > 0 {
+		earliest := targetPods[0].CreationTimestamp.Time
+		for _, p := range targetPods[1:] {
+			if p.CreationTimestamp.Time.Before(earliest) {
+				earliest = p.CreationTimestamp.Time
+			}
+		}
+		since := earliest.Add(-schedLogSafetyMargin)
+		logRef = fmt.Sprintf("since %s", since.UTC().Format(time.RFC3339))
+		logs, err = podlogs.GetSinceTime(ctx, k8sCli, leaderPod.Namespace, leaderPod.Name, schedupdate.MainContainerName, since)
+	} else {
+		logRef = fmt.Sprintf("last %v", schedLogWindow)
+		logs, err = podlogs.GetSince(ctx, k8sCli, leaderPod.Namespace, leaderPod.Name, schedupdate.MainContainerName, schedLogWindow)
+	}
+	if err != nil {
+		klog.ErrorS(err, "cannot fetch scheduler logs", "podNamespace", leaderPod.Namespace, "podName", leaderPod.Name)
+		return
+	}
+	klog.Infof("begin scheduler logs for %s/%s (%s)\n%send scheduler logs for %s/%s", leaderPod.Namespace, leaderPod.Name, logRef, logs, leaderPod.Namespace, leaderPod.Name)
+}
 
 // Return only those NRTs where each request could fit into a different zone.
 func filterNRTsEachRequestOnADifferentZone(nrts []nrtv1alpha2.NodeResourceTopology, r1, r2 corev1.ResourceList) []nrtv1alpha2.NodeResourceTopology {
