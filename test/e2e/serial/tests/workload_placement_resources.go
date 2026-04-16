@@ -196,7 +196,7 @@ func setupNodes(fxt *e2efixture.Fixture, ctx context.Context, nrtCandidates []nr
 			padRes := expectedFreeResources.DeepCopy()
 
 			if zIdx == 0 { // any random zone is actually fine
-				baseload.Apply(padRes)
+				baseload.AddTo(padRes)
 			}
 
 			paddingPods = append(paddingPods, createPaddingPod(fxt, ctx, fmt.Sprintf("padding-%d-%d", nIdx, zIdx), nodeName, zone, padRes))

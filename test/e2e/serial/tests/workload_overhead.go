@@ -194,7 +194,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					for zIdx, zone := range nrtInfo.Zones {
 						zoneRes := minRes.DeepCopy() // to be extra safe
 						if zIdx == 0 {               // any zone is fine
-							baseload.Apply(zoneRes)
+							baseload.AddTo(zoneRes)
 						}
 
 						padPod, err := makePaddingPod(fxt.Namespace.Name, nodeName, zone, zoneRes)
@@ -351,7 +351,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					for zIdx, zone := range nrtInfo.Zones {
 						zoneRes := minRes.DeepCopy() // to be extra safe
 						if zIdx == 0 {               // any zone is fine
-							baseload.Apply(zoneRes)
+							baseload.AddTo(zoneRes)
 						}
 
 						padPod, err := makePaddingPod(fxt.Namespace.Name, nodeName, zone, zoneRes)
@@ -381,7 +381,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 				for zIdx, zone := range targetNrtInitial.Zones {
 					zoneRes := minRes.DeepCopy() // to be extra safe
 					if zIdx == 0 {               // any zone is fine
-						baseload.Apply(zoneRes)
+						baseload.AddTo(zoneRes)
 
 						padPod, err := makePaddingPod(fxt.Namespace.Name, targetNodeName, zone, zoneRes)
 						Expect(err).NotTo(HaveOccurred())
