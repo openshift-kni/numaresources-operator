@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/util/retry"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -38,15 +39,14 @@ func AttachConfigObject(ctx context.Context, cli client.Client, object client.Ob
 	if err != nil {
 		return err
 	}
-	np, err := GetByClusterName(ctx, cli, hostedClusterName)
-	if err != nil {
-		return err
-	}
-	np.Spec.Config = addObjectRef(object, np.Spec.Config)
-	if cli.Update(ctx, np) != nil {
-		return err
-	}
-	return nil
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		np, err := GetByClusterName(ctx, cli, hostedClusterName)
+		if err != nil {
+			return err
+		}
+		np.Spec.Config = addObjectRef(object, np.Spec.Config)
+		return cli.Update(ctx, np)
+	})
 }
 
 func addObjectRef(object client.Object, config []corev1.LocalObjectReference) []corev1.LocalObjectReference {
@@ -75,13 +75,12 @@ func DeAttachConfigObject(ctx context.Context, cli client.Client, object client.
 	if err != nil {
 		return err
 	}
-	np, err := GetByClusterName(ctx, cli, hostedClusterName)
-	if err != nil {
-		return err
-	}
-	np.Spec.Config = removeObjectRef(object, np.Spec.Config)
-	if cli.Update(ctx, np) != nil {
-		return err
-	}
-	return nil
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		np, err := GetByClusterName(ctx, cli, hostedClusterName)
+		if err != nil {
+			return err
+		}
+		np.Spec.Config = removeObjectRef(object, np.Spec.Config)
+		return cli.Update(ctx, np)
+	})
 }

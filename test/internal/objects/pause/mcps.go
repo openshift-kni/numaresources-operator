@@ -20,6 +20,12 @@ import (
 	"context"
 	"fmt"
 
+	"k8s.io/client-go/util/retry"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
@@ -35,8 +41,16 @@ func MachineConfigPoolsByNodeGroups(nodeGroups []nropv1.NodeGroup) (func() error
 	}
 
 	for i := range mcps {
-		mcps[i].Spec.Paused = true
-		if err = e2eclient.Client.Update(context.TODO(), mcps[i]); err != nil {
+		key := client.ObjectKeyFromObject(mcps[i])
+		err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+			updatedMcp := &machineconfigv1.MachineConfigPool{}
+			if err := e2eclient.Client.Get(context.TODO(), key, updatedMcp); err != nil {
+				return err
+			}
+			updatedMcp.Spec.Paused = true
+			return e2eclient.Client.Update(context.TODO(), updatedMcp)
+		})
+		if err != nil {
 			return nil, err
 		}
 	}
@@ -47,9 +61,18 @@ func MachineConfigPoolsByNodeGroups(nodeGroups []nropv1.NodeGroup) (func() error
 			return err
 		}
 		for i := range mcps {
-			mcps[i].Spec.Paused = false
-			err = e2eclient.Client.Update(context.TODO(), mcps[i])
-			return err
+			key := client.ObjectKeyFromObject(mcps[i])
+			err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+				updatedMcp := &machineconfigv1.MachineConfigPool{}
+				if err := e2eclient.Client.Get(context.TODO(), key, updatedMcp); err != nil {
+					return err
+				}
+				updatedMcp.Spec.Paused = false
+				return e2eclient.Client.Update(context.TODO(), updatedMcp)
+			})
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	}
