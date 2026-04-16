@@ -354,7 +354,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 							baseload.Apply(zoneRes)
 						}
 
-						padPod, err := makePaddingPod(fxt.Namespace.Name, nodeName, zone, baseload.Resources)
+						padPod, err := makePaddingPod(fxt.Namespace.Name, nodeName, zone, zoneRes)
 						Expect(err).NotTo(HaveOccurred())
 
 						pinnedPadPod, err := pinPodTo(padPod, nodeName, zone.Name)
@@ -383,7 +383,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					if zIdx == 0 {               // any zone is fine
 						baseload.Apply(zoneRes)
 
-						padPod, err := makePaddingPod(fxt.Namespace.Name, targetNodeName, zone, baseload.Resources)
+						padPod, err := makePaddingPod(fxt.Namespace.Name, targetNodeName, zone, zoneRes)
 						Expect(err).NotTo(HaveOccurred())
 
 						pinnedPadPod, err := pinPodTo(padPod, targetNodeName, zone.Name)
