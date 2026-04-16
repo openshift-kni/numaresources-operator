@@ -154,7 +154,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				for idx, zone := range nrtInfo.Zones {
 					zoneRes := paddingRes.DeepCopy() // extra safety
 					if idx == 0 {                    // any zone is fine
-						baseload.Apply(zoneRes)
+						baseload.AddTo(zoneRes)
 					}
 
 					podName := fmt.Sprintf("padding%s-%d", nodeName, idx)
@@ -374,7 +374,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				for zoneIdx, zone := range nrtInfo.Zones {
 					zoneRes := paddingRes.DeepCopy() // extra safety
 					if zoneIdx == 0 {                // any zone is fine
-						baseload.Apply(zoneRes)
+						baseload.AddTo(zoneRes)
 					}
 
 					podName := fmt.Sprintf("padding%d-%d", nodeIdx, zoneIdx)
@@ -558,7 +558,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			for zoneIdx, zone := range targetNrt.Zones {
 				zoneRes := paddingResources.DeepCopy()
 				if zoneIdx == 0 { //any zone would do it, we just choose one.
-					targetNodeBaseLoad.Apply(zoneRes)
+					targetNodeBaseLoad.AddTo(zoneRes)
 				}
 
 				paddingRes, err := e2enrt.SaturateZoneUntilLeft(zone, zoneRes, e2enrt.DropHostLevelResources)

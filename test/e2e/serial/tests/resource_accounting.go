@@ -355,7 +355,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			e2efixture.By("considering maximum available resources: %s", e2ereslist.ToString(reqResources))
 
 			By("prepare the test's pod resources as maximum available resources on the target node with the baselaod deducted")
-			err = baseload.Deduct(reqResources)
+			err = baseload.SubtractFrom(reqResources)
 			Expect(err).ToNot(HaveOccurred(), "failed deducting resources from baseload: %v", err)
 
 			e2efixture.By("padding all other candidate nodes leaving room for the baseload only (updated maximum available resources: %s)", e2ereslist.ToString(reqResources))
@@ -539,7 +539,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 						numaRes[resName] = quan
 					}
 				}
-				err = baseload.Deduct(numaRes)
+				err = baseload.SubtractFrom(numaRes)
 				Expect(err).ToNot(HaveOccurred(), "failed deducting resources from baseload: %v", err)
 				reqResPerNUMA = append(reqResPerNUMA, numaRes)
 			}

@@ -155,7 +155,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				for zIdx, zone := range nrtInfo.Zones {
 					zoneRes := paddingRes.DeepCopy() // to be extra safe
 					if zIdx == 0 {                   // any zone is fine
-						baseload.Apply(zoneRes)
+						baseload.AddTo(zoneRes)
 					}
 
 					podName := fmt.Sprintf("padding%d-%d", nIdx, zIdx)

@@ -86,15 +86,15 @@ func (nl Load) String() string {
 	return fmt.Sprintf("load for node %q: %s", nl.Name, resourcelist.ToString(nl.Resources))
 }
 
-// Apply adjust the given ResourceList with the current node load by mutating
-// the parameter in place
-func (nl Load) Apply(res corev1.ResourceList) {
+// AddTo adds the current node load to the given ResourceList,
+// mutating the parameter in place.
+func (nl Load) AddTo(res corev1.ResourceList) {
 	resourcelist.AddInPlace(res, nl.Resources)
 }
 
-// Deduct subtract the current node load from the given ResourceList by mutating
-// the parameter in place
-func (nl Load) Deduct(res corev1.ResourceList) error {
+// SubtractFrom subtracts the current node load from the given ResourceList,
+// mutating the parameter in place.
+func (nl Load) SubtractFrom(res corev1.ResourceList) error {
 	return resourcelist.SubInPlace(res, nl.Resources)
 }
 

@@ -147,7 +147,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				// TODO: multi-line value in structured log
 				klog.InfoS("computed base load", "value", baseload)
 				paddingResWithBaseload := paddingRes.DeepCopy()
-				baseload.Apply(paddingResWithBaseload)
+				baseload.AddTo(paddingResWithBaseload)
 				var zonePaddingRes corev1.ResourceList
 				for zIdx, zone := range nrtInfo.Zones {
 					zonePaddingRes = paddingRes
@@ -2130,7 +2130,7 @@ func setupPadding(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopol
 		zone := nrtInfo.Zones[numaIdx]
 		numaRes := padInfo.targetFreeResPerNUMA[idx]
 		if idx == 0 { // any random zone is actually fine
-			baseload.Apply(numaRes)
+			baseload.AddTo(numaRes)
 		}
 
 		e2efixture.By("padding node %q zone %q to fit only %s", nrtInfo.Name, zone.Name, e2ereslist.ToString(numaRes))
@@ -2168,7 +2168,7 @@ func setupPaddingForUnsuitableNodes(fxt *e2efixture.Fixture, nrtList nrtv1alpha2
 
 			e2efixture.By("saturating node %q -> %q zone %q to fit only (vanilla) %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes))
 			if zoneIdx == 0 { // any random zone is actually fine
-				baseload.Apply(padRes)
+				baseload.AddTo(padRes)
 				e2efixture.By("saturating node %q -> %q zone %q to fit only (adjusted) %s", nrtInfo.Name, name, zone.Name, e2ereslist.ToString(padRes))
 			}
 
