@@ -43,6 +43,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
+	"github.com/openshift-kni/numaresources-operator/internal/podlogs"
 	nrowait "github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
@@ -443,7 +444,7 @@ func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context
 		}
 
 		for _, pod := range podList.Items {
-			logs, err := objects.GetLogsForPod(k8sCli, pod.Namespace, pod.Name, containerNameRTE)
+			logs, err := podlogs.Get(ctx, k8sCli, pod.Namespace, pod.Name, containerNameRTE)
 			if err != nil {
 				klog.ErrorS(err, "cannot fetch logs", "dsNamespace", ds.Namespace, "dsName", ds.Name, "podNamespace", pod.Namespace, "podName", pod.Name)
 				continue
