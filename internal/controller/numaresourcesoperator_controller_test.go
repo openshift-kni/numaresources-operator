@@ -64,6 +64,9 @@ import (
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
+	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"
+
+	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -105,6 +108,21 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 		},
 		Recorder: recorder,
 	}, nil
+}
+
+func getDaemonConfigProgArgs(reconciler *NUMAResourcesOperatorReconciler, nroName, poolName string) rteconfiguration.ProgArgs {
+	GinkgoHelper()
+	cmKey := client.ObjectKey{
+		Name:      objectnames.GetDaemonConfigName(nroName, poolName),
+		Namespace: testNamespace,
+	}
+	cm := &corev1.ConfigMap{}
+	Expect(reconciler.Client.Get(context.TODO(), cmKey, cm)).To(Succeed(), "failed to get daemon config ConfigMap %v", cmKey)
+	data, err := rteconfig.UnpackDaemonConfigMap(cm)
+	Expect(err).ToNot(HaveOccurred())
+	pArgs, err := rteconfig.UnrenderDaemonConfig(data)
+	Expect(err).ToNot(HaveOccurred())
+	return pArgs
 }
 
 var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
@@ -496,16 +514,9 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
-						Namespace: testNamespace,
-					}
-					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
-
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
-					Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
+					conf := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(conf.RTE.SleepInterval).To(Equal(10*time.Second))
+					Expect(conf.Resourcemonitor.PodSetFingerprint).To(BeTrue())
 				})
 
 				It("should apply RTEMetricsTLS to RTE DaemonSet metrics arguments", func() {
@@ -522,17 +533,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						reconciler = reconcileObjectsOpenshiftWithMetricsTLS(nro, mcp, tlsMetrics)
 					}
 
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
-						Namespace: testNamespace,
-					}
-					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
-
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement(ContainSubstring("--metrics-mode=httptls")))
-					Expect(args).To(ContainElement(ContainSubstring("--metrics-tls-min-version=" + tlsMetrics.MinVersion)))
-					Expect(args).To(ContainElement(ContainSubstring("--metrics-tls-cipher-suites=" + tlsMetrics.CipherSuites)))
+					conf := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(conf.RTE.MetricsMode).To(Equal("httptls"))
+					Expect(conf.RTE.MetricsTLSCfg.MinTLSVersion).To(Equal(tlsMetrics.MinVersion))
+					Expect(conf.RTE.MetricsTLSCfg.CipherSuites).To(Equal(tlsMetrics.CipherSuites))
 				})
 
 				It("should not set metrics TLS min version or ciphers when RTEMetricsTLS is empty", func() {
@@ -545,17 +549,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
-						Namespace: testNamespace,
-					}
-					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).To(Succeed())
-
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement(ContainSubstring("--metrics-mode=httptls")))
-					Expect(args).ToNot(ContainElement(ContainSubstring("--metrics-tls-min-version")))
-					Expect(args).ToNot(ContainElement(ContainSubstring("--metrics-tls-cipher-suites")))
+					conf := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(conf.RTE.MetricsMode).To(Equal("httptls"))
+					Expect(conf.RTE.MetricsTLSCfg.MinTLSVersion).To(BeEmpty())
+					Expect(conf.RTE.MetricsTLSCfg.CipherSuites).To(BeEmpty())
 				})
 
 				It("should report the observed values per Node Group in status", func() {
@@ -624,18 +621,11 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, pn),
-						Namespace: testNamespace,
-					}
-					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
-
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement("--sleep-interval=33s"), "malformed args: %v", args)
-					Expect(args).ToNot(ContainElement(ContainSubstring("--notify-file=")), "malformed args: %v", args)
-					Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
-					Expect(args).To(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
+					conf2 := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(conf2.RTE.SleepInterval).To(Equal(33 * time.Second))
+					Expect(conf2.RTE.NotifyFilePath).To(BeEmpty())
+					Expect(conf2.Resourcemonitor.PodSetFingerprint).To(BeTrue())
+					Expect(conf2.NRTupdater.NoPublish).To(BeTrue())
 				})
 
 				It("should allow to disable pods fingerprinting", func() {
@@ -652,15 +642,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, pn),
-						Namespace: testNamespace,
-					}
-					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
-
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).ToNot(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
+					conf2 := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(conf2.Resourcemonitor.PodSetFingerprint).To(BeFalse())
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
@@ -689,15 +672,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, pn),
-						Namespace: testNamespace,
-					}
-					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
-
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement("--sleep-interval=42s"), "malformed args: %v", args)
+					conf2 := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(conf2.RTE.SleepInterval).To(Equal(42 * time.Second))
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
@@ -722,15 +698,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, pn),
-						Namespace: testNamespace,
-					}
-					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
-
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).ToNot(ContainElement(ContainSubstring("--notify-file")), "malformed args: %v", args)
+					conf2 := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(conf2.RTE.NotifyFilePath).To(BeEmpty())
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
@@ -758,15 +727,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(reconciler.Client.Get(context.TODO(), key, nroCurrent)).NotTo(HaveOccurred())
 					Expect(nroCurrent.Spec.NodeGroups[0].Config.InfoRefreshPause).To(Equal(conf.InfoRefreshPause))
 
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, pn),
-						Namespace: testNamespace,
-					}
-					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
-
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).ToNot(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
+					conf2 := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(conf2.NRTupdater.NoPublish).To(BeFalse())
 				})
 
 				It("should allow to disabling NRT updates and enabling it back", func() {
@@ -792,15 +754,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						Expect(*nroCurrent.Status.MachineConfigPools[0].Config.InfoRefreshPause).To(Equal(rteMode), "node group config was not updated in the operator status")
 					}
 
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, pn),
-						Namespace: testNamespace,
-					}
-					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
-
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
+					conf2 := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(conf2.NRTupdater.NoPublish).To(BeTrue())
 
 					rteModeOpp := nropv1.InfoRefreshPauseDisabled
 					confUpdated := nropv1.NodeGroupConfig{
@@ -817,11 +772,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					// immediate update reflection with no reboot needed -> no need to reconcile after this
 					Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
-					dsUpdated := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, dsUpdated)).ToNot(HaveOccurred())
-
-					argsUpdated := dsUpdated.Spec.Template.Spec.Containers[0].Args
-					Expect(argsUpdated).ToNot(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", argsUpdated)
+					confUpdated2 := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(confUpdated2.NRTupdater.NoPublish).To(BeFalse())
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).ToNot(HaveOccurred())
@@ -842,17 +794,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, pn),
-						Namespace: testNamespace,
-					}
-					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
-
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement("--sleep-interval=10s"), "malformed args: %v", args)
-					Expect(args).To(ContainElement("--pods-fingerprint"), "malformed args: %v", args)
-					Expect(args).ToNot(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
+					conf2 := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(conf2.RTE.SleepInterval).To(Equal(10 * time.Second))
+					Expect(conf2.Resourcemonitor.PodSetFingerprint).To(BeTrue())
+					Expect(conf2.NRTupdater.NoPublish).To(BeFalse())
 
 					d, err := time.ParseDuration("12s")
 					Expect(err).ToNot(HaveOccurred())
@@ -882,14 +827,11 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					// immediate update reflection with no reboot needed -> no need to reconcile after this
 					Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
-					dsUpdated := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, dsUpdated)).ToNot(HaveOccurred())
-
-					argsUpdated := dsUpdated.Spec.Template.Spec.Containers[0].Args
-					Expect(argsUpdated).To(ContainElement("--sleep-interval=12s"), "malformed updated args: %v", argsUpdated)
-					Expect(argsUpdated).ToNot(ContainElement(ContainSubstring("--notify-file=")), "malformed updated args: %v", argsUpdated)
-					Expect(argsUpdated).To(ContainElement("--pods-fingerprint"), "malformed updated args: %v", argsUpdated)
-					Expect(argsUpdated).To(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", argsUpdated)
+					confUpdated2 := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(confUpdated2.RTE.SleepInterval).To(Equal(12 * time.Second))
+					Expect(confUpdated2.RTE.NotifyFilePath).To(BeEmpty())
+					Expect(confUpdated2.Resourcemonitor.PodSetFingerprint).To(BeTrue())
+					Expect(confUpdated2.NRTupdater.NoPublish).To(BeTrue())
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
@@ -914,15 +856,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 						reconciler = reconcileObjectsOpenshift(nro, mcp)
 					}
 
-					dsKey := client.ObjectKey{
-						Name:      objectnames.GetComponentName(nro.Name, pn),
-						Namespace: testNamespace,
-					}
-					ds := &appsv1.DaemonSet{}
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
-
-					args := ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement("--pods-fingerprint-method=with-exclusive-resources"), "malformed args: %v", args)
+					conf2 := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(conf2.Resourcemonitor.PodSetFingerprintMethod).To(Equal("with-exclusive-resources"))
 
 					key := client.ObjectKeyFromObject(nro)
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
@@ -944,10 +879,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 					Expect(err).ToNot(HaveOccurred())
 
-					Expect(reconciler.Client.Get(context.TODO(), dsKey, ds)).ToNot(HaveOccurred())
-
-					args = ds.Spec.Template.Spec.Containers[0].Args
-					Expect(args).To(ContainElement("--pods-fingerprint-method=all"), "malformed args: %v", args)
+					confUpdated := getDaemonConfigProgArgs(reconciler, nro.Name, pn)
+					Expect(confUpdated.Resourcemonitor.PodSetFingerprintMethod).To(Equal("all"))
 
 					Expect(reconciler.Client.Get(context.TODO(), key, nroUpdated)).ToNot(HaveOccurred())
 					Expect(*nroUpdated.Status.NodeGroups[0].Config.PodsFingerprinting).To(Equal(updatedPFPMode), "node group config was not updated under NodeGroupStatus field")
@@ -2310,6 +2243,47 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 			for _, cnt := range ds.Spec.Template.Spec.Containers {
 				Expect(cnt.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageFallbackToLogsOnError))
+			}
+		})
+
+		It("should render flags instead of config volume when annotation is set", func(ctx context.Context) {
+			By("Creating NRO with daemon-config-mode=flags annotation")
+			pn := "test-flags"
+			ngFlags := nropv1.NodeGroup{
+				PoolName: &pn,
+				Annotations: map[string]string{
+					annotations.DaemonConfigModeAnnotation: annotations.DaemonConfigModeFlags,
+				},
+			}
+			nroFlags := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ngFlags)
+			mcpFlags := testobjs.NewMachineConfigPool(pn, map[string]string{pn: pn}, &metav1.LabelSelector{MatchLabels: map[string]string{pn: pn}}, &metav1.LabelSelector{MatchLabels: map[string]string{pn: pn}})
+			cmFlags := testobjs.NewRTEConfigMap(objectnames.GetComponentName(nroFlags.Name, pn), testNamespace, "single-numa-node", "pod")
+
+			reconcilerFlags, err := NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nroFlags, mcpFlags, cmFlags)
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(reconcilerFlags.Reconcile(ctx, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(nroFlags)})).ToNot(CauseRequeue())
+
+			dsKey := client.ObjectKey{
+				Name:      objectnames.GetComponentName(nroFlags.Name, pn),
+				Namespace: testNamespace,
+			}
+			var ds appsv1.DaemonSet
+			Expect(reconcilerFlags.Client.Get(ctx, dsKey, &ds)).To(Succeed())
+
+			By("Verify DaemonSet has --metrics-mode flag (flags mode)")
+			foundMetricsFlag := false
+			for _, arg := range ds.Spec.Template.Spec.Containers[0].Args {
+				if strings.Contains(arg, "--metrics-mode") {
+					foundMetricsFlag = true
+					break
+				}
+			}
+			Expect(foundMetricsFlag).To(BeTrue(), "expected --metrics-mode flag in DaemonSet args: %v", ds.Spec.Template.Spec.Containers[0].Args)
+
+			By("Verify DaemonSet does NOT have daemon config volume mount")
+			for _, vol := range ds.Spec.Template.Spec.Volumes {
+				Expect(vol.Name).ToNot(Equal("rte-daemon-config"), "daemon config volume should not be mounted in flags mode")
 			}
 		})
 

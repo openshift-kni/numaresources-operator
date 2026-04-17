@@ -199,3 +199,43 @@ func TestIsSchedulerQOSRequestBurstable(t *testing.T) {
 		})
 	}
 }
+
+func TestIsDaemonConfigModeFlags(t *testing.T) {
+	testcases := []struct {
+		description string
+		annotations map[string]string
+		expected    bool
+	}{
+		{
+			description: "empty map",
+			annotations: map[string]string{},
+			expected:    false,
+		},
+		{
+			description: "nil map",
+			annotations: nil,
+			expected:    false,
+		},
+		{
+			description: "flags mode",
+			annotations: map[string]string{
+				DaemonConfigModeAnnotation: DaemonConfigModeFlags,
+			},
+			expected: true,
+		},
+		{
+			description: "unrecognized value",
+			annotations: map[string]string{
+				DaemonConfigModeAnnotation: "something-else",
+			},
+			expected: false,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			if got := IsDaemonConfigModeFlags(tc.annotations); got != tc.expected {
+				t.Errorf("expected %v got %v", tc.expected, got)
+			}
+		})
+	}
+}

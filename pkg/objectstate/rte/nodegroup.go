@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
@@ -43,7 +45,16 @@ func (obj nodeGroupFinder) Name() string {
 
 func (obj nodeGroupFinder) UpdateFromClient(ctx context.Context, cli client.Client, tree nodegroupv1.Tree) {
 	generatedName := objectnames.GetComponentName(obj.instance.Name, *tree.NodeGroup.PoolName)
-	obj.em.daemonSets[generatedName] = getDaemonSetManifest(ctx, cli, obj.namespace, generatedName)
+	daemonConfigName := objectnames.GetDaemonConfigName(obj.instance.Name, *tree.NodeGroup.PoolName)
+	obj.em.daemonSets[generatedName] = getDaemonSetManifest(ctx, cli, obj.namespace, generatedName, daemonConfigName)
+
+	dcmKey := client.ObjectKey{Namespace: obj.namespace, Name: daemonConfigName}
+	dcm := &corev1.ConfigMap{}
+	dcmm := daemonConfigManifest{}
+	if dcmm.configMapError = cli.Get(ctx, dcmKey, dcm); dcmm.configMapError == nil {
+		dcmm.configMap = dcm
+	}
+	obj.em.daemonConfigs[daemonConfigName] = dcmm
 }
 
 func (obj nodeGroupFinder) FindState(mf Manifests, tree nodegroupv1.Tree) []objectstate.ObjectState {
@@ -51,15 +62,18 @@ func (obj nodeGroupFinder) FindState(mf Manifests, tree nodegroupv1.Tree) []obje
 	var existingDs client.Object
 	var loadError error
 	var rteConfigHash string
+	var daemonConfigHash string
 
 	poolName := *tree.NodeGroup.PoolName
 
 	generatedName := objectnames.GetComponentName(obj.instance.Name, poolName)
+	daemonConfigName := objectnames.GetDaemonConfigName(obj.instance.Name, poolName)
 	existingDaemonSet, ok := obj.em.daemonSets[generatedName]
 	if ok {
 		existingDs = existingDaemonSet.daemonSet
 		loadError = existingDaemonSet.daemonSetError
 		rteConfigHash = existingDaemonSet.rteConfigHash
+		daemonConfigHash = existingDaemonSet.daemonConfigHash
 	} else {
 		loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.Core.DaemonSet.Namespace, mf.Core.DaemonSet.Name)
 	}
@@ -78,6 +92,7 @@ func (obj nodeGroupFinder) FindState(mf Manifests, tree nodegroupv1.Tree) []obje
 		NodeGroup:             tree.NodeGroup.DeepCopy(),
 		DaemonSet:             desiredDaemonSet,
 		RTEConfigHash:         rteConfigHash,
+		DaemonConfigHash:      daemonConfigHash,
 		IsCustomPolicyEnabled: annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations),
 		SecOpts:               mf.securityContextOptions(annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)),
 	}
@@ -95,5 +110,17 @@ func (obj nodeGroupFinder) FindState(mf Manifests, tree nodegroupv1.Tree) []obje
 		Compare:     compare.Object,
 		Merge:       merge.ObjectForUpdate,
 	})
+
+	if gdm.DaemonConfigMap != nil {
+		existingDCM, _ := obj.em.daemonConfigs[daemonConfigName]
+		ret = append(ret, objectstate.ObjectState{
+			Existing: existingDCM.configMap,
+			Error:    existingDCM.configMapError,
+			Desired:  gdm.DaemonConfigMap,
+			Compare:  compare.Object,
+			Merge:    merge.ObjectForUpdate,
+		})
+	}
+
 	return ret
 }

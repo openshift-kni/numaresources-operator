@@ -49,7 +49,16 @@ func (obj machineConfigPoolFinder) Name() string {
 func (obj machineConfigPoolFinder) UpdateFromClient(ctx context.Context, cli client.Client, tree nodegroupv1.Tree) {
 	for _, mcp := range tree.MachineConfigPools {
 		generatedName := objectnames.GetComponentName(obj.instance.Name, mcp.Name)
-		obj.em.daemonSets[generatedName] = getDaemonSetManifest(ctx, cli, obj.namespace, generatedName)
+		daemonConfigName := objectnames.GetDaemonConfigName(obj.instance.Name, mcp.Name)
+		obj.em.daemonSets[generatedName] = getDaemonSetManifest(ctx, cli, obj.namespace, generatedName, daemonConfigName)
+
+		dcmKey := client.ObjectKey{Namespace: obj.namespace, Name: daemonConfigName}
+		dcm := &corev1.ConfigMap{}
+		dcmm := daemonConfigManifest{}
+		if dcmm.configMapError = cli.Get(ctx, dcmKey, dcm); dcmm.configMapError == nil {
+			dcmm.configMap = dcm
+		}
+		obj.em.daemonConfigs[daemonConfigName] = dcmm
 
 		mcName := objectnames.GetMachineConfigName(obj.instance.Name, mcp.Name)
 		mckey := client.ObjectKey{
@@ -70,13 +79,16 @@ func (obj machineConfigPoolFinder) FindState(mf Manifests, tree nodegroupv1.Tree
 		var existingDs client.Object
 		var loadError error
 		var rteConfigHash string
+		var daemonConfigHash string
 
 		generatedName := objectnames.GetComponentName(obj.instance.Name, mcp.Name)
+		daemonConfigName := objectnames.GetDaemonConfigName(obj.instance.Name, mcp.Name)
 		existingDaemonSet, ok := obj.em.daemonSets[generatedName]
 		if ok {
 			existingDs = existingDaemonSet.daemonSet
 			loadError = existingDaemonSet.daemonSetError
 			rteConfigHash = existingDaemonSet.rteConfigHash
+			daemonConfigHash = existingDaemonSet.daemonConfigHash
 		} else {
 			loadError = fmt.Errorf("failed to find daemon set %s/%s", mf.Core.DaemonSet.Namespace, mf.Core.DaemonSet.Name)
 		}
@@ -97,6 +109,7 @@ func (obj machineConfigPoolFinder) FindState(mf Manifests, tree nodegroupv1.Tree
 			NodeGroup:             tree.NodeGroup.DeepCopy(),
 			DaemonSet:             desiredDaemonSet,
 			RTEConfigHash:         rteConfigHash,
+			DaemonConfigHash:      daemonConfigHash,
 			IsCustomPolicyEnabled: annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations),
 			SecOpts:               mf.securityContextOptions(annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)),
 		}
@@ -114,6 +127,17 @@ func (obj machineConfigPoolFinder) FindState(mf Manifests, tree nodegroupv1.Tree
 			Compare:     compare.Object,
 			Merge:       merge.ObjectForUpdate,
 		})
+
+		if gdm.DaemonConfigMap != nil {
+			existingDCM, _ := obj.em.daemonConfigs[daemonConfigName]
+			ret = append(ret, objectstate.ObjectState{
+				Existing: existingDCM.configMap,
+				Error:    existingDCM.configMapError,
+				Desired:  gdm.DaemonConfigMap,
+				Compare:  compare.Object,
+				Merge:    merge.ObjectForUpdate,
+			})
+		}
 	}
 	return ret
 }

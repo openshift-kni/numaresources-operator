@@ -21,6 +21,7 @@ import (
 	"errors"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
@@ -108,6 +109,41 @@ func DeleteUnusedMachineConfigs(cli client.Client, ctx context.Context, instance
 	return errs
 }
 
+func DeleteUnusedDaemonConfigMaps(cli client.Client, ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, namespace string) error {
+	klog.V(3).Info("Delete dangling daemon config ConfigMaps start")
+	defer klog.V(3).Info("Delete dangling daemon config ConfigMaps end")
+
+	var cmList corev1.ConfigMapList
+	if err := cli.List(ctx, &cmList, &client.ListOptions{Namespace: namespace}); err != nil {
+		klog.ErrorS(err, "error while getting ConfigMap list")
+		return err
+	}
+
+	expectedNames := buildDaemonConfigNames(instance, trees)
+
+	var errs error
+	deleted := 0
+	for _, cm := range cmList.Items {
+		if !isOwnedBy(cm.GetObjectMeta(), instance) {
+			continue
+		}
+		if expectedNames.Has(cm.Name) {
+			continue
+		}
+		if err := cli.Delete(ctx, &cm); err != nil {
+			klog.ErrorS(err, "error while deleting dangling daemon config ConfigMap", "ConfigMap", cm.Namespace+"/"+cm.Name)
+			errs = errors.Join(errs, err)
+			continue
+		}
+		klog.V(3).InfoS("dangling daemon config ConfigMap deleted", "name", cm.Name)
+		deleted += 1
+	}
+	if deleted > 0 {
+		klog.V(2).InfoS("Delete dangling daemon config ConfigMaps", "deletedCount", deleted)
+	}
+	return errs
+}
+
 func isOwnedBy(element metav1.Object, owner metav1.Object) bool {
 	for _, ref := range element.GetOwnerReferences() {
 		if ref.UID == owner.GetUID() {
@@ -115,6 +151,21 @@ func isOwnedBy(element metav1.Object, owner metav1.Object) bool {
 		}
 	}
 	return false
+}
+
+func buildDaemonConfigNames(instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) sets.Set[string] {
+	expectedNames := sets.New[string]()
+	for _, tree := range trees {
+		poolName := tree.NodeGroup.PoolName
+		if poolName != nil {
+			expectedNames.Insert(objectnames.GetDaemonConfigName(instance.Name, *poolName))
+			continue
+		}
+		for _, mcp := range tree.MachineConfigPools {
+			expectedNames = expectedNames.Insert(objectnames.GetDaemonConfigName(instance.Name, mcp.Name))
+		}
+	}
+	return expectedNames
 }
 
 func buildDaemonSetNames(instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) sets.Set[string] {

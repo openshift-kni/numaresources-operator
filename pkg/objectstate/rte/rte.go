@@ -58,9 +58,15 @@ type rteHelper interface {
 }
 
 type daemonSetManifest struct {
-	daemonSet      *appsv1.DaemonSet
-	daemonSetError error
-	rteConfigHash  string
+	daemonSet        *appsv1.DaemonSet
+	daemonSetError   error
+	rteConfigHash    string
+	daemonConfigHash string
+}
+
+type daemonConfigManifest struct {
+	configMap      *corev1.ConfigMap
+	configMapError error
 }
 
 type machineConfigManifest struct {
@@ -108,6 +114,7 @@ type ExistingManifests struct {
 	existing       Manifests
 	errs           Errors
 	daemonSets     map[string]daemonSetManifest
+	daemonConfigs  map[string]daemonConfigManifest
 	machineConfigs map[string]machineConfigManifest
 	// internal helpers
 	plat      platform.Platform
@@ -118,7 +125,7 @@ type ExistingManifests struct {
 	helper    rteHelper
 }
 
-func getDaemonSetManifest(ctx context.Context, cli client.Client, namespace, name string) daemonSetManifest {
+func getDaemonSetManifest(ctx context.Context, cli client.Client, namespace, name, daemonConfigName string) daemonSetManifest {
 	key := client.ObjectKey{
 		Namespace: namespace,
 		Name:      name,
@@ -132,10 +139,20 @@ func getDaemonSetManifest(ctx context.Context, cli client.Client, namespace, nam
 
 	cm := corev1.ConfigMap{}
 	if err := cli.Get(ctx, key, &cm); err == nil {
-		// we're storing the updated hash only in the case that kubelet controller created a configmap
 		hval := hash.ConfigMapData(&cm)
 		klog.V(4).InfoS("rte configmap hash computed", "cm", key.String(), "hashValue", hval)
 		dsm.rteConfigHash = hval
+	}
+
+	dcmKey := client.ObjectKey{
+		Namespace: namespace,
+		Name:      daemonConfigName,
+	}
+	dcm := corev1.ConfigMap{}
+	if err := cli.Get(ctx, dcmKey, &dcm); err == nil {
+		hval := hash.ConfigMapData(&dcm)
+		klog.V(4).InfoS("rte daemon configmap hash computed", "cm", dcmKey.String(), "hashValue", hval)
+		dsm.daemonConfigHash = hval
 	}
 
 	return dsm
@@ -160,6 +177,8 @@ type GeneratedDesiredManifest struct {
 	DaemonSet             *appsv1.DaemonSet
 	RTEConfigHash         string
 	ConfigMap             *corev1.ConfigMap
+	DaemonConfigMap       *corev1.ConfigMap
+	DaemonConfigHash      string
 	IsCustomPolicyEnabled bool
 }
 
@@ -276,12 +295,13 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		existing: Manifests{
 			Core: rtemanifests.New(plat),
 		},
-		daemonSets: make(map[string]daemonSetManifest),
-		plat:       plat,
-		instance:   instance,
-		trees:      trees,
-		namespace:  namespace,
-		updater:    SkipManifestUpdate,
+		daemonSets:    make(map[string]daemonSetManifest),
+		daemonConfigs: make(map[string]daemonConfigManifest),
+		plat:          plat,
+		instance:      instance,
+		trees:         trees,
+		namespace:     namespace,
+		updater:       SkipManifestUpdate,
 	}
 
 	keyFor := client.ObjectKeyFromObject // shortcut

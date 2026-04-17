@@ -18,6 +18,7 @@ package rte
 
 import (
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -33,6 +34,7 @@ import (
 	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
+	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
@@ -169,7 +171,95 @@ func DaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
 
 const _MiB = 1024 * 1024
 
-func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig, metricsTLS objtls.Settings) error {
+const (
+	daemonConfigMountName = "rte-daemon-config"
+	daemonConfigMountPath = "/etc/rte/daemon"
+)
+
+func ProgArgsFromNodeGroupConfig(conf nropv1.NodeGroupConfig, metricsTLS objtls.Settings) rteconfiguration.ProgArgs {
+	var pArgs rteconfiguration.ProgArgs
+
+	pArgs.RTE.MetricsMode = "httptls"
+	pArgs.RTE.AddNRTOwnerEnable = false
+	pArgs.Resourcemonitor.RefreshNodeResources = true
+
+	pArgs.RTE.MetricsTLSCfg.MinTLSVersion = metricsTLS.MinVersion
+	pArgs.RTE.MetricsTLSCfg.CipherSuites = metricsTLS.CipherSuites
+
+	pArgs.NRTupdater.NoPublish = isInfoRefreshPauseEnabled(&conf)
+
+	if isNotifyFileEnabled(&conf) {
+		pArgs.RTE.NotifyFilePath = "/run/rte/notify"
+	}
+
+	if isPeriodicUpdateRequired(&conf) {
+		pArgs.RTE.SleepInterval = findRefreshPeriodDuration(&conf)
+	}
+
+	pfpEnabled, pfpMethod := isPodFingerprintEnabled(&conf)
+	pArgs.Resourcemonitor.PodSetFingerprint = pfpEnabled
+	if pfpEnabled {
+		pArgs.Resourcemonitor.PodSetFingerprintMethod = pfpMethod
+	}
+
+	return pArgs
+}
+
+func DaemonConfigVolumeMount(ds *appsv1.DaemonSet, configMapName string) error {
+	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
+	if cnt == nil {
+		return fmt.Errorf("cannot find container data for %q", MainContainerName)
+	}
+	podSpec := &ds.Spec.Template.Spec
+
+	cnt.VolumeMounts = append(cnt.VolumeMounts, corev1.VolumeMount{
+		Name:      daemonConfigMountName,
+		MountPath: daemonConfigMountPath,
+		ReadOnly:  true,
+	})
+
+	podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
+		Name: daemonConfigMountName,
+		VolumeSource: corev1.VolumeSource{
+			ConfigMap: &corev1.ConfigMapVolumeSource{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: configMapName,
+				},
+			},
+		},
+	})
+	return nil
+}
+
+func DaemonSetDaemonConfigHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
+	template := &ds.Spec.Template
+	if template.Annotations == nil {
+		template.Annotations = map[string]string{}
+	}
+	template.Annotations[hash.DaemonConfigMapAnnotation] = cmHash
+	klog.V(4).InfoS("DaemonSet RTE daemon ConfigMap hash annotation updated", "namespace", ds.Namespace, "name", ds.Name, "hashValue", cmHash)
+}
+
+func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig) error {
+	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
+	if cnt == nil {
+		return fmt.Errorf("cannot find container data for %q", MainContainerName)
+	}
+
+	pfpEnabled, _ := isPodFingerprintEnabled(&conf)
+	klog.V(2).InfoS("DaemonSet update: pod fingerprinting status", "daemonset", ds.Name, "enabled", pfpEnabled)
+	if pfpEnabled {
+		podSpec := &ds.Spec.Template.Spec
+		AddVolumeMountMemory(podSpec, cnt, pfpStatusMountName, pfpStatusDir, 8*_MiB)
+		envvar.SetForContainer(cnt, envvar.PFPStatusDump, envvar.PFPStatusDirDefault)
+	} else {
+		envvar.DeleteFromContainer(cnt, envvar.PFPStatusDump)
+	}
+
+	return nil
+}
+
+func DaemonSetArgsFlags(ds *appsv1.DaemonSet, pArgs rteconfiguration.ProgArgs) error {
 	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
 	if cnt == nil {
 		return fmt.Errorf("cannot find container data for %q", MainContainerName)
@@ -178,21 +268,16 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig, metricsTLS
 	if flags == nil {
 		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
 	}
-	flags.SetOption("--metrics-mode", "httptls")
-	if metricsTLS.MinVersion != "" {
-		flags.SetOption("--metrics-tls-min-version", metricsTLS.MinVersion)
-	} else {
-		flags.Delete("--metrics-tls-min-version")
+
+	flags.SetOption("--metrics-mode", pArgs.RTE.MetricsMode)
+	if pArgs.RTE.MetricsTLSCfg.MinTLSVersion != "" {
+		flags.SetOption("--metrics-tls-min-version", pArgs.RTE.MetricsTLSCfg.MinTLSVersion)
 	}
-	if metricsTLS.CipherSuites != "" {
-		flags.SetOption("--metrics-tls-cipher-suites", metricsTLS.CipherSuites)
-	} else {
-		flags.Delete("--metrics-tls-cipher-suites")
+	if pArgs.RTE.MetricsTLSCfg.CipherSuites != "" {
+		flags.SetOption("--metrics-tls-cipher-suites", pArgs.RTE.MetricsTLSCfg.CipherSuites)
 	}
 
-	infoRefreshPauseEnabled := isInfoRefreshPauseEnabled(&conf)
-	klog.V(2).InfoS("DaemonSet update: InfoRefreshPause status", "daemonset", ds.Name, "enabled", infoRefreshPauseEnabled)
-	if infoRefreshPauseEnabled {
+	if pArgs.NRTupdater.NoPublish {
 		flags.SetToggle("--no-publish")
 	} else {
 		flags.Delete("--no-publish")
@@ -200,36 +285,19 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig, metricsTLS
 
 	flags.SetToggle("--refresh-node-resources")
 
-	notifEnabled := isNotifyFileEnabled(&conf)
-	klog.V(2).InfoS("DaemonSet update: event notification", "daemonset", ds.Name, "enabled", notifEnabled)
-	if notifEnabled {
-		flags.SetOption("--notify-file", "/run/rte/notify")
+	if pArgs.RTE.NotifyFilePath != "" {
+		flags.SetOption("--notify-file", pArgs.RTE.NotifyFilePath)
 	} else {
 		flags.Delete("--notify-file")
 	}
 
-	needsPeriodic := isPeriodicUpdateRequired(&conf)
-	refreshPeriod := findRefreshPeriod(&conf)
-	klog.V(2).InfoS("DaemonSet update: periodic update", "daemonset", ds.Name, "enabled", needsPeriodic, "period", refreshPeriod)
-	if needsPeriodic {
-		flags.SetOption("--sleep-interval", refreshPeriod)
+	if pArgs.RTE.SleepInterval > 0 {
+		flags.SetOption("--sleep-interval", pArgs.RTE.SleepInterval.String())
 	}
 
-	pfpEnabled, pfpMethod := isPodFingerprintEnabled(&conf)
-	klog.V(2).InfoS("DaemonSet update: pod fingerprinting status", "daemonset", ds.Name, "enabled", pfpEnabled)
-	if pfpEnabled {
+	if pArgs.Resourcemonitor.PodSetFingerprint {
 		flags.SetToggle("--pods-fingerprint")
-		flags.SetOption("--pods-fingerprint-method", pfpMethod)
-
-		podSpec := &ds.Spec.Template.Spec
-
-		// TODO: these don't really belong here, but OTOH adding the status file without having set
-		// the volume doesn't work either. We need a deeper refactoring in this area.
-		AddVolumeMountMemory(podSpec, cnt, pfpStatusMountName, pfpStatusDir, 8*_MiB)
-		envvar.SetForContainer(cnt, envvar.PFPStatusDump, envvar.PFPStatusDirDefault)
-	} else {
-		// TODO: ditto
-		envvar.DeleteFromContainer(cnt, envvar.PFPStatusDump)
+		flags.SetOption("--pods-fingerprint-method", pArgs.Resourcemonitor.PodSetFingerprintMethod)
 	}
 
 	flags.SetOption("--add-nrt-owner", "false")
@@ -338,15 +406,12 @@ func isPeriodicUpdateRequired(conf *nropv1.NodeGroupConfig) bool {
 	return *conf.InfoRefreshMode != nropv1.InfoRefreshEvents
 }
 
-func findRefreshPeriod(conf *nropv1.NodeGroupConfig) string {
+func findRefreshPeriodDuration(conf *nropv1.NodeGroupConfig) time.Duration {
 	cfg := nropv1.DefaultNodeGroupConfig()
 	if conf == nil || conf.InfoRefreshPeriod == nil {
-		// not specified -> use defaults
 		conf = &cfg
 	}
-	// TODO ensure we overwrite - and possibly find a less ugly stringification code
-	// TODO: what if sleep-interval is set and is 0 ?
-	return conf.InfoRefreshPeriod.Duration.String()
+	return conf.InfoRefreshPeriod.Duration
 }
 
 func isInfoRefreshPauseEnabled(conf *nropv1.NodeGroupConfig) bool {

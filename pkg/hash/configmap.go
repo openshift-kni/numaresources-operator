@@ -28,7 +28,10 @@ import (
 //  to allow them to track ConfigMap changes
 // more about this technique here: https://blog.questionable.services/article/kubernetes-deployments-configmap-change/
 
-const ConfigMapAnnotation = "configmap.hash"
+const (
+	ConfigMapAnnotation       = "configmap.hash"
+	DaemonConfigMapAnnotation = "daemonconfigmap.hash"
+)
 
 func ConfigMapData(cm *corev1.ConfigMap) string {
 	var dataAsString string

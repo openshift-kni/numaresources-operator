@@ -44,6 +44,11 @@ const (
 	// remove (only burstable, always) in: 4.24
 	SchedulerQOSRequestAnnotation = "config.numa-operator.openshift.io/scheduler-qos-request"
 	SchedulerQOSRequestGuaranteed = "guaranteed"
+
+	// introduced in: 4.23
+	// remove in: never (escape hatch)
+	DaemonConfigModeAnnotation = "config.node.openshift-kni.io/daemon-config-mode"
+	DaemonConfigModeFlags      = "flags"
 )
 
 func IsCustomPolicyEnabled(annot map[string]string) bool {
@@ -76,6 +81,13 @@ func IsNRTAPIDefinitionCluster(annot map[string]string) bool {
 
 func IsSchedulerQOSRequestGuaranteed(annot map[string]string) bool {
 	if v, ok := annot[SchedulerQOSRequestAnnotation]; ok && v == SchedulerQOSRequestGuaranteed {
+		return true
+	}
+	return false
+}
+
+func IsDaemonConfigModeFlags(annot map[string]string) bool {
+	if v, ok := annot[DaemonConfigModeAnnotation]; ok && v == DaemonConfigModeFlags {
 		return true
 	}
 	return false

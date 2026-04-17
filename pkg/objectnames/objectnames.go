@@ -30,3 +30,7 @@ func GetMachineConfigName(instanceName, mcpName string) string {
 func GetComponentName(instanceName, mcpName string) string {
 	return fmt.Sprintf("%s-%s", instanceName, mcpName)
 }
+
+func GetDaemonConfigName(instanceName, poolName string) string {
+	return fmt.Sprintf("%s-%s-daemon", instanceName, poolName)
+}

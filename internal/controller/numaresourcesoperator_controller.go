@@ -69,7 +69,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/status/conditioninfo"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
-	"github.com/openshift-kni/numaresources-operator/rte/pkg/config"
+	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 )
 
 const numaResourcesRetryPeriod = 1 * time.Minute
@@ -506,6 +506,11 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		klog.ErrorS(err, "failed to deleted unused daemonsets")
 	}
 
+	err = dangling.DeleteUnusedDaemonConfigMaps(r.Client, ctx, instance, trees, r.Namespace)
+	if err != nil {
+		klog.ErrorS(err, "failed to deleted unused daemon config configmaps")
+	}
+
 	if r.Platform == platform.OpenShift {
 		err = dangling.DeleteUnusedMachineConfigs(r.Client, ctx, instance, trees)
 		if err != nil {
@@ -541,7 +546,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	// SCC v2 needs no updates
 
 	existing = existing.WithManifestsUpdater(func(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
-		err := daemonsetUpdater(poolName, gdm, r.RTEMetricsTLS)
+		err := daemonsetUpdater(poolName, gdm, instance.Name, r.Namespace, r.RTEMetricsTLS)
 		if err != nil {
 			return err
 		}
@@ -610,7 +615,7 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 		cm := object.(*corev1.ConfigMap)
 		cmLabels := cm.GetLabels()
 		// return only configmap with the operator name label
-		_, ok := cmLabels[config.LabelOperatorName]
+		_, ok := cmLabels[rteconfig.LabelOperatorName]
 		return ok
 	})
 
@@ -693,7 +698,7 @@ func (r *NUMAResourcesOperatorReconciler) configMapToNUMAResourceOperator(ctx co
 		klog.Errorf("failed to get configmap %+v; %v", key, err)
 		return nil
 	}
-	name, ok := cm.Labels[config.LabelOperatorName]
+	name, ok := cm.Labels[rteconfig.LabelOperatorName]
 	if !ok {
 		return nil
 	}
@@ -753,11 +758,30 @@ func validateMachineConfigLabels(mc client.Object, trees []nodegroupv1.Tree) err
 	return nil
 }
 
-func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest, rteMetricsTLS objtls.Settings) error {
+func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest, instanceName string, namespace string, rteMetricsTLS objtls.Settings) error {
 	rteupdate.AllContainersTerminationMessagePolicy(gdm.DaemonSet)
 	rteupdate.DaemonSetTolerations(gdm.DaemonSet, gdm.NodeGroup.Config.Tolerations)
 
-	err := rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config, rteMetricsTLS)
+	pArgs := rteupdate.ProgArgsFromNodeGroupConfig(*gdm.NodeGroup.Config, rteMetricsTLS)
+	daemonCfgData, err := rteconfig.RenderDaemonConfig(pArgs)
+	if err != nil {
+		return fmt.Errorf("failed to render daemon config for pool %q: %w", poolName, err)
+	}
+
+	daemonConfigName := objectnames.GetDaemonConfigName(instanceName, poolName)
+	gdm.DaemonConfigMap = rteconfig.CreateDaemonConfigMap(namespace, daemonConfigName, daemonCfgData)
+	rteconfig.AddDaemonConfigSoftRefLabels(gdm.DaemonConfigMap, instanceName, poolName)
+
+	if annotations.IsDaemonConfigModeFlags(gdm.NodeGroup.Annotations) {
+		err = rteupdate.DaemonSetArgsFlags(gdm.DaemonSet, pArgs)
+	} else {
+		err = rteupdate.DaemonConfigVolumeMount(gdm.DaemonSet, daemonConfigName)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to configure daemon for pool %q: %w", poolName, err)
+	}
+
+	err = rteupdate.DaemonSetArgs(gdm.DaemonSet, *gdm.NodeGroup.Config)
 	if err != nil {
 		klog.V(5).InfoS("DaemonSet update: cannot update arguments", "pool name", poolName, "daemonset", gdm.DaemonSet.Name, "error", err)
 		return err
@@ -772,7 +796,6 @@ func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest, r
 		klog.V(4).InfoS("DaemonSet update: container configuration", "platform", gdm.ClusterPlatform, "daemonSetName", gdm.DaemonSet.Name)
 		err = rteupdate.ContainerConfig(gdm.DaemonSet, gdm.DaemonSet.Name)
 		if err != nil {
-			// intentionally info because we want to keep going
 			klog.V(5).InfoS("DaemonSet update: cannot update config", "pool name", poolName, "daemonset", gdm.DaemonSet.Name, "error", err)
 			return err
 		}
@@ -780,8 +803,8 @@ func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest, r
 		k8swgrteupdate.SecurityContextWithOpts(gdm.DaemonSet, gdm.SecOpts)
 	}
 
-	// it's possible that the hash will be empty if kubelet controller hasn't created a configmap
 	rteupdate.DaemonSetHashAnnotation(gdm.DaemonSet, gdm.RTEConfigHash)
+	rteupdate.DaemonSetDaemonConfigHashAnnotation(gdm.DaemonSet, gdm.DaemonConfigHash)
 	return nil
 }
 

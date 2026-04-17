@@ -29,6 +29,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	rteconfiguration "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
@@ -67,7 +69,163 @@ var testDs = &appsv1.DaemonSet{
 	},
 }
 
-func TestUpdateDaemonSetArgs(t *testing.T) {
+func TestProgArgsFromNodeGroupConfig(t *testing.T) {
+	type testCase struct {
+		name       string
+		conf       nropv1.NodeGroupConfig
+		metricsTLS objtls.Settings
+		validate   func(t *testing.T, pArgs rteconfiguration.ProgArgs)
+	}
+
+	pfpEnabled := nropv1.PodsFingerprintingEnabled
+	pfpDisabled := nropv1.PodsFingerprintingDisabled
+
+	refreshEvents := nropv1.InfoRefreshEvents
+	refreshPeriodic := nropv1.InfoRefreshPeriodic
+
+	infoRefreshPauseEnabled := nropv1.InfoRefreshPauseEnabled
+	infoRefreshPauseDisabled := nropv1.InfoRefreshPauseDisabled
+
+	testCases := []testCase{
+		{
+			name: "defaults",
+			conf: nropv1.DefaultNodeGroupConfig(),
+			validate: func(t *testing.T, pArgs rteconfiguration.ProgArgs) {
+				if pArgs.RTE.MetricsMode != "httptls" {
+					t.Errorf("expected metricsMode httptls, got %q", pArgs.RTE.MetricsMode)
+				}
+				if pArgs.RTE.AddNRTOwnerEnable {
+					t.Errorf("expected addNRTOwnerEnable false")
+				}
+				if !pArgs.Resourcemonitor.RefreshNodeResources {
+					t.Errorf("expected refreshNodeResources true")
+				}
+				if !pArgs.Resourcemonitor.PodSetFingerprint {
+					t.Errorf("expected podSetFingerprint true")
+				}
+				if pArgs.Resourcemonitor.PodSetFingerprintMethod != "with-exclusive-resources" {
+					t.Errorf("expected podSetFingerprintMethod with-exclusive-resources, got %q", pArgs.Resourcemonitor.PodSetFingerprintMethod)
+				}
+				if pArgs.RTE.SleepInterval != 10*time.Second {
+					t.Errorf("expected sleepInterval 10s, got %v", pArgs.RTE.SleepInterval)
+				}
+				if pArgs.NRTupdater.NoPublish {
+					t.Errorf("expected noPublish false")
+				}
+			},
+		},
+		{
+			name:       "cluster TLS profile on metrics",
+			conf:       nropv1.DefaultNodeGroupConfig(),
+			metricsTLS: objtls.NewSettings(&tls.Config{MinVersion: tls.VersionTLS12, CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256}}),
+			validate: func(t *testing.T, pArgs rteconfiguration.ProgArgs) {
+				if pArgs.RTE.MetricsTLSCfg.MinTLSVersion != "VersionTLS12" {
+					t.Errorf("expected minTLSVersion VersionTLS12, got %q", pArgs.RTE.MetricsTLSCfg.MinTLSVersion)
+				}
+				if pArgs.RTE.MetricsTLSCfg.CipherSuites != "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256" {
+					t.Errorf("expected cipherSuites TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, got %q", pArgs.RTE.MetricsTLSCfg.CipherSuites)
+				}
+			},
+		},
+		{
+			name: "override interval",
+			conf: nropv1.NodeGroupConfig{
+				InfoRefreshPeriod: &metav1.Duration{
+					Duration: 32 * time.Second,
+				},
+			},
+			validate: func(t *testing.T, pArgs rteconfiguration.ProgArgs) {
+				if pArgs.RTE.SleepInterval != 32*time.Second {
+					t.Errorf("expected sleepInterval 32s, got %v", pArgs.RTE.SleepInterval)
+				}
+			},
+		},
+		{
+			name: "explicitly disable restricted fingerprint",
+			conf: nropv1.NodeGroupConfig{
+				PodsFingerprinting: &pfpEnabled,
+			},
+			validate: func(t *testing.T, pArgs rteconfiguration.ProgArgs) {
+				if !pArgs.Resourcemonitor.PodSetFingerprint {
+					t.Errorf("expected podSetFingerprint true")
+				}
+				if pArgs.Resourcemonitor.PodSetFingerprintMethod != "all" {
+					t.Errorf("expected podSetFingerprintMethod all, got %q", pArgs.Resourcemonitor.PodSetFingerprintMethod)
+				}
+			},
+		},
+		{
+			name: "disable fingerprint",
+			conf: nropv1.NodeGroupConfig{
+				PodsFingerprinting: &pfpDisabled,
+			},
+			validate: func(t *testing.T, pArgs rteconfiguration.ProgArgs) {
+				if pArgs.Resourcemonitor.PodSetFingerprint {
+					t.Errorf("expected podSetFingerprint false")
+				}
+			},
+		},
+		{
+			name: "disable periodic update",
+			conf: nropv1.NodeGroupConfig{
+				InfoRefreshMode: &refreshEvents,
+			},
+			validate: func(t *testing.T, pArgs rteconfiguration.ProgArgs) {
+				if pArgs.RTE.NotifyFilePath != "/run/rte/notify" {
+					t.Errorf("expected notifyFilePath /run/rte/notify, got %q", pArgs.RTE.NotifyFilePath)
+				}
+				if pArgs.RTE.SleepInterval != 0 {
+					t.Errorf("expected sleepInterval 0 for events-only, got %v", pArgs.RTE.SleepInterval)
+				}
+			},
+		},
+		{
+			name: "disable events for update",
+			conf: nropv1.NodeGroupConfig{
+				InfoRefreshMode: &refreshPeriodic,
+			},
+			validate: func(t *testing.T, pArgs rteconfiguration.ProgArgs) {
+				if pArgs.RTE.NotifyFilePath != "" {
+					t.Errorf("expected empty notifyFilePath, got %q", pArgs.RTE.NotifyFilePath)
+				}
+				if pArgs.RTE.SleepInterval != 10*time.Second {
+					t.Errorf("expected sleepInterval 10s, got %v", pArgs.RTE.SleepInterval)
+				}
+			},
+		},
+		{
+			name: "disable publishing NRT data",
+			conf: nropv1.NodeGroupConfig{
+				InfoRefreshPause: &infoRefreshPauseEnabled,
+			},
+			validate: func(t *testing.T, pArgs rteconfiguration.ProgArgs) {
+				if !pArgs.NRTupdater.NoPublish {
+					t.Errorf("expected noPublish true")
+				}
+			},
+		},
+		{
+			name: "precisely enable publishing NRT data",
+			conf: nropv1.NodeGroupConfig{
+				InfoRefreshPause: &infoRefreshPauseDisabled,
+			},
+			validate: func(t *testing.T, pArgs rteconfiguration.ProgArgs) {
+				if pArgs.NRTupdater.NoPublish {
+					t.Errorf("expected noPublish false")
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			pArgs := ProgArgsFromNodeGroupConfig(tc.conf, tc.metricsTLS)
+			tc.validate(t, pArgs)
+		})
+	}
+}
+
+func TestDaemonSetArgsFlags(t *testing.T) {
 	type testCase struct {
 		name         string
 		conf         nropv1.NodeGroupConfig
@@ -79,10 +237,8 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 	pfpDisabled := nropv1.PodsFingerprintingDisabled
 
 	refreshEvents := nropv1.InfoRefreshEvents
-	refreshPeriodic := nropv1.InfoRefreshPeriodic
 
 	infoRefreshPauseEnabled := nropv1.InfoRefreshPauseEnabled
-	infoRefreshPauseDisabled := nropv1.InfoRefreshPauseDisabled
 
 	testCases := []testCase{
 		{
@@ -113,7 +269,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "explicitly disable restricted fingerprint",
+			name: "explicitly enable fingerprint",
 			conf: nropv1.NodeGroupConfig{
 				PodsFingerprinting: &pfpEnabled,
 			},
@@ -131,7 +287,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "disable periodic update",
+			name: "events mode enables notify file",
 			conf: nropv1.NodeGroupConfig{
 				InfoRefreshMode: &refreshEvents,
 			},
@@ -140,16 +296,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "disable events for update",
-			conf: nropv1.NodeGroupConfig{
-				InfoRefreshMode: &refreshPeriodic,
-			},
-			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
-			},
-		},
-		{
-			name: "disable publishing NRT data",
+			name: "info refresh pause enables no-publish",
 			conf: nropv1.NodeGroupConfig{
 				InfoRefreshPause: &infoRefreshPauseEnabled,
 			},
@@ -157,23 +304,15 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--no-publish", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
 			},
 		},
-		{
-			name: "precisely enable publishing NRT data",
-			conf: nropv1.NodeGroupConfig{
-				InfoRefreshPause: &infoRefreshPauseDisabled,
-			},
-			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
-			},
-		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			origDs := testDs.DeepCopy()
 			ds := testDs.DeepCopy()
+			origDs := testDs.DeepCopy()
 
-			err := DaemonSetArgs(ds, tc.conf, tc.metricsTLS)
+			pArgs := ProgArgsFromNodeGroupConfig(tc.conf, tc.metricsTLS)
+			err := DaemonSetArgsFlags(ds, pArgs)
 			if err != nil {
 				t.Fatalf("update failed: %v", err)
 			}
@@ -181,6 +320,52 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			expectCommandLine(t, ds, origDs, tc.name, tc.expectedArgs)
 		})
 	}
+}
+
+func expectCommandLine(t *testing.T, ds, origDs *appsv1.DaemonSet, testName string, expectedArgs []string) {
+	t.Helper()
+	expectedArgs = append(expectedArgs, commonArgs...)
+	actualArgs := ds.Spec.Template.Spec.Containers[0].Args
+
+	actualArgsSet := getSetFromStringList(actualArgs)
+	if len(actualArgsSet) != len(actualArgs) {
+		t.Errorf("ds RTE container arguments has duplicates; ds args %v", actualArgs)
+	}
+
+	if len(expectedArgs) != len(actualArgs) {
+		t.Errorf("ds RTE container arguments count mismatch; got %v vs expected %v", actualArgs, expectedArgs)
+	}
+	for _, arg := range expectedArgs {
+		if idx := sliceIndex(actualArgs, arg); idx == -1 {
+			t.Errorf("%s: %s option missing from %v", testName, arg, actualArgs)
+		}
+	}
+
+	if !reflect.DeepEqual(origDs.Spec.Template.Spec.Containers[0].Command, ds.Spec.Template.Spec.Containers[0].Command) {
+		t.Errorf("%s: unexpected change on command: %v", testName, ds.Spec.Template.Spec.Containers[0].Command)
+	}
+
+	if !reflect.DeepEqual(origDs.Spec.Template.Spec.Containers[1].Args, ds.Spec.Template.Spec.Containers[1].Args) {
+		t.Errorf("%s: unexpected change on helper container args: %v", testName, ds.Spec.Template.Spec.Containers[1].Args)
+	}
+}
+
+func sliceIndex(sl []string, s string) int {
+	for idx, it := range sl {
+		if it == s {
+			return idx
+		}
+	}
+	return -1
+}
+
+func getSetFromStringList(args []string) map[string]struct{} {
+	argsSet := map[string]struct{}{}
+	for _, arg := range args {
+		keyVal := strings.Split(arg, "=")
+		argsSet[keyVal[0]] = struct{}{}
+	}
+	return argsSet
 }
 
 func TestUpdateDaemonSetTolerations(t *testing.T) {
@@ -292,56 +477,6 @@ func TestUpdateDaemonSetTolerations(t *testing.T) {
 			}
 		})
 	}
-}
-
-func expectCommandLine(t *testing.T, ds, origDs *appsv1.DaemonSet, testName string, expectedArgs []string) {
-	expectedArgs = append(expectedArgs, commonArgs...)
-	actualArgsSet := getSetFromStringList(ds.Spec.Template.Spec.Containers[0].Args)
-
-	if len(actualArgsSet) != len(ds.Spec.Template.Spec.Containers[0].Args) {
-		t.Errorf("ds RTE container arguments has duplicates; ds args \"%v\"", ds.Spec.Template.Spec.Containers[0].Args)
-	}
-
-	if len(expectedArgs) != len(ds.Spec.Template.Spec.Containers[0].Args) {
-		t.Errorf("ds RTE container arguments does not match the expected; ds args \"%v\" vs expected args \"%v\"", ds.Spec.Template.Spec.Containers[0].Args, expectedArgs)
-	}
-	for _, arg := range expectedArgs {
-		if idx := sliceIndex(ds.Spec.Template.Spec.Containers[0].Args, arg); idx == -1 {
-			t.Errorf("%s: %s option missing from %v", testName, arg, ds.Spec.Template.Spec.Containers[0].Args)
-		}
-	}
-
-	if !reflect.DeepEqual(origDs.Spec.Template.Spec.Containers[0].Command, ds.Spec.Template.Spec.Containers[0].Command) {
-		t.Errorf("%s: unexpected change on command: %v", testName, ds.Spec.Template.Spec.Containers[0].Command)
-	}
-
-	if !reflect.DeepEqual(origDs.Spec.Template.Spec.Containers[1].Args, ds.Spec.Template.Spec.Containers[1].Args) {
-		t.Errorf("%s: unexpected change on command: %v", testName, ds.Spec.Template.Spec.Containers[1].Args)
-	}
-	if !reflect.DeepEqual(origDs.Spec.Template.Spec.Containers[1].Command, ds.Spec.Template.Spec.Containers[1].Command) {
-		t.Errorf("%s: unexpected change on command: %v", testName, ds.Spec.Template.Spec.Containers[1].Command)
-	}
-}
-
-func sliceIndex(sl []string, s string) int {
-	for idx, it := range sl {
-		if it == s {
-			return idx
-		}
-	}
-	return -1
-}
-func getSetFromStringList(args []string) map[string]struct{} {
-	argsSet := map[string]struct{}{}
-	for _, arg := range args {
-		keyVal := strings.Split(arg, "=")
-		if len(keyVal) == 1 {
-			argsSet[keyVal[0]] = struct{}{}
-			continue
-		}
-		argsSet[keyVal[0]] = struct{}{}
-	}
-	return argsSet
 }
 
 func TestDaemonSetAffinitySettings(t *testing.T) {
