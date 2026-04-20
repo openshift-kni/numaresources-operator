@@ -242,7 +242,7 @@ github.com/mailru/easyjson/jwriter
 # github.com/mdomke/git-semver v1.0.0
 ## explicit
 github.com/mdomke/git-semver/version
-# github.com/moby/spdystream v0.5.0
+# github.com/moby/spdystream v0.5.1
 ## explicit; go 1.13
 github.com/moby/spdystream
 github.com/moby/spdystream/spdy
