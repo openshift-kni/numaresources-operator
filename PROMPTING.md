@@ -4,7 +4,7 @@ Focus on the task at hand and don't change anything beside this.
 
 Only do minimal changes to fulfill the task at hand.
 
-Inspect the project codebase and make the change as similar as possible to existing codebase.
+Inspect the project codebase and make the change as similar as possible to existing code.
 
 Adopt as much as possible the patterns and idioms in the existing codebase.
 
@@ -15,3 +15,5 @@ Always minimize external dependencies.
 Comments should provide meaningful insights into the code. Avoid filler comments that simply describe the next step, as they create unnecessary clutter, same goes for docstrings.
 
 Prefer comments to clarify surprising behavior and/or relationships between parts of the code rather than explain what the next line of code does.
+
+Run `make help` to discover about how the build system works and how the project builds it components. Use discovered targets as much as possible (e.g. avoid `go build` if possible).

@@ -84,7 +84,7 @@ SHELL = /usr/bin/env bash -o pipefail
 KUSTOMIZE_DEPLOY_DIR ?= config/default
 
 .PHONY: all
-all: build
+all: build ## Build the project (default target).
 
 ##@ General
 
@@ -101,12 +101,12 @@ all: build
 
 .PHONY: help
 help: ## Display this help.
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-41s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Development
 
 .PHONY: deps-update
-deps-update:
+deps-update: ## Update Go module dependencies and vendor directory.
 	go mod tidy && go mod vendor
 
 .PHONY: manifests
@@ -118,7 +118,7 @@ generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
 .PHONY: generate-source
-generate-source: pkg/version/_buildinfo.json
+generate-source: pkg/version/_buildinfo.json ## Generate build info source data.
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -133,42 +133,42 @@ test: manifests generate fmt vet setup-envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile coverage.out
 
 .PHONY: test-unit
-test-unit: test-unit-pkgs test-controllers
+test-unit: test-unit-pkgs test-controllers ## Run unit tests (packages and controllers).
 
 .PHONY: test-unit-pkgs
-test-unit-pkgs: generate-source
-	go test $$(go list ./... | grep -vE 'tools|cmd|internal/controller|test/e2e|k8simported')	
+test-unit-pkgs: generate-source ## Run unit tests for packages only.
+	go test $$(go list ./... | grep -vE 'tools|cmd|internal/controller|test/e2e|k8simported')
 
 .PHONY: test-unit-pkgs-cover
-test-unit-pkgs-cover: generate-source
+test-unit-pkgs-cover: generate-source ## Run unit tests for packages with coverage.
 	go test $$(go list ./... | grep -vE 'controller|test|tools|cmd') -coverprofile coverage.out
 
-test-controllers: envtest generate-source
+test-controllers: envtest generate-source ## Run controller tests using envtest.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./internal/controller/...
 
-test-e2e: build-e2e-all
+test-e2e: build-e2e-all ## Run e2e tests.
 	ENABLE_SCHED_TESTS=true hack/run-test-e2e.sh
 
-test-compact-e2e: build-e2e-all
+test-compact-e2e: build-e2e-all ## Run compact e2e tests.
 	hack/run-test-compact-e2e.sh
 
-test-install-e2e: build-e2e-all
+test-install-e2e: build-e2e-all ## Run install e2e tests.
 	hack/run-test-install-e2e.sh
 
-test-uninstall-e2e: build-e2e-all
+test-uninstall-e2e: build-e2e-all ## Run uninstall e2e tests.
 	hack/run-test-uninstall-e2e.sh
 
-test-upgrade-e2e: build-e2e-all
+test-upgrade-e2e: build-e2e-all ## Run upgrade e2e tests.
 	hack/run-test-upgrade-e2e.sh
 
-test-must-gather-e2e: build-must-gather-e2e
+test-must-gather-e2e: build-must-gather-e2e ## Run must-gather e2e tests.
 	hack/run-test-must-gather-e2e.sh
 
 # intentional left out:
 #   api/, because autogeneration
 #   cmd/, because kubebuilder scaffolding
 .PHONY:
-sort-imports:
+sort-imports: ## Sort Go imports across the project.
 	@hack/sort-imports.py -v ./test/
 	@hack/sort-imports.py -v ./internal/
 	@hack/sort-imports.py -v ./pkg/
@@ -189,19 +189,19 @@ lint-config: golangci-lint ## Verify golangci-lint linter configuration
 	$(GOLANGCI_LINT) --verbose config verify
 
 .PHONY: gosec
-gosec:
+gosec: ## Run gosec security scanner.
 	gosec ./pkg/... ./rte/pkg/... ./internal/... ./nrovalidate/validator/...
 
 .PHONY: govulncheck
-govulncheck:
+govulncheck: ## Run Go vulnerability checker.
 	govulncheck -show=verbose ./...
 
 .PHONY: cover-view
-cover-view:
+cover-view: ## Open coverage report in browser.
 	go tool cover -html=coverage.out
 
 .PHONY: cover-summary
-cover-summary:
+cover-summary: ## Print coverage summary.
 	go tool cover -func=coverage.out
 
 ##@ Build
@@ -213,144 +213,129 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 
 .PHONY: binary
-binary: build-tools
+binary: build-tools ## Build the manager binary.
 	LDFLAGS="-s -w"; \
 	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/images.tag=$(VERSION)"; \
 	go build -mod=vendor -o bin/manager -ldflags "$$LDFLAGS" -tags "$$GOTAGS" cmd/main.go
 
 .PHONY: binary-rte
-binary-rte: build-tools
+binary-rte: build-tools ## Build the RTE exporter binary.
 	LDFLAGS="-s -w"; \
 	go build -mod=vendor -o bin/exporter -ldflags "$$LDFLAGS" -tags "$$GOTAGS" rte/main.go
 
 .PHONY: binary-nrovalidate
-binary-nrovalidate: build-tools
+binary-nrovalidate: build-tools ## Build the nrovalidate binary.
 	LDFLAGS="-s -w"; \
 	go build -mod=vendor -o bin/nrovalidate -ldflags "$$LDFLAGS" -tags "$$GOTAGS" nrovalidate/main.go
 
 .PHONY: binary-numacell
-binary-numacell: build-tools
+binary-numacell: build-tools ## Build the numacell test device plugin binary.
 	LDFLAGS="-s -w" \
 	CGO_ENABLED=0 go build -mod=vendor -o bin/numacell -ldflags "$$LDFLAGS" test/deviceplugin/cmd/numacell/main.go
 
 .PHONY: binary-all
-binary-all: goversion \
-	binary \
-	binary-rte \
-	binary-nrovalidate \
-	introspect-data
+binary-all: goversion binary binary-rte binary-nrovalidate introspect-data ## Build all component binaries.
 
 .PHONY: binary-e2e-rte-local
-binary-e2e-rte-local: generate-source
+binary-e2e-rte-local: generate-source ## Build RTE local e2e test binary.
 	go test -c -v -o bin/e2e-nrop-rte-local.test ./test/e2e/rte/local
 
 .PHONY: binary-e2e-rte
-binary-e2e-rte: binary-e2e-rte-local generate-source
+binary-e2e-rte: binary-e2e-rte-local generate-source ## Build RTE e2e test binary.
 	go test -c -v -o bin/e2e-nrop-rte.test ./test/e2e/rte
 
 .PHONY: binary-e2e-install
-binary-e2e-install: generate-source
+binary-e2e-install: generate-source ## Build install e2e test binary.
 	go test -v -c -o bin/e2e-nrop-install.test ./test/e2e/install && go test -v -c -o bin/e2e-nrop-sched-install.test ./test/e2e/sched/install
 
 .PHONY: binary-e2e-upgrade
-binary-e2e-upgrade: generate-source
+binary-e2e-upgrade: generate-source ## Build upgrade e2e test binary.
 	go test -v -c -o bin/e2e-nrop-upgrade.test ./test/e2e/upgrade
 
 .PHONY: binary-e2e-uninstall
-binary-e2e-uninstall: generate-source
+binary-e2e-uninstall: generate-source ## Build uninstall e2e test binary.
 	go test -v -c -o bin/e2e-nrop-uninstall.test ./test/e2e/uninstall && go test -v -c -o bin/e2e-nrop-sched-uninstall.test ./test/e2e/sched/uninstall
 
 .PHONY: binary-e2e-sched
-binary-e2e-sched: generate-source
+binary-e2e-sched: generate-source ## Build scheduler e2e test binary.
 	go test -c -v -o bin/e2e-nrop-sched.test ./test/e2e/sched
 
 .PHONY: binary-e2e-serial
-binary-e2e-serial: generate-source
+binary-e2e-serial: generate-source ## Build serial e2e test binary.
 	CGO_ENABLED=0 go test -c -v -o bin/e2e-nrop-serial.test -ldflags "$$LDFLAGS" ./test/e2e/serial
 
 .PHONY: binary-e2e-tools
-binary-e2e-tools: generate-source
+binary-e2e-tools: generate-source ## Build tools e2e test binary.
 	go test -c -v -o bin/e2e-nrop-tools.test ./test/e2e/tools
 
 .PHONY: binary-e2e-must-gather
-binary-e2e-must-gather: generate-source
+binary-e2e-must-gather: generate-source ## Build must-gather e2e test binary.
 	go test -c -v -o bin/e2e-nrop-must-gather.test ./test/e2e/must-gather
 
 # backward compatibility
 binary-must-gather-e2e: binary-e2e-must-gather
 
 .PHONY: binary-e2e-all
-binary-e2e-all: goversion \
-	binary-e2e-install \
-	binary-e2e-upgrade \
-	binary-e2e-rte \
-	binary-e2e-sched \
-	binary-e2e-uninstall \
-	binary-e2e-serial \
-	binary-e2e-tools \
-	binary-e2e-must-gather \
-	runner-e2e-serial \
-	build-pause \
-	introspect-data
+binary-e2e-all: goversion binary-e2e-install binary-e2e-upgrade binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial binary-e2e-tools binary-e2e-must-gather runner-e2e-serial build-pause introspect-data ## Build all e2e test binaries.
 
 .PHONY: runner-e2e-serial
-runner-e2e-serial: bin/envsubst
+runner-e2e-serial: bin/envsubst ## Render and validate the serial e2e runner script.
 	hack/render-e2e-runner.sh
 	hack/test-e2e-runner.sh
 
 .PHONY: introspect-data
-introspect-data: build-topics build-buildinfo
+introspect-data: build-topics build-buildinfo ## Generate introspection data (topics and buildinfo).
 
 .PHONY: build-topics
-build-topics:
+build-topics: ## Generate topics.json for introspection.
 	mkdir -p bin && go run tools/lstopics/lstopics.go > bin/topics.json
 
 .PHONY: build-buildinfo
-build-buildinfo: bin/buildhelper
+build-buildinfo: bin/buildhelper ## Generate buildinfo.json for introspection.
 	bin/buildhelper inspect > bin/buildinfo.json
 
 .PHONY: build
-build: generate generate-source fmt vet binary
+build: generate generate-source fmt vet binary ## Build the operator with codegen and checks.
 
 .PHONY: build-rte
-build-rte: generate-source fmt vet binary-rte introspect-data
+build-rte: generate-source fmt vet binary-rte introspect-data ## Build the RTE component.
 
 .PHONY: build-numacell
-build-numacell: fmt vet binary-numacell
+build-numacell: fmt vet binary-numacell ## Build the numacell test device plugin.
 
 .PHONY: build-nrovalidate
-build-nrovalidate: generate-source fmt vet binary-nrovalidate
+build-nrovalidate: generate-source fmt vet binary-nrovalidate ## Build the nrovalidate tool.
 
 .PHONY: build-all
-build-all: generate generate-source fmt vet binary binary-rte binary-numacell binary-nrovalidate
+build-all: generate generate-source fmt vet binary binary-rte binary-numacell binary-nrovalidate ## Build all components.
 
 .PHONY: build-e2e-rte
-build-e2e-rte: generate-source fmt vet binary-e2e-rte
+build-e2e-rte: generate-source fmt vet binary-e2e-rte ## Build RTE e2e tests.
 
 .PHONY: build-e2e-install
-build-e2e-install: fmt vet binary-e2e-install
+build-e2e-install: fmt vet binary-e2e-install ## Build install e2e tests.
 
 .PHONY: build-e2e-upgrade
-build-e2e-upgrade: fmt vet binary-e2e-upgrade
+build-e2e-upgrade: fmt vet binary-e2e-upgrade ## Build upgrade e2e tests.
 
 .PHONY: build-e2e-uninstall
-build-e2e-uninstall: fmt vet binary-e2e-uninstall
+build-e2e-uninstall: fmt vet binary-e2e-uninstall ## Build uninstall e2e tests.
 
 .PHONY: build-e2e-all
-build-e2e-all: generate-source fmt vet binary-e2e-all
+build-e2e-all: generate-source fmt vet binary-e2e-all ## Build all e2e tests.
 
 .PHONY: build-e2e-must-gather
-build-e2e-must-gather: fmt vet binary-e2e-must-gather
+build-e2e-must-gather: fmt vet binary-e2e-must-gather ## Build must-gather e2e tests.
 
 # backward compatibility
 build-must-gather-e2e: build-e2e-must-gather
 
 .PHONY: build-pause
-build-pause: bin-dir
+build-pause: bin-dir ## Install the pause script into bin/.
 	install -m 755 hack/pause bin/
 
 .PHONY: build-pause-gcc
-build-pause-gcc: bin-dir
+build-pause-gcc: bin-dir ## Compile the pause binary with gcc.
 	gcc -Wall -g -Os -static -o bin/pause hack/pause.c
 
 .PHONY: bin-dir
@@ -366,11 +351,11 @@ container-build: #test ## Build container image with the manager.
 container-push: ## Push container image with the manager.
 	$(CONTAINER_ENGINE) push ${IMG}
 
-container-build-pause:
-	$(CONTAINER_ENGINE) build -f Dockerfile.pause.gcc -t ${REPO}/pause:test-ci . 
+container-build-pause: ## Build the pause container image.
+	$(CONTAINER_ENGINE) build -f Dockerfile.pause.gcc -t ${REPO}/pause:test-ci .
 
-container-push-pause:
-	$(CONTAINER_ENGINE) push ${REPO}/pause:test-ci . 
+container-push-pause: ## Push the pause container image.
+	$(CONTAINER_ENGINE) push ${REPO}/pause:test-ci .
 
 ##@ Manifest Bundle
 
@@ -416,7 +401,7 @@ catalog-push: ## Push a catalog image.
 ##@ Build tools:
 
 .PHONY: goversion
-goversion:
+goversion: ## Display the Go version.
 	@go version
 
 .PHONY: build-tools
@@ -429,7 +414,7 @@ pkg/version/_buildinfo.json: bin/buildhelper
 	@bin/buildhelper inspect > pkg/version/_buildinfo.json
 
 .PHONY: update-buildinfo
-update-buildinfo: pkg/version/_buildinfo.json
+update-buildinfo: pkg/version/_buildinfo.json ## Update the buildinfo JSON file.
 
 bin/buildhelper: tools/buildhelper/buildhelper.go
 	@go build -o $@ $<
@@ -460,12 +445,12 @@ bin/make-job-foreach-ds: tools/make-job-foreach-ds/main.go
 bin/schedlogs: tools/schedlogs/schedlogs.go
 	@go build -o $@ $<
 
-verify-generated: bundle generate
+verify-generated: bundle generate ## Verify that generated code is committed.
 	@echo "Verifying that all code is committed after updating deps and formatting and generating code"
 	hack/verify-generated.sh
 
-install-git-hooks:
-	git config core.hooksPath .githooks	
+install-git-hooks: ## Install project git hooks.
+	git config core.hooksPath .githooks
 
 ##@ Deployment
 
@@ -482,7 +467,7 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 	$(KUSTOMIZE) build config/crd | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: deploy-mco-crds
-deploy-mco-crds: build-tools
+deploy-mco-crds: build-tools ## Deploy MCO CRDs to the cluster if missing.
 	@echo "Verifying that the MCO CRDs are present in the cluster"
 	hack/deploy-mco-crds.sh
 
@@ -522,7 +507,7 @@ GOLANGCI_LINT_EXEC_NAME = golangci-lint
 GOLANGCI_LINT = $(LOCALBIN)/$(GOLANGCI_LINT_EXEC_NAME)
 
 .PHONY: operator-sdk
-operator-sdk:
+operator-sdk: ## Download operator-sdk locally if necessary.
 	@if [ ! -x "$(OPERATOR_SDK)" ]; then\
 		echo "Downloading operator-sdk $(OPERATOR_SDK_VERSION)";\
 		mkdir -p $(LOCALBIN);\
@@ -616,7 +601,7 @@ endef
 ##@ Konflux
 
 .PHONY: sync-git-submodules
-sync-git-submodules:
+sync-git-submodules: ## Sync git submodules.
 	@echo "Checking git submodules"
 	@if [ "$(SKIP_SUBMODULE_SYNC)" != "yes" ]; then \
 		echo "Syncing git submodules"; \
