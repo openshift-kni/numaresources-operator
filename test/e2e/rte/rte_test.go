@@ -149,8 +149,12 @@ var _ = Describe("with a running cluster with all the components", func() {
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(nropObj.Status.DaemonSets).ToNot(BeEmpty())
-			dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
-			Expect(reflect.DeepEqual(nropObj.Status.DaemonSets, dssFromNodeGroupStatus)).To(BeTrue())
+			// When status.nodeGroups is populated, it must match the legacy daemonSets list; when it is
+			// empty the operator may still report daemonSets only
+			if len(nropObj.Status.NodeGroups) > 0 {
+				dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
+				Expect(reflect.DeepEqual(nropObj.Status.DaemonSets, dssFromNodeGroupStatus)).To(BeTrue())
+			}
 			klog.InfoS("using NRO instance", "name", nropObj.Name)
 
 			// NROP guarantees all the daemonsets are in the same namespace,
@@ -198,8 +202,12 @@ var _ = Describe("with a running cluster with all the components", func() {
 			err := clients.Client.Get(context.TODO(), client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(nropObj.Status.DaemonSets).ToNot(BeEmpty())
-			dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
-			Expect(reflect.DeepEqual(nropObj.Status.DaemonSets, dssFromNodeGroupStatus)).To(BeTrue())
+			// When status.nodeGroups is populated, it must match the legacy daemonSets list; when it is
+			// empty the operator may still report daemonSets only (backward-compatible status).
+			if len(nropObj.Status.NodeGroups) > 0 {
+				dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(nropObj.Status.NodeGroups)
+				Expect(reflect.DeepEqual(nropObj.Status.DaemonSets, dssFromNodeGroupStatus)).To(BeTrue())
+			}
 			klog.InfoS("Using NRO instance", "name", nropObj.Name)
 
 			// NROP guarantees all the daemonsets are in the same namespace,

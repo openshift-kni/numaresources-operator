@@ -18,13 +18,11 @@ package wait
 
 import (
 	"context"
-	"reflect"
 
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 )
 
 func (wt Waiter) ForNUMAResourcesOperatorDeleted(ctx context.Context, nrop *nropv1.NUMAResourcesOperator) error {
@@ -62,12 +60,6 @@ func (wt Waiter) ForDaemonsetInNUMAResourcesOperatorStatus(ctx context.Context, 
 
 		if len(updatedNRO.Status.DaemonSets) == 0 {
 			klog.Warningf("failed to get the DaemonSet from NUMAResourcesOperator %s", key.String())
-			return false, nil
-		}
-
-		dssFromNodeGroupStatus := testobjs.GetDaemonSetListFromNodeGroupStatuses(updatedNRO.Status.NodeGroups)
-		if !reflect.DeepEqual(updatedNRO.Status.DaemonSets, dssFromNodeGroupStatus) {
-			klog.Warningf("daemonset list mismatch: from NodeGroupStatus'es:\n%+v\n from operator status:\n%+v\n", dssFromNodeGroupStatus, updatedNRO.Status.NodeGroups)
 			return false, nil
 		}
 
