@@ -1,5 +1,5 @@
 # follow https://brewweb.engineering.redhat.com/brew/packageinfo?packageID=70135
-FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.24@sha256:a36ab96533c7b064b2c836fcc255008cfd71e40ff33be56d9155f43c32b0a356 as tool-builder
+FROM brew.registry.redhat.io/rh-osbs/openshift-golang-builder:rhel_9_golang_1.24@sha256:082320c1a8867f1f94422017135b0da4d87e5e385966bee181b8b0917b2013bd as tool-builder
 
 WORKDIR /go/src/github.com/openshift-kni/numaresources-operator
 COPY . .
