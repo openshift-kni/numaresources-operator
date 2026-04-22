@@ -383,11 +383,9 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				// the operator may take nonzero time to populate the status, and this is still fine.\
 				// NOTE HERE: we need to match the types as well (ptr and ptr)
 				matchFromMCP := cmp.Equal(statusConfFromMCP, &specConf)
-				// TODO: multi-line value in structured log
-				klog.InfoS("result of checking the status from MachineConfigPools", "NRO Object", nroKey.String(), "status", toJSON(statusConfFromMCP), "spec", toJSON(specConf), "match", matchFromMCP)
+				fxt.Dump.Infof(fmt.Sprintf("NRO Object: %s\nstatus: %s\nspec: %s\nmatch: %t", nroKey.String(), toJSON(statusConfFromMCP), toJSON(specConf), matchFromMCP), "result of checking the status from MachineConfigPools")
 				matchFromGroupStatus := cmp.Equal(statusConfFromGroupStatus, specConf)
-				// TODO: multi-line value in structured log
-				klog.InfoS("result of checking the status from NodeGroupStatus", "NRO Object", nroKey.String(), "status", toJSON(statusConfFromGroupStatus), "spec", toJSON(specConf), "match", matchFromGroupStatus)
+				fxt.Dump.Infof(fmt.Sprintf("NRO Object: %s\nstatus: %s\nspec: %s\nmatch: %t", nroKey.String(), toJSON(statusConfFromGroupStatus), toJSON(specConf), matchFromGroupStatus), "result of checking the status from NodeGroupStatus")
 
 				return matchFromMCP && matchFromGroupStatus, nil
 			})
@@ -1098,7 +1096,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 				Eventually(func(g Gomega) {
 					g.Expect(ng.PoolName).ToNot(BeNil())
-					verifyStatusUpdate(fxt.Client, ctx, nroKey, updatedNRO, *ng.PoolName, specConf)
+					verifyStatusUpdate(fxt, ctx, nroKey, updatedNRO, *ng.PoolName, specConf)
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 
 				By("update the same node group config and ensure it's updated in the operator status")
@@ -1128,7 +1126,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				By("wait for NodeGroupStatus to reflect config changes")
 				Eventually(func(g Gomega) {
 					g.Expect(ng.PoolName).ToNot(BeNil())
-					verifyStatusUpdate(fxt.Client, ctx, nroKey, updatedNRO, *ng.PoolName, newSpecConf)
+					verifyStatusUpdate(fxt, ctx, nroKey, updatedNRO, *ng.PoolName, newSpecConf)
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 
 				Expect(fxt.Client.Get(ctx, nroKey, &updatedNRO)).To(Succeed())
@@ -1303,8 +1301,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					rteConfigMap = &updatedConfigMaps.Items[0]
 					return true
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
-				// TODO: multi-line value in structured log
-				klog.InfoS("found RTE configmap", "rteConfigMap", rteConfigMap)
+				fxt.Dump.Infof(fmt.Sprintf("rteConfigMap: %+v", rteConfigMap), "found RTE configmap")
 
 				poolName := rteConfigMap.Labels[rteconfig.LabelNodeGroupName+"/"+rteconfig.LabelNodeGroupKindMachineConfigPool]
 				nodeSelector, err := nodegroups.NodeSelectorFromPoolName(ctx, e2eclient.Client, poolName)
@@ -1456,8 +1453,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					rteConfigMap = updatedConfigMap
 					return true
 				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
-				// TODO: multi-line value in structured log
-				klog.InfoS("found RTE configmap", "rteConfigMap", rteConfigMap)
+				fxt.Dump.Infof(fmt.Sprintf("rteConfigMap: %+v", rteConfigMap), "found RTE configmap")
 
 				poolName := rteConfigMap.Labels[rteconfig.LabelNodeGroupName+"/"+rteconfig.LabelNodeGroupKindMachineConfigPool]
 				nodeSelector, err := nodegroups.NodeSelectorFromPoolName(ctx, e2eclient.Client, poolName)
@@ -1575,11 +1571,11 @@ func nodeWithoutCustomRole(nodes []corev1.Node) *corev1.Node {
 	return nil
 }
 
-func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.ObjectKey, appliedObj nropv1.NUMAResourcesOperator, expectedPoolName string, expectedConf nropv1.NodeGroupConfig) {
+func verifyStatusUpdate(fxt *e2efixture.Fixture, ctx context.Context, key client.ObjectKey, appliedObj nropv1.NUMAResourcesOperator, expectedPoolName string, expectedConf nropv1.NodeGroupConfig) {
 	klog.InfoS("fetch NRO object", "key", key.String())
 	var updatedNRO nropv1.NUMAResourcesOperator
 	Eventually(func(g Gomega) {
-		g.Expect(cli.Get(ctx, key, &updatedNRO)).To(Succeed())
+		g.Expect(fxt.Client.Get(ctx, key, &updatedNRO)).To(Succeed())
 		g.Expect(isNROOperSyncedAt(&updatedNRO.Status, status.ConditionAvailable, updatedNRO.Generation)).To(Succeed())
 		g.Expect(updatedNRO.Status.NodeGroups).To(HaveLen(len(appliedObj.Spec.NodeGroups)),
 			"NodeGroups Status mismatch: found %d, expected %d", len(updatedNRO.Status.NodeGroups), len(appliedObj.Spec.NodeGroups))
@@ -1628,11 +1624,9 @@ func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.Objec
 	// the operator may take nonzero time to populate the status, and this is still fine.\
 	// NOTE HERE: we need to match the types as well (ptr and ptr)
 	matchFromMCP := cmp.Equal(statusConfFromMCP, &expectedConf)
-	// TODO: multi-line value in structured log
-	klog.InfoS("result of checking the status from MachineConfigPools", "NRO Object", key.String(), "status", toJSON(statusConfFromMCP), "spec", toJSON(expectedConf), "match", matchFromMCP)
+	fxt.Dump.Infof(fmt.Sprintf("NRO Object: %s\nstatus: %s\nspec: %s\nmatch: %t", key.String(), toJSON(statusConfFromMCP), toJSON(expectedConf), matchFromMCP), "result of checking the status from MachineConfigPools")
 	matchFromGroupStatus := cmp.Equal(statusFromNodeGroups.Config, expectedConf)
-	// TODO: multi-line value in structured log
-	klog.InfoS("result of checking the status from NodeGroupStatus", "NRO Object", key.String(), "status", toJSON(statusFromNodeGroups), "spec", toJSON(expectedConf), "match", matchFromGroupStatus)
+	fxt.Dump.Infof(fmt.Sprintf("NRO Object: %s\nstatus: %s\nspec: %s\nmatch: %t", key.String(), toJSON(statusFromNodeGroups), toJSON(expectedConf), matchFromGroupStatus), "result of checking the status from NodeGroupStatus")
 	Expect(matchFromMCP && matchFromGroupStatus).To(BeTrue(), "config status mismatch")
 }
 

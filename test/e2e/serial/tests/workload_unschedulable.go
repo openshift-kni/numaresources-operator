@@ -158,7 +158,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					}
 
 					podName := fmt.Sprintf("padding%s-%d", nodeName, idx)
-					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, zoneRes)
+					padPod, err := makePaddingPod(fxt, fxt.Namespace.Name, podName, zone, zoneRes)
 					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone", podName, zone.Name)
 
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
@@ -378,7 +378,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 					}
 
 					podName := fmt.Sprintf("padding%d-%d", nodeIdx, zoneIdx)
-					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, zoneRes)
+					padPod, err := makePaddingPod(fxt, fxt.Namespace.Name, podName, zone, zoneRes)
 					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone", podName, zone.Name)
 
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
@@ -647,8 +647,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				e2efixture.Skipf(fxt, "not enough nodes with 2 NUMA Zones: found %d, needed %d", len(nrts), neededNodes)
 			}
 
-			// TODO: multi-line value in structured log
-			klog.InfoS("reference NRT", "zone", intnrt.ZoneToString(nrts[0].Zones[0]))
+			fxt.Dump.Infof(intnrt.ZoneToString(nrts[0].Zones[0]), "reference NRT")
 
 			ress := make([]corev1.ResourceList, 0, len(nrts))
 			for idx := range nrts {
@@ -659,8 +658,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				ress = append(ress, bl.Resources)
 			}
 			xload := resourcelist.Highest(ress...)
-			// TODO: multi-line value in structured log
-			klog.InfoS("highest base load resource cost", "resources", resourcelist.ToString(xload))
+			fxt.Dump.Infof(resourcelist.ToString(xload), "highest base load resource cost")
 
 			labSel, err := labels.Parse(fmt.Sprintf("%s=%d", serialconfig.MultiNUMALabel, requiredNUMAZones))
 			Expect(err).ToNot(HaveOccurred())
@@ -669,16 +667,13 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 			// note about the factors. We need to use prime numbers and we need to avoid exact multiples.
 			// other than that, we use the smallest meaningful prime numbers
 			numaLevelFreeRes := resourcelist.ScaleCoreResources(xload, 7, 3)
-			// TODO: multi-line value in structured log
-			klog.InfoS("available resources", "resources", resourcelist.ToString(numaLevelFreeRes))
+			fxt.Dump.Infof(resourcelist.ToString(numaLevelFreeRes), "available resources")
 
 			numaLevelFitRequiredRes := resourcelist.ScaleCoreResources(xload, 5, 3)
-			// TODO: multi-line value in structured log
-			klog.InfoS("target resources", "resources", resourcelist.ToString(numaLevelFitRequiredRes))
+			fxt.Dump.Infof(resourcelist.ToString(numaLevelFitRequiredRes), "target resources")
 
 			unfitRequiredRes := resourcelist.ScaleCoreResources(xload, 11, 3) // numaLevelFreeRes 5 3
-			// TODO: multi-line value in structured log
-			klog.InfoS("blocked resources", "resources", resourcelist.ToString(unfitRequiredRes))
+			fxt.Dump.Infof(resourcelist.ToString(unfitRequiredRes), "blocked resources")
 
 			By("padding all the nodes")
 			Expect(padder.Nodes(len(nrts)).UntilAvailableIsResourceListPerZone(numaLevelFreeRes).Pad(time.Minute*2, e2epadder.PaddingOptions{LabelSelector: labSel})).To(Succeed())
@@ -877,8 +872,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				//calculate base load on the node
 				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
-				// TODO: multi-line value in structured log
-				klog.InfoS("computed base load", "value", baseload)
+				fxt.Dump.Infof(baseload.String(), "computed base load")
 
 				//get nrt info of the node
 				klog.InfoS("preparing node to fit the test case", "node", nodeName)

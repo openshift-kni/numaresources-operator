@@ -497,8 +497,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					// but it's not the behavior we expect. A conforming scheduler is expected to send first two pods,
 					// wait for reconciliation, then send the missing two.
 
-					// TODO: multi-line value in structured log
-					klog.InfoS("Creating pods each requiring", "podCount", desiredPods, "resources", e2ereslist.ToString(podRequiredRes))
+					fxt.Dump.Infof(fmt.Sprintf("podCount: %d\nresources: %s", desiredPods, e2ereslist.ToString(podRequiredRes)), "Creating pods each requiring")
 					for _, testPod := range testPods {
 						err := fxt.Client.Create(ctx, testPod)
 						Expect(err).ToNot(HaveOccurred())
@@ -510,8 +509,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					failedPods, updatedPods := wait.With(fxt.Client).Timeout(3*time.Minute).ForPodsAllRunning(ctx, testPods)
 					if len(failedPods) > 0 {
 						nrtListFailed, _ := e2enrt.GetUpdated(fxt.Client, nrtv1alpha2.NodeResourceTopologyList{}, time.Minute)
-						// TODO: multi-line value in structured log
-						klog.InfoS("NRT list", "content", intnrt.ListToString(nrtListFailed.Items, "post failure"))
+						fxt.Dump.Infof(intnrt.ListToString(nrtListFailed.Items, "post failure"), "NRT list")
 
 						for _, failedPod := range failedPods {
 							_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
@@ -539,8 +537,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 							Requests: jobRequiredRes,
 						}
 					}
-					// TODO: multi-line value in structured log
-					klog.InfoS("Creating a job whose containers have requests", "resources", e2ereslist.ToString(jobRequiredRes))
+					fxt.Dump.Infof(e2ereslist.ToString(jobRequiredRes), "Creating a job whose containers have requests")
 				}),
 				// GAP: pinnable cpu (but not memory)
 				// however with the recommended config, we can't have pinnable CPUs without pinnable memory;
@@ -556,8 +553,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 							Limits: jobRequiredRes,
 						}
 					}
-					// TODO: multi-line value in structured log
-					klog.InfoS("Creating a job whose containers have limits", "resources", e2ereslist.ToString(jobRequiredRes))
+					fxt.Dump.Infof(e2ereslist.ToString(jobRequiredRes), "Creating a job whose containers have limits")
 				}),
 				Entry("[test_id:85783] vs guaranteed pods with pinnable memory and CPU", func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
@@ -570,8 +566,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 							Limits: jobRequiredRes,
 						}
 					}
-					// TODO: multi-line value in structured log
-					klog.InfoS("Creating a job whose containers have limits", "resources", e2ereslist.ToString(jobRequiredRes))
+					fxt.Dump.Infof(e2ereslist.ToString(jobRequiredRes), "Creating a job whose containers have limits")
 				}),
 			)
 

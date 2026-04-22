@@ -159,7 +159,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					}
 
 					podName := fmt.Sprintf("padding%d-%d", nIdx, zIdx)
-					padPod, err := makePaddingPod(fxt.Namespace.Name, podName, zone, zoneRes)
+					padPod, err := makePaddingPod(fxt, fxt.Namespace.Name, podName, zone, zoneRes)
 					Expect(err).NotTo(HaveOccurred(), "unable to create padding pod %q on zone %q", podName, zone.Name)
 
 					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
@@ -292,8 +292,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 					deployment.Spec.Template.Spec.SchedulerName = serialconfig.Config.SchedulerName
 					deployment.Spec.Template.Spec.Containers[0].Resources.Limits = requiredRes
 					deployment.Spec.Template.Spec.Affinity = affinity
-					// TODO: multi-line value in structured log
-					klog.InfoS("create the test deployment with requests", "requests", e2ereslist.ToString(requiredRes))
+					fxt.Dump.Infof(e2ereslist.ToString(requiredRes), "create the test deployment with requests")
 					err := fxt.Client.Create(context.TODO(), deployment)
 					Expect(err).NotTo(HaveOccurred(), "unable to create deployment %q", deployment.Name)
 

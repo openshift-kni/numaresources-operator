@@ -226,8 +226,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(err).ToNot(HaveOccurred())
 
 			rl := e2ereslist.FromGuaranteedPod(updatedPod)
-			// TODO: multi-line value in structured log
-			klog.InfoS("post-create pod resource list", "spec", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), "updated", e2ereslist.ToString(rl))
+			fxt.Dump.Infof(fmt.Sprintf("spec: %s\nupdated: %s", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), e2ereslist.ToString(rl)), "post-create pod resource list")
 
 			nrtInitial, err := e2enrt.FindFromList(nrtInitialList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -314,8 +313,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			rl = e2ereslist.FromGuaranteedPod(updatedPod)
-			// TODO: multi-line value in structured log
-			klog.InfoS("post-update pod resource list", "spec", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), "updated", e2ereslist.ToString(rl))
+			fxt.Dump.Infof(fmt.Sprintf("spec: %s\nupdated: %s", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), e2ereslist.ToString(rl)), "post-update pod resource list")
 
 			By("wait for NRT data to settle")
 			e2efixture.MustSettleNRT(fxt)
@@ -426,8 +424,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 
 			rl = e2ereslist.FromGuaranteedPod(updatedPod)
-			// TODO: multi-line value in structured log
-			klog.InfoS("post-reroute pod resource list", "spec", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), "updated", e2ereslist.ToString(rl))
+			fxt.Dump.Infof(fmt.Sprintf("spec: %s\nupdated: %s", e2ereslist.ToString(e2ereslist.FromContainerLimits(podSpec.Containers)), e2ereslist.ToString(rl)), "post-reroute pod resource list")
 
 			nrtReorganized, err := e2enrt.FindFromList(nrtReorganizedList.Items, updatedPod.Spec.NodeName)
 			Expect(err).ToNot(HaveOccurred())
@@ -562,8 +559,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			// calculate base load on the target node
 			baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), targetNodeName)
 			Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", targetNodeName)
-			// TODO: multi-line value in structured log
-			klog.InfoS("computed base load", "baseload", baseload)
+			fxt.Dump.Infof(baseload.String(), "computed base load")
 
 			// get least available CPU and Memory on each NUMA node while taking baseload into consideration
 			cpus := leastAvailableResourceQtyInAllZone(*targetNrtInitial, baseload, corev1.ResourceCPU)
@@ -993,17 +989,15 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	})
 })
 
-func makePaddingPod(namespace, nodeName string, zone nrtv1alpha2.Zone, podReqs corev1.ResourceList) (*corev1.Pod, error) {
-	// TODO: multi-line value in structured log
-	klog.InfoS("want to have zone with allocatable", "zone", zone.Name, "allocatable", e2ereslist.ToString(podReqs))
+func makePaddingPod(fxt *e2efixture.Fixture, namespace, nodeName string, zone nrtv1alpha2.Zone, podReqs corev1.ResourceList) (*corev1.Pod, error) {
+	fxt.Dump.Infof(fmt.Sprintf("zone: %s\nallocatable: %s", zone.Name, e2ereslist.ToString(podReqs)), "want to have zone with allocatable")
 
 	paddingReqs, err := e2enrt.SaturateZoneUntilLeft(zone, podReqs, e2enrt.DropHostLevelResources)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: multi-line value in structured log
-	klog.InfoS("padding resource to saturate", "nodeName", nodeName, "paddingReqs", e2ereslist.ToString(paddingReqs))
+	fxt.Dump.Infof(fmt.Sprintf("nodeName: %s\npaddingReqs: %s", nodeName, e2ereslist.ToString(paddingReqs)), "padding resource to saturate")
 
 	padPod := newPaddingPod(nodeName, zone.Name, namespace, paddingReqs)
 	return padPod, nil
