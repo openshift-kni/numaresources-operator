@@ -2377,7 +2377,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(reconciler.Client.Get(context.TODO(), dsKey, &ds)).To(Succeed())
 			Expect(ds.Spec.Template.Labels).ToNot(BeEmpty())
 
-			expected := corev1.PodAntiAffinity{
+			expectedPodAntiAff := corev1.PodAntiAffinity{
 				RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
 					{
 						LabelSelector: &metav1.LabelSelector{
@@ -2387,10 +2387,9 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					},
 				},
 			}
-
-			Expect(ds.Spec.Template.Spec.Affinity).ToNot(BeNil())
-			Expect(ds.Spec.Template.Spec.Affinity.PodAntiAffinity).ToNot(BeNil())
-			Expect(*ds.Spec.Template.Spec.Affinity.PodAntiAffinity).To(Equal(expected))
+			affinity := ds.Spec.Template.Spec.Affinity
+			Expect(affinity).ToNot(BeNil())
+			Expect(affinity.PodAntiAffinity).To(Equal(&expectedPodAntiAff))
 		})
 
 		It("should have a update strategy with MaxUnavailable set", func() {
