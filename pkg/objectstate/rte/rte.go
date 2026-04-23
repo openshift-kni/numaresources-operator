@@ -157,10 +157,9 @@ type GeneratedDesiredManifest struct {
 	NodeGroup         *nropv1.NodeGroup
 	SecOpts           k8swgrteupdate.SecurityContextOptions
 	// generated manifests
-	DaemonSet             *appsv1.DaemonSet
-	RTEConfigHash         string
-	ConfigMap             *corev1.ConfigMap
-	IsCustomPolicyEnabled bool
+	DaemonSet     *appsv1.DaemonSet
+	RTEConfigHash string
+	ConfigMap     *corev1.ConfigMap
 }
 
 type GenerateDesiredManifestUpdater func(mcpName string, gdm *GeneratedDesiredManifest) error

@@ -92,13 +92,12 @@ func (obj machineConfigPoolFinder) FindState(mf Manifests, tree nodegroupv1.Tree
 		}
 
 		gdm := GeneratedDesiredManifest{
-			ClusterPlatform:       obj.em.plat,
-			MachineConfigPool:     mcp.DeepCopy(),
-			NodeGroup:             tree.NodeGroup.DeepCopy(),
-			DaemonSet:             desiredDaemonSet,
-			RTEConfigHash:         rteConfigHash,
-			IsCustomPolicyEnabled: annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations),
-			SecOpts:               mf.securityContextOptions(annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)),
+			ClusterPlatform:   obj.em.plat,
+			MachineConfigPool: mcp.DeepCopy(),
+			NodeGroup:         tree.NodeGroup.DeepCopy(),
+			DaemonSet:         desiredDaemonSet,
+			RTEConfigHash:     rteConfigHash,
+			SecOpts:           mf.securityContextOptions(annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)),
 		}
 
 		err := obj.em.updater(mcp.Name, &gdm)

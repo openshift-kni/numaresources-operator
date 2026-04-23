@@ -73,13 +73,12 @@ func (obj nodeGroupFinder) FindState(mf Manifests, tree nodegroupv1.Tree) []obje
 	}
 
 	gdm := GeneratedDesiredManifest{
-		ClusterPlatform:       obj.em.plat,
-		MachineConfigPool:     nil,
-		NodeGroup:             tree.NodeGroup.DeepCopy(),
-		DaemonSet:             desiredDaemonSet,
-		RTEConfigHash:         rteConfigHash,
-		IsCustomPolicyEnabled: annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations),
-		SecOpts:               mf.securityContextOptions(annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)),
+		ClusterPlatform:   obj.em.plat,
+		MachineConfigPool: nil,
+		NodeGroup:         tree.NodeGroup.DeepCopy(),
+		DaemonSet:         desiredDaemonSet,
+		RTEConfigHash:     rteConfigHash,
+		SecOpts:           mf.securityContextOptions(annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)),
 	}
 
 	err := obj.em.updater(poolName, &gdm)
