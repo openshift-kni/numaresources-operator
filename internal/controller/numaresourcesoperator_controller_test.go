@@ -52,6 +52,7 @@ import (
 	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	intaff "github.com/openshift-kni/numaresources-operator/internal/affinity"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
@@ -2271,20 +2272,13 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			Expect(reconciler.Client.Get(context.TODO(), dsKey, &ds)).To(Succeed())
 			Expect(ds.Spec.Template.Labels).ToNot(BeEmpty())
 
-			expected := corev1.PodAntiAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchLabels: ds.Spec.Template.Labels,
-						},
-						TopologyKey: "kubernetes.io/hostname",
-					},
-				},
-			}
+			expectedPodAntiAff, err := intaff.GetPodAntiAffinity(ds.Spec.Template.Labels)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(expectedPodAntiAff).ToNot(BeNil())
 
-			Expect(ds.Spec.Template.Spec.Affinity).ToNot(BeNil())
-			Expect(ds.Spec.Template.Spec.Affinity.PodAntiAffinity).ToNot(BeNil())
-			Expect(*ds.Spec.Template.Spec.Affinity.PodAntiAffinity).To(Equal(expected))
+			affinity := ds.Spec.Template.Spec.Affinity
+			Expect(affinity).ToNot(BeNil())
+			Expect(affinity.PodAntiAffinity).To(BeEquivalentTo(expectedPodAntiAff))
 		})
 
 		It("should have a update strategy with MaxUnavailable set", func() {

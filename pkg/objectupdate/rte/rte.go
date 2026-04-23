@@ -22,7 +22,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
 
@@ -35,6 +34,7 @@ import (
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	intaff "github.com/openshift-kni/numaresources-operator/internal/affinity"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
@@ -102,23 +102,24 @@ func DaemonSetPauseContainerSettings(ds *appsv1.DaemonSet) error {
 	return nil
 }
 
-func DaemonSetAffinitySettings(ds *appsv1.DaemonSet, labels map[string]string) error {
+func DaemonSetAffinitySettings(ds *appsv1.DaemonSet) error {
+	labels := ds.Spec.Template.Labels
 	if len(labels) == 0 {
-		return fmt.Errorf("no labels provided for PodAffinity")
+		return intaff.ErrNoPodTemplateLabels
 	}
 
-	ds.Spec.Template.Spec.Affinity = &corev1.Affinity{
-		PodAntiAffinity: &corev1.PodAntiAffinity{
-			RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-				{
-					LabelSelector: &metav1.LabelSelector{
-						MatchLabels: labels,
-					},
-					TopologyKey: "kubernetes.io/hostname",
-				},
-			},
-		},
+	affinityCopy := ds.Spec.Template.Spec.Affinity.DeepCopy()
+	if affinityCopy == nil {
+		ds.Spec.Template.Spec.Affinity = &corev1.Affinity{}
 	}
+
+	podAntiAffinity, err := intaff.GetPodAntiAffinity(labels)
+	if err != nil {
+		return err
+	}
+
+	ds.Spec.Template.Spec.Affinity.PodAntiAffinity = podAntiAffinity
+	klog.V(3).InfoS("Exporter affinity", "podAntiAffinity", ds.Spec.Template.Spec.Affinity.PodAntiAffinity)
 	return nil
 }
 
