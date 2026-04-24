@@ -22,6 +22,7 @@
     "metrics",
     "nrtcrdanns",
     "netpols",
-    "mgselinuxcollect"
+    "mgselinuxcollect",
+    "tlscompliance"
   ]
 }

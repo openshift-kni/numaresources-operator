@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
+	configv1 "github.com/openshift/api/config/v1"
 	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 	hypershiftv1beta1 "github.com/openshift/hypershift/api/hypershift/v1beta1"
 
@@ -48,6 +49,10 @@ var (
 
 func init() {
 	// Setup Scheme for all resources
+	if err := configv1.Install(scheme.Scheme); err != nil {
+		klog.Exit(err.Error())
+	}
+
 	if err := mcov1.AddToScheme(scheme.Scheme); err != nil {
 		klog.Exit(err.Error())
 	}
