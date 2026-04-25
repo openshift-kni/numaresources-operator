@@ -75,7 +75,7 @@ metadata:
       ]
     capabilities: Basic Install
     createdAt: "2025-03-25T14:27:42Z"
-    olm.skipRange: '>=4.17.0 <4.18.0'
+    olm.skipRange: '>=4.16.0 <4.18.0'
     operatorframework.io/cluster-monitoring: "true"
     operators.operatorframework.io/builder: operator-sdk-v1.36.1
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v3
