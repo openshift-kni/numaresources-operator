@@ -2201,6 +2201,51 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				err = reconciler.Client.Get(context.TODO(), mc2Key, mc)
 				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s expected to be deleted; err=%v", mc2Key.Name, err)
 			})
+
+			It("should converge with mixed policy: one pool custom, one pool default", func(ctx context.Context) {
+				nro.Spec.NodeGroups[0].Annotations[annotations.SELinuxPolicyConfigAnnotation] = annotations.SELinuxPolicyCustom
+				// ng2 has no custom annotation -> default policy (MC deletion)
+
+				var err error
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+
+				By("First reconcile: MC created for pool1, MC deleted for pool2, waiting for MCO")
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).To(CauseRequeue())
+
+				By("Make pool1 ready with MC present (custom policy)")
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
+				ensureMCPIsReady(mcp1, nro.Name)
+				Expect(reconciler.Client.Update(ctx, mcp1)).To(Succeed())
+
+				By("Make pool2 ready after MC deletion (default policy)")
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
+				ensureMCPIsReadyAfterMCDeletion(mcp2)
+				Expect(reconciler.Client.Update(ctx, mcp2)).To(Succeed())
+
+				By("Second reconcile: should converge")
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
+
+				By("Verify DaemonSets for both pools exist")
+				ds := &appsv1.DaemonSet{}
+				mcp1DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(ctx, mcp1DSKey, ds)).To(Succeed())
+
+				mcp2DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(ctx, mcp2DSKey, ds)).To(Succeed())
+
+				By("Verify NRO status is Available")
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
+				Expect(nro).To(BeInCondition(status.ConditionAvailable))
+			})
 		})
 	})
 
@@ -2330,11 +2375,19 @@ func checkSELinuxPolicyProcessing(ctx context.Context, nro *nropv1.NUMAResources
 
 	// TODO: we should use Eventually, but we're supposed to be the only ones mutating mcp states
 	Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
-	ensureMCPIsReady(mcp1, nro.Name)
+	if annotations.IsCustomPolicyEnabled(nro.Spec.NodeGroups[0].Annotations) {
+		ensureMCPIsReady(mcp1, nro.Name)
+	} else {
+		ensureMCPIsReadyAfterMCDeletion(mcp1)
+	}
 	Expect(reconciler.Client.Update(ctx, mcp1)).To(Succeed())
 
 	Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
-	ensureMCPIsReady(mcp2, nro.Name)
+	if len(nro.Spec.NodeGroups) > 1 && annotations.IsCustomPolicyEnabled(nro.Spec.NodeGroups[1].Annotations) {
+		ensureMCPIsReady(mcp2, nro.Name)
+	} else {
+		ensureMCPIsReadyAfterMCDeletion(mcp2)
+	}
 	Expect(reconciler.Client.Update(ctx, mcp2)).To(Succeed())
 
 	// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
@@ -2451,6 +2504,16 @@ func ensureMCPIsReady(mcp *machineconfigv1.MachineConfigPool, nroName string) {
 			Name: objectnames.GetMachineConfigName(nroName, mcp.Name),
 		},
 	}
+	mcp.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+		{
+			Type:   machineconfigv1.MachineConfigPoolUpdated,
+			Status: corev1.ConditionTrue,
+		},
+	}
+}
+
+func ensureMCPIsReadyAfterMCDeletion(mcp *machineconfigv1.MachineConfigPool) {
+	mcp.Status.Configuration.Source = nil
 	mcp.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
 		{
 			Type:   machineconfigv1.MachineConfigPoolUpdated,
