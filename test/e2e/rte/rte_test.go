@@ -453,7 +453,7 @@ var _ = Describe("with a running cluster with all the components", func() {
 						return waitForMCPConditionWithRetry(ctx, &mcp, mcov1.MachineConfigPoolUpdated, mcpUpdateTimeout, mcpUpdatePolling)
 					})
 				}
-				Expect(eg.Wait()).To(Succeed(), "failed to wait for all MCPs to start updating")
+				Expect(eg.Wait()).To(Succeed(), "failed while waiting for mcp update")
 
 				By("Verifying per-node MachineConfig alignment after MCP rollback")
 				for i := range allMCPs.Items {
@@ -487,7 +487,7 @@ var _ = Describe("with a running cluster with all the components", func() {
 					return waitForMCPConditionWithRetry(ctx, &mcp, mcov1.MachineConfigPoolUpdated, mcpUpdateTimeout, mcpUpdatePolling)
 				})
 			}
-			Expect(eg.Wait()).To(Succeed(), "failed to wait for all MCPs to start updating")
+			Expect(eg.Wait()).To(Succeed(), "failed while waiting for mcp update")
 
 			// We not only want to verify that the MCPs are updated, but also that the nodes are updated with the new config.
 			By("Verifying per-node MachineConfig alignment after MCP rollout")
