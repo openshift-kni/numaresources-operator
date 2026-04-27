@@ -129,14 +129,29 @@ func MatchMachineConfigPoolCondition(conditions []machineconfigv1.MachineConfigP
 
 type MCPWaitForUpdatedFunc func(string, *machineconfigv1.MachineConfigPool) bool
 
-func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.ObjectState, MCPWaitForUpdatedFunc) {
-	var ret []objectstate.ObjectState
+type MachineConfigObjectState struct {
+	objectstate.ObjectState
+	PoolName       string
+	Paused         bool
+	WaitForUpdated MCPWaitForUpdatedFunc
+}
+
+func (em *ExistingManifests) MachineConfigsState(mf Manifests) []MachineConfigObjectState {
+	var ret []MachineConfigObjectState
 	if mf.Core.MachineConfig == nil {
-		return ret, nullMachineConfigPoolUpdated
+		return ret
 	}
-	enabledMCCount := 0
 	for _, tree := range em.trees {
+		isCustomPolicy := annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
 		for _, mcp := range tree.MachineConfigPools {
+			if mcp.Spec.Paused {
+				ret = append(ret, MachineConfigObjectState{
+					PoolName: mcp.Name,
+					Paused:   true,
+				})
+				continue
+			}
+
 			mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
 			if mcp.Spec.MachineConfigSelector == nil {
 				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
@@ -149,48 +164,41 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]objectstate.Ob
 				continue
 			}
 
-			if !annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations) {
+			if !isCustomPolicy {
 				// caution here: we want a *nil interface value*, not an *interface which points to nil*.
 				// the latter would lead to apparently correct code leading to runtime panics. See:
 				// https://trstringer.com/go-nil-interface-and-interface-with-nil-concrete-value/
 				// (and many other docs like this)
-				ret = append(ret,
-					objectstate.ObjectState{
+				ret = append(ret, MachineConfigObjectState{
+					ObjectState: objectstate.ObjectState{
 						Existing: existingMachineConfig.machineConfig,
 						Error:    existingMachineConfig.machineConfigError,
 						Desired:  nil,
 					},
-				)
+					PoolName:       mcp.Name,
+					WaitForUpdated: IsMachineConfigPoolUpdatedAfterDeletion,
+				})
 				continue
 			}
 
 			desiredMachineConfig := mf.Core.MachineConfig.DeepCopy()
-			// prefix machine config name to guarantee that we will have an option to override it
 			desiredMachineConfig.Name = mcName
 			desiredMachineConfig.Labels = GetMachineConfigLabel(mcp)
 
-			ret = append(ret,
-				objectstate.ObjectState{
+			ret = append(ret, MachineConfigObjectState{
+				ObjectState: objectstate.ObjectState{
 					Existing: existingMachineConfig.machineConfig,
 					Error:    existingMachineConfig.machineConfigError,
 					Desired:  desiredMachineConfig,
 					Compare:  compare.Object,
 					Merge:    merge.ObjectForUpdate,
 				},
-			)
-			enabledMCCount++
+				PoolName:       mcp.Name,
+				WaitForUpdated: IsMachineConfigPoolUpdated,
+			})
 		}
 	}
-
-	klog.V(4).InfoS("machineConfigsState", "enabledMachineConfigs", enabledMCCount)
-	if enabledMCCount > 0 {
-		return ret, IsMachineConfigPoolUpdated
-	}
-	return ret, IsMachineConfigPoolUpdatedAfterDeletion
-}
-
-func nullMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
-	return true
+	return ret
 }
 
 func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {

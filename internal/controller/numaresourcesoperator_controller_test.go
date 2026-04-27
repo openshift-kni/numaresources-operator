@@ -2178,12 +2178,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				reconciler = checkSELinuxPolicyProcessing(ctx, nro, mcp1, mcp2)
 
 				By("upgrading from 4.1X to 4.18")
-				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nro)).To(Succeed())
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
 				clearSELinuxPolicyCustomAnnotations(nro)
 				Expect(reconciler.Client.Update(context.TODO(), nro)).To(Succeed())
 			})
 
-			It("should delete existing mc", func() {
+			It("should delete existing mc", func(ctx context.Context) {
 				key := client.ObjectKeyFromObject(nro)
 				// removing the annotation will trigger reboot which requires resync after 1 min
 				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).To(CauseRequeue())
@@ -2192,14 +2192,95 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
 				}
 				mc := &machineconfigv1.MachineConfig{}
-				err := reconciler.Client.Get(context.TODO(), mc1Key, mc)
+				err := reconciler.Client.Get(ctx, mc1Key, mc)
 				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s expected to be deleted; err=%v", mc1Key.Name, err)
 
 				mc2Key := client.ObjectKey{
 					Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
 				}
-				err = reconciler.Client.Get(context.TODO(), mc2Key, mc)
+				err = reconciler.Client.Get(ctx, mc2Key, mc)
 				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s expected to be deleted; err=%v", mc2Key.Name, err)
+			})
+
+			It("should converge with mixed policy: one pool custom, one pool default", func(ctx context.Context) {
+				nro.Spec.NodeGroups[0].Annotations[annotations.SELinuxPolicyConfigAnnotation] = annotations.SELinuxPolicyCustom
+				// ng2 has no custom annotation -> default policy (MC deletion)
+
+				var err error
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+
+				By("First reconcile: MC created for pool1, MC deleted for pool2, waiting for MCO")
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).To(CauseRequeue())
+
+				By("Make pool1 ready with MC present (custom policy)")
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
+				ensureMCPIsReady(mcp1, nro.Name)
+				Expect(reconciler.Client.Update(ctx, mcp1)).To(Succeed())
+
+				By("Make pool2 ready after MC deletion (default policy)")
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
+				ensureMCPIsReadyAfterMCDeletion(mcp2)
+				Expect(reconciler.Client.Update(ctx, mcp2)).To(Succeed())
+
+				By("Second reconcile: should converge")
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
+
+				By("Verify DaemonSets for both pools exist")
+				ds := &appsv1.DaemonSet{}
+				mcp1DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(ctx, mcp1DSKey, ds)).To(Succeed())
+
+				mcp2DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(ctx, mcp2DSKey, ds)).To(Succeed())
+
+				By("Verify NRO status is Available")
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
+				Expect(nro).To(BeInCondition(status.ConditionAvailable))
+			})
+
+			It("should converge when one pool is paused", func(ctx context.Context) {
+				// neither pool has custom annotation -> both in MC deletion path
+				mcp2.Spec.Paused = true
+
+				var err error
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+
+				By("Reconcile: pool1 converges (default policy, no MC to wait for), pool2 skipped (paused)")
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
+
+				By("Verify DaemonSets for both pools exist")
+				ds := &appsv1.DaemonSet{}
+				mcp1DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(ctx, mcp1DSKey, ds)).To(Succeed())
+
+				mcp2DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(ctx, mcp2DSKey, ds)).To(Succeed())
+
+				By("Verify NRO status is Available with paused condition")
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
+				Expect(nro).To(BeInCondition(status.ConditionAvailable))
+
+				pausedCond := getConditionByType(nro.Status.Conditions, status.ConditionMachineConfigPoolPaused)
+				Expect(pausedCond).ToNot(BeNil())
+				Expect(pausedCond.Status).To(Equal(metav1.ConditionTrue))
 			})
 		})
 	})
@@ -2333,8 +2414,10 @@ func checkSELinuxPolicyProcessing(ctx context.Context, nro *nropv1.NUMAResources
 	ensureMCPIsReady(mcp1, nro.Name)
 	Expect(reconciler.Client.Update(ctx, mcp1)).To(Succeed())
 
+	// Node group 2 has no custom SELinux policy: wait logic expects our MachineConfig to be *absent* from
+	// the pool, so do not put it in Configuration.Source (unlike the pool that has custom policy).
 	Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp2), mcp2)).To(Succeed())
-	ensureMCPIsReady(mcp2, nro.Name)
+	ensureMCPIsReadyAfterMCDeletion(mcp2)
 	Expect(reconciler.Client.Update(ctx, mcp2)).To(Succeed())
 
 	// triggering a second reconcile will create the RTEs and fully update the statuses making the operator in Available condition -> no more reconciliation needed thus the result is clean
@@ -2451,6 +2534,19 @@ func ensureMCPIsReady(mcp *machineconfigv1.MachineConfigPool, nroName string) {
 			Name: objectnames.GetMachineConfigName(nroName, mcp.Name),
 		},
 	}
+	mcp.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
+		{
+			Type:   machineconfigv1.MachineConfigPoolUpdated,
+			Status: corev1.ConditionTrue,
+		},
+	}
+}
+
+// ensureMCPIsReadyAfterMCDeletion fakes a MachineConfig pool that does not include the operator's custom
+// MachineConfig in its configuration source and is not in a "still applying" state. Matches
+// the wait used when a node group does not use custom SELinux policy.
+func ensureMCPIsReadyAfterMCDeletion(mcp *machineconfigv1.MachineConfigPool) {
+	mcp.Status.Configuration.Source = nil
 	mcp.Status.Conditions = []machineconfigv1.MachineConfigPoolCondition{
 		{
 			Type:   machineconfigv1.MachineConfigPoolUpdated,
