@@ -46,6 +46,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// noNrtWorkloadPodRunningTimeout is longer than a typical e2e pod wait: the [no_nrt] path
+// rolls the RTE DaemonSet before creating workloads, and on busy 4.19+ CI we still see
+// the test namespace pod occasionally miss Running within 5m. Using a single higher bound to cut that flake.
+const noNrtWorkloadPodRunningTimeout = 10 * time.Minute
+
 var _ = Describe("[serial] numaresources profile update", Serial, Label("feature:wlplacement", "feature:nonrt"), func() {
 	var fxt *e2efixture.Fixture
 	var nrtList nrtv1alpha2.NodeResourceTopologyList
@@ -106,8 +111,9 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			err := fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedPod, err := wait.With(fxt.Client).Timeout(5*time.Minute).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
+			updatedPod, err := wait.With(fxt.Client).Timeout(noNrtWorkloadPodRunningTimeout).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
 			if err != nil {
+				klog.InfoS("test pod did not reach Running in time", "namespace", updatedPod.Namespace, "name", updatedPod.Name, "phase", updatedPod.Status.Phase, "node", updatedPod.Spec.NodeName, "wait", noNrtWorkloadPodRunningTimeout)
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
 			Expect(err).ToNot(HaveOccurred())
@@ -123,8 +129,9 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			err := fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedPod, err := wait.With(fxt.Client).Timeout(5*time.Minute).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
+			updatedPod, err := wait.With(fxt.Client).Timeout(noNrtWorkloadPodRunningTimeout).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
 			if err != nil {
+				klog.InfoS("test pod did not reach Running in time", "namespace", updatedPod.Namespace, "name", updatedPod.Name, "phase", updatedPod.Status.Phase, "node", updatedPod.Spec.NodeName, "wait", noNrtWorkloadPodRunningTimeout)
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
 			Expect(err).ToNot(HaveOccurred())
@@ -143,8 +150,9 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			err := fxt.Client.Create(context.TODO(), testPod)
 			Expect(err).ToNot(HaveOccurred())
 
-			updatedPod, err := wait.With(fxt.Client).Timeout(5*time.Minute).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
+			updatedPod, err := wait.With(fxt.Client).Timeout(noNrtWorkloadPodRunningTimeout).ForPodPhase(context.TODO(), testPod.Namespace, testPod.Name, corev1.PodRunning)
 			if err != nil {
+				klog.InfoS("test pod did not reach Running in time", "namespace", updatedPod.Namespace, "name", updatedPod.Name, "phase", updatedPod.Status.Phase, "node", updatedPod.Spec.NodeName, "wait", noNrtWorkloadPodRunningTimeout)
 				_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 			}
 			Expect(err).ToNot(HaveOccurred())
@@ -197,7 +205,10 @@ func updateInfoRefreshPause(ctx context.Context, fxt *e2efixture.Fixture, newVal
 		g.Expect(err).ToNot(HaveOccurred())
 	}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-	klog.Info("wait long enough to verify the NROP object is updated")
+	By("ensure that RTE pods are recreated and DS is ready")
+	waitForDaemonSetUpdate(ctx, fxt, dsNsName, rtePods)
+
+	klog.Info("wait long enough to verify the NROP object status is updated")
 	updatedObj := &nropv1.NUMAResourcesOperator{}
 	var currentMode nropv1.InfoRefreshPauseMode
 	Eventually(func() bool {
@@ -217,9 +228,6 @@ func updateInfoRefreshPause(ctx context.Context, fxt *e2efixture.Fixture, newVal
 
 		return true
 	}).WithTimeout(2*time.Minute).WithPolling(9*time.Second).Should(BeTrue(), "Status of NROP failed to get updated")
-
-	By("ensure that RTE pods are recreated and DS is ready")
-	waitForDaemonSetUpdate(ctx, fxt, dsNsName, rtePods)
 }
 
 func waitForDaemonSetUpdate(ctx context.Context, fxt *e2efixture.Fixture, dsNsName nropv1.NamespacedName, rtePods []corev1.Pod) {
