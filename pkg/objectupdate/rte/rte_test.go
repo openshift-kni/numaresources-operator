@@ -25,11 +25,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	intaff "github.com/openshift-kni/numaresources-operator/internal/affinity"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
 
@@ -345,91 +348,99 @@ func getSetFromStringList(args []string) map[string]struct{} {
 }
 
 func TestDaemonSetAffinitySettings(t *testing.T) {
-	tests := []struct {
-		name        string
-		ds          *appsv1.DaemonSet
-		labels      map[string]string
-		expectedErr error
-	}{
-		{
-			name: "no labels",
-			ds: &appsv1.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ds1",
-				},
-			},
-			expectedErr: fmt.Errorf("no labels provided for PodAffinity"),
-		},
-		{
-			name: "override affinity",
-			ds: &appsv1.DaemonSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "ds1",
-				},
-				Spec: appsv1.DaemonSetSpec{
-					Template: corev1.PodTemplateSpec{
-						Spec: corev1.PodSpec{
-							Affinity: &corev1.Affinity{
-								PodAntiAffinity: &corev1.PodAntiAffinity{
-									RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-										{
-											LabelSelector: &metav1.LabelSelector{
-												MatchLabels: map[string]string{
-													"test1": "test1",
-												},
-											},
-										},
-									},
-								},
+	t.Run("no labels", func(t *testing.T) {
+		ds := testDs.DeepCopy()
+		err := DaemonSetAffinitySettings(ds)
+		if err == nil {
+			t.Fatalf("expected error but received nil")
+		}
+		if err != intaff.ErrNoPodTemplateLabels {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("set empty affinity", func(t *testing.T) {
+		ds := testDs.DeepCopy()
+		ds.Spec.Template.Labels = map[string]string{
+			"test1": "test1",
+		}
+		err := DaemonSetAffinitySettings(ds)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if ds.Spec.Template.Spec.Affinity == nil {
+			t.Fatalf("expected affinity but received nil")
+		}
+		if ds.Spec.Template.Spec.Affinity.PodAntiAffinity == nil {
+			t.Fatalf("expected podAntiAffinity but received nil")
+		}
+
+		expectedPodAntiAffinity, err := intaff.GetPodAntiAffinity(ds.Spec.Template.Labels)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if diff := cmp.Diff(expectedPodAntiAffinity, ds.Spec.Template.Spec.Affinity.PodAntiAffinity); diff != "" {
+			t.Errorf("affinity mismatch (-expected +got):\n%s", diff)
+		}
+	})
+
+	t.Run("override podAntiAffinity only while preserving existing NodeAffinity", func(t *testing.T) {
+		ds := testDs.DeepCopy()
+		ds.Spec.Template.Labels = map[string]string{
+			"test1": "test1",
+		}
+		nodeAffinity := &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "node-role.kubernetes.io/worker",
+								Operator: corev1.NodeSelectorOpExists,
+								Values:   []string{""},
 							},
 						},
 					},
 				},
 			},
-			labels: map[string]string{
-				"test2": "test2",
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dsCopy := tt.ds.DeepCopy()
-
-			expectedAffinity := &corev1.Affinity{
-				PodAntiAffinity: &corev1.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchLabels: tt.labels,
+		}
+		ds.Spec.Template.Spec.Affinity = &corev1.Affinity{
+			NodeAffinity: nodeAffinity,
+			PodAntiAffinity: &corev1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{
+								"temp": "temp",
 							},
-							TopologyKey: "kubernetes.io/hostname",
 						},
 					},
 				},
-			}
+			},
+		}
 
-			err := DaemonSetAffinitySettings(tt.ds, tt.labels)
+		err := DaemonSetAffinitySettings(ds)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 
-			if err == nil && tt.expectedErr != nil {
-				t.Fatalf("expected error %v but received nil", tt.expectedErr)
-			}
+		if diff := cmp.Diff(nodeAffinity, ds.Spec.Template.Spec.Affinity.NodeAffinity); diff != "" {
+			t.Errorf("nodeaffinity mismatch (-expected +got):\n%s", diff)
+		}
 
-			if err != nil && tt.expectedErr == nil {
-				t.Fatalf("unexpected error %v", tt.expectedErr)
-			}
+		if ds.Spec.Template.Spec.Affinity.PodAntiAffinity == nil {
+			t.Fatalf("expected podAntiAffinity but received nil")
+		}
 
-			if tt.expectedErr != nil {
-				expectedAffinity = dsCopy.Spec.Template.Spec.Affinity
-				if err.Error() != tt.expectedErr.Error() {
-					t.Fatalf("mismatching errors: expected %v got %v", tt.expectedErr, err)
-				}
-			}
-
-			if !reflect.DeepEqual(expectedAffinity, tt.ds.Spec.Template.Spec.Affinity) {
-				t.Errorf("expected affinity %+v, got %+v", expectedAffinity, tt.ds.Spec.Template.Spec.Affinity)
-			}
-		})
-	}
+		expectedPodAntiAffinity, err := intaff.GetPodAntiAffinity(ds.Spec.Template.Labels)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if diff := cmp.Diff(expectedPodAntiAffinity, ds.Spec.Template.Spec.Affinity.PodAntiAffinity); diff != "" {
+			t.Errorf("nodeaffinity mismatch (-expected +got):\n%s", diff)
+		}
+	})
 }
 
 func TestDaemonSetRolloutSettings(t *testing.T) {

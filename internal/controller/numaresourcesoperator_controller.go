@@ -514,7 +514,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 	}
 
 	rteupdate.DaemonSetRolloutSettings(r.RTEManifests.Core.DaemonSet)
-	err = rteupdate.DaemonSetAffinitySettings(r.RTEManifests.Core.DaemonSet, r.RTEManifests.Core.DaemonSet.Spec.Template.Labels)
+	err = rteupdate.DaemonSetAffinitySettings(r.RTEManifests.Core.DaemonSet)
 	if err != nil {
 		klog.ErrorS(err, "failed to update RTE affinity settings")
 	}

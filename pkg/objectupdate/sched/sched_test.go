@@ -24,14 +24,18 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	intaff "github.com/openshift-kni/numaresources-operator/internal/affinity"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
@@ -629,6 +633,112 @@ func TestDeploymentTLSSettingsRepeated(t *testing.T) {
 	if !reflect.DeepEqual(firstArgs, secondArgs) {
 		t.Errorf("duplicates found in TLS args\nfirst:  %v\nsecond: %v", firstArgs, secondArgs)
 	}
+}
+
+func TestDeploymentAffinitySettings(t *testing.T) {
+	t.Run("no labels", func(t *testing.T) {
+		dp := dpMinimal.DeepCopy()
+		err := DeploymentAffinitySettings(dp, nropv1.NUMAResourcesSchedulerSpec{})
+		if err == nil {
+			t.Fatalf("expected error but received nil")
+		}
+		if err != intaff.ErrNoPodTemplateLabels {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("set podAntiAffinity with zero/nil replicas", func(t *testing.T) {
+		rcs := []*int32{ptr.To(int32(0)), nil}
+		dp := dpMinimal.DeepCopy()
+		dp.Spec.Template.ObjectMeta.Labels = map[string]string{"app": "scheduler"}
+		for _, count := range rcs {
+			err := DeploymentAffinitySettings(dp, nropv1.NUMAResourcesSchedulerSpec{Replicas: count})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if dp.Spec.Template.Spec.Affinity == nil {
+				t.Fatalf("expected affinity but received nil")
+			}
+			if dp.Spec.Template.Spec.Affinity.PodAntiAffinity == nil {
+				t.Fatalf("expected podAntiAffinity but received nil")
+			}
+
+			expectedPodAntiAffinity, err := intaff.GetPodAntiAffinity(dp.Spec.Template.Labels)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if diff := cmp.Diff(expectedPodAntiAffinity, dp.Spec.Template.Spec.Affinity.PodAntiAffinity); diff != "" {
+				t.Errorf("affinity mismatch (-expected +got):\n%s", diff)
+			}
+		}
+	})
+
+	t.Run("reset podAntiAffinity with non-zero replicas", func(t *testing.T) {
+		dp := dpMinimal.DeepCopy()
+		dp.Spec.Template.ObjectMeta.Labels = map[string]string{"app": "scheduler"}
+		initialNodeAffinity := &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: []corev1.NodeSelectorRequirement{
+							{
+								Key:      "node-role.kubernetes.io/worker",
+								Operator: corev1.NodeSelectorOpExists,
+								Values:   []string{""},
+							},
+						},
+					},
+				},
+			},
+		}
+		dp.Spec.Template.Spec.Affinity = &corev1.Affinity{
+			NodeAffinity: initialNodeAffinity,
+			PodAntiAffinity: &corev1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: map[string]string{"app": "scheduler"},
+						},
+					},
+				},
+			},
+		}
+		err := DeploymentAffinitySettings(dp, nropv1.NUMAResourcesSchedulerSpec{Replicas: ptr.To(int32(1))})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if diff := cmp.Diff(initialNodeAffinity, dp.Spec.Template.Spec.Affinity.NodeAffinity); diff != "" {
+			t.Errorf("should preserve existing NodeAffinity: affinity mismatch (-expected +got):\n%s", diff)
+		}
+		if dp.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
+			t.Fatalf("expected podAntiAffinity to be reset but got %v", dp.Spec.Template.Spec.Affinity.PodAntiAffinity)
+		}
+	})
+}
+
+func TestDeploymentAffinitySettingsOverride(t *testing.T) {
+	t.Run("override PodAntiAffinity on autodetection of replicas", func(t *testing.T) {
+		dp := dpMinimal.DeepCopy()
+		dp.Spec.Template.ObjectMeta.Labels = map[string]string{"app": "scheduler"}
+		err := DeploymentAffinitySettings(dp, nropv1.NUMAResourcesSchedulerSpec{Replicas: ptr.To(int32(0))})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if dp.Spec.Template.Spec.Affinity == nil || dp.Spec.Template.Spec.Affinity.PodAntiAffinity == nil {
+			t.Fatal("expected podAntiAffinity but got nil")
+		}
+
+		err = DeploymentAffinitySettings(dp, nropv1.NUMAResourcesSchedulerSpec{Replicas: ptr.To(int32(2))})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if dp.Spec.Template.Spec.Affinity != nil && dp.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
+			t.Fatalf("Override failed: expected no podAntiAffinity but got %v", dp.Spec.Template.Spec.Affinity.PodAntiAffinity)
+		}
+	})
 }
 
 func mustParseResource(t *testing.T, v string) resource.Quantity {
