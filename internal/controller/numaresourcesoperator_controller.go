@@ -241,57 +241,110 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Conte
 	return intreconcile.StepSuccess()
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) intreconcile.Step {
-	// we need to sync machine configs first and wait for the MachineConfigPool updates
-	// before checking additional components for updates
-	waitByPool, pausedMCPNames, err := r.syncMachineConfigs(ctx, instance, existing, trees)
-	if err != nil {
-		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
-		err = fmt.Errorf("failed to sync machine configs: %w", err)
-		return intreconcile.StepFailed(err)
-	}
-	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulMCSync", "Enabled machine configuration for worker nodes")
-
-	// MCO needs to update the SELinux context removal and other stuff, and need to trigger a reboot.
-	// It can take a while.
-	mcpStatuses, mcpNamePending := syncMachineConfigPoolsStatuses(instance.Name, trees, r.ForwardMCPConds, waitByPool)
-	instance.Status.MachineConfigPools = mcpStatuses
-	instance.Status.Conditions = updateMachineConfigPoolPausedCondition(instance.Status.Conditions, instance.Generation, pausedMCPNames)
-
-	if mcpNamePending != "" {
-		// the Machine Config Pool still did not apply the machine config, wait for one minute
-		return intreconcile.StepOngoing(numaResourcesRetryPeriod).WithReason("MachineConfigPoolIsUpdating").WithMessage(mcpNamePending + " is updating")
-	}
-	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
-
-	return intreconcile.StepSuccess()
+type treeReconcileResult struct {
+	tree           nodegroupv1.Tree
+	mcpStatuses    []nropv1.MachineConfigPool
+	dsInfo         []poolDaemonSet
+	pausedMCPNames []string
+	step           intreconcile.Step
 }
 
-func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) ([]poolDaemonSet, intreconcile.Step) {
-	daemonSetsInfoPerPool, err := r.syncNUMAResourcesOperatorResources(ctx, instance, existing, trees)
+func (r *NUMAResourcesOperatorReconciler) reconcileTreeMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, tree nodegroupv1.Tree) treeReconcileResult {
+	result := treeReconcileResult{tree: tree}
+	singleTreeSlice := []nodegroupv1.Tree{tree}
+
+	waitByPool, pausedMCPNames, err := r.syncMachineConfigs(ctx, instance, existing, singleTreeSlice)
+	result.pausedMCPNames = pausedMCPNames
 	if err != nil {
-		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECreate", "Failed to create Resource-Topology-Exporter DaemonSets: %v", err)
-		err = fmt.Errorf("FailedRTESync: %w", err)
-		return nil, intreconcile.StepFailed(err)
+		result.step = intreconcile.StepFailed(fmt.Errorf("failed to sync machine configs: %w", err))
+		return result
 	}
 
-	if len(daemonSetsInfoPerPool) == 0 {
-		return nil, intreconcile.StepSuccess()
+	mcpStatuses, mcpNamePending := syncMachineConfigPoolsStatuses(instance.Name, singleTreeSlice, r.ForwardMCPConds, waitByPool)
+	result.mcpStatuses = mcpStatuses
+
+	if mcpNamePending != "" {
+		result.step = intreconcile.StepOngoing(numaResourcesRetryPeriod).WithReason("MachineConfigPoolIsUpdating").WithMessage(mcpNamePending + " is updating")
+		return result
+	}
+	result.mcpStatuses = syncMachineConfigPoolNodeGroupConfigStatuses(result.mcpStatuses, singleTreeSlice)
+
+	result.step = intreconcile.StepSuccess()
+	return result
+}
+
+func (r *NUMAResourcesOperatorReconciler) reconcileTreeDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, tree nodegroupv1.Tree) treeReconcileResult {
+	result := treeReconcileResult{tree: tree}
+
+	dsPoolPairs, err := r.syncTreeDaemonSet(ctx, instance, existing, r.RTEManifests, tree)
+	if err != nil {
+		result.step = intreconcile.StepFailed(fmt.Errorf("FailedRTESync: %w", err))
+		return result
 	}
 
-	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
-
-	dssWithReadyStatus, dsNamePending, err := r.syncDaemonSetsStatuses(ctx, r.Client, daemonSetsInfoPerPool)
-	instance.Status.DaemonSets = dssWithReadyStatus
-	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dssWithReadyStatus)
+	dssWithReadyStatus, dsNamePending, err := r.syncDaemonSetsStatuses(ctx, r.Client, dsPoolPairs)
+	result.dsInfo = dsPoolPairs
 	if err != nil {
-		return nil, intreconcile.StepFailed(err)
+		result.step = intreconcile.StepFailed(err)
+		return result
 	}
 	if dsNamePending != "" {
-		return nil, intreconcile.StepOngoing(5 * time.Second).WithReason("DaemonSetIsUpdating").WithMessage(dsNamePending + " is updating")
+		result.step = intreconcile.StepOngoing(5 * time.Second).WithReason("DaemonSetIsUpdating").WithMessage(dsNamePending + " is updating")
+		return result
 	}
 
-	return daemonSetsInfoPerPool, intreconcile.StepSuccess()
+	result.dsInfo = dsPoolPairs
+	_ = dssWithReadyStatus // consumed via dsInfo for status aggregation
+	result.step = intreconcile.StepSuccess()
+	return result
+}
+
+func aggregateTreeResults(results []treeReconcileResult) (intreconcile.Step, []nropv1.MachineConfigPool, []poolDaemonSet, []string) {
+	var allMCPStatuses []nropv1.MachineConfigPool
+	var allDSInfo []poolDaemonSet
+	var allPausedMCPNames []string
+
+	worstStep := intreconcile.StepSuccess()
+	var messages []string
+
+	for _, result := range results {
+		allMCPStatuses = append(allMCPStatuses, result.mcpStatuses...)
+		allPausedMCPNames = append(allPausedMCPNames, result.pausedMCPNames...)
+
+		if result.step.Done() {
+			allDSInfo = append(allDSInfo, result.dsInfo...)
+			continue
+		}
+
+		if result.step.Error != nil {
+			messages = append(messages, result.step.Error.Error())
+		} else if result.step.Result.RequeueAfter > 0 {
+			messages = append(messages, result.step.ConditionInfo.Message)
+		}
+
+		if shouldReplaceStep(worstStep, result.step) {
+			worstStep = result.step
+		}
+	}
+
+	if !worstStep.Done() && len(messages) > 0 {
+		worstStep = worstStep.WithMessage(strings.Join(messages, "; "))
+	}
+
+	return worstStep, allMCPStatuses, allDSInfo, allPausedMCPNames
+}
+
+func shouldReplaceStep(current, candidate intreconcile.Step) bool {
+	if current.Done() {
+		return true
+	}
+	if candidate.Error != nil && current.Error == nil {
+		return true
+	}
+	if candidate.Result.RequeueAfter > 0 && current.Result.RequeueAfter > 0 {
+		return candidate.Result.RequeueAfter < current.Result.RequeueAfter
+	}
+	return false
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) intreconcile.Step {
@@ -299,24 +352,61 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 		return step
 	}
 
-	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
+	existing := rtestate.FromClientShared(ctx, r.Client, r.Platform, r.RTEManifests, instance, r.Namespace)
 
+	if err := r.prepareAndApplySharedResources(ctx, instance, existing); err != nil {
+		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECreate", "Failed to create Resource-Topology-Exporter shared resources: %v", err)
+		return intreconcile.StepFailed(fmt.Errorf("FailedSharedResourceSync: %w", err))
+	}
+
+	err := dangling.DeleteUnusedDaemonSets(r.Client, ctx, instance, trees)
+	if err != nil {
+		klog.ErrorS(err, "failed to deleted unused daemonsets")
+	}
 	if r.Platform == platform.OpenShift {
-		if step := r.reconcileResourceMachineConfig(ctx, instance, existing, trees); step.EarlyStop() {
-			return step
+		err = dangling.DeleteUnusedMachineConfigs(r.Client, ctx, instance, trees)
+		if err != nil {
+			klog.ErrorS(err, "failed to deleted unused machineconfigs")
 		}
 	}
 
-	dsPerPool, step := r.reconcileResourceDaemonSet(ctx, instance, existing, trees)
-	if step.EarlyStop() {
-		return step
+	var results []treeReconcileResult
+	for _, tree := range trees {
+		treeExisting := existing.ForTree(ctx, r.Client, tree)
+
+		if r.Platform == platform.OpenShift {
+			mcResult := r.reconcileTreeMachineConfig(ctx, instance, treeExisting, tree)
+			if mcResult.step.EarlyStop() {
+				results = append(results, mcResult)
+				continue
+			}
+			dsResult := r.reconcileTreeDaemonSet(ctx, instance, treeExisting, tree)
+			dsResult.mcpStatuses = mcResult.mcpStatuses
+			dsResult.pausedMCPNames = mcResult.pausedMCPNames
+			results = append(results, dsResult)
+		} else {
+			dsResult := r.reconcileTreeDaemonSet(ctx, instance, treeExisting, tree)
+			results = append(results, dsResult)
+		}
 	}
 
-	// all fields of NodeGroupStatus are required so publish the status only when all daemonset and MCPs are updated which
-	// is a certain thing if we got to this point otherwise the function would have returned already
-	instance.Status.NodeGroups = syncNodeGroupsStatus(instance, dsPerPool)
+	step, allMCPStatuses, allDSInfo, allPausedMCPNames := aggregateTreeResults(results)
 
-	return intreconcile.StepSuccess()
+	instance.Status.MachineConfigPools = allMCPStatuses
+	instance.Status.Conditions = updateMachineConfigPoolPausedCondition(instance.Status.Conditions, instance.Generation, allPausedMCPNames)
+
+	dssReady := []nropv1.NamespacedName{}
+	for _, dsInfo := range allDSInfo {
+		dssReady = append(dssReady, dsInfo.DaemonSet)
+	}
+	instance.Status.DaemonSets = dssReady
+	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dssReady)
+
+	if step.Done() {
+		instance.Status.NodeGroups = syncNodeGroupsStatus(instance, allDSInfo)
+	}
+
+	return step
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Context, rd client.Reader, daemonSetsInfo []poolDaemonSet) ([]nropv1.NamespacedName, string, error) {
@@ -531,21 +621,9 @@ func (r *NUMAResourcesOperatorReconciler) applyObjectStates(ctx context.Context,
 	return nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) prepareAndApplySharedResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) error {
-	err := dangling.DeleteUnusedDaemonSets(r.Client, ctx, instance, trees)
-	if err != nil {
-		klog.ErrorS(err, "failed to deleted unused daemonsets")
-	}
-
-	if r.Platform == platform.OpenShift {
-		err = dangling.DeleteUnusedMachineConfigs(r.Client, ctx, instance, trees)
-		if err != nil {
-			klog.ErrorS(err, "failed to deleted unused machineconfigs")
-		}
-	}
-
+func (r *NUMAResourcesOperatorReconciler) prepareAndApplySharedResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests) error {
 	rteupdate.DaemonSetRolloutSettings(r.RTEManifests.Core.DaemonSet)
-	err = rteupdate.DaemonSetAffinitySettings(r.RTEManifests.Core.DaemonSet, r.RTEManifests.Core.DaemonSet.Spec.Template.Labels)
+	err := rteupdate.DaemonSetAffinitySettings(r.RTEManifests.Core.DaemonSet, r.RTEManifests.Core.DaemonSet.Spec.Template.Labels)
 	if err != nil {
 		klog.ErrorS(err, "failed to update RTE affinity settings")
 	}
@@ -587,28 +665,6 @@ func (r *NUMAResourcesOperatorReconciler) syncTreeDaemonSet(ctx context.Context,
 	return dsPoolPairs, nil
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) ([]poolDaemonSet, error) {
-	klog.V(4).InfoS("RTESync start", "trees", len(trees))
-	defer klog.V(4).Info("RTESync stop")
-
-	if err := r.prepareAndApplySharedResources(ctx, instance, existing, trees); err != nil {
-		return nil, err
-	}
-
-	var dsPoolPairs []poolDaemonSet
-	for _, tree := range trees {
-		pairs, err := r.syncTreeDaemonSet(ctx, instance, existing, r.RTEManifests, tree)
-		if err != nil {
-			return nil, err
-		}
-		dsPoolPairs = append(dsPoolPairs, pairs...)
-	}
-
-	if len(dsPoolPairs) < len(trees) {
-		klog.Warningf("daemonset and tree size mismatch: expected %d got in daemonsets %d", len(trees), len(dsPoolPairs))
-	}
-	return dsPoolPairs, nil
-}
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) error {

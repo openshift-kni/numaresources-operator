@@ -367,6 +367,26 @@ func (em *ExistingManifests) UpdateFromTree(ctx context.Context, cli client.Clie
 	em.trees = append(em.trees, tree)
 }
 
+func (em *ExistingManifests) ForTree(ctx context.Context, cli client.Client, tree nodegroupv1.Tree) *ExistingManifests {
+	ret := &ExistingManifests{
+		existing:       em.existing,
+		errs:           em.errs,
+		daemonSets:     make(map[string]daemonSetManifest),
+		machineConfigs: make(map[string]machineConfigManifest),
+		plat:           em.plat,
+		instance:       em.instance,
+		namespace:      em.namespace,
+		updater:        em.updater,
+	}
+	if em.plat == platform.OpenShift {
+		ret.helper = machineConfigPoolFinder{em: ret, instance: em.instance, namespace: em.namespace}
+	} else {
+		ret.helper = nodeGroupFinder{em: ret, instance: em.instance, namespace: em.namespace}
+	}
+	ret.UpdateFromTree(ctx, cli, tree)
+	return ret
+}
+
 func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf Manifests, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, namespace string) *ExistingManifests {
 	ret := FromClientShared(ctx, cli, plat, mf, instance, namespace)
 	for _, tree := range trees {

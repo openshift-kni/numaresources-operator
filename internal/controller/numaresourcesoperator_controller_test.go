@@ -1751,13 +1751,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								Expect(err).ToNot(HaveOccurred())
 							})
 							It("should wait", func() {
-								// check reconcile first loop result
-								// wait one minute to update MCP, thus RTE daemonsets and complete status update is not going to be achieved at this point
 								Expect(result).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
 
 								Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
-								Expect(nro.Status.MachineConfigPools).To(HaveLen(1))
-								Expect(nro.Status.MachineConfigPools[0].Name).To(Equal("test1"))
+								Expect(nro.Status.MachineConfigPools).To(HaveLen(2))
 							})
 						})
 
@@ -2285,6 +2282,53 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				pausedCond := getConditionByType(nro.Status.Conditions, status.ConditionMachineConfigPoolPaused)
 				Expect(pausedCond).ToNot(BeNil())
 				Expect(pausedCond.Status).To(Equal(metav1.ConditionTrue))
+			})
+
+			It("should create DaemonSet for ready tree while another tree is still pending", func(ctx context.Context) {
+				// pool1 has custom policy -> MC created, needs MCO rollout
+				// pool2 has no custom annotation -> default policy (no MC to wait for)
+				nro.Spec.NodeGroups[0].Annotations[annotations.SELinuxPolicyConfigAnnotation] = annotations.SELinuxPolicyCustom
+
+				var err error
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+
+				By("First reconcile: pool1 MC pending, pool2 ready immediately")
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).To(CauseRequeue())
+
+				By("Verify pool2 DaemonSet exists even though pool1 is still pending")
+				ds := &appsv1.DaemonSet{}
+				mcp2DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(ctx, mcp2DSKey, ds)).To(Succeed())
+
+				By("Verify global status is Progressing, not Available")
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
+				progressingCond := getConditionByType(nro.Status.Conditions, status.ConditionProgressing)
+				Expect(progressingCond).ToNot(BeNil())
+				Expect(progressingCond.Status).To(Equal(metav1.ConditionTrue))
+
+				By("Make pool1 ready and reconcile again")
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
+				ensureMCPIsReady(mcp1, nro.Name)
+				Expect(reconciler.Client.Update(ctx, mcp1)).To(Succeed())
+
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
+
+				By("Now both DaemonSets exist and status is Available")
+				mcp1DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(ctx, mcp1DSKey, ds)).To(Succeed())
+				Expect(reconciler.Client.Get(ctx, mcp2DSKey, ds)).To(Succeed())
+
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
+				Expect(nro).To(BeInCondition(status.ConditionAvailable))
 			})
 
 			It("should report paused condition while Progressing", func(ctx context.Context) {
