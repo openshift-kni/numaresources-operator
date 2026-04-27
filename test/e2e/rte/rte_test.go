@@ -34,6 +34,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -333,18 +334,12 @@ var _ = Describe("with a running cluster with all the components", func() {
 		}
 	})
 	Context("[tlscompliance][rte] rte complies with TLS Profile modifications", Label(label.Tier0, "feature:tlscompliance"), func() {
-		var (
-			rteDaemonSetCheckTimeout  time.Duration
-			rteDaemonSetCheckInterval time.Duration
-			apiServerUpdateTimeout    time.Duration
-			apiServerUpdateInterval   time.Duration
-		)
-		BeforeEach(func() {
-			rteDaemonSetCheckTimeout = 30 * time.Second
+		const (
+			rteDaemonSetCheckTimeout  = 30 * time.Second
 			rteDaemonSetCheckInterval = 5 * time.Second
-			apiServerUpdateTimeout = 10 * time.Minute
-			apiServerUpdateInterval = 10 * time.Second
-		})
+			apiServerUpdateTimeout    = 10 * time.Minute
+			apiServerUpdateInterval   = 10 * time.Second
+		)
 		It("[test_id:88380] should have RTE DaemonSet args aligned with the cluster TLS profile", func(ctx context.Context) {
 			By("Getting initial OCP TLS profile")
 			tlsProfileSpec, err := ctrltls.FetchAPIServerTLSProfile(ctx, clients.Client)
@@ -433,8 +428,7 @@ var _ = Describe("with a running cluster with all the components", func() {
 				g.Expect(clients.Client.Update(ctx, updatedAPIServer)).To(Succeed(), "failed to updated APIServer TLS profile")
 			}).WithTimeout(apiServerUpdateTimeout).WithPolling(apiServerUpdateInterval).Should(Succeed())
 
-			// Always restore original TLS profile after test execution.
-			defer func() {
+			DeferCleanup(func(ctx context.Context) {
 				By("reverting the APIServer TLS profile to original setting")
 				klog.InfoS("switching TLS profile", "from", newProfile.Type, "to", originalTLSProfileType)
 				Eventually(func(g Gomega) {
@@ -444,15 +438,10 @@ var _ = Describe("with a running cluster with all the components", func() {
 					g.Expect(clients.Client.Update(ctx, updatedAPIServer)).To(Succeed(), "failed to updated APIServer TLS profile")
 				}).WithTimeout(apiServerUpdateTimeout).WithPolling(apiServerUpdateInterval).Should(Succeed())
 
-				// Wait for all pools to complete rollback reconciliation.
 				klog.InfoS("Waiting for all MCPs to get updated")
-				// Use goroutines so all pools are monitored in parallel.
 				eg := errgroup.Group{}
-				// Container for current MCP list.
 				allMCPs := &mcov1.MachineConfigPoolList{}
-				// List all pools present in cluster.
 				Expect(clients.Client.List(ctx, allMCPs)).To(Succeed())
-				// Launch one waiter per pool.
 				for _, mcp := range allMCPs.Items {
 					eg.Go(func() error {
 						err := waitForMCPConditionWithRetry(ctx, &mcp, mcov1.MachineConfigPoolUpdating, mcpUpdateTimeout, mcpUpdatePolling)
@@ -464,9 +453,14 @@ var _ = Describe("with a running cluster with all the components", func() {
 						return waitForMCPConditionWithRetry(ctx, &mcp, mcov1.MachineConfigPoolUpdated, mcpUpdateTimeout, mcpUpdatePolling)
 					})
 				}
-				// Ensure all pool waiters completed successfully.
 				Expect(eg.Wait()).To(Succeed(), "failed to wait for all MCPs to start updating")
-			}()
+
+				By("Verifying per-node MachineConfig alignment after MCP rollback")
+				for i := range allMCPs.Items {
+					Expect(verifyNodesMatchMCPConfig(ctx, &allMCPs.Items[i])).To(Succeed(),
+						"node config mismatch for MCP %q", allMCPs.Items[i].Name)
+				}
+			})
 
 			// Wait for all pools to complete forward reconciliation.
 			klog.InfoS("Waiting for all MCPs to get updated")
@@ -493,8 +487,15 @@ var _ = Describe("with a running cluster with all the components", func() {
 					return waitForMCPConditionWithRetry(ctx, &mcp, mcov1.MachineConfigPoolUpdated, mcpUpdateTimeout, mcpUpdatePolling)
 				})
 			}
-			// Ensure all pool waiters completed successfully.
 			Expect(eg.Wait()).To(Succeed(), "failed to wait for all MCPs to start updating")
+
+			// We not only want to verify that the MCPs are updated, but also that the nodes are updated with the new config.
+			By("Verifying per-node MachineConfig alignment after MCP rollout")
+			for i := range allMCPs.Items {
+				Expect(verifyNodesMatchMCPConfig(ctx, &allMCPs.Items[i])).To(Succeed(),
+					"node config mismatch for MCP %q", allMCPs.Items[i].Name)
+			}
+
 			newTLSProfileSpec := *configv1.TLSProfiles[newProfile.Type]
 			newTLSConfigFn, _ := ctrltls.NewTLSConfigFromProfile(newTLSProfileSpec)
 			newTLSCfg := &tls.Config{}
@@ -650,4 +651,40 @@ func isTransientMCPError(err error) bool {
 	}
 	// API transport hiccups seen during control-plane churn may be wrapped.
 	return strings.Contains(err.Error(), "stream error") || strings.Contains(err.Error(), "INTERNAL_ERROR")
+}
+
+// verifyNodesMatchMCPConfig re-reads the given MCP, lists the nodes matching
+// its NodeSelector, and checks that every node's currentConfig annotation
+// matches the MCP's rendered configuration (status.configuration.name).
+// This provides per-node confidence that the rollout actually happened.
+func verifyNodesMatchMCPConfig(ctx context.Context, mcp *mcov1.MachineConfigPool) error {
+	updatedMCP := &mcov1.MachineConfigPool{}
+	if err := clients.Client.Get(ctx, client.ObjectKeyFromObject(mcp), updatedMCP); err != nil {
+		return fmt.Errorf("failed to re-read MCP %q: %w", mcp.Name, err)
+	}
+	renderedConfig := updatedMCP.Status.Configuration.Name
+	if renderedConfig == "" {
+		return fmt.Errorf("MCP %q has empty status.configuration.name", mcp.Name)
+	}
+
+	if updatedMCP.Spec.NodeSelector == nil {
+		return fmt.Errorf("MCP %q has nil NodeSelector", mcp.Name)
+	}
+	nodeList := &corev1.NodeList{}
+	if err := clients.Client.List(ctx, nodeList, &client.ListOptions{
+		LabelSelector: labels.SelectorFromSet(updatedMCP.Spec.NodeSelector.MatchLabels),
+	}); err != nil {
+		return fmt.Errorf("failed to list nodes for MCP %q: %w", mcp.Name, err)
+	}
+
+	for i := range nodeList.Items {
+		node := &nodeList.Items[i]
+		currentConfig := node.Annotations[wait.CurrentConfigNodeAnnotation]
+		if currentConfig != renderedConfig {
+			return fmt.Errorf("node %q currentConfig=%q does not match MCP %q rendered config=%q",
+				node.Name, currentConfig, mcp.Name, renderedConfig)
+		}
+	}
+	klog.InfoS("all nodes match MCP config", "mcp", mcp.Name, "config", renderedConfig, "nodeCount", len(nodeList.Items))
+	return nil
 }
