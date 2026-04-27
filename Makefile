@@ -540,7 +540,7 @@ golangci-lint: ## Download golangci-lint locally if necessary.
 		rm -f $(GOLANGCI_LINT_ARTIFACT_FILE);\
 		popd;\
 	else\
-		echo "Using golangci-lint cached at $(GOLANGCI_LINT), current version $(GOLANGCI_LINT_LOCAL_VERSION) expected version: $(GOLANGCI_LINT_VERSION)";\
+		echo "Using golangci-lint cached at $(GOLANGCI_LINT), current version `$(GOLANGCI_LINT) --version 2>&1` expected version: $(GOLANGCI_LINT_VERSION)";\
 	fi
 
 ## Tool Binaries - go-install binary
