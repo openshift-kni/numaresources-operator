@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -142,7 +143,10 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	initialStatus := *instance.Status.DeepCopy()
 	if len(initialStatus.Conditions) == 0 {
-		instance.Status.Conditions = status.DefaultBaseConditions(time.Now())
+		instance.Status.Conditions = status.NewNUMAResourcesOperatorConditions()
+	} else {
+		// on upgrade, backfill conditions added in newer versions
+		instance.Status.Conditions = status.EnsureNUMAResourcesOperatorConditions(instance.Status.Conditions)
 	}
 
 	if req.Name != objectnames.DefaultNUMAResourcesOperatorCrName {
@@ -237,7 +241,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Conte
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) intreconcile.Step {
 	// we need to sync machine configs first and wait for the MachineConfigPool updates
 	// before checking additional components for updates
-	waitByPool, _, err := r.syncMachineConfigs(ctx, instance, existing, trees)
+	waitByPool, pausedMCPNames, err := r.syncMachineConfigs(ctx, instance, existing, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
 		err = fmt.Errorf("failed to sync machine configs: %w", err)
@@ -255,6 +259,8 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 		return intreconcile.StepOngoing(numaResourcesRetryPeriod).WithReason("MachineConfigPoolIsUpdating").WithMessage(mcpNamePending + " is updating")
 	}
 	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
+
+	instance.Status.Conditions = updateMachineConfigPoolPausedCondition(instance.Status.Conditions, instance.Generation, pausedMCPNames)
 
 	return intreconcile.StepSuccess()
 }
@@ -407,6 +413,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	for _, mcObjState := range mcObjStates {
 		if mcObjState.Paused {
 			pausedMCPNames = append(pausedMCPNames, mcObjState.PoolName)
+			// do no wait on paused MCPs
 			continue
 		}
 		waitByPool[mcObjState.PoolName] = mcObjState.WaitForUpdated
@@ -808,6 +815,26 @@ func daemonsetUpdater(poolName string, gdm *rtestate.GeneratedDesiredManifest) e
 	// it's possible that the hash will be empty if kubelet controller hasn't created a configmap
 	rteupdate.DaemonSetHashAnnotation(gdm.DaemonSet, gdm.RTEConfigHash)
 	return nil
+}
+
+func updateMachineConfigPoolPausedCondition(conditions []metav1.Condition, generation int64, pausedMCPNames []string) []metav1.Condition {
+	pausedStatus := metav1.ConditionFalse
+	message := ""
+	if len(pausedMCPNames) > 0 {
+		klog.InfoS("detected paused MCPs", "pausedMCPs", pausedMCPNames)
+		pausedStatus = metav1.ConditionTrue
+		message = "detected paused MCPs: " + strings.Join(pausedMCPNames, ", ")
+	}
+	condition := metav1.Condition{
+		Type:               status.ConditionMachineConfigPoolPaused,
+		Status:             pausedStatus,
+		Reason:             status.ConditionMachineConfigPoolPaused,
+		Message:            message,
+		ObservedGeneration: generation,
+		LastTransitionTime: metav1.Now(),
+	}
+	conditions, _ = status.ComputeConditions(conditions, condition, time.Now())
+	return conditions
 }
 
 func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
