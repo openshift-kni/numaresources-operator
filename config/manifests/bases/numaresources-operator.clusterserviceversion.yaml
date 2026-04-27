@@ -14,7 +14,7 @@ metadata:
     features.operators.openshift.io/token-auth-aws: "false"
     features.operators.openshift.io/token-auth-azure: "false"
     features.operators.openshift.io/token-auth-gcp: "false"
-    olm.skipRange: '>=4.20.0 <4.22.0'
+    olm.skipRange: '>=4.22.0 <5.0.0'
     operatorframework.io/cluster-monitoring: "true"
     operators.openshift.io/valid-subscription: |-
       [
@@ -331,5 +331,5 @@ spec:
   minKubeVersion: 1.23.0
   provider:
     name: Red Hat
-  replaces: numaresources-operator.v4.21.999-snapshot
-  version: 4.22.0
+  replaces: numaresources-operator.v4.22.999-snapshot
+  version: 5.0.0
