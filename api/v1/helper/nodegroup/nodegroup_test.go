@@ -35,6 +35,45 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )
 
+func TestTreeName(t *testing.T) {
+	type testCase struct {
+		name     string
+		tree     Tree
+		expected string
+	}
+	testCases := []testCase{
+		{
+			name:     "zero value tree",
+			tree:     Tree{},
+			expected: "<nil>",
+		},
+		{
+			name: "nil PoolName",
+			tree: Tree{
+				NodeGroup: &nropv1.NodeGroup{},
+			},
+			expected: "<unknown>",
+		},
+		{
+			name: "with PoolName",
+			tree: Tree{
+				NodeGroup: &nropv1.NodeGroup{
+					PoolName: ptr.To("worker-cnf"),
+				},
+			},
+			expected: "worker-cnf",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.tree.Name()
+			if got != tc.expected {
+				t.Errorf("expected %q, got %q", tc.expected, got)
+			}
+		})
+	}
+}
+
 func TestFindTreesOpenshift(t *testing.T) {
 	mcpList := mcov1.MachineConfigPoolList{
 		Items: []mcov1.MachineConfigPool{
