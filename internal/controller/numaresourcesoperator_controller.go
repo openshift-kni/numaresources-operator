@@ -64,6 +64,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
@@ -510,10 +511,27 @@ func getMachineConfigPoolStatusByName(mcpStatuses []nropv1.MachineConfigPool, na
 	return nropv1.MachineConfigPool{Name: name}
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) ([]poolDaemonSet, error) {
-	klog.V(4).InfoS("RTESync start", "trees", len(trees))
-	defer klog.V(4).Info("RTESync stop")
+func (r *NUMAResourcesOperatorReconciler) applyObjectStates(ctx context.Context, instance *nropv1.NUMAResourcesOperator, objStates []objectstate.ObjectState) error {
+	for _, objState := range objStates {
+		if objState.Error != nil {
+			klog.Warningf("error loading object: %v", objState.Error)
+		}
+		if objState.UpdateError != nil {
+			return fmt.Errorf("failed to update (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), objState.UpdateError)
+		}
+		err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme)
+		if err != nil {
+			return fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+		}
+		_, _, err = apply.ApplyObject(ctx, r.Client, objState)
+		if err != nil {
+			return fmt.Errorf("failed to apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+		}
+	}
+	return nil
+}
 
+func (r *NUMAResourcesOperatorReconciler) prepareAndApplySharedResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) error {
 	err := dangling.DeleteUnusedDaemonSets(r.Client, ctx, instance, trees)
 	if err != nil {
 		klog.ErrorS(err, "failed to deleted unused daemonsets")
@@ -532,27 +550,28 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		klog.ErrorS(err, "failed to update RTE affinity settings")
 	}
 
-	dsPoolPairs := []poolDaemonSet{}
-
-	// using a slice of poolDaemonSet instead of a map because Go maps assignment order is not consistent and non-deterministic
 	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.Core.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
 	if err != nil {
-		return dsPoolPairs, err
+		return err
 	}
 
 	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.Core.DaemonSet)
 	if err != nil {
-		return dsPoolPairs, err
+		return err
 	}
 
 	err = loglevel.UpdatePodSpec(&r.RTEManifests.Core.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
 	if err != nil {
-		return dsPoolPairs, err
+		return err
 	}
 
 	rteupdate.SecurityContextConstraint(r.RTEManifests.Core.SecurityContextConstraint, true) // force to legacy context
-	// SCC v2 needs no updates
 
+	return r.applyObjectStates(ctx, instance, existing.SharedState(r.RTEManifests))
+}
+
+func (r *NUMAResourcesOperatorReconciler) syncTreeDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, mf rtestate.Manifests, tree nodegroupv1.Tree) ([]poolDaemonSet, error) {
+	var dsPoolPairs []poolDaemonSet
 	existing = existing.WithManifestsUpdater(func(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
 		err := daemonsetUpdater(poolName, gdm, r.RTEMetricsTLS)
 		if err != nil {
@@ -562,24 +581,27 @@ func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx
 		return nil
 	})
 
-	for _, objState := range existing.State(r.RTEManifests) {
-		if objState.Error != nil {
-			// We are likely in the bootstrap scenario. In this case, which is expected once, everything is fine.
-			// If it happens past bootstrap, still carry on. We know what to do, and we do want to enforce the desired state.
-			klog.Warningf("error loading object: %v", objState.Error)
-		}
-		if objState.UpdateError != nil {
-			// this is an internal error. Should not happen. But if it happen, we don't want to send garbage to the cluster, so we abort
-			return nil, fmt.Errorf("failed to update (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
-		}
-		err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme)
+	if err := r.applyObjectStates(ctx, instance, existing.TreeState(mf, tree)); err != nil {
+		return nil, err
+	}
+	return dsPoolPairs, nil
+}
+
+func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) ([]poolDaemonSet, error) {
+	klog.V(4).InfoS("RTESync start", "trees", len(trees))
+	defer klog.V(4).Info("RTESync stop")
+
+	if err := r.prepareAndApplySharedResources(ctx, instance, existing, trees); err != nil {
+		return nil, err
+	}
+
+	var dsPoolPairs []poolDaemonSet
+	for _, tree := range trees {
+		pairs, err := r.syncTreeDaemonSet(ctx, instance, existing, r.RTEManifests, tree)
 		if err != nil {
-			return nil, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+			return nil, err
 		}
-		_, _, err = apply.ApplyObject(ctx, r.Client, objState)
-		if err != nil {
-			return nil, fmt.Errorf("failed to apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
-		}
+		dsPoolPairs = append(dsPoolPairs, pairs...)
 	}
 
 	if len(dsPoolPairs) < len(trees) {
