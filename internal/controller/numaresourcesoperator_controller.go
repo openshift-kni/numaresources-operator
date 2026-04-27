@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -31,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 
@@ -146,7 +148,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	initialStatus := *instance.Status.DeepCopy()
 	if len(initialStatus.Conditions) == 0 {
-		instance.Status.Conditions = status.DefaultBaseConditions(time.Now())
+		instance.Status.Conditions = status.NewNUMAResourcesOperatorConditions()
 	}
 
 	if req.Name != objectnames.DefaultNUMAResourcesOperatorCrName {
@@ -241,7 +243,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Conte
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) intreconcile.Step {
 	// we need to sync machine configs first and wait for the MachineConfigPool updates
 	// before checking additional components for updates
-	waitByPool, err := r.syncMachineConfigs(ctx, instance, existing, trees)
+	waitByPool, pausedMCPNames, err := r.syncMachineConfigs(ctx, instance, existing, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
 		err = fmt.Errorf("failed to sync machine configs: %w", err)
@@ -253,6 +255,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 	// It can take a while.
 	mcpStatuses, mcpNamePending := syncMachineConfigPoolsStatuses(instance.Name, trees, r.ForwardMCPConds, waitByPool)
 	instance.Status.MachineConfigPools = mcpStatuses
+	instance.Status.Conditions = updateMachineConfigPoolPausedCondition(instance.Status.Conditions, instance.Generation, pausedMCPNames)
 
 	if mcpNamePending != "" {
 		// the Machine Config Pool still did not apply the machine config, wait for one minute
@@ -395,7 +398,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx contex
 	return (updatedCount == len(objStates)), err
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) (map[string]rtestate.MCPWaitForUpdatedFunc, error) {
+func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) (map[string]rtestate.MCPWaitForUpdatedFunc, []string, error) {
 	klog.V(4).InfoS("Machine Config Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Sync stop")
 
@@ -405,7 +408,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	// In case of operator upgrade from 4.1X → 4.18, it's necessary to remove the old MachineConfig,
 	// unless an emergency annotation is provided which forces the operator to use custom policy
 
-	mcObjStates := existing.MachineConfigsState(r.RTEManifests)
+	mcObjStates, pausedMCPNames := existing.MachineConfigsState(r.RTEManifests)
 	waitByPool := make(map[string]rtestate.MCPWaitForUpdatedFunc, len(mcObjStates))
 	for _, mcObjState := range mcObjStates {
 		waitByPool[mcObjState.PoolName] = mcObjState.WaitForUpdated
@@ -429,7 +432,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 			break
 		}
 	}
-	return waitByPool, err
+	return waitByPool, pausedMCPNames, err
 }
 
 func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree, forwardMCPConds bool, waitByPool map[string]rtestate.MCPWaitForUpdatedFunc) ([]nropv1.MachineConfigPool, string) {
@@ -612,7 +615,8 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 			return !reflect.DeepEqual(mcpOld.Status.Conditions, mcpNew.Status.Conditions) ||
 				!apiequality.Semantic.DeepEqual(mcpOld.Labels, mcpNew.Labels) ||
 				!apiequality.Semantic.DeepEqual(mcpOld.Spec.MachineConfigSelector, mcpNew.Spec.MachineConfigSelector) ||
-				!apiequality.Semantic.DeepEqual(mcpOld.Spec.NodeSelector, mcpNew.Spec.NodeSelector)
+				!apiequality.Semantic.DeepEqual(mcpOld.Spec.NodeSelector, mcpNew.Spec.NodeSelector) ||
+				mcpOld.Spec.Paused != mcpNew.Spec.Paused
 		},
 	}
 
@@ -659,36 +663,45 @@ func (r *NUMAResourcesOperatorReconciler) mcpToNUMAResourceOperator(ctx context.
 
 	nros := &nropv1.NUMAResourcesOperatorList{}
 	if err := r.List(ctx, nros); err != nil {
-		klog.Error("failed to get numa-resources operator")
+		klog.Error("failed to get the numaresources operator")
 		return nil
 	}
 
-	var requests []reconcile.Request
-	for i := range nros.Items {
-		nro := &nros.Items[i]
-		mcpLabels := labels.Set(mcp.Labels)
+	mcpLabels := labels.Set(mcp.Labels)
+	targetNROs := sets.New[string]()
+	for _, nro := range nros.Items {
 		for _, nodeGroup := range nro.Spec.NodeGroups {
-			if nodeGroup.MachineConfigPoolSelector == nil {
+			if !nodeGroupMatchesMCP(nodeGroup, mcp.Name, mcpLabels) {
 				continue
 			}
-
-			nodeGroupSelector, err := metav1.LabelSelectorAsSelector(nodeGroup.MachineConfigPoolSelector)
-			if err != nil {
-				klog.Errorf("failed to parse the selector %v", mcp.Spec.NodeSelector)
-				return nil
-			}
-
-			if nodeGroupSelector.Matches(mcpLabels) {
-				requests = append(requests, reconcile.Request{
-					NamespacedName: client.ObjectKey{
-						Name: nro.Name,
-					},
-				})
-			}
+			targetNROs.Insert(nro.Name)
 		}
 	}
 
+	requests := make([]reconcile.Request, 0, len(targetNROs))
+	for _, nroName := range targetNROs.UnsortedList() {
+		requests = append(requests, reconcile.Request{
+			NamespacedName: client.ObjectKey{
+				Name: nroName,
+			},
+		})
+	}
 	return requests
+}
+
+func nodeGroupMatchesMCP(nodeGroup nropv1.NodeGroup, mcpName string, mcpLabels labels.Set) bool {
+	if nodeGroup.PoolName != nil {
+		return mcpName == *nodeGroup.PoolName
+	}
+	if nodeGroup.MachineConfigPoolSelector == nil {
+		return false
+	}
+	selector, err := metav1.LabelSelectorAsSelector(nodeGroup.MachineConfigPoolSelector)
+	if err != nil {
+		klog.Errorf("failed to parse the selector %v", nodeGroup.MachineConfigPoolSelector)
+		return false
+	}
+	return selector.Matches(mcpLabels)
 }
 
 func (r *NUMAResourcesOperatorReconciler) configMapToNUMAResourceOperator(ctx context.Context, cmObj client.Object) []reconcile.Request {
@@ -801,6 +814,26 @@ func isDaemonSetReady(ds *appsv1.DaemonSet) bool {
 		return true
 	}
 	return ds.Status.DesiredNumberScheduled > 0 && ds.Status.DesiredNumberScheduled == ds.Status.NumberReady
+}
+
+func updateMachineConfigPoolPausedCondition(conditions []metav1.Condition, generation int64, pausedMCPNames []string) []metav1.Condition {
+	pausedStatus := metav1.ConditionFalse
+	message := ""
+	if len(pausedMCPNames) > 0 {
+		klog.InfoS("detected paused MCPs", "pausedMCPs", pausedMCPNames)
+		pausedStatus = metav1.ConditionTrue
+		message = "detected paused MCPs: " + strings.Join(pausedMCPNames, ", ")
+	}
+	condition := metav1.Condition{
+		Type:               status.ConditionMachineConfigPoolPaused,
+		Status:             pausedStatus,
+		Reason:             status.ConditionMachineConfigPoolPaused,
+		Message:            message,
+		ObservedGeneration: generation,
+		LastTransitionTime: metav1.Now(),
+	}
+	conditions, _ = status.ComputeConditions(conditions, condition, time.Now())
+	return conditions
 }
 
 func getTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nropv1.NodeGroup, platf platform.Platform) ([]nodegroupv1.Tree, error) {

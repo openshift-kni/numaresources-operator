@@ -135,14 +135,20 @@ type MachineConfigObjectState struct {
 	WaitForUpdated MCPWaitForUpdatedFunc
 }
 
-func (em *ExistingManifests) MachineConfigsState(mf Manifests) []MachineConfigObjectState {
+func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]MachineConfigObjectState, []string) {
 	var ret []MachineConfigObjectState
+	var pausedMCPNames []string
 	if mf.Core.MachineConfig == nil {
-		return ret
+		return ret, pausedMCPNames
 	}
 	for _, tree := range em.trees {
 		isCustomPolicy := annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
 		for _, mcp := range tree.MachineConfigPools {
+			if mcp.Spec.Paused {
+				pausedMCPNames = append(pausedMCPNames, mcp.Name)
+				continue
+			}
+
 			mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
 			if mcp.Spec.MachineConfigSelector == nil {
 				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
@@ -189,7 +195,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) []MachineConfigOb
 			})
 		}
 	}
-	return ret
+	return ret, pausedMCPNames
 }
 
 func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {

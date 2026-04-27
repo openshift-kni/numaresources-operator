@@ -2242,9 +2242,71 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				}
 				Expect(reconciler.Client.Get(ctx, mcp2DSKey, ds)).To(Succeed())
 
-				By("Verify NRO status is Available")
+				By("Verify NRO status is Available with no paused condition")
 				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
 				Expect(nro).To(BeInCondition(status.ConditionAvailable))
+
+				pausedCond := getConditionByType(nro.Status.Conditions, status.ConditionMachineConfigPoolPaused)
+				Expect(pausedCond).ToNot(BeNil())
+				Expect(pausedCond.Status).To(Equal(metav1.ConditionFalse))
+			})
+
+			It("should converge when one pool is paused", func(ctx context.Context) {
+				// neither pool has custom annotation -> both in MC deletion path
+				mcp2.Spec.Paused = true
+
+				var err error
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+
+				By("Reconcile: pool2 is paused and skipped, pool1 has no MC to wait for")
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
+
+				By("Verify DaemonSets for both pools exist")
+				ds := &appsv1.DaemonSet{}
+				mcp1DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(ctx, mcp1DSKey, ds)).To(Succeed())
+
+				mcp2DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(ctx, mcp2DSKey, ds)).To(Succeed())
+
+				By("Verify NRO status is Available with paused condition")
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
+				Expect(nro).To(BeInCondition(status.ConditionAvailable))
+
+				pausedCond := getConditionByType(nro.Status.Conditions, status.ConditionMachineConfigPoolPaused)
+				Expect(pausedCond).ToNot(BeNil())
+				Expect(pausedCond.Status).To(Equal(metav1.ConditionTrue))
+			})
+
+			It("should report paused condition while Progressing", func(ctx context.Context) {
+				// pool1 has custom policy -> MC created, needs MCO rollout
+				// pool2 is paused -> skipped
+				nro.Spec.NodeGroups[0].Annotations[annotations.SELinuxPolicyConfigAnnotation] = annotations.SELinuxPolicyCustom
+				mcp2.Spec.Paused = true
+
+				var err error
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+
+				By("First reconcile: MC created for pool1, pool2 skipped (paused), waiting for MCO on pool1")
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).To(CauseRequeue())
+
+				By("Verify paused condition is set even while Progressing")
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
+				pausedCond := getConditionByType(nro.Status.Conditions, status.ConditionMachineConfigPoolPaused)
+				Expect(pausedCond).ToNot(BeNil(), "paused condition should be set during Progressing phase")
+				Expect(pausedCond.Status).To(Equal(metav1.ConditionTrue))
 			})
 		})
 	})

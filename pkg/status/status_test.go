@@ -282,6 +282,38 @@ func TestMessageFromError(t *testing.T) {
 	}
 }
 
+func TestNewNUMAResourcesOperatorConditions(t *testing.T) {
+	conds := NewNUMAResourcesOperatorConditions()
+
+	baseTypes := []string{ConditionAvailable, ConditionUpgradeable, ConditionProgressing, ConditionDegraded}
+	for _, ct := range baseTypes {
+		found := false
+		for _, c := range conds {
+			if c.Type == ct {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("missing base condition %q", ct)
+		}
+	}
+
+	var pausedCond *metav1.Condition
+	for i := range conds {
+		if conds[i].Type == ConditionMachineConfigPoolPaused {
+			pausedCond = &conds[i]
+			break
+		}
+	}
+	if pausedCond == nil {
+		t.Fatal("missing MachineConfigPoolPaused condition")
+	}
+	if pausedCond.Status != metav1.ConditionUnknown {
+		t.Fatalf("expected MachineConfigPoolPaused status %q, got %q", metav1.ConditionUnknown, pausedCond.Status)
+	}
+}
+
 func TestComputeConditions(t *testing.T) {
 	tests := []struct {
 		name       string

@@ -37,7 +37,13 @@ const (
 )
 
 const (
+	// scheduler conditions
 	ConditionDedicatedInformerActive = "DedicatedInformerActive"
+)
+
+const (
+	// operator conditions
+	ConditionMachineConfigPoolPaused = "MachineConfigPoolPaused"
 )
 
 // TODO: are we duping these?
@@ -181,6 +187,18 @@ func DefaultBaseConditions(timestamp time.Time) []metav1.Condition {
 			Reason:             ConditionDegraded,
 		},
 	}
+}
+
+// NewNUMAResourcesOperatorConditions creates specific operator conditions on
+// top of DefaultBaseConditions.
+func NewNUMAResourcesOperatorConditions() []metav1.Condition {
+	now := time.Now()
+	return append(DefaultBaseConditions(now), metav1.Condition{
+		Type:               ConditionMachineConfigPoolPaused,
+		Status:             metav1.ConditionUnknown,
+		LastTransitionTime: metav1.Time{Time: now},
+		Reason:             ConditionMachineConfigPoolPaused,
+	})
 }
 
 // NewNUMAResourcesSchedulerBaseConditions creates specific conditions on
