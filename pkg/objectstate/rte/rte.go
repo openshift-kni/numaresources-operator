@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -128,17 +129,24 @@ type MCPWaitForUpdatedFunc func(string, *machineconfigv1.MachineConfigPool) bool
 type MachineConfigObjectState struct {
 	objectstate.ObjectState
 	PoolName       string
+	Paused         bool
 	WaitForUpdated MCPWaitForUpdatedFunc
 }
 
-func (em *ExistingManifests) MachineConfigsState(mf Manifests) []MachineConfigObjectState {
+func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]MachineConfigObjectState, sets.Set[string]) {
 	var ret []MachineConfigObjectState
+	pausedMCPNames := sets.New[string]()
 	if mf.Core.MachineConfig == nil {
-		return ret
+		return ret, pausedMCPNames
 	}
 	for _, tree := range em.trees {
 		isCustomPolicy := annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
 		for _, mcp := range tree.MachineConfigPools {
+			if mcp.Spec.Paused {
+				pausedMCPNames.Insert(mcp.Name)
+				continue
+			}
+
 			mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
 			if mcp.Spec.MachineConfigSelector == nil {
 				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
@@ -185,7 +193,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) []MachineConfigOb
 			})
 		}
 	}
-	return ret
+	return ret, pausedMCPNames
 }
 
 func IsMachineConfigPoolUpdated(instanceName string, mcp *machineconfigv1.MachineConfigPool) bool {
