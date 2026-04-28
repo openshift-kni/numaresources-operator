@@ -31,6 +31,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 
@@ -249,7 +250,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Conte
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) intreconcile.Step {
 	// we need to sync machine configs first and wait for the MachineConfigPool updates
 	// before checking additional components for updates
-	waitByPool, err := r.syncMachineConfigs(ctx, instance, existing, trees)
+	waitByPool, _, err := r.syncMachineConfigs(ctx, instance, existing, trees)
 	if err != nil {
 		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
 		err = fmt.Errorf("failed to sync machine configs: %w", err)
@@ -307,7 +308,9 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
 
 	if r.Platform == platform.OpenShift {
-		if step := r.reconcileResourceMachineConfig(ctx, instance, existing, trees); step.EarlyStop() {
+		var step intreconcile.Step
+		step = r.reconcileResourceMachineConfig(ctx, instance, existing, trees)
+		if step.EarlyStop() {
 			updateStatusConditionsIfNeeded(instance, step.ConditionInfo)
 			return step
 		}
@@ -410,7 +413,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx contex
 	return (updatedCount == len(objStates)), err
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) (map[string]rtestate.MCPWaitForUpdatedFunc, error) {
+func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) (map[string]rtestate.MCPWaitForUpdatedFunc, sets.Set[string], error) {
 	klog.V(4).InfoS("Machine Config Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Sync stop")
 
@@ -420,11 +423,10 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	// In case of operator upgrade from 4.1X → 4.18, it's necessary to remove the old MachineConfig,
 	// unless an emergency annotation is provided which forces the operator to use custom policy
 
-	mcObjStates := existing.MachineConfigsState(r.RTEManifests)
+	mcObjStates, pausedMCPNames := existing.MachineConfigsState(r.RTEManifests)
 	waitByPool := make(map[string]rtestate.MCPWaitForUpdatedFunc, len(mcObjStates))
 	for _, mcObjState := range mcObjStates {
 		waitByPool[mcObjState.PoolName] = mcObjState.WaitForUpdated
-
 		objState := mcObjState.ObjectState
 		klog.InfoS("objState", "desired", objState.Desired, "existing", objState.Existing, "createOrUpdate", objState.IsCreateOrUpdate())
 		if objState.IsCreateOrUpdate() {
@@ -444,7 +446,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 			break
 		}
 	}
-	return waitByPool, err
+	return waitByPool, pausedMCPNames, err
 }
 
 func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree, forwardMCPConds bool, waitByPool map[string]rtestate.MCPWaitForUpdatedFunc) ([]nropv1.MachineConfigPool, string) {
@@ -619,7 +621,8 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 			return !reflect.DeepEqual(mcpOld.Status.Conditions, mcpNew.Status.Conditions) ||
 				!apiequality.Semantic.DeepEqual(mcpOld.Labels, mcpNew.Labels) ||
 				!apiequality.Semantic.DeepEqual(mcpOld.Spec.MachineConfigSelector, mcpNew.Spec.MachineConfigSelector) ||
-				!apiequality.Semantic.DeepEqual(mcpOld.Spec.NodeSelector, mcpNew.Spec.NodeSelector)
+				!apiequality.Semantic.DeepEqual(mcpOld.Spec.NodeSelector, mcpNew.Spec.NodeSelector) ||
+				mcpOld.Spec.Paused != mcpNew.Spec.Paused
 		},
 	}
 

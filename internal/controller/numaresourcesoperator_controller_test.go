@@ -2199,6 +2199,37 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
 				Expect(nro).To(BeInCondition(status.ConditionAvailable))
 			})
+			It("should converge when one pool is paused", func(ctx context.Context) {
+				// neither pool has custom annotation -> both in MC deletion path
+				mcp2.Spec.Paused = true
+
+				var err error
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+
+				By("Reconcile: pool1 converges (default policy, no MC to wait for), pool2 skipped (paused)")
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
+
+				By("Verify DaemonSets for both pools exist")
+				ds := &appsv1.DaemonSet{}
+				mcp1DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(ctx, mcp1DSKey, ds)).To(Succeed())
+
+				mcp2DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(ctx, mcp2DSKey, ds)).To(Succeed())
+
+				By("Verify NRO status is Available")
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
+				Expect(nro).To(BeInCondition(status.ConditionAvailable))
+			})
 		})
 	})
 })
