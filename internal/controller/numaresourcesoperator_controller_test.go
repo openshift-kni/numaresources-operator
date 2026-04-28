@@ -2156,12 +2156,12 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				reconciler = checkSELinuxPolicyProcessing(ctx, nro, mcp1, mcp2)
 
 				By("upgrading from 4.1X to 4.18")
-				Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nro)).To(Succeed())
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
 				clearSELinuxPolicyCustomAnnotations(nro)
 				Expect(reconciler.Client.Update(context.TODO(), nro)).To(Succeed())
 			})
 
-			It("should delete existing mc", func() {
+			It("should delete existing mc", func(ctx context.Context) {
 				key := client.ObjectKeyFromObject(nro)
 				// removing the annotation will trigger reboot which requires resync after 1 min
 				Expect(reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})).To(CauseRequeue())
@@ -2170,13 +2170,13 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Name: objectnames.GetMachineConfigName(nro.Name, mcp1.Name),
 				}
 				mc := &machineconfigv1.MachineConfig{}
-				err := reconciler.Client.Get(context.TODO(), mc1Key, mc)
+				err := reconciler.Client.Get(ctx, mc1Key, mc)
 				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s expected to be deleted; err=%v", mc1Key.Name, err)
 
 				mc2Key := client.ObjectKey{
 					Name: objectnames.GetMachineConfigName(nro.Name, mcp2.Name),
 				}
-				err = reconciler.Client.Get(context.TODO(), mc2Key, mc)
+				err = reconciler.Client.Get(ctx, mc2Key, mc)
 				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "MachineConfig %s expected to be deleted; err=%v", mc2Key.Name, err)
 			})
 
