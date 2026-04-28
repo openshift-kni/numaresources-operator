@@ -11,13 +11,13 @@ entries:
   # Channel entries should contain all the releases
   - entries:
       - name: numaresources-operator.v4.20.0
-        skipRange: '>=4.19.0 <4.20.0'
+        skipRange: '>=4.18.0 <4.20.0'
       - name: numaresources-operator.v4.20.1
         replaces: numaresources-operator.v4.20.0
-        skipRange: '>=4.19.0 <4.20.1'
+        skipRange: '>=4.18.0 <4.20.1'
       - name: numaresources-operator.v4.20.2
         replaces: numaresources-operator.v4.20.1
-        skipRange: '>=4.19.0 <4.20.2'
+        skipRange: '>=4.18.0 <4.20.2'
     name: "4.20"
     package: numaresources-operator
     schema: olm.channel
