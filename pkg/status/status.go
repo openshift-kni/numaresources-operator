@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
@@ -38,7 +39,13 @@ const (
 )
 
 const (
+	// scheduler conditions
 	ConditionDedicatedInformerActive = "DedicatedInformerActive"
+)
+
+const (
+	// operator conditions
+	ConditionMachineConfigPoolPaused = "MachineConfigPoolPaused"
 )
 
 // TODO: are we duping these?
@@ -154,6 +161,35 @@ func newBaseConditions() []metav1.Condition {
 	}
 }
 
+// NewNUMAResourcesOperatorConditions creates specific operator conditions on
+// top of DefaultBaseConditions.
+func NewNUMAResourcesOperatorConditions() []metav1.Condition {
+	now := time.Now()
+	return append(DefaultBaseConditions(now), operatorExtraConditions(now)...)
+}
+
+// EnsureNUMAResourcesOperatorConditions backfills operator-specific conditions
+// that may be missing after an upgrade from an older version.
+func EnsureNUMAResourcesOperatorConditions(conditions []metav1.Condition) []metav1.Condition {
+	now := time.Now()
+	for _, cond := range operatorExtraConditions(now) {
+		if metahelper.FindStatusCondition(conditions, cond.Type) == nil {
+			conditions = append(conditions, cond)
+		}
+	}
+	return conditions
+}
+
+func operatorExtraConditions(now time.Time) []metav1.Condition {
+	return []metav1.Condition{
+		{
+			Type:               ConditionMachineConfigPoolPaused,
+			Status:             metav1.ConditionUnknown,
+			LastTransitionTime: metav1.Time{Time: now},
+			Reason:             ConditionMachineConfigPoolPaused,
+		},
+	}
+}
 func NewNUMAResourcesSchedulerBaseConditions() []metav1.Condition {
 	now := time.Now()
 	return []metav1.Condition{
