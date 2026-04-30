@@ -51,7 +51,10 @@ import (
 	perfprof "github.com/openshift/cluster-node-tuning-operator/pkg/apis/performanceprofile/v2"
 	machineconfigv1 "github.com/openshift/machine-config-operator/pkg/apis/machineconfiguration.openshift.io/v1"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/numaresourcesoperator/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
@@ -353,6 +356,90 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				return true, nil
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(BeTrue(), "failed to update RTE container with LogLevel %q", operatorv1.Trace)
 
+		})
+
+		It("should converge with mixed SELinux policy across node groups", Label("tier2"), func(ctx context.Context) {
+			const minCustomSupportingVString = "4.18"
+			minCustomSupportingVersion, err := platform.ParseVersion(minCustomSupportingVString)
+			Expect(err).NotTo(HaveOccurred())
+			customSupportAvailable, err := configuration.PlatVersion.AtLeast(minCustomSupportingVersion)
+			Expect(err).NotTo(HaveOccurred())
+			if !customSupportAvailable {
+				Skip("mixed SELinux policy test requires platform >= 4.18")
+			}
+
+			nroKey := objects.NROObjectKey()
+			var initialNroOperObj nropv1.NUMAResourcesOperator
+			Expect(fxt.Client.Get(ctx, nroKey, &initialNroOperObj)).To(Succeed())
+
+			testMCP := objects.TestMCP()
+			e2efixture.By("creating new MCP: %q with zero machine count", testMCP.Name)
+			testMCP.Labels = map[string]string{"machineconfiguration.openshift.io/role": roleMCPTest}
+			testMCP.Spec.MachineConfigSelector = &metav1.LabelSelector{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Key:      "machineconfiguration.openshift.io/role",
+						Operator: metav1.LabelSelectorOpIn,
+						Values:   []string{roleMCPTest, depnodes.RoleWorker},
+					},
+				},
+			}
+			testMCP.Spec.NodeSelector = &metav1.LabelSelector{
+				MatchLabels: map[string]string{getLabelRoleMCPTest(): ""},
+			}
+
+			Expect(fxt.Client.Create(ctx, testMCP)).To(Succeed())
+			defer func(dctx context.Context) {
+				e2efixture.By("CLEANUP: deleting mcp: %q", testMCP.Name)
+				Expect(fxt.Client.Delete(dctx, testMCP)).To(Succeed())
+
+				err := wait.With(fxt.Client).
+					Interval(configuration.MachineConfigPoolUpdateInterval).
+					Timeout(configuration.MachineConfigPoolUpdateTimeout).
+					ForMachineConfigPoolDeleted(dctx, testMCP)
+				Expect(err).ToNot(HaveOccurred())
+			}(context.Background())
+
+			By("adding a new node group with custom SELinux policy annotation")
+			testNG := nropv1.NodeGroup{
+				MachineConfigPoolSelector: &metav1.LabelSelector{
+					MatchLabels: testMCP.Labels,
+				},
+				Annotations: map[string]string{
+					annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
+				},
+			}
+
+			var nroOperObj nropv1.NUMAResourcesOperator
+			Eventually(func(g Gomega) {
+				g.Expect(fxt.Client.Get(ctx, nroKey, &nroOperObj)).To(Succeed())
+				nroOperObj.Spec.NodeGroups = append(nroOperObj.Spec.NodeGroups, testNG)
+				g.Expect(fxt.Client.Update(ctx, &nroOperObj)).To(Succeed())
+			}).WithTimeout(5 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+			defer func(dctx context.Context) {
+				By("CLEANUP: reverting the NUMAResourcesOperator object")
+				Eventually(func(g Gomega) {
+					g.Expect(fxt.Client.Get(dctx, nroKey, &nroOperObj)).To(Succeed())
+					nroOperObj.Spec = initialNroOperObj.Spec
+					g.Expect(fxt.Client.Update(dctx, &nroOperObj)).To(Succeed())
+				}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+			}(context.Background())
+
+			By("waiting for operator to converge with mixed policy")
+			updatedOperObj := &nropv1.NUMAResourcesOperator{}
+			Eventually(func(g Gomega) {
+				g.Expect(fxt.Client.Get(ctx, nroKey, updatedOperObj)).To(Succeed())
+				cond := status.FindCondition(updatedOperObj.Status.Conditions, status.ConditionAvailable)
+				g.Expect(cond).ToNot(BeNil(), "Available condition not found")
+				g.Expect(cond.Status).To(Equal(metav1.ConditionTrue), "operator not yet available")
+				g.Expect(cond.ObservedGeneration).To(Equal(updatedOperObj.Generation), "condition not yet updated for current generation")
+			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
+
+			By("verifying DaemonSet count matches NodeGroup count")
+			dss, err := objects.GetDaemonSetsOwnedBy(fxt.Client, updatedOperObj.ObjectMeta)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(dss).To(HaveLen(len(nroOperObj.Spec.NodeGroups)), "daemonsets found owned by NRO object doesn't align with specified NodeGroups")
 		})
 
 		It("[test_id:54916][tier2][schedrst] should be able to modify the configurable values under the NUMAResourcesScheduler CR", Label("tier2", "schedrst"), Label("feature:schedrst"), func() {
