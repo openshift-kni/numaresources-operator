@@ -373,7 +373,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(fxt.Client.Get(ctx, nroKey, &initialNroOperObj)).To(Succeed())
 
 			testMCP := objects.TestMCP()
-			e2efixture.By("creating new MCP: %q with zero machine count", testMCP.Name)
+			By(fmt.Sprintf("creating new MCP: %q with zero machine count", testMCP.Name))
 			testMCP.Labels = map[string]string{"machineconfiguration.openshift.io/role": roleMCPTest}
 			testMCP.Spec.MachineConfigSelector = &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -390,7 +390,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 			Expect(fxt.Client.Create(ctx, testMCP)).To(Succeed())
 			defer func(dctx context.Context) {
-				e2efixture.By("CLEANUP: deleting mcp: %q", testMCP.Name)
+				By(fmt.Sprintf("CLEANUP: deleting mcp: %q", testMCP.Name))
 				Expect(fxt.Client.Delete(dctx, testMCP)).To(Succeed())
 
 				err := wait.With(fxt.Client).
@@ -430,10 +430,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			updatedOperObj := &nropv1.NUMAResourcesOperator{}
 			Eventually(func(g Gomega) {
 				g.Expect(fxt.Client.Get(ctx, nroKey, updatedOperObj)).To(Succeed())
-				cond := status.FindCondition(updatedOperObj.Status.Conditions, status.ConditionAvailable)
-				g.Expect(cond).ToNot(BeNil(), "Available condition not found")
-				g.Expect(cond.Status).To(Equal(metav1.ConditionTrue), "operator not yet available")
-				g.Expect(cond.ObservedGeneration).To(Equal(updatedOperObj.Generation), "condition not yet updated for current generation")
+				g.Expect(isNROOperSyncedAt(&updatedOperObj.Status, status.ConditionAvailable, updatedOperObj.Generation)).To(BeTrue())
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 			By("verifying DaemonSet count matches NodeGroup count")
@@ -1408,6 +1405,20 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 		})
 	})
 })
+
+func isNROOperSyncedAt(nropStatus *nropv1.NUMAResourcesOperatorStatus, conditionType string, gen int64) bool {
+	if nropStatus == nil {
+		return false
+	}
+	cond := status.FindCondition(nropStatus.Conditions, conditionType)
+	if cond == nil {
+		return false
+	}
+	if cond.Status != metav1.ConditionTrue {
+		return false
+	}
+	return cond.ObservedGeneration == gen
+}
 
 func verifyStatusUpdate(cli client.Client, ctx context.Context, key client.ObjectKey, appliedObj nropv1.NUMAResourcesOperator, expectedPoolName string, expectedConf nropv1.NodeGroupConfig) {
 	klog.InfoS("fetch NRO object", "key", key.String())
