@@ -162,17 +162,15 @@ func newBaseConditions() []metav1.Condition {
 }
 
 // NewNUMAResourcesOperatorConditions creates specific operator conditions on
-// top of DefaultBaseConditions.
+// top of newBaseConditions.
 func NewNUMAResourcesOperatorConditions() []metav1.Condition {
-	now := time.Now()
-	return append(DefaultBaseConditions(now), operatorExtraConditions(now)...)
+	return append(newBaseConditions(), operatorExtraConditions()...)
 }
 
 // EnsureNUMAResourcesOperatorConditions backfills operator-specific conditions
 // that may be missing after an upgrade from an older version.
 func EnsureNUMAResourcesOperatorConditions(conditions []metav1.Condition) []metav1.Condition {
-	now := time.Now()
-	for _, cond := range operatorExtraConditions(now) {
+	for _, cond := range operatorExtraConditions() {
 		if metahelper.FindStatusCondition(conditions, cond.Type) == nil {
 			conditions = append(conditions, cond)
 		}
@@ -180,7 +178,8 @@ func EnsureNUMAResourcesOperatorConditions(conditions []metav1.Condition) []meta
 	return conditions
 }
 
-func operatorExtraConditions(now time.Time) []metav1.Condition {
+func operatorExtraConditions() []metav1.Condition {
+	now := time.Now()
 	return []metav1.Condition{
 		{
 			Type:               ConditionMachineConfigPoolPaused,

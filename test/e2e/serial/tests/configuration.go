@@ -373,7 +373,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(fxt.Client.Get(ctx, nroKey, &initialNroOperObj)).To(Succeed())
 
 			testMCP := objects.TestMCP()
-			e2efixture.By("creating new MCP: %q with zero machine count", testMCP.Name)
+			By(fmt.Sprintf("creating new MCP: %q with zero machine count", testMCP.Name))
 			testMCP.Labels = map[string]string{"machineconfiguration.openshift.io/role": roleMCPTest}
 			testMCP.Spec.MachineConfigSelector = &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -390,7 +390,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 			Expect(fxt.Client.Create(ctx, testMCP)).To(Succeed())
 			defer func(dctx context.Context) {
-				e2efixture.By("CLEANUP: deleting mcp: %q", testMCP.Name)
+				By(fmt.Sprintf("CLEANUP: deleting mcp: %q", testMCP.Name))
 				Expect(fxt.Client.Delete(dctx, testMCP)).To(Succeed())
 
 				err := wait.With(fxt.Client).
