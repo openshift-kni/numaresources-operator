@@ -12,7 +12,17 @@ entries:
   - entries:
       - name: numaresources-operator.v4.22.0
         skipRange: '>=4.20.0 <4.22.0'
-        # After 4.22.0 is released, add 4.22.1 back using the quay nudged bundle      
+        # After 4.22.0 is released, add 4.22.1 back using the quay nudged bundle
+        # - name: numaresources-operator.v4.22.1
+        #   replaces: numaresources-operator.v4.22.0
+        #   skipRange: '>=4.20.0 <4.22.1'
+    name: stable
+    package: numaresources-operator
+    schema: olm.channel
+  - entries:
+      - name: numaresources-operator.v4.22.0
+        skipRange: '>=4.20.0 <4.22.0'
+        # After 4.22.0 is released, add 4.22.1 back using the quay nudged bundle
         # - name: numaresources-operator.v4.22.1
         #   replaces: numaresources-operator.v4.22.0
         #   skipRange: '>=4.20.0 <4.22.1'
