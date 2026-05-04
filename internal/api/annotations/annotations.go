@@ -23,7 +23,7 @@ const (
 	SELinuxPolicyCustom           = "custom"
 
 	// introduced in: 4.18
-	// remove in: 4.22 (or 4.24?)
+	// remove in: 5.2 (when branching 5.1 plan to address this https://redhat.atlassian.net/browse/CNF-23341 in main)
 	// MultiplePoolsPerTreeAnnotation an annotation used to re-enable the support of multiple node pools per tree; starting 4.18 it is disabled by default
 	// the annotation is on when it's set to "enabled", every other value is equivalent to disabled
 	MultiplePoolsPerTreeAnnotation = "config.node.openshift-kni.io/multiple-pools-per-tree"
