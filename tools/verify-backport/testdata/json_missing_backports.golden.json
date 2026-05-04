@@ -1,0 +1,30 @@
+{
+  "summary": {
+    "matched": 1,
+    "total": 1,
+    "unmatched_main": 2
+  },
+  "results": [
+    {
+      "status": "MATCH",
+      "backport": {
+        "hash": "aaa1111",
+        "subject": "fix: alpha"
+      },
+      "main": {
+        "hash": "bbb2222",
+        "subject": "fix: alpha"
+      }
+    }
+  ],
+  "missing_backports": [
+    {
+      "hash": "eee5555",
+      "subject": "fix: missing thing"
+    },
+    {
+      "hash": "fff6666",
+      "subject": "fix: another missing"
+    }
+  ]
+}

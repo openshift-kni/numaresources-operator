@@ -1,0 +1,30 @@
+{
+  "summary": {
+    "matched": 2,
+    "total": 2
+  },
+  "results": [
+    {
+      "status": "MATCH",
+      "backport": {
+        "hash": "cbb2ea559ef9e54ae4815dc21359ec35a1619d15",
+        "subject": "makefile: add version to golangci-lint make target"
+      },
+      "main": {
+        "hash": "cbb2ea559ef9e54ae4815dc21359ec35a1619d15",
+        "subject": "makefile: add version to golangci-lint make target"
+      }
+    },
+    {
+      "status": "MATCH",
+      "backport": {
+        "hash": "ff92eec65d2fc7c03177e288a5e57d8133894220",
+        "subject": "Dockerfile: disable RHEL repos when installing hwdata"
+      },
+      "main": {
+        "hash": "ff92eec65d2fc7c03177e288a5e57d8133894220",
+        "subject": "Dockerfile: disable RHEL repos when installing hwdata"
+      }
+    }
+  ]
+}

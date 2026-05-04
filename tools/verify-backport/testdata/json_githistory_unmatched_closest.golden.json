@@ -1,0 +1,25 @@
+{
+  "summary": {
+    "matched": 0,
+    "total": 1
+  },
+  "results": [
+    {
+      "status": "UNMATCHED",
+      "backport": {
+        "hash": "1c1afa7512e2da2c67953ff776cf49f7714cb6ac",
+        "subject": "controller: sched: conditionally enable Shared informer by default"
+      },
+      "closest": {
+        "hash": "6a56840544a420c1393c39fc61e3580f563c1d1f",
+        "subject": "controller: sched: conditionally enable Shared informer by default"
+      },
+      "patch_comparison": {
+        "identical": 2,
+        "moved": 0,
+        "additive": 0,
+        "edits": 2
+      }
+    }
+  ]
+}

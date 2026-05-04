@@ -1,0 +1,30 @@
+{
+  "summary": {
+    "matched": 2,
+    "total": 2
+  },
+  "results": [
+    {
+      "status": "MATCH",
+      "backport": {
+        "hash": "aaa1111",
+        "subject": "fix: alpha"
+      },
+      "main": {
+        "hash": "bbb2222",
+        "subject": "fix: alpha"
+      }
+    },
+    {
+      "status": "MATCH",
+      "backport": {
+        "hash": "ccc3333",
+        "subject": "fix: beta"
+      },
+      "main": {
+        "hash": "ddd4444",
+        "subject": "fix: beta"
+      }
+    }
+  ]
+}
