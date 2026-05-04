@@ -1,5 +1,8 @@
 {
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+    "extends": [
+        "github>konflux-ci/mintmaker-presets:refresh-rpm-lockfiles"
+    ],
     "automergeStrategy": "rebase",
     "automergeType": "pr",
     "gomod": {
@@ -10,23 +13,14 @@
         "packageRules": [
             {
                 "addLabels": [
-                    "approved",
-                    "lgtm"
+                    "allow-automatic-merge"
                 ],
                 "additionalBranchPrefix": "telco5g-konflux-",
-                "autoApprove": true,
-                "automerge": true,
-                "matchFileNames": [
-                    "telco5g-konflux/**"
+                "matchPackageNames": [
+                    "https://github.com/openshift-kni/telco5g-konflux.git"
                 ],
                 "schedule": [
                     "at any time"
-                ]
-            },
-            {
-                "additionalBranchPrefix": "telco5g-konflux-",
-                "matchFileNames": [
-                    "telco5g-konflux/**"
                 ]
             }
         ]
@@ -40,11 +34,8 @@
         },
         {
             "addLabels": [
-                "approved",
-                "lgtm"
+                "allow-automatic-merge"
             ],
-            "autoApprove": true,
-            "automerge": true,
             "enabled": true,
             "ignoreTests": false,
             "matchDatasources": [
@@ -68,13 +59,10 @@
     "prConcurrentLimit": 0,
     "pruneBranchAfterAutomerge": true,
     "tekton": {
-        "autoApprove": true,
-        "automerge": true,
         "enabled": true,
         "managerFilePatterns": [
             "/\\.yaml$/",
-            "/\\.yml$/",
-            "/.*rpms\\.in\\.yaml$/"
+            "/\\.yml$/"
         ],
         "ignoreTests": false,
         "includePaths": [
@@ -83,8 +71,7 @@
         "packageRules": [
             {
                 "addLabels": [
-                    "approved",
-                    "lgtm"
+                    "allow-automatic-merge"
                 ],
                 "matchUpdateTypes": [
                     "digest"
