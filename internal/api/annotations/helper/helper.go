@@ -29,3 +29,12 @@ func IsCustomPolicyEnabled(instance *nropv1.NUMAResourcesOperator) bool {
 	}
 	return false
 }
+
+func MustIgnoreCustomPolicy(instance *nropv1.NUMAResourcesOperator) bool {
+	for _, ng := range instance.Spec.NodeGroups {
+		if anns.MustIgnoreCustomPolicy(ng.Annotations) {
+			return true
+		}
+	}
+	return false
+}
