@@ -192,6 +192,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	if err := r.updateStatus(ctx, initialStatus, instance); err != nil {
 		klog.InfoS("Failed to update numaresources-operator status", "error", err)
+		return ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, nil
 	}
 
 	return step.Result, step.Error
@@ -220,9 +221,10 @@ func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, ini
 	err := r.updateStatus(ctx, initialStatus, instance)
 	if err != nil {
 		klog.InfoS("Failed to update numaresourcesoperator status", "error", err)
+		return ctrl.Result{RequeueAfter: numaResourcesRetryPeriod}, nil
 	}
 
-	return ctrl.Result{}, err
+	return ctrl.Result{}, nil
 }
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) intreconcile.Step {
