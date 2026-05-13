@@ -22,7 +22,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
@@ -30,6 +32,7 @@ import (
 	k8swgschedupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/sched"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	intaff "github.com/openshift-kni/numaresources-operator/internal/affinity"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	intreslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
@@ -99,6 +102,61 @@ func DeploymentTLSSettings(dp *appsv1.Deployment, tlsSettings objtls.Settings) e
 	cnt.Args = flags.Argv()
 
 	klog.V(3).InfoS("Scheduler TLS settings", "minVersion", tlsSettings.MinVersion, "cipherSuites", tlsSettings.CipherSuites)
+	return nil
+}
+
+// DeploymentAffinity configures required pod anti-affinity on the scheduler
+// deployment only when the CR leaves replica count to autodetection (Replicas unset or 0).
+// An explicit non-zero Replicas value means the user chose a replica count and keeps
+// full control (no required pod anti-affinity).
+func DeploymentAffinity(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) error {
+	affinityCopy := dp.Spec.Template.Spec.Affinity.DeepCopy()
+	if spec.Replicas != nil && *spec.Replicas != 0 {
+		if affinityCopy != nil && affinityCopy.PodAntiAffinity != nil {
+			// At the time of writing this, the original pod anti-affinity as well
+			// as deployment strategy rollout are not set in the manifest, and
+			// since we control what goes there we can simply revert the change
+			// by resetting it here.
+			dp.Spec.Template.Spec.Affinity.PodAntiAffinity = nil
+			dp.Spec.Strategy = appsv1.DeploymentStrategy{}
+		}
+		return nil
+	}
+
+	labels := dp.Spec.Template.Labels
+	if len(labels) == 0 {
+		return intaff.ErrNoPodTemplateLabels
+	}
+
+	if affinityCopy == nil {
+		dp.Spec.Template.Spec.Affinity = &corev1.Affinity{}
+	}
+
+	podAntiAffinity, err := intaff.GetPodAntiAffinity(labels)
+	if err != nil {
+		return err
+	}
+
+	dp.Spec.Template.Spec.Affinity.PodAntiAffinity = podAntiAffinity
+	klog.V(3).InfoS("Scheduler Deploymentaffinity", "podAntiAffinity", dp.Spec.Template.Spec.Affinity.PodAntiAffinity)
+	// When PodAntiAffinity is set, we need to set the Rollout Strategy to first delete
+	// existing pod (at least one) then recreate new ones.That is specifically important on
+	// control-plane-cluster where the pods already running with high availability; When
+	// podAntiAffinity is set together with high availability and the preferred NodeAffinity
+	// to control-planes,it triggers the deployment rollout but rollout stalls, because the
+	// default behavior of the deployment, as set in the manifest, sets maxSurge to >0 (25%),
+	// which means it first creates the new pod then terminates the old one gradually.
+	// To fix this, we configure the Rollout Strategy to first delete one existing pod to make
+	// room for the new pod on the target node.
+	// NOTE: this needs to be reconsidered if ever the rollout strategy changes in the manifest.
+	dp.Spec.Strategy = appsv1.DeploymentStrategy{
+		Type: appsv1.RollingUpdateDeploymentStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateDeployment{
+			MaxUnavailable: ptr.To(intstr.FromInt(1)),
+			MaxSurge:       ptr.To(intstr.FromInt(0)),
+		},
+	}
+	klog.V(3).InfoS("Scheduler Deployment Rollout Strategy", "rolloutStrategy", dp.Spec.Strategy.String())
 	return nil
 }
 
