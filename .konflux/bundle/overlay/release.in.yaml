@@ -9,5 +9,5 @@ variables:
   manager_version: "numaresources-operator.v5.0.0"
   # min_kube_version should match ocp
   # https://access.redhat.com/solutions/4870701
-  min_kube_version: "1.32.0"
+  min_kube_version: "1.35.0"
   version: "5.0.0"
