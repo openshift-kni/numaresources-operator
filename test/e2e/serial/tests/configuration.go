@@ -325,7 +325,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			updatedOperObj := &nropv1.NUMAResourcesOperator{}
 			Eventually(func(g Gomega) {
 				g.Expect(fxt.Client.Get(ctx, nroKey, updatedOperObj)).To(Succeed())
-				g.Expect(isNROOperSyncedAt(&updatedOperObj.Status, status.ConditionAvailable, updatedOperObj.Generation)).To(Succeed())
+				g.Expect(isNROOperSyncedAt(&updatedOperObj.Status, status.ConditionAvailable, updatedOperObj.Generation)).To(BeTrue())
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 			By("verifying DaemonSet count matches NodeGroup count")
@@ -1590,6 +1590,20 @@ func isNROSchedAvailableAt(nrosStatus *nropv1.NUMAResourcesSchedulerStatus, gen 
 
 func isNROSchedUpToDate(nros *nropv1.NUMAResourcesScheduler) bool {
 	return isNROSchedAvailableAt(&nros.Status, nros.Generation)
+}
+
+func isNROOperSyncedAt(nropStatus *nropv1.NUMAResourcesOperatorStatus, conditionType string, gen int64) bool {
+	if nropStatus == nil {
+		return false
+	}
+	cond := status.FindCondition(nropStatus.Conditions, conditionType)
+	if cond == nil {
+		return false
+	}
+	if cond.Status != metav1.ConditionTrue {
+		return false
+	}
+	return cond.ObservedGeneration == gen
 }
 
 func isNROOperAvailableAt(nropStatus *nropv1.NUMAResourcesOperatorStatus, gen int64) bool {

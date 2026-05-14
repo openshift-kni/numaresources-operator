@@ -29,6 +29,7 @@ import (
 	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -212,6 +213,11 @@ func updateStatusConditionsIfNeeded(instance *nropv1.NUMAResourcesOperator, cond
 		ObservedGeneration: instance.Generation,
 	}, time.Now())
 	if ok {
+		for _, c := range instance.Status.Conditions {
+			if status.FindCondition(conditions, c.Type) == nil {
+				conditions = append(conditions, c)
+			}
+		}
 		instance.Status.Conditions = conditions
 	}
 }
@@ -850,7 +856,7 @@ func updateMachineConfigPoolPausedCondition(conditions []metav1.Condition, gener
 		ObservedGeneration: generation,
 		LastTransitionTime: metav1.Now(),
 	}
-	conditions, _ = status.ComputeConditions(conditions, condition, time.Now())
+	apimeta.SetStatusCondition(&conditions, condition)
 	return conditions
 }
 

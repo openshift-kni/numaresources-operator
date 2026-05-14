@@ -193,10 +193,10 @@ func newBaseConditions(now time.Time) []metav1.Condition {
 }
 
 // NewNUMAResourcesOperatorConditions creates specific operator conditions on
-// top of DefaultBaseConditions.
+// top of newBaseConditions.
 func NewNUMAResourcesOperatorConditions() []metav1.Condition {
 	now := time.Now()
-	return append(DefaultBaseConditions(now), operatorExtraConditions(now)...)
+	return append(newBaseConditions(now), operatorExtraConditions(now)...)
 }
 
 // EnsureNUMAResourcesOperatorConditions backfills operator-specific conditions
@@ -204,7 +204,7 @@ func NewNUMAResourcesOperatorConditions() []metav1.Condition {
 func EnsureNUMAResourcesOperatorConditions(conditions []metav1.Condition) []metav1.Condition {
 	now := time.Now()
 	for _, cond := range operatorExtraConditions(now) {
-		if metahelper.FindStatusCondition(conditions, cond.Type) == nil {
+		if FindCondition(conditions, cond.Type) == nil {
 			conditions = append(conditions, cond)
 		}
 	}
