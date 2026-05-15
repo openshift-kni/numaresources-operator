@@ -169,6 +169,15 @@ func SkipManifestUpdate(mcpName string, gdm *GeneratedDesiredManifest) error {
 }
 
 func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
+	ret := em.TreeAgnostic(mf)
+	klog.V(4).InfoS("RTE manifests processing trees", "method", em.helper.Name())
+	for _, tree := range em.trees {
+		ret = append(ret, em.PerTreeState(mf, tree)...)
+	}
+	return ret
+}
+
+func (em *ExistingManifests) TreeAgnostic(mf Manifests) []objectstate.ObjectState {
 	ret := []objectstate.ObjectState{
 		{
 			Existing: em.existing.Core.ServiceAccount,
@@ -247,14 +256,6 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 		})
 	}
 
-	klog.V(4).InfoS("RTE manifests processing trees", "method", em.helper.Name())
-
-	for _, tree := range em.trees {
-		ret = append(ret, em.helper.FindState(mf, tree)...)
-	}
-
-	// extra: metrics
-
 	ret = append(ret, objectstate.ObjectState{
 		Existing: em.existing.Metrics.Service,
 		Error:    em.errs.Metrics.Service,
@@ -265,12 +266,26 @@ func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
 	return ret
 }
 
+func (em *ExistingManifests) PerTreeState(mf Manifests, tree nodegroupv1.Tree) []objectstate.ObjectState {
+	return em.helper.FindState(mf, tree)
+}
+
 func (em *ExistingManifests) WithManifestsUpdater(updater GenerateDesiredManifestUpdater) *ExistingManifests {
 	em.updater = updater
 	return em
 }
 
 func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf Manifests, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, namespace string) *ExistingManifests {
+	ret := FromClientTreeAgnostic(ctx, cli, plat, mf, instance, namespace)
+	ret.trees = trees
+	klog.V(4).InfoS("RTE manifests processing trees", "method", ret.helper.Name())
+	for _, tree := range trees {
+		ret.helper.UpdateFromClient(ctx, cli, tree)
+	}
+	return ret
+}
+
+func FromClientTreeAgnostic(ctx context.Context, cli client.Client, plat platform.Platform, mf Manifests, instance *nropv1.NUMAResourcesOperator, namespace string) *ExistingManifests {
 	ret := ExistingManifests{
 		existing: Manifests{
 			Core: rtemanifests.New(plat),
@@ -278,7 +293,6 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		daemonSets: make(map[string]daemonSetManifest),
 		plat:       plat,
 		instance:   instance,
-		trees:      trees,
 		namespace:  namespace,
 		updater:    SkipManifestUpdate,
 	}
@@ -299,7 +313,6 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		}
 	}
 
-	// objects that should present in the single replica
 	ro := &rbacv1.Role{}
 	if ok := getObject(ctx, cli, keyFor(mf.Core.Role), ro, &ret.errs.Core.Role); ok {
 		ret.existing.Core.Role = ro
@@ -325,8 +338,6 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		ret.existing.Core.ServiceAccount = sa
 	}
 
-	klog.V(4).InfoS("RTE manifests processing trees", "method", ret.helper.Name())
-
 	if plat != platform.Kubernetes {
 		scc := &securityv1.SecurityContextConstraints{}
 		if ok := getObject(ctx, cli, keyFor(mf.Core.SecurityContextConstraint), scc, &ret.errs.Core.SCC); ok {
@@ -340,12 +351,6 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		ret.machineConfigs = make(map[string]machineConfigManifest)
 	}
 
-	// should have the amount of resources equals to the amount of node groups
-	for _, tree := range trees {
-		ret.helper.UpdateFromClient(ctx, cli, tree)
-	}
-
-	// extra: metrics
 	ser := &corev1.Service{}
 	if ok := getObject(ctx, cli, keyFor(mf.Metrics.Service), ser, &ret.errs.Metrics.Service); ok {
 		ret.existing.Metrics.Service = ser
@@ -364,6 +369,27 @@ func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, 
 		ret.existing.Core.DefaultNetworkPolicy = networkPolicy
 	}
 	return &ret
+}
+
+func (em *ExistingManifests) PerTree(ctx context.Context, cli client.Client, tree nodegroupv1.Tree) *ExistingManifests {
+	ret := &ExistingManifests{
+		existing:       em.existing,
+		errs:           em.errs,
+		daemonSets:     make(map[string]daemonSetManifest),
+		machineConfigs: make(map[string]machineConfigManifest),
+		plat:           em.plat,
+		instance:       em.instance,
+		namespace:      em.namespace,
+		updater:        em.updater,
+	}
+	if em.plat == platform.OpenShift {
+		ret.helper = machineConfigPoolFinder{em: ret, instance: em.instance, namespace: em.namespace}
+	} else {
+		ret.helper = nodeGroupFinder{em: ret, instance: em.instance, namespace: em.namespace}
+	}
+	klog.V(4).InfoS("RTE manifests processing tree", "method", ret.helper.Name())
+	ret.helper.UpdateFromClient(ctx, cli, tree)
+	return ret
 }
 
 // getObject is a shortcut to don't type the error twice
