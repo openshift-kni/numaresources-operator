@@ -462,17 +462,6 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tre
 	return mcpStatuses, ""
 }
 
-func extractMCPStatus(mcp *machineconfigv1.MachineConfigPool, forwardMCPConds bool) nropv1.MachineConfigPool {
-	mcpStatus := nropv1.MachineConfigPool{
-		Name: mcp.Name,
-	}
-	if !forwardMCPConds {
-		return mcpStatus
-	}
-	mcpStatus.Conditions = mcp.Status.Conditions
-	return mcpStatus
-}
-
 func syncMachineConfigPoolNodeGroupConfigStatuses(mcpStatuses []nropv1.MachineConfigPool, trees []nodegroupv1.Tree) []nropv1.MachineConfigPool {
 	klog.V(4).InfoS("Machine Config Pool Node Group Status Sync start", "mcpStatuses", len(mcpStatuses), "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Pool Node Group Status Sync stop")
@@ -500,15 +489,6 @@ func syncMachineConfigPoolNodeGroupConfigStatuses(mcpStatuses []nropv1.MachineCo
 		}
 	}
 	return updatedMcpStatuses
-}
-
-func getMachineConfigPoolStatusByName(mcpStatuses []nropv1.MachineConfigPool, name string) nropv1.MachineConfigPool {
-	for _, mcpStatus := range mcpStatuses {
-		if mcpStatus.Name == name {
-			return mcpStatus
-		}
-	}
-	return nropv1.MachineConfigPool{Name: name}
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) ([]poolDaemonSet, error) {
@@ -856,4 +836,24 @@ func IsRTEImageOverridable() bool {
 	}
 	klog.InfoS("Exporter image", "overridable", overridable)
 	return overridable
+}
+
+func extractMCPStatus(mcp *machineconfigv1.MachineConfigPool, forwardMCPConds bool) nropv1.MachineConfigPool {
+	mcpStatus := nropv1.MachineConfigPool{
+		Name: mcp.Name,
+	}
+	if !forwardMCPConds {
+		return mcpStatus
+	}
+	mcpStatus.Conditions = mcp.Status.Conditions
+	return mcpStatus
+}
+
+func getMachineConfigPoolStatusByName(mcpStatuses []nropv1.MachineConfigPool, name string) nropv1.MachineConfigPool {
+	for _, mcpStatus := range mcpStatuses {
+		if mcpStatus.Name == name {
+			return mcpStatus
+		}
+	}
+	return nropv1.MachineConfigPool{Name: name}
 }
