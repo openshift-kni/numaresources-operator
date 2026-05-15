@@ -40,6 +40,16 @@ type Tree struct {
 	MachineConfigPools []*mcov1.MachineConfigPool
 }
 
+func (ttr Tree) Name() string {
+	if ttr.NodeGroup == nil {
+		return "<nil>"
+	}
+	if ttr.NodeGroup.PoolName == nil {
+		return "<unknown>"
+	}
+	return *ttr.NodeGroup.PoolName
+}
+
 // Clone creates a deepcopy of a Tree
 func (ttr Tree) Clone() Tree {
 	ret := Tree{
