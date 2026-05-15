@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -177,11 +178,6 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	tolerable, err := validation.NodeGroupsTree(instance, trees, r.Platform)
 	if err != nil {
 		return r.degradeStatus(ctx, initialStatus, instance, validation.NodeGroupsError, err)
-	}
-
-	for idx := range trees {
-		conf := trees[idx].NodeGroup.NormalizeConfig()
-		trees[idx].NodeGroup.Config = &conf
 	}
 
 	step := r.reconcileResource(ctx, instance, trees)
@@ -341,39 +337,39 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 		}
 	}
 
-	// horizontal processing: all trees complete each step before moving to the next
-
-	// step 1: machine configs for all trees
-	var mcResults []treeReconcileResult
-	if r.Platform == platform.OpenShift {
-		for _, tree := range trees {
-			treeExisting := existing.PerTree(ctx, r.Client, tree)
-			mcResults = append(mcResults, r.reconcileResourceMachineConfig(ctx, instance, treeExisting, tree))
-		}
-	}
-	mcOverall := reduceTreeResults(mcResults)
-	instance.Status.MachineConfigPools = mcOverall.mcpStatuses
-	instance.Status.Conditions = updateMachineConfigPoolPausedCondition(instance.Status.Conditions, instance.Generation, mcOverall.pausedMCPNames)
-	if mcOverall.step.EarlyStop() {
-		return mcOverall.step
-	}
-
-	// step 2: daemonsets for all trees
-	var dsResults []treeReconcileResult
+	var results []treeReconcileResult
 	for _, tree := range trees {
+		tree.NodeGroup.Config = ptr.To(tree.NodeGroup.NormalizeConfig())
+
 		treeExisting := existing.PerTree(ctx, r.Client, tree)
-		dsResults = append(dsResults, r.reconcileTreeDaemonSet(ctx, instance, treeExisting, tree))
+
+		mcResult := treeReconcileResult{}
+		if r.Platform == platform.OpenShift {
+			mcResult = r.reconcileResourceMachineConfig(ctx, instance, treeExisting, tree)
+			if mcResult.step.EarlyStop() /* || mcResult.pausedMCPNames.Len() > 0*/ {
+				results = append(results, mcResult)
+				continue
+			}
+		}
+
+		dsResult := r.reconcileTreeDaemonSet(ctx, instance, treeExisting, tree)
+		dsResult.mcpStatuses = mcResult.mcpStatuses
+		dsResult.pausedMCPNames = mcResult.pausedMCPNames
+		results = append(results, dsResult)
 	}
-	dsOverall := reduceTreeResults(dsResults)
-	dssReady := collectDaemonSets(dsOverall.dsInfo)
+
+	overall := reduceTreeResults(results)
+	dssReady := collectDaemonSets(overall.dsInfo)
+	instance.Status.MachineConfigPools = overall.mcpStatuses
+	instance.Status.Conditions = updateMachineConfigPoolPausedCondition(instance.Status.Conditions, instance.Generation, overall.pausedMCPNames)
 	instance.Status.DaemonSets = dssReady
 	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dssReady)
-	if !dsOverall.step.Done() {
-		return dsOverall.step
+
+	if overall.step.Done() {
+		instance.Status.NodeGroups = syncNodeGroupsStatus(instance, overall.dsInfo)
 	}
 
-	instance.Status.NodeGroups = syncNodeGroupsStatus(instance, dsOverall.dsInfo)
-	return intreconcile.StepSuccess()
+	return overall.step
 }
 
 func syncNodeGroupsStatus(instance *nropv1.NUMAResourcesOperator, dsPerPool []poolDaemonSet) []nropv1.NodeGroupStatus {
