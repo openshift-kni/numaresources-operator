@@ -43,6 +43,16 @@ func (rs Step) EarlyStop() bool {
 	return rs.ConditionInfo.Type != status.ConditionAvailable
 }
 
+// Ongoing returns true if the reconciliation is still ongoing/progressing
+func (rs Step) Ongoing() bool {
+	return rs.Result.RequeueAfter > 0
+}
+
+// Failed returns true if the reconciliation was not succesfull
+func (rs Step) Failed() bool {
+	return rs.Error != nil
+}
+
 // WithReason set the existing reason with the given value,
 // if not set already and returns a new updated Step
 func (rs Step) WithReason(reason string) Step {
@@ -59,6 +69,15 @@ func (rs Step) WithMessage(message string) Step {
 	return Step{
 		Result:        rs.Result,
 		ConditionInfo: rs.ConditionInfo.WithMessage(message),
+		Error:         rs.Error,
+	}
+}
+
+// UpdateMessage overrides the message, prepending to any existing one, and returns a new updated Step
+func (rs Step) UpdateMessage(message string) Step {
+	return Step{
+		Result:        rs.Result,
+		ConditionInfo: rs.ConditionInfo.UpdateMessage(message),
 		Error:         rs.Error,
 	}
 }
