@@ -27,6 +27,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -44,7 +46,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("[Scheduler] imageReplacement", func() {
+var _ = Describe("[Scheduler] Scheduler CR modifications", func() {
 	var initialized bool
 	nroSchedObj := &nropv1.NUMAResourcesScheduler{}
 	BeforeEach(func() {
@@ -272,5 +274,147 @@ var _ = Describe("[Scheduler] imageReplacement", func() {
 				Expect(pod.UID).ToNot(Equal(uid), "new scheduler pod has not been created")
 			}
 		})
+	})
+
+	When("testing deployment PodAntiAffinity and rollout strategy", func() {
+		var (
+			expectedPodAntiAffinity   corev1.PodAntiAffinity
+			expectedStrategy          appsv1.DeploymentStrategy
+			nroSchedKey               client.ObjectKey
+			autoDetectedReplicasCount *int32
+			podsUIDsInitial           []types.UID
+			schedDp                   *appsv1.Deployment
+		)
+
+		BeforeEach(func(ctx context.Context) {
+			nroSchedKey = client.ObjectKeyFromObject(nroSchedObj)
+			Expect(e2eclient.Client.Get(ctx, nroSchedKey, nroSchedObj)).To(Succeed())
+			currentReplicas := nroSchedObj.Spec.Replicas
+			var err error
+			schedDp, err = podlist.With(e2eclient.Client).DeploymentByOwnerReference(ctx, nroSchedObj.UID)
+			Expect(err).ToNot(HaveOccurred())
+
+			if currentReplicas != nil {
+				By(fmt.Sprintf("configure NRS replicas for autodetection: current=%d desired=nil", *currentReplicas))
+				Eventually(func(g Gomega) {
+					g.Expect(e2eclient.Client.Get(ctx, nroSchedKey, nroSchedObj)).To(Succeed())
+					nroSchedObj.Spec.Replicas = nil
+					g.Expect(e2eclient.Client.Update(ctx, nroSchedObj)).To(Succeed())
+				}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to update NRS with autodetection mode for replicas")
+
+				schedDp, err = wait.With(e2eclient.Client).Timeout(5*time.Minute).Interval(10*time.Second).ForDeploymentCompleteWithReplicas(ctx, schedDp, nil)
+				Expect(err).ToNot(HaveOccurred())
+			}
+
+			expectedPodAntiAffinity = corev1.PodAntiAffinity{
+				RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+					{
+						LabelSelector: &metav1.LabelSelector{
+							MatchLabels: schedDp.Spec.Template.Labels,
+						},
+						TopologyKey: "kubernetes.io/hostname",
+					},
+				},
+			}
+			expectedStrategy = appsv1.DeploymentStrategy{
+				Type: appsv1.RollingUpdateDeploymentStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateDeployment{
+					MaxUnavailable: ptr.To(intstr.FromInt(1)),
+					MaxSurge:       ptr.To(intstr.FromInt(0)),
+				},
+			}
+
+			By("checking PodAntiAffinity and strategy are set when autodetection mode is enabled - default mode")
+			affinity := schedDp.Spec.Template.Spec.Affinity
+			Expect(affinity).ToNot(BeNil(), "affinity is nil")
+			Expect(affinity.PodAntiAffinity).ToNot(BeNil(), "podAntiAffinity is nil")
+			Expect(affinity.PodAntiAffinity).To(Equal(&expectedPodAntiAffinity), "podAntiAffinity mismatch")
+			Expect(schedDp.Spec.Strategy).To(Equal(expectedStrategy), "strategy mismatch")
+
+			autoDetectedReplicasCount = schedDp.Spec.Replicas
+			Expect(autoDetectedReplicasCount).ToNot(BeNil()) // must never happen
+			podListInitial, err := podlist.With(e2eclient.Client).ByDeployment(ctx, *schedDp)
+			Expect(err).NotTo(HaveOccurred())
+			By("verifying new pods are created")
+			podsUIDsInitial = make([]types.UID, 0, len(podListInitial))
+			for _, pod := range podListInitial {
+				if pod.Status.Phase != corev1.PodRunning || pod.DeletionTimestamp != nil {
+					continue
+				}
+				podsUIDsInitial = append(podsUIDsInitial, pod.UID)
+			}
+			Expect(podsUIDsInitial).To(HaveLen(int(*autoDetectedReplicasCount)), "expected %d initial pods, got %d", *autoDetectedReplicasCount, len(podsUIDsInitial))
+		})
+
+		DescribeTable("should set PodAntiAffinity on replicas autodetection (high-availability) and update it when replicas are set explicitly", func(ctx context.Context, replicasCount int) {
+			By("checking PodAntiAffinity is removed when replicas are set explicitly")
+			newCount := int32(replicasCount)
+			if replicasCount == -1 {
+				// intentionally challenge the condition by setting the replicas count to the autodetected count;
+				// this isolates the podAffinity/strategy check from the old deployment replica count (which results
+				//  the same number of pods on autodetection mode)
+				newCount = *autoDetectedReplicasCount
+			}
+			By(fmt.Sprintf("update NRS to use explicit %d replicas", newCount))
+			Eventually(func(g Gomega) {
+				g.Expect(e2eclient.Client.Get(ctx, nroSchedKey, nroSchedObj)).To(Succeed())
+				nroSchedObj.Spec.Replicas = &newCount
+				g.Expect(e2eclient.Client.Update(ctx, nroSchedObj)).To(Succeed())
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to update NRS with explicit replicas count")
+
+			// allow enough time for the rollout to complete; 10 mins were proved to be enough for 3 target nodes
+			schedDp, err := wait.With(e2eclient.Client).Timeout(10*time.Minute).Interval(10*time.Second).ForDeploymentCompleteWithReplicas(ctx, schedDp, &newCount)
+			Expect(err).ToNot(HaveOccurred())
+			affinity := schedDp.Spec.Template.Spec.Affinity
+			if affinity != nil {
+				Expect(affinity.PodAntiAffinity).To(BeNil(), "podAntiAffinity mismatch")
+			}
+
+			Expect(schedDp.Spec.Strategy).To(Equal(expectedStrategy), "strategy mismatch")
+			updatedPodListExplicit, err := podlist.With(e2eclient.Client).ByDeployment(ctx, *schedDp)
+			Expect(err).NotTo(HaveOccurred())
+			By("verifying new pods are created")
+			newUIDsExplicit := make([]types.UID, 0, len(updatedPodListExplicit))
+			for _, pod := range updatedPodListExplicit {
+				if pod.Status.Phase != corev1.PodRunning || pod.DeletionTimestamp != nil {
+					continue
+				}
+				newUIDsExplicit = append(newUIDsExplicit, pod.UID)
+			}
+			Expect(newUIDsExplicit).To(HaveLen(int(newCount)), "expected %d new pods, got %d", newCount, len(newUIDsExplicit))
+			Expect(newUIDsExplicit).ToNot(ContainElements(podsUIDsInitial), "scheduler pods should be replaced after explicit replica rollout")
+
+			By("switch back to autodetection mode and verify PodAntiAffinity and strategy are set properly and deployment is running")
+			Eventually(func(g Gomega) {
+				g.Expect(e2eclient.Client.Get(ctx, nroSchedKey, nroSchedObj)).To(Succeed())
+				nroSchedObj.Spec.Replicas = nil
+				g.Expect(e2eclient.Client.Update(ctx, nroSchedObj)).To(Succeed())
+			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to update NRS with autodetection mode for replicas")
+
+			// allow enough time for the rollout to complete; 10 mins were proved to be enough for 3 target nodes
+			schedDp, err = wait.With(e2eclient.Client).Timeout(10*time.Minute).Interval(10*time.Second).ForDeploymentCompleteWithReplicas(ctx, schedDp, autoDetectedReplicasCount)
+			Expect(err).ToNot(HaveOccurred())
+			affinity = schedDp.Spec.Template.Spec.Affinity
+			Expect(affinity).ToNot(BeNil(), "affinity is nil")
+			Expect(affinity.PodAntiAffinity).ToNot(BeNil(), "podAntiAffinity is nil")
+			Expect(affinity.PodAntiAffinity).To(Equal(&expectedPodAntiAffinity), "podAntiAffinity mismatch")
+			Expect(schedDp.Spec.Strategy).To(Equal(expectedStrategy), "strategy mismatch")
+
+			By("verifying new pods are created and running")
+			updatedPodListAutodetection, err := podlist.With(e2eclient.Client).ByDeployment(ctx, *schedDp)
+			Expect(err).NotTo(HaveOccurred())
+			newUIDsAutodetection := make([]types.UID, 0, len(updatedPodListAutodetection))
+			for _, pod := range updatedPodListAutodetection {
+				if pod.Status.Phase != corev1.PodRunning || pod.DeletionTimestamp != nil {
+					continue
+				}
+				newUIDsAutodetection = append(newUIDsAutodetection, pod.UID)
+			}
+			Expect(newUIDsAutodetection).To(HaveLen(int(*autoDetectedReplicasCount)), "expected %d new pods, got %d", *autoDetectedReplicasCount, len(newUIDsAutodetection))
+			Expect(newUIDsExplicit).ToNot(ContainElements(newUIDsAutodetection), "scheduler pods should be replaced after explicit replica rollout")
+		},
+			Entry("with 0 replicas count", 0),
+			Entry("with explicit replicas count equal to autodetected count", -1),
+		)
 	})
 })
