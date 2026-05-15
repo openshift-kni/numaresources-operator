@@ -20,15 +20,20 @@ import (
 	"context"
 
 	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+const deploymentRevisionAnnotation = "deployment.kubernetes.io/revision"
+
 func (wt Waiter) ForDeploymentComplete(ctx context.Context, dp *appsv1.Deployment) (*appsv1.Deployment, error) {
-	// This function waits for the readiness of the pods under the deployment. The best use of this check is for
-	// completely new deployments. If the deployment exists on the cluster and simply updated, this check is
-	// not enough to guarantee that the deployment is ready with the NEW replica, thus need to cover that by
-	// additional checks as the context requires
+	return wt.ForDeploymentCompleteWithReplicas(ctx, dp, dp.Spec.Replicas)
+}
+
+func (wt Waiter) ForDeploymentCompleteWithReplicas(ctx context.Context, dp *appsv1.Deployment, expectedReplicas *int32) (*appsv1.Deployment, error) {
 	key := ObjectKeyFromObject(dp)
 	updatedDp := &appsv1.Deployment{}
 	immediate := true
@@ -39,8 +44,17 @@ func (wt Waiter) ForDeploymentComplete(ctx context.Context, dp *appsv1.Deploymen
 			return false, err
 		}
 
-		if !IsDeploymentComplete(dp, &updatedDp.Status) {
+		if !IsDeploymentComplete(dp.Generation, expectedReplicas, &updatedDp.Status) {
 			klog.Warningf("deployment %s not yet complete", key.String())
+			return false, nil
+		}
+
+		rolloutComplete, err := wt.isDeploymentRolloutComplete(aContext, updatedDp, expectedReplicas)
+		if err != nil {
+			return false, err
+		}
+		if !rolloutComplete {
+			klog.Warningf("deployment %s rollout not yet complete", key.String())
 			return false, nil
 		}
 
@@ -50,15 +64,90 @@ func (wt Waiter) ForDeploymentComplete(ctx context.Context, dp *appsv1.Deploymen
 	return updatedDp, err
 }
 
+func (wt Waiter) isDeploymentRolloutComplete(ctx context.Context, dp *appsv1.Deployment, expectedReplicas *int32) (bool, error) {
+	revision, ok := dp.Annotations[deploymentRevisionAnnotation]
+	if !ok || revision == "" {
+		return true, nil
+	}
+
+	sel, err := metav1.LabelSelectorAsSelector(dp.Spec.Selector)
+	if err != nil {
+		return false, err
+	}
+
+	rsList := &appsv1.ReplicaSetList{}
+	if err := wt.Cli.List(ctx, rsList, &client.ListOptions{
+		Namespace:     dp.Namespace,
+		LabelSelector: sel,
+	}); err != nil {
+		return false, err
+	}
+
+	want := deploymentExpectedReplicaCount(expectedReplicas, dp.Status.Replicas)
+	var currentRS *appsv1.ReplicaSet
+	for i := range rsList.Items {
+		rs := &rsList.Items[i]
+		if !metav1.IsControlledBy(rs, dp) {
+			continue
+		}
+		if rs.Annotations[deploymentRevisionAnnotation] != revision {
+			continue
+		}
+		currentRS = rs
+		break
+	}
+	if currentRS == nil {
+		klog.V(4).InfoS("deployment rollout waiting for current revision replicaset",
+			"deployment", ObjectKeyFromObject(dp).String(), "revision", revision)
+		return false, nil
+	}
+	if !isReplicasetStatusComplete(currentRS.Generation, want, &currentRS.Status) {
+		klog.V(4).InfoS("deployment rollout waiting for current revision replicaset to become ready",
+			"deployment", ObjectKeyFromObject(dp).String(),
+			"replicaset", currentRS.Name,
+			"want", want,
+			"ready", currentRS.Status.ReadyReplicas,
+			"replicas", currentRS.Status.Replicas,
+			"available", currentRS.Status.AvailableReplicas)
+		return false, nil
+	}
+
+	for i := range rsList.Items {
+		rs := &rsList.Items[i]
+		if !metav1.IsControlledBy(rs, dp) {
+			continue
+		}
+		if rs.UID == currentRS.UID {
+			continue
+		}
+		if rs.Status.Replicas != 0 {
+			klog.V(4).InfoS("deployment rollout waiting for old replicaset to drain",
+				"deployment", ObjectKeyFromObject(dp).String(),
+				"replicaset", rs.Name,
+				"replicas", rs.Status.Replicas)
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func deploymentExpectedReplicaCount(expectedReplicas *int32, statusReplicas int32) int32 {
+	if expectedReplicas != nil {
+		return *expectedReplicas
+	}
+	return statusReplicas
+}
+
 func areDeploymentReplicasAvailable(newStatus *appsv1.DeploymentStatus, replicas int32) bool {
 	return newStatus.UpdatedReplicas == replicas &&
 		newStatus.Replicas == replicas &&
 		newStatus.AvailableReplicas == replicas
 }
 
-func IsDeploymentComplete(dp *appsv1.Deployment, newStatus *appsv1.DeploymentStatus) bool {
-	return areDeploymentReplicasAvailable(newStatus, *(dp.Spec.Replicas)) &&
-		newStatus.ObservedGeneration >= dp.Generation
+func IsDeploymentComplete(oldGeneration int64, replicas *int32, newStatus *appsv1.DeploymentStatus) bool {
+	expectedReplicas := deploymentExpectedReplicaCount(replicas, newStatus.Replicas)
+	return areDeploymentReplicasAvailable(newStatus, expectedReplicas) &&
+		newStatus.ObservedGeneration >= oldGeneration
 }
 
 func (wt Waiter) ForDeploymentReplicasCreation(ctx context.Context, dp *appsv1.Deployment, expectedReplicas int32) (*appsv1.Deployment, error) {

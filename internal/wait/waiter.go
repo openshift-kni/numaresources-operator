@@ -31,7 +31,7 @@ const (
 	// DefaultPollTimeout was computed by trial and error, not scientifically,
 	// so it may adjusted in the future any time.
 	// Roughly match the time it takes for pods to go running in CI.
-	DefaultPollTimeout = 3 * time.Minute
+	DefaultPollTimeout = 5 * time.Minute
 )
 
 type ObjectKey struct {

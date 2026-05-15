@@ -35,7 +35,7 @@ func (wt Waiter) ForReplicasetComplete(ctx context.Context, rs *appsv1.ReplicaSe
 			return false, err
 		}
 
-		if !isReplicasetComplete(rs, &updatedRs.Status) {
+		if !isReplicasetComplete(updatedRs, &updatedRs.Status) {
 			klog.Warningf("replicaset %s not yet complete", key.String())
 			return false, nil
 		}
@@ -47,9 +47,16 @@ func (wt Waiter) ForReplicasetComplete(ctx context.Context, rs *appsv1.ReplicaSe
 }
 
 func isReplicasetComplete(rs *appsv1.ReplicaSet, newStatus *appsv1.ReplicaSetStatus) bool {
-	replicas := *(rs.Spec.Replicas)
-	areReplicasAvailable := newStatus.ReadyReplicas == replicas &&
+	replicas := int32(1)
+	if rs.Spec.Replicas != nil {
+		replicas = *rs.Spec.Replicas
+	}
+	return isReplicasetStatusComplete(rs.Generation, replicas, newStatus)
+}
+
+func isReplicasetStatusComplete(generation int64, replicas int32, newStatus *appsv1.ReplicaSetStatus) bool {
+	return newStatus.ReadyReplicas == replicas &&
 		newStatus.Replicas == replicas &&
-		newStatus.AvailableReplicas == replicas
-	return areReplicasAvailable && newStatus.ObservedGeneration >= rs.Generation
+		newStatus.AvailableReplicas == replicas &&
+		newStatus.ObservedGeneration >= generation
 }
