@@ -136,18 +136,7 @@ type MachineConfigObjectState struct {
 	WaitForUpdated MCPWaitForUpdatedFunc
 }
 
-func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]MachineConfigObjectState, sets.Set[string]) {
-	var allRet []MachineConfigObjectState
-	allPaused := sets.New[string]()
-	for _, tree := range em.trees {
-		ret, paused := em.MachineConfigsStateForTree(mf, tree)
-		allRet = append(allRet, ret...)
-		allPaused = allPaused.Union(paused)
-	}
-	return allRet, allPaused
-}
-
-func (em *ExistingManifests) MachineConfigsStateForTree(mf Manifests, tree nodegroupv1.Tree) ([]MachineConfigObjectState, sets.Set[string]) {
+func (em *ExistingManifests) MachineConfigsState(mf Manifests, tree nodegroupv1.Tree) ([]MachineConfigObjectState, sets.Set[string]) {
 	var ret []MachineConfigObjectState
 	pausedMCPNames := sets.New[string]()
 	if mf.Core.MachineConfig == nil {

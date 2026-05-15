@@ -112,7 +112,6 @@ type ExistingManifests struct {
 	// internal helpers
 	plat      platform.Platform
 	instance  *nropv1.NUMAResourcesOperator
-	trees     []nodegroupv1.Tree
 	namespace string
 	updater   GenerateDesiredManifestUpdater
 	helper    rteHelper
@@ -166,15 +165,6 @@ type GenerateDesiredManifestUpdater func(mcpName string, gdm *GeneratedDesiredMa
 
 func SkipManifestUpdate(mcpName string, gdm *GeneratedDesiredManifest) error {
 	return nil
-}
-
-func (em *ExistingManifests) State(mf Manifests) []objectstate.ObjectState {
-	ret := em.TreeAgnostic(mf)
-	klog.V(4).InfoS("RTE manifests processing trees", "method", em.helper.Name())
-	for _, tree := range em.trees {
-		ret = append(ret, em.PerTreeState(mf, tree)...)
-	}
-	return ret
 }
 
 func (em *ExistingManifests) TreeAgnostic(mf Manifests) []objectstate.ObjectState {
@@ -273,16 +263,6 @@ func (em *ExistingManifests) PerTreeState(mf Manifests, tree nodegroupv1.Tree) [
 func (em *ExistingManifests) WithManifestsUpdater(updater GenerateDesiredManifestUpdater) *ExistingManifests {
 	em.updater = updater
 	return em
-}
-
-func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf Manifests, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree, namespace string) *ExistingManifests {
-	ret := FromClientTreeAgnostic(ctx, cli, plat, mf, instance, namespace)
-	ret.trees = trees
-	klog.V(4).InfoS("RTE manifests processing trees", "method", ret.helper.Name())
-	for _, tree := range trees {
-		ret.helper.UpdateFromClient(ctx, cli, tree)
-	}
-	return ret
 }
 
 func FromClientTreeAgnostic(ctx context.Context, cli client.Client, plat platform.Platform, mf Manifests, instance *nropv1.NUMAResourcesOperator, namespace string) *ExistingManifests {
