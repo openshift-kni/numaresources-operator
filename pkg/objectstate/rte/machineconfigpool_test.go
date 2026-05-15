@@ -61,7 +61,7 @@ func newTestTree(mcp *machineconfigv1.MachineConfigPool, annots map[string]strin
 	}
 }
 
-func newTestExistingManifests(trees []nodegroupv1.Tree, mcNames ...string) *ExistingManifests {
+func newTestExistingManifests(mcNames ...string) *ExistingManifests {
 	machineConfigs := make(map[string]machineConfigManifest, len(mcNames))
 	for _, mcName := range mcNames {
 		machineConfigs[mcName] = machineConfigManifest{
@@ -76,7 +76,6 @@ func newTestExistingManifests(trees []nodegroupv1.Tree, mcNames ...string) *Exis
 		instance: &nropv1.NUMAResourcesOperator{
 			ObjectMeta: metav1.ObjectMeta{Name: testInstanceName},
 		},
-		trees:          trees,
 		machineConfigs: machineConfigs,
 		namespace:      "test-ns",
 	}
@@ -115,10 +114,10 @@ func TestMachineConfigsState(t *testing.T) {
 		mcp := newTestMCP("pool-a")
 		tree := newTestTree(mcp, nil)
 		mcName := objectnames.GetMachineConfigName(testInstanceName, mcp.Name)
-		em := newTestExistingManifests([]nodegroupv1.Tree{tree}, mcName)
+		em := newTestExistingManifests(mcName)
 
 		mf := Manifests{}
-		got, _ := em.MachineConfigsState(mf)
+		got, _ := em.MachineConfigsState(mf, tree)
 		if len(got) != 0 {
 			t.Fatalf("expected empty result, got %d entries", len(got))
 		}
@@ -130,9 +129,9 @@ func TestMachineConfigsState(t *testing.T) {
 			annotations.SELinuxPolicyConfigAnnotation: annotations.SELinuxPolicyCustom,
 		})
 		mcName := objectnames.GetMachineConfigName(testInstanceName, mcp.Name)
-		em := newTestExistingManifests([]nodegroupv1.Tree{tree}, mcName)
+		em := newTestExistingManifests(mcName)
 
-		got, _ := em.MachineConfigsState(newTestManifests())
+		got, _ := em.MachineConfigsState(newTestManifests(), tree)
 		if len(got) != 1 {
 			t.Fatalf("expected 1 entry, got %d", len(got))
 		}
@@ -160,9 +159,9 @@ func TestMachineConfigsState(t *testing.T) {
 		mcp := newTestMCP("pool-a")
 		tree := newTestTree(mcp, nil)
 		mcName := objectnames.GetMachineConfigName(testInstanceName, mcp.Name)
-		em := newTestExistingManifests([]nodegroupv1.Tree{tree}, mcName)
+		em := newTestExistingManifests(mcName)
 
-		got, _ := em.MachineConfigsState(newTestManifests())
+		got, _ := em.MachineConfigsState(newTestManifests(), tree)
 		if len(got) != 1 {
 			t.Fatalf("expected 1 entry, got %d", len(got))
 		}
@@ -197,50 +196,41 @@ func TestMachineConfigsState(t *testing.T) {
 
 		mcNameCustom := objectnames.GetMachineConfigName(testInstanceName, mcpCustom.Name)
 		mcNameDefault := objectnames.GetMachineConfigName(testInstanceName, mcpDefault.Name)
-		em := newTestExistingManifests(
-			[]nodegroupv1.Tree{treeCustom, treeDefault},
-			mcNameCustom, mcNameDefault,
-		)
+		em := newTestExistingManifests(mcNameCustom, mcNameDefault)
 
-		got, _ := em.MachineConfigsState(newTestManifests())
-		if len(got) != 2 {
-			t.Fatalf("expected 2 entries, got %d", len(got))
+		mf := newTestManifests()
+
+		gotCustom, _ := em.MachineConfigsState(mf, treeCustom)
+		if len(gotCustom) != 1 {
+			t.Fatalf("expected 1 custom entry, got %d", len(gotCustom))
 		}
-
-		var customEntry, defaultEntry MachineConfigObjectState
-		for _, entry := range got {
-			switch entry.PoolName {
-			case "pool-custom":
-				customEntry = entry
-			case "pool-default":
-				defaultEntry = entry
-			default:
-				t.Fatalf("unexpected pool name %q", entry.PoolName)
-			}
-		}
-
-		if customEntry.Desired == nil {
+		if gotCustom[0].Desired == nil {
 			t.Fatal("expected non-nil Desired for custom policy pool")
-		}
-		if defaultEntry.Desired != nil {
-			t.Fatal("expected nil Desired for default policy pool")
 		}
 
 		mcpPresent := mcpWithSourceAndCondition("pool-custom", testInstanceName, true, corev1.ConditionTrue)
-		if !customEntry.WaitForUpdated(testInstanceName, mcpPresent) {
+		if !gotCustom[0].WaitForUpdated(testInstanceName, mcpPresent) {
 			t.Fatal("custom pool: expected true when MC is present")
 		}
 		mcpAbsent := mcpWithSourceAndCondition("pool-custom", testInstanceName, false, corev1.ConditionTrue)
-		if customEntry.WaitForUpdated(testInstanceName, mcpAbsent) {
+		if gotCustom[0].WaitForUpdated(testInstanceName, mcpAbsent) {
 			t.Fatal("custom pool: expected false when MC is absent")
 		}
 
+		gotDefault, _ := em.MachineConfigsState(mf, treeDefault)
+		if len(gotDefault) != 1 {
+			t.Fatalf("expected 1 default entry, got %d", len(gotDefault))
+		}
+		if gotDefault[0].Desired != nil {
+			t.Fatal("expected nil Desired for default policy pool")
+		}
+
 		mcpDeleted := mcpWithSourceAndCondition("pool-default", testInstanceName, false, corev1.ConditionTrue)
-		if !defaultEntry.WaitForUpdated(testInstanceName, mcpDeleted) {
+		if !gotDefault[0].WaitForUpdated(testInstanceName, mcpDeleted) {
 			t.Fatal("default pool: expected true when MC is absent")
 		}
 		mcpStillPresent := mcpWithSourceAndCondition("pool-default", testInstanceName, true, corev1.ConditionTrue)
-		if defaultEntry.WaitForUpdated(testInstanceName, mcpStillPresent) {
+		if gotDefault[0].WaitForUpdated(testInstanceName, mcpStillPresent) {
 			t.Fatal("default pool: expected false when MC is still present")
 		}
 	})
@@ -251,9 +241,9 @@ func TestMachineConfigsState(t *testing.T) {
 
 		tree := newTestTree(mcp, nil)
 		mcName := objectnames.GetMachineConfigName(testInstanceName, mcp.Name)
-		em := newTestExistingManifests([]nodegroupv1.Tree{tree}, mcName)
+		em := newTestExistingManifests(mcName)
 
-		got, _ := em.MachineConfigsState(newTestManifests())
+		got, _ := em.MachineConfigsState(newTestManifests(), tree)
 		if len(got) != 0 {
 			t.Fatalf("expected empty result for pool without selector, got %d entries", len(got))
 		}
@@ -262,9 +252,9 @@ func TestMachineConfigsState(t *testing.T) {
 	t.Run("pool not in machineConfigs cache", func(t *testing.T) {
 		mcp := newTestMCP("pool-uncached")
 		tree := newTestTree(mcp, nil)
-		em := newTestExistingManifests([]nodegroupv1.Tree{tree})
+		em := newTestExistingManifests()
 
-		got, _ := em.MachineConfigsState(newTestManifests())
+		got, _ := em.MachineConfigsState(newTestManifests(), tree)
 		if len(got) != 0 {
 			t.Fatalf("expected empty result for uncached pool, got %d entries", len(got))
 		}
@@ -276,9 +266,9 @@ func TestMachineConfigsState(t *testing.T) {
 
 		tree := newTestTree(mcp, nil)
 		mcName := objectnames.GetMachineConfigName(testInstanceName, mcp.Name)
-		em := newTestExistingManifests([]nodegroupv1.Tree{tree}, mcName)
+		em := newTestExistingManifests(mcName)
 
-		got, pausedMCPNames := em.MachineConfigsState(newTestManifests())
+		got, pausedMCPNames := em.MachineConfigsState(newTestManifests(), tree)
 		if len(got) != 0 {
 			t.Fatalf("expected 0 entries for paused pool, got %d entries", len(got))
 		}
@@ -303,20 +293,35 @@ func TestMachineConfigsState(t *testing.T) {
 		mcNameCustom := objectnames.GetMachineConfigName(testInstanceName, mcpCustom.Name)
 		mcNameDefault := objectnames.GetMachineConfigName(testInstanceName, mcpDefault.Name)
 		mcNamePaused := objectnames.GetMachineConfigName(testInstanceName, mcpPaused.Name)
-		em := newTestExistingManifests(
-			[]nodegroupv1.Tree{treeCustom, treeDefault, treePaused},
-			mcNameCustom, mcNameDefault, mcNamePaused,
-		)
+		em := newTestExistingManifests(mcNameCustom, mcNameDefault, mcNamePaused)
 
-		got, pausedMCPNames := em.MachineConfigsState(newTestManifests())
-		if len(got) != 2 {
-			t.Fatalf("expected 2 active entries, got %d", len(got))
+		mf := newTestManifests()
+
+		gotCustom, pausedCustom := em.MachineConfigsState(mf, treeCustom)
+		if len(gotCustom) != 1 {
+			t.Fatalf("expected 1 custom entry, got %d", len(gotCustom))
 		}
-		if !pausedMCPNames.Has("pool-paused") {
+		if pausedCustom.Len() != 0 {
+			t.Fatalf("expected 0 paused from custom tree, got %d", pausedCustom.Len())
+		}
+
+		gotDefault, pausedDefault := em.MachineConfigsState(mf, treeDefault)
+		if len(gotDefault) != 1 {
+			t.Fatalf("expected 1 default entry, got %d", len(gotDefault))
+		}
+		if pausedDefault.Len() != 0 {
+			t.Fatalf("expected 0 paused from default tree, got %d", pausedDefault.Len())
+		}
+
+		gotPaused, pausedPaused := em.MachineConfigsState(mf, treePaused)
+		if len(gotPaused) != 0 {
+			t.Fatalf("expected 0 entries for paused pool, got %d", len(gotPaused))
+		}
+		if !pausedPaused.Has("pool-paused") {
 			t.Fatal("expected pool-paused to be in pausedMCPNames set")
 		}
-		if pausedMCPNames.Len() != 1 {
-			t.Fatalf("expected 1 paused pool, got %d", pausedMCPNames.Len())
+		if pausedPaused.Len() != 1 {
+			t.Fatalf("expected 1 paused pool, got %d", pausedPaused.Len())
 		}
 	})
 }

@@ -377,7 +377,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfig(ctx context.Context,
 	// In case of operator upgrade from 4.1X → 4.18, it's necessary to remove the old MachineConfig,
 	// unless an emergency annotation is provided which forces the operator to use custom policy
 
-	mcObjStates, pausedMCPNames := existing.MachineConfigsStateForTree(r.RTEManifests, tree)
+	mcObjStates, pausedMCPNames := existing.MachineConfigsState(r.RTEManifests, tree)
 	waitByPool := make(map[string]rtestate.MCPWaitForUpdatedFunc, len(mcObjStates))
 	for _, mcObjState := range mcObjStates {
 		waitByPool[mcObjState.PoolName] = mcObjState.WaitForUpdated
