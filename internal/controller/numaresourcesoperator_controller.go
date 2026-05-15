@@ -64,6 +64,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
@@ -441,10 +442,10 @@ func syncMachineConfigPoolsStatuses(instanceName string, forwardMCPConds bool, w
 	klog.V(4).InfoS("Machine Config Pools Status Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Pools Status Sync stop")
 
-	mcpStatuses := []nropv1.MachineConfigPool{}
+	nroMCPs := []nropv1.MachineConfigPool{}
 	for _, tree := range trees {
 		for _, mcp := range tree.MachineConfigPools {
-			mcpStatuses = append(mcpStatuses, extractMCPStatus(mcp, forwardMCPConds))
+			nroMCPs = append(nroMCPs, makeNROPMCP(mcp, forwardMCPConds))
 
 			waitFunc, ok := waitByPool[mcp.Name]
 			if !ok {
@@ -455,40 +456,40 @@ func syncMachineConfigPoolsStatuses(instanceName string, forwardMCPConds bool, w
 			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instanceName, "updated", isUpdated)
 
 			if !isUpdated {
-				return mcpStatuses, mcp.Name
+				return nroMCPs, mcp.Name
 			}
 		}
 	}
-	return mcpStatuses, ""
+	return nroMCPs, ""
 }
 
-func syncMachineConfigPoolNodeGroupConfigStatuses(mcpStatuses []nropv1.MachineConfigPool, trees ...nodegroupv1.Tree) []nropv1.MachineConfigPool {
-	klog.V(4).InfoS("Machine Config Pool Node Group Status Sync start", "mcpStatuses", len(mcpStatuses), "trees", len(trees))
+func syncMachineConfigPoolNodeGroupConfigStatuses(mcpPools []nropv1.MachineConfigPool, trees ...nodegroupv1.Tree) []nropv1.MachineConfigPool {
+	klog.V(4).InfoS("Machine Config Pool Node Group Status Sync start", "mcpPools", len(mcpPools), "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Pool Node Group Status Sync stop")
 
-	updatedMcpStatuses := []nropv1.MachineConfigPool{}
+	updatedMcpPools := []nropv1.MachineConfigPool{}
 	for _, tree := range trees {
 		klog.V(5).InfoS("Machine Config Pool Node Group tree update", "mcps", len(tree.MachineConfigPools))
 
 		for _, mcp := range tree.MachineConfigPools {
-			mcpStatus := getMachineConfigPoolStatusByName(mcpStatuses, mcp.Name)
+			mcpPool := findNROMCPByName(mcpPools, mcp.Name)
 
 			var confSource string
 			if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
 				confSource = "spec"
-				mcpStatus.Config = tree.NodeGroup.Config.DeepCopy()
+				mcpPool.Config = tree.NodeGroup.Config.DeepCopy()
 			} else {
 				confSource = "default"
 				ngc := nropv1.DefaultNodeGroupConfig()
-				mcpStatus.Config = &ngc
+				mcpPool.Config = &ngc
 			}
 
-			klog.V(6).InfoS("Machine Config Pool Node Group updated status config", "mcp", mcp.Name, "source", confSource, "data", mcpStatus.Config.ToString())
+			klog.V(6).InfoS("Machine Config Pool Node Group updated status config", "mcp", mcp.Name, "source", confSource, "data", mcpPool.Config.ToString())
 
-			updatedMcpStatuses = append(updatedMcpStatuses, mcpStatus)
+			updatedMcpPools = append(updatedMcpPools, mcpPool)
 		}
 	}
-	return updatedMcpStatuses
+	return updatedMcpPools
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNUMAResourcesOperatorResources(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) ([]poolDaemonSet, error) {
@@ -838,22 +839,223 @@ func IsRTEImageOverridable() bool {
 	return overridable
 }
 
-func extractMCPStatus(mcp *machineconfigv1.MachineConfigPool, forwardMCPConds bool) nropv1.MachineConfigPool {
-	mcpStatus := nropv1.MachineConfigPool{
+func makeNROPMCP(mcp *machineconfigv1.MachineConfigPool, forwardMCPConds bool) nropv1.MachineConfigPool {
+	nroMcp := nropv1.MachineConfigPool{
 		Name: mcp.Name,
 	}
 	if !forwardMCPConds {
-		return mcpStatus
+		return nroMcp
 	}
-	mcpStatus.Conditions = mcp.Status.Conditions
-	return mcpStatus
+	nroMcp.Conditions = mcp.Status.Conditions
+	return nroMcp
 }
 
-func getMachineConfigPoolStatusByName(mcpStatuses []nropv1.MachineConfigPool, name string) nropv1.MachineConfigPool {
-	for _, mcpStatus := range mcpStatuses {
+func findNROMCPByName(nroMCPs []nropv1.MachineConfigPool, name string) nropv1.MachineConfigPool {
+	for _, mcpStatus := range nroMCPs {
 		if mcpStatus.Name == name {
 			return mcpStatus
 		}
 	}
 	return nropv1.MachineConfigPool{Name: name}
+}
+
+type perTreeResult struct {
+	dsInfo         []poolDaemonSet
+	nroMCPs        []nropv1.MachineConfigPool
+	pausedMCPNames sets.Set[string]
+	step           intreconcile.Step
+}
+
+// reconcilePerTreeMachineConfig wants to do as much work as possible and return the
+// work done in `perTreeResult`. Depending on cluster state, the `perTreeResult`
+// may be partially filled, but must be always internally consistent (e.g.
+// partial data needs still to be locally correct).
+// Note this function intentionally ignores `dsInfo`. See `reconcilePerTreeDaemonSet`.
+// Callers and downstream code must handle partially-filled perTreeResults.
+func (r *NUMAResourcesOperatorReconciler) reconcilePerTreeMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, tree nodegroupv1.Tree) perTreeResult {
+	result := perTreeResult{}
+
+	waitByPool, pausedMCPNames, err := r.syncMachineConfigs(ctx, instance, existing, tree)
+	result.pausedMCPNames = pausedMCPNames
+	if err != nil {
+		result.step = intreconcile.StepFailed(fmt.Errorf("failed to sync machine configs: %w", err))
+		return result
+	}
+
+	nroMCPs, mcpNamePending := syncMachineConfigPoolsStatuses(instance.Name, r.ForwardMCPConds, waitByPool, tree)
+	result.nroMCPs = nroMCPs
+
+	if mcpNamePending != "" {
+		result.step = intreconcile.StepOngoing(numaResourcesRetryPeriod).WithReason("MachineConfigPoolIsUpdating").WithMessage(mcpNamePending + " is updating")
+		return result
+	}
+	result.nroMCPs = syncMachineConfigPoolNodeGroupConfigStatuses(result.nroMCPs, tree)
+
+	if result.pausedMCPNames.Len() > 0 {
+		result.step = intreconcile.StepOngoing(0)
+	} else {
+		result.step = intreconcile.StepSuccess()
+	}
+	return result
+}
+
+// reconcilePerTreeDaemonSet wants to do as much work as possible and return the
+// work done in `perTreeResult`. Depending on cluster state, the `perTreeResult`
+// may be partially filled, but must be always internally consistent (e.g.
+// partial data needs still to be locally correct).
+// Note this function intentionally only changes `dsInfo` and `step`.
+// See `reconcilePerTreeMachineConfig`.
+// Callers and downstream code must handle partially-filled perTreeResults.
+func (r *NUMAResourcesOperatorReconciler) reconcilePerTreeDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, tree nodegroupv1.Tree) perTreeResult {
+	result := perTreeResult{}
+
+	existing = existing.WithManifestsUpdater(func(poolName string, gdm *rtestate.GeneratedDesiredManifest) error {
+		err := daemonsetUpdater(poolName, gdm, r.RTEMetricsTLS)
+		if err != nil {
+			return err
+		}
+		result.dsInfo = append(result.dsInfo, poolDaemonSet{poolName, namespacedname.FromObject(gdm.DaemonSet)})
+		return nil
+	})
+
+	if err := r.applyObjects(ctx, instance, existing.PerTreeState(r.RTEManifests, tree)); err != nil {
+		result.step = intreconcile.StepFailed(fmt.Errorf("FailedRTESync: %w", err))
+		return result
+	}
+
+	for _, dsInfo := range result.dsInfo {
+		ds := appsv1.DaemonSet{}
+		dsKey := client.ObjectKey{
+			Namespace: dsInfo.DaemonSet.Namespace,
+			Name:      dsInfo.DaemonSet.Name,
+		}
+		if err := r.Client.Get(ctx, dsKey, &ds); err != nil {
+			result.step = intreconcile.StepFailed(err)
+			return result
+		}
+		if !isDaemonSetReady(&ds) {
+			result.step = intreconcile.StepOngoing(5 * time.Second).WithReason("DaemonSetIsUpdating").WithMessage(dsKey.String() + " is updating")
+			return result
+		}
+	}
+
+	result.step = intreconcile.StepSuccess()
+	return result
+}
+
+func (r *NUMAResourcesOperatorReconciler) setupTreeAgnosticManifests(ctx context.Context, instance *nropv1.NUMAResourcesOperator) error {
+	rteupdate.DaemonSetRolloutSettings(r.RTEManifests.Core.DaemonSet)
+	err := rteupdate.DaemonSetAffinitySettings(r.RTEManifests.Core.DaemonSet, r.RTEManifests.Core.DaemonSet.Spec.Template.Labels)
+	if err != nil {
+		klog.ErrorS(err, "failed to update RTE affinity settings")
+	}
+
+	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.Core.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
+	if err != nil {
+		return err
+	}
+
+	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.Core.DaemonSet)
+	if err != nil {
+		return err
+	}
+
+	err = loglevel.UpdatePodSpec(&r.RTEManifests.Core.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
+	if err != nil {
+		return err
+	}
+
+	rteupdate.SecurityContextConstraint(r.RTEManifests.Core.SecurityContextConstraint, true) // force to legacy context
+
+	return nil
+}
+
+func (r *NUMAResourcesOperatorReconciler) applyObjects(ctx context.Context, instance *nropv1.NUMAResourcesOperator, objStates []objectstate.ObjectState) error {
+	klog.V(4).InfoS("Applying objects", "count", len(objStates))
+	defer klog.V(4).InfoS("Applyied objects", "count", len(objStates))
+	for _, objState := range objStates {
+		if objState.Error != nil {
+			klog.Warningf("error loading object: %v", objState.Error)
+		}
+		if objState.UpdateError != nil {
+			return fmt.Errorf("failed to update (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), objState.UpdateError)
+		}
+		err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme)
+		if err != nil {
+			return fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+		}
+		_, _, err = apply.ApplyObject(ctx, r.Client, objState)
+		if err != nil {
+			return fmt.Errorf("failed to apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+		}
+	}
+	return nil
+}
+
+func collectDaemonSets(dsInfos []poolDaemonSet) []nropv1.NamespacedName {
+	dssReady := make([]nropv1.NamespacedName, 0, len(dsInfos))
+	for _, dsInfo := range dsInfos {
+		dssReady = append(dssReady, dsInfo.DaemonSet)
+	}
+	return dssReady
+}
+
+func reducePerTreeResults(results []perTreeResult) perTreeResult {
+	acc := perTreeResult{
+		pausedMCPNames: sets.New[string](),
+		step:           intreconcile.StepSuccess(),
+	}
+
+	var errorCount, ongoingCount int
+	for _, result := range results {
+		acc.nroMCPs = append(acc.nroMCPs, result.nroMCPs...)
+		acc.pausedMCPNames = acc.pausedMCPNames.Union(result.pausedMCPNames)
+
+		if result.step.Done() {
+			acc.dsInfo = append(acc.dsInfo, result.dsInfo...)
+			continue
+		}
+
+		if result.step.Failed() {
+			errorCount++
+		} else if result.step.Ongoing() {
+			ongoingCount++
+		}
+
+		if shouldReplaceStep(acc.step, result.step) {
+			acc.step = result.step
+		}
+	}
+	if !acc.step.Done() {
+		acc.step = acc.step.UpdateMessage(treeSummaryMessage(len(results), errorCount, ongoingCount))
+	}
+	return acc
+}
+
+func treeSummaryMessage(total, errors, ongoing int) string {
+	done := total - errors - ongoing
+	parts := make([]string, 0, 3)
+	if done > 0 {
+		parts = append(parts, fmt.Sprintf("%d/%d completed", done, total))
+	}
+	if ongoing > 0 {
+		parts = append(parts, fmt.Sprintf("%d/%d updating", ongoing, total))
+	}
+	if errors > 0 {
+		parts = append(parts, fmt.Sprintf("%d/%d failed", errors, total))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func shouldReplaceStep(current, candidate intreconcile.Step) bool {
+	if current.Done() {
+		return true
+	}
+	if candidate.Failed() && !current.Failed() {
+		return true
+	}
+	if candidate.Ongoing() && current.Ongoing() {
+		return candidate.Result.RequeueAfter < current.Result.RequeueAfter
+	}
+	return false
 }
