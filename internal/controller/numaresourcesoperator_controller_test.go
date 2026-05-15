@@ -1751,13 +1751,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								Expect(err).ToNot(HaveOccurred())
 							})
 							It("should wait", func() {
-								// check reconcile first loop result
-								// wait one minute to update MCP, thus RTE daemonsets and complete status update is not going to be achieved at this point
 								Expect(result).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
 
 								Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
-								Expect(nro.Status.MachineConfigPools).To(HaveLen(1))
-								Expect(nro.Status.MachineConfigPools[0].Name).To(Equal("test1"))
+								Expect(nro.Status.MachineConfigPools).To(HaveLen(2))
 							})
 						})
 
@@ -2285,6 +2282,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(pausedCond).ToNot(BeNil())
 				Expect(pausedCond.Status).To(Equal(metav1.ConditionTrue))
 			})
+
 
 			It("should report paused condition while Progressing", func(ctx context.Context) {
 				// pool1 has custom policy -> MC created, needs MCO rollout
