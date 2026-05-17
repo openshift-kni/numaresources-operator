@@ -17,6 +17,7 @@ packages:
   - procps-ng
   - rsync
   - tar
+  - gzip
 
 arches:
   - x86_64
