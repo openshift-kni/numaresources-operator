@@ -20,7 +20,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:latest@sha256:12db9874bd753eb98
 
 ARG OPENSHIFT_VERSION
 
-RUN microdnf install -y procps-ng tar rsync ; microdnf clean all
+RUN microdnf install -y procps-ng tar rsync gzip ; microdnf clean all
 
 # Copy must-gather required binaries
 COPY --from=mgbuilder /usr/bin/openshift-must-gather /usr/bin/openshift-must-gather
