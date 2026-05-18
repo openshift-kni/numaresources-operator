@@ -106,16 +106,15 @@ func DeploymentTLSSettings(dp *appsv1.Deployment, tlsSettings objtls.Settings) e
 	return nil
 }
 
-// DeploymentAffinityWithStrategy configures required pod anti-affinity on the scheduler
+// DeploymentAffinity configures required pod anti-affinity on the scheduler
 // deployment only when the CR leaves replica count to autodetection (Replicas unset).
 // An explicit non-nil Replicas value means the user chose a replica count and keeps
 // full control (no required pod anti-affinity).
-func DeploymentAffinityWithStrategy(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) error {
+func DeploymentAffinity(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) error {
 	if spec.Replicas != nil {
 		if dp.Spec.Template.Spec.Affinity != nil {
 			dp.Spec.Template.Spec.Affinity.PodAntiAffinity = nil
 		}
-		dp.Spec.Strategy = appsv1.DeploymentStrategy{}
 		return nil
 	}
 
@@ -139,8 +138,13 @@ func DeploymentAffinityWithStrategy(dp *appsv1.Deployment, spec nropv1.NUMAResou
 		},
 	}
 	klog.V(3).InfoS("Scheduler Deployment affinity", "podAntiAffinity", dp.Spec.Template.Spec.Affinity.PodAntiAffinity.String())
-	// NOTE: With replicas=1 and no PodAntiAffinity, the default strategy (surge 1, then remove old)
-	// works as expected — the new pod can schedule anywhere, no constraints block it.
+	return nil
+}
+
+// DeploymentRolloutStrategy configures the rollout strategy for the scheduler deployment
+// with maxSurge set to 0 to enforce terminating an old pod first. This is important to align
+// as much as possible scheduling the scheduler pods with the expected affinities.
+func DeploymentRolloutStrategy(dp *appsv1.Deployment) {
 	dp.Spec.Strategy = appsv1.DeploymentStrategy{
 		Type: appsv1.RollingUpdateDeploymentStrategyType,
 		RollingUpdate: &appsv1.RollingUpdateDeployment{
@@ -149,7 +153,6 @@ func DeploymentAffinityWithStrategy(dp *appsv1.Deployment, spec nropv1.NUMAResou
 		},
 	}
 	klog.V(3).InfoS("Scheduler Deployment Rollout Strategy", "rolloutStrategy", dp.Spec.Strategy.String())
-	return nil
 }
 
 func SchedulerConfig(cm *corev1.ConfigMap, name string, params *k8swgmanifests.ConfigParams) error {
