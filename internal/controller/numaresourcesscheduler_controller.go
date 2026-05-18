@@ -360,7 +360,9 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 		return nropv1.NUMAResourcesSchedulerStatus{}, err
 	}
 
-	if err := schedupdate.DeploymentAffinityWithStrategy(r.SchedulerManifests.Deployment, instance.Spec); err != nil {
+	schedupdate.DeploymentRolloutStrategy(r.SchedulerManifests.Deployment)
+
+	if err := schedupdate.DeploymentAffinity(r.SchedulerManifests.Deployment, instance.Spec); err != nil {
 		return nropv1.NUMAResourcesSchedulerStatus{}, err
 	}
 

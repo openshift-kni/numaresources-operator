@@ -635,15 +635,15 @@ func TestDeploymentTLSSettingsRepeated(t *testing.T) {
 	}
 }
 
-func TestDeploymentAffinityWithStrategyNoLabels(t *testing.T) {
+func TestDeploymentAffinityNoLabels(t *testing.T) {
 	dp := dpMinimal.DeepCopy()
-	err := DeploymentAffinityWithStrategy(dp, nropv1.NUMAResourcesSchedulerSpec{})
+	err := DeploymentAffinity(dp, nropv1.NUMAResourcesSchedulerSpec{})
 	if err == nil {
 		t.Fatalf("expected error but received nil")
 	}
 }
 
-func TestDeploymentAffinityWithStrategyExplicitNonNilReplicasCount(t *testing.T) {
+func TestDeploymentAffinityExplicitNonNilReplicasCount(t *testing.T) {
 	testcases := []struct {
 		name                string
 		nonNilReplicasCount *int32
@@ -688,7 +688,7 @@ func TestDeploymentAffinityWithStrategyExplicitNonNilReplicasCount(t *testing.T)
 					},
 				},
 			}
-			err := DeploymentAffinityWithStrategy(dp, nropv1.NUMAResourcesSchedulerSpec{Replicas: tc.nonNilReplicasCount})
+			err := DeploymentAffinity(dp, nropv1.NUMAResourcesSchedulerSpec{Replicas: tc.nonNilReplicasCount})
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -699,22 +699,12 @@ func TestDeploymentAffinityWithStrategyExplicitNonNilReplicasCount(t *testing.T)
 			if dp.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
 				t.Fatalf("expected podAntiAffinity to be reset but got %v", dp.Spec.Template.Spec.Affinity.PodAntiAffinity)
 			}
-			if dp.Spec.Strategy != (appsv1.DeploymentStrategy{}) {
-				t.Fatalf("expected strategy to be reset but got %v", dp.Spec.Strategy)
-			}
 		})
 	}
 }
 
-func TestDeploymentAffinityWithStrategyWithOverride(t *testing.T) {
+func TestDeploymentAffinityWithOverride(t *testing.T) {
 	labels := map[string]string{"app": "scheduler"}
-	expectedStrategy := appsv1.DeploymentStrategy{
-		Type: appsv1.RollingUpdateDeploymentStrategyType,
-		RollingUpdate: &appsv1.RollingUpdateDeployment{
-			MaxUnavailable: ptr.To(intstr.FromInt(1)),
-			MaxSurge:       ptr.To(intstr.FromInt(0)),
-		},
-	}
 	expectedPodAntiAffinity := &corev1.PodAntiAffinity{
 		RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
 			{
@@ -728,7 +718,7 @@ func TestDeploymentAffinityWithStrategyWithOverride(t *testing.T) {
 	dp := dpMinimal.DeepCopy()
 	dp.Spec.Template.ObjectMeta.Labels = labels
 
-	err := DeploymentAffinityWithStrategy(dp, nropv1.NUMAResourcesSchedulerSpec{})
+	err := DeploymentAffinity(dp, nropv1.NUMAResourcesSchedulerSpec{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -736,12 +726,9 @@ func TestDeploymentAffinityWithStrategyWithOverride(t *testing.T) {
 	if diff := cmp.Diff(expectedPodAntiAffinity, dp.Spec.Template.Spec.Affinity.PodAntiAffinity); diff != "" {
 		t.Errorf("affinity mismatch (-expected +got):\n%s", diff)
 	}
-	if diff := cmp.Diff(expectedStrategy, dp.Spec.Strategy); diff != "" {
-		t.Errorf("strategy mismatch (-expected +got):\n%s", diff)
-	}
 
 	// check reset works
-	err = DeploymentAffinityWithStrategy(dp, nropv1.NUMAResourcesSchedulerSpec{Replicas: ptr.To(int32(2))})
+	err = DeploymentAffinity(dp, nropv1.NUMAResourcesSchedulerSpec{Replicas: ptr.To(int32(2))})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -749,8 +736,22 @@ func TestDeploymentAffinityWithStrategyWithOverride(t *testing.T) {
 	if dp.Spec.Template.Spec.Affinity != nil && dp.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
 		t.Fatalf("Override failed: expected no podAntiAffinity but got %v", dp.Spec.Template.Spec.Affinity.PodAntiAffinity)
 	}
-	if dp.Spec.Strategy != (appsv1.DeploymentStrategy{}) {
-		t.Fatalf("expected strategy to be reset but got %v", dp.Spec.Strategy)
+}
+
+func TestDeploymentRolloutStrategy(t *testing.T) {
+	dp := dpMinimal.DeepCopy()
+
+	DeploymentRolloutStrategy(dp)
+
+	expected := appsv1.DeploymentStrategy{
+		Type: appsv1.RollingUpdateDeploymentStrategyType,
+		RollingUpdate: &appsv1.RollingUpdateDeployment{
+			MaxUnavailable: ptr.To(intstr.FromInt(1)),
+			MaxSurge:       ptr.To(intstr.FromInt(0)),
+		},
+	}
+	if diff := cmp.Diff(expected, dp.Spec.Strategy); diff != "" {
+		t.Errorf("strategy mismatch (-expected +got):\n%s", diff)
 	}
 }
 
