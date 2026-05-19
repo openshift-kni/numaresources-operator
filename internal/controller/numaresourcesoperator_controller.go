@@ -146,8 +146,8 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return ctrl.Result{}, err
 	}
 
-	initialStatus := *instance.Status.DeepCopy()
-	if len(initialStatus.Conditions) == 0 {
+	initialInstance := instance.DeepCopy()
+	if len(initialInstance.Status.Conditions) == 0 {
 		instance.Status.Conditions = status.NewNUMAResourcesOperatorConditions()
 	} else {
 		// on upgrade, backfill conditions added in newer versions
@@ -156,7 +156,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	if req.Name != objectnames.DefaultNUMAResourcesOperatorCrName {
 		err := fmt.Errorf("incorrect NUMAResourcesOperator resource name: %s", instance.Name)
-		return r.degradeStatus(ctx, initialStatus, instance, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, err)
+		return r.degradeStatus(ctx, initialInstance, instance, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, err)
 	}
 
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
@@ -165,17 +165,17 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	if err := validation.NodeGroups(instance.Spec.NodeGroups, r.Platform); err != nil {
-		return r.degradeStatus(ctx, initialStatus, instance, validation.NodeGroupsError, err)
+		return r.degradeStatus(ctx, initialInstance, instance, validation.NodeGroupsError, err)
 	}
 
 	trees, err := getTreesByNodeGroup(ctx, r.Client, instance.Spec.NodeGroups, r.Platform)
 	if err != nil {
-		return r.degradeStatus(ctx, initialStatus, instance, validation.NodeGroupsError, err)
+		return r.degradeStatus(ctx, initialInstance, instance, validation.NodeGroupsError, err)
 	}
 
 	tolerable, err := validation.NodeGroupsTree(instance, trees, r.Platform)
 	if err != nil {
-		return r.degradeStatus(ctx, initialStatus, instance, validation.NodeGroupsError, err)
+		return r.degradeStatus(ctx, initialInstance, instance, validation.NodeGroupsError, err)
 	}
 
 	for idx := range trees {
@@ -187,29 +187,17 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	instance.Status.Conditions, _ = status.ComputeConditions(instance.Status.Conditions, step.ConditionInfo.ToMetav1Condition(instance.Generation), time.Now())
 
 	if step.Done() && tolerable != nil {
-		return r.degradeStatus(ctx, initialStatus, instance, tolerable.Reason, tolerable.Error)
+		return r.degradeStatus(ctx, initialInstance, instance, tolerable.Reason, tolerable.Error)
 	}
 
-	if err := r.updateStatus(ctx, initialStatus, instance); err != nil {
+	if err := r.Client.Status().Patch(ctx, instance, client.MergeFrom(initialInstance)); err != nil {
 		klog.InfoS("Failed to update numaresources-operator status", "error", err)
 	}
 
 	return step.Result, step.Error
 }
 
-func (r *NUMAResourcesOperatorReconciler) updateStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesOperatorStatus, instance *nropv1.NUMAResourcesOperator) error {
-	if !status.NUMAResourceOperatorNeedsUpdate(initialStatus, instance.Status) {
-		return nil
-	}
-
-	updErr := r.Client.Status().Update(ctx, instance)
-	if updErr != nil {
-		return fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(instance), updErr)
-	}
-	return nil
-}
-
-func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesOperatorStatus, instance *nropv1.NUMAResourcesOperator, reason string, stErr error) (ctrl.Result, error) {
+func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, initialInstance, instance *nropv1.NUMAResourcesOperator, reason string, stErr error) (ctrl.Result, error) {
 	info := conditioninfo.DegradedFromError(stErr)
 	if reason != "" { // intentionally overwrite
 		info.Reason = reason
@@ -217,7 +205,7 @@ func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, ini
 
 	instance.Status.Conditions, _ = status.ComputeConditions(instance.Status.Conditions, info.ToMetav1Condition(instance.Generation), time.Now())
 
-	err := r.updateStatus(ctx, initialStatus, instance)
+	err := r.Client.Status().Patch(ctx, instance, client.MergeFrom(initialInstance))
 	if err != nil {
 		klog.InfoS("Failed to update numaresourcesoperator status", "error", err)
 	}

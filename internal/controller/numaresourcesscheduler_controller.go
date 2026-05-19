@@ -117,14 +117,14 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 		return ctrl.Result{}, err
 	}
 
-	initialStatus := *instance.Status.DeepCopy()
-	if len(initialStatus.Conditions) == 0 {
+	initialInstance := instance.DeepCopy()
+	if len(initialInstance.Status.Conditions) == 0 {
 		instance.Status.Conditions = status.NewNUMAResourcesSchedulerBaseConditions()
 	}
 
 	if req.Name != objectnames.DefaultNUMAResourcesSchedulerCrName {
 		message := fmt.Sprintf("incorrect NUMAResourcesScheduler resource name: %s", instance.Name)
-		return ctrl.Result{}, r.degradeStatus(ctx, initialStatus, instance, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
+		return ctrl.Result{}, r.degradeStatus(ctx, initialInstance, instance, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
 	}
 
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
@@ -134,14 +134,14 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 
 	step := r.reconcileResource(ctx, instance)
 	instance.Status.Conditions, _ = status.ComputeConditions(instance.Status.Conditions, step.ConditionInfo.ToMetav1Condition(instance.Generation), time.Now())
-	if err := r.updateStatus(ctx, initialStatus, instance); err != nil {
+	if err := r.Client.Status().Patch(ctx, instance, client.MergeFrom(initialInstance)); err != nil {
 		klog.InfoS("Failed to update numaresourcesscheduler status", "error", err)
 	}
 
 	return step.Result, step.Error
 }
 
-func (r *NUMAResourcesSchedulerReconciler) degradeStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesSchedulerStatus, instance *nropv1.NUMAResourcesScheduler, reason string, message string) error {
+func (r *NUMAResourcesSchedulerReconciler) degradeStatus(ctx context.Context, initialInstance, instance *nropv1.NUMAResourcesScheduler, reason string, message string) error {
 	condition := metav1.Condition{
 		Type:               status.ConditionDegraded,
 		Status:             metav1.ConditionTrue,
@@ -152,7 +152,7 @@ func (r *NUMAResourcesSchedulerReconciler) degradeStatus(ctx context.Context, in
 
 	instance.Status.Conditions, _ = status.ComputeConditions(instance.Status.Conditions, condition, time.Now())
 
-	err := r.updateStatus(ctx, initialStatus, instance)
+	err := r.Client.Status().Patch(ctx, instance, client.MergeFrom(initialInstance))
 	if err != nil {
 		klog.InfoS("Failed to update numaresourcesoperator status", "error", err)
 	}
@@ -420,17 +420,6 @@ func updateDedicatedInformerCondition(conds []metav1.Condition, instanceGenerati
 
 	conds, _ = status.ComputeConditions(conds, informerCondition, time.Time{})
 	return conds
-}
-
-func (r *NUMAResourcesSchedulerReconciler) updateStatus(ctx context.Context, initialStatus nropv1.NUMAResourcesSchedulerStatus, sched *nropv1.NUMAResourcesScheduler) error {
-	if !status.NUMAResourcesSchedulerNeedsUpdate(initialStatus, sched.Status) {
-		return nil
-	}
-
-	if err := r.Client.Status().Update(ctx, sched); err != nil {
-		return fmt.Errorf("could not update status for object %s: %w", client.ObjectKeyFromObject(sched), err)
-	}
-	return nil
 }
 
 func unpackAPIResyncPeriod(reconcilePeriod *metav1.Duration) time.Duration {
