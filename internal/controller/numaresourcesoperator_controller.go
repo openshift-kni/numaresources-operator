@@ -192,6 +192,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 
 	if err := r.Client.Status().Patch(ctx, instance, client.MergeFrom(initialInstance)); err != nil {
 		klog.InfoS("Failed to update numaresources-operator status", "error", err)
+		return ctrl.Result{}, err
 	}
 
 	return step.Result, step.Error
