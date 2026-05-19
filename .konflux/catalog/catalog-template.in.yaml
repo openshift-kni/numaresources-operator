@@ -24,6 +24,21 @@ entries:
     name: "4.21"
     package: numaresources-operator
     schema: olm.channel
+  - entries:
+      # v4.21.0
+      - name: numaresources-operator.v4.21.0
+        skipRange: '>=4.20.0 <4.21.0'
+      # v4.21.1
+      - name: numaresources-operator.v4.21.1
+        replaces: numaresources-operator.v4.21.0
+        skipRange: '>=4.20.0 <4.21.1'
+      # v4.21.2
+      - name: numaresources-operator.v4.21.2
+        replaces: numaresources-operator.v4.21.1
+        skipRange: '>=4.20.0 <4.21.2'
+    name: stable
+    package: numaresources-operator
+    schema: olm.channel
   # v4.21.0 bundle
   - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:ebf0e77b3372909adcdb266a5e3ca1c6abd95687f3ae389fcef38b58072ac764
     schema: olm.bundle
