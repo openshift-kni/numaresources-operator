@@ -124,7 +124,7 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 
 	if req.Name != objectnames.DefaultNUMAResourcesSchedulerCrName {
 		message := fmt.Sprintf("incorrect NUMAResourcesScheduler resource name: %s", instance.Name)
-		return ctrl.Result{}, r.degradeStatus(ctx, initialInstance, instance, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
+		return r.degradeStatus(ctx, initialInstance, instance, status.ConditionTypeIncorrectNUMAResourcesSchedulerResourceName, message)
 	}
 
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
@@ -136,12 +136,13 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	instance.Status.Conditions, _ = status.ComputeConditions(instance.Status.Conditions, step.ConditionInfo.ToMetav1Condition(instance.Generation), time.Now())
 	if err := r.Client.Status().Patch(ctx, instance, client.MergeFrom(initialInstance)); err != nil {
 		klog.InfoS("Failed to update numaresourcesscheduler status", "error", err)
+		return ctrl.Result{}, err
 	}
 
 	return step.Result, step.Error
 }
 
-func (r *NUMAResourcesSchedulerReconciler) degradeStatus(ctx context.Context, initialInstance, instance *nropv1.NUMAResourcesScheduler, reason string, message string) error {
+func (r *NUMAResourcesSchedulerReconciler) degradeStatus(ctx context.Context, initialInstance, instance *nropv1.NUMAResourcesScheduler, reason string, message string) (ctrl.Result, error) {
 	condition := metav1.Condition{
 		Type:               status.ConditionDegraded,
 		Status:             metav1.ConditionTrue,
@@ -154,9 +155,9 @@ func (r *NUMAResourcesSchedulerReconciler) degradeStatus(ctx context.Context, in
 
 	err := r.Client.Status().Patch(ctx, instance, client.MergeFrom(initialInstance))
 	if err != nil {
-		klog.InfoS("Failed to update numaresourcesoperator status", "error", err)
+		klog.InfoS("Failed to update numaresourcesscheduler status", "error", err)
 	}
-	return err
+	return ctrl.Result{}, err
 }
 
 // SetupWithManager sets up the controller with the Manager.
