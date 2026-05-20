@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
@@ -102,6 +103,35 @@ func DeploymentTLSSettings(dp *appsv1.Deployment, tlsSettings objtls.Settings) e
 	return nil
 }
 
+func DeploymentTopologySpreadConstraints(dp *appsv1.Deployment) error {
+	labels := dp.Spec.Template.Labels
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	/*
+			topologySpreadConstraints:
+		      - labelSelector:
+		          matchLabels:
+		            app: my-app-2
+		        matchLabelKeys:
+		        - pod-template-hash
+		        maxSkew: 1
+		        topologyKey: kubernetes.io/hostname
+		        whenUnsatisfiable: DoNotSchedule
+	*/
+	dp.Spec.Template.Spec.TopologySpreadConstraints = []corev1.TopologySpreadConstraint{
+		{
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: labels,
+			},
+			MaxSkew:           1,
+			TopologyKey:       "kubernetes.io/hostname",
+			WhenUnsatisfiable: corev1.DoNotSchedule,
+			MatchLabelKeys:    []string{"pod-template-hash"},
+		},
+	}
+	return nil
+}
 func SchedulerConfig(cm *corev1.ConfigMap, name string, params *k8swgmanifests.ConfigParams) error {
 	if cm.Data == nil {
 		return fmt.Errorf("no data found in ConfigMap: %s/%s", cm.Namespace, cm.Name)
