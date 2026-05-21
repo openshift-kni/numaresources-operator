@@ -36,6 +36,14 @@
             "addLabels": [
                 "allow-automatic-merge"
             ],
+            "matchManagers": [
+                "rpm-lockfile"
+            ]
+        },
+        {
+            "addLabels": [
+                "allow-automatic-merge"
+            ],
             "enabled": true,
             "ignoreTests": false,
             "matchDatasources": [
