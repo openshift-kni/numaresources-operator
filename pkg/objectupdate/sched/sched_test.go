@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -513,6 +515,43 @@ func TestSchedulerResourcesRequest(t *testing.T) {
 				t.Errorf("got=%s expected %s", toJSON(rr), toJSON(tc.expectedRR))
 			}
 		})
+	}
+}
+
+func TestDeploymentTopologySpreadConstraintsNoLabels(t *testing.T) {
+	dp := dpMinimal.DeepCopy()
+	dp.Spec.Template.Labels = nil
+	if err := DeploymentTopologySpreadConstraints(dp); err == nil {
+		t.Fatalf("expected error but got nil")
+	}
+
+	dp.Spec.Template.Labels = map[string]string{}
+	if err := DeploymentTopologySpreadConstraints(dp); err == nil {
+		t.Fatalf("expected error but got nil")
+	}
+}
+
+func TestDeploymentTopologySpreadConstraints(t *testing.T) {
+	dp := dpMinimal.DeepCopy()
+	dp.Spec.Template.Labels = map[string]string{
+		"app": "numaresources-scheduler",
+	}
+	if err := DeploymentTopologySpreadConstraints(dp); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectedConstraints := []corev1.TopologySpreadConstraint{
+		{
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: dp.Spec.Template.Labels,
+			},
+			MaxSkew:           1,
+			TopologyKey:       "kubernetes.io/hostname",
+			WhenUnsatisfiable: corev1.DoNotSchedule,
+			MatchLabelKeys:    []string{"pod-template-hash"},
+		},
+	}
+	if diff := cmp.Diff(dp.Spec.Template.Spec.TopologySpreadConstraints, expectedConstraints); diff != "" {
+		t.Errorf("constraints mismatch\n%s", diff)
 	}
 }
 

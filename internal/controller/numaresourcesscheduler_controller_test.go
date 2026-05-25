@@ -795,6 +795,29 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
 			Expect(*dp.Spec.Replicas).To(Equal(int32(numOfMasters)), "number of replicas is different than number of control-planes nodes; want=%d got=%d", numOfMasters, *dp.Spec.Replicas)
 		})
+
+		It("should set the TopologySpreadConstraints in the deployment by default", func(ctx context.Context) {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(reconciler.Client.Get(ctx, key, nrs)).To(Succeed())
+			dpKey := client.ObjectKey{Namespace: nrs.Status.Deployment.Namespace, Name: nrs.Status.Deployment.Name}
+			dp := &appsv1.Deployment{}
+			Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
+			Expect(dp.Spec.Template.Spec.TopologySpreadConstraints).To(HaveLen(1))
+
+			expectedConstraint := corev1.TopologySpreadConstraint{
+				MaxSkew:           1,
+				TopologyKey:       "kubernetes.io/hostname",
+				WhenUnsatisfiable: corev1.DoNotSchedule,
+				MatchLabelKeys:    []string{"pod-template-hash"},
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: dp.Spec.Template.Labels,
+				},
+			}
+			Expect(dp.Spec.Template.Spec.TopologySpreadConstraints[0]).To(Equal(expectedConstraint))
+		})
 	})
 
 	When("setting the scheduler pod resource requests", func() {

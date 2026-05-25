@@ -330,6 +330,10 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 
 	schedupdate.DeploymentEnvVarSettings(r.SchedulerManifests.Deployment, schedSpec)
 
+	if err := schedupdate.DeploymentTopologySpreadConstraints(r.SchedulerManifests.Deployment); err != nil {
+		return nropv1.NUMAResourcesSchedulerStatus{}, err
+	}
+
 	k8swgrbacupdate.RoleForLeaderElection(r.SchedulerManifests.Role, r.Namespace, nrosched.LeaderElectionResourceName)
 	k8swgrbacupdate.RoleBinding(r.SchedulerManifests.RoleBinding, r.SchedulerManifests.ServiceAccount.Name, r.Namespace)
 
