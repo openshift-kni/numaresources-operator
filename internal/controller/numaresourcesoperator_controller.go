@@ -251,7 +251,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Conte
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) intreconcile.Step {
 	// we need to sync machine configs first and wait for the MachineConfigPool updates
 	// before checking additional components for updates
-	waitByPool, pausedMCPNames, err := r.syncMachineConfigs(ctx, instance, existing, trees)
+	waitByPool, pausedMCPNames, err := r.syncMachineConfigs(ctx, instance, existing, trees...)
 	if err != nil {
 		err = fmt.Errorf("failed to sync machine configs: %w", err)
 		return intreconcile.StepFailed(err)
@@ -259,7 +259,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 
 	// MCO needs to update the SELinux context removal and other stuff, and need to trigger a reboot.
 	// It can take a while.
-	mcpStatuses, mcpNamePending := syncMachineConfigPoolsStatuses(instance.Name, trees, r.ForwardMCPConds, waitByPool)
+	mcpStatuses, mcpNamePending := syncMachineConfigPoolsStatuses(instance.Name, r.ForwardMCPConds, waitByPool, trees...)
 	instance.Status.MachineConfigPools = mcpStatuses
 	instance.Status.Conditions = updateMachineConfigPoolPausedCondition(instance.Status.Conditions, instance.Generation, pausedMCPNames)
 
@@ -267,7 +267,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 		// the Machine Config Pool still did not apply the machine config, wait for one minute
 		return intreconcile.StepOngoing(numaResourcesRetryPeriod).WithReason("MachineConfigPoolIsUpdating").WithMessage(mcpNamePending + " is updating")
 	}
-	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees)
+	instance.Status.MachineConfigPools = syncMachineConfigPoolNodeGroupConfigStatuses(instance.Status.MachineConfigPools, trees...)
 
 	return intreconcile.StepSuccess()
 }
@@ -401,7 +401,7 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx contex
 	return (updatedCount == len(objStates)), err
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) (map[string]rtestate.MCPWaitForUpdatedFunc, sets.Set[string], error) {
+func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees ...nodegroupv1.Tree) (map[string]rtestate.MCPWaitForUpdatedFunc, sets.Set[string], error) {
 	klog.V(4).InfoS("Machine Config Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Sync stop")
 
@@ -437,7 +437,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	return waitByPool, pausedMCPNames, err
 }
 
-func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tree, forwardMCPConds bool, waitByPool map[string]rtestate.MCPWaitForUpdatedFunc) ([]nropv1.MachineConfigPool, string) {
+func syncMachineConfigPoolsStatuses(instanceName string, forwardMCPConds bool, waitByPool map[string]rtestate.MCPWaitForUpdatedFunc, trees ...nodegroupv1.Tree) ([]nropv1.MachineConfigPool, string) {
 	klog.V(4).InfoS("Machine Config Pools Status Sync start", "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Pools Status Sync stop")
 
@@ -462,7 +462,7 @@ func syncMachineConfigPoolsStatuses(instanceName string, trees []nodegroupv1.Tre
 	return mcpStatuses, ""
 }
 
-func syncMachineConfigPoolNodeGroupConfigStatuses(mcpStatuses []nropv1.MachineConfigPool, trees []nodegroupv1.Tree) []nropv1.MachineConfigPool {
+func syncMachineConfigPoolNodeGroupConfigStatuses(mcpStatuses []nropv1.MachineConfigPool, trees ...nodegroupv1.Tree) []nropv1.MachineConfigPool {
 	klog.V(4).InfoS("Machine Config Pool Node Group Status Sync start", "mcpStatuses", len(mcpStatuses), "trees", len(trees))
 	defer klog.V(4).Info("Machine Config Pool Node Group Status Sync stop")
 
