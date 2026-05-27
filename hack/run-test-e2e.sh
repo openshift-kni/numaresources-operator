@@ -43,6 +43,9 @@ if [ "$ENABLE_SCHED_TESTS" = true ]; then
   echo "Running NROScheduler install test suite"
   ${BIN_DIR}/e2e-nrop-sched-install.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.fail-fast --ginkgo.junit-report=${REPORT_DIR}/sched-install.xml
 
+  echo "Running TLS e2e suite"
+  ${BIN_DIR}/e2e-nrop-tls.test ${NO_COLOR} --ginkgo.v --ginkgo.junit-report=${REPORT_DIR}/e2e-tls.xml
+
   echo "Running Functional Tests: ${GINKGO_SUITS}"
   # -v: print out the text and location for each spec before running it and flush output to stdout in realtime
   # -timeout: exit the suite after the specified time

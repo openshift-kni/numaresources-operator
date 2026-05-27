@@ -272,11 +272,15 @@ binary-e2e-tools: generate-source ## Build tools e2e test binary.
 binary-e2e-must-gather: generate-source ## Build must-gather e2e test binary.
 	go test -c -v -o bin/e2e-nrop-must-gather.test ./test/e2e/must-gather
 
+.PHONY: binary-e2e-tls
+binary-e2e-tls: generate-source ## Build TLS e2e test binary.
+	go test -c -v -o bin/e2e-nrop-tls.test ./test/e2e/tls
+
 # backward compatibility
 binary-must-gather-e2e: binary-e2e-must-gather
 
 .PHONY: binary-e2e-all
-binary-e2e-all: goversion binary-e2e-install binary-e2e-upgrade binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial binary-e2e-tools binary-e2e-must-gather runner-e2e-serial build-pause introspect-data ## Build all e2e test binaries.
+binary-e2e-all: goversion binary-e2e-install binary-e2e-upgrade binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial binary-e2e-tools binary-e2e-must-gather binary-e2e-tls runner-e2e-serial build-pause introspect-data ## Build all e2e test binaries.
 
 .PHONY: runner-e2e-serial
 runner-e2e-serial: bin/envsubst ## Render and validate the serial e2e runner script.
@@ -326,6 +330,9 @@ build-e2e-all: generate-source fmt vet binary-e2e-all ## Build all e2e tests.
 
 .PHONY: build-e2e-must-gather
 build-e2e-must-gather: fmt vet binary-e2e-must-gather ## Build must-gather e2e tests.
+
+.PHONY: build-e2e-tls
+build-e2e-tls: fmt vet binary-e2e-tls ## Build TLS e2e tests.
 
 # backward compatibility
 build-must-gather-e2e: build-e2e-must-gather
