@@ -189,6 +189,10 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.degradeStatus(ctx, initialInstance, instance, tolerable.Reason, tolerable.Error)
 	}
 
+	if step.Done() && instance.Spec.ExporterImage != "" {
+		return r.degradeStatusf(ctx, initialInstance, instance, status.ConditionTypeCustomUserImage, "custom operand image set: %s", instance.Spec.ExporterImage)
+	}
+
 	if err := r.Client.Status().Patch(ctx, instance, client.MergeFrom(initialInstance)); err != nil {
 		klog.InfoS("Failed to update numaresources-operator status", "error", err)
 		return ctrl.Result{}, err

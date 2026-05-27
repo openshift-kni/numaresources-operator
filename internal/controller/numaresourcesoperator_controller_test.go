@@ -192,6 +192,31 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			})
 		})
 
+		Context("with custom ExporterImage set", func() {
+			It("should update the CR condition to degraded", func(ctx context.Context) {
+				pn := "test"
+				ng := nropv1.NodeGroup{
+					PoolName: &pn,
+				}
+				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
+				nro.Spec.ExporterImage = "quay.io/custom/image:latest"
+
+				labSel := &metav1.LabelSelector{
+					MatchLabels: map[string]string{pn: pn},
+				}
+				mcp := testobjs.NewMachineConfigPool(pn, labSel.MatchLabels, labSel, labSel)
+
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platf, defaultOCPVersion, nro, mcp)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
+
+				Expect(reconciler.Client.Get(ctx, key, nro)).ToNot(HaveOccurred())
+				Expect(nro).To(BeDegradedWithReason(status.ConditionTypeCustomUserImage))
+			})
+		})
+
 		Context("with default RTE SELinux and PoolName set", func() {
 			Context("with correct NRO and more than one NodeGroup", func() {
 				var nro *nropv1.NUMAResourcesOperator
