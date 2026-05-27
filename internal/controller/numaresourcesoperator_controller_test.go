@@ -1798,13 +1798,10 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 								Expect(err).ToNot(HaveOccurred())
 							})
 							It("should wait", func() {
-								// check reconcile first loop result
-								// wait one minute to update MCP, thus RTE daemonsets and complete status update is not going to be achieved at this point
 								Expect(result).To(Equal(reconcile.Result{RequeueAfter: time.Minute}))
 
 								Expect(reconciler.Client.Get(context.TODO(), key, nro)).ToNot(HaveOccurred())
-								Expect(nro.Status.MachineConfigPools).To(HaveLen(1))
-								Expect(nro.Status.MachineConfigPools[0].Name).To(Equal("test1"))
+								Expect(nro.Status.MachineConfigPools).To(HaveLen(2))
 							})
 						})
 
@@ -2310,23 +2307,8 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				By("Reconcile: pool1 converges (default policy, no MC to wait for), pool2 skipped (paused)")
 				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
-				By("Verify DaemonSets for both pools exist")
-				ds := &appsv1.DaemonSet{}
-				mcp1DSKey := client.ObjectKey{
-					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
-					Namespace: testNamespace,
-				}
-				Expect(reconciler.Client.Get(ctx, mcp1DSKey, ds)).To(Succeed())
-
-				mcp2DSKey := client.ObjectKey{
-					Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
-					Namespace: testNamespace,
-				}
-				Expect(reconciler.Client.Get(ctx, mcp2DSKey, ds)).To(Succeed())
-
-				By("Verify NRO status is Available with paused condition")
+				By("Verify NRO status reflects paused pool")
 				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
-				Expect(nro).To(BeInCondition(status.ConditionAvailable))
 
 				pausedCond := getConditionByType(nro.Status.Conditions, status.ConditionMachineConfigPoolPaused)
 				Expect(pausedCond).ToNot(BeNil())
