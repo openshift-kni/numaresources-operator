@@ -51,14 +51,28 @@ func (wt Waiter) ForDeploymentComplete(ctx context.Context, dp *appsv1.Deploymen
 }
 
 func areDeploymentReplicasAvailable(newStatus *appsv1.DeploymentStatus, replicas int32) bool {
-	return newStatus.UpdatedReplicas == replicas &&
-		newStatus.Replicas == replicas &&
-		newStatus.AvailableReplicas == replicas
+	if newStatus.Replicas != replicas {
+		klog.InfoS("newStatus.Replicas", "expected", replicas, "found", newStatus.Replicas)
+		return false
+	}
+	if newStatus.UpdatedReplicas != replicas {
+		klog.InfoS("newStatus.UpdatedReplicas", "expected", replicas, "found", newStatus.UpdatedReplicas)
+		return false
+	}
+	if newStatus.AvailableReplicas != replicas {
+		klog.InfoS("newStatus.AvailableReplicas", "expected", replicas, "found", newStatus.AvailableReplicas)
+		return false
+	}
+	return true
 }
 
 func IsDeploymentComplete(dp *appsv1.Deployment, newStatus *appsv1.DeploymentStatus) bool {
-	return areDeploymentReplicasAvailable(newStatus, *(dp.Spec.Replicas)) &&
-		newStatus.ObservedGeneration >= dp.Generation
+	if newStatus.ObservedGeneration < dp.Generation {
+		klog.InfoS("generation is older than expected to indicate the deployment is complete", "old", dp.Generation, "new", newStatus.ObservedGeneration)
+		return false
+	}
+
+	return areDeploymentReplicasAvailable(newStatus, *(dp.Spec.Replicas))
 }
 
 func (wt Waiter) ForDeploymentReplicasCreation(ctx context.Context, dp *appsv1.Deployment, expectedReplicas int32) (*appsv1.Deployment, error) {
