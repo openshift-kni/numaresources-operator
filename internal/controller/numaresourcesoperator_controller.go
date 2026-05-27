@@ -367,8 +367,8 @@ func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx contex
 	return (updatedCount == len(objStates)), err
 }
 
-func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees ...nodegroupv1.Tree) (map[string]rtestate.MCPWaitForUpdatedFunc, sets.Set[string], error) {
-	klog.V(4).InfoS("Machine Config Sync start", "trees", len(trees))
+func (r *NUMAResourcesOperatorReconciler) syncMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, tree nodegroupv1.Tree) (map[string]rtestate.MCPWaitForUpdatedFunc, sets.Set[string], error) {
+	klog.V(4).InfoS("Machine Config Sync start", "tree", tree.Name())
 	defer klog.V(4).Info("Machine Config Sync stop")
 
 	var err error
@@ -377,7 +377,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	// In case of operator upgrade from 4.1X → 4.18, it's necessary to remove the old MachineConfig,
 	// unless an emergency annotation is provided which forces the operator to use custom policy
 
-	mcObjStates, pausedMCPNames := existing.MachineConfigsStateForTree(r.RTEManifests, trees[0])
+	mcObjStates, pausedMCPNames := existing.MachineConfigsStateForTree(r.RTEManifests, tree)
 	waitByPool := make(map[string]rtestate.MCPWaitForUpdatedFunc, len(mcObjStates))
 	for _, mcObjState := range mcObjStates {
 		waitByPool[mcObjState.PoolName] = mcObjState.WaitForUpdated
@@ -389,7 +389,7 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 				break
 			}
 
-			if err2 := validateMachineConfigLabels(objState.Desired, trees); err2 != nil {
+			if err2 := validateMachineConfigLabels(objState.Desired, tree); err2 != nil {
 				err = err2
 				break
 			}
@@ -609,7 +609,7 @@ func validateUpdateEvent(e *event.UpdateEvent) bool {
 	return true
 }
 
-func validateMachineConfigLabels(mc client.Object, trees []nodegroupv1.Tree) error {
+func validateMachineConfigLabels(mc client.Object, tree nodegroupv1.Tree) error {
 	mcLabels := mc.GetLabels()
 	v, ok := mcLabels[rtestate.MachineConfigLabelKey]
 	// the machine config does not have generated label, meaning the machine config pool has the matchLabels under
@@ -618,21 +618,19 @@ func validateMachineConfigLabels(mc client.Object, trees []nodegroupv1.Tree) err
 		return nil
 	}
 
-	for _, tree := range trees {
-		for _, mcp := range tree.MachineConfigPools {
-			if v != mcp.Name {
-				continue
-			}
+	for _, mcp := range tree.MachineConfigPools {
+		if v != mcp.Name {
+			continue
+		}
 
-			mcLabels := labels.Set(mcLabels)
-			mcSelector, err := metav1.LabelSelectorAsSelector(mcp.Spec.MachineConfigSelector)
-			if err != nil {
-				return fmt.Errorf("failed to represent machine config pool %q machine config selector as selector: %w", mcp.Name, err)
-			}
+		mcLabels := labels.Set(mcLabels)
+		mcSelector, err := metav1.LabelSelectorAsSelector(mcp.Spec.MachineConfigSelector)
+		if err != nil {
+			return fmt.Errorf("failed to represent machine config pool %q machine config selector as selector: %w", mcp.Name, err)
+		}
 
-			if !mcSelector.Matches(mcLabels) {
-				return fmt.Errorf("machine config %q labels does not match the machine config pool %q machine config selector", mc.GetName(), mcp.Name)
-			}
+		if !mcSelector.Matches(mcLabels) {
+			return fmt.Errorf("machine config %q labels does not match the machine config pool %q machine config selector", mc.GetName(), mcp.Name)
 		}
 	}
 	return nil
@@ -752,7 +750,7 @@ type perTreeResult struct {
 func (r *NUMAResourcesOperatorReconciler) reconcilePerTreeMachineConfig(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, tree nodegroupv1.Tree) perTreeResult {
 	result := perTreeResult{}
 
-	waitByPool, pausedMCPNames, err := r.syncMachineConfigs(ctx, instance, existing, tree)
+	waitByPool, pausedMCPNames, err := r.syncMachineConfig(ctx, instance, existing, tree)
 	result.pausedMCPNames = pausedMCPNames
 	if err != nil {
 		result.step = intreconcile.StepFailed(fmt.Errorf("failed to sync machine configs: %w", err))
