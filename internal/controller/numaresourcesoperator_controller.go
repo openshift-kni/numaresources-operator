@@ -403,56 +403,52 @@ func (r *NUMAResourcesOperatorReconciler) syncMachineConfigs(ctx context.Context
 	return waitByPool, pausedMCPNames, err
 }
 
-func syncMachineConfigPoolsStatuses(instanceName string, forwardMCPConds bool, waitByPool map[string]rtestate.MCPWaitForUpdatedFunc, trees ...nodegroupv1.Tree) ([]nropv1.MachineConfigPool, string) {
-	klog.V(4).InfoS("Machine Config Pools Status Sync start", "trees", len(trees))
+func syncMachineConfigPoolsStatuses(instanceName string, forwardMCPConds bool, waitByPool map[string]rtestate.MCPWaitForUpdatedFunc, tree nodegroupv1.Tree) ([]nropv1.MachineConfigPool, string) {
+	klog.V(4).InfoS("Machine Config Pools Status Sync start", "tree", tree.Name())
 	defer klog.V(4).Info("Machine Config Pools Status Sync stop")
 
 	mcpStatuses := []nropv1.MachineConfigPool{}
-	for _, tree := range trees {
-		for _, mcp := range tree.MachineConfigPools {
-			mcpStatuses = append(mcpStatuses, extractMCPStatus(mcp, forwardMCPConds))
+	for _, mcp := range tree.MachineConfigPools {
+		mcpStatuses = append(mcpStatuses, extractMCPStatus(mcp, forwardMCPConds))
 
-			waitFunc, ok := waitByPool[mcp.Name]
-			if !ok {
-				continue
-			}
+		waitFunc, ok := waitByPool[mcp.Name]
+		if !ok {
+			continue
+		}
 
-			isUpdated := waitFunc(instanceName, mcp)
-			klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instanceName, "updated", isUpdated)
+		isUpdated := waitFunc(instanceName, mcp)
+		klog.V(5).InfoS("Machine Config Pool state", "name", mcp.Name, "instance", instanceName, "updated", isUpdated)
 
-			if !isUpdated {
-				return mcpStatuses, mcp.Name
-			}
+		if !isUpdated {
+			return mcpStatuses, mcp.Name
 		}
 	}
 	return mcpStatuses, ""
 }
 
-func syncMachineConfigPoolNodeGroupConfigStatuses(mcpStatuses []nropv1.MachineConfigPool, trees ...nodegroupv1.Tree) []nropv1.MachineConfigPool {
-	klog.V(4).InfoS("Machine Config Pool Node Group Status Sync start", "mcpStatuses", len(mcpStatuses), "trees", len(trees))
+func syncMachineConfigPoolNodeGroupConfigStatuses(mcpStatuses []nropv1.MachineConfigPool, tree nodegroupv1.Tree) []nropv1.MachineConfigPool {
+	klog.V(4).InfoS("Machine Config Pool Node Group Status Sync start", "mcpStatuses", len(mcpStatuses), "tree", tree.Name())
 	defer klog.V(4).Info("Machine Config Pool Node Group Status Sync stop")
 
 	updatedMcpStatuses := []nropv1.MachineConfigPool{}
-	for _, tree := range trees {
-		klog.V(5).InfoS("Machine Config Pool Node Group tree update", "mcps", len(tree.MachineConfigPools))
+	klog.V(5).InfoS("Machine Config Pool Node Group tree update", "mcps", len(tree.MachineConfigPools))
 
-		for _, mcp := range tree.MachineConfigPools {
-			mcpStatus := getMachineConfigPoolStatusByName(mcpStatuses, mcp.Name)
+	for _, mcp := range tree.MachineConfigPools {
+		mcpStatus := getMachineConfigPoolStatusByName(mcpStatuses, mcp.Name)
 
-			var confSource string
-			if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
-				confSource = "spec"
-				mcpStatus.Config = tree.NodeGroup.Config.DeepCopy()
-			} else {
-				confSource = "default"
-				ngc := nropv1.DefaultNodeGroupConfig()
-				mcpStatus.Config = &ngc
-			}
-
-			klog.V(6).InfoS("Machine Config Pool Node Group updated status config", "mcp", mcp.Name, "source", confSource, "data", mcpStatus.Config.ToString())
-
-			updatedMcpStatuses = append(updatedMcpStatuses, mcpStatus)
+		var confSource string
+		if tree.NodeGroup != nil && tree.NodeGroup.Config != nil {
+			confSource = "spec"
+			mcpStatus.Config = tree.NodeGroup.Config.DeepCopy()
+		} else {
+			confSource = "default"
+			ngc := nropv1.DefaultNodeGroupConfig()
+			mcpStatus.Config = &ngc
 		}
+
+		klog.V(6).InfoS("Machine Config Pool Node Group updated status config", "mcp", mcp.Name, "source", confSource, "data", mcpStatus.Config.ToString())
+
+		updatedMcpStatuses = append(updatedMcpStatuses, mcpStatus)
 	}
 	return updatedMcpStatuses
 }
