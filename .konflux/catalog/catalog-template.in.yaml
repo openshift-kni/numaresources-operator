@@ -42,6 +42,39 @@ entries:
     name: "4.16"
     package: numaresources-operator
     schema: olm.channel
+  - entries:
+      - name: numaresources-operator.v4.16.0
+        skipRange: '>=4.14.0 <4.16.0'
+      - name: numaresources-operator.v4.16.1
+        replaces: numaresources-operator.v4.16.0
+        skipRange: '>=4.14.0 <4.16.1'
+      - name: numaresources-operator.v4.16.2
+        replaces: numaresources-operator.v4.16.1
+        skipRange: '>=4.14.0 <4.16.2'
+      - name: numaresources-operator.v4.16.3
+        replaces: numaresources-operator.v4.16.2
+        skipRange: '>=4.14.0 <4.16.3'
+      - name: numaresources-operator.v4.16.4
+        replaces: numaresources-operator.v4.16.3
+        skipRange: '>=4.14.0 <4.16.4'
+      - name: numaresources-operator.v4.16.5
+        replaces: numaresources-operator.v4.16.4
+        skipRange: '>=4.14.0 <4.16.5'
+      - name: numaresources-operator.v4.16.6
+        replaces: numaresources-operator.v4.16.5
+        skipRange: '>=4.14.0 <4.16.6'
+      - name: numaresources-operator.v4.16.7
+        replaces: numaresources-operator.v4.16.6
+        skipRange: '>=4.14.0 <4.16.7'
+      - name: numaresources-operator.v4.16.8
+        replaces: numaresources-operator.v4.16.7
+        skipRange: '>=4.14.0 <4.16.8'
+      - name: numaresources-operator.v4.16.9
+        replaces: numaresources-operator.v4.16.8
+        skipRange: '>=4.14.0 <4.16.9'
+    name: stable
+    package: numaresources-operator
+    schema: olm.channel
   # v4.16.0 bundle
   - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:1317b5ca5cb3e5793ac5ff84ed896acd2c5c4ff6d34ee8dea930463255e2948d
     schema: olm.bundle
