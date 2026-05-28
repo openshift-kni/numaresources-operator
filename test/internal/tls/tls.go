@@ -17,12 +17,14 @@
 package tls
 
 import (
+	"context"
 	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -32,7 +34,14 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	libgocrypto "github.com/openshift/library-go/pkg/crypto"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
+	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
+
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
+	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
+	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
 
 // ErrTLSHandshakeRejected is a base error for any TLS connection refusal.
@@ -190,4 +199,52 @@ func TLSVersionBelow(v uint16) (uint16, error) {
 	default:
 		return 0, fmt.Errorf("unknown TLS version %d", v)
 	}
+}
+
+func CheckRTEDaemonSetTLSFlags(ctx context.Context, cli client.Client, expected objtls.Settings) error {
+	nropObj := &nropv1.NUMAResourcesOperator{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nropObj); err != nil {
+		return fmt.Errorf("failed to get NUMAResourcesOperator: %w", err)
+	}
+	if len(nropObj.Status.NodeGroups) == 0 {
+		return fmt.Errorf("expect the numaresourcesoperator to have at least one NodeGroup in status")
+	}
+	for _, ng := range nropObj.Status.NodeGroups {
+		ds := &appsv1.DaemonSet{}
+		if err := cli.Get(ctx, client.ObjectKey{Namespace: ng.DaemonSet.Namespace, Name: ng.DaemonSet.Name}, ds); err != nil {
+			return fmt.Errorf("failed to get DaemonSet %s/%s: %w", ng.DaemonSet.Namespace, ng.DaemonSet.Name, err)
+		}
+		rteCnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, rteupdate.MainContainerName)
+		if rteCnt == nil {
+			return fmt.Errorf("main container not found daemonsetName=%q", ds.Name)
+		}
+		rteFlags := flagcodec.ParseArgvKeyValue(rteCnt.Args, flagcodec.WithFlagNormalization)
+		if err := matchTLSFlag(rteFlags, "--metrics-tls-min-version", expected.MinVersion, ds.Name); err != nil {
+			return err
+		}
+		// TLS 1.3 cipher suites are fixed by the Go crypto/tls implementation and cannot
+		// be configured, so expected.CipherSuites will be empty for the Modern profile.
+		if err := matchTLSFlag(rteFlags, "--metrics-tls-cipher-suites", expected.CipherSuites, ds.Name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func matchTLSFlag(rteFlags *flagcodec.Flags, flagName, expected, dsName string) error {
+	val, found := rteFlags.GetFlag(flagName)
+	if expected == "" {
+		if found && val.Data != "" {
+			return fmt.Errorf("%s should be absent or empty for this TLS profile daemonsetName=%q got=%q", flagName, dsName, val.Data)
+		}
+		return nil
+	}
+	if !found || val.Data != expected {
+		got := ""
+		if found {
+			got = val.Data
+		}
+		return fmt.Errorf("%s mismatch daemonsetName=%q expected=%q got=%q", flagName, dsName, expected, got)
+	}
+	return nil
 }
