@@ -348,7 +348,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 						updatedDp := &appsv1.Deployment{}
 						err := fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(deployment), updatedDp)
 						Expect(err).ToNot(HaveOccurred())
-						return wait.IsDeploymentComplete(deployment, &updatedDp.Status)
+						return wait.IsDeploymentComplete(deployment.Generation, &updatedDp.Status, *deployment.Spec.Replicas)
 					}).WithTimeout(time.Second*30).WithPolling(time.Second*5).Should(BeTrue(), "deployment %q became unready", deployment.Name)
 				},
 				Entry("[test_id:47597] should be able to schedule pod with affinity property requiredDuringSchedulingIgnoredDuringExecution on the available node with feasible numa zone", createNodeAffinityRequiredDuringSchedulingIgnoredDuringExecution),
