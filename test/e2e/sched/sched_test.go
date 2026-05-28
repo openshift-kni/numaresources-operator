@@ -26,6 +26,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	klog "k8s.io/klog/v2"
@@ -33,6 +34,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
@@ -40,6 +42,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	e2eimages "github.com/openshift-kni/numaresources-operator/test/internal/images"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
@@ -80,7 +83,7 @@ var _ = Describe("[Scheduler] scheduler object updates", func() {
 			dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.UID)
 			Expect(err).ToNot(HaveOccurred(), "unable to get deployment by owner reference")
 
-			_, err = wait.With(e2eclient.Client).Timeout(5*time.Minute).Interval(10*time.Second).ForDeploymentComplete(context.TODO(), dp)
+			_, err = wait.With(e2eclient.Client).Timeout(5*time.Minute).Interval(10*time.Second).ForDeploymentCompleteWithReplicas(context.TODO(), dp, *dp.Spec.Replicas)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -137,7 +140,7 @@ var _ = Describe("[Scheduler] scheduler object updates", func() {
 			dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.GetUID())
 			Expect(err).ToNot(HaveOccurred())
 
-			_, err = wait.With(e2eclient.Client).Interval(30*time.Second).Timeout(2*time.Minute).ForDeploymentComplete(context.TODO(), dp)
+			_, err = wait.With(e2eclient.Client).Interval(30*time.Second).Timeout(2*time.Minute).ForDeploymentCompleteWithReplicas(context.TODO(), dp, *dp.Spec.Replicas)
 			Expect(err).ToNot(HaveOccurred())
 		})
 
@@ -298,7 +301,7 @@ var _ = Describe("[Scheduler] scheduler object updates", func() {
 			dp, err := podlist.With(e2eclient.Client).DeploymentByOwnerReference(context.TODO(), nroSchedObj.UID)
 			Expect(err).ToNot(HaveOccurred(), "unable to get deployment by owner reference")
 
-			dp, err = wait.With(e2eclient.Client).Timeout(5*time.Minute).Interval(10*time.Second).ForDeploymentComplete(context.TODO(), dp)
+			dp, err = wait.With(e2eclient.Client).Timeout(5*time.Minute).Interval(10*time.Second).ForDeploymentCompleteWithReplicas(context.TODO(), dp, *dp.Spec.Replicas)
 			Expect(err).ToNot(HaveOccurred())
 
 			podList, err = podlist.With(e2eclient.Client).ByDeployment(context.TODO(), *dp)
@@ -311,6 +314,7 @@ var _ = Describe("[Scheduler] scheduler object updates", func() {
 	})
 
 	When("testing deployment TopologySpreadConstraints", func() {
+
 		var (
 			nroSchedKey               client.ObjectKey
 			autoDetectedReplicasCount *int32
@@ -326,6 +330,30 @@ var _ = Describe("[Scheduler] scheduler object updates", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			if currentReplicas != nil {
+				By("compute expected autodetected replicas count")
+				var labelSelector map[string]string
+				switch configuration.Plat {
+				case platform.HyperShift:
+					labelSelector = map[string]string{
+						"node-role.kubernetes.io/worker": "",
+					}
+				case platform.OpenShift:
+					labelSelector = map[string]string{
+						"node-role.kubernetes.io/control-plane": "",
+					}
+				default:
+					Fail("unknown platform")
+				}
+
+				nodeList := &corev1.NodeList{}
+				Expect(e2eclient.Client.List(ctx, nodeList, &client.ListOptions{LabelSelector: labels.SelectorFromSet(labelSelector)})).To(Succeed())
+				Expect(nodeList.Items).ToNot(BeEmpty(), "no nodes found with control-plane or worker role")
+				expectedAutodetectedCount := int32(len(nodeList.Items))
+				if expectedAutodetectedCount > 3 {
+					// this is how it is capped in the controller
+					expectedAutodetectedCount = 3
+				}
+
 				e2efixture.By("configure NRS replicas for autodetection: current=%d desired=nil", *currentReplicas)
 				Eventually(func(g Gomega) {
 					g.Expect(e2eclient.Client.Get(ctx, nroSchedKey, nroSchedObj)).To(Succeed())
@@ -333,7 +361,7 @@ var _ = Describe("[Scheduler] scheduler object updates", func() {
 					g.Expect(e2eclient.Client.Update(ctx, nroSchedObj)).To(Succeed())
 				}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to update NRS with autodetection mode for replicas")
 
-				schedDp, err = wait.With(e2eclient.Client).Timeout(5*time.Minute).Interval(10*time.Second).ForDeploymentComplete(ctx, schedDp)
+				schedDp, err = wait.With(e2eclient.Client).Timeout(5*time.Minute).Interval(10*time.Second).ForDeploymentCompleteWithReplicas(ctx, schedDp, expectedAutodetectedCount)
 				if err != nil {
 					infoUponDeploymentCompleteFailure(ctx, schedDp)
 				}
@@ -346,7 +374,7 @@ var _ = Describe("[Scheduler] scheduler object updates", func() {
 						nroSchedObj.Spec.Replicas = currentReplicas
 						g.Expect(e2eclient.Client.Update(ctx, nroSchedObj)).To(Succeed())
 					}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to update NRS with autodetection mode for replicas")
-					schedDp, err := wait.With(e2eclient.Client).Timeout(5*time.Minute).Interval(10*time.Second).ForDeploymentComplete(ctx, schedDp)
+					schedDp, err := wait.With(e2eclient.Client).Timeout(5*time.Minute).Interval(10*time.Second).ForDeploymentCompleteWithReplicas(ctx, schedDp, *currentReplicas)
 					if err != nil {
 						infoUponDeploymentCompleteFailure(ctx, schedDp)
 					}
@@ -394,7 +422,7 @@ var _ = Describe("[Scheduler] scheduler object updates", func() {
 				g.Expect(e2eclient.Client.Update(ctx, nroSchedObj)).To(Succeed())
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to update NRS with explicit replicas count")
 
-			schedDp, err := wait.With(e2eclient.Client).Timeout(10*time.Minute).Interval(10*time.Second).ForDeploymentComplete(ctx, schedDp)
+			schedDp, err := wait.With(e2eclient.Client).Timeout(10*time.Minute).Interval(10*time.Second).ForDeploymentCompleteWithReplicas(ctx, schedDp, 0)
 			if err != nil {
 				infoUponDeploymentCompleteFailure(ctx, schedDp)
 			}
@@ -420,7 +448,7 @@ var _ = Describe("[Scheduler] scheduler object updates", func() {
 				g.Expect(e2eclient.Client.Update(ctx, nroSchedObj)).To(Succeed())
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to update NRS with autodetection mode for replicas")
 
-			schedDp, err = wait.With(e2eclient.Client).Timeout(10*time.Minute).Interval(10*time.Second).ForDeploymentComplete(ctx, schedDp)
+			schedDp, err = wait.With(e2eclient.Client).Timeout(10*time.Minute).Interval(10*time.Second).ForDeploymentCompleteWithReplicas(ctx, schedDp, *autoDetectedReplicasCount)
 			if err != nil {
 				infoUponDeploymentCompleteFailure(ctx, schedDp)
 			}
@@ -482,7 +510,7 @@ var _ = Describe("[Scheduler] scheduler object updates", func() {
 				g.Expect(e2eclient.Client.Update(ctx, nroSchedObj)).To(Succeed())
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to update NRS with explicit replicas count")
 
-			schedDp, err := wait.With(e2eclient.Client).Timeout(10*time.Minute).Interval(10*time.Second).ForDeploymentComplete(ctx, schedDp)
+			schedDp, err := wait.With(e2eclient.Client).Timeout(10*time.Minute).Interval(10*time.Second).ForDeploymentCompleteWithReplicas(ctx, schedDp, 1)
 			if err != nil {
 				infoUponDeploymentCompleteFailure(ctx, schedDp)
 			}
@@ -504,7 +532,7 @@ var _ = Describe("[Scheduler] scheduler object updates", func() {
 				g.Expect(e2eclient.Client.Update(ctx, nroSchedObj)).To(Succeed())
 			}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "failed to update NRS with autodetection mode for replicas")
 
-			schedDp, err = wait.With(e2eclient.Client).Timeout(10*time.Minute).Interval(10*time.Second).ForDeploymentComplete(ctx, schedDp)
+			schedDp, err = wait.With(e2eclient.Client).Timeout(10*time.Minute).Interval(10*time.Second).ForDeploymentCompleteWithReplicas(ctx, schedDp, *autoDetectedReplicasCount)
 			if err != nil {
 				infoUponDeploymentCompleteFailure(ctx, schedDp)
 			}
