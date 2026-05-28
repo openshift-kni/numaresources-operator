@@ -17,7 +17,7 @@
                 ],
                 "additionalBranchPrefix": "telco5g-konflux-",
                 "matchPackageNames": [
-                    "https://github.com/openshift-kni/telco5g-konflux.git"
+                    "https://github.com/openshift-kni/telco5g-konflux"
                 ],
                 "schedule": [
                     "at any time"
