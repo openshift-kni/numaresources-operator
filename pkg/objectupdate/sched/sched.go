@@ -17,16 +17,13 @@
 package sched
 
 import (
-	"errors"
 	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/ptr"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
@@ -106,52 +103,30 @@ func DeploymentTLSSettings(dp *appsv1.Deployment, tlsSettings objtls.Settings) e
 	return nil
 }
 
-// DeploymentAffinityWithStrategy configures required pod anti-affinity on the scheduler
-// deployment only when the CR leaves replica count to autodetection (Replicas unset).
-// An explicit non-nil Replicas value means the user chose a replica count and keeps
-// full control (no required pod anti-affinity).
-func DeploymentAffinityWithStrategy(dp *appsv1.Deployment, spec nropv1.NUMAResourcesSchedulerSpec) error {
-	if spec.Replicas != nil {
-		if dp.Spec.Template.Spec.Affinity != nil {
-			dp.Spec.Template.Spec.Affinity.PodAntiAffinity = nil
-		}
-		dp.Spec.Strategy = appsv1.DeploymentStrategy{}
-		return nil
-	}
-
+func DeploymentTopologySpreadConstraints(dp *appsv1.Deployment) error {
 	labels := dp.Spec.Template.Labels
 	if len(labels) == 0 {
-		return errors.New("no labels provided for PodAntiAffinity")
+		return fmt.Errorf("no labels found in deployment template")
 	}
 
-	if dp.Spec.Template.Spec.Affinity == nil {
-		dp.Spec.Template.Spec.Affinity = &corev1.Affinity{}
+	schedConstr := corev1.TopologySpreadConstraint{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: labels,
+		},
+		MaxSkew:           1,
+		TopologyKey:       "kubernetes.io/hostname",
+		WhenUnsatisfiable: corev1.DoNotSchedule,
+		// the below label is set by the deployment controller and is needed for safe rollouts to allow ignoring
+		// the old replicaset and calculates the spread purely based on the new replicaset, ensuring the final
+		// state is perfectly balanced without stalling:
+		// https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#pod-template-hash-label
+		MatchLabelKeys: []string{"pod-template-hash"},
 	}
 
-	dp.Spec.Template.Spec.Affinity.PodAntiAffinity = &corev1.PodAntiAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchLabels: labels,
-				},
-				TopologyKey: "kubernetes.io/hostname",
-			},
-		},
-	}
-	klog.V(3).InfoS("Scheduler Deployment affinity", "podAntiAffinity", dp.Spec.Template.Spec.Affinity.PodAntiAffinity.String())
-	// NOTE: With replicas=1 and no PodAntiAffinity, the default strategy (surge 1, then remove old)
-	// works as expected — the new pod can schedule anywhere, no constraints block it.
-	dp.Spec.Strategy = appsv1.DeploymentStrategy{
-		Type: appsv1.RollingUpdateDeploymentStrategyType,
-		RollingUpdate: &appsv1.RollingUpdateDeployment{
-			MaxUnavailable: ptr.To(intstr.FromInt(1)),
-			MaxSurge:       ptr.To(intstr.FromInt(0)),
-		},
-	}
-	klog.V(3).InfoS("Scheduler Deployment Rollout Strategy", "rolloutStrategy", dp.Spec.Strategy.String())
+	dp.Spec.Template.Spec.TopologySpreadConstraints = []corev1.TopologySpreadConstraint{schedConstr}
+	klog.V(3).InfoS("scheduler deployment topology spread constraints", "constraints", schedConstr.String())
 	return nil
 }
-
 func SchedulerConfig(cm *corev1.ConfigMap, name string, params *k8swgmanifests.ConfigParams) error {
 	if cm.Data == nil {
 		return fmt.Errorf("no data found in ConfigMap: %s/%s", cm.Namespace, cm.Name)

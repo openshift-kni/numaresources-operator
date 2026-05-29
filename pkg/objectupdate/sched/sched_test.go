@@ -30,8 +30,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/utils/ptr"
 
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
 
@@ -635,122 +633,40 @@ func TestDeploymentTLSSettingsRepeated(t *testing.T) {
 	}
 }
 
-func TestDeploymentAffinityWithStrategyNoLabels(t *testing.T) {
+func TestDeploymentTopologySpreadConstraintsNoLabels(t *testing.T) {
 	dp := dpMinimal.DeepCopy()
-	err := DeploymentAffinityWithStrategy(dp, nropv1.NUMAResourcesSchedulerSpec{})
-	if err == nil {
-		t.Fatalf("expected error but received nil")
+	dp.Spec.Template.Labels = nil
+	if err := DeploymentTopologySpreadConstraints(dp); err == nil {
+		t.Fatalf("expected error but got nil")
+	}
+
+	dp.Spec.Template.Labels = map[string]string{}
+	if err := DeploymentTopologySpreadConstraints(dp); err == nil {
+		t.Fatalf("expected error but got nil")
 	}
 }
 
-func TestDeploymentAffinityWithStrategyExplicitNonNilReplicasCount(t *testing.T) {
-	testcases := []struct {
-		name                string
-		nonNilReplicasCount *int32
-	}{
+func TestDeploymentTopologySpreadConstraints(t *testing.T) {
+	dp := dpMinimal.DeepCopy()
+	dp.Spec.Template.Labels = map[string]string{
+		"app": "numaresources-scheduler",
+	}
+	if err := DeploymentTopologySpreadConstraints(dp); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	expectedConstraints := []corev1.TopologySpreadConstraint{
 		{
-			name:                "replicas count is positive int",
-			nonNilReplicasCount: ptr.To(int32(2)),
-		},
-		{
-			name:                "replicas count is zero",
-			nonNilReplicasCount: ptr.To(int32(0)),
-		},
-	}
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			dp := dpMinimal.DeepCopy()
-			dp.Spec.Template.ObjectMeta.Labels = map[string]string{"app": "scheduler"}
-			initialNodeAffinity := &corev1.NodeAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-					NodeSelectorTerms: []corev1.NodeSelectorTerm{
-						{
-							MatchExpressions: []corev1.NodeSelectorRequirement{
-								{
-									Key:      "node-role.kubernetes.io/worker",
-									Operator: corev1.NodeSelectorOpExists,
-									Values:   []string{""},
-								},
-							},
-						},
-					},
-				},
-			}
-			dp.Spec.Template.Spec.Affinity = &corev1.Affinity{
-				NodeAffinity: initialNodeAffinity,
-				PodAntiAffinity: &corev1.PodAntiAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-						{
-							LabelSelector: &metav1.LabelSelector{
-								MatchLabels: map[string]string{"app": "scheduler"},
-							},
-						},
-					},
-				},
-			}
-			err := DeploymentAffinityWithStrategy(dp, nropv1.NUMAResourcesSchedulerSpec{Replicas: tc.nonNilReplicasCount})
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			// check that the node affinity is preserved
-			if diff := cmp.Diff(initialNodeAffinity, dp.Spec.Template.Spec.Affinity.NodeAffinity); diff != "" {
-				t.Errorf("should preserve existing NodeAffinity: affinity mismatch (-expected +got):\n%s", diff)
-			}
-			if dp.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
-				t.Fatalf("expected podAntiAffinity to be reset but got %v", dp.Spec.Template.Spec.Affinity.PodAntiAffinity)
-			}
-			if dp.Spec.Strategy != (appsv1.DeploymentStrategy{}) {
-				t.Fatalf("expected strategy to be reset but got %v", dp.Spec.Strategy)
-			}
-		})
-	}
-}
-
-func TestDeploymentAffinityWithStrategyWithOverride(t *testing.T) {
-	labels := map[string]string{"app": "scheduler"}
-	expectedStrategy := appsv1.DeploymentStrategy{
-		Type: appsv1.RollingUpdateDeploymentStrategyType,
-		RollingUpdate: &appsv1.RollingUpdateDeployment{
-			MaxUnavailable: ptr.To(intstr.FromInt(1)),
-			MaxSurge:       ptr.To(intstr.FromInt(0)),
-		},
-	}
-	expectedPodAntiAffinity := &corev1.PodAntiAffinity{
-		RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-			{
-				LabelSelector: &metav1.LabelSelector{
-					MatchLabels: labels,
-				},
-				TopologyKey: "kubernetes.io/hostname",
+			LabelSelector: &metav1.LabelSelector{
+				MatchLabels: dp.Spec.Template.Labels,
 			},
+			MaxSkew:           1,
+			TopologyKey:       "kubernetes.io/hostname",
+			WhenUnsatisfiable: corev1.DoNotSchedule,
+			MatchLabelKeys:    []string{"pod-template-hash"},
 		},
 	}
-	dp := dpMinimal.DeepCopy()
-	dp.Spec.Template.ObjectMeta.Labels = labels
-
-	err := DeploymentAffinityWithStrategy(dp, nropv1.NUMAResourcesSchedulerSpec{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if diff := cmp.Diff(expectedPodAntiAffinity, dp.Spec.Template.Spec.Affinity.PodAntiAffinity); diff != "" {
-		t.Errorf("affinity mismatch (-expected +got):\n%s", diff)
-	}
-	if diff := cmp.Diff(expectedStrategy, dp.Spec.Strategy); diff != "" {
-		t.Errorf("strategy mismatch (-expected +got):\n%s", diff)
-	}
-
-	// check reset works
-	err = DeploymentAffinityWithStrategy(dp, nropv1.NUMAResourcesSchedulerSpec{Replicas: ptr.To(int32(2))})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if dp.Spec.Template.Spec.Affinity != nil && dp.Spec.Template.Spec.Affinity.PodAntiAffinity != nil {
-		t.Fatalf("Override failed: expected no podAntiAffinity but got %v", dp.Spec.Template.Spec.Affinity.PodAntiAffinity)
-	}
-	if dp.Spec.Strategy != (appsv1.DeploymentStrategy{}) {
-		t.Fatalf("expected strategy to be reset but got %v", dp.Spec.Strategy)
+	if diff := cmp.Diff(dp.Spec.Template.Spec.TopologySpreadConstraints, expectedConstraints); diff != "" {
+		t.Errorf("constraints mismatch\n%s", diff)
 	}
 }
 

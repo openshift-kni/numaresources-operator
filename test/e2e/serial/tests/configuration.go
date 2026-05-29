@@ -1006,7 +1006,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				e2efixture.By("ensuring the deployment %q keep being pending %d/%d", deployment.Name, step+1, maxStep)
 				err = fxt.Client.Get(ctx, client.ObjectKeyFromObject(deployment), &updatedDeployment)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(wait.IsDeploymentComplete(deployment, &updatedDeployment.Status)).To(BeFalse(), "deployment %q become ready", deployment.Name)
+				Expect(wait.IsDeploymentComplete(deployment.Generation, &updatedDeployment.Status, *(deployment.Spec.Replicas))).To(BeFalse(), "deployment %q become ready", deployment.Name)
 			}
 
 			By("checking the deployment pod has failed scheduling and its at the pending status")

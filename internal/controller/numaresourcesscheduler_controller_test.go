@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -1031,192 +1030,27 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-min-version=" + updatedSettings.MinVersion))
 			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-cipher-suites=" + updatedSettings.CipherSuites))
 		})
-	})
 
-	Context("when setting the scheduler PodAntiAffinity", func() {
-		var (
-			expectedPodAntiAff *corev1.PodAntiAffinity
-			expectedStrategy   appsv1.DeploymentStrategy
-		)
+		It("should set the TopologySpreadConstraints in the deployment by default", func(ctx context.Context) {
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: nrsKey})
+			Expect(err).ToNot(HaveOccurred())
 
-		BeforeEach(func() {
-			expectedPodAntiAff = &corev1.PodAntiAffinity{
-				RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
-					{
-						LabelSelector: &metav1.LabelSelector{
-							MatchLabels: map[string]string{
-								"app": "secondary-scheduler",
-							},
-						},
-						TopologyKey: "kubernetes.io/hostname",
-					},
+			Expect(reconciler.Client.Get(ctx, nrsKey, nrs)).To(Succeed())
+			dpKey := client.ObjectKey{Namespace: nrs.Status.Deployment.Namespace, Name: nrs.Status.Deployment.Name}
+			dp := &appsv1.Deployment{}
+			Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
+			Expect(dp.Spec.Template.Spec.TopologySpreadConstraints).To(HaveLen(1))
+
+			expectedConstraint := corev1.TopologySpreadConstraint{
+				MaxSkew:           1,
+				TopologyKey:       "kubernetes.io/hostname",
+				WhenUnsatisfiable: corev1.DoNotSchedule,
+				MatchLabelKeys:    []string{"pod-template-hash"},
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: dp.Spec.Template.Labels,
 				},
 			}
-			expectedStrategy = appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
-				RollingUpdate: &appsv1.RollingUpdateDeployment{
-					MaxUnavailable: ptr.To(intstr.FromInt(1)),
-					MaxSurge:       ptr.To(intstr.FromInt(0)),
-				},
-			}
-		})
-
-		Context("set different replicas counts", func() {
-			type testCase struct {
-				replicasCount         *int32
-				expectPodAntiAffinity bool
-			}
-
-			DescribeTable("should set PodAntiAffinity for scheduler Deployment according to replicas count", func(ctx context.Context, tc testCase) {
-				nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
-				nrs.Spec.Replicas = tc.replicasCount
-				initObjects := []runtime.Object{nrs}
-				initObjects = append(initObjects, fakeNodes(3, 0)...)
-				reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
-				Expect(err).ToNot(HaveOccurred())
-				// Baseline node affinity comes from the scheduler deployment manifest; reconcile must preserve it.
-				Expect(reconciler.SchedulerManifests.Deployment.Spec.Template.Spec.Affinity).ToNot(BeNil())
-				expectedNodeAff := reconciler.SchedulerManifests.Deployment.Spec.Template.Spec.Affinity.NodeAffinity.DeepCopy()
-
-				key := client.ObjectKeyFromObject(nrs)
-				_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-
-				dp := &appsv1.Deployment{}
-				dpKey := client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}
-				Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
-				affinity := dp.Spec.Template.Spec.Affinity
-				Expect(affinity).ToNot(BeNil())
-				Expect(affinity.NodeAffinity).To(Equal(expectedNodeAff))
-
-				if !tc.expectPodAntiAffinity {
-					Expect(affinity.PodAntiAffinity).To(BeNil())
-					Expect(dp.Spec.Strategy).To(Equal(appsv1.DeploymentStrategy{}))
-
-					// no changes expected on second reconcile with same input
-					_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
-					Expect(err).ToNot(HaveOccurred())
-					Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
-					affinity = dp.Spec.Template.Spec.Affinity
-					Expect(affinity).ToNot(BeNil())
-					Expect(affinity.NodeAffinity).To(Equal(expectedNodeAff))
-					Expect(affinity.PodAntiAffinity).To(BeNil())
-					Expect(dp.Spec.Strategy).To(Equal(appsv1.DeploymentStrategy{}))
-					return
-				}
-
-				Expect(affinity.PodAntiAffinity).ToNot(BeNil())
-				Expect(affinity.PodAntiAffinity).To(Equal(expectedPodAntiAff))
-				Expect(dp.Spec.Strategy).To(Equal(expectedStrategy))
-
-				// no changes expected on second reconcile with same input
-				_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
-				affinity = dp.Spec.Template.Spec.Affinity
-				Expect(affinity).ToNot(BeNil())
-				Expect(affinity.NodeAffinity).To(Equal(expectedNodeAff))
-				Expect(affinity.PodAntiAffinity).ToNot(BeNil())
-				Expect(affinity.PodAntiAffinity).To(Equal(expectedPodAntiAff))
-				Expect(dp.Spec.Strategy).To(Equal(expectedStrategy))
-			},
-				Entry("when replicas are not set, expected podAntiAffinity", testCase{expectPodAntiAffinity: true}),
-				Entry("when replicas are set and zero, no podAntiAffinity is set", testCase{replicasCount: ptr.To(int32(0)), expectPodAntiAffinity: false}),
-				Entry("when replicas are set and non-zero, no podAntiAffinity is set", testCase{replicasCount: ptr.To(int32(1)), expectPodAntiAffinity: false}),
-			)
-		})
-
-		Context("switch between replicas counts", func() {
-			It("should reset podAntiAffinity and strategy - transition from autodetect to explicit replicas count", func(ctx context.Context) {
-				nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
-				nrs.Spec.Replicas = nil // autodetect
-				initObjects := []runtime.Object{nrs}
-				initObjects = append(initObjects, fakeNodes(3, 0)...)
-				reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
-				Expect(err).ToNot(HaveOccurred())
-
-				key := client.ObjectKeyFromObject(nrs)
-				_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-
-				dp := &appsv1.Deployment{}
-				dpKey := client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}
-
-				Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
-				affinity := dp.Spec.Template.Spec.Affinity
-				Expect(affinity).ToNot(BeNil())
-				Expect(affinity.PodAntiAffinity).To(Equal(expectedPodAntiAff))
-				Expect(dp.Spec.Strategy).To(Equal(expectedStrategy))
-
-				// reconcile with non-nil replicas count
-				Eventually(func(g Gomega) {
-					g.Expect(reconciler.Client.Get(ctx, key, nrs)).ToNot(HaveOccurred())
-					nrs.Spec.Replicas = ptr.To(int32(2))
-					g.Expect(reconciler.Client.Update(ctx, nrs)).ToNot(HaveOccurred())
-				}).WithPolling(5 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
-
-				_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-
-				Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
-				affinity = dp.Spec.Template.Spec.Affinity
-				Expect(affinity).ToNot(BeNil())
-				Expect(affinity.PodAntiAffinity).To(BeNil())
-				Expect(dp.Spec.Strategy).To(Equal(appsv1.DeploymentStrategy{}))
-
-				// reconcile with a different non-nil replicas count should keep the same result
-				Eventually(func(g Gomega) {
-					g.Expect(reconciler.Client.Get(ctx, key, nrs)).ToNot(HaveOccurred())
-					nrs.Spec.Replicas = ptr.To(int32(0))
-					g.Expect(reconciler.Client.Update(ctx, nrs)).ToNot(HaveOccurred())
-				}).WithPolling(5 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
-
-				_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-
-				Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
-				affinity = dp.Spec.Template.Spec.Affinity
-				Expect(affinity).ToNot(BeNil())
-				Expect(affinity.PodAntiAffinity).To(BeNil())
-				Expect(dp.Spec.Strategy).To(Equal(appsv1.DeploymentStrategy{}))
-
-			})
-
-			It("should reset podAntiAffinity and strategy - transition from explicit replicas count to autodetect", func(ctx context.Context) {
-				nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
-				nrs.Spec.Replicas = ptr.To(int32(3))
-				initObjects := []runtime.Object{nrs}
-				initObjects = append(initObjects, fakeNodes(3, 0)...)
-				reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
-				Expect(err).ToNot(HaveOccurred())
-
-				key := client.ObjectKeyFromObject(nrs)
-				_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-
-				dp := &appsv1.Deployment{}
-				dpKey := client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}
-				Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
-				affinity := dp.Spec.Template.Spec.Affinity
-				Expect(affinity).ToNot(BeNil())
-				Expect(affinity.PodAntiAffinity).To(BeNil())
-				Expect(dp.Spec.Strategy).To(Equal(appsv1.DeploymentStrategy{}))
-
-				Eventually(func(g Gomega) {
-					g.Expect(reconciler.Client.Get(ctx, key, nrs)).ToNot(HaveOccurred())
-					nrs.Spec.Replicas = nil // autodetect
-					g.Expect(reconciler.Client.Update(ctx, nrs)).ToNot(HaveOccurred())
-				}).WithPolling(5 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
-
-				_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-
-				Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
-				affinity = dp.Spec.Template.Spec.Affinity
-				Expect(affinity).ToNot(BeNil())
-				Expect(affinity.PodAntiAffinity).To(Equal(expectedPodAntiAff))
-				Expect(dp.Spec.Strategy).To(Equal(expectedStrategy))
-			})
+			Expect(dp.Spec.Template.Spec.TopologySpreadConstraints[0]).To(Equal(expectedConstraint))
 		})
 	})
 })
@@ -1293,36 +1127,157 @@ var _ = Describe("Test computeSchedulerReplicas", func() {
 		Entry("HyperShift: 3 control-plane + 5 worker should return 3 replicas (uses worker)", platform.HyperShift, 3, 5, ptr.To(int32(3)), false),
 	)
 
-	Context("when replicas are explicitly set", func() {
-		It("should return the explicitly set replicas without checking nodes", func() {
-			// setup reconciler with HyperShift platform (uses worker nodes)
+	When("replicas count is explicitly set", func() {
+		type testCase struct {
+			platform         platform.Platform
+			numControlPlane  int
+			numWorker        int
+			explicitReplicas *int32
+			expectedReplicas *int32
+			expectError      string
+		}
+		DescribeTable(
+			"should not allow more replicas than the number of nodes", func(ctx context.Context, tc testCase) {
+				nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				nrs.Spec.Replicas = tc.explicitReplicas
+				initObjects := []runtime.Object{nrs}
+				initObjects = append(initObjects, fakeNodes(tc.numControlPlane, tc.numWorker)...)
+				reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
+				Expect(err).ToNot(HaveOccurred())
+				reconciler.PlatformInfo = platforminfo.PlatformInfo{
+					Platform: tc.platform,
+					Version:  "v4.14.0",
+				}
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				if tc.expectError == "" {
+					Expect(err).ToNot(HaveOccurred())
+				} else {
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring(tc.expectError))
+				}
+
+				Expect(reconciler.Client.Get(ctx, key, nrs)).To(Succeed())
+
+				if tc.expectError != "" {
+					degradedCondition := getConditionByType(nrs.Status.Conditions, status.ConditionDegraded)
+					Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+					Expect(degradedCondition.Reason).To(Equal(status.ReasonInternalError))
+					Expect(degradedCondition.Message).To(ContainSubstring(tc.expectError))
+					return
+				}
+
+				dp := &appsv1.Deployment{}
+				dpKey := client.ObjectKey{Namespace: nrs.Status.Deployment.Namespace, Name: nrs.Status.Deployment.Name}
+				Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
+				Expect(*dp.Spec.Replicas).To(Equal(*tc.expectedReplicas))
+			},
+			// openshift scenarios
+			Entry("OpenShift: 3 control-plane with explicit replicas count equal to the number of nodes",
+				testCase{
+					platform:         platform.OpenShift,
+					numControlPlane:  3,
+					numWorker:        5,
+					explicitReplicas: ptr.To(int32(3)),
+					expectedReplicas: ptr.To(int32(3)),
+				}),
+			Entry("OpenShift: 3 control-plane with explicit replicas count less than the number of nodes",
+				testCase{
+					platform:         platform.OpenShift,
+					numControlPlane:  3,
+					numWorker:        0,
+					explicitReplicas: ptr.To(int32(2)),
+					expectedReplicas: ptr.To(int32(2)),
+				}),
+			Entry("OpenShift: 3 control-plane with explicit replicas count greater than the number of nodes",
+				testCase{
+					platform:         platform.OpenShift,
+					numControlPlane:  3,
+					numWorker:        5,
+					explicitReplicas: ptr.To(int32(5)),
+					expectError:      "explicitly set replicas count should not be greater than the number of the nodes with role",
+				}),
+
+			// hypershift scenarios
+			Entry("HyperShift: 3 control-plane with explicit replicas count equal to the number of nodes",
+				testCase{
+					platform:         platform.HyperShift,
+					numControlPlane:  0,
+					numWorker:        3,
+					explicitReplicas: ptr.To(int32(3)),
+					expectedReplicas: ptr.To(int32(3)),
+				}),
+			Entry("HyperShift: 3 control-plane with explicit replicas count less than the number of nodes",
+				testCase{
+					platform:         platform.HyperShift,
+					numControlPlane:  0,
+					numWorker:        3,
+					explicitReplicas: ptr.To(int32(2)),
+					expectedReplicas: ptr.To(int32(2)),
+				}),
+			Entry("HyperShift: 3 control-plane with explicit replicas count greater than the number of nodes",
+				testCase{
+					platform:         platform.HyperShift,
+					numControlPlane:  0,
+					numWorker:        5,
+					explicitReplicas: ptr.To(int32(6)),
+					expectError:      "explicitly set replicas count should not be greater than the number of the nodes with role",
+				}),
+		)
+
+		It("should degrade when nodes are scaled down with higher number of explicit replicas", func(ctx context.Context) {
+			nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+			initialReplicas := int32(3)
+			nrs.Spec.Replicas = ptr.To(initialReplicas)
+			initObjects := []runtime.Object{nrs}
+			initialNodes := fakeNodes(4, 4)
+			initObjects = append(initObjects, initialNodes...)
+			reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
+			Expect(err).ToNot(HaveOccurred())
 			reconciler.PlatformInfo = platforminfo.PlatformInfo{
-				Platform: platform.HyperShift,
+				Platform: platform.OpenShift,
 				Version:  "v4.14.0",
 			}
 
-			// create scenario with no worker nodes but explicit replicas
-			nodes := fakeNodes(3, 0) // only control-plane nodes
-			reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nodes...)
+			key := client.ObjectKeyFromObject(nrs)
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			reconciler.PlatformInfo = platforminfo.PlatformInfo{
-				Platform: platform.HyperShift,
-				Version:  "v4.14.0",
-			}
 
-			// create test scheduler spec with explicit replicas
-			explicitReplicas := int32(5)
-			schedSpec := nropv1.NUMAResourcesSchedulerSpec{
-				Replicas: &explicitReplicas,
-			}
+			Expect(reconciler.Client.Get(ctx, key, nrs)).To(Succeed())
+			dp := &appsv1.Deployment{}
+			dpKey := client.ObjectKey{Namespace: nrs.Status.Deployment.Namespace, Name: nrs.Status.Deployment.Name}
+			Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
+			Expect(*dp.Spec.Replicas).To(Equal(initialReplicas))
 
-			// call the function under test
-			result, err := reconciler.computeSchedulerReplicas(context.TODO(), schedSpec)
+			// scale down the nodes by one but keep it same as the explicit replicas count
+			Eventually(func(g Gomega) {
+				g.Expect(reconciler.Client.Delete(ctx, initialNodes[0].(*corev1.Node))).To(Succeed())
+			}).WithPolling(5 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
 
-			// should return the explicit value without error
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result).ToNot(BeNil())
-			Expect(*result).To(Equal(explicitReplicas))
+
+			Expect(reconciler.Client.Get(ctx, key, nrs)).To(Succeed())
+			Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
+			Expect(*dp.Spec.Replicas).To(Equal(initialReplicas))
+
+			// scale down the nodes by one but keep it same as the explicit replicas count
+			Eventually(func(g Gomega) {
+				g.Expect(reconciler.Client.Delete(ctx, initialNodes[1].(*corev1.Node))).To(Succeed())
+			}).WithPolling(5 * time.Second).WithTimeout(30 * time.Second).Should(Succeed())
+
+			errMessage := "explicitly set replicas count should not be greater than the number of the nodes with role"
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring(errMessage))
+
+			Expect(reconciler.Client.Get(ctx, key, nrs)).To(Succeed())
+
+			degradedCondition := getConditionByType(nrs.Status.Conditions, status.ConditionDegraded)
+			Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+			Expect(degradedCondition.Reason).To(Equal(status.ReasonInternalError))
+			Expect(degradedCondition.Message).To(ContainSubstring(errMessage))
 		})
 	})
 })

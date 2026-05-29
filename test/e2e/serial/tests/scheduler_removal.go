@@ -95,7 +95,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(wait.IsDeploymentComplete(dp, &updatedDp.Status)).To(BeTrue(), "deployment %q become unready", dp.Name)
+				Expect(wait.IsDeploymentComplete(dp.Generation, &updatedDp.Status, *dp.Spec.Replicas)).To(BeTrue(), "deployment %q become unready", dp.Name)
 			}
 		})
 
@@ -122,7 +122,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 				err = fxt.Client.Get(context.TODO(), client.ObjectKeyFromObject(dp), updatedDp)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(wait.IsDeploymentComplete(dp, &updatedDp.Status)).To(BeFalse(), "deployment %q become ready", dp.Name)
+				Expect(wait.IsDeploymentComplete(dp.Generation, &updatedDp.Status, *dp.Spec.Replicas)).To(BeFalse(), "deployment %q become ready", dp.Name)
 			}
 		})
 	})
@@ -153,7 +153,7 @@ var _ = Describe("[serial][disruptive][scheduler][schedrst] numaresources schedu
 				err = fxt.Client.Get(ctx, client.ObjectKeyFromObject(dp), updatedDp)
 				Expect(err).ToNot(HaveOccurred())
 
-				Expect(wait.IsDeploymentComplete(dp, &updatedDp.Status)).To(BeFalse(), "deployment %q become ready", dp.Name)
+				Expect(wait.IsDeploymentComplete(dp.Generation, &updatedDp.Status, *dp.Spec.Replicas)).To(BeFalse(), "deployment %q become ready", dp.Name)
 			}
 
 			restoreScheduler(fxt, nroSchedObj)

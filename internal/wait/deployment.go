@@ -24,11 +24,14 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// ForDeploymentComplete waits for the deployment to be complete with the number of replicas specified in the deployment spec.
 func (wt Waiter) ForDeploymentComplete(ctx context.Context, dp *appsv1.Deployment) (*appsv1.Deployment, error) {
-	// This function waits for the readiness of the pods under the deployment. The best use of this check is for
-	// completely new deployments. If the deployment exists on the cluster and simply updated, this check is
-	// not enough to guarantee that the deployment is ready with the NEW replica, thus need to cover that by
-	// additional checks as the context requires
+	return wt.ForDeploymentCompleteWithReplicas(ctx, dp, *(dp.Spec.Replicas))
+}
+
+// ForDeploymentCompleteWithReplicas waits for the deployment to be complete and have the specified number of replicas.
+// Use this function when the deployment is expected to have new number of replicas after an update.
+func (wt Waiter) ForDeploymentCompleteWithReplicas(ctx context.Context, dp *appsv1.Deployment, newExpectedReplicas int32) (*appsv1.Deployment, error) {
 	key := ObjectKeyFromObject(dp)
 	updatedDp := &appsv1.Deployment{}
 	immediate := true
@@ -39,7 +42,7 @@ func (wt Waiter) ForDeploymentComplete(ctx context.Context, dp *appsv1.Deploymen
 			return false, err
 		}
 
-		if !IsDeploymentComplete(dp, &updatedDp.Status) {
+		if !IsDeploymentComplete(dp.Generation, &updatedDp.Status, newExpectedReplicas) {
 			klog.Warningf("deployment %s not yet complete", key.String())
 			return false, nil
 		}
@@ -51,14 +54,28 @@ func (wt Waiter) ForDeploymentComplete(ctx context.Context, dp *appsv1.Deploymen
 }
 
 func areDeploymentReplicasAvailable(newStatus *appsv1.DeploymentStatus, replicas int32) bool {
-	return newStatus.UpdatedReplicas == replicas &&
-		newStatus.Replicas == replicas &&
-		newStatus.AvailableReplicas == replicas
+	if newStatus.Replicas != replicas {
+		klog.InfoS("newStatus.Replicas", "expected", replicas, "found", newStatus.Replicas)
+		return false
+	}
+	if newStatus.UpdatedReplicas != replicas {
+		klog.InfoS("newStatus.UpdatedReplicas", "expected", replicas, "found", newStatus.UpdatedReplicas)
+		return false
+	}
+	if newStatus.AvailableReplicas != replicas {
+		klog.InfoS("newStatus.AvailableReplicas", "expected", replicas, "found", newStatus.AvailableReplicas)
+		return false
+	}
+	return true
 }
 
-func IsDeploymentComplete(dp *appsv1.Deployment, newStatus *appsv1.DeploymentStatus) bool {
-	return areDeploymentReplicasAvailable(newStatus, *(dp.Spec.Replicas)) &&
-		newStatus.ObservedGeneration >= dp.Generation
+func IsDeploymentComplete(oldGeneration int64, newStatus *appsv1.DeploymentStatus, expectedReplicas int32) bool {
+	if newStatus.ObservedGeneration < oldGeneration {
+		klog.InfoS("generation is older than expected to indicate the deployment is complete", "old", oldGeneration, "new", newStatus.ObservedGeneration)
+		return false
+	}
+
+	return areDeploymentReplicasAvailable(newStatus, expectedReplicas)
 }
 
 func (wt Waiter) ForDeploymentReplicasCreation(ctx context.Context, dp *appsv1.Deployment, expectedReplicas int32) (*appsv1.Deployment, error) {
