@@ -1,4 +1,4 @@
 # Do not modify the manager 'key' value: 'manager'
 - key: manager
   source: quay.io/openshift-kni/numaresources-operator:4.14.999-snapshot
-  target: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-4-14@sha256:03510dce83c9a5d1197dc274536d452f38b17a54e11a129aba26b8dfbdcb2ec6
+  target: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-4-14@sha256:a1d9784d8ad2b55c1294060100f40bcda3bf69cf9c85277db9e1c992e9791aa3
