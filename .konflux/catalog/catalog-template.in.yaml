@@ -28,6 +28,25 @@ entries:
     name: "4.18"
     package: numaresources-operator
     schema: olm.channel
+  - entries:
+      - name: numaresources-operator.v4.18.0
+        skipRange: '>=4.16.0 <4.18.0'
+      - name: numaresources-operator.v4.18.1
+        replaces: numaresources-operator.v4.18.0
+        skipRange: '>=4.16.0 <4.18.1'
+      - name: numaresources-operator.v4.18.2
+        replaces: numaresources-operator.v4.18.1
+        skipRange: '>=4.16.0 <4.18.2'
+      - name: numaresources-operator.v4.18.3
+        replaces: numaresources-operator.v4.18.2
+        skipRange: '>=4.16.0 <4.18.3'
+      # v4.18.4
+      - name: numaresources-operator.v4.18.4
+        replaces: numaresources-operator.v4.18.3
+        skipRange: '>=4.16.0 <4.18.4'
+    name: stable
+    package: numaresources-operator
+    schema: olm.channel
     # v4.18.0 bundle
   - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:8b14759b8e5148fadf9511d3cf52923301567824ac7f5eacc3984e050ad33754
     schema: olm.bundle
