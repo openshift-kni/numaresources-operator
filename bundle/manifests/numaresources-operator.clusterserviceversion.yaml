@@ -66,7 +66,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2026-05-13T12:16:00Z"
+    createdAt: "2026-06-02T08:17:10Z"
     features.operators.openshift.io/cnf: "true"
     features.operators.openshift.io/cni: "false"
     features.operators.openshift.io/csi: "false"
@@ -394,7 +394,9 @@ spec:
           resources:
           - nodes
           verbs:
+          - get
           - list
+          - patch
           - watch
         - apiGroups:
           - ""
@@ -463,10 +465,10 @@ spec:
           - nodetopology.openshift.io
           resources:
           - numaresourcesoperators
-          - numaresourcesschedulers
           verbs:
           - get
           - list
+          - update
           - watch
         - apiGroups:
           - nodetopology.openshift.io
@@ -484,6 +486,14 @@ spec:
           - get
           - patch
           - update
+        - apiGroups:
+          - nodetopology.openshift.io
+          resources:
+          - numaresourcesschedulers
+          verbs:
+          - get
+          - list
+          - watch
         - apiGroups:
           - rbac.authorization.k8s.io
           resources:
