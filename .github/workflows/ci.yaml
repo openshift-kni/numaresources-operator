@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 env:
-  GOLANG_VERSION: 1.25.8
+  GOLANG_VERSION: 1.25.11
 
 defaults:
   run:
