@@ -13,6 +13,9 @@ on:
     branches:
       - main
 
+env:
+  GOLANG_VERSION: 1.25.11
+
 defaults:
   run:
     shell: bash
@@ -27,7 +30,7 @@ jobs:
       - name: Set up golang
         uses: actions/setup-go@v5
         with:
-          go-version: 1.25.8
+          go-version: ${{ env.GOLANG_VERSION }}
 
       - name: Show current working directory
         run: pwd
@@ -36,3 +39,4 @@ jobs:
         uses: golang/govulncheck-action@v1
         with:
           go-package: "./..."
+          go-version-input: ${{ env.GOLANG_VERSION }}
