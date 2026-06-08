@@ -374,3 +374,33 @@ func TestListPools_EmptySelector(t *testing.T) {
 		t.Fatal("expected no pools to match for empty selector")
 	}
 }
+
+func TestGetPoolsForNode_CompactCluster(t *testing.T) {
+	pools := []mcov1.MachineConfigPool{
+		newMCP("master", &metav1.LabelSelector{
+			MatchLabels: map[string]string{"node-role.kubernetes.io/master": ""},
+		}),
+		newMCP("worker", &metav1.LabelSelector{
+			MatchLabels: map[string]string{"node-role.kubernetes.io/worker": ""},
+		}),
+	}
+
+	node := newNode("compact-node", map[string]string{
+		"node-role.kubernetes.io/master": "",
+		"node-role.kubernetes.io/worker": "",
+	})
+
+	result, err := GetPoolsForNode(pools, &node)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 2 {
+		t.Fatalf("expected 2 pools (master, worker), got %d", len(result))
+	}
+	if result[0].Name != "master" {
+		t.Fatalf("expected first pool to be master, got %s", result[0].Name)
+	}
+	if result[1].Name != "worker" {
+		t.Fatalf("expected second pool to be worker, got %s", result[1].Name)
+	}
+}

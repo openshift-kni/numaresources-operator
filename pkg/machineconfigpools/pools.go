@@ -88,7 +88,14 @@ func GetPoolsForNode(pools []mcov1.MachineConfigPool, node *corev1.Node) ([]*mco
 		}
 		return pls, nil
 	case master != nil:
-		return []*mcov1.MachineConfigPool{master}, nil
+		// On compact clusters nodes have both master and worker roles.
+		// Include worker so the fallback logic can find a managed pool
+		// when master is not in the NRO NodeGroups.
+		pls := []*mcov1.MachineConfigPool{master}
+		if worker != nil {
+			pls = append(pls, worker)
+		}
+		return pls, nil
 	default:
 		return []*mcov1.MachineConfigPool{worker}, nil
 	}
