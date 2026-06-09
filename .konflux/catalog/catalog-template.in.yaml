@@ -10,25 +10,31 @@ entries:
     schema: olm.package
   # Channel entries should contain all the releases
   - entries:
+      # v4.22.0
       - name: numaresources-operator.v4.22.0
         skipRange: '>=4.20.0 <4.22.0'
-        # After 4.22.0 is released, add 4.22.1 back using the quay nudged bundle
-        # - name: numaresources-operator.v4.22.1
-        #   replaces: numaresources-operator.v4.22.0
-        #   skipRange: '>=4.20.0 <4.22.1'
+      # v4.22.1
+      - name: numaresources-operator.v4.22.1
+        replaces: numaresources-operator.v4.22.0
+        skipRange: '>=4.20.0 <4.22.1'
     name: stable
     package: numaresources-operator
     schema: olm.channel
   - entries:
+      # v4.22.0
       - name: numaresources-operator.v4.22.0
         skipRange: '>=4.20.0 <4.22.0'
-        # After 4.22.0 is released, add 4.22.1 back using the quay nudged bundle
-        # - name: numaresources-operator.v4.22.1
-        #   replaces: numaresources-operator.v4.22.0
-        #   skipRange: '>=4.20.0 <4.22.1'
+      # v4.22.1
+      - name: numaresources-operator.v4.22.1
+        replaces: numaresources-operator.v4.22.0
+        skipRange: '>=4.20.0 <4.22.1'
     name: "4.22"
     package: numaresources-operator
     schema: olm.channel
+  # v4.22.0 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:1a2b6307e0c3a3a1939ff8b52b28486e2694d284c83c572f6bf66d1102d55d51
+    schema: olm.bundle
+  # v4.22.1 bundle
   # The url for this last entry is updated by telco5g-konflux/scripts/catalog/update-catalog-template.sh automatically
   - image: placeholder.will.be.updated.by.telco5g-konflux.scripts.catalog.update-catalog-template.sh
     schema: olm.bundle
