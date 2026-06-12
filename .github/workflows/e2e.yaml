@@ -57,7 +57,7 @@ jobs:
       run: |
         # kind is part of 20.04 image, see relevant READMEs in https://github.com/actions/virtual-environments/tree/main/images/linux
         kind version
-        kind create cluster --config=hack/kind-config-e2e-no-registry.yaml --image kindest/node:v1.30.4@sha256:976ea815844d5fa93be213437e3ff5754cd599b040946b5cca43ca45c2047114 
+        kind create cluster --config=hack/kind-config-e2e-no-registry.yaml --image kindest/node:v1.35.5@sha256:ce977ae6d65918d0b58a5f8b5e940429c2ce42fa3a5619ec2bbc60b949c0ac95
         kubectl label node kind-worker node-role.kubernetes.io/worker=''
         kind load docker-image ${built_image}
 
