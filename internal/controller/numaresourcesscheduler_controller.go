@@ -243,11 +243,6 @@ func isDeploymentRunning(ctx context.Context, c client.Client, key nropv1.Namesp
 }
 
 func (r *NUMAResourcesSchedulerReconciler) computeSchedulerReplicas(ctx context.Context, schedSpec nropv1.NUMAResourcesSchedulerSpec) (*int32, error) {
-	// do not autodetect if explicitly set by the user
-	if schedSpec.Replicas != nil {
-		return schedSpec.Replicas, nil
-	}
-
 	var labelSelector map[string]string
 	var nodeRoleDescription string
 
@@ -274,6 +269,14 @@ func (r *NUMAResourcesSchedulerReconciler) computeSchedulerReplicas(ctx context.
 	}
 
 	replicaCount := int32(len(nodeList.Items))
+
+	if schedSpec.Replicas != nil {
+		// should not allow more replicas than max found nodes
+		if *schedSpec.Replicas > replicaCount {
+			return nil, fmt.Errorf("explicitly set replicas count should not be greater than the number of the nodes with role %s", nodeRoleDescription)
+		}
+		return schedSpec.Replicas, nil
+	}
 
 	// check if no nodes are found for the target role
 	if replicaCount == 0 {
@@ -357,6 +360,10 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 	}
 
 	if err := schedupdate.DeploymentTLSSettings(r.SchedulerManifests.Deployment, r.TLSSettings); err != nil {
+		return nropv1.NUMAResourcesSchedulerStatus{}, err
+	}
+
+	if err := schedupdate.DeploymentTopologySpreadConstraints(r.SchedulerManifests.Deployment); err != nil {
 		return nropv1.NUMAResourcesSchedulerStatus{}, err
 	}
 
