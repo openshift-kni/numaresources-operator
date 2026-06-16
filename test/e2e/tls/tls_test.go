@@ -25,12 +25,10 @@ import (
 
 	"k8s.io/klog/v2"
 
-	ctrltls "github.com/openshift/controller-runtime-common/pkg/tls"
 	libgocrypto "github.com/openshift/library-go/pkg/crypto"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
-	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
@@ -45,13 +43,8 @@ const schedulerSecurePort = "10259"
 var _ = Describe("TLS", func() {
 	It("should reject TLS connections that are not compatible with the profile - negative test", func(ctx context.Context) {
 		By("getting the current OCP TLS profile")
-		tlsProfileSpec, err := ctrltls.FetchAPIServerTLSProfile(ctx, e2eclient.Client)
+		minVersion, tlsProfileSpec, err := intls.GetClusterTLSProfile(ctx, e2eclient.Client)
 		Expect(err).ToNot(HaveOccurred(), "unable to get TLS profile from APIServer")
-
-		tlsConfigFn, _ := ctrltls.NewTLSConfigFromProfile(tlsProfileSpec)
-		tlsCfg := &tls.Config{}
-		tlsConfigFn(tlsCfg)
-		minVersion := tlsCfg.MinVersion
 		klog.InfoS("current TLS minimum version", "version", libgocrypto.TLSVersionToNameOrDie(minVersion))
 
 		belowMinVersion, err := intls.TLSVersionBelow(minVersion)
@@ -77,9 +70,8 @@ var _ = Describe("TLS", func() {
 		Expect(err).To(HaveOccurred(), "scheduler server should reject TLS connections capped at %s", tls.VersionName(belowMinVersion))
 		Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
 			"expected TLS handshake rejection, got: %v", err)
-		By("verifying that TLS connections with unsupported ciphers are rejected by the server")
 		if minVersion == tls.VersionTLS13 {
-			klog.InfoS("TLS 1.3 is not configurable, so we cannot test unsupported ciphers")
+			By("skipping disallowed-cipher probe: TLS 1.3 ciphers are not individually configurable")
 			return
 		}
 
@@ -87,7 +79,7 @@ var _ = Describe("TLS", func() {
 		if disallowedCipher == "" {
 			Skip("all known TLS 1.2 ciphers are in the allowed set, nothing to test")
 		}
-		klog.InfoS("testing with disallowed cipher", "cipher", disallowedCipher)
+		By(fmt.Sprintf("verifying that TLS connections with disallowed cipher %s are rejected by pod %s", disallowedCipher, schedulerPod.Name))
 		err = intls.ProbeTLSCipher(e2eclient.K8sClient, schedulerPod, schedulerSecurePort, disallowedCipher)
 		Expect(err).To(HaveOccurred(), "scheduler server should reject connections with disallowed cipher %s", disallowedCipher)
 		Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(), "expected TLS handshake rejection for cipher %s, got: %v", disallowedCipher, err)
@@ -95,13 +87,8 @@ var _ = Describe("TLS", func() {
 
 	It("should adhere to openshift TLS profile - positive test", func(ctx context.Context) {
 		By("getting the current OCP TLS profile")
-		tlsProfileSpec, err := ctrltls.FetchAPIServerTLSProfile(ctx, e2eclient.Client)
+		minVersion, tlsProfileSpec, err := intls.GetClusterTLSProfile(ctx, e2eclient.Client)
 		Expect(err).ToNot(HaveOccurred(), "unable to get TLS profile from APIServer")
-
-		tlsConfigFn, _ := ctrltls.NewTLSConfigFromProfile(tlsProfileSpec)
-		tlsCfg := &tls.Config{}
-		tlsConfigFn(tlsCfg)
-		minVersion := tlsCfg.MinVersion
 		klog.InfoS("current TLS minimum version", "version", libgocrypto.TLSVersionToNameOrDie(minVersion))
 
 		By("getting the scheduler deployment and pods")
@@ -144,17 +131,9 @@ var _ = Describe("TLS", func() {
 			rteDaemonSetCheckInterval = 5 * time.Second
 		)
 		It("[test_id:88380] should have RTE DaemonSet args aligned with the cluster TLS profile", func(ctx context.Context) {
-			By("Getting initial OCP TLS profile")
-			tlsProfileSpec, err := ctrltls.FetchAPIServerTLSProfile(ctx, e2eclient.Client)
-			Expect(err).ToNot(HaveOccurred(), "Unable to get TLS Profile from APIServer")
-			tlsConfig, _ := ctrltls.NewTLSConfigFromProfile(tlsProfileSpec)
-			tlsCfg := &tls.Config{}
-			tlsConfig(tlsCfg)
-			tlsSettings := objtls.NewSettings(tlsCfg)
-			klog.InfoS("Initial TLS Settings", "tlsSettings", tlsSettings)
 			By("Verifying RTE DaemonSet TLS flags match the cluster TLS profile")
 			Eventually(func() error {
-				return intls.CheckRTEDaemonSetTLSFlags(ctx, e2eclient.Client, tlsSettings)
+				return intls.CheckRTEDaemonSetTLSFlagsMatchClusterProfile(ctx, e2eclient.Client)
 			}).WithTimeout(rteDaemonSetCheckTimeout).WithPolling(rteDaemonSetCheckInterval).Should(Succeed())
 		})
 	})
