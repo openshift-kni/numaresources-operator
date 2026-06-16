@@ -35,7 +35,10 @@ type NUMAResourcesOperatorSpec struct {
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Group of nodes to enable RTE on"
 	NodeGroups []NodeGroup `json:"nodeGroups,omitempty"`
 	// Optional Resource Topology Exporter image URL
-	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Optional RTE image URL",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	//
+	// Deprecated: custom operand image override is restricted by default;
+	// set EXPORTER_IMAGE_RESTRICTION=false in the operator environment to re-enable.
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="DEPRECATED: Optional RTE image URL restricted by default",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	ExporterImage string `json:"imageSpec,omitempty"`
 	// Valid values are: "Normal", "Debug", "Trace", "TraceAll".
 	// Defaults to "Normal".
