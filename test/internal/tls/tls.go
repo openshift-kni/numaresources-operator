@@ -32,6 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	configv1 "github.com/openshift/api/config/v1"
+	ctrltls "github.com/openshift/controller-runtime-common/pkg/tls"
 	libgocrypto "github.com/openshift/library-go/pkg/crypto"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
@@ -188,6 +189,35 @@ func FindDisallowedCipher(allowed []string) string {
 	return ""
 }
 
+// GetClusterTLSProfile returns the cluster APIServer TLS profile spec and its minimum TLS version.
+func GetClusterTLSProfile(ctx context.Context, cli client.Client) (minVersion uint16, profileSpec configv1.TLSProfileSpec, err error) {
+	profileSpec, err = ctrltls.FetchAPIServerTLSProfile(ctx, cli)
+	if err != nil {
+		return 0, configv1.TLSProfileSpec{}, fmt.Errorf("unable to fetch TLS profile from API Server: %w", err)
+	}
+	cfg := tlsConfigFromProfileSpec(profileSpec)
+	klog.InfoS("cluster TLS minimum version", "version", tls.VersionName(cfg.MinVersion))
+	return cfg.MinVersion, profileSpec, nil
+}
+
+// RTESettingsFromClusterProfile returns expected RTE metrics TLS flags for the cluster APIServer profile.
+func RTESettingsFromClusterProfile(ctx context.Context, cli client.Client) (objtls.Settings, error) {
+	_, profileSpec, err := GetClusterTLSProfile(ctx, cli)
+	if err != nil {
+		return objtls.Settings{}, err
+	}
+	return objtls.NewSettings(tlsConfigFromProfileSpec(profileSpec)), nil
+}
+
+// CheckRTEDaemonSetTLSFlagsMatchClusterProfile verifies RTE DaemonSet TLS flags against the cluster APIServer profile.
+func CheckRTEDaemonSetTLSFlagsMatchClusterProfile(ctx context.Context, cli client.Client) error {
+	settings, err := RTESettingsFromClusterProfile(ctx, cli)
+	if err != nil {
+		return err
+	}
+	return CheckRTEDaemonSetTLSFlags(ctx, cli, settings)
+}
+
 func TLSVersionBelow(v uint16) (uint16, error) {
 	switch v {
 	case tls.VersionTLS13:
@@ -247,4 +277,14 @@ func matchTLSFlag(rteFlags *flagcodec.Flags, flagName, expected, dsName string) 
 		return fmt.Errorf("%s mismatch daemonsetName=%q expected=%q got=%q", flagName, dsName, expected, got)
 	}
 	return nil
+}
+
+func tlsConfigFromProfileSpec(profileSpec configv1.TLSProfileSpec) *tls.Config {
+	tlsConfigFn, unsupportedCiphers := ctrltls.NewTLSConfigFromProfile(profileSpec)
+	if len(unsupportedCiphers) > 0 {
+		klog.InfoS("TLS profile has unsupported ciphers", "ciphers", unsupportedCiphers)
+	}
+	cfg := &tls.Config{}
+	tlsConfigFn(cfg)
+	return cfg
 }
