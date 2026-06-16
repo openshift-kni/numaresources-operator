@@ -21,7 +21,9 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -32,6 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	configv1 "github.com/openshift/api/config/v1"
+	ctrltls "github.com/openshift/controller-runtime-common/pkg/tls"
 	libgocrypto "github.com/openshift/library-go/pkg/crypto"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
@@ -188,6 +191,35 @@ func FindDisallowedCipher(allowed []string) string {
 	return ""
 }
 
+// GetClusterTLSProfile returns the cluster APIServer TLS profile spec and its minimum TLS version.
+func GetClusterTLSProfile(ctx context.Context, cli client.Client) (minVersion uint16, profileSpec configv1.TLSProfileSpec, err error) {
+	profileSpec, err = ctrltls.FetchAPIServerTLSProfile(ctx, cli)
+	if err != nil {
+		return 0, configv1.TLSProfileSpec{}, fmt.Errorf("unable to fetch TLS profile from API Server: %w", err)
+	}
+	cfg := tlsConfigFromProfileSpec(profileSpec)
+	klog.InfoS("cluster TLS minimum version", "version", tls.VersionName(cfg.MinVersion))
+	return cfg.MinVersion, profileSpec, nil
+}
+
+// RTESettingsFromClusterProfile returns expected RTE metrics TLS flags for the cluster APIServer profile.
+func RTESettingsFromClusterProfile(ctx context.Context, cli client.Client) (objtls.Settings, error) {
+	_, profileSpec, err := GetClusterTLSProfile(ctx, cli)
+	if err != nil {
+		return objtls.Settings{}, err
+	}
+	return objtls.NewSettings(tlsConfigFromProfileSpec(profileSpec)), nil
+}
+
+// CheckRTEDaemonSetTLSFlagsMatchClusterProfile verifies RTE DaemonSet TLS flags against the cluster APIServer profile.
+func CheckRTEDaemonSetTLSFlagsMatchClusterProfile(ctx context.Context, cli client.Client) error {
+	settings, err := RTESettingsFromClusterProfile(ctx, cli)
+	if err != nil {
+		return err
+	}
+	return CheckRTEDaemonSetTLSFlags(ctx, cli, settings)
+}
+
 func TLSVersionBelow(v uint16) (uint16, error) {
 	switch v {
 	case tls.VersionTLS13:
@@ -231,6 +263,76 @@ func CheckRTEDaemonSetTLSFlags(ctx context.Context, cli client.Client, expected 
 	return nil
 }
 
+// FetchMetrics performs TLS handshake to rte pods metrics port and issues an HTTP Get /metrics request,
+// returning the response body
+func FetchMetrics(cli kubernetes.Interface, pod *corev1.Pod, podPort string) ([]byte, error) {
+	var body []byte
+	err := remoteexec.PortForwardToPod(cli, pod, podPort, func(conn net.Conn) error {
+		var reqErr error
+		body, reqErr = doMetricsRequestOverConnection(conn, podPort)
+		return reqErr
+	})
+	if err != nil {
+		return nil, err
+	}
+	return body, nil
+}
+
+func doMetricsRequestOverConnection(conn net.Conn, podPort string) ([]byte, error) {
+	httpCli := buildMetricsHTTPClient(conn)
+	defer httpCli.CloseIdleConnections()
+	return executeMetricsRequest(httpCli, podPort)
+}
+func buildMetricsHTTPClient(conn net.Conn) *http.Client {
+	usedConn := false
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+		// The port-forward callback provides a single live stream connection
+		// we allow exactly one dial so HTTP/TLS uses this stream and fails fast
+		// if a retry/exta dial is attempted
+		DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+			if usedConn {
+				return nil, fmt.Errorf("unexpected extra dial attempt while fetching metrics")
+			}
+			usedConn = true
+			return conn, nil
+		},
+		DisableKeepAlives: true,
+	}
+	return &http.Client{Transport: tr}
+}
+
+func executeMetricsRequest(httpCli *http.Client, podPort string) ([]byte, error) {
+	const url = "https://127.0.0.1/metrics"
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build HTTP request: %w", err)
+	}
+	req.Host = "127.0.0.1:" + podPort
+
+	resp, err := httpCli.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed HTTPS Get /metrics: %w", err)
+	}
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			klog.ErrorS(err, "failed to close /metrics response body")
+		}
+	}()
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read /metrics response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected /metrics status code %d: %q", resp.StatusCode, strings.TrimSpace(string(responseBody)))
+	}
+	return responseBody, nil
+}
+
 func matchTLSFlag(rteFlags *flagcodec.Flags, flagName, expected, dsName string) error {
 	val, found := rteFlags.GetFlag(flagName)
 	if expected == "" {
@@ -247,4 +349,14 @@ func matchTLSFlag(rteFlags *flagcodec.Flags, flagName, expected, dsName string) 
 		return fmt.Errorf("%s mismatch daemonsetName=%q expected=%q got=%q", flagName, dsName, expected, got)
 	}
 	return nil
+}
+
+func tlsConfigFromProfileSpec(profileSpec configv1.TLSProfileSpec) *tls.Config {
+	tlsConfigFn, unsupportedCiphers := ctrltls.NewTLSConfigFromProfile(profileSpec)
+	if len(unsupportedCiphers) > 0 {
+		klog.InfoS("TLS profile has unsupported ciphers", "ciphers", unsupportedCiphers)
+	}
+	cfg := &tls.Config{}
+	tlsConfigFn(cfg)
+	return cfg
 }
