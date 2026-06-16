@@ -38,8 +38,12 @@ spec:
         name: ""
         version: v1
       specDescriptors:
-      - description: Optional Resource Topology Exporter image URL
-        displayName: Optional RTE image URL
+      - description: |-
+          Optional Resource Topology Exporter image URL
+
+          Deprecated: custom operand image override is restricted by default;
+          set EXPORTER_IMAGE_RESTRICTION=false in the operator environment to re-enable.
+        displayName: 'DEPRECATED: Optional RTE image URL restricted by default'
         path: imageSpec
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
