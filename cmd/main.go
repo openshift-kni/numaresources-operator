@@ -399,12 +399,13 @@ func main() {
 			Core:    rteManifestsRendered,
 			Metrics: rteMetricsManifests,
 		},
-		Platform:        discoveredCluster.Platform,
-		Images:          imgs,
-		ImagePullPolicy: pullPolicy,
-		Namespace:       namespace,
-		ForwardMCPConds: params.enableMCPCondsForward,
-		RTEMetricsTLS:   tlsSettings,
+		Platform:            discoveredCluster.Platform,
+		Images:              imgs,
+		ImagePullPolicy:     pullPolicy,
+		Namespace:           namespace,
+		ForwardMCPConds:     params.enableMCPCondsForward,
+		RTEMetricsTLS:       tlsSettings,
+		OverridableRTEImage: controller.IsRTEImageOverridable(),
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesOperator")
 		exitWithCancel(cancel, 1)

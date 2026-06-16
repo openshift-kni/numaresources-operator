@@ -192,6 +192,57 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			})
 		})
 
+		Context("with custom ExporterImage set", func() {
+			It("should reject and set the CR condition to degraded when image restriction is enabled", func(ctx context.Context) {
+				pn := "test"
+				ng := nropv1.NodeGroup{
+					PoolName: &pn,
+				}
+				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
+				nro.Spec.ExporterImage = "quay.io/custom/image:latest"
+
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platf, defaultOCPVersion, nro)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
+
+				Expect(reconciler.Client.Get(ctx, key, nro)).ToNot(HaveOccurred())
+				Expect(nro).To(BeDegradedWithReason(status.ReasonCustomUserImage))
+			})
+
+			It("should allow custom image and not degrade when image restriction is disabled", func(ctx context.Context) {
+				pn := "test"
+				ng := nropv1.NodeGroup{
+					PoolName: &pn,
+				}
+				nro := testobjs.NewNUMAResourcesOperator(objectnames.DefaultNUMAResourcesOperatorCrName, ng)
+				nro.Spec.ExporterImage = "quay.io/custom/image:latest"
+
+				mcpSelector := &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						pn: pn,
+					},
+				}
+				mcp := testobjs.NewMachineConfigPool(pn, mcpSelector.MatchLabels, mcpSelector, mcpSelector)
+
+				reconciler, err := NewFakeNUMAResourcesOperatorReconciler(platf, defaultOCPVersion, nro, mcp)
+				Expect(err).ToNot(HaveOccurred())
+				reconciler.OverridableRTEImage = true
+
+				key := client.ObjectKeyFromObject(nro)
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
+
+				Expect(reconciler.Client.Get(ctx, key, nro)).ToNot(HaveOccurred())
+				degradedCondition := getConditionByType(nro.Status.Conditions, status.ConditionDegraded)
+				Expect(degradedCondition.Status).To(Equal(metav1.ConditionFalse), "should not be degraded when image restriction is disabled")
+
+				availableCondition := getConditionByType(nro.Status.Conditions, status.ConditionAvailable)
+				Expect(availableCondition).ToNot(BeNil())
+				Expect(availableCondition.Status).To(Equal(metav1.ConditionTrue), "should be available when image restriction is disabled")
+			})
+		})
+
 		Context("with default RTE SELinux and PoolName set", func() {
 			Context("with correct NRO and more than one NodeGroup", func() {
 				var nro *nropv1.NUMAResourcesOperator

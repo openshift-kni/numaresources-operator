@@ -210,7 +210,6 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 				newNGs := append(nroOperObj.Spec.NodeGroups, testNG)
 				nroOperObj.Spec.NodeGroups = newNGs
-				nroOperObj.Spec.ExporterImage = serialconfig.GetRteCiImage()
 
 				if nroOperObj.Spec.LogLevel == operatorv1.Trace {
 					newLogLevel = operatorv1.Debug
@@ -250,9 +249,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					By("check the correct match labels for the new RTE daemonset")
 					Expect(ds.Spec.Template.Spec.NodeSelector).To(Equal(testMCP.Spec.NodeSelector.MatchLabels))
 				}
-				By("check the correct image")
 				cnt := ds.Spec.Template.Spec.Containers[0] // shortcut
-				Expect(cnt.Image).To(Equal(serialconfig.GetRteCiImage()))
 
 				By("checking the correct LogLevel")
 				found, match := matchLogLevelToKlog(&cnt, newLogLevel)
