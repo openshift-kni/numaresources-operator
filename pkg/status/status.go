@@ -94,6 +94,15 @@ func EqualConditions(current, updated []metav1.Condition) bool {
 func UpdateConditions(currentConditions []metav1.Condition, cond metav1.Condition, now time.Time) ([]metav1.Condition, bool) {
 	conditions := NewConditions(cond, now)
 
+	for _, cur := range currentConditions {
+		if isBaseCondition(cur.Type) {
+			continue
+		}
+		if FindCondition(conditions, cur.Type) == nil {
+			conditions = append(conditions, cur)
+		}
+	}
+
 	conds := CloneConditions(conditions)
 	curConds := CloneConditions(currentConditions)
 
@@ -104,6 +113,10 @@ func UpdateConditions(currentConditions []metav1.Condition, cond metav1.Conditio
 		return currentConditions, false
 	}
 	return conditions, true
+}
+
+func isBaseCondition(t string) bool {
+	return t == ConditionAvailable || t == ConditionUpgradeable || t == ConditionProgressing || t == ConditionDegraded
 }
 
 func FindCondition(conditions []metav1.Condition, condition string) *metav1.Condition {
