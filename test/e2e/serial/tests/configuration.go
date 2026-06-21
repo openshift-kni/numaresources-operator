@@ -44,13 +44,12 @@ import (
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
-	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
-	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
-	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	intobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
@@ -239,7 +238,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			Expect(fxt.Client.Get(ctx, nroKey, &initialNroOperObj)).To(Succeed())
 
 			testMCP := objects.TestMCP()
-			e2efixture.By("creating new MCP: %q with zero machine count", testMCP.Name)
+			By(fmt.Sprintf("creating new MCP: %q with zero machine count", testMCP.Name))
 			testMCP.Labels = map[string]string{"machineconfiguration.openshift.io/role": roleMCPTest}
 			testMCP.Spec.MachineConfigSelector = &metav1.LabelSelector{
 				MatchExpressions: []metav1.LabelSelectorRequirement{
@@ -256,7 +255,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 
 			Expect(fxt.Client.Create(ctx, testMCP)).To(Succeed())
 			defer func(dctx context.Context) {
-				e2efixture.By("CLEANUP: deleting mcp: %q", testMCP.Name)
+				By(fmt.Sprintf("CLEANUP: deleting mcp: %q", testMCP.Name))
 				Expect(fxt.Client.Delete(dctx, testMCP)).To(Succeed())
 
 				err := wait.With(fxt.Client).
@@ -296,11 +295,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			updatedOperObj := &nropv1.NUMAResourcesOperator{}
 			Eventually(func(g Gomega) {
 				g.Expect(fxt.Client.Get(ctx, nroKey, updatedOperObj)).To(Succeed())
-				g.Expect(isNROOperSyncedAt(&updatedOperObj.Status, status.ConditionAvailable, updatedOperObj.Generation)).To(Succeed())
+				cond := status.FindCondition(updatedOperObj.Status.Conditions, status.ConditionAvailable)
+				g.Expect(cond).ToNot(BeNil(), "condition Available not found")
+				g.Expect(cond.Status).To(Equal(metav1.ConditionTrue), "operator not Available: %+v", updatedOperObj.Status.Conditions)
+				g.Expect(cond.ObservedGeneration).To(Equal(updatedOperObj.Generation), "condition not yet synced to current generation")
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
 			By("verifying DaemonSet count matches NodeGroup count")
-			dss, err := objects.GetDaemonSetsByNamespacedName(fxt.Client, ctx, updatedOperObj.Status.DaemonSets...)
+			dss, err := objects.GetDaemonSetsOwnedBy(fxt.Client, updatedOperObj.ObjectMeta)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(dss).To(HaveLen(len(nroOperObj.Spec.NodeGroups)), "daemonsets found owned by NRO object doesn't align with specified NodeGroups")
 		})
