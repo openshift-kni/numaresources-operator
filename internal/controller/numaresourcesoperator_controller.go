@@ -850,7 +850,16 @@ func updateMachineConfigPoolPausedCondition(conditions []metav1.Condition, gener
 		ObservedGeneration: generation,
 		LastTransitionTime: metav1.Now(),
 	}
-	conditions, _ = status.ComputeConditions(conditions, condition, time.Now())
+	existingCond := status.FindCondition(conditions, condition.Type)
+	if existingCond != nil {
+		if existingCond.Status != condition.Status {
+			existingCond.LastTransitionTime = condition.LastTransitionTime
+		}
+		existingCond.Status = condition.Status
+		existingCond.Reason = condition.Reason
+		existingCond.Message = condition.Message
+		existingCond.ObservedGeneration = condition.ObservedGeneration
+	}
 	return conditions
 }
 
