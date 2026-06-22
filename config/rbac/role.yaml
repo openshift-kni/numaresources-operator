@@ -7,24 +7,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - configmaps
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - patch
-- apiGroups:
-  - ""
-  resources:
   - nodes
   verbs:
   - list
@@ -37,32 +19,6 @@ rules:
   - get
   - list
   - watch
-- apiGroups:
-  - ""
-  resources:
-  - serviceaccounts
-  verbs:
-  - create
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resourceNames:
-  - rte
-  resources:
-  - serviceaccounts
-  verbs:
-  - get
-  - update
-- apiGroups:
-  - ""
-  resourceNames:
-  - secondary-scheduler
-  resources:
-  - serviceaccounts
-  verbs:
-  - get
-  - update
 - apiGroups:
   - apiextensions.k8s.io
   resources:
@@ -77,34 +33,6 @@ rules:
   - noderesourcetopologies.topology.node.k8s.io
   resources:
   - customresourcedefinitions
-  verbs:
-  - get
-  - update
-- apiGroups:
-  - apps
-  resources:
-  - daemonsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
-  - deployments
-  verbs:
-  - create
-  - list
-  - watch
-- apiGroups:
-  - apps
-  resourceNames:
-  - secondary-scheduler
-  resources:
-  - deployments
   verbs:
   - get
   - update
@@ -195,8 +123,6 @@ rules:
   resources:
   - clusterrolebindings
   - clusterroles
-  - rolebindings
-  - roles
   verbs:
   - create
   - list
@@ -208,8 +134,6 @@ rules:
   resources:
   - clusterrolebindings
   - clusterroles
-  - rolebindings
-  - roles
   verbs:
   - get
   - update
@@ -219,16 +143,6 @@ rules:
   - topology-aware-scheduler
   resources:
   - clusterroles
-  verbs:
-  - get
-  - update
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resourceNames:
-  - topology-aware-scheduler-leader-elect
-  resources:
-  - rolebindings
-  - roles
   verbs:
   - get
   - update
@@ -269,9 +183,48 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resourceNames:
+  - rte
+  resources:
+  - serviceaccounts
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - ""
+  resourceNames:
+  - secondary-scheduler
+  resources:
+  - serviceaccounts
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
   - services
   verbs:
   - create
+  - list
+  - watch
 - apiGroups:
   - ""
   resourceNames:
@@ -282,11 +235,41 @@ rules:
   - get
   - update
 - apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resourceNames:
+  - secondary-scheduler
+  resources:
+  - deployments
+  verbs:
+  - get
+  - update
+- apiGroups:
   - networking.k8s.io
   resources:
   - networkpolicies
   verbs:
   - create
+  - list
+  - watch
 - apiGroups:
   - networking.k8s.io
   resourceNames:
@@ -304,6 +287,35 @@ rules:
   - scheduler-egress-to-api-server
   resources:
   - networkpolicies
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings
+  - roles
+  verbs:
+  - create
+  - list
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resourceNames:
+  - rte
+  resources:
+  - rolebindings
+  - roles
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resourceNames:
+  - topology-aware-scheduler-leader-elect
+  resources:
+  - rolebindings
+  - roles
   verbs:
   - get
   - update
