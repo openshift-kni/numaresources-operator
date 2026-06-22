@@ -695,13 +695,6 @@ spec:
           - watch
         - apiGroups:
           - ""
-          resources:
-          - events
-          verbs:
-          - create
-          - patch
-        - apiGroups:
-          - ""
           resourceNames:
           - rte
           resources:
