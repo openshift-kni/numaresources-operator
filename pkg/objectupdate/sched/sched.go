@@ -22,6 +22,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
 	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
@@ -80,6 +81,31 @@ func DeploymentConfigMapSettings(dp *appsv1.Deployment, cmName, cmHash string) {
 		template.Annotations = map[string]string{}
 	}
 	template.Annotations[hash.ConfigMapAnnotation] = cmHash
+}
+
+func DeploymentTopologySpreadConstraints(dp *appsv1.Deployment) error {
+	labels := dp.Spec.Template.Labels
+	if len(labels) == 0 {
+		return fmt.Errorf("no labels found in deployment template")
+	}
+
+	schedConstr := corev1.TopologySpreadConstraint{
+		LabelSelector: &metav1.LabelSelector{
+			MatchLabels: labels,
+		},
+		MaxSkew:           1,
+		TopologyKey:       "kubernetes.io/hostname",
+		WhenUnsatisfiable: corev1.DoNotSchedule,
+		// the below label is set by the deployment controller and is needed for safe rollouts to allow ignoring
+		// the old replicaset and calculates the spread purely based on the new replicaset, ensuring the final
+		// state is perfectly balanced without stalling:
+		// https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#pod-template-hash-label
+		MatchLabelKeys: []string{"pod-template-hash"},
+	}
+
+	dp.Spec.Template.Spec.TopologySpreadConstraints = []corev1.TopologySpreadConstraint{schedConstr}
+	klog.V(3).InfoS("scheduler deployment topology spread constraints", "constraints", schedConstr.String())
+	return nil
 }
 
 func SchedulerConfig(cm *corev1.ConfigMap, name string, params *k8swgmanifests.ConfigParams) error {
