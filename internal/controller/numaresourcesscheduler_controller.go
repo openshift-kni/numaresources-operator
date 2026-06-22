@@ -78,14 +78,21 @@ type NUMAResourcesSchedulerReconciler struct {
 }
 
 // Namespace Scoped
-//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=*,namespace="numaresources"
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create,namespace="numaresources"
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,resourceNames=scheduler-default-deny-all;scheduler-egress-to-api-server,verbs=get;update,namespace="numaresources"
 
 // Cluster Scoped
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
-//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=*
-//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
-//+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=create;list;watch
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,resourceNames=topology-aware-scheduler,verbs=get;update
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=create;list;watch
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,resourceNames=secondary-scheduler;topology-aware-scheduler,verbs=get;update
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=create
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,resourceNames=topology-aware-scheduler-leader-elect,verbs=get;update
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=create;list;watch
+//+kubebuilder:rbac:groups=apps,resources=deployments,resourceNames=secondary-scheduler,verbs=get;update
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;list;watch
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,resourceNames=secondary-scheduler,verbs=get;update
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=create;get;list;update;watch
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=list;watch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers,verbs=get;list;watch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers/status,verbs=get;update;patch
