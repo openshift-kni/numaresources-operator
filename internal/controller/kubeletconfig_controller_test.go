@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/record"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -45,17 +44,12 @@ import (
 
 type reconcilerBuilderFunc func(...runtime.Object) (*KubeletConfigReconciler, error)
 
-const (
-	bufferSize = 1024
-)
-
 func NewFakeKubeletConfigReconciler(initObjects ...runtime.Object) (*KubeletConfigReconciler, error) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithRuntimeObjects(initObjects...).Build()
 	return &KubeletConfigReconciler{
 		Client:    fakeClient,
 		Scheme:    scheme.Scheme,
 		Namespace: testNamespace,
-		Recorder:  record.NewFakeRecorder(bufferSize),
 		Platform:  platform.OpenShift,
 	}, nil
 }
@@ -66,7 +60,6 @@ func NewFakeKubeletConfigReconcilerForHyperShift(initObjects ...runtime.Object) 
 		Client:    fakeClient,
 		Scheme:    scheme.Scheme,
 		Namespace: testNamespace,
-		Recorder:  record.NewFakeRecorder(bufferSize),
 		Platform:  platform.HyperShift,
 	}, nil
 }
@@ -146,22 +139,7 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 				Expect(cm.Labels).To(HaveKeyWithValue(rteconfig.LabelOperatorName, nro.Name))
 				Expect(cm.Labels).To(HaveKeyWithValue(rteconfig.LabelNodeGroupName+"/"+rteconfig.LabelNodeGroupKindMachineConfigPool, poolName))
 			})
-			It("should send events when NRO present and operation successful", func() {
-				reconciler, err := newFakeReconciler(nro, mcp1, mcoKc1, cmKc1)
-				Expect(err).ToNot(HaveOccurred())
-
-				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
-				Expect(err).ToNot(HaveOccurred())
-				Expect(result).To(Equal(reconcile.Result{}))
-
-				// verify creation event
-				fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
-				Expect(ok).To(BeTrue())
-				event := <-fakeRecorder.Events
-				Expect(event).To(ContainSubstring("ProcessOK"))
-			})
-
-			It("should send events when NRO present and operation failure", func() {
+			It("should fail when NRO present and operation failure", func() {
 				brokenMcoKc := testobjs.NewKubeletConfigWithData("broken", label1, mcp1.Spec.MachineConfigSelector, []byte(""))
 				// on HyperShift we can mimic this behavior by not having a ConfigMap with a KubeletConfig
 				// present on the cluster at all
@@ -171,12 +149,6 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 				key := client.ObjectKeyFromObject(brokenMcoKc)
 				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).To(HaveOccurred())
-
-				// verify creation event
-				fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
-				Expect(ok).To(BeTrue())
-				event := <-fakeRecorder.Events
-				Expect(event).To(ContainSubstring("ProcessFailed"))
 			})
 
 			It("should skip invalid kubeletconfig", func() {
@@ -189,13 +161,6 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 				key := client.ObjectKeyFromObject(invalidMcoKc)
 				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).ToNot(HaveOccurred())
-
-				// verify creation event
-				fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
-				Expect(ok).To(BeTrue())
-				event := <-fakeRecorder.Events
-				Expect(event).To(ContainSubstring("ProcessSkip"))
-				Expect(event).To(ContainSubstring(invalidMcoKc.Name))
 			})
 
 			It("should ignore non-matching kubeketconfigs", func() {
@@ -209,21 +174,11 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 				result, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(Equal(reconcile.Result{}))
-
-				// verify creation event
-				fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
-				Expect(ok).To(BeTrue())
-				event := <-fakeRecorder.Events
-				Expect(event).To(ContainSubstring("ProcessSkip"))
-				Expect(event).To(ContainSubstring(ctrlPlaneKc.Name))
 			})
 
 			It("should process matching kubeletconfig, then ignore non-matching kubeketconfig", func() {
 				reconciler, err := newFakeReconciler(nro, mcp1)
 				Expect(err).ToNot(HaveOccurred())
-
-				fakeRecorder, ok := reconciler.Recorder.(*record.FakeRecorder)
-				Expect(ok).To(BeTrue())
 
 				var reconciledObj client.Object
 				reconciledObj = mcoKc1
@@ -243,10 +198,6 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 					Name:      objectnames.GetComponentName(nro.Name, poolName),
 				}
 				Expect(reconciler.Client.Get(context.TODO(), key, cm)).ToNot(HaveOccurred())
-				// verify creation event
-				event := <-fakeRecorder.Events
-				Expect(event).To(ContainSubstring("ProcessOK"))
-				Expect(event).To(ContainSubstring(reconciledObj.GetName()))
 
 				ctrlPlaneKc := testobjs.NewKubeletConfigAutoresizeControlPlane()
 				err = reconciler.Client.Create(context.TODO(), ctrlPlaneKc)
@@ -261,11 +212,6 @@ var _ = Describe("Test KubeletConfig Reconcile", func() {
 				result, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).ToNot(HaveOccurred())
 				Expect(result).To(Equal(reconcile.Result{}))
-
-				// verify creation event
-				event = <-fakeRecorder.Events
-				Expect(event).To(ContainSubstring("ProcessSkip"))
-				Expect(event).To(ContainSubstring(ctrlPlaneKc.Name))
 			})
 		})
 	},
