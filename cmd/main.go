@@ -397,7 +397,6 @@ func main() {
 	if err = (&controller.NUMAResourcesOperatorReconciler{
 		Client:       mgr.GetClient(),
 		Scheme:       mgr.GetScheme(),
-		Recorder:     mgr.GetEventRecorderFor("numaresources-controller"),
 		APIManifests: apiManifests,
 		RTEManifests: rtestate.Manifests{
 			Core:    rteManifestsRendered,
@@ -417,7 +416,6 @@ func main() {
 	if err = (&controller.KubeletConfigReconciler{
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
-		Recorder:  mgr.GetEventRecorderFor("kubeletconfig-controller"),
 		Namespace: namespace,
 		Platform:  discoveredCluster.Platform,
 	}).SetupWithManager(mgr); err != nil {
