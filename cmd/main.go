@@ -38,7 +38,6 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 	ctrltls "github.com/openshift/controller-runtime-common/pkg/tls"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -289,6 +288,7 @@ func main() {
 	if !ok {
 		namespace = defaultNamespace
 	}
+	klog.InfoS("namespace detected", "namespace", namespace)
 
 	rteManifests, err := rtemanifests.GetManifests(discoveredCluster.Platform, discoveredCluster.ShortVersion, namespace, false, true)
 	if err != nil {
@@ -340,12 +340,16 @@ func main() {
 
 	webhookTLSOpts := append(webhookTLSOpts(params.enableHTTP2), tlsConfig)
 
+	cacheNamespaces := map[string]cache.Config{
+		namespace: {},
+	}
+	if discoveredCluster.Platform == platform.HyperShift {
+		cacheNamespaces[controller.HyperShiftKubeletConfigConfigMapNamespace] = cache.Config{}
+	}
+
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Cache: cache.Options{
-			DefaultNamespaces: map[string]cache.Config{
-				namespace:            {},
-				metav1.NamespaceNone: {},
-			},
+			DefaultNamespaces: cacheNamespaces,
 		},
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
