@@ -35,7 +35,13 @@ const (
 )
 
 const (
+	// scheduler conditions
 	ConditionDedicatedInformerActive = "DedicatedInformerActive"
+)
+
+const (
+	// operator conditions
+	ConditionMachineConfigPoolPaused = "MachineConfigPoolPaused"
 )
 
 // TODO: are we duping these?
@@ -88,6 +94,15 @@ func EqualConditions(current, updated []metav1.Condition) bool {
 func UpdateConditions(currentConditions []metav1.Condition, cond metav1.Condition, now time.Time) ([]metav1.Condition, bool) {
 	conditions := NewConditions(cond, now)
 
+	for _, cur := range currentConditions {
+		if isBaseCondition(cur.Type) {
+			continue
+		}
+		if FindCondition(conditions, cur.Type) == nil {
+			conditions = append(conditions, cur)
+		}
+	}
+
 	conds := CloneConditions(conditions)
 	curConds := CloneConditions(currentConditions)
 
@@ -98,6 +113,10 @@ func UpdateConditions(currentConditions []metav1.Condition, cond metav1.Conditio
 		return currentConditions, false
 	}
 	return conditions, true
+}
+
+func isBaseCondition(t string) bool {
+	return t == ConditionAvailable || t == ConditionUpgradeable || t == ConditionProgressing || t == ConditionDegraded
 }
 
 func FindCondition(conditions []metav1.Condition, condition string) *metav1.Condition {
@@ -157,6 +176,32 @@ func newBaseConditions(now time.Time) []metav1.Condition {
 			Status:             metav1.ConditionFalse,
 			LastTransitionTime: metav1.Time{Time: now},
 			Reason:             ConditionDegraded,
+		},
+	}
+}
+
+func NewNUMAResourcesOperatorConditions() []metav1.Condition {
+	now := time.Now()
+	return append(newBaseConditions(now), operatorExtraConditions(now)...)
+}
+
+func EnsureNUMAResourcesOperatorConditions(conditions []metav1.Condition) []metav1.Condition {
+	now := time.Now()
+	for _, cond := range operatorExtraConditions(now) {
+		if FindCondition(conditions, cond.Type) == nil {
+			conditions = append(conditions, cond)
+		}
+	}
+	return conditions
+}
+
+func operatorExtraConditions(now time.Time) []metav1.Condition {
+	return []metav1.Condition{
+		{
+			Type:               ConditionMachineConfigPoolPaused,
+			Status:             metav1.ConditionUnknown,
+			LastTransitionTime: metav1.Time{Time: now},
+			Reason:             ConditionMachineConfigPoolPaused,
 		},
 	}
 }
