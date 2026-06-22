@@ -109,10 +109,15 @@ type NUMAResourcesOperatorReconciler struct {
 }
 
 // Namespace Scoped
-//+kubebuilder:rbac:groups="",resources=services,verbs=create,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=services,verbs=create;list;watch,namespace="numaresources"
 //+kubebuilder:rbac:groups="",resources=services,resourceNames=numaresources-rte-metrics-service,verbs=get;update,namespace="numaresources"
-//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create,namespace="numaresources"
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;list;watch,namespace="numaresources"
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,resourceNames=rte-default-deny-all;rte-egress-to-api-server,verbs=get;update,namespace="numaresources"
+//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=create;delete;get;list;update;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,resourceNames=rte,verbs=get;update,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,resourceNames=rte,verbs=get;update,namespace="numaresources"
 
 // Cluster Scoped
 //+kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get;list;watch
@@ -125,15 +130,10 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=resource-topology-exporter;resource-topology-exporter-v2,verbs=get;update
 //+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=create;list;watch
 //+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,resourceNames=noderesourcetopologies.topology.node.k8s.io,verbs=get;update
-//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=create;delete;get;list;update;watch
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=create;list;watch
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,resourceNames=rte,verbs=get;update
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=create
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,resourceNames=rte,verbs=get;update
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=create
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,resourceNames=rte,verbs=get;update
-//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;list;watch
-//+kubebuilder:rbac:groups="",resources=serviceaccounts,resourceNames=rte,verbs=get;update
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=list
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=get;list;watch
