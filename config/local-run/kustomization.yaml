@@ -1,0 +1,12 @@
+# Kustomize overlay for local operator development.
+# Installs CRDs, RBAC and namespace - but NOT the manager Deployment.
+# Use with hack/run-local.sh to run the operator as its ServiceAccount.
+
+namespace: numaresources
+
+namePrefix: numaresources-
+
+resources:
+- ../crd
+- ../rbac
+- namespace.yaml
