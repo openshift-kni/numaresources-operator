@@ -62,12 +62,12 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 		Expect(e2efixture.Teardown(fxt)).To(Succeed())
 	})
 
-	Context("with at least two nodes suitable", Label(label.Tier0), func() {
+	Context("with at least two nodes suitable", func() {
 		// testing scope=container is pointless in this case: 1 pod with 1 container.
 		// It should behave exactly like scope=pod. But we keep these tests as non-regression
 		// to have a signal the system is behaving as expected.
 		// This is the reason we don't filter for scope, but only by policy.
-		DescribeTable("a pod should be placed and aligned on the node", Label(label.Tier0, "hostlevel"),
+		DescribeTable("a pod should be placed and aligned on the node", Label("hostlevel"),
 			func(tmPolicy string, requiredRes []corev1.ResourceList, expectedQOS corev1.PodQOSClass) {
 				ctx := context.TODO()
 				nrtCandidates := filterNodes(fxt, desiredNodesState{
@@ -125,7 +125,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				expectNRTConsumedResources(fxt, *targetNrtInitial, accumulatedRes, updatedPod)
 			},
 			Entry("[test_id:84015][qos:gu] with ephemeral storage, single-container",
-				Label("qos:gu"),
+				Label(label.Tier0, "qos:gu"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
 				[]corev1.ResourceList{
@@ -138,7 +138,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				corev1.PodQOSGuaranteed,
 			),
 			Entry("[test_id:84016][qos:bu] with ephemeral storage, single-container",
-				Label("qos:bu"),
+				Label(label.Tier1, "qos:bu"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
 				[]corev1.ResourceList{
@@ -151,7 +151,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				corev1.PodQOSBurstable,
 			),
 			Entry("[test_id:84017][qos:be] with ephemeral storage, single-container",
-				Label("qos:be"),
+				Label(label.Tier1, "qos:be"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
 				[]corev1.ResourceList{
@@ -162,7 +162,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				corev1.PodQOSBestEffort,
 			),
 			Entry("[test_id:74249][qos:gu] with ephemeral storage, multi-container",
-				Label("qos:gu"),
+				Label(label.Tier0, "qos:gu"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
 				[]corev1.ResourceList{
@@ -190,7 +190,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				corev1.PodQOSGuaranteed,
 			),
 			Entry("[test_id:74250][qos:gu] with ephemeral storage, multi-container, fractional",
-				Label("qos:gu"),
+				Label(label.Tier0, "qos:gu"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
 				[]corev1.ResourceList{
@@ -219,7 +219,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 			),
 
 			Entry("[test_id:74251][qos:bu] with ephemeral storage, multi-container, fractional",
-				Label("qos:bu"),
+				Label(label.Tier1, "qos:bu"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
 				[]corev1.ResourceList{
@@ -247,7 +247,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				corev1.PodQOSBurstable,
 			),
 			Entry("[test_id:74252][qos:be] with ephemeral storage, multi-container", //TODO test with devices and hugepages requests and fix automation
-				Label("qos:be"),
+				Label(label.Tier1, "qos:be"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
 				[]corev1.ResourceList{

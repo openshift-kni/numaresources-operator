@@ -72,7 +72,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 		Expect(err).NotTo(HaveOccurred())
 	})
 
-	Context("[no_nrt] using the NUMA-aware scheduler without updated NRT data", Label("no_nrt"), func() {
+	Context("[no_nrt] using the NUMA-aware scheduler without updated NRT data", Label(label.Tier2, "no_nrt"), func() {
 		var testPod *corev1.Pod
 		nropObjInitial := &nropv1.NUMAResourcesOperator{}
 		var initialInfoRefreshPause nropv1.InfoRefreshPauseMode
@@ -104,7 +104,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			updateInfoRefreshPause(context.TODO(), fxt, initialInfoRefreshPause, nropObjInitial)
 		})
 
-		It("[test_id:85012] should make a best-effort pod running", Label(label.Tier1), func() {
+		It("[test_id:85012] should make a best-effort pod running", func() {
 			By("create best-effort pod expect it to start running")
 			testPod := objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
@@ -119,7 +119,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("[test_id:85013] should make a burstable pod running", Label(label.Tier1), func() {
+		It("[test_id:85013] should make a burstable pod running", func() {
 			By("create burstable pod and expect it to run")
 			testPod = objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName
@@ -137,7 +137,7 @@ var _ = Describe("[serial] numaresources profile update", Serial, Label("feature
 			Expect(err).ToNot(HaveOccurred())
 		})
 
-		It("[test_id:47611] should make a guaranteed pod running", Label(label.Tier1), func() {
+		It("[test_id:47611] should make a guaranteed pod running", func() {
 			By("create guaranteed pod and expect it to run")
 			testPod = objects.NewTestPodPause(fxt.Namespace.Name, "testpod")
 			testPod.Spec.SchedulerName = serialconfig.Config.SchedulerName

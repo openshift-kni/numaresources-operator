@@ -33,7 +33,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("[serial] numaresources operator introspection", Serial, Label(label.Tier2, "feature:introspection"), func() {
+var _ = Describe("[serial] numaresources operator introspection", Serial, Label(label.Tier3, "feature:introspection"), func() {
 	When("checking the numaresources operator pod proper", func() {
 		var nropKey client.ObjectKey
 		var nropObj nropv1.NUMAResourcesOperator
