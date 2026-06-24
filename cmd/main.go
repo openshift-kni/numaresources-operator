@@ -47,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -67,6 +68,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
+	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
@@ -420,6 +422,19 @@ func main() {
 		Platform:  discoveredCluster.Platform,
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "KubeletConfig")
+		exitWithCancel(cancel, 1)
+	}
+
+	// intentionally done unconditionally to catch the unlikely case someone managed
+	// to disable the scheduler pre-upgrade (very hard task anyway, but still) to
+	// ensure no dangerous leftovers
+	if err = mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+		if err := schedstate.Cleanup(ctx, mgr.GetClient()); err != nil {
+			klog.ErrorS(err, "best-effort scheduler cleanup failed")
+		}
+		return nil
+	})); err != nil {
+		klog.ErrorS(err, "unable to add scheduler cleanup runnable")
 		exitWithCancel(cancel, 1)
 	}
 

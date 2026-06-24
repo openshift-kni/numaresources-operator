@@ -18,11 +18,13 @@ package sched
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -41,14 +43,30 @@ const (
 	SchedulerConfigFileName      = "config.yaml"
 	SchedulerConfigMapVolumeName = "etckubernetes"
 	SchedulerPluginName          = "NodeResourceTopologyMatch"
+
+	legacyClusterRoleBindingK8SName = "secondary-scheduler"
 )
+
+// Cleanup removes leftover resources from previous operator versions.
+func Cleanup(ctx context.Context, cli client.Client) error {
+	crb := &rbacv1.ClusterRoleBinding{}
+	crb.Name = legacyClusterRoleBindingK8SName
+	err := cli.Delete(ctx, crb)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil // expected steady state. Stay silent
+		}
+		return fmt.Errorf("failed to delete legacy ClusterRoleBinding %q: %w", legacyClusterRoleBindingK8SName, err)
+	}
+	klog.Infof("deleted legacy ClusterRoleBinding %q", legacyClusterRoleBindingK8SName)
+	return nil
+}
 
 type ExistingManifests struct {
 	Existing                    schedmanifests.Manifests
 	serviceAccountError         error
 	configMapError              error
 	clusterRoleError            error
-	clusterRoleBindingK8SError  error
 	clusterRoleBindingNRTError  error
 	roleError                   error
 	roleBindingError            error
@@ -77,13 +95,6 @@ func (em ExistingManifests) State(mf schedmanifests.Manifests) []objectstate.Obj
 			Existing: em.Existing.ClusterRole,
 			Error:    em.clusterRoleError,
 			Desired:  mf.ClusterRole.DeepCopy(),
-			Compare:  compare.Object,
-			Merge:    merge.MetadataForUpdate,
-		},
-		{
-			Existing: em.Existing.ClusterRoleBindingK8S,
-			Error:    em.clusterRoleBindingK8SError,
-			Desired:  mf.ClusterRoleBindingK8S.DeepCopy(),
 			Compare:  compare.Object,
 			Merge:    merge.MetadataForUpdate,
 		},
@@ -152,10 +163,6 @@ func FromClient(ctx context.Context, cli client.Client, mf schedmanifests.Manife
 		ret.Existing.ClusterRole = cro
 	}
 
-	crbK8S := &rbacv1.ClusterRoleBinding{}
-	if ret.clusterRoleBindingK8SError = cli.Get(ctx, client.ObjectKeyFromObject(mf.ClusterRoleBindingK8S), crbK8S); ret.clusterRoleBindingK8SError == nil {
-		ret.Existing.ClusterRoleBindingK8S = crbK8S
-	}
 	crbNRT := &rbacv1.ClusterRoleBinding{}
 	if ret.clusterRoleBindingNRTError = cli.Get(ctx, client.ObjectKeyFromObject(mf.ClusterRoleBindingNRT), crbNRT); ret.clusterRoleBindingNRTError == nil {
 		ret.Existing.ClusterRoleBindingNRT = crbNRT

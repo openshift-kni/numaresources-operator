@@ -62,10 +62,6 @@ func ClusterRole() (*rbacv1.ClusterRole, error) {
 	return cr, nil
 }
 
-func ClusterRoleBindingK8S(namespace string) (*rbacv1.ClusterRoleBinding, error) {
-	return loadClusterRoleBinding("clusterrolebinding.yaml", namespace)
-}
-
 func ClusterRoleBindingNRT(namespace string) (*rbacv1.ClusterRoleBinding, error) {
 	return loadClusterRoleBinding("clusterrolebinding.nrt.yaml", namespace)
 }
