@@ -402,7 +402,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 			)
 		})
 
-		When("there are jobs in the cluster", Label("job", "generic", label.Tier0), func() {
+		When("there are jobs in the cluster", Label("job", "generic"), func() {
 			var idleJob *batchv1.Job
 			var hostsRequired int
 			var NUMAZonesRequired int
@@ -523,10 +523,10 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, serialconfig.Config.SchedulerName)
 					}
 				},
-				Entry("[test_id:85780] vs best-effort pods", func(job *batchv1.Job) {
+				Entry("[test_id:85780] vs best-effort pods", Label(label.Tier1), func(job *batchv1.Job) {
 					klog.InfoS("Creating a job whose containers have requests=none")
 				}),
-				Entry("[test_id:85781] vs burstable pods", func(job *batchv1.Job) {
+				Entry("[test_id:85781] vs burstable pods", Label(label.Tier0), func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("100m"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
@@ -542,7 +542,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 				// GAP: pinnable cpu (but not memory)
 				// however with the recommended config, we can't have pinnable CPUs without pinnable memory;
 				// we would need cpumanager policy=static and memorymanager policy=none, which we don't recommend.
-				Entry("[test_id:85782] vs guaranteed pods with pinnable memory", func(job *batchv1.Job) {
+				Entry("[test_id:85782] vs guaranteed pods with pinnable memory", Label(label.Tier1), func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("100m"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
@@ -555,7 +555,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 					}
 					fxt.Dump.Infof(e2ereslist.ToString(jobRequiredRes), "Creating a job whose containers have limits")
 				}),
-				Entry("[test_id:85783] vs guaranteed pods with pinnable memory and CPU", func(job *batchv1.Job) {
+				Entry("[test_id:85783] vs guaranteed pods with pinnable memory and CPU", Label(label.Tier0), func(job *batchv1.Job) {
 					jobRequiredRes := corev1.ResourceList{
 						corev1.ResourceCPU:    resource.MustParse("1"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
@@ -570,7 +570,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 				}),
 			)
 
-			DescribeTable("[nodeAll] against all the available worker nodes", Label("nodeAll"),
+			DescribeTable("[nodeAll] against all the available worker nodes", Label(label.Tier0, "nodeAll"),
 				// like non-regression tests, but with jobs present
 				func(setupPod setupPodFunc) {
 					expectedJobPodsPerNode = 2 // anything >= 1 should be fine

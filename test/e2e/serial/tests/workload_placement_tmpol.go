@@ -273,7 +273,6 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 		// FIXME: this is a slight abuse of DescribeTable, but we need to run
 		// the same code which a different test_id per tmscope
 		DescribeTable("a deployment with a guaranteed pod with one container should be scheduled into one NUMA zone",
-			Label(label.Tier0),
 			func(tmPolicy, tmScope string, requiredRes, paddingRes corev1.ResourceList) {
 				setupCluster(requiredRes, paddingRes, tmPolicy, tmScope)
 
@@ -319,7 +318,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				expectNRTConsumedResources(fxt, targetNrtInitial, requiredRes, &pods[0])
 			},
 			Entry("[test_id:47583][tmscope:cnt] with topology-manager-scope: container",
-				Label("tmscope:cnt"),
+				Label(label.Tier0, "tmscope:cnt"),
 				intnrt.SingleNUMANode,
 				intnrt.Container,
 				corev1.ResourceList{
@@ -332,7 +331,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			),
 			Entry("[test_id:50159][tmscope:pod] with topology-manager-scope: pod",
-				Label("tmscope:pod"),
+				Label(label.Tier0, "tmscope:pod"),
 				intnrt.SingleNUMANode,
 				intnrt.Pod,
 				corev1.ResourceList{
@@ -345,7 +344,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			),
 			Entry("[test_id:50165][tmscope:cnt][hugepages] with topology-manager-scope: container and with hugepages",
-				Label("tmscope:cnt", "hugepages"),
+				Label(label.Tier1, "tmscope:cnt", "hugepages"),
 				intnrt.SingleNUMANode,
 				intnrt.Container,
 				corev1.ResourceList{
@@ -360,7 +359,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			),
 			Entry("[test_id:50182][tmscope:pod][hugepages] with topology-manager-scope: pod and with hugepages",
-				Label("tmscope:pod", "hugepages"),
+				Label(label.Tier1, "tmscope:pod", "hugepages"),
 				intnrt.SingleNUMANode,
 				intnrt.Pod,
 				corev1.ResourceList{
@@ -1190,7 +1189,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:55431] should make a besteffort pod requesting devices land on a node with enough resources on a specific NUMA zone",
-			Label(label.Tier0, "tmscope:pod", "devices"),
+			Label(label.Tier1, "tmscope:pod", "devices"),
 			newPodScopeSingleNUMANodeFuncs(),
 			podResourcesRequest{
 				appCnt: []corev1.ResourceList{
@@ -1655,7 +1654,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 			},
 		),
 		Entry("[test_id:85009] pod with two gu cnt keep on pending because cannot align the second container to a single numa node",
-			Label(label.Tier0, "unsched", "tmscope:cnt", "hugepages2Mi"),
+			Label(label.Tier1, "unsched", "tmscope:cnt", "hugepages2Mi"),
 			newContainerScopeSingleNUMANodeFuncs(),
 			nrosched.ErrorCannotAlignContainer,
 			podResourcesRequest{
