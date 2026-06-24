@@ -41,6 +41,7 @@ const (
 	envVarMCPUpdateInterval = "E2E_NROP_MCP_UPDATE_INTERVAL"
 	envVarPlatform          = "E2E_NROP_PLATFORM"
 	envVarPlatformVersion   = "E2E_NROP_PLATFORM_VERSION"
+	envVarBuildInfoPath     = "E2E_NROP_BUILDINFO"
 )
 
 const (
@@ -81,6 +82,10 @@ func init() {
 	discoveredCluster, _ := version.DiscoverCluster(ctx, os.Getenv(envVarPlatform), os.Getenv(envVarPlatformVersion))
 	Plat = discoveredCluster.Platform
 	PlatVersion = discoveredCluster.ShortVersion
+}
+
+func GetBuildInfoPath() string {
+	return os.Getenv(envVarBuildInfoPath)
 }
 
 func getMachineConfigPoolUpdateValueFromEnv(envVar string, fallback time.Duration) (time.Duration, error) {

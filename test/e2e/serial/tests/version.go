@@ -19,6 +19,8 @@ package tests
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
 	"path/filepath"
 
 	"k8s.io/klog/v2"
@@ -28,6 +30,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 
@@ -49,13 +52,20 @@ var _ = Describe("[serial] numaresources version", Serial, Label("feature:config
 			}
 			By("running against cluster " + discoveredCluster.Platform.String() + " " + discoveredCluster.LongVersion.String())
 
-			nropKey := objects.NROObjectKey()
-			nropObj := nropv1.NUMAResourcesOperator{}
-			Expect(e2eclient.Client.Get(ctx, nropKey, &nropObj)).To(Succeed(), "failed to get the NRO resource: %v", nropKey)
+			var stdout []byte
+			if biPath := configuration.GetBuildInfoPath(); biPath != "" {
+				By(fmt.Sprintf("using buildinfo from local path: %s", biPath))
+				stdout, err = os.ReadFile(biPath)
+			} else {
+				nropKey := objects.NROObjectKey()
+				nropObj := nropv1.NUMAResourcesOperator{}
+				Expect(e2eclient.Client.Get(ctx, nropKey, &nropObj)).To(Succeed(), "failed to get the NRO resource: %v", nropKey)
 
-			pod, err := deploy.FindNUMAResourcesOperatorPod(ctx, e2eclient.Client, &nropObj)
-			Expect(err).ToNot(HaveOccurred())
-			stdout, _, err := remoteexec.CommandOnPod(ctx, e2eclient.K8sClient, pod, "/bin/cat", filepath.Join("/usr/local/share/", "buildinfo.json"))
+				pod, err2 := deploy.FindNUMAResourcesOperatorPod(ctx, e2eclient.Client, &nropObj)
+				Expect(err2).ToNot(HaveOccurred())
+				By(fmt.Sprintf("using buildinfo from operator pod: %s/%s", pod.Namespace, pod.Name))
+				stdout, _, err = remoteexec.CommandOnPod(ctx, e2eclient.K8sClient, pod, "/bin/cat", filepath.Join("/usr/local/share/", "buildinfo.json"))
+			}
 
 			// older version may miss the buildinfo.json, and that's fine
 			if err != nil {
@@ -66,7 +76,7 @@ var _ = Describe("[serial] numaresources version", Serial, Label("feature:config
 			// this should not happen, but since we are sneaking in, not worth to fail
 			nropBi := buildinfo.BuildInfo{}
 			if err := json.Unmarshal(stdout, &nropBi); err != nil {
-				klog.ErrorS(err, "buildinfo unmarshal failure", "nropNamespace", pod.Namespace, "nropName", pod.Name)
+				klog.ErrorS(err, "buildinfo unmarshal failure")
 				By("running against NUMAResources UNKNOWN UNKNOWN")
 				return
 			}
