@@ -57,6 +57,54 @@ entries:
     name: "4.12"
     package: numaresources-operator
     schema: olm.channel
+  - entries:
+      - name: numaresources-operator.v4.12.0
+        skipRange: '>=4.11.0 <4.12.0'
+      - name: numaresources-operator.v4.12.1
+        replaces: numaresources-operator.v4.12.0
+        skipRange: '>=4.11.0 <4.12.1'
+      - name: numaresources-operator.v4.12.2
+        replaces: numaresources-operator.v4.12.1
+        skipRange: '>=4.11.0 <4.12.2'
+      - name: numaresources-operator.v4.12.3
+        replaces: numaresources-operator.v4.12.2
+        skipRange: '>=4.11.0 <4.12.3'
+      - name: numaresources-operator.v4.12.4
+        replaces: numaresources-operator.v4.12.3
+        skipRange: '>=4.11.0 <4.12.4'
+      - name: numaresources-operator.v4.12.6
+        replaces: numaresources-operator.v4.12.4
+        skipRange: '>=4.11.0 <4.12.6'
+      - name: numaresources-operator.v4.12.8
+        replaces: numaresources-operator.v4.12.6
+        skipRange: '>=4.11.0 <4.12.8'
+      - name: numaresources-operator.v4.12.9
+        replaces: numaresources-operator.v4.12.8
+        skipRange: '>=4.11.0 <4.12.9'
+      - name: numaresources-operator.v4.12.11
+        replaces: numaresources-operator.v4.12.9
+        skipRange: '>=4.11.0 <4.12.11'
+      - name: numaresources-operator.v4.12.12
+        replaces: numaresources-operator.v4.12.11
+        skipRange: '>=4.11.0 <4.12.12'
+      - name: numaresources-operator.v4.12.13
+        replaces: numaresources-operator.v4.12.12
+        skipRange: '>=4.11.0 <4.12.13'
+      - name: numaresources-operator.v4.12.14
+        replaces: numaresources-operator.v4.12.13
+        skipRange: '>=4.11.0 <4.12.14'
+      - name: numaresources-operator.v4.12.15
+        replaces: numaresources-operator.v4.12.14
+        skipRange: '>=4.11.0 <4.12.15'
+      - name: numaresources-operator.v4.12.16
+        replaces: numaresources-operator.v4.12.15
+        skipRange: '>=4.11.0 <4.12.16'
+      - name: numaresources-operator.v4.12.17
+        replaces: numaresources-operator.v4.12.16
+        skipRange: '>=4.11.0 <4.12.17'
+    name: stable
+    package: numaresources-operator
+    schema: olm.channel
     # v4.12.0 bundle
   - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:9851b25b29fc23c06bcc8b11e93834095c47200d51413e71fd37f61ffe622259
     schema: olm.bundle
