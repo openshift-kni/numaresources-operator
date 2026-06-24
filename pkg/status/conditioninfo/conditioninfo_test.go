@@ -42,11 +42,13 @@ func TestWithMessage(t *testing.T) {
 func TestAvailable(t *testing.T) {
 	cond := Available()
 	assert.Equal(t, cond.Type, status.ConditionAvailable)
+	assert.NotEmpty(t, cond.Reason)
 }
 
 func TestProgressing(t *testing.T) {
 	cond := Progressing()
 	assert.Equal(t, cond.Type, status.ConditionProgressing)
+	assert.NotEmpty(t, cond.Reason)
 }
 
 func TestDegradedFromError(t *testing.T) {
