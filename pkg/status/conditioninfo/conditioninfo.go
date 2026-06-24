@@ -62,7 +62,8 @@ func Available() ConditionInfo {
 // an Progressing condition
 func Progressing() ConditionInfo {
 	return ConditionInfo{
-		Type: status.ConditionProgressing,
+		Type:   status.ConditionProgressing,
+		Reason: status.ConditionProgressing,
 	}
 }
 
