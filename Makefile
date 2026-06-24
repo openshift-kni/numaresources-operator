@@ -212,11 +212,17 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 
+OPERATOR_LDFLAGS := -X github.com/openshift-kni/numaresources-operator/pkg/images.tag=$(VERSION)
+ifneq ($(OPERATOR_IMAGE_REPO),)
+OPERATOR_LDFLAGS += -X github.com/openshift-kni/numaresources-operator/pkg/images.repo=$(OPERATOR_IMAGE_REPO)
+endif
+ifneq ($(OPERATOR_IMAGE_NAME),)
+OPERATOR_LDFLAGS += -X github.com/openshift-kni/numaresources-operator/pkg/images.name=$(OPERATOR_IMAGE_NAME)
+endif
+
 .PHONY: binary
 binary: build-tools ## Build the manager binary.
-	LDFLAGS="-s -w"; \
-	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/images.tag=$(VERSION)"; \
-	go build -mod=vendor -o bin/manager -ldflags "$$LDFLAGS" -tags "$$GOTAGS" cmd/main.go
+	go build -mod=vendor -o bin/manager -ldflags "-s -w $(OPERATOR_LDFLAGS)" -tags "$$GOTAGS" cmd/main.go
 
 .PHONY: binary-rte
 binary-rte: build-tools ## Build the RTE exporter binary.
