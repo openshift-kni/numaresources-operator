@@ -27,9 +27,6 @@ func TestLoad(t *testing.T) {
 	if obj, err := ClusterRole(); obj == nil || err != nil {
 		t.Errorf("ClusterRole() failed: err=%v", err)
 	}
-	if obj, err := ClusterRoleBindingK8S(""); obj == nil || err != nil {
-		t.Errorf("ClusterRoleBindingK8S() failed: err=%v", err)
-	}
 	if obj, err := ClusterRoleBindingNRT(""); obj == nil || err != nil {
 		t.Errorf("ClusterRoleBindingNRT() failed: err=%v", err)
 	}

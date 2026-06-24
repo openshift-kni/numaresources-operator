@@ -39,8 +39,6 @@ import (
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
 
-// these should be provided by a deployer API
-
 const (
 	MainContainerName = "secondary-scheduler"
 )
