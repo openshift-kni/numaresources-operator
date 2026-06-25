@@ -276,6 +276,10 @@ binary-e2e-tools: generate-source
 binary-e2e-must-gather: generate-source
 	go test -c -v -o bin/e2e-nrop-must-gather.test ./test/e2e/must-gather
 
+.PHONY: binary-e2e-tls
+binary-e2e-tls: generate-source ## Build TLS e2e test binary.
+	go test -c -v -o bin/e2e-nrop-tls.test ./test/e2e/tls
+
 # backward compatibility
 binary-must-gather-e2e: binary-e2e-must-gather
 
@@ -289,6 +293,7 @@ binary-e2e-all: goversion \
 	binary-e2e-serial \
 	binary-e2e-tools \
 	binary-e2e-must-gather \
+	binary-e2e-tls \
 	runner-e2e-serial \
 	build-pause \
 	introspect-data
@@ -341,6 +346,9 @@ build-e2e-all: generate-source fmt vet binary-e2e-all
 
 .PHONY: build-e2e-must-gather
 build-e2e-must-gather: fmt vet binary-e2e-must-gather
+
+.PHONY: build-e2e-tls
+build-e2e-tls: fmt vet binary-e2e-tls ## Build TLS e2e tests.
 
 # backward compatibility
 build-must-gather-e2e: build-e2e-must-gather

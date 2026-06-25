@@ -23,6 +23,7 @@
     "nrtcrdanns",
     "netpols",
     "introspection",
-    "mgselinuxcollect"
+    "mgselinuxcollect",
+    "tlscompliance"
   ]
 }
