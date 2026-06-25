@@ -113,7 +113,7 @@ func ComputeConditions(conds []metav1.Condition, condition metav1.Condition, ts 
 	}
 
 	if !updated {
-		klog.InfoS("Failed to update status condition", "condition", condition.Type, "conditions", newConds)
+		klog.V(6).InfoS("Status condition unchanged", "condition", condition.Type, "conditions", newConds)
 	}
 
 	return newConds, updated
