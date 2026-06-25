@@ -22,8 +22,12 @@ const (
 	defaultTag  string = "devel"
 )
 
-// tag Must not be const, supposed to be set using ldflags at build time
-var tag = defaultTag
+// Must not be const, supposed to be set using ldflags at build time
+var (
+	repo = defaultRepo
+	name = defaultName
+	tag  = defaultTag
+)
 
 // Tag returns the image tag as a string
 func Tag() string {
@@ -32,12 +36,12 @@ func Tag() string {
 
 // Name returns the image name as a string
 func Name() string {
-	return defaultName
+	return name
 }
 
 // Repo returns the image repo as a string
 func Repo() string {
-	return defaultRepo
+	return repo
 }
 
 // SpecPath() returns the image full image spec path as a string

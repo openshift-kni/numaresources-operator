@@ -2,6 +2,7 @@
 
 REPO_DIR=$(dirname "${BASH_SOURCE[0]}")/..
 BIN_DIR="${REPO_DIR}/bin"
+DRY_RUN="${DRY_RUN:-false}"
 
 function runcmd() {
 	echo "Running: $@"

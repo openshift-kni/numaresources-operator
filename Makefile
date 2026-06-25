@@ -212,11 +212,17 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 
+OPERATOR_LDFLAGS := -X github.com/openshift-kni/numaresources-operator/pkg/images.tag=$(VERSION)
+ifneq ($(OPERATOR_IMAGE_REPO),)
+OPERATOR_LDFLAGS += -X github.com/openshift-kni/numaresources-operator/pkg/images.repo=$(OPERATOR_IMAGE_REPO)
+endif
+ifneq ($(OPERATOR_IMAGE_NAME),)
+OPERATOR_LDFLAGS += -X github.com/openshift-kni/numaresources-operator/pkg/images.name=$(OPERATOR_IMAGE_NAME)
+endif
+
 .PHONY: binary
 binary: build-tools ## Build the manager binary.
-	LDFLAGS="-s -w"; \
-	LDFLAGS+=" -X github.com/openshift-kni/numaresources-operator/pkg/images.tag=$(VERSION)"; \
-	go build -mod=vendor -o bin/manager -ldflags "$$LDFLAGS" -tags "$$GOTAGS" cmd/main.go
+	go build -mod=vendor -o bin/manager -ldflags "-s -w $(OPERATOR_LDFLAGS)" -tags "$$GOTAGS" cmd/main.go
 
 .PHONY: binary-rte
 binary-rte: build-tools ## Build the RTE exporter binary.
@@ -486,6 +492,19 @@ deploy: manifests kustomize deploy-mco-crds ## Deploy controller to the K8s clus
 .PHONY: undeploy
 undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | $(KUBECTL) delete --ignore-not-found=$(ignore-not-found) -f -
+
+.PHONY: deploy-local
+deploy-local: manifests kustomize deploy-mco-crds ## Install CRDs + RBAC + Namespace for local operator development (no Deployment).
+	hack/run-local.sh --prepare
+
+.PHONY: undeploy-local
+undeploy-local: kustomize ## Remove CRDs + RBAC + Namespace installed by deploy-local.
+	hack/run-local.sh --cleanup
+
+OPERATOR_ARGS ?=
+.PHONY: run-local
+run-local: binary manifests kustomize deploy-mco-crds ## Run the operator locally as its ServiceAccount (no container image needed).
+	hack/run-local.sh $(OPERATOR_ARGS)
 
 ##@ Dependencies
 

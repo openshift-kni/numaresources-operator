@@ -53,6 +53,9 @@ they found it before they run.
   the cluster and will be used as a resource of type `device-type-2` in the tests.
 - `E2E_NROP_DEVICE_TYPE_3` (accepts string, e.g `example.com/deviceC`) declares name of a device type that exists on
   the cluster and will be used as a resource of type `device-type-3` in the tests.
+- `E2E_NROP_BUILDINFO` (accepts string, e.g `/path/to/buildinfo.json`) instructs the suite to read the operator
+  build information from the given local file path instead of discovering the operator pod in the cluster and
+  reading it via remote exec. Useful when running the operator locally via `hack/run-local.sh`.
 - `E2E_RTE_CI_IMAGE` (accepts string, e.g `quay.io/openshift-kni/resource-topology-exporter:test-ci`) sets the 
   RTE image to be used for testing purposes particularly for modifying the operator object.
   
