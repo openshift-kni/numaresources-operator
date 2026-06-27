@@ -136,66 +136,63 @@ type MachineConfigObjectState struct {
 	WaitForUpdated MCPWaitForUpdatedFunc
 }
 
-func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]MachineConfigObjectState, sets.Set[string]) {
+func (em *ExistingManifests) MachineConfigsState(mf Manifests, tree nodegroupv1.Tree) ([]MachineConfigObjectState, sets.Set[string]) {
 	var ret []MachineConfigObjectState
 	pausedMCPNames := sets.New[string]()
 	if mf.Core.MachineConfig == nil {
 		return ret, pausedMCPNames
 	}
-	for _, tree := range em.trees {
-		isCustomPolicy := annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
-		for _, mcp := range tree.MachineConfigPools {
-			// do not update state when MachineConfigPool is paused
-			if mcp.Spec.Paused {
-				pausedMCPNames.Insert(mcp.Name)
-				continue
-			}
+	isCustomPolicy := annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
+	for _, mcp := range tree.MachineConfigPools {
+		if mcp.Spec.Paused {
+			pausedMCPNames.Insert(mcp.Name)
+			continue
+		}
 
-			mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
-			if mcp.Spec.MachineConfigSelector == nil {
-				klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
-				continue
-			}
+		mcName := objectnames.GetMachineConfigName(em.instance.Name, mcp.Name)
+		if mcp.Spec.MachineConfigSelector == nil {
+			klog.Warningf("the machine config pool %q does not have machine config selector", mcp.Name)
+			continue
+		}
 
-			existingMachineConfig, ok := em.machineConfigs[mcName]
-			if !ok {
-				klog.Warningf("failed to find machine config %q in namespace %q", mcName, em.namespace)
-				continue
-			}
+		existingMachineConfig, ok := em.machineConfigs[mcName]
+		if !ok {
+			klog.Warningf("failed to find machine config %q in namespace %q", mcName, em.namespace)
+			continue
+		}
 
-			if !isCustomPolicy {
-				// caution here: we want a *nil interface value*, not an *interface which points to nil*.
-				// the latter would lead to apparently correct code leading to runtime panics. See:
-				// https://trstringer.com/go-nil-interface-and-interface-with-nil-concrete-value/
-				// (and many other docs like this)
-				ret = append(ret, MachineConfigObjectState{
-					ObjectState: objectstate.ObjectState{
-						Existing: existingMachineConfig.machineConfig,
-						Error:    existingMachineConfig.machineConfigError,
-						Desired:  nil,
-					},
-					PoolName:       mcp.Name,
-					WaitForUpdated: IsMachineConfigPoolUpdatedAfterDeletion,
-				})
-				continue
-			}
-
-			desiredMachineConfig := mf.Core.MachineConfig.DeepCopy()
-			desiredMachineConfig.Name = mcName
-			desiredMachineConfig.Labels = GetMachineConfigLabel(mcp)
-
+		if !isCustomPolicy {
+			// caution here: we want a *nil interface value*, not an *interface which points to nil*.
+			// the latter would lead to apparently correct code leading to runtime panics. See:
+			// https://trstringer.com/go-nil-interface-and-interface-with-nil-concrete-value/
+			// (and many other docs like this)
 			ret = append(ret, MachineConfigObjectState{
 				ObjectState: objectstate.ObjectState{
 					Existing: existingMachineConfig.machineConfig,
 					Error:    existingMachineConfig.machineConfigError,
-					Desired:  desiredMachineConfig,
-					Compare:  compare.Object,
-					Merge:    merge.ObjectForUpdate,
+					Desired:  nil,
 				},
 				PoolName:       mcp.Name,
-				WaitForUpdated: IsMachineConfigPoolUpdated,
+				WaitForUpdated: IsMachineConfigPoolUpdatedAfterDeletion,
 			})
+			continue
 		}
+
+		desiredMachineConfig := mf.Core.MachineConfig.DeepCopy()
+		desiredMachineConfig.Name = mcName
+		desiredMachineConfig.Labels = GetMachineConfigLabel(mcp)
+
+		ret = append(ret, MachineConfigObjectState{
+			ObjectState: objectstate.ObjectState{
+				Existing: existingMachineConfig.machineConfig,
+				Error:    existingMachineConfig.machineConfigError,
+				Desired:  desiredMachineConfig,
+				Compare:  compare.Object,
+				Merge:    merge.ObjectForUpdate,
+			},
+			PoolName:       mcp.Name,
+			WaitForUpdated: IsMachineConfigPoolUpdated,
+		})
 	}
 	return ret, pausedMCPNames
 }
