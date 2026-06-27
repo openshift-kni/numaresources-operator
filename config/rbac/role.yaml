@@ -23,7 +23,9 @@ rules:
   resources:
   - nodes
   verbs:
+  - get
   - list
+  - patch
   - watch
 - apiGroups:
   - ""
@@ -92,10 +94,10 @@ rules:
   - nodetopology.openshift.io
   resources:
   - numaresourcesoperators
-  - numaresourcesschedulers
   verbs:
   - get
   - list
+  - update
   - watch
 - apiGroups:
   - nodetopology.openshift.io
@@ -113,6 +115,14 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - nodetopology.openshift.io
+  resources:
+  - numaresourcesschedulers
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:

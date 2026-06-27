@@ -37,11 +37,13 @@ import (
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
+	nrolabels "github.com/openshift-kni/numaresources-operator/internal/api/labels"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/podlogs"
 	nrowait "github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -151,6 +153,8 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 			rteContainer, err := findContainerByName(*ds, containerNameRTE)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(rteContainer.SecurityContext.SELinuxOptions.Type).To(Equal(selinux.RTEContextType), "container %s is running with wrong selinux context", rteContainer.Name)
+
+			expectNROPrimaryPoolLabelsPresent(ds)
 		})
 	})
 })
@@ -265,9 +269,13 @@ var _ = Describe("[Install] durability", Serial, func() {
 				return err
 			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 
+			expectNROPrimaryPoolLabelsPresent(ds)
+
 			deleteNROPSync(e2eclient.Client, nroObj)
 
 			deploy.WaitForMCPUpdatedAfterNRODeleted(nroObj)
+
+			expectNROPrimaryPoolLabelsAbsent()
 
 			By("checking there are no leftovers")
 			// by taking the ns from the ds we're avoiding the need to figure out in advanced
@@ -326,6 +334,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 				return ds.Spec.Template.Spec.Containers[0].Image == e2eimages.RTETestImageCI
 			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
 		})
+
 		It("should have the desired topology manager configuration under the NRT object", func() {
 			rteConfigMap := &corev1.ConfigMap{}
 			Eventually(func() bool {
@@ -413,6 +422,45 @@ func getDaemonSetByOwnerReference(uid types.UID) (*appsv1.DaemonSet, error) {
 		}
 	}
 	return nil, fmt.Errorf("failed to get daemonset with owner reference uid: %s", uid)
+}
+
+func expectNROPrimaryPoolLabelsPresent(ds *appsv1.DaemonSet) {
+	GinkgoHelper()
+	if configuration.Plat != platform.OpenShift {
+		return
+	}
+
+	By("checking that managed nodes have the NRO primary-pool label")
+	sel, err := labels.Parse(nrolabels.NodePrimaryPool)
+	Expect(err).ToNot(HaveOccurred())
+	nodeList := &corev1.NodeList{}
+	err = e2eclient.Client.List(context.TODO(), nodeList, &client.ListOptions{LabelSelector: sel})
+	Expect(err).ToNot(HaveOccurred())
+	Expect(nodeList.Items).ToNot(BeEmpty(), "expected at least one node with the NRO primary-pool label")
+	for _, node := range nodeList.Items {
+		val := node.Labels[nrolabels.NodePrimaryPool]
+		Expect(val).ToNot(BeEmpty(), "node %s has the NRO label key but empty value", node.Name)
+		klog.InfoS("node has NRO primary-pool label", "node", node.Name, "pool", val)
+	}
+
+	By("checking that the DaemonSet NodeSelector uses the NRO primary-pool label")
+	_, hasKey := ds.Spec.Template.Spec.NodeSelector[nrolabels.NodePrimaryPool]
+	Expect(hasKey).To(BeTrue(), "DaemonSet NodeSelector should contain %s", nrolabels.NodePrimaryPool)
+}
+
+func expectNROPrimaryPoolLabelsAbsent() {
+	GinkgoHelper()
+	if configuration.Plat != platform.OpenShift {
+		return
+	}
+
+	By("checking that the NRO primary-pool labels were removed from all nodes")
+	sel, err := labels.Parse(nrolabels.NodePrimaryPool)
+	Expect(err).ToNot(HaveOccurred())
+	nodeList := &corev1.NodeList{}
+	err = e2eclient.Client.List(context.TODO(), nodeList, &client.ListOptions{LabelSelector: sel})
+	Expect(err).ToNot(HaveOccurred())
+	Expect(nodeList.Items).To(BeEmpty(), "expected no nodes with the NRO primary-pool label after deletion, but found %d", len(nodeList.Items))
 }
 
 func logRTEPodsLogs(cli client.Client, k8sCli *kubernetes.Clientset, ctx context.Context, nroObj *nropv1.NUMAResourcesOperator, reason string) {

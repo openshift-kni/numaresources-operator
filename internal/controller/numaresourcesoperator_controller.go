@@ -57,7 +57,9 @@ import (
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	nrolabels "github.com/openshift-kni/numaresources-operator/internal/api/labels"
 	"github.com/openshift-kni/numaresources-operator/internal/dangling"
+	"github.com/openshift-kni/numaresources-operator/internal/nodes"
 	intreconcile "github.com/openshift-kni/numaresources-operator/internal/reconcile"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
@@ -119,8 +121,8 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
 //+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
-//+kubebuilder:rbac:groups="",resources=nodes,verbs=list
-//+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch;patch
+//+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=get;list;watch;update
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators/finalizers,verbs=update
 
@@ -144,6 +146,26 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		}
 		// Error reading the object - requeue the request.
 		return ctrl.Result{}, err
+	}
+
+	if !instance.DeletionTimestamp.IsZero() {
+		if controllerutil.ContainsFinalizer(instance, nrolabels.NodeFinalizer) {
+			if err := nodes.RemoveAllLabels(ctx, r.Client); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to clean up node labels: %w", err)
+			}
+			controllerutil.RemoveFinalizer(instance, nrolabels.NodeFinalizer)
+			if err := r.Update(ctx, instance); err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	if !controllerutil.ContainsFinalizer(instance, nrolabels.NodeFinalizer) {
+		controllerutil.AddFinalizer(instance, nrolabels.NodeFinalizer)
+		if err := r.Update(ctx, instance); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 
 	initialInstance := instance.DeepCopy()
@@ -296,6 +318,10 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 		if step := r.reconcileResourceMachineConfig(ctx, instance, existing, trees); step.EarlyStop() {
 			return step
 		}
+	}
+
+	if err := nodes.LabelForTrees(ctx, r.Client, r.Platform, trees); err != nil {
+		return intreconcile.StepFailed(fmt.Errorf("failed to label nodes for primary pools: %w", err))
 	}
 
 	dsPerPool, step := r.reconcileResourceDaemonSet(ctx, instance, existing, trees)
@@ -618,12 +644,29 @@ func (r *NUMAResourcesOperatorReconciler) SetupWithManager(mgr ctrl.Manager) err
 		return ok
 	})
 
+	nodePredicates := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			if !validateUpdateEvent(&e) {
+				return false
+			}
+			_, oldHas := e.ObjectOld.GetLabels()[nrolabels.NodePrimaryPool]
+			_, newHas := e.ObjectNew.GetLabels()[nrolabels.NodePrimaryPool]
+			if oldHas || newHas {
+				return true
+			}
+			return !apiequality.Semantic.DeepEqual(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels())
+		},
+	}
+
 	b := ctrl.NewControllerManagedBy(mgr).For(&nropv1.NUMAResourcesOperator{})
 	if r.Platform == platform.OpenShift {
 		b.Watches(
 			&machineconfigv1.MachineConfigPool{},
 			handler.EnqueueRequestsFromMapFunc(r.mcpToNUMAResourceOperator),
 			builder.WithPredicates(mcpPredicates)).
+			Watches(&corev1.Node{},
+				handler.EnqueueRequestsFromMapFunc(r.nodeToNUMAResourceOperator),
+				builder.WithPredicates(nodePredicates)).
 			Owns(&securityv1.SecurityContextConstraints{}).
 			Owns(&machineconfigv1.MachineConfig{}, builder.WithPredicates(p))
 	}
@@ -674,6 +717,14 @@ func (r *NUMAResourcesOperatorReconciler) mcpToNUMAResourceOperator(ctx context.
 	}
 
 	return requests
+}
+
+func (r *NUMAResourcesOperatorReconciler) nodeToNUMAResourceOperator(ctx context.Context, nodeObj client.Object) []reconcile.Request {
+	return []reconcile.Request{{
+		NamespacedName: client.ObjectKey{
+			Name: objectnames.DefaultNUMAResourcesOperatorCrName,
+		},
+	}}
 }
 
 func nodeGroupMatchesMCP(nodeGroup nropv1.NodeGroup, mcpName string, mcpLabels labels.Set) bool {
