@@ -81,6 +81,7 @@ func ApplyObject(ctx context.Context, cli k8sclient.Client, objState objectstate
 	updated := false
 	if !ok {
 		klog.InfoS("updating", "object", objDesc)
+		recordApplyClientUpdate()
 		if err := cli.Update(ctx, merged); err != nil {
 			return nil, updated, fmt.Errorf("could not update object %s: %w", objDesc, err)
 		}
