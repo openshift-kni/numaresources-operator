@@ -155,8 +155,7 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	}
 
 	if req.Name != objectnames.DefaultNUMAResourcesOperatorCrName {
-		err := fmt.Errorf("incorrect NUMAResourcesOperator resource name: %s", instance.Name)
-		return r.degradeStatus(ctx, initialInstance, instance, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, err)
+		return r.degradeStatusf(ctx, initialInstance, instance, status.ConditionTypeIncorrectNUMAResourcesOperatorResourceName, "incorrect NUMAResourcesOperator resource name: %s", instance.Name)
 	}
 
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
@@ -190,6 +189,10 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 		return r.degradeStatus(ctx, initialInstance, instance, tolerable.Reason, tolerable.Error)
 	}
 
+	if step.Done() && instance.Spec.ExporterImage != "" {
+		return r.degradeStatusf(ctx, initialInstance, instance, status.ConditionTypeCustomUserImage, "custom operand image set: %s", instance.Spec.ExporterImage)
+	}
+
 	if err := r.Client.Status().Patch(ctx, instance, client.MergeFrom(initialInstance)); err != nil {
 		klog.InfoS("Failed to update numaresources-operator status", "error", err)
 		return ctrl.Result{}, err
@@ -198,19 +201,28 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	return step.Result, step.Error
 }
 
+func (r *NUMAResourcesOperatorReconciler) degradeStatusf(ctx context.Context, initialInstance, instance *nropv1.NUMAResourcesOperator, reason string, format string, args ...any) (ctrl.Result, error) {
+	return r.degradeStatusWithInfo(ctx, initialInstance, instance, conditioninfo.ConditionInfo{
+		Type:    status.ConditionDegraded,
+		Message: fmt.Sprintf(format, args...),
+		Reason:  reason,
+	})
+}
+
 func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, initialInstance, instance *nropv1.NUMAResourcesOperator, reason string, stErr error) (ctrl.Result, error) {
-	info := conditioninfo.DegradedFromError(stErr)
-	if reason != "" { // intentionally overwrite
-		info.Reason = reason
-	}
+	return r.degradeStatusWithInfo(ctx, initialInstance, instance, conditioninfo.ConditionInfo{
+		Type:    status.ConditionDegraded,
+		Message: status.MessageFromError(stErr),
+		Reason:  reason,
+	})
+}
 
+func (r *NUMAResourcesOperatorReconciler) degradeStatusWithInfo(ctx context.Context, initialInstance, instance *nropv1.NUMAResourcesOperator, info conditioninfo.ConditionInfo) (ctrl.Result, error) {
 	instance.Status.Conditions, _ = status.ComputeConditions(instance.Status.Conditions, info.ToMetav1Condition(instance.Generation), time.Now())
-
 	err := r.Client.Status().Patch(ctx, instance, client.MergeFrom(initialInstance))
 	if err != nil {
 		klog.InfoS("Failed to update numaresourcesoperator status", "error", err)
 	}
-
 	return ctrl.Result{}, err
 }
 

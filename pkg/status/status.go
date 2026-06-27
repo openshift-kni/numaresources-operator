@@ -54,6 +54,7 @@ const (
 
 const (
 	ConditionTypeIncorrectNUMAResourcesOperatorResourceName = "IncorrectNUMAResourcesOperatorResourceName"
+	ConditionTypeCustomUserImage                            = "CustomUserImage"
 )
 
 const (
