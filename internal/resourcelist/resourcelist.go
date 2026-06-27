@@ -209,3 +209,16 @@ func scaleQuantity(qty resource.Quantity, scaleNum, scaleDen int) int64 {
 	// we use Ceil, not Round, to make sure to include the fractional amounts
 	return int64(math.Ceil(float64(val*int64(scaleNum)) / float64(scaleDen)))
 }
+
+func IsSubset(a, b corev1.ResourceList) bool {
+	for resName, aQty := range a {
+		bQty, ok := b[resName]
+		if !ok {
+			return false
+		}
+		if aQty.Cmp(bQty) > 0 {
+			return false
+		}
+	}
+	return true
+}
