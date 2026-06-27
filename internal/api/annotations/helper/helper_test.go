@@ -139,3 +139,103 @@ func TestIsCustomPolicyEnabled(t *testing.T) {
 		})
 	}
 }
+
+func TestMustIgnoreCustomPolicy(t *testing.T) {
+	testcases := []struct {
+		description string
+		nodeGroups  []nropv1.NodeGroup
+		expected    bool
+	}{
+		{
+			description: "empty maps - single",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					Annotations: make(map[string]string),
+				},
+			},
+			expected: false,
+		},
+		{
+			description: "empty maps - multi",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					Annotations: make(map[string]string),
+				},
+				{
+					Annotations: make(map[string]string),
+				},
+				{
+					Annotations: make(map[string]string),
+				},
+			},
+			expected: false,
+		},
+		{
+			description: "annotation set to custom does not trigger ignore - single",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					Annotations: map[string]string{
+						anns.SELinuxPolicyConfigAnnotation: "custom",
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			description: "annotation set to ignore - single",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					Annotations: map[string]string{
+						anns.SELinuxPolicyConfigAnnotation: "ignore",
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			description: "annotation set to ignore - multi",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					Annotations: make(map[string]string),
+				},
+				{
+					Annotations: map[string]string{
+						anns.SELinuxPolicyConfigAnnotation: "ignore",
+					},
+				},
+				{
+					Annotations: make(map[string]string),
+				},
+			},
+			expected: true,
+		},
+		{
+			description: "annotation set to ignore - multi + mixed",
+			nodeGroups: []nropv1.NodeGroup{
+				{
+					Annotations: map[string]string{
+						anns.SELinuxPolicyConfigAnnotation: "custom",
+					},
+				},
+				{
+					Annotations: map[string]string{
+						anns.SELinuxPolicyConfigAnnotation: "ignore",
+					},
+				},
+				{
+					Annotations: make(map[string]string),
+				},
+			},
+			expected: true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			nropObj := nropv1.NUMAResourcesOperator{}
+			nropObj.Spec.NodeGroups = tc.nodeGroups
+			if got := MustIgnoreCustomPolicy(&nropObj); got != tc.expected {
+				t.Errorf("expected %v got %v", tc.expected, got)
+			}
+		})
+	}
+}

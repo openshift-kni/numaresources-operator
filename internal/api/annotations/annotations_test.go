@@ -37,6 +37,13 @@ func TestIsCustomPolicyEnabled(t *testing.T) {
 			expected: false,
 		},
 		{
+			description: "annotation set to ignore does not enable custom policy",
+			annotations: map[string]string{
+				SELinuxPolicyConfigAnnotation: "ignore",
+			},
+			expected: false,
+		},
+		{
 			description: "enabled custom policy",
 			annotations: map[string]string{
 				SELinuxPolicyConfigAnnotation: "custom",
@@ -47,6 +54,48 @@ func TestIsCustomPolicyEnabled(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
 			if got := IsCustomPolicyEnabled(tc.annotations); got != tc.expected {
+				t.Errorf("expected %v got %v", tc.expected, got)
+			}
+		})
+	}
+}
+
+func TestMustIgnoreCustomPolicy(t *testing.T) {
+	testcases := []struct {
+		description string
+		annotations map[string]string
+		expected    bool
+	}{
+		{
+			description: "empty map",
+			annotations: map[string]string{},
+			expected:    false,
+		},
+		{
+			description: "annotation set to custom does not trigger ignore",
+			annotations: map[string]string{
+				SELinuxPolicyConfigAnnotation: "custom",
+			},
+			expected: false,
+		},
+		{
+			description: "annotation set to arbitrary value does not trigger ignore",
+			annotations: map[string]string{
+				SELinuxPolicyConfigAnnotation: "true",
+			},
+			expected: false,
+		},
+		{
+			description: "annotation set to ignore",
+			annotations: map[string]string{
+				SELinuxPolicyConfigAnnotation: "ignore",
+			},
+			expected: true,
+		},
+	}
+	for _, tc := range testcases {
+		t.Run(tc.description, func(t *testing.T) {
+			if got := MustIgnoreCustomPolicy(tc.annotations); got != tc.expected {
 				t.Errorf("expected %v got %v", tc.expected, got)
 			}
 		})
