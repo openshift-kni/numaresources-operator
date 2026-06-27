@@ -18,6 +18,7 @@ package config
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sync"
@@ -32,11 +33,14 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/api/features"
 	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
+	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 	numacellmanifests "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
+	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 
@@ -210,4 +214,39 @@ func unlabelNodeByName(cli client.Client, nodeName string) {
 		err = cli.Update(context.TODO(), &node)
 		g.Expect(err).ToNot(HaveOccurred())
 	}).WithTimeout(3*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to unlabel node %q: %v", nodeName, err)
+}
+
+func FetchClusterTopics(ctx context.Context, fxt *e2efixture.Fixture, nropObj *nropv1.NUMAResourcesOperator) (features.TopicInfo, error) {
+	pod, err := deploy.FindNUMAResourcesOperatorPod(ctx, fxt.Client, nropObj)
+	if err != nil {
+		return features.NewTopicInfo(), err
+	}
+
+	cmdline := []string{
+		"/bin/numaresources-operator",
+		"--inspect-features",
+	}
+	stdout, stderr, err := remoteexec.CommandOnPod(ctx, fxt.K8sClient, pod, cmdline...)
+	// older version may miss introspection support that's fine
+	if err != nil {
+		return features.NewTopicInfo(), nil
+	}
+
+	if len(stderr) > 0 {
+		klog.InfoS("while fetching cluster topics", "stderr", stderr)
+	}
+
+	var tp features.TopicInfo
+	err = json.Unmarshal(stdout, &tp)
+	if err != nil {
+		return features.NewTopicInfo(), err
+	}
+	klog.InfoS("active features from the deployed operator", "features", string(stdout))
+
+	tp.Metadata.Version = features.Version
+	err = tp.Validate()
+	if err != nil {
+		return features.NewTopicInfo(), err
+	}
+	return tp, nil
 }
