@@ -139,7 +139,7 @@ func TestRunCommand(t *testing.T) {
 	}
 }
 
-func TestRefineSchedListToMap(t *testing.T) {
+func TestRefineListToMap(t *testing.T) {
 	baseTime := time.Now()
 	olderTime := baseTime.Add(-1 * time.Hour)
 	newerTime := baseTime.Add(1 * time.Hour)
@@ -161,16 +161,20 @@ func TestRefineSchedListToMap(t *testing.T) {
 			expected: map[string]record.RecordedStatus{},
 		},
 		{
-			name: "single item with same expected and computed fingerprints should be skipped",
+			name: "Scheduler list: single item with same expected and computed fingerprints should be skipped",
 			input: []record.RecordedStatus{
 				{
+					Status: podfingerprint.Status{
+						FingerprintComputed: "pfp0v0014cd95bb1fa84d3f9",
+						FingerprintExpected: "pfp0v0014cd95bb1fa84d3f9",
+					},
 					RecordTime: baseTime,
 				},
 			},
 			expected: map[string]record.RecordedStatus{},
 		},
 		{
-			name: "items with matching fingerprints should all be skipped",
+			name: "Scheduler list: items with matching fingerprints should all be skipped",
 			input: []record.RecordedStatus{
 				{
 					Status: podfingerprint.Status{
@@ -205,7 +209,7 @@ func TestRefineSchedListToMap(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple unique items",
+			name: "Scheduler list: multiple unique items",
 			input: []record.RecordedStatus{
 				{
 					Status: podfingerprint.Status{
@@ -241,7 +245,7 @@ func TestRefineSchedListToMap(t *testing.T) {
 			},
 		},
 		{
-			name: "duplicate keys with different timestamps - keeps newer",
+			name: "Scheduler list: duplicate keys with different timestamps - keeps newer",
 			input: []record.RecordedStatus{
 				{
 					Status: podfingerprint.Status{
@@ -268,56 +272,8 @@ func TestRefineSchedListToMap(t *testing.T) {
 				},
 			},
 		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := refineSchedListToMap(tt.input)
-
-			if len(result) != len(tt.expected) {
-				t.Fatalf("refineSchedListToMap() length = %d, expected %d", len(result), len(tt.expected))
-			}
-
-			for key, expectedValue := range tt.expected {
-				actualValue, ok := result[key]
-				if !ok {
-					t.Fatalf("refineSchedListToMap() missing key %s", key)
-				}
-
-				if !actualValue.RecordTime.Equal(expectedValue.RecordTime) {
-					t.Fatalf("refineSchedListToMap() RecordTime = %v, expected %v", actualValue.RecordTime, expectedValue.RecordTime)
-				}
-
-				if !actualValue.Status.Equal(expectedValue.Status) {
-					t.Fatalf("refineSchedListToMap() Status = %v, expected %v", actualValue.Status, expectedValue.Status)
-				}
-			}
-		})
-	}
-}
-
-func TestRefineRTEListToMap(t *testing.T) {
-	baseTime := time.Now()
-	olderTime := baseTime.Add(-1 * time.Hour)
-	newerTime := baseTime.Add(1 * time.Hour)
-
-	tests := []struct {
-		name     string
-		input    []record.RecordedStatus
-		expected map[string]record.RecordedStatus
-	}{
 		{
-			name:     "nil input",
-			input:    nil,
-			expected: map[string]record.RecordedStatus{},
-		},
-		{
-			name:     "empty list",
-			input:    []record.RecordedStatus{},
-			expected: map[string]record.RecordedStatus{},
-		},
-		{
-			name: "single item",
+			name: "RTE list: single item",
 			input: []record.RecordedStatus{
 				{
 					Status: podfingerprint.Status{
@@ -336,7 +292,7 @@ func TestRefineRTEListToMap(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple unique items",
+			name: "RTE list: multiple unique items",
 			input: []record.RecordedStatus{
 				{
 					Status: podfingerprint.Status{
@@ -367,7 +323,7 @@ func TestRefineRTEListToMap(t *testing.T) {
 			},
 		},
 		{
-			name: "duplicate keys with different timestamps - keeps newer",
+			name: "RTE list: duplicate keys with different timestamps - keeps newer",
 			input: []record.RecordedStatus{
 				{
 					Status: podfingerprint.Status{
@@ -395,24 +351,24 @@ func TestRefineRTEListToMap(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := refineRTEListToMap(tt.input)
+			result := refineListToMap(tt.input)
 
 			if len(result) != len(tt.expected) {
-				t.Fatalf("refineRTEListToMap() length = %d, expected %d", len(result), len(tt.expected))
+				t.Fatalf("refineListToMap() length = %d, expected %d", len(result), len(tt.expected))
 			}
 
 			for key, expectedValue := range tt.expected {
 				actualValue, ok := result[key]
 				if !ok {
-					t.Fatalf("refineRTEListToMap() missing key %s", key)
+					t.Fatalf("refineListToMap() missing key %s", key)
 				}
 
 				if !actualValue.RecordTime.Equal(expectedValue.RecordTime) {
-					t.Fatalf("refineRTEListToMap() RecordTime = %v, expected %v", actualValue.RecordTime, expectedValue.RecordTime)
+					t.Fatalf("refineListToMap() RecordTime = %v, expected %v", actualValue.RecordTime, expectedValue.RecordTime)
 				}
 
 				if !actualValue.Status.Equal(expectedValue.Status) {
-					t.Fatalf("refineRTEListToMap() = %v, expected %v", actualValue, expectedValue)
+					t.Fatalf("refineListToMap() Status = %v, expected %v", actualValue.Status, expectedValue.Status)
 				}
 			}
 		})
