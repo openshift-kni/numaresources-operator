@@ -19,14 +19,17 @@ package validation
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	schedulerapi "github.com/openshift-kni/numaresources-operator/internal/api/scheduler"
 )
 
 const (
@@ -236,4 +239,23 @@ func nodeGroupsAnnotations(nodeGroups []nropv1.NodeGroup) error {
 		err = errors.Join(err, fmt.Errorf("pool #%d has too many annotations %d max %d", idx, len(nodeGroup.Annotations), nropv1.NodeGroupMaxAnnotations))
 	}
 	return err
+}
+
+// SchedulerImage checks if the scheduler image is pinned by a valid sha256 digest and is
+// found in the trusted digests list
+func SchedulerImage(image string, digests sets.Set[string]) error {
+	idx := strings.Index(image, "@")
+	if idx == -1 {
+		return fmt.Errorf("image %q must be referenced by digest, not by tag", image)
+	}
+
+	digest := image[idx+1:]
+	if !schedulerapi.IsValidDigest(digest) {
+		return fmt.Errorf("image %q has malformed digest %q: expected sha256:<64 hex chars>", image, digest)
+	}
+
+	if !digests.Has(digest) {
+		return fmt.Errorf("image %q digest %q is not in the trusted list", image, digest)
+	}
+	return nil
 }

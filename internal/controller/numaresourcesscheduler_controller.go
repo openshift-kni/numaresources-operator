@@ -47,6 +47,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	schedulerapi "github.com/openshift-kni/numaresources-operator/internal/api/scheduler"
 	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
 	intreconcile "github.com/openshift-kni/numaresources-operator/internal/reconcile"
 	"github.com/openshift-kni/numaresources-operator/internal/relatedobjects"
@@ -60,6 +61,7 @@ import (
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
+	"github.com/openshift-kni/numaresources-operator/pkg/validation"
 )
 
 const (
@@ -75,6 +77,7 @@ type NUMAResourcesSchedulerReconciler struct {
 	Namespace          string
 	PlatformInfo       platforminfo.PlatformInfo
 	TLSSettings        objtls.Settings
+	ImageValidation    schedulerapi.ImageValidation
 }
 
 // Namespace Scoped
@@ -139,6 +142,14 @@ func (r *NUMAResourcesSchedulerReconciler) Reconcile(ctx context.Context, req ct
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
 		klog.InfoS("Pause reconciliation enabled", "object", req.NamespacedName)
 		return ctrl.Result{}, nil
+	}
+
+	if r.ImageValidation.Enabled {
+		if err := validation.SchedulerImage(instance.Spec.SchedulerImage, r.ImageValidation.Digests); err != nil {
+			return r.degradeStatus(ctx, initialInstance, instance, status.ReasonInvalidSchedulerImage, err.Error())
+		}
+	} else {
+		klog.V(4).InfoS("Skipping scheduler image validation. To enable it unset the environment variable", "object", req.NamespacedName, "envvar", schedulerapi.SchedulerImageValidationEnvVar)
 	}
 
 	step := r.reconcileResource(ctx, instance)
