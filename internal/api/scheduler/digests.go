@@ -20,16 +20,22 @@ import (
 	"encoding/json"
 	"os"
 	"regexp"
+	"strings"
 
 	_ "embed"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog/v2"
 )
 
 const (
 	// SchedulerImageValidationEnvVar is the environment variable that controls whether the scheduler image validation is enabled.
 	// If it is set to "false", the scheduler image validation is disabled; any other value is considered as enabled.
 	SchedulerImageValidationEnvVar = "SCHEDULER_IMAGE_VALIDATION"
+
+	// CustomSchedulerDigestsEnvVar is the environment variable that contains a user-provided comma-separated list of SHA256
+	// digests of the scheduler images. It is used to extend the embedded digests.
+	CustomSchedulerDigestsEnvVar = "SCHEDULER_IMAGE_DIGESTS"
 )
 
 var (
@@ -65,9 +71,44 @@ func loadDigests() sets.Set[string] {
 
 	digests := sets.New(d.CurrentChannel...)
 	digests.Insert(d.PreviousChannelLast)
+
+	userDigests := getUserImageDigests()
+	digests.Insert(userDigests...)
+
+	klog.V(4).InfoS("trusted set of scheduler images",
+		"fromCurrentChannel", d.CurrentChannel,
+		"latestFromPreviousChannel", d.PreviousChannelLast,
+		"customDigests", userDigests)
+
 	return digests
 }
 
 func IsValidDigest(digest string) bool {
 	return sha256DigestRE.MatchString(digest)
+}
+
+func getUserImageDigests() []string {
+	val, ok := os.LookupEnv(CustomSchedulerDigestsEnvVar)
+	if !ok {
+		return []string{}
+	}
+	return parseCustomSchedulerDigests(val)
+}
+
+func parseCustomSchedulerDigests(customList string) []string {
+	ret := []string{}
+	digests := strings.Split(strings.TrimSpace(customList), ",")
+	for _, d := range digests {
+		d = strings.TrimSpace(d)
+		if d == "" {
+			continue
+		}
+		if !sha256DigestRE.MatchString(d) {
+			klog.Warningf("custom scheduler image digest %q is malformed: expected sha256:<64 hex chars>", d)
+			continue
+		}
+		ret = append(ret, d)
+	}
+
+	return ret
 }
