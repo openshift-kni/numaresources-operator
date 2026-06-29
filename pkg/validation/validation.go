@@ -255,7 +255,7 @@ func SchedulerImage(image string, digests sets.Set[string]) error {
 	}
 
 	if !digests.Has(digest) {
-		return fmt.Errorf("image %q digest %q is not in the trusted list", image, digest)
+		return fmt.Errorf("image %q digest %q is not in the trusted list. To extend the list, update the environment variable %q with comma separated list of digests", image, digest, schedulerapi.CustomSchedulerDigestsEnvVar)
 	}
 	return nil
 }

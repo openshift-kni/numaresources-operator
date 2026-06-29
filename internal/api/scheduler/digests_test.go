@@ -33,6 +33,12 @@ func loadEmbeddedDigests() sets.Set[string] {
 	return digests
 }
 
+func embeddedDigestsWith(extra ...string) sets.Set[string] {
+	d := loadEmbeddedDigests().Clone()
+	d.Insert(extra...)
+	return d
+}
+
 func TestGetImageValidation(t *testing.T) {
 	embeddedDigests := loadEmbeddedDigests()
 	type testCase struct {
@@ -93,6 +99,123 @@ func TestGetImageValidation(t *testing.T) {
 			}
 			if !got.Digests.Equal(tc.expected.Digests) {
 				t.Errorf("Digests: got=%v want=%v", sets.List(got.Digests), sets.List(tc.expected.Digests))
+			}
+		})
+	}
+}
+
+func TestGetImageValidationWithCustomDigests(t *testing.T) {
+	const (
+		customDigest1 = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+		customDigest2 = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+	)
+
+	type testCase struct {
+		name             string
+		customDigests    string
+		validationEnv    string
+		setValidationEnv bool
+		expected         ImageValidation
+	}
+
+	testCases := []testCase{
+		{
+			name:          "extends embedded digests with a valid custom digest",
+			customDigests: customDigest1,
+			expected: ImageValidation{
+				Enabled: true,
+				Digests: embeddedDigestsWith(customDigest1),
+			},
+		},
+		{
+			name:          "accepts multiple comma-separated custom digests",
+			customDigests: customDigest1 + ", " + customDigest2,
+			expected: ImageValidation{
+				Enabled: true,
+				Digests: embeddedDigestsWith(customDigest1, customDigest2),
+			},
+		},
+		{
+			name:          "skips malformed custom digests",
+			customDigests: "not-a-digest, sha256:short, " + customDigest1,
+			expected: ImageValidation{
+				Enabled: true,
+				Digests: embeddedDigestsWith(customDigest1),
+			},
+		},
+		{
+			name:             "validation disabled ignores custom digests",
+			customDigests:    customDigest1,
+			setValidationEnv: true,
+			validationEnv:    "false",
+			expected: ImageValidation{
+				Enabled: false,
+				Digests: sets.New[string](),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.setValidationEnv {
+				t.Setenv(SchedulerImageValidationEnvVar, tc.validationEnv)
+			}
+			t.Setenv(CustomSchedulerDigestsEnvVar, tc.customDigests)
+
+			got := GetImageValidationData()
+
+			if got.Enabled != tc.expected.Enabled {
+				t.Errorf("Enabled: got=%v want=%v", got.Enabled, tc.expected.Enabled)
+			}
+			if !got.Digests.Equal(tc.expected.Digests) {
+				t.Errorf("Digests: got=%v want=%v", sets.List(got.Digests), sets.List(tc.expected.Digests))
+			}
+		})
+	}
+}
+
+func TestParseCustomSchedulerDigests(t *testing.T) {
+	const validDigest = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+
+	type testCase struct {
+		name     string
+		input    string
+		expected []string
+	}
+
+	testCases := []testCase{
+		{
+			name:     "empty input",
+			input:    "",
+			expected: []string{},
+		},
+		{
+			name:     "single valid digest",
+			input:    validDigest,
+			expected: []string{validDigest},
+		},
+		{
+			name:     "trims whitespace and skips empty entries",
+			input:    "  " + validDigest + " , , ",
+			expected: []string{validDigest},
+		},
+		{
+			name:     "skips malformed digests",
+			input:    "not-a-digest, sha256:short",
+			expected: []string{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseCustomSchedulerDigests(tc.input)
+			if len(got) != len(tc.expected) {
+				t.Fatalf("got=%v want=%v", got, tc.expected)
+			}
+			for i := range got {
+				if got[i] != tc.expected[i] {
+					t.Errorf("index %d: got=%q want=%q", i, got[i], tc.expected[i])
+				}
 			}
 		})
 	}
