@@ -82,7 +82,7 @@ const (
 
 // NUMAResourcesSchedulerSpec defines the desired state of NUMAResourcesScheduler
 type NUMAResourcesSchedulerSpec struct {
-	// Scheduler container image URL
+	// Scheduler container image URL, must be referenced by SHA256 digest, not by tag
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Scheduler container image URL",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	SchedulerImage string `json:"imageSpec"`
 	// Scheduler name to be used in pod templates
