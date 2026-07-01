@@ -1,7 +1,7 @@
 package resourcetopologyexporter
 
 import (
-	"fmt"
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -24,12 +24,7 @@ type ResourceObserver struct {
 	exposeTiming    bool
 }
 
-func NewResourceObserver(hnd resourcemonitor.Handle, args resourcemonitor.Args) (*ResourceObserver, error) {
-	resMon, err := resourcemonitor.NewResourceMonitor(hnd, args)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize ResourceMonitor: %w", err)
-	}
-
+func NewResourceObserver(resMon resourcemonitor.ResourceMonitor, args resourcemonitor.Args) *ResourceObserver {
 	resObs := ResourceObserver{
 		resMon:          resMon,
 		resourceExclude: args.ResourceExclude,
@@ -38,14 +33,15 @@ func NewResourceObserver(hnd resourcemonitor.Handle, args resourcemonitor.Args) 
 		exposeTiming:    args.ExposeTiming,
 	}
 	resObs.Infos = resObs.infoChan
-	return &resObs, nil
+	return &resObs
 }
 
 func (rm *ResourceObserver) Stop() {
 	rm.stopChan <- struct{}{}
 }
 
-func (rm *ResourceObserver) Run(eventsChan <-chan notification.Event, condChan chan<- v1.PodCondition) {
+func (rm *ResourceObserver) Run(ctx context.Context, eventsChan <-chan notification.Event, condChan chan<- v1.PodCondition) {
+	logger := klog.FromContext(ctx)
 	lastWakeup := time.Now()
 	for {
 		select {
@@ -59,7 +55,7 @@ func (rm *ResourceObserver) Run(eventsChan <-chan notification.Event, condChan c
 			metrics.UpdateWakeupDelayMetric(monInfo.UpdateReason(), float64(tsWakeupDiff.Milliseconds()))
 
 			tsBegin := time.Now()
-			scanRes, err := rm.resMon.Scan(rm.resourceExclude)
+			scanRes, err := rm.resMon.Scan(ctx, rm.resourceExclude)
 			tsEnd := time.Now()
 
 			monInfo.Annotations = scanRes.Annotations
@@ -73,7 +69,7 @@ func (rm *ResourceObserver) Run(eventsChan <-chan notification.Event, condChan c
 
 			condStatus := v1.ConditionTrue
 			if err != nil {
-				klog.Warningf("failed to scan pod resources: %v\n", err)
+				logger.V(1).Info("failed to scan pod resources", "err", err)
 				condStatus = v1.ConditionFalse
 				podreadiness.SetCondition(condChan, podreadiness.PodresourcesFetched, condStatus)
 				continue
@@ -83,8 +79,10 @@ func (rm *ResourceObserver) Run(eventsChan <-chan notification.Event, condChan c
 			tsDiff := tsEnd.Sub(tsBegin)
 			metrics.UpdateOperationDelayMetric("podresources_scan", monInfo.UpdateReason(), float64(tsDiff.Milliseconds()))
 			podreadiness.SetCondition(condChan, podreadiness.PodresourcesFetched, condStatus)
+		case <-ctx.Done():
+			return
 		case <-rm.stopChan:
-			klog.Infof("read stop at %v", time.Now())
+			logger.Info("read stop", "at", time.Now())
 			return
 		}
 	}
