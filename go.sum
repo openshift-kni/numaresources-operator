@@ -114,10 +114,12 @@ github.com/k8stopologyawareschedwg/deployer v0.24.0 h1:ieRgSJ7mQmMAWo7Vu2wXvbpBf
 github.com/k8stopologyawareschedwg/deployer v0.24.0/go.mod h1:ZkZiHYIpeXS5+QUUA4+b/TiFBZpQYsecJMAk0uX+jTM=
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2 h1:uAwqOtyrFYggq3pVf3hs1XKkBxrQ8dkgjWz3LCLJsiY=
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2/go.mod h1:LBzS4n6GX1C69tzSd5EibZ9cGOXFuHP7GxEMDYVe1sM=
+github.com/k8stopologyawareschedwg/numaplacement v0.1.0 h1:Y1GxVAAc+FVewXRdnPfXT8DM8yICPsM8kLHh4I7f7uU=
+github.com/k8stopologyawareschedwg/numaplacement v0.1.0/go.mod h1:wU3DV2l+5mzMLufnTYhtsiyXqiNwfDMN0Hq29c+qXU4=
 github.com/k8stopologyawareschedwg/podfingerprint v0.2.3 h1:nVKmzn6g7CHhDtB+jG85Db/B/ALRY9VLh5ueAfVPEHU=
 github.com/k8stopologyawareschedwg/podfingerprint v0.2.3/go.mod h1:E0bjgihZTSwRIJVjNV45Lm0C/j5w+YkGSnfpYXoI8Ws=
-github.com/k8stopologyawareschedwg/resource-topology-exporter v0.24.0 h1:1GKIZyxZH6fp8ckQHHFWBs0gjbvjUURYPoa6Mah7xGk=
-github.com/k8stopologyawareschedwg/resource-topology-exporter v0.24.0/go.mod h1:J9li0VDP3ogNEBaikyCZqHiPg5kYmcn1m0qTk4q8BA0=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.25.0 h1:GvZiWAoY8CTEHPB49BLKHhe+NjkrXdQKjawZAZKi0QU=
+github.com/k8stopologyawareschedwg/resource-topology-exporter v0.25.0/go.mod h1:HuyWeTKYUZ3KKKPn6VOSOGGYcMpdheJyrvcMAh/6e+A=
 github.com/kisielk/errcheck v1.5.0/go.mod h1:pFxgyoBC7bSaBwPgfKdkLd5X25qrDl4LWUI2bnpBCr8=
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=
