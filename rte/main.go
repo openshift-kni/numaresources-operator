@@ -15,7 +15,6 @@ limitations under the License.
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -99,9 +98,11 @@ func main() {
 		cli = podexclude.NewFromLister(cli, parsedArgs.Global.Debug, parsedArgs.Resourcemonitor.PodExclude)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+
 	if parsedArgs.Resourcemonitor.ExcludeTerminalPods {
 		klog.Infof("terminal pods are filtered from the PodResourcesLister client")
-		cli, err = terminalpods.NewFromLister(context.TODO(), cli, k8scli, time.Minute, parsedArgs.Global.Debug)
+		cli, err = terminalpods.NewFromLister(ctx, cli, k8scli, time.Minute, parsedArgs.Global.Debug)
 		if err != nil {
 			klog.Fatalf("failed to get PodResourceAPI client: %v", err)
 		}
@@ -127,7 +128,7 @@ func main() {
 		},
 		NRTCli: nrtcli,
 	}
-	err = resourcetopologyexporter.Execute(hnd, parsedArgs.NRTupdater, parsedArgs.Resourcemonitor, parsedArgs.RTE)
+	err = resourcetopologyexporter.Execute(ctx, hnd, parsedArgs.NRTupdater, parsedArgs.Resourcemonitor, parsedArgs.RTE)
 	if err != nil {
 		klog.Fatalf("failed to execute: %v", err)
 	}
