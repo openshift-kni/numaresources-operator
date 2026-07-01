@@ -15,6 +15,9 @@ data:
           multiPoint:
             disabled:
               - name: DynamicResources
+          preFilter:
+            enabled:
+              - name: NodeResourceTopologyMatch
           filter:
             disabled:
               - name: '*'
