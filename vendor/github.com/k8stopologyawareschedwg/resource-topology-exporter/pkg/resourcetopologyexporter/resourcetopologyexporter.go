@@ -8,6 +8,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
 
+	"github.com/go-logr/logr"
 	topologyclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
 
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/kubeconf"
@@ -67,17 +68,19 @@ type Handle struct {
 	NRTCli topologyclientset.Interface
 }
 
-func Execute(hnd Handle, nrtupdaterArgs nrtupdater.Args, resourcemonitorArgs resourcemonitor.Args, rteArgs Args) error {
-	tmConf, err := getTopologyManagerSettings(rteArgs)
+func Execute(ctx context.Context, hnd Handle, nrtupdaterArgs nrtupdater.Args, resourcemonitorArgs resourcemonitor.Args, rteArgs Args) error {
+	logger := klog.FromContext(ctx)
+
+	tmConf, err := getTopologyManagerSettings(logger, rteArgs)
 	if err != nil {
 		return err
 	}
 
 	var nodeGetter nrtupdater.NodeGetter
 	if rteArgs.AddNRTOwnerEnable {
-		nodeGetter, err = nrtupdater.NewCachedNodeGetter(hnd.ResMon.K8SCli, context.Background())
+		nodeGetter, err = nrtupdater.NewCachedNodeGetter(hnd.ResMon.K8SCli, ctx)
 		if err != nil {
-			klog.V(2).Info("Cannot enable 'add-nrt-owner'. Unable to get node info")
+			logger.V(2).Info("Cannot enable 'add-nrt-owner'. Unable to get node info")
 			return fmt.Errorf("Cannot enable 'add-nrt-owner'. %w", err)
 		}
 	} else {
@@ -91,7 +94,7 @@ func Execute(hnd Handle, nrtupdaterArgs nrtupdater.Args, resourcemonitorArgs res
 		if err != nil {
 			return err
 		}
-		condIn.Run(condChan)
+		go condIn.Run(ctx, condChan)
 	}
 
 	eventSource, err := createEventSource(&rteArgs)
@@ -99,11 +102,14 @@ func Execute(hnd Handle, nrtupdaterArgs nrtupdater.Args, resourcemonitorArgs res
 		return err
 	}
 
-	resObs, err := NewResourceObserver(hnd.ResMon, resourcemonitorArgs)
-	if err != nil {
-		return err
+	resMon := resourcemonitor.NewResourceMonitor(hnd.ResMon, resourcemonitorArgs, tmConf.config.Policy)
+	if err := resMon.Setup(ctx); err != nil {
+		return fmt.Errorf("failed to setup ResourceMonitor: %w", err)
 	}
-	go resObs.Run(eventSource.Events(), condChan)
+
+	resObs := NewResourceObserver(resMon, resourcemonitorArgs)
+
+	go resObs.Run(ctx, eventSource.Events(), condChan)
 
 	upd, err := nrtupdater.NewNRTUpdater(nodeGetter, hnd.NRTCli, nrtupdaterArgs, tmConf.config)
 	if err != nil {
@@ -113,9 +119,13 @@ func Execute(hnd Handle, nrtupdaterArgs nrtupdater.Args, resourcemonitorArgs res
 
 	go eventSource.Run()
 
-	eventSource.Wait()  // will never return
-	eventSource.Close() // still we try to clean after ourselves :)
-	return nil          // unreachable
+	select {
+	case <-ctx.Done():
+	}
+	eventSource.Stop()
+	eventSource.Wait()
+	eventSource.Close()
+	return nil
 }
 
 func createEventSource(rteArgs *Args) (notification.EventSource, error) {
@@ -149,7 +159,7 @@ func createEventSource(rteArgs *Args) (notification.EventSource, error) {
 	return es, nil
 }
 
-func getTopologyManagerSettings(rteArgs Args) (tmSettings, error) {
+func getTopologyManagerSettings(logger logr.Logger, rteArgs Args) (tmSettings, error) {
 	if rteArgs.TopologyManagerPolicy != "" && rteArgs.TopologyManagerScope != "" {
 		tmConf := tmSettings{
 			config: nrtupdater.TMConfig{
@@ -157,7 +167,7 @@ func getTopologyManagerSettings(rteArgs Args) (tmSettings, error) {
 				Scope:  rteArgs.TopologyManagerScope,
 			},
 		}
-		klog.Infof("using given Topology Manager policy %q scope %q", tmConf.config.Policy, tmConf.config.Scope)
+		logger.Info("using given Topology Manager settings", "policy", tmConf.config.Policy, "scope", tmConf.config.Scope)
 		return tmConf, nil
 	}
 	if rteArgs.KubeletConfigFile != "" {
@@ -171,7 +181,7 @@ func getTopologyManagerSettings(rteArgs Args) (tmSettings, error) {
 				Scope:  klConfig.TopologyManagerScope,
 			},
 		}
-		klog.Infof("using detected Topology Manager policy %q scope %q", tmConf.config.Policy, tmConf.config.Scope)
+		logger.Info("using detected Topology Manager settings", "policy", tmConf.config.Policy, "scope", tmConf.config.Scope)
 		return tmConf, nil
 	}
 	return tmSettings{}, fmt.Errorf("cannot find the kubelet Topology Manager policy")

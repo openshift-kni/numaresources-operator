@@ -47,21 +47,18 @@ func GetNodeTopology(topologyClient *topologyclientset.Clientset, nodeName strin
 }
 
 func GetNodeTopologyWithResource(topologyClient *topologyclientset.Clientset, nodeName, resName string) *v1alpha2.NodeResourceTopology {
+	ginkgo.GinkgoHelper()
 	ginkgo.By(fmt.Sprintf("getting NRT for node=%q resource=%q", nodeName, resName))
 
 	var nodeTopology *v1alpha2.NodeResourceTopology
 	var err error
-	gomega.EventuallyWithOffset(1, func() bool {
+	gomega.Eventually(func(g gomega.Gomega) {
 		nodeTopology, err = topologyClient.TopologyV1alpha2().NodeResourceTopologies().Get(context.TODO(), nodeName, metav1.GetOptions{})
-		if err != nil {
-			klog.Infof("failed to get the node topology resource: %v", err)
-			return false
+		g.Expect(err).ToNot(gomega.HaveOccurred(), "failed to get the node topology resource")
+		if resName != "" {
+			g.Expect(containsResource(nodeTopology, resName)).To(gomega.BeTrue(), "the node topology data doesn't include resource %q", resName)
 		}
-		if resName == "" {
-			return true
-		}
-		return containsResource(nodeTopology, resName)
-	}).WithTimeout(time.Minute).WithPolling(5 * time.Second).Should(gomega.BeTrue())
+	}).WithTimeout(time.Minute).WithPolling(5 * time.Second).Should(gomega.Succeed())
 
 	return nodeTopology
 }

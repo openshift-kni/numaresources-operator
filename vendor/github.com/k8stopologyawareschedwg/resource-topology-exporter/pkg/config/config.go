@@ -50,6 +50,12 @@ func (args GlobalArgs) Clone() GlobalArgs {
 	}
 }
 
+const (
+	DumpConfigStdout string = "-"
+	DumpConfigAbort  string = ".andexit"
+	DumpConfigLog    string = ".log"
+)
+
 type ProgArgs struct {
 	Global          GlobalArgs                    `json:"global,omitempty"`
 	NRTupdater      nrtupdater.Args               `json:"nrtUpdater,omitempty"`
@@ -141,6 +147,7 @@ func LoadArgs(args ...string) (ProgArgs, error) {
 		klog.Infof("config from flags:{{\n%s\n}}", pArgs.ToYAMLString())
 	}
 
+	Canonicalize(&pArgs)
 	err = Validate(&pArgs)
 	if err != nil {
 		return pArgs, err
@@ -188,4 +195,18 @@ func UserHomeDir() (string, error) {
 		return "", SkipDirectory
 	}
 	return filepath.Join(homeDir, ".rte"), nil
+}
+
+func HandleDumpConfig(parsedArgs ProgArgs) bool {
+	conf := parsedArgs.ToYAMLString()
+	if parsedArgs.DumpConfig == DumpConfigLog {
+		klog.Infof("current configuration:\n%s", conf)
+		return false
+	}
+	if parsedArgs.DumpConfig == DumpConfigStdout {
+		fmt.Println(conf)
+		return false
+	}
+	fmt.Println(conf)
+	return true
 }

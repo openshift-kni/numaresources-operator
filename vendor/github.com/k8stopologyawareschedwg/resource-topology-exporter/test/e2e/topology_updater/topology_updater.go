@@ -24,7 +24,6 @@ package topology_updater
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
@@ -111,24 +110,12 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 				Kind:       "Node",
 				UID:        topologyUpdaterNode.UID,
 			}
-			gomega.Eventually(func() bool {
+			gomega.Eventually(func(g gomega.Gomega) {
 				finalNodeTopo, err := f.TopoCli.TopologyV1alpha2().NodeResourceTopologies().Get(context.TODO(), topologyUpdaterNode.Name, metav1.GetOptions{})
-				if err != nil {
-					klog.Infof("failed to get the node topology resource: %v", err)
-					return false
-				}
-
-				if len(finalNodeTopo.OwnerReferences) != 1 {
-					klog.Infof("Too many OwnerReferences: expected=1; got=%d", len(finalNodeTopo.OwnerReferences))
-					klog.Infof("%+#v", finalNodeTopo.OwnerReferences)
-					return false
-				}
-				if !reflect.DeepEqual(finalNodeTopo.OwnerReferences[0], expectedOwnerReference) {
-					klog.Infof("Unexpected OwnerReference: expected=%+#v; got=%+#v", expectedOwnerReference, finalNodeTopo.OwnerReferences[0])
-					return false
-				}
-				return true
-			}).WithTimeout(5*timeout).WithPolling(5*time.Second).Should(gomega.BeTrue(), "didn't get updated node topology info")
+				g.Expect(err).ToNot(gomega.HaveOccurred(), "failed to get the node topology resource")
+				g.Expect(finalNodeTopo.OwnerReferences).To(gomega.HaveLen(1), "unexpected number of OwnerReferences")
+				g.Expect(finalNodeTopo.OwnerReferences[0]).To(gomega.Equal(expectedOwnerReference), "unexpected OwnerReference")
+			}).WithTimeout(5*timeout).WithPolling(5*time.Second).Should(gomega.Succeed(), "didn't get updated node topology info")
 		})
 		ginkgo.It("it should not account for any cpus if a container doesn't request exclusive cpus (best effort QOS)", func() {
 			devName := e2etestenv.GetDeviceName()
@@ -136,7 +123,7 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 			ginkgo.By("getting the initial topology information")
 			initialNodeTopo := e2enodetopology.GetNodeTopologyWithResource(f.TopoCli, topologyUpdaterNode.Name, devName)
 			ginkgo.By("creating a pod consuming resources from the shared, non-exclusive CPU pool (best-effort QoS)")
-			sleeperPod := e2epods.MakeBestEffortSleeperPod()
+			sleeperPod := e2epods.MakeSleeperPod([]corev1.ResourceRequirements{{}})
 
 			pod, err := e2epods.CreateSync(f, sleeperPod)
 			gomega.Expect(err).ToNot(gomega.HaveOccurred())
@@ -231,14 +218,11 @@ var _ = ginkgo.Describe("[TopologyUpdater][InfraConsuming] Node topology updater
 
 			ginkgo.By("getting the updated topology")
 			var finalNodeTopo *v1alpha2.NodeResourceTopology
-			gomega.Eventually(func() bool {
+			gomega.Eventually(func(g gomega.Gomega) {
 				finalNodeTopo, err = f.TopoCli.TopologyV1alpha2().NodeResourceTopologies().Get(context.TODO(), topologyUpdaterNode.Name, metav1.GetOptions{})
-				if err != nil {
-					klog.Infof("failed to get the node topology resource: %v", err)
-					return false
-				}
-				return finalNodeTopo.ObjectMeta.Generation != initialNodeTopo.ObjectMeta.Generation
-			}).WithTimeout(5*timeout).WithPolling(5*time.Second).Should(gomega.BeTrue(), "didn't get updated node topology info")
+				g.Expect(err).ToNot(gomega.HaveOccurred(), "failed to get the node topology resource")
+				g.Expect(finalNodeTopo.ObjectMeta.Generation).ToNot(gomega.Equal(initialNodeTopo.ObjectMeta.Generation), "resource %s not yet updated - generation not bumped", topologyUpdaterNode.Name)
+			}).WithTimeout(5*timeout).WithPolling(5*time.Second).Should(gomega.Succeed(), "didn't get updated node topology info")
 			klog.Infof("final topology information: %#v", initialNodeTopo)
 
 			ginkgo.By("checking the changes in the updated topology")

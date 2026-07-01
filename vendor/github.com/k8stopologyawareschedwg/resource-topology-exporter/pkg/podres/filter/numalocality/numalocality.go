@@ -19,6 +19,7 @@ package numalocality
 import (
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 
+	numaloclib "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/numalocality"
 	podresfilter "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/filter"
 )
 
@@ -46,7 +47,7 @@ func Verify(pr *podresourcesapi.PodResources) podresfilter.Result {
 			}
 		}
 		for _, mem := range cr.Memory {
-			if IsPresent(mem.Topology) {
+			if len(numaloclib.GetNUMAIDs(mem.Topology)) > 0 {
 				return podresfilter.Result{
 					Allow:  true,
 					Ident:  cr.Name,
@@ -55,7 +56,7 @@ func Verify(pr *podresourcesapi.PodResources) podresfilter.Result {
 			}
 		}
 		for _, dev := range cr.Devices {
-			if len(dev.DeviceIds) > 0 && IsPresent(dev.Topology) {
+			if len(dev.DeviceIds) > 0 && len(numaloclib.GetNUMAIDs(dev.Topology)) > 0 {
 				return podresfilter.Result{
 					Allow:  true,
 					Ident:  cr.Name,
@@ -72,24 +73,4 @@ func Verify(pr *podresourcesapi.PodResources) podresfilter.Result {
 // AlwaysPass is deprecated; if needed use pkg/pkodres/filter.VerifyAlwaysPass
 func AlwaysPass(_ *podresourcesapi.PodResources) bool {
 	return true
-}
-
-// Required is deprecated: use Verify instead
-func Required(pr *podresourcesapi.PodResources) bool {
-	got := Verify(pr)
-	return got.Allow
-}
-
-func IsPresent(topo *podresourcesapi.TopologyInfo) bool {
-	if topo == nil || topo.Nodes == nil {
-		return false
-	}
-	// if Nodes is not given, this means "don't care about locality". It's a legal representation.
-	for _, node := range topo.Nodes {
-		// setting node.ID == -1 is also a legal representation for "don't care about locality".
-		if node.ID >= 0 {
-			return true
-		}
-	}
-	return false
 }

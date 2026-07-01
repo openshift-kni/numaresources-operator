@@ -19,6 +19,8 @@ package config
 import (
 	"os"
 
+	"k8s.io/klog/v2"
+
 	metricssrv "github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/metrics/server"
 
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/sharedcpuspool"
@@ -55,25 +57,48 @@ func PodSetFingerprintStatusFileFromEnv() string {
 }
 
 func FromEnv(pArgs *ProgArgs) {
+	before := pArgs.Clone()
+
 	if pArgs.NRTupdater.Hostname == "" {
 		pArgs.NRTupdater.Hostname = HostNameFromEnv()
+		if before.NRTupdater.Hostname != pArgs.NRTupdater.Hostname {
+			klog.V(4).Infof("environment override: hostname %q -> %q", before.NRTupdater.Hostname, pArgs.NRTupdater.Hostname)
+		}
 	}
 	if pArgs.RTE.TopologyManagerPolicy == "" {
 		pArgs.RTE.TopologyManagerPolicy = TopologyManagerPolicyFromEnv()
+		if before.RTE.TopologyManagerPolicy != pArgs.RTE.TopologyManagerPolicy {
+			klog.V(4).Infof("environment override: topologyManagerPolicy %q -> %q", before.RTE.TopologyManagerPolicy, pArgs.RTE.TopologyManagerPolicy)
+		}
 	}
 	if pArgs.RTE.TopologyManagerScope == "" {
 		pArgs.RTE.TopologyManagerScope = TopologyManagerScopeFromEnv()
+		if before.RTE.TopologyManagerScope != pArgs.RTE.TopologyManagerScope {
+			klog.V(4).Infof("environment override: topologyManagerScope %q -> %q", before.RTE.TopologyManagerScope, pArgs.RTE.TopologyManagerScope)
+		}
 	}
 	if pArgs.RTE.ReferenceContainer.IsEmpty() {
 		pArgs.RTE.ReferenceContainer = sharedcpuspool.ContainerIdentFromEnv()
+		if before.RTE.ReferenceContainer.String() != pArgs.RTE.ReferenceContainer.String() {
+			klog.V(4).Infof("environment override: referenceContainer %q -> %q", before.RTE.ReferenceContainer.String(), pArgs.RTE.ReferenceContainer.String())
+		}
 	}
 	if pArgs.RTE.MetricsPort == 0 {
 		pArgs.RTE.MetricsPort = metricssrv.PortFromEnv()
+		if before.RTE.MetricsPort != pArgs.RTE.MetricsPort {
+			klog.V(4).Infof("environment override: metricsPort %d -> %d", before.RTE.MetricsPort, pArgs.RTE.MetricsPort)
+		}
 	}
 	if pArgs.RTE.MetricsAddress == "" {
 		pArgs.RTE.MetricsAddress = metricssrv.AddressFromEnv()
+		if before.RTE.MetricsAddress != pArgs.RTE.MetricsAddress {
+			klog.V(4).Infof("environment override: metricsAddress %q -> %q", before.RTE.MetricsAddress, pArgs.RTE.MetricsAddress)
+		}
 	}
 	if pArgs.Resourcemonitor.PodSetFingerprintStatusFile == "" {
 		pArgs.Resourcemonitor.PodSetFingerprintStatusFile = PodSetFingerprintStatusFileFromEnv()
+		if before.Resourcemonitor.PodSetFingerprintStatusFile != pArgs.Resourcemonitor.PodSetFingerprintStatusFile {
+			klog.V(4).Infof("environment override: podSetFingerprintStatusFile %q -> %q", before.Resourcemonitor.PodSetFingerprintStatusFile, pArgs.Resourcemonitor.PodSetFingerprintStatusFile)
+		}
 	}
 }

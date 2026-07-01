@@ -23,7 +23,6 @@ package rte
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"k8s.io/klog/v2"
@@ -127,13 +126,15 @@ var _ = ginkgo.Describe("[RTE][Monitoring] metrics", func() {
 			key := client.ObjectKeyFromObject(rtePod)
 			klog.Infof("executing cmd: %s on pod %q", cmd, key.String())
 			var stdout, stderr []byte
-			gomega.Eventually(func() bool {
+			gomega.Eventually(func(g gomega.Gomega) {
 				var err error
 				stdout, stderr, err = remoteexec.CommandOnPod(f.Ctx, f.K8SCli, rtePod, rteContainerName, cmd...)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred(), "failed exec command on pod. pod=%q; cmd=%q; err=%v; stderr=%q", key.String(), cmd, err, stderr)
-				return strings.Contains(string(stdout), "operation_delay") &&
-					strings.Contains(string(stdout), "wakeup_delay")
-			}).WithPolling(10*time.Second).WithTimeout(3*time.Minute).Should(gomega.BeTrue(), "failed to get metrics from pod\nstdout=%q\nstderr=%q\n", stdout, stderr)
+				g.Expect(err).ToNot(gomega.HaveOccurred(), "failed exec command on pod. pod=%q; cmd=%q; err=%v; stderr=%q", key.String(), cmd, err, stderr)
+				g.Expect(string(stdout)).To(gomega.And(
+					gomega.ContainSubstring("operation_delay"),
+					gomega.ContainSubstring("wakeup_delay"),
+				), "failed to get metrics from pod\nstdout=%q\nstderr=%q\n", stdout, stderr)
+			}).WithPolling(10 * time.Second).WithTimeout(3 * time.Minute).Should(gomega.Succeed())
 		})
 
 		ginkgo.It("[EventChain] should have some metrics exported over plain http", func() {
@@ -146,13 +147,15 @@ var _ = ginkgo.Describe("[RTE][Monitoring] metrics", func() {
 			key := client.ObjectKeyFromObject(rtePod)
 			klog.Infof("executing cmd: %s on pod %q", cmd, key.String())
 			var stdout, stderr []byte
-			gomega.Eventually(func() bool {
+			gomega.Eventually(func(g gomega.Gomega) {
 				var err error
 				stdout, stderr, err = remoteexec.CommandOnPod(f.Ctx, f.K8SCli, rtePod, rteContainerName, cmd...)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred(), "failed exec command on pod. pod=%q; cmd=%q; err=%v; stderr=%q", key.String(), cmd, err, stderr)
-				return strings.Contains(string(stdout), "operation_delay") &&
-					strings.Contains(string(stdout), "wakeup_delay")
-			}).WithPolling(10*time.Second).WithTimeout(3*time.Minute).Should(gomega.BeTrue(), "failed to get metrics from pod\nstdout=%q\nstderr=%q\n", stdout, stderr)
+				g.Expect(err).ToNot(gomega.HaveOccurred(), "failed exec command on pod. pod=%q; cmd=%q; err=%v; stderr=%q", key.String(), cmd, err, stderr)
+				g.Expect(string(stdout)).To(gomega.And(
+					gomega.ContainSubstring("operation_delay"),
+					gomega.ContainSubstring("wakeup_delay"),
+				), "failed to get metrics from pod\nstdout=%q\nstderr=%q\n", stdout, stderr)
+			}).WithPolling(10 * time.Second).WithTimeout(3 * time.Minute).Should(gomega.Succeed())
 		})
 		ginkgo.It("[release] it should report noderesourcetopology writes", func() {
 			if metricsMode != "http" {
@@ -180,13 +183,13 @@ var _ = ginkgo.Describe("[RTE][Monitoring] metrics", func() {
 			key := client.ObjectKeyFromObject(rtePod)
 			klog.Infof("executing cmd: %s on pod %q", cmd, key.String())
 			var stdout, stderr []byte
-			gomega.Eventually(func() bool {
+			gomega.Eventually(func(g gomega.Gomega) {
 				var err error
 				stdout, stderr, err = remoteexec.CommandOnPod(f.Ctx, f.K8SCli, rtePod, rteContainerName, cmd...)
-				gomega.Expect(err).ToNot(gomega.HaveOccurred(), "failed exec command on pod. pod=%q; cmd=%q; err=%v; stderr=%q", key.String(), cmd, err, stderr)
+				g.Expect(err).ToNot(gomega.HaveOccurred(), "failed exec command on pod. pod=%q; cmd=%q; err=%v; stderr=%q", key.String(), cmd, err, stderr)
 
-				return strings.Contains(string(stdout), "noderesourcetopology_writes_total")
-			}).WithPolling(10*time.Second).WithTimeout(2*time.Minute).Should(gomega.BeTrue(), "failed to get metrics from pod\nstdout=%q\nstderr=%q\n", stdout, stderr)
+				g.Expect(string(stdout)).To(gomega.ContainSubstring("noderesourcetopology_writes_total"), "failed to get metrics from pod\nstdout=%q\nstderr=%q\n", stdout, stderr)
+			}).WithPolling(10 * time.Second).WithTimeout(2 * time.Minute).Should(gomega.Succeed())
 		})
 	})
 })
