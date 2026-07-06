@@ -192,13 +192,13 @@ var _ = Describe("[Install] durability", Serial, func() {
 			deployer.Teardown(context.TODO(), 5*time.Minute)
 		})
 
-		It("[test_id:47587] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator", Label(label.Tier1), func() {
+		It("should reject custom ExporterImage and go Degraded without changing the DaemonSet", Label(label.Tier1), func(ctx context.Context) {
 			By("getting up-to-date NRO object")
 			nroKey := objects.NROObjectKey()
 
 			immediate := true
-			err := wait.PollUntilContextTimeout(context.Background(), 10*time.Second, 10*time.Minute, immediate, func(ctx context.Context) (bool, error) {
-				err := e2eclient.Client.Get(ctx, nroKey, nroObj)
+			err := wait.PollUntilContextTimeout(ctx, 10*time.Second, 10*time.Minute, immediate, func(fCtx context.Context) (bool, error) {
+				err := e2eclient.Client.Get(fCtx, nroKey, nroObj)
 				if err != nil {
 					return false, err
 				}
@@ -209,7 +209,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 				return true, nil
 			})
 			if err != nil {
-				logRTEPodsLogs(e2eclient.Client, e2eclient.K8sClient, context.TODO(), nroObj, "NRO not available")
+				logRTEPodsLogs(e2eclient.Client, e2eclient.K8sClient, ctx, nroObj, "NRO not available")
 			}
 			Expect(err).NotTo(HaveOccurred(), "inconsistent NRO instance:\n%s", objects.ToYAML(nroObj))
 
@@ -219,23 +219,161 @@ var _ = Describe("[Install] durability", Serial, func() {
 			}
 
 			By("waiting for DaemonSet to be ready")
-			ds, err := nrowait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(context.TODO(), dsKey)
+			ds, err := nrowait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
 			Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+			dsUID := ds.GetUID()
 
-			By("Update RTE image in NRO")
+			By("setting a custom ExporterImage in NRO")
 			Eventually(func() error {
-				err := e2eclient.Client.Get(context.TODO(), nroKey, nroObj)
+				err := e2eclient.Client.Get(ctx, nroKey, nroObj)
 				if err != nil {
 					return err
 				}
 				nroObj.Spec.ExporterImage = e2eimages.RTETestImageCI
-				return e2eclient.Client.Update(context.TODO(), nroObj)
+				return e2eclient.Client.Update(ctx, nroObj)
 			}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
 
-			By("waiting for the daemonset to be ready again")
+			defer func() {
+				By("reverting ExporterImage to restore healthy state")
+				Eventually(func() error {
+					err := e2eclient.Client.Get(ctx, nroKey, nroObj)
+					if err != nil {
+						return err
+					}
+					nroObj.Spec.ExporterImage = ""
+					return e2eclient.Client.Update(ctx, nroObj)
+				}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
+
+				Eventually(func() error {
+					updatedNroObj := &nropv1.NUMAResourcesOperator{}
+					if err := e2eclient.Client.Get(ctx, nroKey, updatedNroObj); err != nil {
+						return err
+					}
+					cond := metahelper.FindStatusCondition(updatedNroObj.Status.Conditions, status.ConditionAvailable)
+					if cond == nil {
+						return fmt.Errorf("missing Available condition")
+					}
+					if cond.Status != metav1.ConditionTrue {
+						return fmt.Errorf("NRO did not recover after reverting ExporterImage: status %q", cond.Status)
+					}
+					return nil
+				}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+			}()
+
+			By("waiting for the operator to report Degraded")
+			Eventually(func() error {
+				updatedNroObj := &nropv1.NUMAResourcesOperator{}
+				if err := e2eclient.Client.Get(ctx, nroKey, updatedNroObj); err != nil {
+					return err
+				}
+
+				cond := metahelper.FindStatusCondition(updatedNroObj.Status.Conditions, status.ConditionDegraded)
+				if cond == nil {
+					return fmt.Errorf("missing Degraded condition")
+				}
+				if cond.Status != metav1.ConditionTrue {
+					return fmt.Errorf("operator not yet Degraded: status %q", cond.Status)
+				}
+				if cond.Reason != status.ReasonCustomUserImage {
+					return fmt.Errorf("Degraded reason mismatch: got %q expected %q", cond.Reason, status.ReasonCustomUserImage)
+				}
+				return nil
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
+
+			By("verifying the DaemonSet was not changed")
+			Consistently(func() error {
+				updatedDs := &appsv1.DaemonSet{}
+				if err := e2eclient.Client.Get(ctx, dsKey.AsKey(), updatedDs); err != nil {
+					return err
+				}
+				if updatedDs.GetUID() != dsUID {
+					return fmt.Errorf("DaemonSet was recreated unexpectedly: got UID %q expected %q", updatedDs.GetUID(), dsUID)
+				}
+
+				rteContainer, err := findContainerByName(*updatedDs, containerNameRTE)
+				if err != nil {
+					return err
+				}
+				if rteContainer.Image == e2eimages.RTETestImageCI {
+					return fmt.Errorf("DaemonSet image should not have changed to the custom image: %q", rteContainer.Image)
+				}
+				return nil
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+		})
+
+		It("[test_id:47587] should restart RTE DaemonSet when image is updated in NUMAResourcesOperator and the ExporterImage restriction is disabled", Label(label.Tier1), func(ctx context.Context) {
+			By("getting up-to-date NRO object")
+			nroKey := objects.NROObjectKey()
+
+			immediate := true
+			err := wait.PollUntilContextTimeout(ctx, 10*time.Second, 10*time.Minute, immediate, func(fCtx context.Context) (bool, error) {
+				err := e2eclient.Client.Get(fCtx, nroKey, nroObj)
+				if err != nil {
+					return false, err
+				}
+				if len(nroObj.Status.DaemonSets) != 1 {
+					klog.InfoS("unsupported daemonsets (/MCP)", "count", len(nroObj.Status.DaemonSets))
+					return false, nil
+				}
+				return true, nil
+			})
+			if err != nil {
+				logRTEPodsLogs(e2eclient.Client, e2eclient.K8sClient, ctx, nroObj, "NRO not available")
+			}
+			Expect(err).NotTo(HaveOccurred(), "inconsistent NRO instance:\n%s", objects.ToYAML(nroObj))
+
+			By("checking if ExporterImage restriction is disabled in the operator pod")
+			nropPod, err := deploy.FindNUMAResourcesOperatorPod(ctx, e2eclient.Client, nroObj)
+			Expect(err).ToNot(HaveOccurred())
+
+			unrestricted := false
+			for _, cnt := range nropPod.Spec.Containers {
+				for _, env := range cnt.Env {
+					if env.Name == "EXPORTER_IMAGE_RESTRICTION" && env.Value == "false" {
+						unrestricted = true
+						break
+					}
+				}
+			}
+			if !unrestricted {
+				Skip("EXPORTER_IMAGE_RESTRICTION is not set to false, skipping unrestricted ExporterImage test")
+			}
+
+			dsKey := nrowait.ObjectKey{
+				Namespace: nroObj.Status.DaemonSets[0].Namespace,
+				Name:      nroObj.Status.DaemonSets[0].Name,
+			}
+
+			By("waiting for DaemonSet to be ready")
+			ds, err := nrowait.With(e2eclient.Client).Interval(10*time.Second).Timeout(3*time.Minute).ForDaemonSetReadyByKey(ctx, dsKey)
+			Expect(err).ToNot(HaveOccurred(), "failed to get the daemonset %s: %v", dsKey.String(), err)
+
+			By("setting a custom ExporterImage in NRO")
+			Eventually(func() error {
+				err := e2eclient.Client.Get(ctx, nroKey, nroObj)
+				if err != nil {
+					return err
+				}
+				nroObj.Spec.ExporterImage = e2eimages.RTETestImageCI
+				return e2eclient.Client.Update(ctx, nroObj)
+			}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
+
+			defer func() {
+				By("reverting ExporterImage")
+				Eventually(func() error {
+					err := e2eclient.Client.Get(ctx, nroKey, nroObj)
+					if err != nil {
+						return err
+					}
+					nroObj.Spec.ExporterImage = ""
+					return e2eclient.Client.Update(ctx, nroObj)
+				}).WithTimeout(3 * time.Minute).WithPolling(10 * time.Second).ShouldNot(HaveOccurred())
+			}()
+
+			By("waiting for the daemonset to be updated with the new image")
 			Eventually(func() bool {
 				updatedDs := &appsv1.DaemonSet{}
-				err := e2eclient.Client.Get(context.TODO(), dsKey.AsKey(), updatedDs)
+				err := e2eclient.Client.Get(ctx, dsKey.AsKey(), updatedDs)
 				if err != nil {
 					klog.ErrorS(err, "failed to get the daemonset", "key", dsKey.String())
 					return false
@@ -351,6 +489,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 				return nil
 			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 		})
+
 		It("should have the desired topology manager configuration under the NRT object", func() {
 			rteConfigMap := &corev1.ConfigMap{}
 			Eventually(func() bool {
