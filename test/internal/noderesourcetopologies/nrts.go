@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 	"time"
@@ -43,6 +44,8 @@ import (
 
 // ErrNotEnoughResources means a NUMA zone or a node has not enough resouces to reserve
 var ErrNotEnoughResources = errors.New("nrt: Not enough resources")
+
+const WorkloadPartitioningResourcePrefix = "management.workload.openshift.io/"
 
 func GetZoneIDFromName(zoneName string) (int, error) {
 	for _, prefix := range []string{
@@ -257,6 +260,11 @@ func DropHostLevelResources(res corev1.ResourceList) corev1.ResourceList {
 	newList := res.DeepCopy() // since res is a map, updating it directly would mutate its instance in all places
 	klog.Info("drop host-level resources")
 	delete(newList, corev1.ResourceEphemeralStorage)
+	// workload partitioning resources (e.g. management.workload.openshift.io/cores) are
+	// reported in node allocatable but not in NRT zone data, so we must drop them.
+	maps.DeleteFunc(newList, func(resName corev1.ResourceName, _ resource.Quantity) bool {
+		return strings.HasPrefix(string(resName), WorkloadPartitioningResourcePrefix)
+	})
 	return newList
 }
 
