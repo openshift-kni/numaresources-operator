@@ -25,7 +25,7 @@ require (
 	github.com/openshift/hypershift/api v0.0.0-20241115183703-d41904871380 // release-4.18
 	github.com/sergi/go-diff v1.1.0
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/net v0.55.0
+	golang.org/x/net v0.55.0 // indirect
 	golang.org/x/sync v0.20.0
 	google.golang.org/grpc v1.79.3
 	k8s.io/api v0.35.3
