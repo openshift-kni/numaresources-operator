@@ -35,9 +35,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
@@ -46,6 +48,7 @@ import (
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/podlogs"
 	nrowait "github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
@@ -260,11 +263,11 @@ var _ = Describe("[Install] durability", Serial, func() {
 			Expect(rteContainer.Image).To(BeIdenticalTo(e2eimages.RTETestImageCI))
 		})
 
-		It("should be able to delete NUMAResourceOperator CR and redeploy without polluting cluster state", func() {
+		It("should be able to delete NUMAResourceOperator CR and redeploy without polluting cluster state", func(ctx context.Context) {
 			nname := client.ObjectKeyFromObject(nroObj)
 			Expect(nname.Name).NotTo(BeEmpty())
 
-			err := e2eclient.Client.Get(context.TODO(), objects.NROObjectKey(), nroObj)
+			err := e2eclient.Client.Get(ctx, objects.NROObjectKey(), nroObj)
 			Expect(err).ToNot(HaveOccurred())
 
 			By("waiting for the DaemonSet to be created..")
@@ -290,7 +293,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 				objs := mf.ToObjects()
 				for _, obj := range objs {
 					key := client.ObjectKeyFromObject(obj)
-					if err := e2eclient.Client.Get(context.TODO(), key, obj); !errors.IsNotFound(err) {
+					if err := e2eclient.Client.Get(ctx, key, obj); !errors.IsNotFound(err) {
 						if err == nil {
 							klog.InfoS("obj still exists", "key", key.String())
 						} else {
@@ -302,40 +305,51 @@ var _ = Describe("[Install] durability", Serial, func() {
 				return true
 			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
 
-			By("redeploy with other parameters")
+			By("redeploy with a different parameter to verify it's not a stale cached redeploy")
 			nroObjRedep := objects.TestNRO(objects.NROWithMCPSelector(objects.EmptyMatchLabels()))
 			nroObjRedep.Spec = *nroObj.Spec.DeepCopy()
-			// TODO change to an image which is test dedicated
-			nroObjRedep.Spec.ExporterImage = e2eimages.RTETestImageCI
+			nroObjRedep.Spec.LogLevel = operatorv1.Trace
 
 			var mcps []*machineconfigv1.MachineConfigPool
 			if inthelper.IsCustomPolicyEnabled(nroObj) {
 				// need to get MCPs before the mutation
-				mcps, err = nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
+				mcps, err = nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, nroObj.Spec.NodeGroups)
 				Expect(err).NotTo(HaveOccurred())
 			}
 
-			err = e2eclient.Client.Create(context.TODO(), nroObjRedep)
+			err = e2eclient.Client.Create(ctx, nroObjRedep)
 			Expect(err).ToNot(HaveOccurred())
 
 			if inthelper.IsCustomPolicyEnabled(nroObj) {
-				Expect(deploy.WaitForMCPsCondition(e2eclient.Client, context.TODO(), machineconfigv1.MachineConfigPoolUpdated, mcps...)).To(Succeed())
+				Expect(deploy.WaitForMCPsCondition(e2eclient.Client, ctx, machineconfigv1.MachineConfigPoolUpdated, mcps...)).To(Succeed())
 			}
 
-			Eventually(func() bool {
+			Eventually(func() error {
 				updatedNroObj := &nropv1.NUMAResourcesOperator{}
-				err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), updatedNroObj)
-				Expect(err).ToNot(HaveOccurred())
-
-				ds, err := getDaemonSetByOwnerReference(updatedNroObj.GetUID())
-				if err != nil {
-					// TODO: multi-line value in structured log
-					klog.ErrorS(err, "failed to get the RTE DaemonSet", "nroYAML", objects.ToYAML(updatedNroObj))
-					return false
+				if err := e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(nroObj), updatedNroObj); err != nil {
+					return err
 				}
 
-				return ds.Spec.Template.Spec.Containers[0].Image == e2eimages.RTETestImageCI
-			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(BeTrue())
+				redepDs, err := getDaemonSetByOwnerReference(updatedNroObj.GetUID())
+				if err != nil {
+					return fmt.Errorf("failed to get the RTE DaemonSet: %w", err)
+				}
+				if !nrowait.AreDaemonSetPodsReady(&redepDs.Status) {
+					return fmt.Errorf("DaemonSet not ready after redeploy")
+				}
+
+				cnt := redepDs.Spec.Template.Spec.Containers[0]
+				rteFlags := flagcodec.ParseArgvKeyValue(cnt.Args, flagcodec.WithFlagNormalization)
+				kLvl := loglevel.ToKlog(operatorv1.Trace)
+				val, found := rteFlags.GetFlag("-v")
+				if !found {
+					return fmt.Errorf("-v flag not found in container %q args", cnt.Name)
+				}
+				if val.Data != kLvl.String() {
+					return fmt.Errorf("LogLevel not reflected in -v flag of container %q: got %q expected %q", cnt.Name, val.Data, kLvl.String())
+				}
+				return nil
+			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 		})
 		It("should have the desired topology manager configuration under the NRT object", func() {
 			rteConfigMap := &corev1.ConfigMap{}
