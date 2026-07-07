@@ -142,7 +142,10 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests, tree nodegroupv1.
 	if mf.Core.MachineConfig == nil {
 		return ret, pausedMCPNames
 	}
-	isCustomPolicy := annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
+	isCustomPolicy := false
+	if tree.NodeGroup != nil {
+		isCustomPolicy = annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
+	}
 	for _, mcp := range tree.MachineConfigPools {
 		if mcp.Spec.Paused {
 			pausedMCPNames.Insert(mcp.Name)

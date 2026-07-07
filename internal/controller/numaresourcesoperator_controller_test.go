@@ -2343,6 +2343,19 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(progressingCond).ToNot(BeNil())
 				Expect(progressingCond.Status).To(Equal(metav1.ConditionTrue))
 
+				By("Verify pool1 DaemonSet does not exist yet")
+				mcp1DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+					Namespace: testNamespace,
+				}
+				err = reconciler.Client.Get(ctx, mcp1DSKey, ds)
+				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "unexpected error: %v", err)
+
+				By("Verify global Available condition is false")
+				availableCond := getConditionByType(nro.Status.Conditions, status.ConditionAvailable)
+				Expect(availableCond).ToNot(BeNil())
+				Expect(availableCond.Status).To(Equal(metav1.ConditionFalse))
+
 				By("Make pool1 ready and reconcile again")
 				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(mcp1), mcp1)).To(Succeed())
 				ensureMCPIsReady(mcp1, nro.Name)
@@ -2351,7 +2364,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
 
 				By("Now both DaemonSets exist and status is Available")
-				mcp1DSKey := client.ObjectKey{
+				mcp1DSKey = client.ObjectKey{
 					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
 					Namespace: testNamespace,
 				}

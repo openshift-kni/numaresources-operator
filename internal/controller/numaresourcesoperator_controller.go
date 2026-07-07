@@ -839,7 +839,9 @@ func (r *NUMAResourcesOperatorReconciler) applyObjects(ctx context.Context, inst
 	defer klog.V(4).InfoS("Applyied objects", "count", len(objStates))
 	for _, objState := range objStates {
 		if objState.Error != nil {
-			klog.Warningf("error loading object: %v", objState.Error)
+			if !objState.IsNotFoundError() {
+				return fmt.Errorf("failed to load object state for %s/%s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), objState.Error)
+			}
 		}
 		if objState.UpdateError != nil {
 			return fmt.Errorf("failed to update (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), objState.UpdateError)
@@ -919,7 +921,7 @@ func shouldReplaceStep(current, candidate intreconcile.Step) bool {
 		return true
 	}
 	if candidate.Ongoing() && current.Ongoing() {
-		return candidate.Result.RequeueAfter < current.Result.RequeueAfter
+		return candidate.Result.RequeueAfter > 0 && candidate.Result.RequeueAfter < current.Result.RequeueAfter
 	}
 	return false
 }
