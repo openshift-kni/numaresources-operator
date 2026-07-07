@@ -55,6 +55,8 @@ they found it before they run.
   the cluster and will be used as a resource of type `device-type-3` in the tests.
 - `E2E_RTE_CI_IMAGE` (accepts string, e.g `quay.io/openshift-kni/resource-topology-exporter:test-ci`) sets the 
   RTE image to be used for testing purposes particularly for modifying the operator object.
+- `E2E_OPERATOR_SUBSCRIPTION_NAME` (accepts string) sets the subscription name of the installed operator that in case of updates needed on the subscription (such as setting `spec.config.env`) the specified subscription would be used. 
+- `E2E_VALIDATE_SCHEDULER_IMAGE` if set to `true`, the manager controller will be validating the scheduler image. Most useful to run the tests using the production flow. 
   
 ### Tests tagging 
 
