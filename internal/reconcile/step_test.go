@@ -48,6 +48,12 @@ func TestStepOngoingIsOngoing(t *testing.T) {
 	assert.False(t, st.Failed())
 }
 
+func TestStepOngoingZeroDurationIsOngoing(t *testing.T) {
+	st := StepOngoing(0)
+	assert.True(t, st.Ongoing())
+	assert.False(t, st.Done())
+}
+
 func TestStepFailedIsFailed(t *testing.T) {
 	st := StepFailed(errors.New("fake error"))
 	assert.True(t, st.Failed())
