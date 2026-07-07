@@ -19,6 +19,7 @@ package nrosched
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -185,6 +186,13 @@ func CheckNROSchedulerAvailable(ctx context.Context, cli client.Client, schedObj
 	Expect(dpNName.Name).ToNot(BeEmpty(), "scheduler deployment missing: %q", dpNName.String())
 
 	return nroSchedObj
+}
+
+func IsSchedulerImageValidationEnabled() bool {
+	if v, ok := os.LookupEnv("E2E_VALIDATE_SCHEDULER_IMAGE"); ok && v == "true" {
+		return true
+	}
+	return false
 }
 
 func eventToString(ev corev1.Event) string {

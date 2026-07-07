@@ -44,6 +44,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
+	testconsts "github.com/openshift-kni/numaresources-operator/test/internal/consts"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -184,7 +185,7 @@ var _ = Describe("[must-gather] NRO data collected", func() {
 					}
 					podFolderNames = append(podFolderNames, podFolder.Name())
 				}
-				Expect(podFolderNames).To(ContainElement(MatchRegexp("^numaresources-controller-manager*")))
+				Expect(podFolderNames).To(ContainElement(MatchRegexp("^" + testconsts.OperatorDeploymentName + "*")))
 				Expect(podFolderNames).To(ContainElement(MatchRegexp("^secondary-scheduler*")))
 			}
 		})

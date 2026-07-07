@@ -24,8 +24,11 @@ import (
 	_ "github.com/openshift-kni/numaresources-operator/test/e2e/serial/tests"
 	_ "github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 
+	intsched "github.com/openshift-kni/numaresources-operator/internal/api/scheduler"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	e2eenvvar "github.com/openshift-kni/numaresources-operator/test/internal/envvar"
+	e2esched "github.com/openshift-kni/numaresources-operator/test/internal/nrosched"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -46,6 +49,21 @@ var _ = BeforeSuite(func() {
 	Expect(serialconfig.CheckNodesTopology(ctx)).Should(Succeed())
 	serialconfig.Setup()
 	setupExecuted = true
+
+	if !e2esched.IsSchedulerImageValidationEnabled() {
+		// for e2e verification we disable the image validation because handling pulling images in the CI from the
+		// production registry is troublesome, and so is handling changing the digests on each branch. Testing e2e
+		// for the image validation will be handled in a separate test.
+		By("identify the source of operator installation and disable scheduler image validation")
+		var err error
+		restoreFunc, err := e2eenvvar.SetOperatorEnvVar(ctx, e2eclient.Client, intsched.SchedulerImageValidationEnvVar, "false")
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(func(cleanupCtx context.Context) {
+			By("restoring scheduler image validation settings")
+			Expect(restoreFunc(cleanupCtx)).To(Succeed())
+		})
+	}
+
 })
 
 var _ = AfterSuite(func() {
