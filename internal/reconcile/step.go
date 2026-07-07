@@ -45,7 +45,7 @@ func (rs Step) EarlyStop() bool {
 
 // Ongoing returns true if the reconciliation is still ongoing/progressing
 func (rs Step) Ongoing() bool {
-	return rs.Result.RequeueAfter > 0
+	return rs.ConditionInfo.Type == status.ConditionProgressing
 }
 
 // Failed returns true if the reconciliation was not succesfull
