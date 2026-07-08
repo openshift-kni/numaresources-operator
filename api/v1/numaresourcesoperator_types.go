@@ -56,10 +56,10 @@ const (
 	// PodsFingerprintingDisabled disables the pod fingerprinting reporting.
 	PodsFingerprintingDisabled PodsFingerprintingMode = "Disabled"
 
-	// PodsFingerprintingEnabled enables the pod fingerprint considering all the pods running on nodes. It is the default.
+	// PodsFingerprintingEnabled enables the pod fingerprint considering all the pods running on nodes.
 	PodsFingerprintingEnabled PodsFingerprintingMode = "Enabled"
 
-	// PodsFingerprintingEnabledExclusiveResources enables the pod fingerprint considering only pods which have exclusive resources assigned.
+	// PodsFingerprintingEnabledExclusiveResources enables the pod fingerprint considering only pods which have exclusive resources assigned. It is the default.
 	PodsFingerprintingEnabledExclusiveResources PodsFingerprintingMode = "EnabledExclusiveResources"
 )
 
