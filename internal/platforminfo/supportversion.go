@@ -33,7 +33,7 @@ const (
 	// first OCP build to have the fix is always the nightly build. Yet that doesn't necessarily mean that builds of other lanes
 	// (e.i CI) that produce the build after the specific nightly build date will certainly
 	// have the fix, thus we need to track them separately.
-	// releases that are already have thier first build GA do not have dev-preview or release-candidate builds
+	// releases that are already have their first build GA do not have dev-preview or release-candidate builds
 	StableSupportSince  = "4.19.10"
 	NightlySupportSince = "4.19.0-0.nightly-2025-08-14-135013"
 	CISupportSince      = "4.19.0-0.ci-2025-09-01-150951" // *** the earliest that was found available at time of writing this
