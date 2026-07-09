@@ -317,8 +317,7 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	existing := rtestate.FromClient(ctx, r.Client, r.Platform, r.RTEManifests, instance, trees, r.Namespace)
 
 	if r.Platform == platform.OpenShift {
-		var step intreconcile.Step
-		step = r.reconcileResourceMachineConfig(ctx, instance, existing, trees)
+		step := r.reconcileResourceMachineConfig(ctx, instance, existing, trees)
 		if step.EarlyStop() {
 			updateStatusConditionsIfNeeded(instance, step.ConditionInfo)
 			return step
