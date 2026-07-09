@@ -205,6 +205,9 @@ var _ = Describe("[Install] durability", Serial, func() {
 		})
 
 		AfterEach(func() {
+			if deployer == nil {
+				return
+			}
 			deployer.Teardown(context.TODO(), 5*time.Minute)
 		})
 
