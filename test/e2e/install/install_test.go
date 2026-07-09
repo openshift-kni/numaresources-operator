@@ -21,8 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	ginkgotypes "github.com/onsi/ginkgo/v2/types"
-
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -185,7 +183,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 		})
 
 		AfterEach(func() {
-			if CurrentSpecReport().State.Is(ginkgotypes.SpecStateSkipped) {
+			if deployer == nil {
 				return
 			}
 			deployer.Teardown(context.TODO(), 5*time.Minute)
