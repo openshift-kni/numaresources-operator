@@ -51,6 +51,12 @@ import (
 
 const (
 	systemNodeCriticalPriorityClassName = "system-node-critical"
+	customLowPriorityClassName          = "e2e-preemption-low"
+	customMediumPriorityClassName       = "e2e-preemption-medium"
+	customHighPriorityClassName         = "e2e-preemption-high"
+
+	pendingTimeout   = 5 * time.Minute
+	pendingPollIntvl = 10 * time.Second
 )
 
 var _ = Describe("[serial][disruptive][preemption] priority-based workload placement functionality", Serial, Label("disruptive", "scheduler"), Label("feature:preemption"), func() {
@@ -66,22 +72,43 @@ var _ = Describe("[serial][disruptive][preemption] priority-based workload place
 		Expect(err).ToNot(HaveOccurred(), "unable to setup test fixture")
 
 		Expect(fxt.Client.List(ctx, &nrtList)).ToNot(HaveOccurred())
+
+		By("creating custom priority classes")
+		Expect(fxt.Client.Create(ctx, &schedulingv1.PriorityClass{
+			ObjectMeta: metav1.ObjectMeta{Name: customLowPriorityClassName},
+			Value:      100,
+		})).To(Succeed(), "cannot create low priority class %q", customLowPriorityClassName)
+
+		Expect(fxt.Client.Create(ctx, &schedulingv1.PriorityClass{
+			ObjectMeta: metav1.ObjectMeta{Name: customMediumPriorityClassName},
+			Value:      200,
+		})).To(Succeed(), "cannot create medium priority class %q", customMediumPriorityClassName)
+
+		Expect(fxt.Client.Create(ctx, &schedulingv1.PriorityClass{
+			ObjectMeta: metav1.ObjectMeta{Name: customHighPriorityClassName},
+			Value:      300,
+		})).To(Succeed(), "cannot create high priority class %q", customHighPriorityClassName)
 	})
 
-	AfterEach(func() {
+	AfterEach(func(ctx context.Context) {
+		By("deleting custom priority classes")
+		for _, pcName := range []string{customLowPriorityClassName, customMediumPriorityClassName, customHighPriorityClassName} {
+			if pcName == "" {
+				continue
+			}
+			pc := &schedulingv1.PriorityClass{}
+			err := fxt.Client.Get(ctx, client.ObjectKey{Name: pcName}, pc)
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			Expect(err).ToNot(HaveOccurred(), "cannot get priority class %q", pcName)
+			Expect(fxt.Client.Delete(ctx, pc)).To(Succeed(), "cannot delete priority class %q", pcName)
+		}
+
 		Expect(e2efixture.Teardown(fxt)).ToNot(HaveOccurred())
 	})
 
 	When("one node is schedulable and the other is unschedulable", func() {
-		const (
-			customLowPriorityClassName    = "e2e-preemption-low"
-			customMediumPriorityClassName = "e2e-preemption-medium"
-			customHighPriorityClassName   = "e2e-preemption-high"
-
-			pendingTimeout   = 5 * time.Minute
-			pendingPollIntvl = 10 * time.Second
-		)
-
 		var (
 			targetNodeName string
 			uncordonFunc   func()
@@ -146,22 +173,6 @@ var _ = Describe("[serial][disruptive][preemption] priority-based workload place
 					klog.InfoS("uncordoned node", "nodeName", nodeName)
 				}
 			}
-
-			By("creating custom priority classes")
-			Expect(fxt.Client.Create(ctx, &schedulingv1.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{Name: customLowPriorityClassName},
-				Value:      100,
-			})).To(Succeed(), "cannot create low priority class %q", customLowPriorityClassName)
-
-			Expect(fxt.Client.Create(ctx, &schedulingv1.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{Name: customMediumPriorityClassName},
-				Value:      200,
-			})).To(Succeed(), "cannot create medium priority class %q", customMediumPriorityClassName)
-
-			Expect(fxt.Client.Create(ctx, &schedulingv1.PriorityClass{
-				ObjectMeta: metav1.ObjectMeta{Name: customHighPriorityClassName},
-				Value:      300,
-			})).To(Succeed(), "cannot create high priority class %q", customHighPriorityClassName)
 		})
 
 		AfterEach(func(ctx context.Context) {
@@ -169,20 +180,6 @@ var _ = Describe("[serial][disruptive][preemption] priority-based workload place
 			if uncordonFunc != nil {
 				uncordonFunc()
 				uncordonFunc = nil
-			}
-
-			By("deleting custom priority classes")
-			for _, pcName := range []string{customLowPriorityClassName, customMediumPriorityClassName, customHighPriorityClassName} {
-				if pcName == "" {
-					continue
-				}
-				pc := &schedulingv1.PriorityClass{}
-				err := fxt.Client.Get(ctx, client.ObjectKey{Name: pcName}, pc)
-				if apierrors.IsNotFound(err) {
-					continue
-				}
-				Expect(err).ToNot(HaveOccurred(), "cannot get priority class %q", pcName)
-				Expect(fxt.Client.Delete(ctx, pc)).To(Succeed(), "cannot delete priority class %q", pcName)
 			}
 		})
 
@@ -475,7 +472,99 @@ var _ = Describe("[serial][disruptive][preemption] priority-based workload place
 					To(Succeed(), "failed to have the filler pods running")
 			})
 		})
+
+		When("pods are created in bursts", func() {
+			It("should not falsely evict pods because the cache in not yet updated", func(ctx context.Context) {
+				// Create a burst of pods with low priority that all requesting the same amount of resources
+				// derived from the base load's CPUs. Then additional couple of pods that request the same
+				// resources but with higher priority. The goal of this test is to ensure that even when the
+				// NRT cache is not updated, the preemption logic also fails and would not evict pods on dirty state.
+
+				baseload, err := intbaseload.ForNode(fxt.Client, ctx, targetNodeName)
+				Expect(err).ToNot(HaveOccurred(), "cannot get base load for %q", targetNodeName)
+				klog.InfoS("node base load", "nodeName", targetNodeName, "resources", baseload.Resources)
+
+				// the less resources the more challenging it is for the preemption logic on dirty state
+				perPodCPURequest := baseload.CPU().DeepCopy()
+
+				targetNRT, err := e2enrt.FindFromList(nrtList.Items, targetNodeName)
+				Expect(err).ToNot(HaveOccurred(), "no NRT data for target node %q", targetNodeName)
+
+				totalCPUCount := 0
+				for _, zone := range targetNRT.Zones {
+					minCount := 0
+					for _, ri := range zone.Resources {
+						if ri.Name != "cpu" {
+							continue
+						}
+
+						total := perPodCPURequest.DeepCopy()
+						count := 0
+						for {
+							totalWithBaseload := total.DeepCopy()
+							totalWithBaseload.Add(baseload.CPU())
+							if ri.Available.Cmp(totalWithBaseload) < 0 {
+								// high enough number of pods to trigger a chance of a race and challenge the preemption logic
+								if count < 4 {
+									e2efixture.Skipf(fxt, "not enough available resources in zone %s to fit the test pods: %s", zone.Name, ri.Available.String())
+								}
+								break
+							}
+							count++
+							klog.InfoS("current count calculation", "zone", zone.Name, "resourceName", ri.Name, "currentCount", count)
+							total.Add(perPodCPURequest.DeepCopy())
+						}
+						klog.InfoS("pod count per resource", "zone", zone.Name, "resourceName", ri.Name, "currentCount", count, "currenMinCount", minCount)
+						if minCount == 0 || count < minCount {
+							minCount = count
+							klog.InfoS("new min count", "zone", zone.Name, "resourceName", ri.Name, "newMinCount", minCount)
+						}
+					}
+					totalCPUCount += minCount
+				}
+
+				podtemplate := objects.NewTestPodPause(fxt.Namespace.Name, "test-workload")
+				podtemplate.Spec.SchedulerName = serialconfig.Config.SchedulerName
+				podtemplate.Spec.PriorityClassName = customLowPriorityClassName
+				singlePodResources := corev1.ResourceList{
+					corev1.ResourceName("cpu"):    perPodCPURequest,
+					corev1.ResourceName("memory"): resource.MustParse("32Mi"), // arbitrary small memory request
+				}
+
+				podtemplate.Spec.Containers[0].Resources = corev1.ResourceRequirements{
+					Limits:   singlePodResources,
+					Requests: singlePodResources,
+				}
+
+				pods := []*corev1.Pod{}
+				for i := 0; i < totalCPUCount; i++ {
+					pod := podtemplate.DeepCopy()
+					pod.Name = fmt.Sprintf("pod-%d", i)
+
+					// last 2 pods make them with high priority
+					if i > totalCPUCount-3 {
+						pod.Spec.PriorityClassName = customHighPriorityClassName
+					}
+					Expect(fxt.Client.Create(ctx, pod)).To(Succeed(), "cannot create test workload pod")
+					pods = append(pods, pod)
+				}
+
+				klog.Info("waiting for the pods to be running")
+				failedPodIds := e2efixture.WaitForPaddingPodsRunning(ctx, fxt, pods)
+				Expect(failedPodIds).To(BeEmpty(), "some padding pods have failed to run")
+
+				klog.Info("waiting for the NRT data to settle")
+				e2efixture.MustSettleNRT(fxt)
+
+				klog.Info("ensure all pods are kept running")
+				for _, pod := range pods {
+					Expect(fxt.Client.Get(ctx, client.ObjectKeyFromObject(pod), pod)).To(Succeed(), "cannot get pod %q", pod.Name)
+					Expect(pod.Status.Phase).To(Equal(corev1.PodRunning), "pod %s/%s is not running", pod.Namespace, pod.Name)
+				}
+			})
+		})
 	})
+
 })
 
 func ensurePodsNotEvicted(ctx context.Context, c client.Client, pods []*corev1.Pod, podNameToOriginalUID map[string]types.UID, timeout, pollInterval time.Duration) error {
