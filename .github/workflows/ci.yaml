@@ -57,7 +57,7 @@ jobs:
         run: echo ${{ env.BRANCH_NAME }}
 
       - name: Verify commits
-        run: TRIGGER_BRANCH=${{ env.BRANCH_NAME }} ./hack/verify-commits.sh
+        run: UPSTREAM_COMMIT=origin/${{ github.base_ref }} TRIGGER_BRANCH=${{ env.BRANCH_NAME }} ./hack/verify-commits.sh
 
   test-units:
     runs-on: ubuntu-latest
