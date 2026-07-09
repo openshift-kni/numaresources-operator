@@ -4,7 +4,9 @@ on:
   pull_request:
     branches:
       - main
-      - "release-4.1[8]"
+      - "release-4.20"
+      - "release-4.19"
+      - "release-4.18"
   push:
     branches: 
       - main
@@ -57,7 +59,7 @@ jobs:
         run: echo ${{ env.BRANCH_NAME }}
 
       - name: Verify commits
-        run: TRIGGER_BRANCH=${{ env.BRANCH_NAME }} ./hack/verify-commits.sh
+        run: UPSTREAM_COMMIT=origin/${{ github.base_ref }} TRIGGER_BRANCH=${{ env.BRANCH_NAME }} ./hack/verify-commits.sh
 
   test-units:
     runs-on: ubuntu-latest
