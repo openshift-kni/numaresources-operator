@@ -1,7 +1,7 @@
 package dpm_test
 
 import (
-	"golang.org/x/net/context"
+	"context"
 
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 
@@ -24,23 +24,23 @@ func (dp *FakeDevicePlugin) Start() error {
 	return nil
 }
 
-func (dp *FakeDevicePlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
+func (dp *FakeDevicePlugin) ListAndWatch(_ *pluginapi.Empty, _ pluginapi.DevicePlugin_ListAndWatchServer) error {
 	return nil
 }
 
-func (dp *FakeDevicePlugin) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
+func (dp *FakeDevicePlugin) Allocate(_ context.Context, _ *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	return nil, nil
 }
 
-func (FakeDevicePlugin) GetDevicePluginOptions(context.Context, *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
+func (FakeDevicePlugin) GetDevicePluginOptions(_ context.Context, _ *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
 	return nil, nil
 }
 
-func (FakeDevicePlugin) PreStartContainer(context.Context, *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
+func (FakeDevicePlugin) PreStartContainer(_ context.Context, _ *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
 	return nil, nil
 }
 
-func (dp *FakeDevicePlugin) GetPreferredAllocation(ctx context.Context, request *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
+func (dp *FakeDevicePlugin) GetPreferredAllocation(_ context.Context, _ *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
 	return nil, nil
 }
 
