@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -240,25 +241,29 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				g.Expect(isNROOperSyncedAt(&updatedOperObj.Status, status.ConditionAvailable, updatedOperObj.Generation)).To(Succeed())
 			}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update RTE daemonset node selector")
 
-			dss, err := objects.GetDaemonSetsByNamespacedName(fxt.Client, ctx, updatedOperObj.Status.DaemonSets...)
-			Expect(err).ToNot(HaveOccurred())
+			// Eventually is not strictly needed but till all the supported version report ObservedGeneration in status
+			// (aka oldest supported version is 4.20) we can't really depend on `isNROOperUpToDate`
+			Eventually(func(g Gomega) {
+				dss, err := objects.GetDaemonSetsByNamespacedName(fxt.Client, ctx, updatedOperObj.Status.DaemonSets...)
+				g.Expect(err).ToNot(HaveOccurred())
 
-			Expect(dss).To(HaveLen(len(nroOperObj.Spec.NodeGroups)), "daemonsets found owned by NRO object doesn't align with specified NodeGroups")
-			for _, ds := range dss {
-				e2efixture.By("check RTE daemonset %q", ds.Name)
-				if ds.Name == objectnames.GetComponentName(updatedOperObj.Name, roleMCPTest) {
-					By("check the correct match labels for the new RTE daemonset")
-					Expect(ds.Spec.Template.Spec.NodeSelector).To(Equal(testMCP.Spec.NodeSelector.MatchLabels))
+				g.Expect(dss).To(HaveLen(len(nroOperObj.Spec.NodeGroups)), "daemonsets found owned by NRO object doesn't align with specified NodeGroups")
+				for _, ds := range dss {
+					e2efixture.By("check RTE daemonset %q", ds.Name)
+					if ds.Name == objectnames.GetComponentName(updatedOperObj.Name, roleMCPTest) {
+						By("check the correct match labels for the new RTE daemonset")
+						g.Expect(ds.Spec.Template.Spec.NodeSelector).To(Equal(testMCP.Spec.NodeSelector.MatchLabels))
+					}
+					By("check the correct image")
+					cnt := ds.Spec.Template.Spec.Containers[0] // shortcut
+					g.Expect(cnt.Image).To(Equal(serialconfig.GetRteCiImage()))
+
+					By("checking the correct LogLevel")
+					found, match := matchLogLevelToKlog(&cnt, newLogLevel)
+					g.Expect(found).To(BeTrue(), "-v flag doesn't exist in container %q args under DaemonSet: %q", cnt.Name, ds.Name)
+					g.Expect(match).To(BeTrue(), "LogLevel %s doesn't match the existing -v flag in container: %q managed by DaemonSet: %q", updatedOperObj.Spec.LogLevel, cnt.Name, ds.Name)
 				}
-				By("check the correct image")
-				cnt := ds.Spec.Template.Spec.Containers[0] // shortcut
-				Expect(cnt.Image).To(Equal(serialconfig.GetRteCiImage()))
-
-				By("checking the correct LogLevel")
-				found, match := matchLogLevelToKlog(&cnt, newLogLevel)
-				Expect(found).To(BeTrue(), "-v flag doesn't exist in container %q args under DaemonSet: %q", cnt.Name, ds.Name)
-				Expect(match).To(BeTrue(), "LogLevel %s doesn't match the existing -v flag in container: %q managed by DaemonSet: %q", updatedOperObj.Spec.LogLevel, cnt.Name, ds.Name)
-			}
+			}).WithTimeout(10*time.Minute).WithPolling(30*time.Second).Should(Succeed(), "failed to update RTE daemonset node selector")
 		})
 
 		It("should converge with mixed SELinux policy across node groups", Label(label.Tier2, label.OpenShift), func(ctx context.Context) {
@@ -1944,6 +1949,10 @@ func isNROOperSyncedAt(nropStatus *nropv1.NUMAResourcesOperatorStatus, condition
 	}
 	if cond.Status != metav1.ConditionTrue {
 		return errors.New("condition not true")
+	}
+	// TODO: until all the version reports ObservedGeneration
+	if serialconfig.Config != nil && !slices.Contains(serialconfig.Config.ClusterTopics.Active, "operobsgen") {
+		return nil
 	}
 	if cond.ObservedGeneration != gen {
 		return fmt.Errorf("condition at %d expected %d", cond.ObservedGeneration, gen)
