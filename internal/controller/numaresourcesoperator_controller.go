@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -74,6 +75,13 @@ import (
 	"github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 )
 
+const (
+	// ExporterImageRestrictionEnvVar is the environment variable that controls whether the exporter image restriction is enabled.
+	// If it is set to "false", the exporter image restriction is disabled; any other value is considered as enabled.
+	// Remove at after 5.4, preferably at 5.2.
+	ExporterImageRestrictionEnvVar = "EXPORTER_IMAGE_RESTRICTION"
+)
+
 const numaResourcesRetryPeriod = 1 * time.Minute
 
 // poolDaemonSet a struct to hold the target MCP of a configured node group and its created respective RTE daemonset
@@ -85,15 +93,16 @@ type poolDaemonSet struct {
 // NUMAResourcesOperatorReconciler reconciles a NUMAResourcesOperator object
 type NUMAResourcesOperatorReconciler struct {
 	client.Client
-	Scheme          *runtime.Scheme
-	Platform        platform.Platform
-	APIManifests    apimanifests.Manifests
-	RTEManifests    rtestate.Manifests
-	Namespace       string
-	Images          images.Data
-	ImagePullPolicy corev1.PullPolicy
-	Recorder        record.EventRecorder
-	ForwardMCPConds bool
+	Scheme              *runtime.Scheme
+	Platform            platform.Platform
+	APIManifests        apimanifests.Manifests
+	RTEManifests        rtestate.Manifests
+	Namespace           string
+	Images              images.Data
+	ImagePullPolicy     corev1.PullPolicy
+	Recorder            record.EventRecorder
+	ForwardMCPConds     bool
+	OverridableRTEImage bool
 	// RTEMetricsTLS is derived from apiserver.config.openshift.io/cluster TLS profile at operator
 	// startup (same source as the operator metrics server and scheduler).
 	RTEMetricsTLS objtls.Settings
@@ -162,6 +171,13 @@ func (r *NUMAResourcesOperatorReconciler) Reconcile(ctx context.Context, req ctr
 	if annotations.IsPauseReconciliationEnabled(instance.Annotations) {
 		klog.V(2).InfoS("Pause reconciliation enabled", "object", req.NamespacedName)
 		return ctrl.Result{}, nil
+	}
+
+	if !r.OverridableRTEImage && instance.Spec.ExporterImage != "" {
+		// intentionally mention the env var override only in the logs
+		klog.V(4).InfoS("custom operand image is not supported use env var to override", "image", instance.Spec.ExporterImage, "envVar", ExporterImageRestrictionEnvVar, "shouldHaveValue", "false")
+		err := fmt.Errorf("custom operand image is not supported: %s", instance.Spec.ExporterImage)
+		return r.degradeStatus(ctx, initialInstance, instance, status.ReasonCustomUserImage, err)
 	}
 
 	if err := validation.NodeGroups(instance.Spec.NodeGroups, r.Platform); err != nil {
@@ -836,4 +852,13 @@ func getTreesByNodeGroup(ctx context.Context, cli client.Client, nodeGroups []nr
 	default:
 		return nil, fmt.Errorf("unsupported platform")
 	}
+}
+
+func IsRTEImageOverridable() bool {
+	var overridable bool
+	if val, ok := os.LookupEnv(ExporterImageRestrictionEnvVar); ok && val == "false" {
+		overridable = true
+	}
+	klog.InfoS("Exporter image", "overridable", overridable)
+	return overridable
 }
