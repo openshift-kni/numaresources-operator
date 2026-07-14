@@ -86,8 +86,9 @@ type kubeletConfigHandler struct {
 }
 
 // Namespace Scoped
-//+kubebuilder:rbac:groups="",resources=configmaps,verbs=create;delete;get;list;update;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=create;delete;update,namespace="numaresources"
 // Cluster Scoped
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 //+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=kubeletconfigs,verbs=get;list;watch
 //+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=kubeletconfigs/finalizers,verbs=update
 
