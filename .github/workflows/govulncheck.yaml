@@ -14,7 +14,7 @@ on:
       - main
 
 env:
-  GOLANG_VERSION: 1.25.11
+  GOLANG_VERSION: 1.25.12
 
 defaults:
   run:
