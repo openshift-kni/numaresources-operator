@@ -38,7 +38,6 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 	ctrltls "github.com/openshift/controller-runtime-common/pkg/tls"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -48,6 +47,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -68,6 +68,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
+	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
@@ -289,6 +290,7 @@ func main() {
 	if !ok {
 		namespace = defaultNamespace
 	}
+	klog.InfoS("namespace detected", "namespace", namespace)
 
 	rteManifests, err := rtemanifests.GetManifests(discoveredCluster.Platform, discoveredCluster.ShortVersion, namespace, false, true)
 	if err != nil {
@@ -340,12 +342,16 @@ func main() {
 
 	webhookTLSOpts := append(webhookTLSOpts(params.enableHTTP2), tlsConfig)
 
+	cacheNamespaces := map[string]cache.Config{
+		namespace: {},
+	}
+	if discoveredCluster.Platform == platform.HyperShift {
+		cacheNamespaces[controller.HyperShiftKubeletConfigConfigMapNamespace] = cache.Config{}
+	}
+
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Cache: cache.Options{
-			DefaultNamespaces: map[string]cache.Config{
-				namespace:            {},
-				metav1.NamespaceNone: {},
-			},
+			DefaultNamespaces: cacheNamespaces,
 		},
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -393,7 +399,6 @@ func main() {
 	if err = (&controller.NUMAResourcesOperatorReconciler{
 		Client:       mgr.GetClient(),
 		Scheme:       mgr.GetScheme(),
-		Recorder:     mgr.GetEventRecorderFor("numaresources-controller"),
 		APIManifests: apiManifests,
 		RTEManifests: rtestate.Manifests{
 			Core:    rteManifestsRendered,
@@ -413,11 +418,23 @@ func main() {
 	if err = (&controller.KubeletConfigReconciler{
 		Client:    mgr.GetClient(),
 		Scheme:    mgr.GetScheme(),
-		Recorder:  mgr.GetEventRecorderFor("kubeletconfig-controller"),
 		Namespace: namespace,
 		Platform:  discoveredCluster.Platform,
 	}).SetupWithManager(mgr); err != nil {
 		klog.ErrorS(err, "unable to create controller", "controller", "KubeletConfig")
+		exitWithCancel(cancel, 1)
+	}
+
+	// intentionally done unconditionally to catch the unlikely case someone managed
+	// to disable the scheduler pre-upgrade (very hard task anyway, but still) to
+	// ensure no dangerous leftovers
+	if err = mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+		if err := schedstate.Cleanup(ctx, mgr.GetClient()); err != nil {
+			klog.ErrorS(err, "best-effort scheduler cleanup failed")
+		}
+		return nil
+	})); err != nil {
+		klog.ErrorS(err, "unable to add scheduler cleanup runnable")
 		exitWithCancel(cancel, 1)
 	}
 

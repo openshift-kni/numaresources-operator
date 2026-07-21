@@ -78,15 +78,24 @@ type NUMAResourcesSchedulerReconciler struct {
 }
 
 // Namespace Scoped
-//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=*,namespace="numaresources"
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,resourceNames=scheduler-default-deny-all;scheduler-egress-to-api-server,verbs=get;update,namespace="numaresources"
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,resourceNames=topology-aware-scheduler-leader-elect,verbs=get;update,namespace="numaresources"
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups=apps,resources=deployments,resourceNames=secondary-scheduler,verbs=get;update,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,resourceNames=secondary-scheduler,verbs=get;update,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=create;get;list;update;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=endpoints,verbs=create,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=endpoints,resourceNames=numa-scheduler-leader,verbs=get;update,namespace="numaresources"
 
 // Cluster Scoped
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
-//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=*
-//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
-//+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
-//+kubebuilder:rbac:groups="",resources=nodes,verbs=list;watch
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=create;list;watch
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,resourceNames=topology-aware-scheduler,verbs=get;update
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=create;list;watch
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,resourceNames=topology-aware-scheduler,verbs=get;update
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,resourceNames=secondary-scheduler,verbs=delete
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers,verbs=get;list;watch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesschedulers/finalizers,verbs=update
@@ -373,12 +382,14 @@ func (r *NUMAResourcesSchedulerReconciler) syncNUMASchedulerResources(ctx contex
 
 	existing := schedstate.FromClient(ctx, r.Client, r.SchedulerManifests)
 	for _, objState := range existing.State(r.SchedulerManifests) {
-		if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
-			return schedStatus, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+		if objState.IsCreateOrUpdate() {
+			if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
+				return schedStatus, fmt.Errorf("failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+			}
 		}
-		obj, _, err := apply.ApplyObject(ctx, r.Client, objState)
+		obj, _, err := apply.ApplyState(ctx, r.Client, objState)
 		if err != nil {
-			return schedStatus, fmt.Errorf("could not apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err)
+			return schedStatus, fmt.Errorf("could not apply scheduler object: %w", err)
 		}
 
 		if nname, ok := schedstate.DeploymentNamespacedNameFromObject(obj); ok {

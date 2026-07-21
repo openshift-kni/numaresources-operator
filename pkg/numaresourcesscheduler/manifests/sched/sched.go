@@ -33,7 +33,6 @@ type Manifests struct {
 	ServiceAccount         *corev1.ServiceAccount
 	ConfigMap              *corev1.ConfigMap
 	ClusterRole            *rbacv1.ClusterRole
-	ClusterRoleBindingK8S  *rbacv1.ClusterRoleBinding
 	ClusterRoleBindingNRT  *rbacv1.ClusterRoleBinding
 	Role                   *rbacv1.Role
 	RoleBinding            *rbacv1.RoleBinding
@@ -47,7 +46,6 @@ func (mf Manifests) ToObjects() []client.Object {
 		mf.ServiceAccount,
 		mf.ConfigMap,
 		mf.ClusterRole,
-		mf.ClusterRoleBindingK8S,
 		mf.ClusterRoleBindingNRT,
 		mf.Role,
 		mf.RoleBinding,
@@ -62,7 +60,6 @@ func (mf Manifests) Clone() Manifests {
 		ServiceAccount:         mf.ServiceAccount.DeepCopy(),
 		ConfigMap:              mf.ConfigMap.DeepCopy(),
 		ClusterRole:            mf.ClusterRole.DeepCopy(),
-		ClusterRoleBindingK8S:  mf.ClusterRoleBindingK8S.DeepCopy(),
 		ClusterRoleBindingNRT:  mf.ClusterRoleBindingNRT.DeepCopy(),
 		Role:                   mf.Role.DeepCopy(),
 		RoleBinding:            mf.RoleBinding.DeepCopy(),
@@ -87,11 +84,6 @@ func GetManifests(namespace string) (Manifests, error) {
 	}
 
 	mf.ClusterRole, err = manifests.ClusterRole()
-	if err != nil {
-		return mf, err
-	}
-
-	mf.ClusterRoleBindingK8S, err = manifests.ClusterRoleBindingK8S(namespace)
 	if err != nil {
 		return mf, err
 	}

@@ -34,7 +34,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -100,7 +99,6 @@ type NUMAResourcesOperatorReconciler struct {
 	Namespace           string
 	Images              images.Data
 	ImagePullPolicy     corev1.PullPolicy
-	Recorder            record.EventRecorder
 	ForwardMCPConds     bool
 	OverridableRTEImage bool
 	// RTEMetricsTLS is derived from apiserver.config.openshift.io/cluster TLS profile at operator
@@ -109,24 +107,31 @@ type NUMAResourcesOperatorReconciler struct {
 }
 
 // Namespace Scoped
-//+kubebuilder:rbac:groups="",resources=services,verbs=*,namespace="numaresources"
-//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=*,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=services,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=services,resourceNames=numaresources-rte-metrics-service,verbs=get;update,namespace="numaresources"
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,resourceNames=rte-default-deny-all;rte-egress-to-api-server,verbs=get;update,namespace="numaresources"
+//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=create;delete;get;list;update;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,resourceNames=rte,verbs=get;update,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,resourceNames=rte,verbs=get;update,namespace="numaresources"
 
 // Cluster Scoped
 //+kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get;list;watch
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=list
 //+kubebuilder:rbac:groups=config.openshift.io,resources=clusteroperators,verbs=get
 //+kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=get
-//+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=machineconfigs,verbs=*
+//+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=machineconfigs,verbs=create;delete;get;list;update;watch
 //+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=machineconfigpools,verbs=get;list;watch
-//+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=*
-//+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=*
-//+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=*
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=*
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=*
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=*
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=*
-//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=*
+//+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=create;list;watch
+//+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=resource-topology-exporter;resource-topology-exporter-v2,verbs=get;update
+//+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=create;list;watch
+//+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,resourceNames=noderesourcetopologies.topology.node.k8s.io,verbs=get;update
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=create
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,resourceNames=rte,verbs=get;update
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,verbs=create
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterrolebindings,resourceNames=rte,verbs=get;update
 //+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=list
 //+kubebuilder:rbac:groups=nodetopology.openshift.io,resources=numaresourcesoperators,verbs=get;list;watch
@@ -232,18 +237,13 @@ func (r *NUMAResourcesOperatorReconciler) degradeStatus(ctx context.Context, ini
 
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceAPI(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) intreconcile.Step {
 	if annotations.IsNRTAPIDefinitionCluster(instance.Annotations) {
-		// should never happen, so let's be vocal. Very vocal.
-		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "SkipCRDInstall", "Skipped to install Node Resource Topology CRD: caused by annotation")
+		klog.InfoS("Skipped NRT CRD install: caused by annotation")
 		return intreconcile.StepSuccess()
 	}
-	applied, err := r.syncNodeResourceTopologyAPI(ctx)
+	_, err := r.syncNodeResourceTopologyAPI(ctx)
 	if err != nil {
-		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedCRDInstall", "Failed to install Node Resource Topology CRD: %v", err)
 		err = fmt.Errorf("FailedAPISync: %w", err)
 		return intreconcile.StepFailed(err)
-	}
-	if applied {
-		r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulCRDInstall", "Node Resource Topology CRD installed")
 	}
 	return intreconcile.StepSuccess()
 }
@@ -253,11 +253,9 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 	// before checking additional components for updates
 	waitByPool, pausedMCPNames, err := r.syncMachineConfigs(ctx, instance, existing, trees)
 	if err != nil {
-		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedMCSync", "Failed to set up machine configuration for worker nodes: %v", err)
 		err = fmt.Errorf("failed to sync machine configs: %w", err)
 		return intreconcile.StepFailed(err)
 	}
-	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulMCSync", "Enabled machine configuration for worker nodes")
 
 	// MCO needs to update the SELinux context removal and other stuff, and need to trigger a reboot.
 	// It can take a while.
@@ -277,7 +275,6 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceMachineConfig(ctx con
 func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, existing *rtestate.ExistingManifests, trees []nodegroupv1.Tree) ([]poolDaemonSet, intreconcile.Step) {
 	daemonSetsInfoPerPool, err := r.syncNUMAResourcesOperatorResources(ctx, instance, existing, trees)
 	if err != nil {
-		r.Recorder.Eventf(instance, corev1.EventTypeWarning, "FailedRTECreate", "Failed to create Resource-Topology-Exporter DaemonSets: %v", err)
 		err = fmt.Errorf("FailedRTESync: %w", err)
 		return nil, intreconcile.StepFailed(err)
 	}
@@ -285,8 +282,6 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResourceDaemonSet(ctx context
 	if len(daemonSetsInfoPerPool) == 0 {
 		return nil, intreconcile.StepSuccess()
 	}
-
-	r.Recorder.Eventf(instance, corev1.EventTypeNormal, "SuccessfulRTECreate", "Created Resource-Topology-Exporter DaemonSets")
 
 	dssWithReadyStatus, dsNamePending, err := r.syncDaemonSetsStatuses(ctx, r.Client, daemonSetsInfoPerPool)
 	instance.Status.DaemonSets = dssWithReadyStatus
