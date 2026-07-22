@@ -64,6 +64,7 @@ import (
 	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
 
+	schedulerapi "github.com/openshift-kni/numaresources-operator/internal/api/scheduler"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
@@ -446,6 +447,11 @@ func main() {
 		}
 		klog.InfoS("manifests loaded", "component", "Scheduler")
 
+		iv := schedulerapi.GetImageValidationData()
+		if !iv.Enabled {
+			klog.InfoS("scheduler image validation is disabled. To enable it unset the environment variable", "controller", "NUMAResourcesScheduler", "envvar", schedulerapi.SchedulerImageValidationEnvVar)
+		}
+
 		if err = (&controller.NUMAResourcesSchedulerReconciler{
 			Client:             mgr.GetClient(),
 			Scheme:             mgr.GetScheme(),
@@ -453,6 +459,7 @@ func main() {
 			Namespace:          namespace,
 			PlatformInfo:       platforminfo.New(discoveredCluster.Platform, discoveredCluster.LongVersion),
 			TLSSettings:        tlsSettings,
+			ImageValidation:    iv,
 		}).SetupWithManager(mgr); err != nil {
 			klog.ErrorS(err, "unable to create controller", "controller", "NUMAResourcesScheduler")
 			exitWithCancel(cancel, 1)

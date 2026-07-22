@@ -48,9 +48,10 @@ const (
 
 // TODO: are we duping these?
 const (
-	ReasonAsExpected      = "AsExpected"
-	ReasonInternalError   = "InternalError"
-	ReasonCustomUserImage = "CustomUserImage"
+	ReasonAsExpected            = "AsExpected"
+	ReasonInternalError         = "InternalError"
+	ReasonCustomUserImage       = "CustomUserImage"
+	ReasonInvalidSchedulerImage = "InvalidSchedulerImage"
 )
 
 const (

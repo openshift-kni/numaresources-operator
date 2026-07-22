@@ -49,6 +49,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	schedulerapi "github.com/openshift-kni/numaresources-operator/internal/api/scheduler"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
@@ -66,6 +67,11 @@ import (
 
 const testSchedulerName = "testSchedulerName"
 
+func getSchedulerTestImage() string {
+	iv := schedulerapi.GetImageValidationData()
+	return "some/url@" + iv.Digests.UnsortedList()[0]
+}
+
 func NewFakeNUMAResourcesSchedulerReconciler(initObjects ...runtime.Object) (*NUMAResourcesSchedulerReconciler, error) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithStatusSubresource(&nropv1.NUMAResourcesScheduler{}).WithRuntimeObjects(initObjects...).Build()
 	schedMf, err := schedmanifests.GetManifests(testNamespace)
@@ -82,13 +88,14 @@ func NewFakeNUMAResourcesSchedulerReconciler(initObjects ...runtime.Object) (*NU
 			MinVersion:   tls.VersionTLS13,
 			CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
 		}),
+		ImageValidation: schedulerapi.GetImageValidationData(),
 	}, nil
 }
 
 var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 	Context("with unexpected NRS CR name", func() {
 		It("should reject creating the CR", func() {
-			nrs := testobjs.NewNUMAResourcesScheduler("test", "some/url:latest", testSchedulerName, 9*time.Second)
+			nrs := testobjs.NewNUMAResourcesScheduler("test", getSchedulerTestImage(), testSchedulerName, 9*time.Second)
 			err := k8sClient.Create(context.TODO(), nrs)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("the object name must be 'numaresourcesscheduler'."))
@@ -97,7 +104,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 	Context("with status conditions updates", func() {
 		It("should fix degraded condition on progressing scheduler", func() {
-			nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 9*time.Second)
+			nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", getSchedulerTestImage(), testSchedulerName, 9*time.Second)
 			reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nrs)
 			Expect(err).ToNot(HaveOccurred())
 
@@ -132,6 +139,61 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			Expect(degradedCondition.Reason).To(Equal(status.ConditionDegraded))
 			Expect(degradedCondition.Message).To(BeEmpty())
 		})
+
+		When("scheduler image validation is enabled - default case", func() {
+			It("should degrade status when image is not pinned by SHA256 digest", func(ctx context.Context) {
+				image := "some/url:v4.22.0"
+				nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", image, testSchedulerName, 9*time.Second)
+				reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nrs)
+				Expect(err).ToNot(HaveOccurred())
+				key := client.ObjectKeyFromObject(nrs)
+				_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(reconciler.Client.Get(ctx, key, nrs)).To(Succeed())
+				degradedCondition := getConditionByType(nrs.Status.Conditions, status.ConditionDegraded)
+				Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+				Expect(degradedCondition.Reason).To(Equal(status.ReasonInvalidSchedulerImage))
+				Expect(degradedCondition.Message).To(ContainSubstring("image %q must be referenced by digest, not by tag", image))
+			})
+
+			It("should degrade status when image is pinned by untrusted SHA256 digest", func(ctx context.Context) {
+				image := "some/url@sha256:0000000000000000000000000000000000000000000000000000000000000000"
+				nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", image, testSchedulerName, 9*time.Second)
+				reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(nrs)
+				Expect(err).ToNot(HaveOccurred())
+				key := client.ObjectKeyFromObject(nrs)
+				_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(reconciler.Client.Get(ctx, key, nrs)).To(Succeed())
+				degradedCondition := getConditionByType(nrs.Status.Conditions, status.ConditionDegraded)
+				Expect(degradedCondition.Status).To(Equal(metav1.ConditionTrue))
+				Expect(degradedCondition.Reason).To(Equal(status.ReasonInvalidSchedulerImage))
+				Expect(degradedCondition.Message).To(ContainSubstring("is not in the trusted list"))
+			})
+		})
+
+		When("scheduler image validation is OFF", func() {
+			It("should NOT degrade status when image digest is not found among trusted digests", func(ctx context.Context) {
+				testSHA := "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+				nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url@"+testSHA, testSchedulerName, 9*time.Second)
+				initObjects := []runtime.Object{nrs}
+				initObjects = append(initObjects, fakeNodes(3, 3)...)
+				reconciler, err := NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
+				Expect(err).ToNot(HaveOccurred())
+
+				reconciler.ImageValidation.Enabled = false
+
+				key := client.ObjectKeyFromObject(nrs)
+				_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+				Expect(err).ToNot(HaveOccurred())
+
+				Expect(reconciler.Client.Get(ctx, key, nrs)).To(Succeed())
+				degradedCondition := getConditionByType(nrs.Status.Conditions, status.ConditionDegraded)
+				Expect(degradedCondition.Status).To(Equal(metav1.ConditionFalse))
+			})
+		})
 	})
 
 	Context("with correct NRS CR", func() {
@@ -141,7 +203,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 		BeforeEach(func() {
 			var err error
-			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", getSchedulerTestImage(), testSchedulerName, 11*time.Second)
 			initObjects := []runtime.Object{nrs}
 			initObjects = append(initObjects, fakeNodes(numOfMasters, 3)...)
 			reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
@@ -796,7 +858,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 		BeforeEach(func() {
 			var err error
-			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", getSchedulerTestImage(), testSchedulerName, 11*time.Second)
 			initObjects := []runtime.Object{nrs}
 			initObjects = append(initObjects, fakeNodes(numOfMasters, 3)...)
 			reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
@@ -884,7 +946,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 			DescribeTable("should configure by default the informerMode to the expected when field is not set", func(reconcilerPlatInfo platforminfo.PlatformInfo, expectedInformer string) {
 				var err error
-				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", getSchedulerTestImage(), testSchedulerName, 11*time.Second)
 				initObjects := []runtime.Object{nrs}
 				initObjects = append(initObjects, fakeNodes(numOfMasters, 3)...)
 				reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
@@ -922,7 +984,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 			DescribeTable("should preserve informerMode value if set", func(reconcilerPlatInfo platforminfo.PlatformInfo) {
 				var err error
-				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", getSchedulerTestImage(), testSchedulerName, 11*time.Second)
 				infMode := nropv1.SchedulerInformerDedicated
 				nrs.Spec.SchedulerInformer = &infMode
 				initObjects := []runtime.Object{nrs}
@@ -949,7 +1011,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 			DescribeTable("should allow to update the informerMode to be Dedicated after an overridden default", func(reconcilerPlatInfo platforminfo.PlatformInfo) {
 				var err error
-				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", getSchedulerTestImage(), testSchedulerName, 11*time.Second)
 				initObjects := []runtime.Object{nrs}
 				initObjects = append(initObjects, fakeNodes(numOfMasters, 3)...)
 				reconciler, err = NewFakeNUMAResourcesSchedulerReconciler(initObjects...)
@@ -999,7 +1061,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 		var reconciler *NUMAResourcesSchedulerReconciler
 
 		BeforeEach(func() {
-			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 5*time.Second)
+			nrs = testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", getSchedulerTestImage(), testSchedulerName, 5*time.Second)
 			nrsKey = client.ObjectKeyFromObject(nrs)
 			initObjects := []runtime.Object{nrs}
 			initObjects = append(initObjects, fakeNodes(3, 3)...)
@@ -1138,7 +1200,7 @@ var _ = Describe("Test computeSchedulerReplicas", func() {
 		}
 		DescribeTable(
 			"should not allow more replicas than the number of nodes", func(ctx context.Context, tc testCase) {
-				nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+				nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", getSchedulerTestImage(), testSchedulerName, 11*time.Second)
 				nrs.Spec.Replicas = tc.explicitReplicas
 				initObjects := []runtime.Object{nrs}
 				initObjects = append(initObjects, fakeNodes(tc.numControlPlane, tc.numWorker)...)
@@ -1227,7 +1289,7 @@ var _ = Describe("Test computeSchedulerReplicas", func() {
 		)
 
 		It("should degrade when nodes are scaled down with higher number of explicit replicas", func(ctx context.Context) {
-			nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", "some/url:latest", testSchedulerName, 11*time.Second)
+			nrs := testobjs.NewNUMAResourcesScheduler("numaresourcesscheduler", getSchedulerTestImage(), testSchedulerName, 11*time.Second)
 			initialReplicas := int32(3)
 			nrs.Spec.Replicas = ptr.To(initialReplicas)
 			initObjects := []runtime.Object{nrs}
