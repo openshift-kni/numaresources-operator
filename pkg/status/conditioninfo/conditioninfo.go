@@ -49,6 +49,18 @@ func (ci ConditionInfo) WithMessage(message string) ConditionInfo {
 	return ret
 }
 
+// UpdateMessage overrides the ConditionInfo message with the given value.
+// If a message is already set, the new value is prepended to it.
+func (ci ConditionInfo) UpdateMessage(message string) ConditionInfo {
+	ret := ci
+	if ret.Message != "" {
+		ret.Message = message + "; " + ret.Message
+	} else {
+		ret.Message = message
+	}
+	return ret
+}
+
 // Available returns a ConditionInfo ready to build
 // an Available condition
 func Available() ConditionInfo {

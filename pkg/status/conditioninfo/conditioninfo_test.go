@@ -51,6 +51,20 @@ func TestProgressing(t *testing.T) {
 	assert.NotEmpty(t, cond.Reason)
 }
 
+func TestUpdateMessageEmpty(t *testing.T) {
+	cond := ConditionInfo{}
+	cond2 := cond.UpdateMessage("foobar")
+	assert.Empty(t, cond.Message) // original object not mutated
+	assert.Equal(t, cond2.Message, "foobar")
+}
+
+func TestUpdateMessageExisting(t *testing.T) {
+	cond := ConditionInfo{Message: "existing error"}
+	cond2 := cond.UpdateMessage("summary")
+	assert.Equal(t, cond.Message, "existing error") // original object not mutated
+	assert.Equal(t, cond2.Message, "summary; existing error")
+}
+
 func TestDegradedFromError(t *testing.T) {
 	cond1 := DegradedFromError(nil)
 	assert.Equal(t, cond1.Type, status.ConditionDegraded)
