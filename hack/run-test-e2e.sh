@@ -54,6 +54,7 @@ if [ "$ENABLE_SCHED_TESTS" = true ]; then
   # --flake-attempts: rerun the test if it fails
   # -requireSuite: fail if tests are not executed because of missing suite
   ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.flake-attempts=2 --ginkgo.junit-report=${REPORT_DIR}/e2e-sched.xml
+  ${BIN_DIR}/e2e-nrop-sched-image-validation.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.flake-attempts=2 --ginkgo.junit-report=${REPORT_DIR}/e2e-sched-image-validation.xml
 
   if [ "$ENABLE_CLEANUP" = true ]; then
     echo "Running NROScheduler uninstall test suite";
