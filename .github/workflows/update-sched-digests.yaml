@@ -1,0 +1,62 @@
+name: Watch and Update embedded Scheduler Images Digests JSON File
+
+on:
+  # Option A: Run periodically to "watch" for external updates
+  schedule:
+    - cron: '0 */4 * * *' 
+  
+  # Option B:Useful for manually triggering the workflow 
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  GOLANG_VERSION: 1.25.11
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  generate-and-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: Install skopeo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      
+      - name: Log in to registry.redhat.io
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: registry.redhat.io
+          username: ${{ secrets.REGISTRY_PRD_USERNAME }}
+          password: ${{ secrets.REGISTRY_PRD_PASSWORD }}
+
+      - name: Run make target the updated file
+        run: make update-scheduler-digests
+
+      - name: Create Pull Request (if changes detected)
+        # This action automatically checks if the file changed. 
+        # No diff = No PR created.
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "New scheduler images are detected in the production registry. Update the embedded digests JSON file to reflect the latest version."
+          title: "chore: update embedded scheduler images digests JSON file"
+          body: |
+            New scheduler images are detected in the production registry. Update the embedded digests JSON file to reflect the latest version.
+          branch: "update-sched-digests-main"
+          # Deletes the branch automatically once you merge the PR
+          delete-branch: true
+          labels: "chore, ok-to-test" # TODO: once proved stable, add "lgtm" and "approved" labels
