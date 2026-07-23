@@ -56,7 +56,7 @@ jobs:
           title: "chore: update embedded scheduler images digests JSON file"
           body: |
             New scheduler images are detected in the production registry. Update the embedded digests JSON file to reflect the latest version.
-          branch:"update-sched-digests-main"
+          branch: "update-sched-digests-main"
           # Deletes the branch automatically once you merge the PR
           delete-branch: true
           labels: "chore, ok-to-test" # TODO: once proved stable, add "lgtm" and "approved" labels
