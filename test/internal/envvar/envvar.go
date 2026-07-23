@@ -278,7 +278,7 @@ func waitForDeploymentRolloutAfterSubscriptionUpdate(ctx context.Context, cli cl
 	}
 
 	err := k8swait.PollUntilContextTimeout(ctx, 10*time.Second, 15*time.Minute, true, func(aContext context.Context) (bool, error) {
-		if err := cli.Get(ctx, client.ObjectKeyFromObject(dp), dp); err != nil {
+		if err := cli.Get(aContext, client.ObjectKeyFromObject(dp), dp); err != nil {
 			klog.Warningf("failed getting the deployment %s: %v", dp.Name, err)
 			return false, nil
 		}
