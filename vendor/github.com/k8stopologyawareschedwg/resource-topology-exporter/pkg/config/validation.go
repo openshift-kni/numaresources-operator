@@ -28,19 +28,18 @@ import (
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/resourcemonitor"
 )
 
+func Canonicalize(pArgs *ProgArgs) {
+	pArgs.RTE.MetricsMode = strings.ToLower(pArgs.RTE.MetricsMode)
+	pArgs.Resourcemonitor.PodSetFingerprintMethod = strings.ToLower(pArgs.Resourcemonitor.PodSetFingerprintMethod)
+}
+
 func Validate(pArgs *ProgArgs) error {
-	var err error
-
-	pArgs.RTE.MetricsMode, err = metricssrv.ServingModeIsSupported(pArgs.RTE.MetricsMode)
-	if err != nil {
+	if _, err := metricssrv.ServingModeIsSupported(pArgs.RTE.MetricsMode); err != nil {
 		return err
 	}
-
-	pArgs.Resourcemonitor.PodSetFingerprintMethod, err = resourcemonitor.PFPMethodIsSupported(pArgs.Resourcemonitor.PodSetFingerprintMethod)
-	if err != nil {
+	if _, err := resourcemonitor.PFPMethodIsSupported(pArgs.Resourcemonitor.PodSetFingerprintMethod); err != nil {
 		return err
 	}
-
 	return nil
 }
 

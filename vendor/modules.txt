@@ -196,10 +196,14 @@ github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/client
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/scheme
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/typed/topology/v1alpha1
 github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned/typed/topology/v1alpha2
+# github.com/k8stopologyawareschedwg/numaplacement v0.1.0
+## explicit; go 1.21
+github.com/k8stopologyawareschedwg/numaplacement
+github.com/k8stopologyawareschedwg/numaplacement/leb89
 # github.com/k8stopologyawareschedwg/podfingerprint v0.2.3
 ## explicit; go 1.18
 github.com/k8stopologyawareschedwg/podfingerprint
-# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.24.0
+# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.25.0
 ## explicit; go 1.25.0
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/dump
@@ -211,6 +215,7 @@ github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/metrics
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/metrics/server
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/notification
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/nrtupdater
+github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/numalocality
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podreadiness
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/filter
@@ -734,6 +739,7 @@ k8s.io/apimachinery/pkg/util/httpstream/spdy
 k8s.io/apimachinery/pkg/util/httpstream/wsstream
 k8s.io/apimachinery/pkg/util/intstr
 k8s.io/apimachinery/pkg/util/json
+k8s.io/apimachinery/pkg/util/jsonmergepatch
 k8s.io/apimachinery/pkg/util/managedfields
 k8s.io/apimachinery/pkg/util/managedfields/internal
 k8s.io/apimachinery/pkg/util/mergepatch

@@ -24,6 +24,7 @@
     "netpols",
     "introspection",
     "mgselinuxcollect",
-    "tlscompliance"
+    "tlscompliance",
+    "preemption"
   ]
 }

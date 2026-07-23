@@ -13,7 +13,7 @@ require (
 	github.com/k8stopologyawareschedwg/deployer v0.24.0
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2
 	github.com/k8stopologyawareschedwg/podfingerprint v0.2.3
-	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.24.0
+	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.25.0
 	github.com/mdomke/git-semver v1.0.0
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.39.1
@@ -78,6 +78,7 @@ require (
 	github.com/jeremywohl/flatten/v2 v2.0.0-20211013061545-07e4a09fb8e4 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/k8stopologyawareschedwg/numaplacement v0.1.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/moby/spdystream v0.5.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
