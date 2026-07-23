@@ -1,0 +1,19 @@
+{
+  "summary": {
+    "matched": 0,
+    "total": 1
+  },
+  "results": [
+    {
+      "status": "MISMATCH-MESSAGE",
+      "backport": {
+        "hash": "aaa1111",
+        "subject": "fix: alpha (backport note)"
+      },
+      "main": {
+        "hash": "bbb2222",
+        "subject": "fix: alpha"
+      }
+    }
+  ]
+}
