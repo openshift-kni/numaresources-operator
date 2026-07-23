@@ -21,6 +21,7 @@ const (
 	// remove in: 4.24 (tentative) or when 4.18 becomes the last supported version
 	SELinuxPolicyConfigAnnotation = "config.node.openshift-kni.io/selinux-policy"
 	SELinuxPolicyCustom           = "custom"
+	SELinuxPolicyIgnore           = "ignore"
 
 	// introduced in: 4.18
 	// remove in: 5.2 (when branching 5.1 plan to address this https://redhat.atlassian.net/browse/CNF-23341 in main)
@@ -48,6 +49,13 @@ const (
 
 func IsCustomPolicyEnabled(annot map[string]string) bool {
 	if v, ok := annot[SELinuxPolicyConfigAnnotation]; ok && v == SELinuxPolicyCustom {
+		return true
+	}
+	return false
+}
+
+func MustIgnoreCustomPolicy(annot map[string]string) bool {
+	if v, ok := annot[SELinuxPolicyConfigAnnotation]; ok && v == SELinuxPolicyIgnore {
 		return true
 	}
 	return false
