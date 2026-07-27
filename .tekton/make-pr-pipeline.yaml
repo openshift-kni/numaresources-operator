@@ -1,0 +1,58 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: trigger-make-pr
+  annotations:
+    # Trigger manually via "/retest" comment or a standard git push
+    pipelinesascode.tekton.dev/on-event: "[push]"
+    pipelinesascode.tekton.dev/on-target-branch: "[main]"
+    # Fetch the public git-clone task AND your local custom task
+    pipelinesascode.tekton.dev/task: "[git-clone, tasks/make-and-create-pr.yaml]"
+spec:
+  params:
+  - name: repo_url
+    value: "{{ repo_url }}"
+  - name: revision
+    value: "{{ revision }}"
+  workspaces:
+  - name: source-workspace
+    volumeClaimTemplate:
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 1Gi
+  - name: basic-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
+  pipelineSpec:
+    workspaces:
+    - name: source-workspace
+    - name: basic-auth
+    tasks:
+    - name: clone-repo
+      taskRef:
+        name: git-clone
+      workspaces:
+        - name: output
+          workspace: source-workspace
+        - name: basic-auth
+          workspace: basic-auth
+      params:
+        - name: url
+          value: "$(params.repo_url)"
+        - name: revision
+          value: "$(params.revision)"
+    
+    - name: run-make-target-and-pr
+      runAfter: [clone-repo]
+      taskRef:
+        name: make-and-create-pr
+      workspaces:
+        - name: source
+          workspace: source-workspace
+        - name: basic-auth
+          workspace: basic-auth
+      params:
+        - name: repo-url
+          value: "https://api.github.com/repos/openshift-kni/numaresources-operator"
