@@ -328,6 +328,16 @@ rules:
   - update
 - apiGroups:
   - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - ""
   resourceNames:
   - rte
   resources:
@@ -347,7 +357,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - serviceaccounts
   - services
   verbs:
   - create
@@ -425,7 +434,9 @@ rules:
   - roles
   verbs:
   - create
+  - get
   - list
+  - update
   - watch
 - apiGroups:
   - rbac.authorization.k8s.io
