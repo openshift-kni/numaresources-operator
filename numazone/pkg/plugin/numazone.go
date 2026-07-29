@@ -26,24 +26,24 @@ import (
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 
-	"github.com/openshift-kni/numaresources-operator/numacell/pkg/dpm"
-	numacellapi "github.com/openshift-kni/numaresources-operator/pkg/numacell/api"
+	"github.com/openshift-kni/numaresources-operator/numazone/pkg/dpm"
+	numazoneapi "github.com/openshift-kni/numaresources-operator/pkg/numazone/api"
 )
 
-// NUMACellLister is the object responsible for discovering initial pool of devices and their allocation.
-type NUMACellLister struct {
+// NUMAZoneLister is the object responsible for discovering initial pool of devices and their allocation.
+type NUMAZoneLister struct {
 	topoInfo    *topology.Info
 	nameToID    map[string]int64
 	deviceCount int
 }
 
-func NewNUMACellLister(topoInfo *topology.Info, deviceCount int) NUMACellLister {
+func NewNUMAZoneLister(topoInfo *topology.Info, deviceCount int) NUMAZoneLister {
 	if deviceCount <= 0 {
-		klog.InfoS("invalid devices count, forced reset", "devicesPerNUMACell", numacellapi.NUMACellDefaultDeviceCount)
-		deviceCount = numacellapi.NUMACellDefaultDeviceCount
+		klog.InfoS("invalid devices count, forced reset", "devicesPerNUMAZone", numazoneapi.NUMAZoneDefaultDeviceCount)
+		deviceCount = numazoneapi.NUMAZoneDefaultDeviceCount
 	}
-	klog.InfoS("detected device count ", "devicesPerNUMACell", deviceCount)
-	return NUMACellLister{
+	klog.InfoS("detected device count ", "devicesPerNUMAZone", deviceCount)
+	return NUMAZoneLister{
 		topoInfo:    topoInfo,
 		nameToID:    make(map[string]int64),
 		deviceCount: deviceCount,
@@ -52,55 +52,55 @@ func NewNUMACellLister(topoInfo *topology.Info, deviceCount int) NUMACellLister 
 
 type message struct{}
 
-// NUMACellDevicePlugin is an implementation of DevicePlugin that is capable of exposing devices to containers.
-type NUMACellDevicePlugin struct {
+// NUMAZoneDevicePlugin is an implementation of DevicePlugin that is capable of exposing devices to containers.
+type NUMAZoneDevicePlugin struct {
 	pluginapi.UnimplementedDevicePluginServer
 	deviceID    string
-	numacellID  int64
+	numaNodeID  int64
 	deviceCount int
 	update      chan message
 }
 
-func (ncl NUMACellLister) GetResourceNamespace() string {
-	return numacellapi.NUMACellResourceNamespace
+func (nzl NUMAZoneLister) GetResourceNamespace() string {
+	return numazoneapi.NUMAZoneResourceNamespace
 }
 
-// Discovery discovers all NUMA cells within the system.
-func (ncl NUMACellLister) Discover(pluginListCh chan dpm.PluginNameList) {
-	for _, node := range ncl.topoInfo.Nodes {
-		deviceID := numacellapi.MakeDeviceID(node.ID)
-		ncl.nameToID[deviceID] = int64(node.ID)
+// Discover discovers all NUMA zones within the system.
+func (nzl NUMAZoneLister) Discover(pluginListCh chan dpm.PluginNameList) {
+	for _, node := range nzl.topoInfo.Nodes {
+		deviceID := numazoneapi.MakeDeviceID(node.ID)
+		nzl.nameToID[deviceID] = int64(node.ID)
 		pluginListCh <- dpm.PluginNameList{deviceID}
 	}
 }
 
-// NewPlugin initializes new device plugin with NUMACell specific attributes.
-func (ncl NUMACellLister) NewPlugin(deviceID string) dpm.PluginInterface {
-	numacellID, found := ncl.nameToID[deviceID]
-	klog.InfoS("Creating device plugin", "deviceID", deviceID, "NUMACellID", numacellID, "found", found)
-	return &NUMACellDevicePlugin{
+// NewPlugin initializes new device plugin with NUMA zone specific attributes.
+func (nzl NUMAZoneLister) NewPlugin(deviceID string) dpm.PluginInterface {
+	numaNodeID, found := nzl.nameToID[deviceID]
+	klog.InfoS("Creating device plugin", "deviceID", deviceID, "NUMANodeID", numaNodeID, "found", found)
+	return &NUMAZoneDevicePlugin{
 		deviceID:    deviceID,
-		numacellID:  numacellID,
+		numaNodeID:  numaNodeID,
 		update:      make(chan message),
-		deviceCount: ncl.deviceCount,
+		deviceCount: nzl.deviceCount,
 	}
 }
 
-func (dpi *NUMACellDevicePlugin) device(idx int) *pluginapi.Device {
+func (dpi *NUMAZoneDevicePlugin) device(idx int) *pluginapi.Device {
 	return &pluginapi.Device{
 		ID:     fmt.Sprintf("%s-%03d", dpi.deviceID, idx),
 		Health: pluginapi.Healthy,
 		Topology: &pluginapi.TopologyInfo{
 			Nodes: []*pluginapi.NUMANode{
 				{
-					ID: dpi.numacellID,
+					ID: dpi.numaNodeID,
 				},
 			},
 		},
 	}
 }
 
-func (dpi *NUMACellDevicePlugin) devices() []*pluginapi.Device {
+func (dpi *NUMAZoneDevicePlugin) devices() []*pluginapi.Device {
 	devs := []*pluginapi.Device{}
 	for cnt := 0; cnt < dpi.deviceCount; cnt++ {
 		devs = append(devs, dpi.device(cnt))
@@ -109,7 +109,7 @@ func (dpi *NUMACellDevicePlugin) devices() []*pluginapi.Device {
 }
 
 // ListAndWatch sends gRPC stream of devices.
-func (dpi *NUMACellDevicePlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
+func (dpi *NUMAZoneDevicePlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.DevicePlugin_ListAndWatchServer) error {
 	devs := dpi.devices()
 
 	// Send initial list of devices
@@ -118,7 +118,7 @@ func (dpi *NUMACellDevicePlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.De
 	klog.V(4).InfoS("ListAndWatchResponse", "data", resp)
 
 	if err := s.Send(resp); err != nil {
-		klog.ErrorS(err, "failed to list NUMA cells")
+		klog.ErrorS(err, "failed to list NUMA zones")
 		return err
 	}
 
@@ -134,7 +134,7 @@ func (dpi *NUMACellDevicePlugin) ListAndWatch(e *pluginapi.Empty, s pluginapi.De
 }
 
 // Allocate allocates a set of devices to be used by container runtime environment.
-func (dpi *NUMACellDevicePlugin) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
+func (dpi *NUMAZoneDevicePlugin) Allocate(ctx context.Context, r *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
 	var response pluginapi.AllocateResponse
 
 	dpi.update <- message{}
@@ -142,22 +142,22 @@ func (dpi *NUMACellDevicePlugin) Allocate(ctx context.Context, r *pluginapi.Allo
 	klog.V(4).InfoS("Allocate()", "request", r)
 	for _, container := range r.ContainerRequests {
 		if len(container.DevicesIds) != 1 {
-			return nil, fmt.Errorf("can't allocate more than 1 numacell")
+			return nil, fmt.Errorf("can't allocate more than 1 numazone device")
 		}
-		if !strings.HasPrefix(container.DevicesIds[0], numacellapi.NUMACellResourceName) {
-			return nil, fmt.Errorf("cannot allocate numacell %q", container.DevicesIds[0])
+		if !strings.HasPrefix(container.DevicesIds[0], numazoneapi.NUMAZoneResourceName) {
+			return nil, fmt.Errorf("cannot allocate numazone %q", container.DevicesIds[0])
 		}
 
 		dev := new(pluginapi.DeviceSpec)
-		dev.HostPath = numacellapi.NUMACellDevicePath      // TODO
-		dev.ContainerPath = numacellapi.NUMACellDevicePath // TODO
+		dev.HostPath = numazoneapi.NUMAZoneDevicePath
+		dev.ContainerPath = numazoneapi.NUMAZoneDevicePath
 		dev.Permissions = "rw"
 
 		containerResp := new(pluginapi.ContainerAllocateResponse)
 		containerResp.Devices = []*pluginapi.DeviceSpec{dev}
 		// this is only meant to improve debuggability
 		containerResp.Envs = map[string]string{
-			numacellapi.NUMACellEnvironVarName: fmt.Sprintf("%d", dpi.numacellID),
+			numazoneapi.NUMAZoneEnvironVarName: fmt.Sprintf("%d", dpi.numaNodeID),
 		}
 
 		response.ContainerResponses = append(response.ContainerResponses, containerResp)
@@ -168,7 +168,7 @@ func (dpi *NUMACellDevicePlugin) Allocate(ctx context.Context, r *pluginapi.Allo
 
 // GetDevicePluginOptions returns options to be communicated with Device
 // Manager
-func (NUMACellDevicePlugin) GetDevicePluginOptions(context.Context, *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
+func (NUMAZoneDevicePlugin) GetDevicePluginOptions(context.Context, *pluginapi.Empty) (*pluginapi.DevicePluginOptions, error) {
 	options := &pluginapi.DevicePluginOptions{
 		PreStartRequired:                false,
 		GetPreferredAllocationAvailable: false,
@@ -181,13 +181,13 @@ func (NUMACellDevicePlugin) GetDevicePluginOptions(context.Context, *pluginapi.E
 // guaranteed to be the allocation ultimately performed by the
 // devicemanager. It is only designed to help the devicemanager make a more
 // informed allocation decision when possible.
-func (NUMACellDevicePlugin) GetPreferredAllocation(context.Context, *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
+func (NUMAZoneDevicePlugin) GetPreferredAllocation(context.Context, *pluginapi.PreferredAllocationRequest) (*pluginapi.PreferredAllocationResponse, error) {
 	return nil, nil
 }
 
 // PreStartContainer is called, if indicated by Device Plugin during registeration phase,
 // before each container start. Device plugin can run device specific operations
 // such as reseting the device before making devices available to the container
-func (NUMACellDevicePlugin) PreStartContainer(context.Context, *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
+func (NUMAZoneDevicePlugin) PreStartContainer(context.Context, *pluginapi.PreStartContainerRequest) (*pluginapi.PreStartContainerResponse, error) {
 	return nil, nil
 }

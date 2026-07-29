@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	Prefix = "numacell-dp"
+	Prefix = "numazone-dp"
 )
 
 func ServiceAccount(namespace, name string) *corev1.ServiceAccount {
@@ -133,7 +133,7 @@ func DaemonSet(nodeSelector map[string]string, namespace, name, saName, image st
 						{
 							Name:    name + "-cnt",
 							Image:   image,
-							Command: []string{"/bin/numacell"},
+							Command: []string{"/bin/numazone"},
 							Args: []string{
 								"-alsologtostderr",
 								"-v", "3",

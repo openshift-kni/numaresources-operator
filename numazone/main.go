@@ -17,7 +17,7 @@ limitations under the License.
 package main
 
 import (
-	"github.com/openshift-kni/numaresources-operator/numacell/pkg/cmd"
+	"github.com/openshift-kni/numaresources-operator/numazone/pkg/cmd"
 )
 
 func main() {

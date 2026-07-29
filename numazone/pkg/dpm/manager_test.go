@@ -5,7 +5,7 @@ import (
 
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 
-	"github.com/openshift-kni/numaresources-operator/numacell/pkg/dpm"
+	"github.com/openshift-kni/numaresources-operator/numazone/pkg/dpm"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

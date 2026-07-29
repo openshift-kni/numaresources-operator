@@ -24,24 +24,24 @@ import (
 )
 
 const (
-	NUMACellDevicePath        = "/dev/null"
-	NUMACellResourceName      = "numacell"
-	NUMACellResourceNamespace = "kni.node"
+	NUMAZoneDevicePath        = "/dev/null"
+	NUMAZoneResourceName      = "numazone"
+	NUMAZoneResourceNamespace = "kni.node"
 
-	NUMACellEnvironVarName = "KNI_NODE_CELL_ID"
+	NUMAZoneEnvironVarName = "KNI_NODE_ZONE_ID"
 
-	NUMACellDefaultDeviceCount = 15
+	NUMAZoneDefaultDeviceCount = 15
 )
 
-func MakeResourceName(numacellid int) corev1.ResourceName {
-	return corev1.ResourceName(fmt.Sprintf("%s/%s", NUMACellResourceNamespace, MakeDeviceID(numacellid))) // TODO
+func MakeResourceName(numazoneid int) corev1.ResourceName {
+	return corev1.ResourceName(fmt.Sprintf("%s/%s", NUMAZoneResourceNamespace, MakeDeviceID(numazoneid)))
 }
 
-func MakeDeviceID(numacellid int) string {
-	return fmt.Sprintf("%s%02d", NUMACellResourceName, numacellid)
+func MakeDeviceID(numazoneid int) string {
+	return fmt.Sprintf("%s%02d", NUMAZoneResourceName, numazoneid)
 }
 
 func IsResourceName(resName string) bool {
-	tmpl := fmt.Sprintf("%s/%s", NUMACellResourceNamespace, NUMACellResourceName)
+	tmpl := fmt.Sprintf("%s/%s", NUMAZoneResourceNamespace, NUMAZoneResourceName)
 	return strings.HasPrefix(resName, tmpl)
 }
