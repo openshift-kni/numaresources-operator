@@ -73,6 +73,14 @@ spec:
         path: nodeGroups[0].config.infoRefreshPeriod
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
+      - description: |-
+          NUMAAwareDevicePlugin enables the NUMA-aware device plugin for this node group.
+          When enabled, a device plugin DaemonSet is deployed to nodes in this group,
+          exposing per-NUMA-zone devices for topology-aware workload placement.
+        displayName: NUMA-aware device plugin setting
+        path: nodeGroups[0].config.numaAwareDevicePlugin
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: PodsFingerprinting defines if pod fingerprint should be reported
           for the machines belonging to this group
         displayName: Enable or disable the pods fingerprinting setting
@@ -120,6 +128,10 @@ spec:
       - description: DaemonSet of the configured RTEs, for this node group
         displayName: RTE DaemonSets
         path: nodeGroups[0].daemonsets
+      - description: NUMAAwareDevicePluginDaemonSet is the DaemonSet for the NUMA-aware
+          device plugin, if enabled for this node group.
+        displayName: NUMA-aware device plugin DaemonSet
+        path: nodeGroups[0].numaAwareDevicePluginDaemonSet
       - description: PoolName represents the pool name to which the nodes belong that
           the config of this node group is be applied to
         displayName: Pool name of nodes in this node group
