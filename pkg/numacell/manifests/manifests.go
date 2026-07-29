@@ -27,21 +27,6 @@ const (
 	Prefix = "numacell-dp"
 )
 
-/*
- * The preferred approach would be to have the YAML manifests and to go embed them.
- * We are _intentionally_ not doing this, drifting from the best practice.
- * But the best practice applies for public-facing, library-wannabe packages.
- * This is a significantly different case:
- * - you should never ever consume these manifests outside e2e tests. Never ever.
- * - these manifests are doing nasty things, so they want to be as hidden as possible
- * - these manifests are expected to change rarely, if at all
- * - but more than else we want to hide the manifests and control their access as much
- *   as possible.
- *
- * We will reconsidering to bite the bullet and move them to plain YAML, go embed-able
- * files in the future.
- */
-
 func ServiceAccount(namespace, name string) *corev1.ServiceAccount {
 	sa := corev1.ServiceAccount{
 		// TODO: avoid to hardcode values
