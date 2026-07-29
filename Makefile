@@ -235,9 +235,9 @@ binary-nrovalidate: build-tools ## Build the nrovalidate binary.
 	go build -mod=vendor -o bin/nrovalidate -ldflags "$$LDFLAGS" -tags "$$GOTAGS" nrovalidate/main.go
 
 .PHONY: binary-numacell
-binary-numacell: build-tools ## Build the numacell test device plugin binary.
+binary-numacell: build-tools ## Build the numacell device plugin binary.
 	LDFLAGS="-s -w" \
-	CGO_ENABLED=0 go build -mod=vendor -o bin/numacell -ldflags "$$LDFLAGS" test/deviceplugin/cmd/numacell/main.go
+	CGO_ENABLED=0 go build -mod=vendor -o bin/numacell -ldflags "$$LDFLAGS" numacell/main.go
 
 .PHONY: binary-getdigests
 binary-getdigests: 
@@ -245,7 +245,7 @@ binary-getdigests:
 	go build -mod=vendor -o bin/getdigests -ldflags "$$LDFLAGS" tools/getdigests/getdigests.go
 
 .PHONY: binary-all
-binary-all: goversion binary binary-rte binary-nrovalidate introspect-data ## Build all component binaries.
+binary-all: goversion binary binary-rte binary-nrovalidate binary-numacell introspect-data ## Build all component binaries.
 
 .PHONY: binary-e2e-rte-local
 binary-e2e-rte-local: generate-source ## Build RTE local e2e test binary.
