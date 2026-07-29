@@ -30,10 +30,10 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/dpm"
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/plugin"
+	"github.com/openshift-kni/numaresources-operator/numacell/pkg/dpm"
+	"github.com/openshift-kni/numaresources-operator/numacell/pkg/plugin"
+	"github.com/openshift-kni/numaresources-operator/pkg/numacell/api"
+	"github.com/openshift-kni/numaresources-operator/pkg/numacell/manifests"
 )
 
 func summarize(topoInfo *topology.Info) string {
