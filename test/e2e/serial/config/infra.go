@@ -34,9 +34,9 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	numacellapi "github.com/openshift-kni/numaresources-operator/pkg/numacell/api"
+	numacellmanifests "github.com/openshift-kni/numaresources-operator/pkg/numacell/manifests"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
-	numacellmanifests "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 

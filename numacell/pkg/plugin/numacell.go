@@ -26,8 +26,8 @@ import (
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/dpm"
-	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
+	"github.com/openshift-kni/numaresources-operator/numacell/pkg/dpm"
+	numacellapi "github.com/openshift-kni/numaresources-operator/pkg/numacell/api"
 )
 
 // NUMACellLister is the object responsible for discovering initial pool of devices and their allocation.
