@@ -98,6 +98,15 @@ spec:
                           description: InfoRefreshPeriod sets the topology info refresh
                             period. Use explicit 0 to disable.
                           type: string
+                        numaAwareDevicePlugin:
+                          description: |-
+                            NUMAAwareDevicePlugin enables the NUMA-aware device plugin for this node group.
+                            When enabled, a device plugin DaemonSet is deployed to nodes in this group,
+                            exposing per-NUMA-zone devices for topology-aware workload placement.
+                          enum:
+                          - Disabled
+                          - Enabled
+                          type: string
                         podsFingerprinting:
                           description: PodsFingerprinting defines if pod fingerprint
                             should be reported for the machines belonging to this
@@ -357,6 +366,15 @@ spec:
                           description: InfoRefreshPeriod sets the topology info refresh
                             period. Use explicit 0 to disable.
                           type: string
+                        numaAwareDevicePlugin:
+                          description: |-
+                            NUMAAwareDevicePlugin enables the NUMA-aware device plugin for this node group.
+                            When enabled, a device plugin DaemonSet is deployed to nodes in this group,
+                            exposing per-NUMA-zone devices for topology-aware workload placement.
+                          enum:
+                          - Disabled
+                          - Enabled
+                          type: string
                         podsFingerprinting:
                           description: PodsFingerprinting defines if pod fingerprint
                             should be reported for the machines belonging to this
@@ -453,6 +471,15 @@ spec:
                           description: InfoRefreshPeriod sets the topology info refresh
                             period. Use explicit 0 to disable.
                           type: string
+                        numaAwareDevicePlugin:
+                          description: |-
+                            NUMAAwareDevicePlugin enables the NUMA-aware device plugin for this node group.
+                            When enabled, a device plugin DaemonSet is deployed to nodes in this group,
+                            exposing per-NUMA-zone devices for topology-aware workload placement.
+                          enum:
+                          - Disabled
+                          - Enabled
+                          type: string
                         podsFingerprinting:
                           description: PodsFingerprinting defines if pod fingerprint
                             should be reported for the machines belonging to this
@@ -508,6 +535,16 @@ spec:
                     daemonsets:
                       description: DaemonSet of the configured RTEs, for this node
                         group
+                      properties:
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                      type: object
+                    numaAwareDevicePluginDaemonSet:
+                      description: NUMAAwareDevicePluginDaemonSet is the DaemonSet
+                        for the NUMA-aware device plugin, if enabled for this node
+                        group.
                       properties:
                         name:
                           type: string
