@@ -38,7 +38,7 @@ import (
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
-	numacellapi "github.com/openshift-kni/numaresources-operator/pkg/numacell/api"
+	numazoneapi "github.com/openshift-kni/numaresources-operator/pkg/numazone/api"
 	"github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	nrtutil "github.com/openshift-kni/numaresources-operator/test/internal/noderesourcetopologies"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
@@ -366,7 +366,7 @@ func pinPodTo(pod *corev1.Pod, zone nrtv1alpha2.Zone, nodeName string) (*corev1.
 	}
 
 	// try to pin to specific zone only if the NUMA cell resources exists
-	if numaCellResourceFound(zone) {
+	if numaZoneResourceFound(zone) {
 		zoneID, err := nrtutil.GetZoneIDFromName(zone.Name)
 		if err != nil {
 			return nil, err
@@ -374,14 +374,14 @@ func pinPodTo(pod *corev1.Pod, zone nrtv1alpha2.Zone, nodeName string) (*corev1.
 		klog.Infof("creating padding pod for node %q zone %d", nodeName, zoneID)
 
 		cnt := &pod.Spec.Containers[0] // shortcut
-		cnt.Resources.Limits[numacellapi.MakeResourceName(zoneID)] = resource.MustParse("1")
+		cnt.Resources.Limits[numazoneapi.MakeResourceName(zoneID)] = resource.MustParse("1")
 	}
 	return pod, nil
 }
 
-func numaCellResourceFound(zone nrtv1alpha2.Zone) bool {
+func numaZoneResourceFound(zone nrtv1alpha2.Zone) bool {
 	for _, res := range zone.Resources {
-		if strings.HasPrefix(res.Name, numacellapi.NUMACellResourceNamespace) {
+		if strings.HasPrefix(res.Name, numazoneapi.NUMAZoneResourceNamespace) {
 			return true
 		}
 	}

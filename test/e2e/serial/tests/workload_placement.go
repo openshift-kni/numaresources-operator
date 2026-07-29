@@ -47,7 +47,7 @@ import (
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
-	numacellapi "github.com/openshift-kni/numaresources-operator/pkg/numacell/api"
+	numazoneapi "github.com/openshift-kni/numaresources-operator/pkg/numazone/api"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
@@ -1038,7 +1038,7 @@ func pinPodTo(pod *corev1.Pod, nodeName, zoneName string) (*corev1.Pod, error) {
 
 	klog.InfoS("pinning padding pod for node zone", "nodeName", nodeName, "zoneID", zoneID)
 	cnt := &pod.Spec.Containers[0] // shortcut
-	cnt.Resources.Limits[numacellapi.MakeResourceName(zoneID)] = resource.MustParse("1")
+	cnt.Resources.Limits[numazoneapi.MakeResourceName(zoneID)] = resource.MustParse("1")
 
 	pinnedPod, err := pinPodToNode(pod, nodeName)
 	if err != nil {
