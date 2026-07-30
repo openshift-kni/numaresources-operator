@@ -269,7 +269,7 @@ binary-e2e-uninstall: generate-source ## Build uninstall e2e test binary.
 
 .PHONY: binary-e2e-sched
 binary-e2e-sched: generate-source ## Build scheduler e2e test binary.
-	go test -c -v -o bin/e2e-nrop-sched.test ./test/e2e/sched
+	go test -c -v -o bin/e2e-nrop-sched.test ./test/e2e/sched && go test -c -v -o bin/e2e-nrop-sched-image-validation.test ./test/e2e/sched/image_validation
 
 .PHONY: binary-e2e-serial
 binary-e2e-serial: generate-source ## Build serial e2e test binary.
