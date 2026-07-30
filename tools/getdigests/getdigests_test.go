@@ -24,6 +24,86 @@ import (
 	"testing"
 )
 
+func TestParseImageURL(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantRepo    string
+		wantTag     string
+		wantVersion string
+		expectError bool
+	}{
+		{
+			name:        "valid channel tag",
+			input:       "registry.example.com/img:v4.20",
+			wantRepo:    "registry.example.com/img",
+			wantTag:     "v4.20",
+			wantVersion: "4.20",
+		},
+		{
+			name:        "nested path",
+			input:       "registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9:v4.16",
+			wantRepo:    "registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9",
+			wantTag:     "v4.16",
+			wantVersion: "4.16",
+		},
+		{
+			name:        "missing tag",
+			input:       "registry.example.com/img",
+			expectError: true,
+		},
+		{
+			name:        "empty",
+			input:       "",
+			expectError: true,
+		},
+		{
+			name:        "tag without v prefix",
+			input:       "registry.example.com/img:4.20",
+			expectError: true,
+		},
+		{
+			name:        "patch-level tag rejected",
+			input:       "registry.example.com/img:v4.20.1",
+			expectError: true,
+		},
+		{
+			name:        "nonnumeric minor rejected",
+			input:       "registry.example.com/img:v4.foo",
+			expectError: true,
+		},
+		{
+			name:        "prerelease-style minor rejected",
+			input:       "registry.example.com/img:v4.20-rc",
+			expectError: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseImageURL(tc.input)
+			if tc.expectError {
+				if err == nil {
+					t.Errorf("expected error, got nil (result: %+v)", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got.Repository != tc.wantRepo {
+				t.Errorf("Repository: got %q want %q", got.Repository, tc.wantRepo)
+			}
+			if got.Tag != tc.wantTag {
+				t.Errorf("Tag: got %q want %q", got.Tag, tc.wantTag)
+			}
+			if got.Version != tc.wantVersion {
+				t.Errorf("Version: got %q want %q", got.Version, tc.wantVersion)
+			}
+		})
+	}
+}
+
 func TestFilterTags(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -53,7 +133,7 @@ func TestFilterTags(t *testing.T) {
 			name:          "does not match partial prefix",
 			tags:          []string{"v4.200.0", "v4.20.0"},
 			versionString: "4.20",
-			expected:      []string{"v4.200.0", "v4.20.0"},
+			expected:      []string{"v4.20.0"},
 		},
 		{
 			name:          "no matches returns nil",
@@ -79,42 +159,6 @@ func TestFilterTags(t *testing.T) {
 				if got[i] != tc.expected[i] {
 					t.Errorf("index %d: expected %q, got %q", i, tc.expected[i], got[i])
 				}
-			}
-		})
-	}
-}
-
-func TestPreviousVersion(t *testing.T) {
-	tests := []struct {
-		name        string
-		version     string
-		expected    string
-		expectError bool
-	}{
-		{name: "normal minor decrement", version: "4.20", expected: "4.19"},
-		{name: "minor version 1", version: "4.1", expected: "4.0"},
-		{name: "different major", version: "5.3", expected: "5.2"},
-		{name: "5.0 maps to 4.22 (cross-major special case)", version: "5.0", expected: "4.22"},
-		{name: "minor version 0 errors", version: "4.0", expectError: true},
-		{name: "no dot in version", version: "420", expectError: true},
-		{name: "non-numeric minor", version: "4.x", expectError: true},
-		{name: "empty string", version: "", expectError: true},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got, err := previousVersion(tc.version)
-			if tc.expectError {
-				if err == nil {
-					t.Errorf("expected error, got nil (result: %q)", got)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got != tc.expected {
-				t.Errorf("expected %q, got %q", tc.expected, got)
 			}
 		})
 	}
@@ -150,31 +194,32 @@ func TestSkopeoInspectArgs(t *testing.T) {
 
 func TestGetDigests(t *testing.T) {
 	fakeDigests := map[string]string{
-		"v4.20.0": "sha256:aaa",
-		"v4.20.1": "sha256:bbb",
-		"v4.19":   "sha256:ccc",
+		"registry.example.com/current:v4.20.0": "sha256:aaa",
+		"registry.example.com/current:v4.20.1": "sha256:bbb",
+		"registry.example.com/prev:v4.19":      "sha256:ccc",
 	}
 
 	rawTags, _ := json.Marshal(listTagsOutput{
 		Tags: []string{"v4.20.0", "v4.20.0-source", "v4.20.1", "v4.19.5"},
 	})
 
-	fakeRunner := func(name string, args ...string) (string, error) {
+	fakeRunner := func(_ string, args ...string) (string, error) {
 		if args[0] == "list-tags" {
 			return string(rawTags), nil
 		}
-		// inspect: last arg is docker://image:tag
 		lastArg := args[len(args)-1]
-		idx := strings.LastIndex(lastArg, ":")
-		tag := lastArg[idx+1:]
-		digest, ok := fakeDigests[tag]
+		ref := strings.TrimPrefix(lastArg, "docker://")
+		digest, ok := fakeDigests[ref]
 		if !ok {
-			return "", fmt.Errorf("unknown tag: %s", tag)
+			return "", fmt.Errorf("unknown ref: %s", ref)
 		}
 		return digest, nil
 	}
 
-	result, err := getDigests(fakeRunner, "registry.example.com/img", "", "4.20", "")
+	result, err := getDigests(fakeRunner, "",
+		"registry.example.com/current:v4.20",
+		"registry.example.com/prev:v4.19",
+		"")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -189,6 +234,66 @@ func TestGetDigests(t *testing.T) {
 	}
 	if result.PreviousChannelLast != "sha256:ccc" {
 		t.Errorf("expected prev channel digest %q, got %q", "sha256:ccc", result.PreviousChannelLast)
+	}
+	if result.EUSChannelLast != "" {
+		t.Errorf("expected empty EUS channel digest, got %q", result.EUSChannelLast)
+	}
+}
+
+func TestGetDigests_WithEUS(t *testing.T) {
+	fakeDigests := map[string]string{
+		"registry.example.com/current:v4.20.0": "sha256:aaa",
+		"registry.example.com/prev:v4.19":      "sha256:bbb",
+		"registry.example.com/eus:v4.16":       "sha256:eus",
+	}
+	rawTags, _ := json.Marshal(listTagsOutput{Tags: []string{"v4.20.0"}})
+
+	fakeRunner := func(_ string, args ...string) (string, error) {
+		if args[0] == "list-tags" {
+			return string(rawTags), nil
+		}
+		ref := strings.TrimPrefix(args[len(args)-1], "docker://")
+		digest, ok := fakeDigests[ref]
+		if !ok {
+			return "", fmt.Errorf("unknown ref: %s", ref)
+		}
+		return digest, nil
+	}
+
+	result, err := getDigests(fakeRunner, "",
+		"registry.example.com/current:v4.20",
+		"registry.example.com/prev:v4.19",
+		"registry.example.com/eus:v4.16")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.EUSChannelLast != "sha256:eus" {
+		t.Errorf("expected EUS digest %q, got %q", "sha256:eus", result.EUSChannelLast)
+	}
+}
+
+func TestGetDigests_EUSFailureIsFatal(t *testing.T) {
+	rawTags, _ := json.Marshal(listTagsOutput{Tags: []string{"v4.20.0"}})
+	fakeRunner := func(_ string, args ...string) (string, error) {
+		if args[0] == "list-tags" {
+			return string(rawTags), nil
+		}
+		ref := strings.TrimPrefix(args[len(args)-1], "docker://")
+		if strings.Contains(ref, "eus") {
+			return "", fmt.Errorf("eus channel not found")
+		}
+		return "sha256:abc", nil
+	}
+
+	_, err := getDigests(fakeRunner, "",
+		"registry.example.com/current:v4.20",
+		"registry.example.com/prev:v4.19",
+		"registry.example.com/eus:v4.16")
+	if err == nil {
+		t.Fatal("expected error when EUS channel lookup fails, got nil")
+	}
+	if !strings.Contains(err.Error(), "failed to get digest of EUS channel") {
+		t.Fatalf("expected EUS channel error, got: %v", err)
 	}
 }
 
@@ -208,7 +313,10 @@ func TestGetDigests_NoDuplicateDigests(t *testing.T) {
 		return sharedDigest, nil
 	}
 
-	result, err := getDigests(fakeRunner, "registry.example.com/img", "", "4.22", "4.21")
+	result, err := getDigests(fakeRunner, "",
+		"registry.example.com/current:v4.22",
+		"registry.example.com/prev:v4.21",
+		"")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -225,7 +333,10 @@ func TestGetDigests_ListTagsError(t *testing.T) {
 	fakeRunner := func(_ string, _ ...string) (string, error) {
 		return "", fmt.Errorf("registry unavailable")
 	}
-	_, err := getDigests(fakeRunner, "registry.example.com/img", "", "4.20", "")
+	_, err := getDigests(fakeRunner, "",
+		"registry.example.com/current:v4.20",
+		"registry.example.com/prev:v4.19",
+		"")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -239,23 +350,25 @@ func TestGetDigests_NoMatchingTags(t *testing.T) {
 		}
 		return "", fmt.Errorf("should not be called")
 	}
-	_, err := getDigests(fakeRunner, "registry.example.com/img", "", "4.20", "")
+	_, err := getDigests(fakeRunner, "",
+		"registry.example.com/current:v4.20",
+		"registry.example.com/prev:v4.19",
+		"")
 	if err == nil {
 		t.Fatal("expected error for no matching tags, got nil")
 	}
 }
 
-func TestGetDigests_InvalidVersion(t *testing.T) {
-	rawTags, _ := json.Marshal(listTagsOutput{Tags: []string{"v4.20.0"}})
-	fakeRunner := func(_ string, args ...string) (string, error) {
-		if args[0] == "list-tags" {
-			return string(rawTags), nil
-		}
-		return "sha256:abc", nil
+func TestGetDigests_InvalidCurrentURL(t *testing.T) {
+	fakeRunner := func(_ string, _ ...string) (string, error) {
+		return "", fmt.Errorf("should not be called")
 	}
-	_, err := getDigests(fakeRunner, "registry.example.com/img", "", "420", "")
+	_, err := getDigests(fakeRunner, "",
+		"registry.example.com/current",
+		"registry.example.com/prev:v4.19",
+		"")
 	if err == nil {
-		t.Fatal("expected error for invalid version format, got nil")
+		t.Fatal("expected error for invalid current URL, got nil")
 	}
 }
 
@@ -265,26 +378,28 @@ func TestGetDigests_PrevChannelFailureIsFatal(t *testing.T) {
 		if args[0] == "list-tags" {
 			return string(rawTags), nil
 		}
-		// inspect for current channel succeeds, prev channel fails
 		lastArg := args[len(args)-1]
 		if strings.HasSuffix(lastArg, ":v4.19") {
 			return "", fmt.Errorf("prev channel not found")
 		}
 		return "sha256:abc", nil
 	}
-	_, err := getDigests(fakeRunner, "registry.example.com/img", "", "4.20", "")
+	_, err := getDigests(fakeRunner, "",
+		"registry.example.com/current:v4.20",
+		"registry.example.com/prev:v4.19",
+		"")
 	if err == nil {
 		t.Fatal("expected error when previous channel lookup fails, got nil")
 	}
-	if !strings.Contains(err.Error(), "failed to get latest of previous channel") {
+	if !strings.Contains(err.Error(), "failed to get digest of previous channel") {
 		t.Fatalf("expected previous channel error, got: %v", err)
 	}
 }
 
-func TestGetDigests_PrevVersionOverride(t *testing.T) {
+func TestGetDigests_DifferentImageBases(t *testing.T) {
 	fakeDigests := map[string]string{
-		"v5.0.0": "sha256:new",
-		"v4.22":  "sha256:last422",
+		"registry.example.com/scheduler-rhel9:v5.0.0": "sha256:new",
+		"registry.example.com/scheduler-rhel8:v4.22":  "sha256:last422",
 	}
 	rawTags, _ := json.Marshal(listTagsOutput{Tags: []string{"v5.0.0"}})
 
@@ -292,26 +407,20 @@ func TestGetDigests_PrevVersionOverride(t *testing.T) {
 		if args[0] == "list-tags" {
 			return string(rawTags), nil
 		}
-		lastArg := args[len(args)-1]
-		idx := strings.LastIndex(lastArg, ":")
-		tag := lastArg[idx+1:]
-		digest, ok := fakeDigests[tag]
+		ref := strings.TrimPrefix(args[len(args)-1], "docker://")
+		digest, ok := fakeDigests[ref]
 		if !ok {
-			return "", fmt.Errorf("unknown tag: %s", tag)
+			return "", fmt.Errorf("unknown ref: %s", ref)
 		}
 		return digest, nil
 	}
 
-	// 4.0 has no auto-resolved previous channel without override
-	_, err := getDigests(fakeRunner, "registry.example.com/img", "", "4.0", "")
-	if err == nil {
-		t.Fatal("expected error for 4.0 without override, got nil")
-	}
-
-	// 5.0 auto-resolves to 4.22; explicit override should succeed too
-	result, err := getDigests(fakeRunner, "registry.example.com/img", "", "5.0", "4.22")
+	result, err := getDigests(fakeRunner, "",
+		"registry.example.com/scheduler-rhel9:v5.0",
+		"registry.example.com/scheduler-rhel8:v4.22",
+		"")
 	if err != nil {
-		t.Fatalf("unexpected error with prev-version override: %v", err)
+		t.Fatalf("unexpected error with different image bases: %v", err)
 	}
 	if !slices.Contains(result.CurrentChannel, "sha256:new") {
 		t.Errorf("expected current channel digest %q, got %v", "sha256:new", result.CurrentChannel)

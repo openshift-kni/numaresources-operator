@@ -71,6 +71,9 @@ func loadDigests() sets.Set[string] {
 
 	digests := sets.New(d.CurrentChannel...)
 	digests.Insert(d.PreviousChannelLast)
+	if d.EUSChannelLast != "" {
+		digests.Insert(d.EUSChannelLast)
+	}
 
 	userDigests := getUserImageDigests()
 	digests.Insert(userDigests...)
@@ -78,6 +81,7 @@ func loadDigests() sets.Set[string] {
 	klog.V(4).InfoS("trusted set of scheduler images",
 		"fromCurrentChannel", d.CurrentChannel,
 		"latestFromPreviousChannel", d.PreviousChannelLast,
+		"latestFromEUSChannel", d.EUSChannelLast,
 		"customDigests", userDigests)
 
 	return digests
