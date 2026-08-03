@@ -30,8 +30,10 @@ import (
 	schedulerapi "github.com/openshift-kni/numaresources-operator/internal/api/scheduler"
 )
 
-// This is tool to print json representation of the digests of the images in the current channel
-// and the latest one in the previous channel
+// This tool prints a JSON representation of:
+// - unique digests for all vX.Y.* tags in the current image repository
+// - the digest of the previous-channel image URL
+// - optionally, the digest of the EUS-channel image URL
 
 // cmdRunner executes a named command and returns its trimmed stdout or an error
 // that includes stderr when available.
@@ -40,6 +42,13 @@ type cmdRunner func(name string, args ...string) (string, error)
 // listTagsOutput matches the JSON structure returned by `skopeo list-tags`.
 type listTagsOutput struct {
 	Tags []string `json:"Tags"`
+}
+
+// imageRef is a repository reference plus a tag of the form vX.Y.
+type imageRef struct {
+	Repository string // e.g. registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9
+	Tag        string // e.g. v4.20
+	Version    string // e.g. 4.20 (Tag without leading "v")
 }
 
 func execRunner(name string, args ...string) (string, error) {
@@ -54,15 +63,63 @@ func execRunner(name string, args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// getDigests fetches the digests of all tags matching versionString for the
-// current channel, plus the latest tag of the previous channel.
-// prevVersionOverride, when non-empty, is used as the previous version directly
-// instead of auto-calculating it (required when the current minor version is 0,
-// e.g. "5.0" where the previous channel is "4.22").
-func getDigests(run cmdRunner, imageURL string, pullSecretPath string, versionString string, prevVersionOverride string) (schedulerapi.Digests, error) {
-	raw, err := run("skopeo", skopeoListTagsArgs(imageURL, pullSecretPath)...)
+// parseImageURL splits a full image URL with a vX.Y tag into repository and version.
+// Expected form: registry.example.com/path/image:v4.20
+// NOTE: no validation is done on the image URL format, so the user must ensure it is valid.
+func parseImageURL(fullURL string) (imageRef, error) {
+	fullURL = strings.TrimSpace(fullURL)
+	if fullURL == "" {
+		return imageRef{}, fmt.Errorf("image URL is empty")
+	}
+
+	idx := strings.LastIndex(fullURL, ":")
+	if idx < 0 {
+		return imageRef{}, fmt.Errorf("image URL %q missing tag; expected form registry/image:vX.Y", fullURL)
+	}
+	// Avoid treating host:port as a tag separator when no tag is present.
+	// A valid tag always starts with 'v' after the last colon for our use case.
+	repo := fullURL[:idx]
+	tag := fullURL[idx+1:]
+	if repo == "" || tag == "" {
+		return imageRef{}, fmt.Errorf("image URL %q missing repository or tag; expected form registry/image:vX.Y", fullURL)
+	}
+	if !strings.HasPrefix(tag, "v") {
+		return imageRef{}, fmt.Errorf("image URL tag %q must be of form vX.Y", tag)
+	}
+	version := strings.TrimPrefix(tag, "v")
+	parts := strings.SplitN(version, ".", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return imageRef{}, fmt.Errorf("image URL tag %q must be of form vX.Y", tag)
+	}
+	// Reject patch-level tags like v4.20.1 — the tool expects channel tags vX.Y (minor)
+	if strings.Contains(parts[1], ".") {
+		return imageRef{}, fmt.Errorf("image URL tag %q must be of form vX.Y (no patch component)", tag)
+	}
+	if _, err := strconv.Atoi(parts[0]); err != nil {
+		return imageRef{}, fmt.Errorf("image URL tag %q must be of form vX.Y where X and Y are integers", tag)
+	}
+	if _, err := strconv.Atoi(parts[1]); err != nil {
+		return imageRef{}, fmt.Errorf("image URL tag %q must be of form vX.Y where X and Y are integers", tag)
+	}
+
+	return imageRef{Repository: repo, Tag: tag, Version: version}, nil
+}
+
+// getDigests fetches unique digests for all vX.Y.* tags from currentURL's repository,
+// the digest of prevURL, and optionally the digest of eusURL.
+func getDigests(run cmdRunner, pullSecretPath string, currentURL string, prevURL string, eusURL string) (schedulerapi.Digests, error) {
+	current, err := parseImageURL(currentURL)
 	if err != nil {
-		return schedulerapi.Digests{}, fmt.Errorf("listing tags for %s: %w", imageURL, err)
+		return schedulerapi.Digests{}, fmt.Errorf("parsing --current-url: %w", err)
+	}
+	prev, err := parseImageURL(prevURL)
+	if err != nil {
+		return schedulerapi.Digests{}, fmt.Errorf("parsing --prev-url: %w", err)
+	}
+
+	raw, err := run("skopeo", skopeoListTagsArgs(current.Repository, pullSecretPath)...)
+	if err != nil {
+		return schedulerapi.Digests{}, fmt.Errorf("listing tags for %s: %w", currentURL, err)
 	}
 
 	var tagsOut listTagsOutput
@@ -70,14 +127,14 @@ func getDigests(run cmdRunner, imageURL string, pullSecretPath string, versionSt
 		return schedulerapi.Digests{}, fmt.Errorf("parsing list-tags output: %w", err)
 	}
 
-	tags := filterTags(tagsOut.Tags, versionString)
+	tags := filterTags(tagsOut.Tags, current.Version)
 	if len(tags) == 0 {
-		return schedulerapi.Digests{}, fmt.Errorf("no tags found matching version %q", versionString)
+		return schedulerapi.Digests{}, fmt.Errorf("no tags found matching version %q in %s", current.Version, current.Repository)
 	}
 
 	digests := schedulerapi.Digests{}
 	for _, tag := range tags {
-		digest, err := run("skopeo", skopeoInspectArgs(imageURL, pullSecretPath, tag)...)
+		digest, err := run("skopeo", skopeoInspectArgs(current.Repository, pullSecretPath, tag)...)
 		if err != nil {
 			return schedulerapi.Digests{}, fmt.Errorf("inspecting tag %s: %w", tag, err)
 		}
@@ -90,45 +147,25 @@ func getDigests(run cmdRunner, imageURL string, pullSecretPath string, versionSt
 		digests.AddCurrentChannel(digest)
 	}
 
-	prevVer := prevVersionOverride
-	if prevVer == "" {
-		prevVer, err = previousVersion(versionString)
-		if err != nil {
-			return schedulerapi.Digests{}, err
-		}
-	}
-	prevTag := "v" + prevVer
-	latestOfPrev, err := run("skopeo", skopeoInspectArgs(imageURL, pullSecretPath, prevTag)...)
+	latestOfPrev, err := run("skopeo", skopeoInspectArgs(prev.Repository, pullSecretPath, prev.Tag)...)
 	if err != nil {
-		return schedulerapi.Digests{}, fmt.Errorf("failed to get latest of previous channel (%s): %v", prevTag, err)
+		return schedulerapi.Digests{}, fmt.Errorf("failed to get digest of previous channel (%s:%s): %v", prev.Repository, prev.Tag, err)
 	}
-
 	digests.PreviousChannelLast = latestOfPrev
 
+	if eusURL != "" {
+		eus, err := parseImageURL(eusURL)
+		if err != nil {
+			return schedulerapi.Digests{}, fmt.Errorf("parsing --eus-url: %w", err)
+		}
+		latestOfEUS, err := run("skopeo", skopeoInspectArgs(eus.Repository, pullSecretPath, eus.Tag)...)
+		if err != nil {
+			return schedulerapi.Digests{}, fmt.Errorf("failed to get digest of EUS channel (%s:%s): %v", eus.Repository, eus.Tag, err)
+		}
+		digests.EUSChannelLast = latestOfEUS
+	}
+
 	return digests, nil
-}
-
-// previousVersion returns the version string for the immediately preceding minor release.
-// e.g. "4.20" -> "4.19"
-func previousVersion(versionString string) (string, error) {
-	if versionString == "5.0" {
-		// special case for 5.0, which is the first release of the 5.x series
-		return "4.22", nil
-	}
-
-	parts := strings.SplitN(versionString, ".", 2)
-	if len(parts) != 2 {
-		return "", fmt.Errorf("invalid version format %q: expected X.Y", versionString)
-	}
-	minor, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return "", fmt.Errorf("invalid minor version in %q: %v", versionString, err)
-	}
-	if minor == 0 {
-		// we cannot make a guess for the previous minor version so we error out
-		return "", fmt.Errorf("no previous minor version for %q", versionString)
-	}
-	return fmt.Sprintf("%s.%d", parts[0], minor-1), nil
 }
 
 func skopeoListTagsArgs(imageURL string, pullSecretPath string) []string {
@@ -164,24 +201,24 @@ func filterTags(tags []string, versionString string) []string {
 }
 
 func run() error {
-	imageURL := ""
+	currentURL := ""
+	prevURL := ""
+	eusURL := ""
 	pullSecretPath := ""
 	outputFile := ""
-	versionString := ""
-	prevVersionOverride := ""
 
-	flag.StringVar(&imageURL, "image", "", "image URL to query (e.g. registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9)")
+	flag.StringVar(&currentURL, "current-url", "", "full image URL for the current channel with a vX.Y tag (e.g. registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9:v4.20)")
+	flag.StringVar(&prevURL, "prev-url", "", "full image URL for the previous channel with a vX.Y tag (e.g. registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9:v4.19)")
+	flag.StringVar(&eusURL, "eus-url", "", "optional full image URL for the EUS channel with a vX.Y tag (e.g. registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9:v4.18)")
 	flag.StringVar(&pullSecretPath, "pull-secret", "", "path to the pull secret JSON file for registry authentication")
 	flag.StringVar(&outputFile, "output", "", "path to output file; if not provided, output is written to stdout")
-	flag.StringVar(&versionString, "version", "", "version string to filter tags (e.g. 4.20)")
-	flag.StringVar(&prevVersionOverride, "prev-version", "", "previous channel version to use instead of auto-calculating (required when --version has minor=0, e.g. --version 5.0 --prev-version 4.22)")
 	flag.Parse()
 
-	if imageURL == "" {
-		log.Fatal("--image is required")
+	if currentURL == "" {
+		log.Fatal("--current-url is required")
 	}
-	if versionString == "" {
-		log.Fatal("--version is required")
+	if prevURL == "" {
+		log.Fatal("--prev-url is required")
 	}
 
 	out := os.Stdout
@@ -198,7 +235,7 @@ func run() error {
 		out = f
 	}
 
-	result, err := getDigests(execRunner, imageURL, pullSecretPath, versionString, prevVersionOverride)
+	result, err := getDigests(execRunner, pullSecretPath, currentURL, prevURL, eusURL)
 	if err != nil {
 		return fmt.Errorf("getting digests: %w", err)
 	}

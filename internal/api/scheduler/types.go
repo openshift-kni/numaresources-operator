@@ -26,6 +26,7 @@ type ImageValidation struct {
 type Digests struct {
 	CurrentChannel      []string `json:"current_channel"`
 	PreviousChannelLast string   `json:"prev_channel_last"`
+	EUSChannelLast      string   `json:"eus_channel_last"`
 }
 
 func (ti *Digests) AddCurrentChannel(digest string) {

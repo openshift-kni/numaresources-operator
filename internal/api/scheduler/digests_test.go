@@ -30,6 +30,9 @@ func loadEmbeddedDigests() sets.Set[string] {
 	}
 	digests := sets.New(d.CurrentChannel...)
 	digests.Insert(d.PreviousChannelLast)
+	if d.EUSChannelLast != "" {
+		digests.Insert(d.EUSChannelLast)
+	}
 	return digests
 }
 
