@@ -23,6 +23,10 @@ defaults:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -39,4 +43,26 @@ jobs:
       # because the action always pulls govulncheck@latest which can break
       # with newer Go versions. See https://github.com/golang/go/issues/80059
       - name: Run govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.3 && govulncheck ./...
+        id: govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.3
+          govulncheck ./... 2>&1 | tee govulncheck-output.txt
+        continue-on-error: true
+
+      - name: Run OpenCode to fix vulnerabilities
+        if: steps.govulncheck.outcome == 'failure'
+        uses: anomalyco/opencode/github@latest
+        env:
+          GEMINI_API_KEY: ${{ secrets.NROP_ASSISTANT_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: google/gemini-2.5-flash-001
+          use_github_token: true
+          prompt: |
+            The govulncheck CI step failed. Read the file `govulncheck-output.txt`
+            in the repository root for the full vulnerability report.
+
+            Analyze the vulnerable dependencies and create a PR that bumps the
+            affected packages in go.mod to versions that resolve the vulnerabilities.
+            Run `go mod tidy` and `go mod vendor` after updating.
+            Make sure the fix compiles cleanly with `go build ./...`.
