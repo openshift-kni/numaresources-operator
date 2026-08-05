@@ -1,0 +1,114 @@
+name: Autofix govulncheck vulnerabilities
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC daily
+  workflow_dispatch: {}
+  issue_comment:
+    types: [created]
+
+env:
+  GOLANG_VERSION: 1.25.12
+  MODEL: google/gemini-3.6-flash
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: govulncheck-autofix
+      cancel-in-progress: true
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.issue.pull_request &&
+        contains(github.event.comment.body, '/fix-vulns') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      )
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GOLANG_VERSION }}
+
+      - name: Resolve base branch
+        id: base
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            REF=$(gh pr view "${{ github.event.issue.number }}" --json baseRefName -q .baseRefName)
+          else
+            REF="${{ github.event.repository.default_branch }}"
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+
+      - name: Acknowledge trigger
+        if: github.event_name == 'issue_comment'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "${{ github.event.issue.number }}" \
+            --body "ai-bot: govulncheck autofix triggered — running vulnerability scan."
+
+      - name: Run govulncheck
+        id: govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-package: "./..."
+          go-version-input: ${{ env.GOLANG_VERSION }}
+          output-file: govulncheck-output.txt
+          repo-checkout: false
+        continue-on-error: true
+
+      - name: Run OpenCode to fix vulnerabilities
+        if: steps.govulncheck.outcome == 'failure'
+        uses: anomalyco/opencode/github@latest
+        env:
+          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: ${{ env.MODEL }}
+          use_github_token: true
+          prompt: |
+            The file `govulncheck-output.txt` contains a govulncheck vulnerability report.
+            The target branch is `${{ steps.base.outputs.ref }}`.
+
+            Fix ALL reported vulnerabilities by bumping the affected Go packages in go.mod
+            to versions that resolve them. Run `go mod tidy` and `go mod vendor`, then
+            verify the build passes with `go build ./...`.
+
+            Steps:
+            1. Run `git fetch origin ${{ steps.base.outputs.ref }}`.
+            2. Run `gh pr list --head fix/govulncheck-${{ steps.base.outputs.ref }} --state open --json number -q '.[0].number'`
+               to check if an open PR already exists.
+            3. If an open PR exists:
+               - Run `git checkout fix/govulncheck-${{ steps.base.outputs.ref }}`.
+               - Run `git rebase origin/${{ steps.base.outputs.ref }}`.
+               - Compare the report against existing commits in the branch.
+                 If all vulnerabilities are already fixed, stop — nothing to do.
+               - Add new commits only for vulnerabilities not already fixed in the branch.
+            4. If no open PR exists:
+               - Run `git push origin --delete fix/govulncheck-${{ steps.base.outputs.ref }}` (ignore errors if branch doesn't exist).
+               - Run `git checkout -b fix/govulncheck-${{ steps.base.outputs.ref }} origin/${{ steps.base.outputs.ref }}`.
+            5. For each vulnerability, bump the package in go.mod, then run
+               `go mod tidy && go mod vendor && go build ./...`.
+               Commit with message: "deps: bump <pkg> to <version> to fix <vuln-id>".
+            6. Run `git push --force-with-lease origin fix/govulncheck-${{ steps.base.outputs.ref }}`.
+            7. If no open PR was found in step 2, run:
+               `gh pr create --base ${{ steps.base.outputs.ref }} --head fix/govulncheck-${{ steps.base.outputs.ref }} \
+                 --title "[ai-bot] deps: fix govulncheck vulnerabilities" \
+                 --body "<body>"`
+               The PR body should be concise:
+               - For each vulnerability: ID, module, fixed version, and a one-line description.
+               - A "Bumped packages" section listing each package with old -> new version.
+               Do NOT include call traces or example traces.
+            8. If an open PR was found, update its body with:
+               `gh pr edit <number> --body "<updated concise body>"`
+
+            If any command fails, try an alternative approach to achieve the same goal.
+            Do not stop on the first error — adapt and retry.
