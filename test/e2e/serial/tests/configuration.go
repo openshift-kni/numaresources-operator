@@ -1818,14 +1818,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 		})
 	})
 
-	Context("[tlscompliance][rte] rte complies with TLS Profile modifications", Label(label.Tier2, "feature:tlscompliance"), func() {
+	Context("[tlscompliance][rte] rte complies with TLS Profile modifications", Label("feature:tlscompliance"), func() {
 		const (
 			rteDaemonSetCheckTimeout  = 30 * time.Second
 			rteDaemonSetCheckInterval = 5 * time.Second
 			apiServerUpdateTimeout    = 10 * time.Minute
 			apiServerUpdateInterval   = 10 * time.Second
 		)
-		It("[test_id:88383] should update RTE daemonset TLS args to adhere to modified TLS profile", Label(label.Reboot, label.Slow), func(ctx context.Context) {
+		It("[test_id:88383] should update RTE daemonset TLS args to adhere to modified TLS profile", Label(label.Reboot, label.Slow, label.Tier2), func(ctx context.Context) {
 			fxt.IsRebootTest = true
 			mcpUpdateTimeout := 40 * time.Minute
 			mcpUpdatePolling := 20 * time.Second
