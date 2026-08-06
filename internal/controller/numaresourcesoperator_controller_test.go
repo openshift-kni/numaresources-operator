@@ -634,14 +634,16 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
 
+					expectedConf := conf
+					expectedConf.SetDefaults()
 					Expect(nroUpdated.Status.NodeGroups).To(HaveLen(1))
-					Expect(nroUpdated.Status.NodeGroups[0].Config).To(Equal(conf), "operator status was not updated under NodeGroupStatus field")
+					Expect(nroUpdated.Status.NodeGroups[0].Config).To(Equal(expectedConf), "operator status was not updated under NodeGroupStatus field")
 
 					if platf != platform.HyperShift {
 						Expect(nroUpdated.Status.MachineConfigPools).To(HaveLen(1))
 						Expect(nroUpdated.Status.MachineConfigPools[0].Name).To(Equal(pn))
 						Expect(nroUpdated.Status.MachineConfigPools[0].Config).ToNot(BeNil(), "operator status contains nil config")
-						Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(conf), "operator status was not updated")
+						Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(expectedConf), "operator status was not updated")
 					}
 				})
 
@@ -816,6 +818,68 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(args).ToNot(ContainElement(ContainSubstring("--no-publish")), "malformed args: %v", args)
 				})
 
+				It("should enable container NUMA placement reporting by default", func(ctx context.Context) {
+					conf := nropv1.DefaultNodeGroupConfig()
+
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
+
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
+					}
+
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
+						Namespace: testNamespace,
+					}
+					ds := &appsv1.DaemonSet{}
+					Expect(reconciler.Client.Get(ctx, dsKey, ds)).ToNot(HaveOccurred())
+
+					args := ds.Spec.Template.Spec.Containers[0].Args
+					Expect(args).To(ContainElement("--container-numa-placement"), "malformed args: %v", args)
+
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
+					Expect(*nroUpdated.Status.NodeGroups[0].Config.NumaPlacement).To(Equal(nropv1.NumaPlacementEnabled), "node group config was not updated under NodeGroupStatus field")
+					if platf != platform.HyperShift {
+						Expect(*nroUpdated.Status.MachineConfigPools[0].Config.NumaPlacement).To(Equal(nropv1.NumaPlacementEnabled), "node group config was not updated in the operator status")
+					}
+				})
+
+				It("should allow to disable container NUMA placement reporting", func(ctx context.Context) {
+					numaPlacement := nropv1.NumaPlacementDisabled
+					conf := nropv1.NodeGroupConfig{
+						NumaPlacement: &numaPlacement,
+					}
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, &conf)
+
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershift(nro)
+					} else {
+						reconciler = reconcileObjectsOpenshift(nro, mcp)
+					}
+
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, pn),
+						Namespace: testNamespace,
+					}
+					ds := &appsv1.DaemonSet{}
+					Expect(reconciler.Client.Get(ctx, dsKey, ds)).ToNot(HaveOccurred())
+
+					args := ds.Spec.Template.Spec.Containers[0].Args
+					Expect(args).ToNot(ContainElement("--container-numa-placement"), "malformed args: %v", args)
+
+					nroUpdated := &nropv1.NUMAResourcesOperator{}
+					Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
+					Expect(*nroUpdated.Status.NodeGroups[0].Config.NumaPlacement).To(Equal(numaPlacement), "node group config was not updated under NodeGroupStatus field")
+					if platf != platform.HyperShift {
+						Expect(*nroUpdated.Status.MachineConfigPools[0].Config.NumaPlacement).To(Equal(numaPlacement), "node group config was not updated in the operator status")
+					}
+				})
+
 				It("should allow to disabling NRT updates and enabling it back", func() {
 					rteMode := nropv1.InfoRefreshPauseEnabled
 					conf := nropv1.NodeGroupConfig{
@@ -940,9 +1004,11 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 
 					nroUpdated := &nropv1.NUMAResourcesOperator{}
 					Expect(reconciler.Client.Get(context.TODO(), client.ObjectKeyFromObject(nro), nroUpdated)).ToNot(HaveOccurred())
-					Expect(nroUpdated.Status.NodeGroups[0].Config).To(Equal(confUpdated), "node group config was not updated under NodeGroupStatus field")
+					expectedConf := confUpdated
+					expectedConf.SetDefaults()
+					Expect(nroUpdated.Status.NodeGroups[0].Config).To(Equal(expectedConf), "node group config was not updated under NodeGroupStatus field")
 					if platf != platform.HyperShift {
-						Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(confUpdated), "node group config was not updated in the operator status")
+						Expect(*nroUpdated.Status.MachineConfigPools[0].Config).To(Equal(expectedConf), "node group config was not updated in the operator status")
 					}
 				})
 

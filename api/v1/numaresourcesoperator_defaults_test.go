@@ -23,6 +23,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestNodeGroupConfigDefaultMethod(t *testing.T) {
@@ -39,6 +40,7 @@ func TestNodeGroupConfigDefaultMethod(t *testing.T) {
 				InfoRefreshMode:    defaultInfoRefreshMode(),
 				InfoRefreshPeriod:  defaultInfoRefreshPeriod(),
 				InfoRefreshPause:   defaultInfoRefreshPause(),
+				NumaPlacement:      defaultNumaPlacement(),
 			},
 		},
 		{
@@ -51,6 +53,7 @@ func TestNodeGroupConfigDefaultMethod(t *testing.T) {
 				InfoRefreshMode:    defaultInfoRefreshMode(),
 				InfoRefreshPeriod:  ptrToDuration(42 * time.Second),
 				InfoRefreshPause:   defaultInfoRefreshPause(),
+				NumaPlacement:      defaultNumaPlacement(),
 			},
 		},
 		{
@@ -63,6 +66,20 @@ func TestNodeGroupConfigDefaultMethod(t *testing.T) {
 				InfoRefreshMode:    defaultInfoRefreshMode(),
 				InfoRefreshPeriod:  defaultInfoRefreshPeriod(),
 				InfoRefreshPause:   ptrToRTEMode(InfoRefreshPauseEnabled),
+				NumaPlacement:      defaultNumaPlacement(),
+			},
+		},
+		{
+			name: "partial fill: numaPlacement",
+			val: NodeGroupConfig{
+				NumaPlacement: ptr.To(NumaPlacementDisabled),
+			},
+			expected: NodeGroupConfig{
+				PodsFingerprinting: defaultPodsFingerprinting(),
+				InfoRefreshMode:    defaultInfoRefreshMode(),
+				InfoRefreshPeriod:  defaultInfoRefreshPeriod(),
+				InfoRefreshPause:   defaultInfoRefreshPause(),
+				NumaPlacement:      ptr.To(NumaPlacementDisabled),
 			},
 		},
 	}
@@ -86,12 +103,14 @@ func TestNodeGroupConfigDefault(t *testing.T) {
 		Duration: 10 * time.Second,
 	}
 	infoRefreshPause := InfoRefreshPauseDisabled
+	numaPlacement := NumaPlacementEnabled
 
 	exp := toJSON(NodeGroupConfig{
 		PodsFingerprinting: &podsFp,
 		InfoRefreshMode:    &refMode,
 		InfoRefreshPeriod:  &period,
 		InfoRefreshPause:   &infoRefreshPause,
+		NumaPlacement:      &numaPlacement,
 	})
 	got := toJSON(DefaultNodeGroupConfig())
 

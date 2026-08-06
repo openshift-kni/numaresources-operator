@@ -28,6 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
@@ -89,7 +90,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			name: "defaults",
 			conf: nropv1.DefaultNodeGroupConfig(),
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls", "--container-numa-placement",
 			},
 		},
 		{
@@ -97,7 +98,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			conf:       nropv1.DefaultNodeGroupConfig(),
 			metricsTLS: objtls.NewSettings(&tls.Config{MinVersion: tls.VersionTLS12, CipherSuites: []uint16{tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256}}),
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls", "--container-numa-placement",
 				"--metrics-tls-min-version=VersionTLS12", "--metrics-tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
 			},
 		},
@@ -109,7 +110,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				},
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=32s", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=32s", "--metrics-mode=httptls", "--container-numa-placement",
 			},
 		},
 		{
@@ -118,7 +119,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				PodsFingerprinting: &pfpEnabled,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=all", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=all", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls", "--container-numa-placement",
 			},
 		},
 		{
@@ -127,7 +128,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				PodsFingerprinting: &pfpDisabled,
 			},
 			expectedArgs: []string{
-				"--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+				"--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls", "--container-numa-placement",
 			},
 		},
 		{
@@ -136,7 +137,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshMode: &refreshEvents,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--notify-file=/run/rte/notify", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--notify-file=/run/rte/notify", "--metrics-mode=httptls", "--container-numa-placement",
 			},
 		},
 		{
@@ -145,7 +146,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshMode: &refreshPeriodic,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls", "--container-numa-placement",
 			},
 		},
 		{
@@ -154,7 +155,7 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshPause: &infoRefreshPauseEnabled,
 			},
 			expectedArgs: []string{
-				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--no-publish", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--no-publish", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls", "--container-numa-placement",
 			},
 		},
 		{
@@ -163,7 +164,25 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 				InfoRefreshPause: &infoRefreshPauseDisabled,
 			},
 			expectedArgs: []string{
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls", "--container-numa-placement",
+			},
+		},
+		{
+			name: "disable container NUMA placement reporting",
+			conf: nropv1.NodeGroupConfig{
+				NumaPlacement: ptr.To(nropv1.NumaPlacementDisabled),
+			},
+			expectedArgs: []string{
 				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls",
+			},
+		},
+		{
+			name: "precisely enable container NUMA placement reporting",
+			conf: nropv1.NodeGroupConfig{
+				NumaPlacement: ptr.To(nropv1.NumaPlacementEnabled),
+			},
+			expectedArgs: []string{
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls", "--container-numa-placement",
 			},
 		},
 	}
