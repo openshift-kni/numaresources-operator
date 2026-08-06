@@ -73,6 +73,13 @@ spec:
         path: nodeGroups[0].config.infoRefreshPeriod
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
+      - description: |-
+          NUMAPlacement selects the NUMA placement reporting mode in NRT for the machines belonging to this group.
+          Valid values are: "container", "none". Defaults to "container".
+        displayName: NUMA placement reporting mode
+        path: nodeGroups[0].config.numaPlacement
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: PodsFingerprinting defines if pod fingerprint should be reported
           for the machines belonging to this group
         displayName: Enable or disable the pods fingerprinting setting

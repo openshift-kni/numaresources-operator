@@ -39,6 +39,7 @@ func TestNodeGroupConfigDefaultMethod(t *testing.T) {
 				InfoRefreshMode:    defaultInfoRefreshMode(),
 				InfoRefreshPeriod:  defaultInfoRefreshPeriod(),
 				InfoRefreshPause:   defaultInfoRefreshPause(),
+				NUMAPlacement:      defaultNUMAPlacement(),
 			},
 		},
 		{
@@ -51,6 +52,7 @@ func TestNodeGroupConfigDefaultMethod(t *testing.T) {
 				InfoRefreshMode:    defaultInfoRefreshMode(),
 				InfoRefreshPeriod:  ptrToDuration(42 * time.Second),
 				InfoRefreshPause:   defaultInfoRefreshPause(),
+				NUMAPlacement:      defaultNUMAPlacement(),
 			},
 		},
 		{
@@ -63,6 +65,20 @@ func TestNodeGroupConfigDefaultMethod(t *testing.T) {
 				InfoRefreshMode:    defaultInfoRefreshMode(),
 				InfoRefreshPeriod:  defaultInfoRefreshPeriod(),
 				InfoRefreshPause:   ptrToRTEMode(InfoRefreshPauseEnabled),
+				NUMAPlacement:      defaultNUMAPlacement(),
+			},
+		},
+		{
+			name: "partial fill: numaPlacement",
+			val: NodeGroupConfig{
+				NUMAPlacement: ptrToNPMode(NUMAPlacementNone),
+			},
+			expected: NodeGroupConfig{
+				PodsFingerprinting: defaultPodsFingerprinting(),
+				InfoRefreshMode:    defaultInfoRefreshMode(),
+				InfoRefreshPeriod:  defaultInfoRefreshPeriod(),
+				InfoRefreshPause:   defaultInfoRefreshPause(),
+				NUMAPlacement:      ptrToNPMode(NUMAPlacementNone),
 			},
 		},
 	}
@@ -86,12 +102,14 @@ func TestNodeGroupConfigDefault(t *testing.T) {
 		Duration: 10 * time.Second,
 	}
 	infoRefreshPause := InfoRefreshPauseDisabled
+	numaPlacement := NUMAPlacementContainer
 
 	exp := toJSON(NodeGroupConfig{
 		PodsFingerprinting: &podsFp,
 		InfoRefreshMode:    &refMode,
 		InfoRefreshPeriod:  &period,
 		InfoRefreshPause:   &infoRefreshPause,
+		NUMAPlacement:      &numaPlacement,
 	})
 	got := toJSON(DefaultNodeGroupConfig())
 
@@ -117,4 +135,8 @@ func ptrToDuration(d time.Duration) *metav1.Duration {
 
 func ptrToRTEMode(m InfoRefreshPauseMode) *InfoRefreshPauseMode {
 	return &m
+}
+
+func ptrToNPMode(v NUMAPlacementMode) *NUMAPlacementMode {
+	return &v
 }

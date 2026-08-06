@@ -23,6 +23,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestNodeGroupNormalizeConfigKeepsTolerations(t *testing.T) {
@@ -86,7 +87,8 @@ func TestNodeGroupConfigMerge(t *testing.T) {
 				InfoRefreshPeriod: &metav1.Duration{
 					Duration: 42 * time.Second,
 				},
-				InfoRefreshPause: ptrToRTEMode(InfoRefreshPauseEnabled),
+				InfoRefreshPause: ptr.To(InfoRefreshPauseEnabled),
+				NUMAPlacement:    ptr.To(NUMAPlacementNone),
 			},
 			expected: NodeGroupConfig{
 				PodsFingerprinting: &podsFp,
@@ -94,7 +96,8 @@ func TestNodeGroupConfigMerge(t *testing.T) {
 				InfoRefreshPeriod: &metav1.Duration{
 					Duration: 42 * time.Second,
 				},
-				InfoRefreshPause: ptrToRTEMode(InfoRefreshPauseEnabled),
+				InfoRefreshPause: ptr.To(InfoRefreshPauseEnabled),
+				NUMAPlacement:    ptr.To(NUMAPlacementNone),
 			},
 		},
 	}
