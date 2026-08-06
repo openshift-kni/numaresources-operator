@@ -20,6 +20,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func DefaultNodeGroupConfig() NodeGroupConfig {
@@ -41,26 +42,29 @@ func (ngc *NodeGroupConfig) SetDefaults() {
 	if ngc.InfoRefreshPause == nil {
 		ngc.InfoRefreshPause = defaultInfoRefreshPause()
 	}
+	if ngc.NumaPlacement == nil {
+		ngc.NumaPlacement = defaultNumaPlacement()
+	}
 }
 
 func defaultPodsFingerprinting() *PodsFingerprintingMode {
-	podsFp := PodsFingerprintingEnabledExclusiveResources
-	return &podsFp
+	return ptr.To(PodsFingerprintingEnabledExclusiveResources)
 }
 
 func defaultInfoRefreshMode() *InfoRefreshMode {
-	refMode := InfoRefreshPeriodic
-	return &refMode
+	return ptr.To(InfoRefreshPeriodic)
 }
 
 func defaultInfoRefreshPeriod() *metav1.Duration {
-	period := metav1.Duration{
+	return ptr.To(metav1.Duration{
 		Duration: 10 * time.Second,
-	}
-	return &period
+	})
 }
 
 func defaultInfoRefreshPause() *InfoRefreshPauseMode {
-	infoRefreshPause := InfoRefreshPauseDisabled
-	return &infoRefreshPause
+	return ptr.To(InfoRefreshPauseDisabled)
+}
+
+func defaultNumaPlacement() *NumaPlacementMode {
+	return ptr.To(NumaPlacementContainer)
 }

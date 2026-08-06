@@ -70,7 +70,7 @@ func TestNodeGroupConfigToString(t *testing.T) {
 					},
 				},
 			},
-			expected: "PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {33s} InfoRefreshPause: Enabled Tolerations: [{Key:foo Operator: Value:1 Effect:NoSchedule TolerationSeconds:<nil>}]",
+			expected: "PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {33s} InfoRefreshPause: Enabled NumaPlacement mode: container Tolerations: [{Key:foo Operator: Value:1 Effect:NoSchedule TolerationSeconds:<nil>}]",
 		},
 	}
 
@@ -155,7 +155,7 @@ func TestNodeGroupToString(t *testing.T) {
 					"ann2": "val2",
 				},
 			},
-			expected: "PoolName: pn MCPSelector: <missing> Config: PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {10s} InfoRefreshPause: Disabled Tolerations: [] Annotations: ann1=val1,ann2=val2",
+			expected: "PoolName: pn MCPSelector: <missing> Config: PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {10s} InfoRefreshPause: Disabled NumaPlacement mode: container Tolerations: [] Annotations: ann1=val1,ann2=val2",
 		},
 		{
 			name: "many annotations",
@@ -173,7 +173,7 @@ func TestNodeGroupToString(t *testing.T) {
 					"ann9": "valA",
 				},
 			},
-			expected: "PoolName: pn MCPSelector: <missing> Config: PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {10s} InfoRefreshPause: Disabled Tolerations: [] Annotations: ann1=val1,ann2=val2,ann3=val7,ann5=val4,ann9=valA",
+			expected: "PoolName: pn MCPSelector: <missing> Config: PodsFingerprinting mode: Disabled InfoRefreshMode: Events InfoRefreshPeriod: {10s} InfoRefreshPause: Disabled NumaPlacement mode: container Tolerations: [] Annotations: ann1=val1,ann2=val2,ann3=val7,ann5=val4,ann9=valA",
 		},
 	}
 	for _, tc := range testcases {

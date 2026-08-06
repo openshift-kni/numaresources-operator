@@ -234,6 +234,10 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig, metricsTLS
 
 	flags.SetOption("--add-nrt-owner", "false")
 
+	numaPlacement := getNumaPlacementMode(&conf)
+	klog.V(2).InfoS("DaemonSet update: NUMA placement reporting", "daemonset", ds.Name, "mode", numaPlacement)
+	flags.SetOption("--numa-placement", string(numaPlacement))
+
 	cnt.Args = flags.Argv()
 	return nil
 }
@@ -356,4 +360,13 @@ func isInfoRefreshPauseEnabled(conf *nropv1.NodeGroupConfig) bool {
 		conf = &cfg
 	}
 	return *conf.InfoRefreshPause == nropv1.InfoRefreshPauseEnabled
+}
+
+func getNumaPlacementMode(conf *nropv1.NodeGroupConfig) nropv1.NumaPlacementMode {
+	cfg := nropv1.DefaultNodeGroupConfig()
+	if conf == nil || conf.NumaPlacement == nil {
+		// not specified -> use defaults
+		conf = &cfg
+	}
+	return *conf.NumaPlacement
 }
