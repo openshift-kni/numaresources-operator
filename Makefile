@@ -240,9 +240,18 @@ binary-numacell: build-tools ## Build the numacell test device plugin binary.
 	CGO_ENABLED=0 go build -mod=vendor -o bin/numacell -ldflags "$$LDFLAGS" test/deviceplugin/cmd/numacell/main.go
 
 .PHONY: binary-getdigests
-binary-getdigests: 
+binary-getdigests: ## Build the getdigests helper binary.
 	LDFLAGS="-s -w"; \
 	go build -mod=vendor -o bin/getdigests -ldflags "$$LDFLAGS" tools/getdigests/getdigests.go
+
+.PHONY: update-scheduler-digests
+update-scheduler-digests: binary-getdigests ## Refresh embedded scheduler image digests from the production registry.
+	bin/getdigests \
+		--current-url registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9:v4.22 \
+		--prev-url registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9:v4.21 \
+		--eus-url registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9:v4.20 \
+		--output internal/api/scheduler/_digests.json
+		
 
 .PHONY: binary-all
 binary-all: goversion binary binary-rte binary-nrovalidate introspect-data ## Build all component binaries.
