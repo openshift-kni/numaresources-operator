@@ -233,6 +233,11 @@ binary-numacell: build-tools
 	LDFLAGS="-s -w" \
 	CGO_ENABLED=0 go build -mod=vendor -o bin/numacell -ldflags "$$LDFLAGS" test/deviceplugin/cmd/numacell/main.go
 
+.PHONY: binary-getdigests
+binary-getdigests: 
+	LDFLAGS="-s -w"; \
+	go build -mod=vendor -o bin/getdigests -ldflags "$$LDFLAGS" tools/getdigests/getdigests.go
+
 .PHONY: binary-all
 binary-all: goversion \
 	binary \

@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
@@ -352,6 +353,75 @@ func TestMultipleMCPsPerTree(t *testing.T) {
 			}
 			if err != nil && !tc.expectedError {
 				t.Errorf("expected success, but failed instead: %v", err)
+			}
+		})
+	}
+}
+
+func TestSchedulerImage(t *testing.T) {
+	const (
+		trustedDigest   = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		untrustedDigest = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	)
+
+	trustedDigests := sets.New(trustedDigest)
+
+	type testCase struct {
+		name                 string
+		image                string
+		digests              sets.Set[string]
+		expectedError        bool
+		expectedErrorMessage string
+	}
+
+	testCases := []testCase{
+		{
+			name:    "accepts trusted digest-pinned image",
+			image:   "registry.example/numaresources/scheduler@" + trustedDigest,
+			digests: trustedDigests,
+		},
+		{
+			name:                 "rejects tag-pinned image",
+			image:                "registry.example/numaresources/scheduler:v4.20.0",
+			digests:              trustedDigests,
+			expectedError:        true,
+			expectedErrorMessage: "must be referenced by digest, not by tag",
+		},
+		{
+			name:                 "rejects malformed digest",
+			image:                "registry.example/numaresources/scheduler@sha256:short",
+			digests:              trustedDigests,
+			expectedError:        true,
+			expectedErrorMessage: "has malformed digest",
+		},
+		{
+			name:                 "rejects digest not in trusted list",
+			image:                "registry.example/numaresources/scheduler@" + untrustedDigest,
+			digests:              trustedDigests,
+			expectedError:        true,
+			expectedErrorMessage: "is not in the trusted list",
+		},
+		{
+			name:          "trusted digest without image name",
+			image:         "@" + trustedDigest,
+			digests:       trustedDigests,
+			expectedError: false, // would fail later on pulling the image
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := SchedulerImage(tc.image, tc.digests)
+			if err == nil && tc.expectedError {
+				t.Errorf("expected error but succeeded instead")
+			}
+			if err != nil && !tc.expectedError {
+				t.Errorf("expected success but failed instead: %v", err)
+			}
+			if tc.expectedErrorMessage != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.expectedErrorMessage) {
+					t.Errorf("unexpected error: %v (expected %q)", err, tc.expectedErrorMessage)
+				}
 			}
 		})
 	}

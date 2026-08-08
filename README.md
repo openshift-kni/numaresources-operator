@@ -18,6 +18,31 @@ Note that installing the operator using this method requires adding the openshif
 
 For further details, please refer to the [operator-sdk documentation](https://sdk.operatorframework.io/docs/olm-integration/tutorial-bundle/)
 
+## deploying with a scheduler
+
+The controller validates the scheduler image set in `numaresourcesscheduler.spec.image` against an embedded set of valid images by their digests. This set is fetched from the production registry. To pass the image validation, the following must be true:
+1. The image is pinned by SHA digest.
+2. The digest belongs to an image that's available in the production registry `registry.redhat.io` and is of the same minor operator version or is the latest of the previous minor version. 
+
+If a privileged user wants to extend the allow list to include other digests, that is possible by providing a comma-separated list of SHA digests as an environment variable `SCHEDULER_IMAGE_DIGESTS` under `subscription.spec.config.env`.
+A privileged user can completely disable the image validation by setting `SCHEDULER_IMAGE_VALIDATION` to `false` under `subscription.spec.config.env`, any other value is ignored and keeps the validation `ON`.
+
+
+On locally installed operators (no OLM), one can directly set the environment variables through the manager deployment using this command:
+
+```
+kubectl -n numaresources set env deployment/numaresources-controller-manager \
+  SCHEDULER_IMAGE_DIGESTS='sha256:abc...'
+```
+
+or completely disable the validation:
+```
+kubectl -n numaresources set env deployment/numaresources-controller-manager \
+  SCHEDULER_IMAGE_VALIDATION=false
+```
+
+IMPORTANT: the cluster admin should ensure that only other cluster admins (e.g. not namespace users) can set these variables.
+
 ## roadmap
 
 The NUMA Resources operator is meant to have a limited lifetime, because all the operands it manages have a path towards
