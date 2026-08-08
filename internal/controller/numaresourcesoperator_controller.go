@@ -65,6 +65,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
+	numazonestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/numazone"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
@@ -112,9 +113,9 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;list;watch,namespace="numaresources"
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,resourceNames=rte-default-deny-all;rte-egress-to-api-server,verbs=get;update,namespace="numaresources"
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=create;delete;get;list;update;watch,namespace="numaresources"
-//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=create;get;list;update;watch,namespace="numaresources"
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,resourceNames=rte,verbs=get;update,namespace="numaresources"
-//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;get;list;update;watch,namespace="numaresources"
 //+kubebuilder:rbac:groups="",resources=serviceaccounts,resourceNames=rte,verbs=get;update,namespace="numaresources"
 
 // Cluster Scoped
@@ -314,9 +315,14 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 		return step
 	}
 
+	numazoneDSPerPool, step := r.reconcileNUMAAwareDevicePlugin(ctx, instance, trees)
+	if step.EarlyStop() {
+		return step
+	}
+
 	// all fields of NodeGroupStatus are required so publish the status only when all daemonset and MCPs are updated which
 	// is a certain thing if we got to this point otherwise the function would have returned already
-	instance.Status.NodeGroups = syncNodeGroupsStatus(instance, dsPerPool)
+	instance.Status.NodeGroups = syncNodeGroupsStatus(instance, dsPerPool, numazoneDSPerPool)
 
 	return intreconcile.StepSuccess()
 }
@@ -342,7 +348,66 @@ func (r *NUMAResourcesOperatorReconciler) syncDaemonSetsStatuses(ctx context.Con
 	return dssWithReadyStatus, "", nil
 }
 
-func syncNodeGroupsStatus(instance *nropv1.NUMAResourcesOperator, dsPerPool []poolDaemonSet) []nropv1.NodeGroupStatus {
+func (r *NUMAResourcesOperatorReconciler) reconcileNUMAAwareDevicePlugin(ctx context.Context, instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) (map[string]nropv1.NamespacedName, intreconcile.Step) {
+	numazoneDSPerPool := make(map[string]nropv1.NamespacedName)
+
+	for _, tree := range trees {
+		poolNames := nodegroupv1.GetTreePoolsNames(tree)
+		config := tree.NodeGroup.NormalizeConfig()
+
+		for _, poolName := range poolNames {
+			componentName := numazonestate.ComponentNameFor(instance.Name, poolName)
+			existing := numazonestate.FromClient(ctx, r.Client, r.Namespace, componentName)
+
+			if !numazonestate.IsEnabled(&config) {
+				for _, objState := range existing.DeletionState() {
+					if _, _, err := apply.ApplyState(ctx, r.Client, objState); err != nil {
+						return nil, intreconcile.StepFailed(fmt.Errorf("NUMA-aware device plugin: failed to delete %s/%s: %w", objState.Existing.GetNamespace(), objState.Existing.GetName(), err))
+					}
+				}
+				continue
+			}
+
+			nodeSelector := numazoneNodeSelector(tree, poolName)
+			desired := numazonestate.DesiredManifests(r.Namespace, componentName, r.Images.Preferred(), r.ImagePullPolicy, nodeSelector)
+
+			for _, objState := range existing.State(desired) {
+				if objState.Error != nil {
+					klog.Warningf("NUMA-aware device plugin: error loading object: %v", objState.Error)
+				}
+				if err := controllerutil.SetControllerReference(instance, objState.Desired, r.Scheme); err != nil {
+					return nil, intreconcile.StepFailed(fmt.Errorf("NUMA-aware device plugin: failed to set controller reference to %s %s: %w", objState.Desired.GetNamespace(), objState.Desired.GetName(), err))
+				}
+				if _, _, err := apply.ApplyObject(ctx, r.Client, objState); err != nil {
+					return nil, intreconcile.StepFailed(fmt.Errorf("NUMA-aware device plugin: failed to apply (%s) %s/%s: %w", objState.Desired.GetObjectKind().GroupVersionKind(), objState.Desired.GetNamespace(), objState.Desired.GetName(), err))
+				}
+			}
+
+			numazoneDSPerPool[poolName] = nropv1.NamespacedName{
+				Namespace: desired.DaemonSet.Namespace,
+				Name:      desired.DaemonSet.Name,
+			}
+		}
+	}
+
+	return numazoneDSPerPool, intreconcile.StepSuccess()
+}
+
+func numazoneNodeSelector(tree nodegroupv1.Tree, poolName string) map[string]string {
+	for _, mcp := range tree.MachineConfigPools {
+		if mcp.Name == poolName && mcp.Spec.NodeSelector != nil {
+			return mcp.Spec.NodeSelector.MatchLabels
+		}
+	}
+	if tree.NodeGroup.PoolName != nil {
+		return map[string]string{
+			rtestate.HyperShiftNodePoolLabel: poolName,
+		}
+	}
+	return nil
+}
+
+func syncNodeGroupsStatus(instance *nropv1.NUMAResourcesOperator, dsPerPool []poolDaemonSet, numazoneDSPerPool map[string]nropv1.NamespacedName) []nropv1.NodeGroupStatus {
 	ngStatuses := []nropv1.NodeGroupStatus{}
 
 	if len(instance.Status.MachineConfigPools) == 0 {
@@ -355,6 +420,9 @@ func syncNodeGroupsStatus(instance *nropv1.NUMAResourcesOperator, dsPerPool []po
 					PoolName:  info.PoolName,
 					Config:    *group.Config,
 					DaemonSet: info.DaemonSet,
+				}
+				if dsName, ok := numazoneDSPerPool[info.PoolName]; ok {
+					status.NUMAAwareDevicePluginDaemonSet = &dsName
 				}
 				ngStatuses = append(ngStatuses, status)
 			}
@@ -371,6 +439,9 @@ func syncNodeGroupsStatus(instance *nropv1.NUMAResourcesOperator, dsPerPool []po
 				PoolName:  mcp.Name,
 				Config:    *mcp.Config,
 				DaemonSet: info.DaemonSet,
+			}
+			if dsName, ok := numazoneDSPerPool[mcp.Name]; ok {
+				status.NUMAAwareDevicePluginDaemonSet = &dsName
 			}
 			ngStatuses = append(ngStatuses, status)
 		}
