@@ -399,6 +399,11 @@ func (in *NodeGroupConfig) DeepCopyInto(out *NodeGroupConfig) {
 		*out = new(InfoRefreshPauseMode)
 		**out = **in
 	}
+	if in.NumaPlacement != nil {
+		in, out := &in.NumaPlacement, &out.NumaPlacement
+		*out = new(NumaPlacementMode)
+		**out = **in
+	}
 	if in.Tolerations != nil {
 		in, out := &in.Tolerations, &out.Tolerations
 		*out = make([]corev1.Toleration, len(*in))

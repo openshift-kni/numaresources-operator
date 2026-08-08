@@ -66,7 +66,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2026-07-14T08:24:59Z"
+    createdAt: "2026-08-05T20:32:26Z"
     features.operators.openshift.io/cnf: "true"
     features.operators.openshift.io/cni: "false"
     features.operators.openshift.io/csi: "false"
@@ -136,6 +136,12 @@ spec:
           explicit 0 to disable.
         displayName: Topology info refresh period setting
         path: nodeGroups[0].config.infoRefreshPeriod
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
+      - description: NumaPlacement defines if container NUMA placement should be reported
+          in NRT for the machines belonging to this group
+        displayName: Enable or disable container NUMA placement reporting
+        path: nodeGroups[0].config.numaPlacement
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
       - description: PodsFingerprinting defines if pod fingerprint should be reported

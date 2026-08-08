@@ -77,6 +77,17 @@ const (
 	InfoRefreshPauseEnabled InfoRefreshPauseMode = "Enabled"
 )
 
+// +kubebuilder:validation:Enum=Disabled;Enabled
+type NumaPlacementMode string
+
+const (
+	// NumaPlacementEnabled enables container NUMA placement reporting in NRT. It is the default.
+	NumaPlacementEnabled NumaPlacementMode = "Enabled"
+
+	// NumaPlacementDisabled disables container NUMA placement reporting in NRT.
+	NumaPlacementDisabled NumaPlacementMode = "Disabled"
+)
+
 // +kubebuilder:validation:Enum=Periodic;Events;PeriodicAndEvents
 type InfoRefreshMode string
 
@@ -109,6 +120,10 @@ type NodeGroupConfig struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Enable or disable the RTE pause setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	InfoRefreshPause *InfoRefreshPauseMode `json:"infoRefreshPause,omitempty"`
+	// NumaPlacement defines if container NUMA placement should be reported in NRT for the machines belonging to this group
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Enable or disable container NUMA placement reporting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	NumaPlacement *NumaPlacementMode `json:"numaPlacement,omitempty"`
 	// Tolerations overrides tolerations to be set into RTE daemonsets for this NodeGroup. If not empty, the tolerations will be the one set here.
 	// Leave empty to make the system use the default tolerations.
 	// +optional
@@ -235,7 +250,7 @@ func (ngc *NodeGroupConfig) ToString() string {
 		return "nil"
 	}
 	ngc.SetDefaults()
-	return fmt.Sprintf("PodsFingerprinting mode: %s InfoRefreshMode: %s InfoRefreshPeriod: %s InfoRefreshPause: %s Tolerations: %+v", *ngc.PodsFingerprinting, *ngc.InfoRefreshMode, *ngc.InfoRefreshPeriod, *ngc.InfoRefreshPause, ngc.Tolerations)
+	return fmt.Sprintf("PodsFingerprinting mode: %s InfoRefreshMode: %s InfoRefreshPeriod: %s InfoRefreshPause: %s NumaPlacement mode: %s Tolerations: %+v", *ngc.PodsFingerprinting, *ngc.InfoRefreshMode, *ngc.InfoRefreshPeriod, *ngc.InfoRefreshPause, *ngc.NumaPlacement, ngc.Tolerations)
 }
 
 func (ng *NodeGroup) GetName() string {
