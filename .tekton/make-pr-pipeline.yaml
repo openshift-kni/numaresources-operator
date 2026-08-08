@@ -1,0 +1,84 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  annotations:
+    build.appstudio.openshift.io/repo: https://github.com/openshift-kni/numaresources-operator?rev={{revision}}
+    build.appstudio.redhat.com/commit_sha: '{{revision}}'
+    build.appstudio.redhat.com/target_branch: '{{target_branch}}'
+    pipelinesascode.tekton.dev/cancel-in-progress: "false"
+    pipelinesascode.tekton.dev/max-keep-runs: "3"
+    # Fetch the Hub git-clone task and the local custom task
+    pipelinesascode.tekton.dev/task: "[git-clone, tasks/make-and-create-pr.yaml]"
+    # Digest updates are driven by registry state, not repo path changes, so
+    # run on every push to main. The task no-ops when digests are unchanged.
+    pipelinesascode.tekton.dev/on-cel-expression: |
+      event == "pull_request" &&
+      target_branch == "main" &&
+      ("tasks/make-and-create-pr.yaml".pathChanged() ||
+      ".tekton/make-pr-pipeline.yaml".pathChanged())
+  creationTimestamp: null
+  name: update-scheduler-digests-on-push
+spec:
+  params:
+  - name: git-url
+    value: '{{source_url}}'
+  - name: revision
+    value: '{{revision}}'
+  - name: target-branch
+    value: '{{target_branch}}'
+  timeouts:
+    pipeline: 1h0m0s
+  workspaces:
+  - name: source-workspace
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
+  - name: basic-auth
+    secret:
+      secretName: '{{ git_auth_secret }}'
+  pipelineSpec:
+    params:
+    - name: git-url
+      type: string
+    - name: revision
+      type: string
+    - name: target-branch
+      type: string
+      default: main
+    workspaces:
+    - name: source-workspace
+    - name: basic-auth
+    tasks:
+    - name: clone-repo
+      taskRef:
+        name: git-clone
+      workspaces:
+      - name: output
+        workspace: source-workspace
+      - name: basic-auth
+        workspace: basic-auth
+      params:
+      - name: url
+        value: $(params.git-url)
+      - name: revision
+        value: $(params.revision)
+    - name: run-make-target-and-pr
+      runAfter:
+      - clone-repo
+      taskRef:
+        name: make-and-create-pr
+      workspaces:
+      - name: source
+        workspace: source-workspace
+      - name: basic-auth
+        workspace: basic-auth
+      params:
+      - name: repo-url
+        value: https://api.github.com/repos/openshift-kni/numaresources-operator
+      - name: target-branch
+        value: $(params.target-branch)
+status: {}
