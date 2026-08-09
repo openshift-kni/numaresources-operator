@@ -284,7 +284,8 @@ spec:
         path: cacheResyncPeriod
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
-      - description: Scheduler container image URL
+      - description: Scheduler container image URL, must be referenced by SHA256 digest,
+          not by tag
         displayName: Scheduler container image URL
         path: imageSpec
         x-descriptors:
