@@ -7,8 +7,8 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    # Fetch the Hub git-clone task and the local custom task
-    pipelinesascode.tekton.dev/task: "[git-clone, tasks/make-and-create-pr.yaml]"
+    # Local custom task only; git-clone comes from the Konflux catalog via bundles
+    pipelinesascode.tekton.dev/task: "[tasks/make-and-create-pr.yaml]"
     # Digest updates are driven by registry state, not repo path changes, so
     # run on every push to main. The task no-ops when digests are unchanged.
     pipelinesascode.tekton.dev/on-cel-expression: |
@@ -28,6 +28,9 @@ spec:
     value: '{{target_branch}}'
   timeouts:
     pipeline: 1h0m0s
+  # Required for Konflux catalog git-clone (runs as root / appstudio-pipelines-scc)
+  taskRunTemplate:
+    serviceAccountName: build-pipeline-numaresources-operator-5-0
   workspaces:
   - name: source-workspace
     volumeClaimTemplate:
@@ -37,9 +40,12 @@ spec:
         resources:
           requests:
             storage: 5Gi
-  - name: basic-auth
+  - name: git-auth
     secret:
       secretName: '{{ git_auth_secret }}'
+  - name: pull-secret
+    secret:
+      secretName: telco-5g-redhat-pull-secret
   pipelineSpec:
     params:
     - name: git-url
@@ -51,31 +57,45 @@ spec:
       default: main
     workspaces:
     - name: source-workspace
-    - name: basic-auth
+    - name: git-auth
+    - name: pull-secret
     tasks:
-    - name: clone-repo
+    - name: clone-repository
       taskRef:
-        name: git-clone
+        params:
+        - name: name
+          value: git-clone
+        - name: bundle
+          value: quay.io/konflux-ci/tekton-catalog/task-git-clone:0.2@sha256:4ba6a13721fc5e7258d2ca6a0bed0dae9be5548691c691cb5eb36aea5ac62136
+        - name: kind
+          value: task
+        resolver: bundles
       workspaces:
       - name: output
         workspace: source-workspace
       - name: basic-auth
-        workspace: basic-auth
+        workspace: git-auth
       params:
       - name: url
         value: $(params.git-url)
       - name: revision
         value: $(params.revision)
+      # Konflux git-clone defaults subdirectory to "source"; empty keeps the
+      # checkout at the workspace root for the following make task.
+      - name: subdirectory
+        value: ""
     - name: run-make-target-and-pr
       runAfter:
-      - clone-repo
+      - clone-repository
       taskRef:
         name: make-and-create-pr
       workspaces:
       - name: source
         workspace: source-workspace
       - name: basic-auth
-        workspace: basic-auth
+        workspace: git-auth
+      - name: pull-secret
+        workspace: pull-secret
       params:
       - name: repo-url
         value: https://api.github.com/repos/openshift-kni/numaresources-operator

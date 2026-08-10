@@ -250,8 +250,9 @@ update-scheduler-digests: binary-getdigests ## Refresh embedded scheduler image 
 		--current-url registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9:v4.22 \
 		--prev-url registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9:v4.21 \
 		--eus-url registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9:v4.20 \
-		--output internal/api/scheduler/_digests.json
-		
+		--output internal/api/scheduler/_digests.json \
+		$(if $(PULL_SECRET),--pull-secret $(PULL_SECRET),)
+
 
 .PHONY: binary-all
 binary-all: goversion binary binary-rte binary-nrovalidate introspect-data ## Build all component binaries.

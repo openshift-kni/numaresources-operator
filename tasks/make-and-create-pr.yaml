@@ -10,6 +10,9 @@ spec:
   workspaces:
   - name: source
   - name: basic-auth
+  - name: pull-secret
+    optional: true
+    description: dockerconfigjson for registry.redhat.io (e.g. telco-5g-redhat-pull-secret)
   params:
   - name: target-branch
     type: string
@@ -31,14 +34,33 @@ spec:
       #!/usr/bin/env bash
       set -euo pipefail
 
-      if ! command -v skopeo >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
-        dnf install -y skopeo curl git make
+      # ubi go-toolset ships curl-minimal (provides `curl`); installing `curl`
+      # conflicts. Only install packages that are actually missing.
+      need=()
+      command -v skopeo >/dev/null 2>&1 || need+=(skopeo)
+      command -v git >/dev/null 2>&1 || need+=(git)
+      command -v make >/dev/null 2>&1 || need+=(make)
+      command -v curl >/dev/null 2>&1 || need+=(curl-minimal)
+      if ((${#need[@]})); then
+        dnf install -y "${need[@]}"
       fi
 
       # go.mod may require a newer toolchain than the image provides
       export GOTOOLCHAIN=auto
 
       GITHUB_TOKEN="$(cat "$(workspaces.basic-auth.path)/git-provider-token")"
+
+      if [ -d "$(workspaces.pull-secret.path)" ]; then
+        for candidate in \
+          "$(workspaces.pull-secret.path)/.dockerconfigjson" \
+          "$(workspaces.pull-secret.path)/.dockercfg"; do
+          if [ -f "$candidate" ]; then
+            echo "Using pull secret $candidate"
+            export PULL_SECRET="$candidate"
+            break
+          fi
+        done
+      fi
 
       make update-scheduler-digests
 
