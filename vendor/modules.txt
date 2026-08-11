@@ -203,7 +203,7 @@ github.com/k8stopologyawareschedwg/numaplacement/leb89
 # github.com/k8stopologyawareschedwg/podfingerprint v0.2.3
 ## explicit; go 1.18
 github.com/k8stopologyawareschedwg/podfingerprint
-# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.25.0
+# github.com/k8stopologyawareschedwg/resource-topology-exporter v0.25.1
 ## explicit; go 1.25.0
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/config
 github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/dump
