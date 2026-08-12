@@ -719,8 +719,8 @@ konflux-update-rpm-lock-operator: sync-git-submodules ## Update the rpm lock fil
 	@echo "Updating rpm lock file for the operator..."
 	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/rpm-lock generate-rhel9-locks \
 		LOCK_SCRIPT_TARGET_DIR=$(PROJECT_DIR)/.konflux/operator/tmp/ \
-		RHEL9_EXECUTION_IMAGE=$$(grep -E '^FROM registry.access.redhat.com/ubi9/ubi-minimal' $(PROJECT_DIR)/.konflux/operator/konflux.Dockerfile | sed 's|FROM ||' | sed 's|ubi-minimal|ubi|g' | sed 's|@.*||') \
-		RHEL9_IMAGE_TO_LOCK=$$(grep -E '^FROM registry.access.redhat.com/ubi9/ubi-minimal' $(PROJECT_DIR)/.konflux/operator/konflux.Dockerfile | sed 's|FROM ||')
+		RHEL9_EXECUTION_IMAGE=$$(grep -E '^FROM .*/ubi9/ubi-minimal' $(PROJECT_DIR)/.konflux/operator/konflux.Dockerfile | sed 's|FROM ||' | sed 's|ubi-minimal[^:]*|ubi|' | sed 's|@.*||') \
+		RHEL9_IMAGE_TO_LOCK=$$(grep -E '^FROM .*/ubi9/ubi-minimal' $(PROJECT_DIR)/.konflux/operator/konflux.Dockerfile | sed 's|FROM ||')
 	@echo "Update rpms.lock.yaml with new contents..."
 	cp $(PROJECT_DIR)/.konflux/operator/tmp/rpms.lock.yaml $(PROJECT_DIR)/.konflux/operator/rpms.lock.yaml
 	# intentionally keep operator/tmp/ directory for debugging purposes
