@@ -39,7 +39,7 @@ import (
 	intbaseload "github.com/openshift-kni/numaresources-operator/internal/baseload"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
-	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
+	numazoneapi "github.com/openshift-kni/numaresources-operator/pkg/numazone/api"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
@@ -339,7 +339,7 @@ var _ = Describe("[serial][disruptive][preemption] priority-based workload place
 
 				// first pod with two containers, pinned to the first zone
 				defaultPriorityPodResZone0 := baseload.Resources.DeepCopy()
-				defaultPriorityPodResZone0[numacellapi.MakeResourceName(0)] = resource.MustParse("1")
+				defaultPriorityPodResZone0[numazoneapi.MakeResourceName(0)] = resource.MustParse("1")
 				defaultPriorityPod1 := objects.NewTestPodPause(fxt.Namespace.Name, "default-priority-filler-1")
 				defaultPriorityPod1.Spec.SchedulerName = serialconfig.Config.SchedulerName
 				defaultPriorityPod1.Spec.Containers[0].Resources = corev1.ResourceRequirements{
@@ -352,7 +352,7 @@ var _ = Describe("[serial][disruptive][preemption] priority-based workload place
 
 				// second pod with two containers, pinned to the second zone
 				defaultPriorityPodResZone1 := baseload.Resources.DeepCopy()
-				defaultPriorityPodResZone1[numacellapi.MakeResourceName(1)] = resource.MustParse("1")
+				defaultPriorityPodResZone1[numazoneapi.MakeResourceName(1)] = resource.MustParse("1")
 				cntResourcesZone1 := corev1.ResourceRequirements{
 					Limits:   defaultPriorityPodResZone1,
 					Requests: defaultPriorityPodResZone1,
