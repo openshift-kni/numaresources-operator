@@ -6,13 +6,13 @@ COPY . .
 RUN make build-tools
 RUN make build-topics
 RUN make build-e2e-all
-RUN make build-numacell
+RUN make build-numazone
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 WORKDIR /usr/local/bin
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/e2e-nrop*.test .
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/run-e2e-nrop*.sh .
-COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/numacell /bin/numacell
+COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/numazone /bin/numazone
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/pause /pause
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/topics.json /usr/local/share/topics.json
 CMD ["./run-e2e-nrop-serial.sh"]
