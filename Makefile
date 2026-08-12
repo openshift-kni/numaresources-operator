@@ -239,6 +239,12 @@ binary-numazone: build-tools ## Build the NUMA-aware device plugin binary.
 	LDFLAGS="-s -w" \
 	CGO_ENABLED=0 go build -mod=vendor -o bin/numazone -ldflags "$$LDFLAGS" numazone/main.go
 
+# Temporary alias: openshift/release still invokes binary-numacell in
+# binary_build_commands. Keep this until that config is updated after this PR
+# has had review time; merging the release change early would break other PRs.
+.PHONY: binary-numacell
+binary-numacell: binary-numazone
+
 .PHONY: binary-getdigests
 binary-getdigests: 
 	LDFLAGS="-s -w"; \
@@ -317,6 +323,10 @@ build-rte: generate-source fmt vet binary-rte introspect-data ## Build the RTE c
 
 .PHONY: build-numazone
 build-numazone: fmt vet binary-numazone ## Build the NUMA-aware device plugin.
+
+# Temporary alias for callers still using the pre-rename target name.
+.PHONY: build-numacell
+build-numacell: build-numazone
 
 .PHONY: build-nrovalidate
 build-nrovalidate: generate-source fmt vet binary-nrovalidate ## Build the nrovalidate tool.
