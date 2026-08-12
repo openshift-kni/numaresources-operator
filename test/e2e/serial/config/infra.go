@@ -145,10 +145,16 @@ func GetNUMAAwareDevicePluginPullSpec() string {
 }
 
 func getNUMAAwareDevicePluginPullSpec() string {
+	if pullSpec, ok := os.LookupEnv("E2E_NROP_URL_NUMAZONE_DEVICE_PLUGIN"); ok {
+		return pullSpec
+	}
+	if pullSpec, ok := os.LookupEnv("E2E_NUMAZONE_DEVICE_PLUGIN_URL"); ok {
+		return pullSpec
+	}
+	// backward compatibility with pre-rename env names
 	if pullSpec, ok := os.LookupEnv("E2E_NROP_URL_NUMACELL_DEVICE_PLUGIN"); ok {
 		return pullSpec
 	}
-	// backward compatibility
 	if pullSpec, ok := os.LookupEnv("E2E_NUMACELL_DEVICE_PLUGIN_URL"); ok {
 		return pullSpec
 	}
