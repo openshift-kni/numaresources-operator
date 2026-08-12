@@ -1,4 +1,4 @@
-name: CI numacell device plugin release flow
+name: CI numazone device plugin release flow
 
 on:
   workflow_dispatch:
@@ -25,7 +25,7 @@ jobs:
           image: numacell-device-plugin
           tags: test-ci
           dockerfiles: |
-            ./test/deviceplugin/cmd/numacell/Dockerfile
+            ./Dockerfile.numazone
 
       - name: Push to quay
         id: push-to-quay
