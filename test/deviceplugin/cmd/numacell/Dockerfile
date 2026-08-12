@@ -7,4 +7,6 @@ RUN make build-numacell
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/numacell /bin/numacell
+# Temporary compatibility path for the upcoming numazone rename.
+COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/numacell /bin/numazone
 ENTRYPOINT ["/bin/numacell", "-alsologtostderr", "-v", "3"]
