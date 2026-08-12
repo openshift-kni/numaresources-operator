@@ -96,7 +96,7 @@ func Teardown() {
 		return
 	}
 	TeardownInfra(Config.Fixture, Config.infraNRTList)
-	// numacell daemonset automatically cleaned up when we remove the namespace
+	// numazone daemonset automatically cleaned up when we remove the namespace
 	err := TeardownFixture()
 	Expect(err).NotTo(HaveOccurred())
 }
