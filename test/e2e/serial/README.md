@@ -3,7 +3,7 @@
 The "serial" e2e test suite holds e2e tests covering topology-aware scheduling as a whole.
 
 For this purposes "end to end" means the cluster, taken as black box, with minimal breakages to this rule
-only iff and when these breakages are extremely helpful (point in case: the numacell plugin).
+only iff and when these breakages are extremely helpful (point in case: the numazone plugin).
 All these cases are vetted anyway, and the goal is to gradually minimize or eliminate them all.
 
 Because of the fact that "e2e" is the cluster here, the suite expects to run against an already configured
