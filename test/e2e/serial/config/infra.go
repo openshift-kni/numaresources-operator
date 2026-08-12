@@ -39,13 +39,14 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
+	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 func SetupInfra(fxt *e2efixture.Fixture, nroOperObj *nropv1.NUMAResourcesOperator, nrtList nrtv1alpha2.NodeResourceTopologyList) {
-	setupNUMAZone(fxt, nroOperObj.Spec.NodeGroups, nrtList, 3*time.Minute)
+	setupNUMAZone(fxt, nroOperObj, nrtList, 3*time.Minute)
 	LabelNodes(fxt.Client, nrtList)
 }
 
@@ -53,12 +54,13 @@ func TeardownInfra(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopo
 	UnlabelNodes(fxt.Client, nrtList)
 }
 
-func setupNUMAZone(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, nrtList nrtv1alpha2.NodeResourceTopologyList, timeout time.Duration) {
+func setupNUMAZone(fxt *e2efixture.Fixture, nroOperObj *nropv1.NUMAResourcesOperator, nrtList nrtv1alpha2.NodeResourceTopologyList, timeout time.Duration) {
 	klog.InfoS("e2e infra setup begin")
 
-	Expect(nodeGroups).ToNot(BeEmpty(), "cannot autodetect the TAS node groups from the cluster")
+	Expect(nroOperObj).ToNot(BeNil(), "NUMAResourcesOperator object is required for e2e infra setup")
+	Expect(nroOperObj.Spec.NodeGroups).ToNot(BeEmpty(), "cannot autodetect the TAS node groups from the cluster")
 
-	poolNames, err := nodegroups.GetPoolNamesFrom(context.TODO(), fxt.Client, nodeGroups)
+	poolNames, err := nodegroups.GetPoolNamesFrom(context.TODO(), fxt.Client, nroOperObj.Spec.NodeGroups)
 	Expect(err).ToNot(HaveOccurred())
 	klog.InfoS("setting e2e infra for pools", "poolCount", len(poolNames))
 
@@ -74,12 +76,13 @@ func setupNUMAZone(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, nrtLi
 	err = fxt.Client.Create(context.TODO(), rb)
 	Expect(err).ToNot(HaveOccurred(), "cannot create the NUMA-aware device plugin rolebinding %q in the namespace %q", sa.Name, sa.Namespace)
 
+	pullSpec := GetNUMAAwareDevicePluginPullSpec(context.TODO(), fxt.Client, nroOperObj)
+
 	var dss []*appsv1.DaemonSet
 	for _, poolName := range poolNames {
 		dsName := objectnames.GetComponentName(numazonemanifests.Prefix, poolName)
 		klog.InfoS("setting e2e infra for pool", "poolName", poolName, "daemonsetName", dsName)
 
-		pullSpec := GetNUMAAwareDevicePluginPullSpec()
 		labels, err := nodegroups.NodeSelectorFromPoolName(context.TODO(), fxt.Client, poolName)
 		Expect(err).ToNot(HaveOccurred())
 		ds := numazonemanifests.DaemonSet(labels, fxt.Namespace.Name, dsName, sa.Name, pullSpec)
@@ -138,13 +141,13 @@ func waitResourcesAvailable(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeRes
 	wg.Wait()
 }
 
-func GetNUMAAwareDevicePluginPullSpec() string {
-	pullSpec := getNUMAAwareDevicePluginPullSpec()
+func GetNUMAAwareDevicePluginPullSpec(ctx context.Context, cli client.Client, nroOperObj *nropv1.NUMAResourcesOperator) string {
+	pullSpec := getNUMAAwareDevicePluginPullSpec(ctx, cli, nroOperObj)
 	klog.InfoS("using NUMA-aware device plugin", "image", pullSpec)
 	return pullSpec
 }
 
-func getNUMAAwareDevicePluginPullSpec() string {
+func getNUMAAwareDevicePluginPullSpec(ctx context.Context, cli client.Client, nroOperObj *nropv1.NUMAResourcesOperator) string {
 	if pullSpec, ok := os.LookupEnv("E2E_NROP_URL_NUMAZONE_DEVICE_PLUGIN"); ok {
 		return pullSpec
 	}
@@ -158,7 +161,40 @@ func getNUMAAwareDevicePluginPullSpec() string {
 	if pullSpec, ok := os.LookupEnv("E2E_NUMACELL_DEVICE_PLUGIN_URL"); ok {
 		return pullSpec
 	}
+
+	// Prefer the operator-managed RTE image. In productization, numazone is
+	// shipped in the same multi-entrypoint operator image as RTE.
+	if pullSpec, err := devicePluginImageFromRTEDaemonSet(ctx, cli, nroOperObj); err == nil {
+		return pullSpec
+	} else {
+		klog.InfoS("unable to discover device plugin image from RTE DaemonSet, using fallback", "error", err)
+	}
 	return images.NUMAAwareDevicePluginTestImageCI
+}
+
+func devicePluginImageFromRTEDaemonSet(ctx context.Context, cli client.Client, nroOperObj *nropv1.NUMAResourcesOperator) (string, error) {
+	if nroOperObj == nil {
+		return "", fmt.Errorf("NUMAResourcesOperator object is nil")
+	}
+	if len(nroOperObj.Status.DaemonSets) == 0 {
+		return "", fmt.Errorf("NUMAResourcesOperator %q has no RTE DaemonSets in status", nroOperObj.Name)
+	}
+
+	dss, err := objects.GetDaemonSetsByNamespacedName(cli, ctx, nroOperObj.Status.DaemonSets...)
+	if err != nil {
+		return "", err
+	}
+	if len(dss) == 0 {
+		return "", fmt.Errorf("no RTE DaemonSets found for NUMAResourcesOperator %q", nroOperObj.Name)
+	}
+	if len(dss[0].Spec.Template.Spec.Containers) == 0 {
+		return "", fmt.Errorf("RTE DaemonSet %s/%s has no containers", dss[0].Namespace, dss[0].Name)
+	}
+	image := dss[0].Spec.Template.Spec.Containers[0].Image
+	if image == "" {
+		return "", fmt.Errorf("RTE DaemonSet %s/%s has empty container image", dss[0].Namespace, dss[0].Name)
+	}
+	return image, nil
 }
 
 func LabelNodes(cli client.Client, nrtList nrtv1alpha2.NodeResourceTopologyList) {

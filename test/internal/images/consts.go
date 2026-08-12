@@ -20,6 +20,8 @@ const (
 	RTETestImageCI   = "quay.io/openshift-kni/resource-topology-exporter:test-ci"
 	SchedTestImageCI = "quay.io/openshift-kni/scheduler-plugins:test-ci"
 
+	// Last-resort fallback when the operator/RTE image cannot be discovered.
+	// Prefer the operator-bundled image (same multi-entrypoint image as RTE).
 	// NEVER EVER USE THIS OUTSIDE CI or (early) DEVELOPMENT ENVIRONMENTS
 	NUMAAwareDevicePluginTestImageCI = "quay.io/openshift-kni/numacell-device-plugin:test-ci"
 
