@@ -91,6 +91,18 @@ const (
 	InfoRefreshPeriodicAndEvents InfoRefreshMode = "PeriodicAndEvents"
 )
 
+// NUMAAwareDevicePluginMode controls whether the NUMA-aware device plugin is deployed.
+// +kubebuilder:validation:Enum=Disabled;Enabled
+type NUMAAwareDevicePluginMode string
+
+const (
+	// NUMAAwareDevicePluginDisabled disables the NUMA-aware device plugin deployment.
+	NUMAAwareDevicePluginDisabled NUMAAwareDevicePluginMode = "Disabled"
+
+	// NUMAAwareDevicePluginEnabled enables the NUMA-aware device plugin deployment.
+	NUMAAwareDevicePluginEnabled NUMAAwareDevicePluginMode = "Enabled"
+)
+
 // NodeGroupConfig exposes topology info reporting setting per node group
 type NodeGroupConfig struct {
 	// PodsFingerprinting defines if pod fingerprint should be reported for the machines belonging to this group
@@ -114,6 +126,12 @@ type NodeGroupConfig struct {
 	// +optional
 	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="Extra tolerations for the topology updater daemonset",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
+	// NUMAAwareDevicePlugin enables the NUMA-aware device plugin for this node group.
+	// When enabled, a device plugin DaemonSet is deployed to nodes in this group,
+	// exposing per-NUMA-zone devices for topology-aware workload placement.
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=spec,displayName="NUMA-aware device plugin setting",xDescriptors={"urn:alm:descriptor:com.tectonic.ui:text"}
+	NUMAAwareDevicePlugin *NUMAAwareDevicePluginMode `json:"numaAwareDevicePlugin,omitempty"`
 }
 
 const (
@@ -163,6 +181,10 @@ type NodeGroupStatus struct {
 	// PoolName represents the pool name to which the nodes belong that the config of this node group is be applied to
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Pool name of nodes in this node group"
 	PoolName string `json:"selector"`
+	// NUMAAwareDevicePluginDaemonSet is the DaemonSet for the NUMA-aware device plugin, if enabled for this node group.
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="NUMA-aware device plugin DaemonSet"
+	NUMAAwareDevicePluginDaemonSet *NamespacedName `json:"numaAwareDevicePluginDaemonSet,omitempty"`
 }
 
 // NUMAResourcesOperatorStatus defines the observed state of NUMAResourcesOperator
