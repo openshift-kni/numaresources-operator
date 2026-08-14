@@ -6,8 +6,8 @@ metadata:
 spec:
   imageDigestMirrors:
   - mirrors:
-    - registry.stage.redhat.io/openshift4/numaresources-rhel9-operator
-    source: registry.redhat.io/openshift4/numaresources-rhel9-operator
+    - registry.stage.redhat.io/openshift5/numaresources-rhel9-operator
+    source: registry.redhat.io/openshift5/numaresources-rhel9-operator
   - mirrors:
-    - registry.stage.redhat.io/openshift4/numaresources-operator-bundle
-    source: registry.redhat.io/openshift4/numaresources-operator-bundle
+    - registry.stage.redhat.io/openshift5/numaresources-operator-bundle
+    source: registry.redhat.io/openshift5/numaresources-operator-bundle
