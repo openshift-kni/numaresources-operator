@@ -110,8 +110,8 @@ github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnr
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
 github.com/jtolds/gls v4.20.0+incompatible h1:xdiiI2gbIgH/gLH7ADydsJ1uDOEzR8yvV7C0MuV77Wo=
 github.com/jtolds/gls v4.20.0+incompatible/go.mod h1:QJZ7F/aHp+rZTRtaJ1ow/lLfFfVYBRgL+9YlvaHOwJU=
-github.com/k8stopologyawareschedwg/deployer v0.24.0 h1:ieRgSJ7mQmMAWo7Vu2wXvbpBf1CYKxAZamyGAWC7FZ8=
-github.com/k8stopologyawareschedwg/deployer v0.24.0/go.mod h1:ZkZiHYIpeXS5+QUUA4+b/TiFBZpQYsecJMAk0uX+jTM=
+github.com/k8stopologyawareschedwg/deployer v0.24.2 h1:S94DztuSZ9ZNkeICT2pCfP/xox9yENCR/k4SsxdbnkE=
+github.com/k8stopologyawareschedwg/deployer v0.24.2/go.mod h1:ZkZiHYIpeXS5+QUUA4+b/TiFBZpQYsecJMAk0uX+jTM=
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2 h1:uAwqOtyrFYggq3pVf3hs1XKkBxrQ8dkgjWz3LCLJsiY=
 github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2/go.mod h1:LBzS4n6GX1C69tzSd5EibZ9cGOXFuHP7GxEMDYVe1sM=
 github.com/k8stopologyawareschedwg/numaplacement v0.1.0 h1:Y1GxVAAc+FVewXRdnPfXT8DM8yICPsM8kLHh4I7f7uU=
