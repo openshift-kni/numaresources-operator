@@ -230,6 +230,13 @@ spec:
           Defaults to "Normal".
         displayName: Scheduler log verbosity
         path: logLevel
+      - description: |-
+          PreemptionMode controls NUMA-aware preemption in the NodeResourceTopologyMatch plugin.
+          When unset, preemption is disabled by default. Set explicitly to Enabled to enable preemption.
+        displayName: Scheduler preemption mode setting
+        path: preemptionMode
+        x-descriptors:
+        - urn:alm:descriptor:com.tectonic.ui:text
       - description: Replicas control how many scheduler pods must be configured for
           High Availability (HA)
         displayName: Scheduler replicas

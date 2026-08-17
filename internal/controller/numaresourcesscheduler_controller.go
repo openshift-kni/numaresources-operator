@@ -514,6 +514,13 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 		})
 	}
 	params.ScoringStrategy.Resources = resources
+
+	if schedSpec.PreemptionMode != nil && *schedSpec.PreemptionMode == nropv1.PreemptionEnabled {
+		params.PreemptionMode = ptr.To(k8swgmanifests.PreemptionEnabled)
+	} else {
+		params.PreemptionMode = nil
+	}
+
 	params.Cache.ResyncMethod = &resyncMethod
 	params.Cache.ForeignPodsDetectMode = &foreignPodsDetect
 	params.Cache.InformerMode = &informerMode

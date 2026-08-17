@@ -708,6 +708,81 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 		})
 
+		It("should not configure preemptionMode when unset", func(ctx context.Context) {
+			key := client.ObjectKeyFromObject(nrs)
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+
+			cm := schedulerConfigMap(ctx, reconciler.Client)
+			Expect(cm).To(HaveSchedulerPreemptionMode(""))
+		})
+
+		It("should allow to change preemptionMode from Enabled to Disabled explicitly", func(ctx context.Context) {
+			key := client.ObjectKeyFromObject(nrs)
+			nrs := nrs.DeepCopy()
+			nrs.Spec.PreemptionMode = ptr.To(nropv1.PreemptionEnabled)
+			Eventually(func(g Gomega) {
+				g.Expect(reconciler.Client.Update(ctx, nrs)).To(Succeed())
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedulerConfigMap(ctx, reconciler.Client)).To(HaveSchedulerPreemptionMode(string(nropv1.PreemptionEnabled)))
+
+			Expect(reconciler.Client.Get(ctx, key, nrs)).To(Succeed())
+			nrs.Spec.PreemptionMode = ptr.To(nropv1.PreemptionDisabled)
+			Eventually(func(g Gomega) {
+				g.Expect(reconciler.Client.Update(ctx, nrs)).To(Succeed())
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedulerConfigMap(ctx, reconciler.Client)).To(HaveSchedulerPreemptionMode(""))
+		})
+
+		It("should allow to change preemptionMode from Disabled to Enabled explicitly", func(ctx context.Context) {
+			key := client.ObjectKeyFromObject(nrs)
+
+			nrs := nrs.DeepCopy()
+			nrs.Spec.PreemptionMode = ptr.To(nropv1.PreemptionDisabled)
+			Eventually(func(g Gomega) {
+				g.Expect(reconciler.Client.Update(ctx, nrs)).To(Succeed())
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedulerConfigMap(ctx, reconciler.Client)).To(HaveSchedulerPreemptionMode(""))
+
+			Expect(reconciler.Client.Get(ctx, key, nrs)).To(Succeed())
+
+			nrs.Spec.PreemptionMode = ptr.To(nropv1.PreemptionEnabled)
+			Eventually(func(g Gomega) {
+				g.Expect(reconciler.Client.Update(ctx, nrs)).To(Succeed())
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedulerConfigMap(ctx, reconciler.Client)).To(HaveSchedulerPreemptionMode(string(nropv1.PreemptionEnabled)))
+		})
+
+		It("should allow to change preemptionMode from Enabled to unset (clear the value)", func(ctx context.Context) {
+			key := client.ObjectKeyFromObject(nrs)
+
+			nrs := nrs.DeepCopy()
+			nrs.Spec.PreemptionMode = ptr.To(nropv1.PreemptionEnabled)
+			Eventually(func(g Gomega) {
+				g.Expect(reconciler.Client.Update(ctx, nrs)).To(Succeed())
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedulerConfigMap(ctx, reconciler.Client)).To(HaveSchedulerPreemptionMode(string(nropv1.PreemptionEnabled)))
+
+			Expect(reconciler.Client.Get(ctx, key, nrs)).To(Succeed())
+			nrs.Spec.PreemptionMode = nil
+			Eventually(func(g Gomega) {
+				g.Expect(reconciler.Client.Update(ctx, nrs)).To(Succeed())
+			}).WithTimeout(30 * time.Second).WithPolling(5 * time.Second).Should(Succeed())
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedulerConfigMap(ctx, reconciler.Client)).To(HaveSchedulerPreemptionMode(""))
+		})
+
 		It("should allow to change the ScoringStrategy resources", func() {
 			nrs := nrs.DeepCopy()
 			nrs.Spec.ScoringStrategy = &nropv1.ScoringStrategyParams{}
@@ -1353,6 +1428,48 @@ func HaveTheSameResourceRequirements(expectedRR corev1.ResourceRequirements) typ
 		}
 		return reflect.DeepEqual(cnt.Resources, expectedRR), nil
 	}).WithTemplate("Deployment {{.Actual.Namespace}}/{{.Actual.Name}} resources request mismatch")
+}
+
+func HaveSchedulerPreemptionMode(want string) types.GomegaMatcher {
+	expected := want
+	if want == "" {
+		expected = "unset"
+	}
+
+	return gcustom.MakeMatcher(func(cm *corev1.ConfigMap) (bool, error) {
+		if cm == nil {
+			return false, fmt.Errorf("config map is nil")
+		}
+
+		confRaw := cm.Data[sched.SchedulerConfigFileName]
+		cfgs, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(confRaw))
+		if err != nil {
+			return false, err
+		}
+		if len(cfgs) != 1 {
+			return false, fmt.Errorf("unexpected config params count: %d", len(cfgs))
+		}
+		cfg := cfgs[0]
+
+		if want == "" {
+			return cfg.PreemptionMode == nil, nil
+		}
+		if cfg.PreemptionMode == nil {
+			return false, nil
+		}
+		return *cfg.PreemptionMode == want, nil
+	}).WithTemplate("scheduler config preemptionMode should be {{.Data}}").WithTemplateData(expected)
+}
+
+func schedulerConfigMap(ctx context.Context, cli client.Client) *corev1.ConfigMap {
+	GinkgoHelper()
+
+	cm := &corev1.ConfigMap{}
+	Expect(cli.Get(ctx, client.ObjectKey{
+		Name:      "topo-aware-scheduler-config",
+		Namespace: testNamespace,
+	}, cm)).To(Succeed())
+	return cm
 }
 
 func pop(m map[string]string, k string) string {
