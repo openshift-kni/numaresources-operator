@@ -55,6 +55,11 @@ const (
 )
 
 const (
+	PreemptionEnabled  = "Enabled"
+	PreemptionDisabled = "Disabled"
+)
+
+const (
 	LeaderElectionDefaultName      = "nrtmatch-scheduler"
 	LeaderElectionDefaultNamespace = "tas-scheduler"
 )
@@ -141,6 +146,17 @@ func ValidateScoringStrategyType(value string) error {
 	}
 }
 
+func ValidatePreemptionMode(value string) error {
+	switch value {
+	case PreemptionEnabled:
+		return nil
+	case PreemptionDisabled:
+		return nil
+	default:
+		return fmt.Errorf("unsupported preemptionMode: %v", value)
+	}
+}
+
 type LeaderElectionParams struct {
 	LeaderElect       bool   `json:"leaderElect"`
 	ResourceNamespace string `json:"resourceNamespace,omitempty"`
@@ -162,6 +178,7 @@ type ConfigParams struct {
 	Cache           *ConfigCacheParams     `json:"cache"`
 	ScoringStrategy *ScoringStrategyParams `json:"scoringStrategy,omitempty"`
 	LeaderElection  *LeaderElectionParams  `json:"leaderElection"`
+	PreemptionMode  *string                `json:"preemptionMode,omitempty"`
 }
 
 func DecodeSchedulerProfilesFromData(data []byte) ([]ConfigParams, error) {
@@ -359,6 +376,17 @@ func extractParams(profileName string, args map[string]interface{}) (ConfigParam
 			}
 			params.ScoringStrategy.Resources = resources
 		}
+	}
+
+	preemptionMode, ok, err := unstructured.NestedString(args, "preemptionMode")
+	if err != nil {
+		return params, fmt.Errorf("cannot process field preemptionMode: %w", err)
+	}
+	if ok {
+		if err := ValidatePreemptionMode(preemptionMode); err != nil {
+			return params, err
+		}
+		params.PreemptionMode = &preemptionMode
 	}
 
 	return params, nil

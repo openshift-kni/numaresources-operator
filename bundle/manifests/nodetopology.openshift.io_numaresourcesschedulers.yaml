@@ -75,6 +75,14 @@ spec:
                 - Trace
                 - TraceAll
                 type: string
+              preemptionMode:
+                description: |-
+                  PreemptionMode controls NUMA-aware preemption in the NodeResourceTopologyMatch plugin.
+                  When unset, preemption is disabled by default. Set explicitly to Enabled to enable preemption.
+                enum:
+                - Enabled
+                - Disabled
+                type: string
               replicas:
                 description: Replicas control how many scheduler pods must be configured
                   for High Availability (HA)

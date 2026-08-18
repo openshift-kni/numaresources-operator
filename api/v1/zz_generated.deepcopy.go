@@ -274,6 +274,11 @@ func (in *NUMAResourcesSchedulerSpec) DeepCopyInto(out *NUMAResourcesSchedulerSp
 		*out = new(ScoringStrategyParams)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.PreemptionMode != nil {
+		in, out := &in.PreemptionMode, &out.PreemptionMode
+		*out = new(PreemptionMode)
+		**out = **in
+	}
 	if in.Replicas != nil {
 		in, out := &in.Replicas, &out.Replicas
 		*out = new(int32)

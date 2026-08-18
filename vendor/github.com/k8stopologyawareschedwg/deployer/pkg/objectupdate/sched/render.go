@@ -263,6 +263,12 @@ func updateArgs(args map[string]interface{}, params *manifests.ConfigParams) (bo
 		}
 	}
 
+	preemptionArgsUpdated, err := updatePreemptionArgs(args, params)
+	if err != nil {
+		return updated > 0, err
+	}
+	updated += preemptionArgsUpdated
+
 	return updated > 0, ensureBackwardCompatibility(args)
 }
 
@@ -342,6 +348,30 @@ func updateScoringStrategyArgs(args map[string]interface{}, params *manifests.Co
 	}
 
 	return updated, nil
+}
+
+func updatePreemptionArgs(args map[string]interface{}, params *manifests.ConfigParams) (int, error) {
+	if params.PreemptionMode == nil {
+		if _, ok, err := unstructured.NestedString(args, "preemptionMode"); err != nil {
+			return 0, err
+		} else if ok {
+			// remove for backward compatibility
+			delete(args, "preemptionMode")
+			return 1, nil
+		}
+		return 0, nil
+	}
+
+	preemptionMode := *params.PreemptionMode // shortcut
+	err := manifests.ValidatePreemptionMode(preemptionMode)
+	if err != nil {
+		return 0, err
+	}
+	err = unstructured.SetNestedField(args, preemptionMode, "preemptionMode")
+	if err != nil {
+		return 0, err
+	}
+	return 1, nil
 }
 
 func ensureBackwardCompatibility(args map[string]interface{}) error {
