@@ -69,11 +69,18 @@ func (cm configMap) Duration(key string, out *time.Duration) error {
 	if !ok {
 		return nil
 	}
-	j, ok := val.(float64)
-	if !ok {
-		return fmt.Errorf("key %q has non-float64 value representation %T", key, val)
+	switch v := val.(type) {
+	case float64:
+		*out = time.Duration(v)
+	case string:
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return fmt.Errorf("key %q: %w", key, err)
+		}
+		*out = d
+	default:
+		return fmt.Errorf("key %q has unsupported value type %T", key, val)
 	}
-	*out = time.Duration(j)
 	return nil
 }
 
@@ -92,22 +99,21 @@ func (cm configMap) Value(key string, out_ any) error {
 	}
 }
 
-type confBinding struct {
+type Binding struct {
 	key string
 	out any
 }
 
-func dispatchConfObj(obj map[string]interface{}, pArgs *ProgArgs) error {
-	var err error
-	cm := configMap(obj)
-
-	cbs := []confBinding{
+func MakeBindings(pArgs *ProgArgs) []Binding {
+	return []Binding{
 		{key: "global.debug", out: &pArgs.Global.Debug},
 		{key: "global.verbose", out: &pArgs.Global.Verbose},
 		{key: "global.kubeconfig", out: &pArgs.Global.KubeConfig},
 		{key: "nrtUpdater.noPublish", out: &pArgs.NRTupdater.NoPublish},
 		{key: "nrtUpdater.oneShot", out: &pArgs.NRTupdater.Oneshot},
 		{key: "nrtUpdater.hostname", out: &pArgs.NRTupdater.Hostname},
+		{key: "nrtUpdater.patchMode", out: &pArgs.NRTupdater.PatchMode},
+		{key: "nrtUpdater.patchResync", out: &pArgs.NRTupdater.PatchResync},
 		{key: "resourceMonitor.namespace", out: &pArgs.Resourcemonitor.Namespace},
 		{key: "resourceMonitor.sysfsRoot", out: &pArgs.Resourcemonitor.SysfsRoot},
 		{key: "resourceMonitor.refreshNodeResources", out: &pArgs.Resourcemonitor.RefreshNodeResources},
@@ -116,6 +122,8 @@ func dispatchConfObj(obj map[string]interface{}, pArgs *ProgArgs) error {
 		{key: "resourceMonitor.exposeTiming", out: &pArgs.Resourcemonitor.ExposeTiming},
 		{key: "resourceMonitor.podSetFingerprintStatusFile", out: &pArgs.Resourcemonitor.PodSetFingerprintStatusFile},
 		{key: "resourceMonitor.excludeTerminalPods", out: &pArgs.Resourcemonitor.ExcludeTerminalPods},
+		{key: "resourceMonitor.numaPlacement", out: &pArgs.Resourcemonitor.NUMAPlacement},
+		{key: "topologyExporter.kubeletConfigFile", out: &pArgs.RTE.KubeletConfigFile},
 		{key: "topologyExporter.podResourcesSocketPath", out: &pArgs.RTE.PodResourcesSocketPath},
 		{key: "topologyExporter.sleepInterval", out: &pArgs.RTE.SleepInterval},
 		{key: "topologyExporter.podReadinessEnable", out: &pArgs.RTE.PodReadinessEnable},
@@ -124,7 +132,7 @@ func dispatchConfObj(obj map[string]interface{}, pArgs *ProgArgs) error {
 		{key: "topologyExporter.addNRTOwnerEnable", out: &pArgs.RTE.AddNRTOwnerEnable},
 		{key: "topologyExporter.metricsMode", out: &pArgs.RTE.MetricsMode},
 		{key: "topologyExporter.metricsPort", out: &pArgs.RTE.MetricsPort},
-		{key: "topologyExporter.MetricsAddress", out: &pArgs.RTE.MetricsAddress},
+		{key: "topologyExporter.metricsAddress", out: &pArgs.RTE.MetricsAddress},
 		{key: "topologyExporter.metricsTLS.certsDir", out: &pArgs.RTE.MetricsTLSCfg.CertsDir},
 		{key: "topologyExporter.metricsTLS.certFile", out: &pArgs.RTE.MetricsTLSCfg.CertFile},
 		{key: "topologyExporter.metricsTLS.keyFile", out: &pArgs.RTE.MetricsTLSCfg.KeyFile},
@@ -132,8 +140,13 @@ func dispatchConfObj(obj map[string]interface{}, pArgs *ProgArgs) error {
 		{key: "topologyExporter.metricsTLS.minTLSVersion", out: &pArgs.RTE.MetricsTLSCfg.MinTLSVersion},
 		{key: "topologyExporter.metricsTLS.cipherSuites", out: &pArgs.RTE.MetricsTLSCfg.CipherSuites},
 	}
+}
 
-	for _, cb := range cbs {
+func dispatchConfObj(obj map[string]interface{}, pArgs *ProgArgs) error {
+	var err error
+	cm := configMap(obj)
+
+	for _, cb := range MakeBindings(pArgs) {
 		err = cm.Value(cb.key, cb.out)
 		if err != nil {
 			return err

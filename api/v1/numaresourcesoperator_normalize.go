@@ -49,6 +49,9 @@ func (current NodeGroupConfig) Merge(updated NodeGroupConfig) NodeGroupConfig {
 	if updated.InfoRefreshPause != nil {
 		conf.InfoRefreshPause = updated.InfoRefreshPause
 	}
+	if updated.NumaPlacement != nil {
+		conf.NumaPlacement = updated.NumaPlacement
+	}
 	return conf
 }
 

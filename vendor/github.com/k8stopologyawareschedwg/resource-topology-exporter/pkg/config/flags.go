@@ -52,6 +52,8 @@ func FromFlags(pArgs *ProgArgs, args ...string) (string, string, error) {
 	CommandLine.BoolVar(&pArgs.NRTupdater.NoPublish, "no-publish", pArgs.NRTupdater.NoPublish, "Do not publish discovered features to the cluster-local Kubernetes API server.")
 	CommandLine.BoolVar(&pArgs.NRTupdater.Oneshot, "oneshot", pArgs.NRTupdater.Oneshot, "Update once and exit.")
 	CommandLine.StringVar(&pArgs.NRTupdater.Hostname, "hostname", pArgs.NRTupdater.Hostname, "Override the node hostname.")
+	CommandLine.BoolVar(&pArgs.NRTupdater.PatchMode, "patch-mode", pArgs.NRTupdater.PatchMode, "Send updates using patches.")
+	CommandLine.IntVar(&pArgs.NRTupdater.PatchResync, "patch-resync", pArgs.NRTupdater.PatchResync, "Force a full get+update resync every N patch cycles. 0 means never resync.")
 
 	CommandLine.StringVar(&pArgs.Resourcemonitor.Namespace, "watch-namespace", pArgs.Resourcemonitor.Namespace, "Namespace to watch pods for. Use \"\" for all namespaces.")
 	CommandLine.StringVar(&pArgs.Resourcemonitor.SysfsRoot, "sysfs", pArgs.Resourcemonitor.SysfsRoot, "Top-level component path of sysfs.")
@@ -60,6 +62,7 @@ func FromFlags(pArgs *ProgArgs, args ...string) (string, string, error) {
 	CommandLine.BoolVar(&pArgs.Resourcemonitor.RefreshNodeResources, "refresh-node-resources", pArgs.Resourcemonitor.RefreshNodeResources, "If enable, track changes in node's resources")
 	CommandLine.StringVar(&pArgs.Resourcemonitor.PodSetFingerprintStatusFile, "pods-fingerprint-status-file", pArgs.Resourcemonitor.PodSetFingerprintStatusFile, "File to dump the pods fingerprint status. Use empty string to disable.")
 	CommandLine.BoolVar(&pArgs.Resourcemonitor.ExcludeTerminalPods, "exclude-terminal-pods", pArgs.Resourcemonitor.ExcludeTerminalPods, "If enable, exclude terminal pods from podresource API List call")
+	CommandLine.StringVar(&pArgs.Resourcemonitor.NUMAPlacement, "numa-placement", pArgs.Resourcemonitor.NUMAPlacement, fmt.Sprintf("Select the NUMA placement reporting mode. Use %q to enable container-level NUMA placement in NRT attributes. Use %q to disable.", resourcemonitor.NUMAPlacementModeContainer, resourcemonitor.NUMAPlacementModeNone))
 	CommandLine.StringVar(&pArgs.Resourcemonitor.PodSetFingerprintMethod, "pods-fingerprint-method", pArgs.Resourcemonitor.PodSetFingerprintMethod, fmt.Sprintf("Select the method to compute the pods fingerprint. Valid options: %s.", resourcemonitor.PFPMethodSupported()))
 
 	CommandLine.StringVar(&pArgs.RTE.TopologyManagerPolicy, "topology-manager-policy", pArgs.RTE.TopologyManagerPolicy, "Explicitly set the topology manager policy instead of reading from the kubelet.")
@@ -88,12 +91,7 @@ func FromFlags(pArgs *ProgArgs, args ...string) (string, string, error) {
 	CommandLine.Int64Var(&pArgs.RTE.MaxEventsPerTimeUnit, "max-events-per-second", pArgs.RTE.MaxEventsPerTimeUnit, "Max times per second resources will be scanned and updated")
 
 	CommandLine.BoolVar(&pArgs.Version, "version", pArgs.Version, "Output version and exit")
-	CommandLine.StringVar(&pArgs.DumpConfig, "dump-config", pArgs.DumpConfig, `dump the current configuration to the given file path. Empty string (default) disable the dumping.
-Special targets:
-. "-" for stdout.
-. ".andexit" stdout and exit right after.
-. ".log" to dump in the log".`,
-	)
+	CommandLine.Var(&DumpConfigValue{DumpConfig: &pArgs.DumpConfig}, "dump-config", `dump the current configuration to either stdout (use "-") or the log (use ".log").`)
 
 	err := CommandLine.Parse(args)
 	if err != nil {
@@ -126,4 +124,23 @@ Special targets:
 	}
 	configRoot := params[0]
 	return configRoot, FixExtraConfigPath(configRoot), nil
+}
+
+type DumpConfigValue struct {
+	DumpConfig *string
+}
+
+func (v DumpConfigValue) String() string {
+	if v.DumpConfig == nil {
+		return ""
+	}
+	return *v.DumpConfig
+}
+
+func (v DumpConfigValue) Set(s string) error {
+	if s != DumpConfigStdout && s != DumpConfigAbort && s != DumpConfigLog {
+		return fmt.Errorf("invalid dump config target: %q", s)
+	}
+	*v.DumpConfig = s
+	return nil
 }
