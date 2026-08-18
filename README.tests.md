@@ -74,7 +74,7 @@ podman run -ti \
 	-v $KUBECONFIG:/kubeconfig:z \
 	-e KUBECONFIG=/kubeconfig \
 	-e E2E_NROP_INSTALL_SKIP_KC=true \
-	-e E2E_NUMACELL_DEVICE_PLUGIN_URL=${E2E_IMAGE_URL} \
+	-e E2E_NUMAZONE_DEVICE_PLUGIN_URL=${E2E_IMAGE_URL} \
 	-e E2E_PAUSE_IMAGE_URL=${E2E_IMAGE_URL} \
 	${E2E_IMAGE_URL}
 ```
@@ -92,7 +92,7 @@ podman run -ti \
 	-e KUBECONFIG=/kubeconfig \
 	-e CLEAN_PERFORMANCE_PROFILE=false \
 	-e E2E_NROP_INSTALL_SKIP_KC=true \
-	-e E2E_NUMACELL_DEVICE_PLUGIN_URL=${CNF_TESTS_URL} \
+	-e E2E_NUMAZONE_DEVICE_PLUGIN_URL=${CNF_TESTS_URL} \
 	-e E2E_PAUSE_IMAGE_URL=${CNF_TESTS_URL} \
 	${CNF_TESTS_URL} \
 	/usr/bin/test-run.sh \
@@ -109,7 +109,7 @@ podman run -ti \
 	-v $KUBECONFIG:/kubeconfig:z \
 	-e KUBECONFIG=/kubeconfig \
 	-e E2E_NROP_INSTALL_SKIP_KC=true \
-	-e E2E_NUMACELL_DEVICE_PLUGIN_URL=${E2E_IMAGE_URL} \
+	-e E2E_NUMAZONE_DEVICE_PLUGIN_URL=${E2E_IMAGE_URL} \
 	-e E2E_PAUSE_IMAGE_URL=${E2E_IMAGE_URL} \
 	${E2E_IMAGE_URL}
 	--skip '.*reboot_required.*'
@@ -122,7 +122,7 @@ podman run -ti \
 	-e KUBECONFIG=/kubeconfig \
 	-e CLEAN_PERFORMANCE_PROFILE=false \
 	-e E2E_NROP_INSTALL_SKIP_KC=true \
-	-e E2E_NUMACELL_DEVICE_PLUGIN_URL=${CNF_TESTS_URL} \
+	-e E2E_NUMAZONE_DEVICE_PLUGIN_URL=${CNF_TESTS_URL} \
 	-e E2E_PAUSE_IMAGE_URL=${CNF_TESTS_URL} \
 	${CNF_TESTS_URL} \
 	/usr/bin/test-run.sh \

@@ -234,10 +234,16 @@ binary-nrovalidate: build-tools ## Build the nrovalidate binary.
 	LDFLAGS="-s -w"; \
 	go build -mod=vendor -o bin/nrovalidate -ldflags "$$LDFLAGS" -tags "$$GOTAGS" nrovalidate/main.go
 
-.PHONY: binary-numacell
-binary-numacell: build-tools ## Build the numacell test device plugin binary.
+.PHONY: binary-numazone
+binary-numazone: build-tools ## Build the NUMA-aware device plugin binary.
 	LDFLAGS="-s -w" \
-	CGO_ENABLED=0 go build -mod=vendor -o bin/numacell -ldflags "$$LDFLAGS" test/deviceplugin/cmd/numacell/main.go
+	CGO_ENABLED=0 go build -mod=vendor -o bin/numazone -ldflags "$$LDFLAGS" numazone/main.go
+
+# Temporary alias: openshift/release still invokes binary-numacell in
+# binary_build_commands. Keep this until that config is updated after this PR
+# has had review time; merging the release change early would break other PRs.
+.PHONY: binary-numacell
+binary-numacell: binary-numazone
 
 .PHONY: binary-getdigests
 binary-getdigests: 
@@ -245,7 +251,7 @@ binary-getdigests:
 	go build -mod=vendor -o bin/getdigests -ldflags "$$LDFLAGS" tools/getdigests/getdigests.go
 
 .PHONY: binary-all
-binary-all: goversion binary binary-rte binary-nrovalidate introspect-data ## Build all component binaries.
+binary-all: goversion binary binary-rte binary-nrovalidate binary-numazone introspect-data ## Build all component binaries.
 
 .PHONY: binary-e2e-rte-local
 binary-e2e-rte-local: generate-source ## Build RTE local e2e test binary.
@@ -315,14 +321,18 @@ build: generate generate-source fmt vet binary ## Build the operator with codege
 .PHONY: build-rte
 build-rte: generate-source fmt vet binary-rte introspect-data ## Build the RTE component.
 
+.PHONY: build-numazone
+build-numazone: fmt vet binary-numazone ## Build the NUMA-aware device plugin.
+
+# Temporary alias for callers still using the pre-rename target name.
 .PHONY: build-numacell
-build-numacell: fmt vet binary-numacell ## Build the numacell test device plugin.
+build-numacell: build-numazone
 
 .PHONY: build-nrovalidate
 build-nrovalidate: generate-source fmt vet binary-nrovalidate ## Build the nrovalidate tool.
 
 .PHONY: build-all
-build-all: generate generate-source fmt vet binary binary-rte binary-numacell binary-nrovalidate ## Build all components.
+build-all: generate generate-source fmt vet binary binary-rte binary-numazone binary-nrovalidate ## Build all components.
 
 .PHONY: build-e2e-rte
 build-e2e-rte: generate-source fmt vet binary-e2e-rte ## Build RTE e2e tests.

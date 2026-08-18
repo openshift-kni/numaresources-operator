@@ -34,9 +34,9 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	numazoneapi "github.com/openshift-kni/numaresources-operator/pkg/numazone/api"
+	numazonemanifests "github.com/openshift-kni/numaresources-operator/pkg/numazone/manifests"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
-	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
-	numacellmanifests "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 
@@ -45,7 +45,7 @@ import (
 )
 
 func SetupInfra(fxt *e2efixture.Fixture, nroOperObj *nropv1.NUMAResourcesOperator, nrtList nrtv1alpha2.NodeResourceTopologyList) {
-	setupNUMACell(fxt, nroOperObj.Spec.NodeGroups, nrtList, 3*time.Minute)
+	setupNUMAZone(fxt, nroOperObj.Spec.NodeGroups, nrtList, 3*time.Minute)
 	LabelNodes(fxt.Client, nrtList)
 }
 
@@ -53,7 +53,7 @@ func TeardownInfra(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeResourceTopo
 	UnlabelNodes(fxt.Client, nrtList)
 }
 
-func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, nrtList nrtv1alpha2.NodeResourceTopologyList, timeout time.Duration) {
+func setupNUMAZone(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, nrtList nrtv1alpha2.NodeResourceTopologyList, timeout time.Duration) {
 	klog.InfoS("e2e infra setup begin")
 
 	Expect(nodeGroups).ToNot(BeEmpty(), "cannot autodetect the TAS node groups from the cluster")
@@ -62,29 +62,29 @@ func setupNUMACell(fxt *e2efixture.Fixture, nodeGroups []nropv1.NodeGroup, nrtLi
 	Expect(err).ToNot(HaveOccurred())
 	klog.InfoS("setting e2e infra for pools", "poolCount", len(poolNames))
 
-	sa := numacellmanifests.ServiceAccount(fxt.Namespace.Name, numacellmanifests.Prefix)
+	sa := numazonemanifests.ServiceAccount(fxt.Namespace.Name, numazonemanifests.Prefix)
 	err = fxt.Client.Create(context.TODO(), sa)
-	Expect(err).ToNot(HaveOccurred(), "cannot create the numacell serviceaccount %q in the namespace %q", sa.Name, sa.Namespace)
+	Expect(err).ToNot(HaveOccurred(), "cannot create the NUMA-aware device plugin serviceaccount %q in the namespace %q", sa.Name, sa.Namespace)
 
-	ro := numacellmanifests.Role(fxt.Namespace.Name, numacellmanifests.Prefix)
+	ro := numazonemanifests.Role(fxt.Namespace.Name, numazonemanifests.Prefix)
 	err = fxt.Client.Create(context.TODO(), ro)
-	Expect(err).ToNot(HaveOccurred(), "cannot create the numacell role %q in the namespace %q", sa.Name, sa.Namespace)
+	Expect(err).ToNot(HaveOccurred(), "cannot create the NUMA-aware device plugin role %q in the namespace %q", sa.Name, sa.Namespace)
 
-	rb := numacellmanifests.RoleBinding(fxt.Namespace.Name, numacellmanifests.Prefix)
+	rb := numazonemanifests.RoleBinding(fxt.Namespace.Name, numazonemanifests.Prefix)
 	err = fxt.Client.Create(context.TODO(), rb)
-	Expect(err).ToNot(HaveOccurred(), "cannot create the numacell rolebinding %q in the namespace %q", sa.Name, sa.Namespace)
+	Expect(err).ToNot(HaveOccurred(), "cannot create the NUMA-aware device plugin rolebinding %q in the namespace %q", sa.Name, sa.Namespace)
 
 	var dss []*appsv1.DaemonSet
 	for _, poolName := range poolNames {
-		dsName := objectnames.GetComponentName(numacellmanifests.Prefix, poolName)
+		dsName := objectnames.GetComponentName(numazonemanifests.Prefix, poolName)
 		klog.InfoS("setting e2e infra for pool", "poolName", poolName, "daemonsetName", dsName)
 
-		pullSpec := GetNUMACellDevicePluginPullSpec()
+		pullSpec := GetNUMAAwareDevicePluginPullSpec()
 		labels, err := nodegroups.NodeSelectorFromPoolName(context.TODO(), fxt.Client, poolName)
 		Expect(err).ToNot(HaveOccurred())
-		ds := numacellmanifests.DaemonSet(labels, fxt.Namespace.Name, dsName, sa.Name, pullSpec)
+		ds := numazonemanifests.DaemonSet(labels, fxt.Namespace.Name, dsName, sa.Name, pullSpec)
 		err = fxt.Client.Create(context.TODO(), ds)
-		Expect(err).ToNot(HaveOccurred(), "cannot create the numacell daemonset %q in the namespace %q", ds.Name, ds.Namespace)
+		Expect(err).ToNot(HaveOccurred(), "cannot create the NUMA-aware device plugin daemonset %q in the namespace %q", ds.Name, ds.Namespace)
 
 		dss = append(dss, ds)
 	}
@@ -126,33 +126,39 @@ func waitResourcesAvailable(fxt *e2efixture.Fixture, nrtList nrtv1alpha2.NodeRes
 			defer GinkgoRecover()
 			defer wg.Done()
 
-			klog.InfoS("waiting for numacell resources to be reported on NRT", "nrtName", nrtName)
+			klog.InfoS("waiting for numazone resources to be reported on NRT", "nrtName", nrtName)
 
 			_, err := wait.With(fxt.Client).Interval(11*time.Second).Timeout(timeout).ForNodeResourceTopologyToHave(context.TODO(), nrtName, func(resInfo nrtv1alpha2.ResourceInfo) bool {
 				// TODO: check available qty > 0?
-				return numacellapi.IsResourceName(resInfo.Name)
+				return numazoneapi.IsResourceName(resInfo.Name)
 			})
-			Expect(err).ToNot(HaveOccurred(), "NRT %q failed to expose numacell resources", nrtName)
+			Expect(err).ToNot(HaveOccurred(), "NRT %q failed to expose numazone resources", nrtName)
 		}(nrt.Name)
 	}
 	wg.Wait()
 }
 
-func GetNUMACellDevicePluginPullSpec() string {
-	pullSpec := getNUMACellDevicePluginPullSpec()
-	klog.InfoS("using NUMACell", "image", pullSpec)
+func GetNUMAAwareDevicePluginPullSpec() string {
+	pullSpec := getNUMAAwareDevicePluginPullSpec()
+	klog.InfoS("using NUMA-aware device plugin", "image", pullSpec)
 	return pullSpec
 }
 
-func getNUMACellDevicePluginPullSpec() string {
+func getNUMAAwareDevicePluginPullSpec() string {
+	if pullSpec, ok := os.LookupEnv("E2E_NROP_URL_NUMAZONE_DEVICE_PLUGIN"); ok {
+		return pullSpec
+	}
+	if pullSpec, ok := os.LookupEnv("E2E_NUMAZONE_DEVICE_PLUGIN_URL"); ok {
+		return pullSpec
+	}
+	// backward compatibility with pre-rename env names
 	if pullSpec, ok := os.LookupEnv("E2E_NROP_URL_NUMACELL_DEVICE_PLUGIN"); ok {
 		return pullSpec
 	}
-	// backward compatibility
 	if pullSpec, ok := os.LookupEnv("E2E_NUMACELL_DEVICE_PLUGIN_URL"); ok {
 		return pullSpec
 	}
-	return images.NUMACellDevicePluginTestImageCI
+	return images.NUMAAwareDevicePluginTestImageCI
 }
 
 func LabelNodes(cli client.Client, nrtList nrtv1alpha2.NodeResourceTopologyList) {

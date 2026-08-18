@@ -30,10 +30,10 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/dpm"
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/manifests"
-	"github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/plugin"
+	"github.com/openshift-kni/numaresources-operator/numazone/pkg/dpm"
+	"github.com/openshift-kni/numaresources-operator/numazone/pkg/plugin"
+	"github.com/openshift-kni/numaresources-operator/pkg/numazone/api"
+	"github.com/openshift-kni/numaresources-operator/pkg/numazone/manifests"
 )
 
 func summarize(topoInfo *topology.Info) string {
@@ -86,7 +86,7 @@ func Execute() {
 	flag.BoolVar(&discoverMode, "discover", false, "discover NUMA resources and exit")
 	flag.BoolVar(&renderMode, "render", false, "render daemonset manifest and exit")
 	flag.StringVar(&sysfsPath, "sysfs", "/sys", "mount path of sysfs")
-	flag.IntVar(&deviceCount, "devices", api.NUMACellDefaultDeviceCount, "amount of devices to expose (will not be decremented anyway)")
+	flag.IntVar(&deviceCount, "devices", api.NUMAZoneDefaultDeviceCount, "amount of devices to expose (will not be decremented anyway)")
 	flag.Parse()
 
 	if renderMode {
@@ -105,9 +105,9 @@ func Execute() {
 		os.Exit(0)
 	}
 
-	klog.InfoS("NUMACell device plugin starting ", "sysfs", sysfsPath)
+	klog.InfoS("NUMA-aware device plugin starting", "sysfs", sysfsPath)
 	logSummary(topoInfo)
 
-	manager := dpm.NewManager(plugin.NewNUMACellLister(topoInfo, deviceCount))
+	manager := dpm.NewManager(plugin.NewNUMAZoneLister(topoInfo, deviceCount))
 	manager.Run()
 }
