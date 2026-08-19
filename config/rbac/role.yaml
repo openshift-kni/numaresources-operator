@@ -396,7 +396,9 @@ rules:
   - networkpolicies
   verbs:
   - create
+  - delete
   - list
+  - update
   - watch
 - apiGroups:
   - networking.k8s.io
