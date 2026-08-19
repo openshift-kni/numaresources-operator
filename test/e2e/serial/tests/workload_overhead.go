@@ -49,6 +49,13 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+type runtimeHandler = string
+
+const (
+	crunHandler runtimeHandler = "crun"
+	runcHandler runtimeHandler = "runc"
+)
+
 var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhead", Serial, Label("disruptive", "scheduler"), Label("feature:overhead"), func() {
 	var fxt *e2efixture.Fixture
 	var padder *e2epadder.Padder
@@ -107,16 +114,29 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 
 		When("a RuntimeClass exist in the cluster", func() {
 			var rtClass *nodev1.RuntimeClass
-			BeforeEach(func() {
+			BeforeEach(func(ctx context.Context) {
+				node := &corev1.Node{}
+				Expect(fxt.Client.Get(ctx, client.ObjectKey{Name: nrtTwoZoneCandidates[0].Name}, node)).To(Succeed())
+
+				var handler string
+				for _, h := range node.Status.RuntimeHandlers {
+					if h.Name == crunHandler || h.Name == runcHandler {
+						handler = h.Name
+						break
+					}
+				}
+				Expect(handler).NotTo(BeEmpty(), "no %s/%s runtime handler on node %q", crunHandler, runcHandler, node.Name)
+
+				klog.InfoS("creating RuntimeClass", "name", "test-rtclass", "handler", handler, "node", node.Name)
 				rtClass = &nodev1.RuntimeClass{
 					TypeMeta: metav1.TypeMeta{
 						Kind:       "RuntimeClass",
-						APIVersion: "node.k8s.io/vi",
+						APIVersion: "node.k8s.io/v1",
 					},
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "test-rtclass",
 					},
-					Handler: "runc",
+					Handler: handler,
 					Overhead: &nodev1.Overhead{
 						PodFixed: corev1.ResourceList{
 							corev1.ResourceCPU:    resource.MustParse("500m"),
@@ -125,7 +145,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload overhea
 					},
 				}
 
-				err := fxt.Client.Create(context.TODO(), rtClass)
+				err := fxt.Client.Create(ctx, rtClass)
 				Expect(err).NotTo(HaveOccurred())
 			})
 			AfterEach(func() {
