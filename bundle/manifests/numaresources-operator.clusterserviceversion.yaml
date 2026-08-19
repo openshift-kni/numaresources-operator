@@ -66,7 +66,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2026-08-18T10:28:38Z"
+    createdAt: "2026-08-19T14:55:27Z"
     features.operators.openshift.io/cnf: "true"
     features.operators.openshift.io/cni: "false"
     features.operators.openshift.io/csi: "false"
@@ -906,7 +906,9 @@ spec:
           - networkpolicies
           verbs:
           - create
+          - delete
           - list
+          - update
           - watch
         - apiGroups:
           - networking.k8s.io

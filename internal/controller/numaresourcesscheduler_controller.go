@@ -81,7 +81,7 @@ type NUMAResourcesSchedulerReconciler struct {
 }
 
 // Namespace Scoped
-//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;delete;list;update;watch,namespace="numaresources"
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,resourceNames=scheduler-default-deny-all;scheduler-egress-to-api-server,verbs=get;update,namespace="numaresources"
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=create;list;watch,namespace="numaresources"
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,resourceNames=topology-aware-scheduler-leader-elect,verbs=get;update,namespace="numaresources"

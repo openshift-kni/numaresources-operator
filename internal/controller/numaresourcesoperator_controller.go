@@ -109,7 +109,7 @@ type NUMAResourcesOperatorReconciler struct {
 // Namespace Scoped
 //+kubebuilder:rbac:groups="",resources=services,verbs=create;list;watch,namespace="numaresources"
 //+kubebuilder:rbac:groups="",resources=services,resourceNames=numaresources-rte-metrics-service,verbs=get;update,namespace="numaresources"
-//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;list;watch,namespace="numaresources"
+//+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=create;delete;list;update;watch,namespace="numaresources"
 //+kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,resourceNames=rte-default-deny-all;rte-egress-to-api-server,verbs=get;update,namespace="numaresources"
 //+kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=create;delete;get;list;update;watch,namespace="numaresources"
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=create;list;watch,namespace="numaresources"
