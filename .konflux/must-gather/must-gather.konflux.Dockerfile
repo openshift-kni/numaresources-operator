@@ -32,7 +32,7 @@ COPY --from=mgbuilder /usr/libexec/must-gather/numaresources-operator/* /usr/bin
 ENTRYPOINT ["/usr/bin/gather"]
 
 LABEL com.redhat.component="numaresources-must-gather-container" \
-    name="openshift4/numaresources-must-gather-rhel9" \
+    name="openshift5/numaresources-must-gather-rhel9" \
     summary="numa resources data gathering image" \
     io.openshift.expose-services="" \
     io.openshift.tags="data,images" \

@@ -11,3 +11,9 @@ spec:
   - mirrors:
     - registry.stage.redhat.io/openshift4/numaresources-operator-bundle
     source: registry.redhat.io/openshift4/numaresources-operator-bundle
+  - mirrors:
+    - registry.stage.redhat.io/openshift5/numaresources-rhel9-operator
+    source: registry.redhat.io/openshift5/numaresources-rhel9-operator
+  - mirrors:
+    - registry.stage.redhat.io/openshift5/numaresources-operator-bundle
+    source: registry.redhat.io/openshift5/numaresources-operator-bundle
