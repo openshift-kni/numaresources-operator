@@ -143,6 +143,10 @@ test-unit-pkgs: generate-source ## Run unit tests for packages only.
 test-unit-pkgs-cover: generate-source ## Run unit tests for packages with coverage.
 	go test $$(go list ./... | grep -vE 'controller|test|tools|cmd') -coverprofile coverage.out
 
+.PHONY: test-numazone-race
+test-numazone-race: ## Run numazone tests uncached, in randomized order, with the race detector.
+	go test -mod=vendor -race -vet=all -count=1 -shuffle=on -timeout=2m ./numazone/...
+
 test-controllers: envtest generate-source ## Run controller tests using envtest.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./internal/controller/...
 
@@ -239,6 +243,11 @@ binary-numacell: build-tools ## Build the numacell test device plugin binary.
 	LDFLAGS="-s -w" \
 	CGO_ENABLED=0 go build -mod=vendor -o bin/numacell -ldflags "$$LDFLAGS" test/deviceplugin/cmd/numacell/main.go
 
+.PHONY: binary-numazone
+binary-numazone: build-tools ## Build the numazone device plugin binary.
+	LDFLAGS="-s -w" \
+	CGO_ENABLED=0 go build -mod=vendor -o bin/numazone -ldflags "$$LDFLAGS" numazone/main.go
+
 .PHONY: binary-getdigests
 binary-getdigests: 
 	LDFLAGS="-s -w"; \
@@ -317,6 +326,9 @@ build-rte: generate-source fmt vet binary-rte introspect-data ## Build the RTE c
 
 .PHONY: build-numacell
 build-numacell: fmt vet binary-numacell ## Build the numacell test device plugin.
+
+.PHONY: build-numazone
+build-numazone: fmt vet binary-numazone ## Build the numazone device plugin.
 
 .PHONY: build-nrovalidate
 build-nrovalidate: generate-source fmt vet binary-nrovalidate ## Build the nrovalidate tool.
