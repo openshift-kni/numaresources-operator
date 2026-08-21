@@ -21,6 +21,7 @@ require (
 	github.com/openshift/api v0.0.0-20260326111139-30c2ef7a272e // release-4.18
 	github.com/openshift/controller-runtime-common v0.0.0-20260213175913-767fef058eca
 	github.com/openshift/hypershift/api v0.0.0-20241115183703-d41904871380 // release-4.18
+	github.com/prometheus/client_golang v1.23.2
 	github.com/sergi/go-diff v1.1.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/net v0.58.0 // indirect
@@ -95,7 +96,6 @@ require (
 	github.com/openshift/client-go v0.0.0-20260320040014-4b5fc2cdad98 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.66.1 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
