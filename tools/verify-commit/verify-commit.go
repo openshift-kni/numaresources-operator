@@ -37,6 +37,7 @@ type GitCommit struct {
 const (
 	dependabot = "dependabot[bot]"
 	konflux    = "red-hat-konflux"
+	nropBot    = "numaresources-operator-bot"
 )
 
 func validate(commit GitCommit) error {
@@ -47,6 +48,10 @@ func validate(commit GitCommit) error {
 	}
 	if strings.Contains(commit.Author, konflux) {
 		fmt.Printf("git commit authored by konflux bot\n")
+		return nil
+	}
+	if commit.Author == nropBot {
+		fmt.Printf("git commit authored by numaresources-operator bot\n")
 		return nil
 	}
 	if commit.DCOSignTag == "" {
