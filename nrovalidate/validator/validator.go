@@ -18,6 +18,7 @@ package validator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -31,13 +32,20 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/go-logr/logr"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+)
+
+var (
+	ErrUnsupported = errors.New("validator not supported on this platform")
 )
 
 type Report struct {
@@ -120,20 +128,15 @@ func Collect(ctx context.Context, cli client.Client, userLabels string, what set
 
 	ver, err := getClusterVersionInfo()
 	if err != nil {
-		return data, err
+		return data, fmt.Errorf("getting cluster info: %w", err)
 	}
 
 	data.versionInfo = ver
+	fmt.Fprintf(os.Stderr, "INFO>>>>: running against: %v\n", ver)
 
-	// Get Node Names for those nodes with TAS enabled
-	var enabledNodeNames sets.Set[string]
-	if userLabels != "" {
-		enabledNodeNames, err = GetNodesByLabels(ctx, cli, userLabels)
-	} else {
-		enabledNodeNames, err = GetNodesByNRO(ctx, cli)
-	}
+	enabledNodeNames, err := getEnabledNodeNames(ctx, cli, userLabels)
 	if err != nil {
-		return data, err
+		return data, fmt.Errorf("getting nodes: %w", err)
 	}
 
 	fmt.Fprintf(os.Stderr, "INFO>>>>: inspecting nodes: %s\n", strings.Join(enabledNodeNames.UnsortedList(), ","))
@@ -141,8 +144,12 @@ func Collect(ctx context.Context, cli client.Client, userLabels string, what set
 
 	for _, helper := range colFns {
 		err = helper(ctx, cli, &data)
+		if errors.Is(err, ErrUnsupported) {
+			fmt.Fprintf(os.Stderr, "INFO>>>>: validator skipped\n")
+			continue
+		}
 		if err != nil {
-			return data, err
+			return data, fmt.Errorf("error collecting data: %w", err)
 		}
 	}
 	return data, nil
@@ -210,7 +217,7 @@ func Validate(data ValidatorData) (Report, error) {
 	for _, helper := range valFns {
 		res, err := helper(data)
 		if err != nil {
-			return Report{}, err
+			return Report{}, fmt.Errorf("error validating data: %w", err)
 		}
 		ret = append(ret, res...)
 	}
@@ -254,6 +261,35 @@ func getNodeNames(nodes []corev1.Node) []string {
 	for _, node := range nodes {
 		nodeNames = append(nodeNames, node.Name)
 	}
-
 	return nodeNames
+}
+
+func getEnabledNodeNames(ctx context.Context, cli client.Client, userLabels string) (sets.Set[string], error) {
+	var err error
+	var enabledNodeNames sets.Set[string]
+	if userLabels != "" {
+		enabledNodeNames, err = GetNodesByLabels(ctx, cli, userLabels)
+	} else {
+		enabledNodeNames, err = GetNodesByNRO(ctx, cli)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "INFO>>>>: getting nodes by NRO failed, falling back to workers: %v\n", err)
+			workers, err2 := nodes.GetWorkers(&deployer.Environment{
+				Ctx: ctx,
+				Cli: cli,
+				Log: logr.Discard(),
+			})
+			if err2 != nil {
+				err = errors.Join(err, err2)
+			} else {
+				fmt.Fprintf(os.Stderr, "INFO>>>>: found %d worker nodes\n", len(workers))
+				err = nil
+				enabledNodeNames.Insert(getNodeNames(workers)...)
+			}
+		}
+	}
+	if err != nil {
+		return enabledNodeNames, fmt.Errorf("getting nodes: %w", err)
+	}
+	fmt.Fprintf(os.Stderr, "INFO>>>>: inspecting nodes: %s\n", strings.Join(enabledNodeNames.UnsortedList(), ","))
+	return enabledNodeNames, nil
 }
