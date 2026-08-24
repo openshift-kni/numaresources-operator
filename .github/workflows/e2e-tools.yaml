@@ -61,12 +61,11 @@ jobs:
     - name: Deploy NUMA Resources Operator
       run: |
         # we only need the manifests, this happens to be the easiest way known to date
-        KUSTOMIZE_DEPLOY_DIR="config/kind-ci/" make deploy
+        KUSTOMIZE_DEPLOY_DIR="config/kind-ci/" E2E_NROP_INSTALL_SKIP_CRD=true make deploy
 
     - name: E2E Tests
       run: |
         export KUBECONFIG=${HOME}/.kube/config
-        kubectl create -f doc/examples/mcp.yaml
         kubectl create -f doc/examples/nrop.yaml
         hack/run-test-tools-e2e.sh --no-color
 

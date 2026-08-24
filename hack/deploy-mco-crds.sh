@@ -7,6 +7,11 @@ CRD_MACHINE_CONFIG_POOL_URL="https://raw.githubusercontent.com/openshift/api/ref
 # Specify the URL link to the kubeletconfig CRD
 CRD_KUBELET_CONFIG_URL="https://raw.githubusercontent.com/openshift/api/refs/heads/master/payload-manifests/crds/0000_80_machine-config_01_kubeletconfigs-Default.crd.yaml"
 
+if [ ${E2E_NROP_INSTALL_SKIP_CRD} == "true" ]; then
+	echo "CRD installation skipped"
+	exit 0
+fi
+
 [ ! -x ${REPO_DIR}/bin/lsplatform ] && exit 1
 
 if ${REPO_DIR}/bin/lsplatform -is-platform openshift; then
