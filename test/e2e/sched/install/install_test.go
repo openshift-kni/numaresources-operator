@@ -22,7 +22,9 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	metahelper "k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
@@ -33,11 +35,14 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
+	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	e2ecluster "github.com/openshift-kni/numaresources-operator/test/internal/cluster"
 	"github.com/openshift-kni/numaresources-operator/test/internal/crds"
+	"github.com/openshift-kni/numaresources-operator/test/internal/nrosched"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -46,7 +51,7 @@ import (
 
 var _ = Describe("[Scheduler] install", func() {
 	Context("with a running cluster with all the components", func() {
-		It("[test_id:48598] should perform the scheduler deployment and verify it is reported as available with healthy conditions", Label(label.Tier2), func() {
+		It("[test_id:48598] should perform the scheduler deployment and verify it is reported as available with healthy conditions", Label(label.Tier2), func(ctx context.Context) {
 			var err error
 			nroSchedObj := objects.TestNROScheduler()
 
@@ -109,6 +114,55 @@ var _ = Describe("[Scheduler] install", func() {
 
 			By("checking deployment has number of replicas equal to number of control plane nodes")
 			Expect(*deployment.Spec.Replicas).To(Equal(int32(len(nodeList))), "wrong number of replicas configured for the deployment; want=%d got=%d", int32(len(nodeList)), *deployment.Spec.Replicas)
+
+			if e2ecluster.GetClusterType(ctx, e2eclient.Client) != label.Compact {
+				return
+			}
+
+			By("on compact clusters, verifying a guaranteed pod schedules with the topology-aware scheduler (OCPBUGS-90597)")
+			err = e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(nroSchedObj), nroSchedObj)
+			Expect(err).NotTo(HaveOccurred())
+			schedulerName := nroSchedObj.Status.SchedulerName
+			Expect(schedulerName).ToNot(BeEmpty(), "missing topology-aware scheduler name in %q status", client.ObjectKeyFromObject(nroSchedObj))
+
+			testNS := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "e2e-sched-install-"}}
+			Expect(e2eclient.Client.Create(ctx, testNS)).To(Succeed())
+			defer func() {
+				Expect(e2eclient.Client.Delete(context.Background(), testNS)).To(Succeed())
+			}()
+
+			requiredRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			}
+			testPod := objects.NewTestPodPause(testNS.Name, "compact-gu")
+			testPod.Spec.SchedulerName = schedulerName
+			testPod.Spec.Containers[0].Resources.Requests = requiredRes
+			testPod.Spec.Containers[0].Resources.Limits = requiredRes.DeepCopy()
+			Expect(e2eclient.Client.Create(ctx, testPod)).To(Succeed())
+			defer func() {
+				_ = e2eclient.Client.Delete(context.Background(), testPod)
+			}()
+
+			podRunningTimeout := 5 * time.Minute
+			updatedPod, err := wait.With(e2eclient.Client).Timeout(podRunningTimeout).ForPodPhase(ctx, testPod.Namespace, testPod.Name, corev1.PodRunning)
+			if err != nil {
+				_ = objects.LogEventsForPod(e2eclient.K8sClient, testPod.Namespace, testPod.Name)
+				if updatedPod != nil {
+					for _, cond := range updatedPod.Status.Conditions {
+						if cond.Type == corev1.PodScheduled && cond.Status == corev1.ConditionFalse {
+							Expect(cond.Message).ToNot(ContainSubstring("invalid node topology data"),
+								"pod stayed unschedulable with PFP/topology mismatch (OCPBUGS-90597): %s", cond.Message)
+						}
+					}
+				}
+			}
+			Expect(err).ToNot(HaveOccurred(), "pod %s/%s did not reach Running within %v", testPod.Namespace, testPod.Name, podRunningTimeout)
+
+			schedOK, err := nrosched.CheckPODWasScheduledWith(ctx, e2eclient.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
+			Expect(updatedPod.Spec.NodeName).ToNot(BeEmpty())
 		})
 	})
 })
