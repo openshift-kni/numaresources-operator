@@ -32,17 +32,17 @@ func TestParseVersionFromReader(t *testing.T) {
 		},
 		{
 			description: "valid data",
-			data:        "VERSION ?= 5.0.999-snapshot\n",
-			expected:    "5.0",
+			data:        "VERSION ?= 5.1.999-snapshot\n",
+			expected:    "5.1",
 		},
 		{
 			description: "malformed data: missing `-snapshot`",
-			data:        "VERSION ?= 5.0.999\n",
+			data:        "VERSION ?= 5.1.999\n",
 			expected:    "",
 		},
 		{
 			description: "malformed data: commented out",
-			data:        "# VERSION ?= 5.0.999-snapshot\n",
+			data:        "# VERSION ?= 5.1.999-snapshot\n",
 			expected:    "",
 		},
 	}

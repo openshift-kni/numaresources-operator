@@ -398,10 +398,10 @@ func TestGetDigests_PrevChannelFailureIsFatal(t *testing.T) {
 
 func TestGetDigests_DifferentImageBases(t *testing.T) {
 	fakeDigests := map[string]string{
-		"registry.example.com/scheduler-rhel9:v5.0.0": "sha256:new",
+		"registry.example.com/scheduler-rhel9:v5.1.0": "sha256:new",
 		"registry.example.com/scheduler-rhel8:v4.22":  "sha256:last422",
 	}
-	rawTags, _ := json.Marshal(listTagsOutput{Tags: []string{"v5.0.0"}})
+	rawTags, _ := json.Marshal(listTagsOutput{Tags: []string{"v5.1.0"}})
 
 	fakeRunner := func(_ string, args ...string) (string, error) {
 		if args[0] == "list-tags" {
@@ -416,7 +416,7 @@ func TestGetDigests_DifferentImageBases(t *testing.T) {
 	}
 
 	result, err := getDigests(fakeRunner, "",
-		"registry.example.com/scheduler-rhel9:v5.0",
+		"registry.example.com/scheduler-rhel9:v5.1",
 		"registry.example.com/scheduler-rhel8:v4.22",
 		"")
 	if err != nil {
