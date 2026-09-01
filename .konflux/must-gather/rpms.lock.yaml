@@ -18,12 +18,12 @@ arches:
     name: rsync
     evr: 3.2.5-7.el9_8.2
     sourcerpm: rsync-3.2.5-7.el9_8.2.src.rpm
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/t/tar-1.34-11.el9.x86_64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/t/tar-1.34-13.el9_8.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 913256
-    checksum: sha256:58b622ab7bc225731a2473e677f16c9eb51b1ed218a86a7aa039a6fed665f245
+    size: 914200
+    checksum: sha256:913d84cd94463e3f0400d80c6742a2974eeab6445ac71ff9eb802a70779c146f
     name: tar
-    evr: 2:1.34-11.el9
-    sourcerpm: tar-1.34-11.el9.src.rpm
+    evr: 2:1.34-13.el9_8
+    sourcerpm: tar-1.34-13.el9_8.src.rpm
   source: []
   module_metadata: []
