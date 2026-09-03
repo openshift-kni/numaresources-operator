@@ -28,6 +28,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
 )
 
@@ -105,10 +106,7 @@ func GetEventsForPod(k8sCli kubernetes.Interface, podNamespace, podName string) 
 func DumpPODResourceRequirements(pod *corev1.Pod) string {
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "resource requirements for pod %s/%s:\n", pod.Namespace, pod.Name)
-	allContainers := []corev1.Container{}
-	allContainers = append(allContainers, pod.Spec.Containers...)
-	allContainers = append(allContainers, pod.Spec.InitContainers...)
-	for _, container := range allContainers {
+	for container := range nroiter.OnContainers(&pod.Spec, nroiter.InitContainers|nroiter.Containers) {
 		fmt.Fprintf(&sb, "+- container %q: %s\n", container.Name, resourcelist.ToString(container.Resources.Limits))
 	}
 	fmt.Fprintf(&sb, "---\n")

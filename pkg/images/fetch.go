@@ -25,6 +25,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
+
+	"github.com/openshift-kni/numaresources-operator/pkg/iter"
 )
 
 const (
@@ -72,8 +74,7 @@ func findContainerByName(pod *corev1.Pod, containerName string) (*corev1.Contain
 		return &pod.Spec.Containers[0], nil
 	}
 
-	for idx := 0; idx < len(pod.Spec.Containers); idx++ {
-		cnt := &pod.Spec.Containers[idx]
+	for cnt := range iter.OnContainers(&pod.Spec, iter.Containers) {
 		if cnt.Name == containerName {
 			return cnt, nil
 		}

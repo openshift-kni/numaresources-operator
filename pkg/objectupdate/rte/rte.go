@@ -36,6 +36,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
+	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
@@ -260,8 +261,7 @@ func ContainerConfig(ds *appsv1.DaemonSet, name string) error {
 }
 
 func AllContainersTerminationMessagePolicy(ds *appsv1.DaemonSet) {
-	for idx := range ds.Spec.Template.Spec.Containers {
-		cnt := &ds.Spec.Template.Spec.Containers[idx]
+	for cnt := range nroiter.OnContainers(&ds.Spec.Template.Spec, nroiter.Containers) {
 		oldPolicy := cnt.TerminationMessagePolicy
 		cnt.TerminationMessagePolicy = corev1.TerminationMessageFallbackToLogsOnError
 		klog.V(5).InfoS("container termination message policy", "container", cnt.Name, "previous", oldPolicy, "current", cnt.TerminationMessagePolicy)

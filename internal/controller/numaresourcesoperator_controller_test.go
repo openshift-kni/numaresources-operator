@@ -56,6 +56,7 @@ import (
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
+	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
@@ -2527,7 +2528,7 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 			var ds appsv1.DaemonSet
 			Expect(reconciler.Client.Get(context.TODO(), dsKey, &ds)).To(Succeed())
 
-			for _, cnt := range ds.Spec.Template.Spec.Containers {
+			for cnt := range nroiter.OnContainers(&ds.Spec.Template.Spec, nroiter.Containers) {
 				Expect(cnt.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageFallbackToLogsOnError))
 			}
 		})

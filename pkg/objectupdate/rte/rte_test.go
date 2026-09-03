@@ -31,6 +31,7 @@ import (
 	"k8s.io/utils/ptr"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
 
@@ -470,7 +471,7 @@ func TestAllContainersTerminationMessagePolicy(t *testing.T) {
 	ds := testDs.DeepCopy()
 	AllContainersTerminationMessagePolicy(ds)
 
-	for _, cnt := range ds.Spec.Template.Spec.Containers {
+	for cnt := range nroiter.OnContainers(&ds.Spec.Template.Spec, nroiter.Containers) {
 		if cnt.TerminationMessagePolicy != corev1.TerminationMessageFallbackToLogsOnError {
 			t.Errorf("container %q termination message policy unexpectedly set to %q", cnt.Name, cnt.TerminationMessagePolicy)
 		}
