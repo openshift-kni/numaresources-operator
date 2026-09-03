@@ -10,13 +10,32 @@ entries:
     schema: olm.package
   # Channel entries should contain all the releases
   - entries:
+      # v4.22.0
+      - name: numaresources-operator.v4.22.0
+        skipRange: '>=4.20.0 <4.22.0'
+      # v4.22.1
+      - name: numaresources-operator.v4.22.1
+        replaces: numaresources-operator.v4.22.0
+        skipRange: '>=4.20.0 <4.22.1'
       - name: numaresources-operator.v5.0.0
+        replaces: numaresources-operator.v4.22.1
         skipRange: '>=4.22.0 <5.0.0'
         # After 5.0.0 is released, add 5.0.1 back using the quay nudged bundle
         # - name: numaresources-operator.v5.0.1
         #   replaces: numaresources-operator.v5.0.0
         #   skipRange: '>=4.22.0 <5.0.1'
     name: stable
+    package: numaresources-operator
+    schema: olm.channel
+  - entries:
+      # v4.22.0
+      - name: numaresources-operator.v4.22.0
+        skipRange: '>=4.20.0 <4.22.0'
+      # v4.22.1
+      - name: numaresources-operator.v4.22.1
+        replaces: numaresources-operator.v4.22.0
+        skipRange: '>=4.20.0 <4.22.1'
+    name: "4.22"
     package: numaresources-operator
     schema: olm.channel
   - entries:
@@ -29,6 +48,13 @@ entries:
     name: "5.0"
     package: numaresources-operator
     schema: olm.channel
+  # v4.22.0 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:1a2b6307e0c3a3a1939ff8b52b28486e2694d284c83c572f6bf66d1102d55d51
+    schema: olm.bundle
+  # v4.22.1 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:fabf68cf18714965e6fd1356551d4206c93081910eedaf35731acd3eb52c4d0d
+    schema: olm.bundle
+  # v5.0.0 bundle
   # The url for this last entry is updated by telco5g-konflux/scripts/catalog/update-catalog-template.sh automatically
   - image: placeholder.will.be.updated.by.telco5g-konflux.scripts.catalog.update-catalog-template.sh
     schema: olm.bundle
