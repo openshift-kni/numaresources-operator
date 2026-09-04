@@ -48,6 +48,7 @@ import (
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/podlogs"
 	nrowait "github.com/openshift-kni/numaresources-operator/internal/wait"
+	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
@@ -327,7 +328,7 @@ var _ = Describe("[Install] durability", Serial, func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			unrestricted := false
-			for _, cnt := range nropPod.Spec.Containers {
+			for cnt := range nroiter.OnContainers(&nropPod.Spec, nroiter.Containers) {
 				for _, env := range cnt.Env {
 					if env.Name == "EXPORTER_IMAGE_RESTRICTION" && env.Value == "false" {
 						unrestricted = true

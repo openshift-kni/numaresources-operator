@@ -27,6 +27,7 @@ import (
 
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
+	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 )
 
 type Load struct {
@@ -50,7 +51,7 @@ func FromPods(nodeName string, pods []corev1.Pod) Load {
 
 	for _, pod := range pods {
 		// TODO: we assume a steady state - aka we ignore InitContainers
-		for _, cnt := range pod.Spec.Containers {
+		for cnt := range nroiter.OnContainers(&pod.Spec, nroiter.Containers) {
 			for resName, resQty := range cnt.Resources.Requests {
 				qty := nl.Resources[resName]
 				qty.Add(resQty)

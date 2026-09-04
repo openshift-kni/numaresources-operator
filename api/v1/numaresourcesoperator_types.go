@@ -18,6 +18,7 @@ package v1
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -299,11 +300,7 @@ func (ng *NodeGroup) ToString() string {
 
 func annsToString(anns map[string]string) string {
 	items := make([]string, 0, len(anns))
-	keys := make([]string, 0, len(anns)) // TODO: use `keys := slices.Collect(maps.Keys(anns))` when we move to 1.23
-	for key := range anns {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
+	keys := slices.Sorted(maps.Keys(anns))
 	for _, key := range keys {
 		items = append(items, key+"="+anns[key])
 	}

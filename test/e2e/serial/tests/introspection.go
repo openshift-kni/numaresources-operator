@@ -24,6 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
@@ -49,7 +50,7 @@ var _ = Describe("[serial] numaresources operator introspection", Serial, Label(
 			pod, err := deploy.FindNUMAResourcesOperatorPod(ctx, e2eclient.Client, &nropObj)
 			Expect(err).ToNot(HaveOccurred())
 
-			for _, cnt := range pod.Spec.Containers {
+			for cnt := range nroiter.OnContainers(&pod.Spec, nroiter.Containers) {
 				Expect(cnt.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageFallbackToLogsOnError))
 			}
 		})
@@ -61,7 +62,7 @@ var _ = Describe("[serial] numaresources operator introspection", Serial, Label(
 			Expect(dss).ToNot(BeEmpty(), "unexpected DaemonSet count: %d", len(dss))
 
 			for _, ds := range dss {
-				for _, cnt := range ds.Spec.Template.Spec.Containers {
+				for cnt := range nroiter.OnContainers(&ds.Spec.Template.Spec, nroiter.Containers) {
 					Expect(cnt.TerminationMessagePolicy).To(Equal(corev1.TerminationMessageFallbackToLogsOnError))
 				}
 			}

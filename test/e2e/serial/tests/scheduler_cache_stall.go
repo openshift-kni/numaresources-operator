@@ -37,6 +37,7 @@ import (
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
@@ -531,8 +532,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						corev1.ResourceCPU:    resource.MustParse("100m"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
 					}
-					for idx := 0; idx < len(idleJob.Spec.Template.Spec.Containers); idx++ {
-						cnt := &idleJob.Spec.Template.Spec.Containers[idx] // shortcut
+					for cnt := range nroiter.OnContainers(&idleJob.Spec.Template.Spec, nroiter.Containers) {
 						cnt.Resources = corev1.ResourceRequirements{
 							Requests: jobRequiredRes,
 						}
@@ -547,8 +547,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						corev1.ResourceCPU:    resource.MustParse("100m"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
 					}
-					for idx := 0; idx < len(idleJob.Spec.Template.Spec.Containers); idx++ {
-						cnt := &idleJob.Spec.Template.Spec.Containers[idx] // shortcut
+					for cnt := range nroiter.OnContainers(&idleJob.Spec.Template.Spec, nroiter.Containers) {
 						cnt.Resources = corev1.ResourceRequirements{
 							Limits: jobRequiredRes,
 						}
@@ -560,8 +559,7 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 						corev1.ResourceCPU:    resource.MustParse("1"),
 						corev1.ResourceMemory: resource.MustParse("256Mi"),
 					}
-					for idx := 0; idx < len(idleJob.Spec.Template.Spec.Containers); idx++ {
-						cnt := &idleJob.Spec.Template.Spec.Containers[idx] // shortcut
+					for cnt := range nroiter.OnContainers(&idleJob.Spec.Template.Spec, nroiter.Containers) {
 						cnt.Resources = corev1.ResourceRequirements{
 							Limits: jobRequiredRes,
 						}
@@ -682,11 +680,8 @@ var _ = Describe("[serial][scheduler][cache] scheduler cache stall", Label("sche
 })
 
 func dumpPodResources(pod *corev1.Pod) {
-	for _, ctr := range pod.Spec.InitContainers {
-		klog.InfoS("dump pod resources", "pod", pod.Namespace+"/"+pod.Name, "init container", ctr.Name, "node", pod.Spec.NodeName, "resourceRequests", e2ereslist.ToString(ctr.Resources.Requests), "resourceLimits", e2ereslist.ToString(ctr.Resources.Limits))
-	}
-	for _, ctr := range pod.Spec.Containers {
-		klog.InfoS("dump pod resources", "pod", pod.Namespace+"/"+pod.Name, "app container", ctr.Name, "node", pod.Spec.NodeName, "resourceRequests", e2ereslist.ToString(ctr.Resources.Requests), "resourceLimits", e2ereslist.ToString(ctr.Resources.Limits))
+	for ctr, ctrType := range nroiter.OnContainers(&pod.Spec, nroiter.InitContainers|nroiter.Containers) {
+		klog.InfoS("dump pod resources", "pod", pod.Namespace+"/"+pod.Name, "containerType", ctrType, "containerName", ctr.Name, "node", pod.Spec.NodeName, "resourceRequests", e2ereslist.ToString(ctr.Resources.Requests), "resourceLimits", e2ereslist.ToString(ctr.Resources.Limits))
 	}
 }
 
