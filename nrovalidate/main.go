@@ -65,6 +65,12 @@ type ProgArgs struct {
 	Validations sets.Set[string]
 }
 
+func defaultProgArgs() ProgArgs {
+	return ProgArgs{
+		Validations: sets.New[string](),
+	}
+}
+
 func main() {
 	parsedArgs, err := parseArgs(os.Args[1:]...)
 	if err != nil {
@@ -92,18 +98,16 @@ func main() {
 }
 
 func parseArgs(args ...string) (ProgArgs, error) {
-	pArgs := ProgArgs{}
-
-	var validationsArg string
+	pArgs := defaultProgArgs()
+	validationsArg := "all"
 
 	flags := flag.NewFlagSet(version.ProgramName(), flag.ExitOnError)
-
-	flags.BoolVar(&pArgs.Version, "version", false, "Output version and exit")
-	flags.BoolVar(&pArgs.Verbose, "verbose", false, "Verbose output")
-	flags.BoolVar(&pArgs.JSON, "json", false, "Output JSON, not free text")
-	flags.BoolVar(&pArgs.Quiet, "quiet", false, "Avoid all output. Overrides 'verbose'")
-	flags.StringVar(&validationsArg, "what", "all", "Validations to perform")
-	flags.StringVar(&pArgs.Labels, "labels", "", "Selector (label query) to filter on. e.g. -l key1=value1,key2=value2; autodetect with NRO if missing.")
+	flags.BoolVar(&pArgs.Version, "version", pArgs.Version, "Output version and exit")
+	flags.BoolVar(&pArgs.Verbose, "verbose", pArgs.Verbose, "Verbose output")
+	flags.BoolVar(&pArgs.JSON, "json", pArgs.JSON, "Output JSON, not free text")
+	flags.BoolVar(&pArgs.Quiet, "quiet", pArgs.Quiet, "Avoid all output. Overrides 'verbose'")
+	flags.StringVar(&pArgs.Labels, "labels", pArgs.Labels, "Selector (label query) to filter on. e.g. -l key1=value1,key2=value2; autodetect with NRO if missing.")
+	flags.StringVar(&validationsArg, "what", validationsArg, "Validations to perform")
 
 	err := flags.Parse(args)
 	if err != nil {
