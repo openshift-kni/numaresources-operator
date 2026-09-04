@@ -29,6 +29,9 @@ rte/hack/check-ds.sh oc sampledevices device-plugin-a-ds
 echo "Running Functional Tests: ${GINKGO_SUITS}"
 ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.flake-attempts=2 --ginkgo.junit-report=${REPORT_DIR}/e2e-sched.xml
 
+echo "Running compact serial regression for default exclusive-resources PFP (OCPBUGS-90597)"
+${BIN_DIR}/e2e-nrop-serial.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=2h --ginkgo.junit-report=${REPORT_DIR}/e2e-serial-compact-pfp.xml --ginkgo.focus='test_id:90597'
+
 if [ "$ENABLE_CLEANUP" = true ]; then
   echo "Undeploying sample devices for RTE tests"
   rte/hack/undeploy-devices.sh
