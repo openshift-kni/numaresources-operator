@@ -41,3 +41,41 @@ func TestStepFailed(t *testing.T) {
 	assert.False(t, st.Done())
 	assert.True(t, st.EarlyStop())
 }
+
+func TestStepOngoingIsOngoing(t *testing.T) {
+	st := StepOngoing(5 * time.Second)
+	assert.True(t, st.Ongoing())
+	assert.False(t, st.Failed())
+}
+
+func TestStepOngoingZeroDurationIsOngoing(t *testing.T) {
+	st := StepOngoing(0)
+	assert.True(t, st.Ongoing())
+	assert.False(t, st.Done())
+}
+
+func TestStepFailedIsFailed(t *testing.T) {
+	st := StepFailed(errors.New("fake error"))
+	assert.True(t, st.Failed())
+	assert.False(t, st.Ongoing())
+}
+
+func TestStepSuccessIsNeitherOngoingNorFailed(t *testing.T) {
+	st := StepSuccess()
+	assert.False(t, st.Ongoing())
+	assert.False(t, st.Failed())
+}
+
+func TestStepUpdateMessageEmpty(t *testing.T) {
+	st := StepOngoing(5 * time.Second)
+	st2 := st.UpdateMessage("summary")
+	assert.Empty(t, st.ConditionInfo.Message)
+	assert.Equal(t, st2.ConditionInfo.Message, "summary")
+}
+
+func TestStepUpdateMessageExisting(t *testing.T) {
+	st := StepFailed(errors.New("fake error"))
+	st2 := st.UpdateMessage("summary")
+	assert.Equal(t, st.ConditionInfo.Message, "fake error")
+	assert.Equal(t, st2.ConditionInfo.Message, "summary; fake error")
+}
