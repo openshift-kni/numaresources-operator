@@ -7,7 +7,7 @@ metadata:
 spec:
   imageDigestMirrors:
   - mirrors:
-    - quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-5-0
+    - quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-5-1
     source: registry.redhat.io/openshift5/numaresources-operator-bundle
 
 

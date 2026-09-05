@@ -157,7 +157,7 @@ spec:
       value:
       - build-date=$SOURCE_DATE
       - short-commit=$(tasks.clone-repository.results.short-commit)
-      - version=v5.0-$SOURCE_DATE_EPOCH
+      - version=v5.1-$SOURCE_DATE_EPOCH
     - name: source-date-epoch
       value: $(tasks.clone-repository.results.commit-timestamp)
     runAfter:
