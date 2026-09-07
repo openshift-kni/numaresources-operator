@@ -144,6 +144,7 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]MachineConfigO
 	}
 	for _, tree := range em.trees {
 		isCustomPolicy := annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations)
+		mustIgnore := annotations.MustIgnoreCustomPolicy(tree.NodeGroup.Annotations)
 		for _, mcp := range tree.MachineConfigPools {
 			// do not update state when MachineConfigPool is paused
 			if mcp.Spec.Paused {
@@ -160,6 +161,11 @@ func (em *ExistingManifests) MachineConfigsState(mf Manifests) ([]MachineConfigO
 			existingMachineConfig, ok := em.machineConfigs[mcName]
 			if !ok {
 				klog.Warningf("failed to find machine config %q in namespace %q", mcName, em.namespace)
+				continue
+			}
+
+			if mustIgnore {
+				klog.V(4).Infof("ignoring MachineConfig for pool %q", mcp.Name)
 				continue
 			}
 
