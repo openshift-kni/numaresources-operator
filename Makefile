@@ -244,6 +244,11 @@ binary-getdigests:
 	LDFLAGS="-s -w"; \
 	go build -mod=vendor -o bin/getdigests -ldflags "$$LDFLAGS" tools/getdigests/getdigests.go
 
+.PHONY: update-scheduler-digests
+update-scheduler-digests: binary-getdigests
+	RELVERSION=$(shell echo $(VERSION) | sed 's/.999-snapshot//')
+	bin/getdigests -image registry.redhat.io/openshift4/noderesourcetopology-scheduler-rhel9 -version $(RELVERSION) -output internal/api/scheduler/_digests.json 
+
 .PHONY: binary-all
 binary-all: goversion binary binary-rte binary-nrovalidate introspect-data ## Build all component binaries.
 
