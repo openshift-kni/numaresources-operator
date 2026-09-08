@@ -822,28 +822,20 @@ func (r *NUMAResourcesOperatorReconciler) reconcilePerTreeDaemonSet(ctx context.
 
 func (r *NUMAResourcesOperatorReconciler) setupTreeAgnosticManifests(ctx context.Context, instance *nropv1.NUMAResourcesOperator) error {
 	rteupdate.DaemonSetRolloutSettings(r.RTEManifests.Core.DaemonSet)
-	err := rteupdate.DaemonSetAffinitySettings(r.RTEManifests.Core.DaemonSet, r.RTEManifests.Core.DaemonSet.Spec.Template.Labels)
-	if err != nil {
-		klog.ErrorS(err, "failed to update RTE affinity settings")
+	if err := rteupdate.DaemonSetAffinitySettings(r.RTEManifests.Core.DaemonSet, r.RTEManifests.Core.DaemonSet.Spec.Template.Labels); err != nil {
+		return fmt.Errorf("failed to update RTE affinity: %w", err)
+	}
+	if err := rteupdate.DaemonSetUserImageSettings(r.RTEManifests.Core.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy); err != nil {
+		return fmt.Errorf("failed to update RTE user image: %w", err)
+	}
+	if err := rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.Core.DaemonSet); err != nil {
+		return fmt.Errorf("failed to update RTE pause container: %w", err)
 	}
 
-	err = rteupdate.DaemonSetUserImageSettings(r.RTEManifests.Core.DaemonSet, instance.Spec.ExporterImage, r.Images.Preferred(), r.ImagePullPolicy)
-	if err != nil {
-		return err
+	if err := loglevel.UpdatePodSpec(&r.RTEManifests.Core.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel); err != nil {
+		return fmt.Errorf("failed to update RTE log level: %w", err)
 	}
-
-	err = rteupdate.DaemonSetPauseContainerSettings(r.RTEManifests.Core.DaemonSet)
-	if err != nil {
-		return err
-	}
-
-	err = loglevel.UpdatePodSpec(&r.RTEManifests.Core.DaemonSet.Spec.Template.Spec, manifests.ContainerNameRTE, instance.Spec.LogLevel)
-	if err != nil {
-		return err
-	}
-
 	rteupdate.SecurityContextConstraint(r.RTEManifests.Core.SecurityContextConstraint, true) // force to legacy context
-
 	return nil
 }
 
