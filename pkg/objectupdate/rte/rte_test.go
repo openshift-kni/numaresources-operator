@@ -488,7 +488,7 @@ func checkPercIsAtLeast(val string, amount int) error {
 		return fmt.Errorf("not a percentage: %q: %w", val, err)
 	}
 	if perc < amount {
-		return fmt.Errorf("percentage %q lower than the amount %v", perc, amount)
+		return fmt.Errorf("percentage %d lower than the amount %v", perc, amount)
 	}
 	return nil
 }
