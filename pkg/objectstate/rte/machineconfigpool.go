@@ -31,6 +31,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	labels "github.com/openshift-kni/numaresources-operator/internal/api/labels"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
@@ -85,12 +86,10 @@ func (obj machineConfigPoolFinder) FindState(mf Manifests, tree nodegroupv1.Tree
 		desiredDaemonSet := mf.Core.DaemonSet.DeepCopy()
 		desiredDaemonSet.Name = generatedName
 
-		var updateError error
-		if mcp.Spec.NodeSelector != nil {
-			desiredDaemonSet.Spec.Template.Spec.NodeSelector = mcp.Spec.NodeSelector.MatchLabels
-		} else {
-			updateError = fmt.Errorf("the machine config pool %q does not have node selector", mcp.Name)
+		desiredDaemonSet.Spec.Template.Spec.NodeSelector = map[string]string{
+			labels.NodePrimaryPool: mcp.Name,
 		}
+		var updateError error
 
 		gdm := GeneratedDesiredManifest{
 			ClusterPlatform:   obj.em.plat,
