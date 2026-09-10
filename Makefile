@@ -531,7 +531,7 @@ OPM_VERSION ?= 1.52.0
 OPM_BIN = "$(GOOS)-$(GOARCH)-opm"
 OPM = "$(LOCALBIN)/$(OPM_BIN)"
 
-GOLANGCI_LINT_VERSION ?= 2.8.0
+GOLANGCI_LINT_VERSION ?= 2.13.2
 GOLANGCI_LINT_NAME = golangci-lint-$(GOLANGCI_LINT_VERSION)-$(GOOS)-$(GOARCH)
 GOLANGCI_LINT_ARTIFACT_FILE = $(GOLANGCI_LINT_NAME).tar.gz
 GOLANGCI_LINT_EXEC_NAME = golangci-lint
@@ -561,7 +561,7 @@ opm: ## Download opm locally if necessary.
 
 .PHONY: golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
-	@if [ ! -x "$(GOLANGCI_LINT)" ]; then\
+	@if [ ! -x "$(GOLANGCI_LINT)" ] || ! "$(GOLANGCI_LINT)" --version 2>&1 | grep -q "$(GOLANGCI_LINT_VERSION)"; then\
 		echo "Downloading golangci-lint from https://github.com/golangci/golangci-lint/releases/download/v$(GOLANGCI_LINT_VERSION)/$(GOLANGCI_LINT_ARTIFACT_FILE)";\
 		mkdir -p $(LOCALBIN);\
 		curl -JL https://github.com/golangci/golangci-lint/releases/download/v$(GOLANGCI_LINT_VERSION)/$(GOLANGCI_LINT_ARTIFACT_FILE) -o $(LOCALBIN)/$(GOLANGCI_LINT_ARTIFACT_FILE);\

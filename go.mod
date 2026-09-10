@@ -1,6 +1,6 @@
 module github.com/openshift-kni/numaresources-operator
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/aquasecurity/go-version v0.0.0-20210121072130-637058cfe492
