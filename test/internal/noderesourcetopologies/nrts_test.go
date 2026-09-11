@@ -19,11 +19,80 @@ package noderesourcetopologies
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 )
+
+func TestDropHostLevelResources(t *testing.T) {
+	t.Parallel()
+
+	input := corev1.ResourceList{
+		corev1.ResourceCPU:              resource.MustParse("4"),
+		corev1.ResourceMemory:            resource.MustParse("8Gi"),
+		corev1.ResourceEphemeralStorage:  resource.MustParse("1Gi"),
+		corev1.ResourceName(WorkloadPartitioningResourcePrefix + "cores"): resource.MustParse("3089"),
+	}
+
+	got := DropHostLevelResources(input)
+
+	if _, ok := got[corev1.ResourceEphemeralStorage]; ok {
+		t.Fatal("expected ephemeral-storage to be dropped")
+	}
+	if _, ok := got[corev1.ResourceName(WorkloadPartitioningResourcePrefix+"cores")]; ok {
+		t.Fatal("expected workload partitioning resources to be dropped")
+	}
+	cpuQty := got[corev1.ResourceCPU]
+	if cpuQty.Cmp(resource.MustParse("4")) != 0 {
+		t.Fatalf("expected cpu=4, got %s", cpuQty.String())
+	}
+	memQty := got[corev1.ResourceMemory]
+	if memQty.Cmp(resource.MustParse("8Gi")) != 0 {
+		t.Fatalf("expected memory=8Gi, got %s", memQty.String())
+	}
+}
+
+func TestSaturateZoneUntilLeftIgnoresWorkloadPartitioningResources(t *testing.T) {
+	t.Parallel()
+
+	// Reproduces compact-cluster padding setup for tier-0 tests 85792, 85793,
+	// 50159, 47577, 54016: baseload adds management.workload.openshift.io/cores
+	// from infra pods, but NRT zones only track cpu/memory/devices.
+	zone := nrtv1alpha2.Zone{
+		Name: "node-0",
+		Resources: nrtv1alpha2.ResourceInfoList{
+			{
+				Name:      string(corev1.ResourceCPU),
+				Available: resource.MustParse("18"),
+			},
+			{
+				Name:      string(corev1.ResourceMemory),
+				Available: resource.MustParse("24Gi"),
+			},
+		},
+	}
+
+	required := corev1.ResourceList{
+		corev1.ResourceCPU:              resource.MustParse("4"),
+		corev1.ResourceMemory:            resource.MustParse("4Gi"),
+		corev1.ResourceName(WorkloadPartitioningResourcePrefix + "cores"): resource.MustParse("3089"),
+	}
+
+	padding, err := SaturateZoneUntilLeft(zone, required, DropHostLevelResources)
+	if err != nil {
+		t.Fatalf("SaturateZoneUntilLeft failed: %v", err)
+	}
+
+	if _, ok := padding[corev1.ResourceName(WorkloadPartitioningResourcePrefix+"cores")]; ok {
+		t.Fatal("padding must not include workload partitioning resources")
+	}
+	cpuPadding := padding[corev1.ResourceCPU]
+	if cpuPadding.Cmp(resource.MustParse("14")) != 0 {
+		t.Fatalf("expected padding cpu=14, got %s", cpuPadding.String())
+	}
+}
 
 func TestEqualNRTListsItems(t *testing.T) {
 	testCases := []struct {
