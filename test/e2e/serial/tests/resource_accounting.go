@@ -27,7 +27,6 @@ import (
 	"k8s.io/klog/v2"
 	corev1qos "k8s.io/kubectl/pkg/util/qos"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
@@ -359,11 +358,6 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 			e2efixture.By("padding all other candidate nodes leaving room for the baseload only (updated maximum available resources: %s)", e2ereslist.ToString(reqResources))
 			var paddingPods []*corev1.Pod
 			for _, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
-				node := &corev1.Node{}
-				nodeKey := client.ObjectKey{Name: nodeName}
-				err = fxt.Client.Get(context.TODO(), nodeKey, node)
-				Expect(err).NotTo(HaveOccurred())
-
 				//calculate base load on the node
 				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
@@ -374,20 +368,7 @@ var _ = Describe("[serial][disruptive][scheduler][resacct] numaresources workloa
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-				paddingRes, err := e2enrt.SaturateNodeUntilLeft(*nrtInfo, baseload.Resources)
-				Expect(err).ToNot(HaveOccurred(), "could not get padding resources for node %q", nrtInfo.Name)
-
-				for _, zone := range nrtInfo.Zones {
-					e2efixture.By("fully padding node %q zone %q ", nrtInfo.Name, zone.Name)
-					padPod := newPaddingPod(nrtInfo.Name, zone.Name, fxt.Namespace.Name, paddingRes[zone.Name])
-
-					padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
-					Expect(err).ToNot(HaveOccurred(), "unable to pin pod %q to zone %q", padPod.Name, zone.Name)
-
-					err = fxt.Client.Create(context.TODO(), padPod)
-					Expect(err).ToNot(HaveOccurred())
-					paddingPods = append(paddingPods, padPod)
-				}
+				paddingPods = append(paddingPods, createSchedulerPaddingPodsForNode(fxt.Client, context.TODO(), fxt.Namespace.Name, *nrtInfo, baseload.Resources)...)
 			}
 
 			By("Waiting for padding pods to be ready")

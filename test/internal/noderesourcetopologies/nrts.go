@@ -297,6 +297,40 @@ func SaturateNodeUntilLeft(nrtInfo nrtv1alpha2.NodeResourceTopology, requiredRes
 	return paddingRes, nil
 }
 
+func NodeFreeCPUAndMemory(allocatable, requested corev1.ResourceList) corev1.ResourceList {
+	free := corev1.ResourceList{}
+	for _, resName := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
+		qty := allocatable[resName].DeepCopy()
+		req := requested[resName]
+		if req.Cmp(qty) > 0 {
+			qty = resource.MustParse("0")
+		} else {
+			qty.Sub(req)
+		}
+		free[resName] = qty
+	}
+	return free
+}
+
+func CapCPUAndMemory(res, free corev1.ResourceList) corev1.ResourceList {
+	capped := res.DeepCopy()
+	if capped == nil {
+		capped = corev1.ResourceList{}
+	}
+	for _, resName := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
+		padQty, ok := capped[resName]
+		if !ok {
+			continue
+		}
+		avail := free[resName]
+		if padQty.Cmp(avail) > 0 {
+			klog.InfoS("capping padding to node free", "resource", resName, "requested", padQty.String(), "nodeFree", avail.String())
+			capped[resName] = avail.DeepCopy()
+		}
+	}
+	return capped
+}
+
 func checkEqualResourcesInfo(nodeName, zoneName string, resourcesInitial, resourcesUpdated []nrtv1alpha2.ResourceInfo) (bool, string, error) {
 	for _, res := range resourcesInitial {
 		initialQty := res.Available

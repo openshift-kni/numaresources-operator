@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 	corev1qos "k8s.io/kubectl/pkg/util/qos"
+	resourcehelper "k8s.io/kubectl/pkg/util/resource"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
@@ -989,6 +990,76 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 	})
 })
 
+// createSchedulerPaddingPodsForNode saturates a node one NUMA zone at a time for
+// the default scheduler. Each zone pad is sized from NRT, then capped to live
+// node free (allocatable minus pods already on the node, including pads that
+// already went Running). A one-shot cap against allocatable−baseload is not
+// enough: that budget can still look like it fits while the second-zone pad
+// lands Pending with Insufficient memory.
+func createSchedulerPaddingPodsForNode(cli client.Client, ctx context.Context, namespace string, nrtInfo nrtv1alpha2.NodeResourceTopology, leaveRes corev1.ResourceList) []*corev1.Pod {
+	zeroRes := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("0"),
+		corev1.ResourceMemory: resource.MustParse("0"),
+	}
+
+	var paddingPods []*corev1.Pod
+	for ind, zone := range nrtInfo.Zones {
+		leave := leaveRes
+		if ind == 0 {
+			leave = zeroRes
+		}
+		pad, err := e2enrt.SaturateZoneUntilLeft(zone, leave, e2enrt.DropHostLevelResources)
+		Expect(err).ToNot(HaveOccurred(), "could not get padding resources for node %q zone %q", nrtInfo.Name, zone.Name)
+
+		node := &corev1.Node{}
+		err = cli.Get(ctx, client.ObjectKey{Name: nrtInfo.Name}, node)
+		Expect(err).ToNot(HaveOccurred(), "missing node %q", nrtInfo.Name)
+
+		allocated, err := schedulerAllocatedCPUAndMemory(ctx, cli, nrtInfo.Name)
+		Expect(err).ToNot(HaveOccurred(), "unable to compute allocated resources for node %q", nrtInfo.Name)
+		pad = e2enrt.CapCPUAndMemory(pad, e2enrt.NodeFreeCPUAndMemory(node.Status.Allocatable, allocated))
+
+		e2efixture.By("fully padding node %q zone %q ", nrtInfo.Name, zone.Name)
+		padPod := newPaddingPod(nrtInfo.Name, zone.Name, namespace, pad)
+
+		padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
+		Expect(err).ToNot(HaveOccurred(), "unable to pin pod %q to zone %q", padPod.Name, zone.Name)
+
+		err = cli.Create(ctx, padPod)
+		Expect(err).ToNot(HaveOccurred(), "unable to create padding pod on node %q zone %q", nrtInfo.Name, zone.Name)
+
+		failedPods, _ := wait.With(cli).ForPodsAllRunning(ctx, []*corev1.Pod{padPod})
+		Expect(failedPods).To(BeEmpty(), "padding pod failed to run on node %q zone %q", nrtInfo.Name, zone.Name)
+
+		paddingPods = append(paddingPods, padPod)
+	}
+	return paddingPods
+}
+
+func schedulerAllocatedCPUAndMemory(ctx context.Context, cli client.Client, nodeName string) (corev1.ResourceList, error) {
+	pods, err := podlist.With(cli).OnNode(ctx, nodeName)
+	if err != nil {
+		return nil, err
+	}
+	allocated := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("0"),
+		corev1.ResourceMemory: resource.MustParse("0"),
+	}
+	for i := range pods {
+		if pods[i].Status.Phase == corev1.PodSucceeded || pods[i].Status.Phase == corev1.PodFailed {
+			continue
+		}
+		req, _ := resourcehelper.PodRequestsAndLimits(&pods[i])
+		for _, resName := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
+			qty := req[resName]
+			allocatedQty := allocated[resName]
+			allocatedQty.Add(qty)
+			allocated[resName] = allocatedQty
+		}
+	}
+	return allocated, nil
+}
+
 func makePaddingPod(fxt *e2efixture.Fixture, namespace, nodeName string, zone nrtv1alpha2.Zone, podReqs corev1.ResourceList) (*corev1.Pod, error) {
 	fxt.Dump.Infof(fmt.Sprintf("zone: %s\nallocatable: %s", zone.Name, e2ereslist.ToString(podReqs)), "want to have zone with allocatable")
 
@@ -1022,7 +1093,8 @@ func newPaddingPod(nodeName, zoneName, namespace string, resourceReqs corev1.Res
 					Image:   images.GetPauseImage(),
 					Command: []string{images.PauseCommand},
 					Resources: corev1.ResourceRequirements{
-						Limits: resourceReqs,
+						Requests: resourceReqs.DeepCopy(),
+						Limits:   resourceReqs,
 					},
 				},
 			},

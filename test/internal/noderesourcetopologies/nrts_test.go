@@ -19,6 +19,7 @@ package noderesourcetopologies
 import (
 	"testing"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -271,5 +272,45 @@ func TestEqualNRTListsItems(t *testing.T) {
 				t.Errorf("test: %s; \n   got=%v expected=%v\n", tc.description, got, tc.expected)
 			}
 		})
+	}
+}
+
+func qtyString(q resource.Quantity) string {
+	return q.String()
+}
+
+func TestCapCPUAndMemory(t *testing.T) {
+	res := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("10"),
+		corev1.ResourceMemory: resource.MustParse("10Gi"),
+	}
+	got := CapCPUAndMemory(res, corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("20"),
+		corev1.ResourceMemory: resource.MustParse("4Gi"),
+	})
+	if !got[corev1.ResourceCPU].Equal(resource.MustParse("10")) {
+		t.Fatalf("cpu should stay 10, got %s", qtyString(got[corev1.ResourceCPU]))
+	}
+	if !got[corev1.ResourceMemory].Equal(resource.MustParse("4Gi")) {
+		t.Fatalf("memory should cap to 4Gi, got %s", qtyString(got[corev1.ResourceMemory]))
+	}
+}
+
+func TestNodeFreeCPUAndMemory(t *testing.T) {
+	got := NodeFreeCPUAndMemory(
+		corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("8"),
+			corev1.ResourceMemory: resource.MustParse("16Gi"),
+		},
+		corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("2"),
+			corev1.ResourceMemory: resource.MustParse("4Gi"),
+		},
+	)
+	if !got[corev1.ResourceCPU].Equal(resource.MustParse("6")) {
+		t.Fatalf("cpu free: got %s", qtyString(got[corev1.ResourceCPU]))
+	}
+	if !got[corev1.ResourceMemory].Equal(resource.MustParse("12Gi")) {
+		t.Fatalf("memory free: got %s", qtyString(got[corev1.ResourceMemory]))
 	}
 }
