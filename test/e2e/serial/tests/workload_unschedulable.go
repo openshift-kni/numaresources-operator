@@ -513,7 +513,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 
 			By("Padding all other candidate nodes")
 			var paddingPods []*corev1.Pod
-			for nodeIdx, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
+			for _, nodeName := range e2efixture.ListNodeNames(nrtCandidateNames) {
 
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).NotTo(HaveOccurred(), "missing NRT info for %q", nodeName)
@@ -521,21 +521,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				baseload, err := intbaseload.ForNode(fxt.Client, context.TODO(), nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing node load info for %q", nodeName)
 
-				paddingResources, err := e2enrt.SaturateNodeUntilLeft(*nrtInfo, baseload.Resources)
-				Expect(err).ToNot(HaveOccurred(), "could not get padding resources for node %q", nrtInfo.Name)
-
-				for zoneIdx, zone := range nrtInfo.Zones {
-					podName := fmt.Sprintf("padding%d-%d", nodeIdx, zoneIdx)
-					padPod := newPaddingPod(nodeName, zone.Name, fxt.Namespace.Name, paddingResources[zone.Name])
-
-					padPod, err = pinPodTo(padPod, nodeName, zone.Name)
-					Expect(err).NotTo(HaveOccurred(), "unable to pin pod %q to zone %q", podName, zone.Name)
-
-					err = fxt.Client.Create(context.TODO(), padPod)
-					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q on zone %q", podName, zone.Name)
-
-					paddingPods = append(paddingPods, padPod)
-				}
+				paddingPods = append(paddingPods, createSchedulerPaddingPodsForNode(fxt.Client, context.TODO(), fxt.Namespace.Name, *nrtInfo, baseload.Resources)...)
 			}
 
 			By("Padding target node")
@@ -879,20 +865,7 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload unsched
 				nrtInfo, err := e2enrt.FindFromList(nrtCandidates, nodeName)
 				Expect(err).ToNot(HaveOccurred(), "missing NRT info for %q", nodeName)
 
-				paddingRes, err := e2enrt.SaturateNodeUntilLeft(*nrtInfo, baseload.Resources)
-				Expect(err).ToNot(HaveOccurred(), "could not get padding resources for node %q", nrtInfo.Name)
-
-				for _, zone := range nrtInfo.Zones {
-					e2efixture.By("fully padding node %q zone %q ", nrtInfo.Name, zone.Name)
-					padPod := newPaddingPod(nrtInfo.Name, zone.Name, fxt.Namespace.Name, paddingRes[zone.Name])
-
-					padPod, err = pinPodTo(padPod, nrtInfo.Name, zone.Name)
-					Expect(err).ToNot(HaveOccurred(), "unable to pin pod %q to zone %q", padPod.Name, zone.Name)
-
-					err = fxt.Client.Create(context.TODO(), padPod)
-					Expect(err).ToNot(HaveOccurred())
-					paddingPods = append(paddingPods, padPod)
-				}
+				paddingPods = append(paddingPods, createSchedulerPaddingPodsForNode(fxt.Client, context.TODO(), fxt.Namespace.Name, *nrtInfo, baseload.Resources)...)
 			}
 
 			By("Waiting for padding pods to be ready")
