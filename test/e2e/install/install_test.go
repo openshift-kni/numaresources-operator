@@ -75,20 +75,28 @@ const (
 	skipHyperShiftKCDetachReason = "Skipped until OCPBUGS-88738 (hypershift#8890): HCCO does not delete mirrored kubelet ConfigMap on guest cluster after KC detach"
 )
 
-var _ = Describe("[Install] continuousIntegration", Serial, func() {
-	var initialized bool
+var _ = Describe("[Install]", Serial, Ordered, func() {
+	var deployer deploy.Deployer
+	var nroObj *nropv1.NUMAResourcesOperator
 
-	BeforeEach(func() {
-		if !initialized {
-			Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
+	BeforeAll(func() {
+		Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
+		if configuration.Plat == platform.HyperShift {
+			Skip(skipHyperShiftKCDetachReason)
 		}
-		initialized = true
+		deployer = deploy.NewForPlatform(configuration.Plat)
+		nroObj = deployer.Deploy(context.TODO(), configuration.MachineConfigPoolUpdateTimeout)
 	})
 
-	Context("with a running cluster with all the components", func() {
+	AfterAll(func() {
+		if deployer == nil {
+			return
+		}
+		deployer.Teardown(context.TODO(), 5*time.Minute)
+	})
+
+	Context("continuousIntegration with a running cluster with all the components", func() {
 		It("[test_id:47574] should perform overall deployment and verify the condition is reported as available", Label(label.Tier0), func() {
-			deployer := deploy.NewForPlatform(configuration.Plat)
-			nroObj := deployer.Deploy(context.TODO(), configuration.MachineConfigPoolUpdateTimeout)
 			nname := client.ObjectKeyFromObject(nroObj)
 			Expect(nname.Name).ToNot(BeEmpty())
 
@@ -162,37 +170,8 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 			Expect(rteContainer.SecurityContext.SELinuxOptions.Type).To(Equal(selinux.RTEContextType), "container %s is running with wrong selinux context", rteContainer.Name)
 		})
 	})
-})
 
-var _ = Describe("[Install] durability", Serial, func() {
-	var initialized bool
-
-	BeforeEach(func() {
-		if !initialized {
-			Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
-		}
-		initialized = true
-	})
-
-	Context("with a running cluster with all the components and overall deployment", func() {
-		var deployer deploy.Deployer
-		var nroObj *nropv1.NUMAResourcesOperator
-
-		BeforeEach(func() {
-			if configuration.Plat == platform.HyperShift {
-				Skip(skipHyperShiftKCDetachReason)
-			}
-			deployer = deploy.NewForPlatform(configuration.Plat)
-			nroObj = deployer.Deploy(context.TODO(), configuration.MachineConfigPoolUpdateTimeout)
-		})
-
-		AfterEach(func() {
-			if deployer == nil {
-				return
-			}
-			deployer.Teardown(context.TODO(), 5*time.Minute)
-		})
-
+	Context("durability with a running cluster with all the components and overall deployment", func() {
 		It("should reject custom ExporterImage and go Degraded without changing the DaemonSet", Label(label.Tier1), func(ctx context.Context) {
 			By("getting up-to-date NRO object")
 			nroKey := objects.NROObjectKey()
