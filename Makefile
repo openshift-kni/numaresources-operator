@@ -298,7 +298,7 @@ kustomize: ## Download kustomize locally if necessary.
 ENVTEST = $(shell pwd)/bin/setup-envtest
 envtest: ## Download envtest-setup locally if necessary.
 	# this is the last version before the bump golang 1.20 -> 1.22. We want to avoid the go.mod version format changes - for now.
-	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@v0.0.0-20230927023946-553bd00cfec5)
+	$(call go-install-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@release-0.19)
 
 # go-install-tool will 'go get' any package $2 and install it to $1.
 define go-install-tool
