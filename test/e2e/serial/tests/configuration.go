@@ -83,6 +83,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	e2ecluster "github.com/openshift-kni/numaresources-operator/test/internal/cluster"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/images"
@@ -1370,7 +1371,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			})
 
 			It("[test_id:83869] should configure NRO CR with multiple non-overlapping node groups and check e2e results", Label(label.Tier2, label.OpenShift, label.MNOMastersSchedulable), func(ctx context.Context) {
-				clusterType := getClusterType(ctx, fxt.Client)
+				clusterType := e2ecluster.GetClusterType(ctx, fxt.Client)
 				if !(clusterType == label.MNOMastersSchedulable) {
 					e2efixture.Skipf(fxt, "test requires %q cluster type, got %q", label.MNOMastersSchedulable, clusterType)
 				}
@@ -1528,7 +1529,7 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			})
 
 			It("[test_id:83870] should handle overlapping node group pools by keeping the duplicate RTE pods pending", Label(label.Tier2, label.OpenShift, label.Compact, label.MNOMastersSchedulable), func(ctx context.Context) {
-				clusterType := getClusterType(ctx, fxt.Client)
+				clusterType := e2ecluster.GetClusterType(ctx, fxt.Client)
 				if !(clusterType == label.Compact || clusterType == label.MNOMastersSchedulable) {
 					e2efixture.Skipf(fxt, "test requires one of [%q, %q] cluster types, got %q", label.Compact, label.MNOMastersSchedulable, clusterType)
 				}
@@ -2180,37 +2181,6 @@ func updatePerformanceProfileFieldUnstructured(dynamicClient dynamic.Interface, 
 		Expect(err).ToNot(HaveOccurred())
 	}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 	return
-}
-
-func getClusterType(ctx context.Context, cli client.Client) label.ClusterType {
-	GinkgoHelper()
-
-	allNodes := &corev1.NodeList{}
-	Expect(cli.List(ctx, allNodes)).To(Succeed())
-
-	mastersSchedulable := false
-	schedulerCfg := &configv1.Scheduler{}
-	err := cli.Get(ctx, client.ObjectKey{Name: "cluster"}, schedulerCfg)
-	if err != nil && !apierrors.IsNotFound(err) {
-		Expect(err).ToNot(HaveOccurred())
-	}
-	if err == nil {
-		mastersSchedulable = schedulerCfg.Spec.MastersSchedulable
-	}
-
-	infraCfg := &configv1.Infrastructure{}
-	err = cli.Get(ctx, client.ObjectKey{Name: "cluster"}, infraCfg)
-	if err != nil && !apierrors.IsNotFound(err) {
-		Expect(err).ToNot(HaveOccurred())
-	}
-
-	if err == nil && infraCfg.Status.ControlPlaneTopology == configv1.HighlyAvailableTopologyMode && mastersSchedulable {
-		if len(allNodes.Items) == 3 {
-			return label.Compact
-		}
-		return label.MNOMastersSchedulable
-	}
-	return label.MNO
 }
 
 func getDedicatedWorkerNodes(ctx context.Context, cli client.Client) []corev1.Node {
