@@ -2,7 +2,7 @@ FROM registry.access.redhat.com/ubi9/ubi
 
 ENV HOME=/home/ci
 ENV GOROOT=/usr/local/go
-ENV GOVERSION=1.25.11
+ENV GOVERSION=1.25
 ENV GOPATH=/go
 ENV GOBIN=${GOPATH}/bin
 ENV PATH=${PATH}:${GOROOT}/bin:${GOBIN}
@@ -16,14 +16,19 @@ RUN yum --setopt=install_weak_deps=False -y install \
     make \
     gettext \
     which \
+    jq \
     findutils \
     && yum clean all
 
 RUN mkdir -p $HOME && \
-    # install go
-    curl -JL https://dl.google.com/go/go${GOVERSION}.linux-amd64.tar.gz -o go.tar.gz && \
+    # install the latest stable Go patch release in the requested minor line
+    curl -fsSL 'https://go.dev/dl/?mode=json&include=all' -o go-releases.json && \
+    GO_ARCHIVE=$(jq -er --arg version "$GOVERSION" '[.[] | select(.stable and (.version | startswith("go" + $version + "."))) | .files[] | select(.os == "linux" and .arch == "amd64" and .kind == "archive")] | first | .filename' go-releases.json) && \
+    GO_CHECKSUM=$(jq -er --arg version "$GOVERSION" '[.[] | select(.stable and (.version | startswith("go" + $version + "."))) | .files[] | select(.os == "linux" and .arch == "amd64" and .kind == "archive")] | first | .sha256' go-releases.json) && \
+    curl -fsSLo go.tar.gz "https://dl.google.com/go/${GO_ARCHIVE}" && \
+    echo "${GO_CHECKSUM}  go.tar.gz" | sha256sum -c - && \
     tar -C /usr/local -xzf go.tar.gz && \
-    rm go.tar.gz && \
+    rm go.tar.gz go-releases.json && \
     # get required golang tools and OC client
     go install golang.org/x/lint/golint@v0.0.0-20210508222113-6edffad5e616 && \
     go install github.com/mattn/goveralls@v0.0.12 && \
