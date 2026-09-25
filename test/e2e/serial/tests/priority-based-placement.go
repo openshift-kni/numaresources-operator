@@ -473,6 +473,7 @@ var _ = Describe("[serial][disruptive][preemption] priority-based workload place
 						}
 					}
 					Expect(evictedPod.Name).ToNot(BeEmpty(), "no medium-priority filler pod was evicted")
+					klog.InfoS("evicted pod", "podName", evictedPod.Name)
 
 					keptRunningPods := []*corev1.Pod{}
 					for _, pod := range fillerPods {
@@ -482,6 +483,7 @@ var _ = Describe("[serial][disruptive][preemption] priority-based workload place
 						keptRunningPods = append(keptRunningPods, pod)
 					}
 					klog.Info("verifying the rest of the filler pods continue to run")
+					// known bug here: https://redhat.atlassian.net/browse/OCPBUGS-123679. Effect: more than one medium priority filler pod may be evicted.
 					Expect(ensurePodsNotEvicted(ctx, fxt.Client, keptRunningPods, fillersNameToUID, 1*time.Minute, 10*time.Second)).
 						To(Succeed(), "failed to have the filler pods running")
 				})
