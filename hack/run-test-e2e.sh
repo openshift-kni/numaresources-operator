@@ -25,6 +25,9 @@ echo "Deploying sample devices for RTE tests"
 rte/hack/deploy-devices.sh
 
 rte/hack/check-ds.sh oc sampledevices device-plugin-a-ds
+rte/hack/check-ds.sh oc sampledevices device-plugin-hostlevel-a-ds
+# Enable OCPBUGS-90597 serial coverage when host-level sample device is present
+export E2E_NROP_PFP_HOSTLEVEL_SIM="${E2E_NROP_PFP_HOSTLEVEL_SIM:-1}"
 
 echo "Running RTE tests"
 export E2E_TOPOLOGY_MANAGER_POLICY="${E2E_TOPOLOGY_MANAGER_POLICY}"

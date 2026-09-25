@@ -25,6 +25,7 @@ ${BIN_DIR}/e2e-nrop-sched-install.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5
 echo "Deploying sample devices for RTE tests"
 rte/hack/deploy-devices.sh
 rte/hack/check-ds.sh oc sampledevices device-plugin-a-ds
+rte/hack/check-ds.sh oc sampledevices device-plugin-hostlevel-a-ds
 
 echo "Running Functional Tests: ${GINKGO_SUITS}"
 ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.flake-attempts=2 --ginkgo.junit-report=${REPORT_DIR}/e2e-sched.xml
