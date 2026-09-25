@@ -59,7 +59,9 @@ const (
 	customMediumPriorityClassName       = "e2e-preemption-medium"
 	customHighPriorityClassName         = "e2e-preemption-high"
 
-	pendingTimeout = 5 * time.Minute
+	// TODO: This is a temporary workaround to avoid flakiness because NRT-cache resources avialability updates does not trigger the rescheduling for
+	// pending pods like node-level events, see https://redhat.atlassian.net/browse/OCPBUGS-123706. Once the bug is addressed, a 5 minutes timeout should be enough.
+	pendingTimeout = 10 * time.Minute
 )
 
 var _ = Describe("[serial][disruptive][preemption] priority-based workload placement functionality", Serial, Label("disruptive", "scheduler"), Label("feature:preemption"), func() {
