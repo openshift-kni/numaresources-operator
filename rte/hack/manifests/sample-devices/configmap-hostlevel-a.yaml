@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: sampledevices
+  name: device-hostlevel-a-configmap
+data:
+  example_com_hostlevelA.yaml: |
+    # Host-level extended resource (numanode: -1 → nil Topology).
+    # Appears on node allocatable but not in NRT zones — used to simulate
+    # OCPBUGS-90597 PFP mismatch environments (e.g. WP-like infra resources).
+    # numanode must be set to -1 explicitly; omitting it defaults to 0 (NUMA-local).
+    devicename: example.com/hostlevelA
+    devices:
+      '*':
+        - id: HostA1
+          healthy: true
+          numanode: -1
+        - id: HostA2
+          healthy: true
+          numanode: -1
+        - id: HostA3
+          healthy: true
+          numanode: -1
+        - id: HostA4
+          healthy: true
+          numanode: -1
