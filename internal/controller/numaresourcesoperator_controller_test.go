@@ -37,7 +37,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/record"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -88,8 +87,6 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 	if err != nil {
 		return nil, err
 	}
-	recorder := record.NewFakeRecorder(bufferSize)
-
 	return &NUMAResourcesOperatorReconciler{
 		Client:       fakeClient,
 		Scheme:       scheme.Scheme,
@@ -103,7 +100,6 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 		Images: images.Data{
 			Builtin: testImageSpec,
 		},
-		Recorder: recorder,
 	}, nil
 }
 

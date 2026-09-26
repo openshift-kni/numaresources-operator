@@ -17,14 +17,18 @@ limitations under the License.
 package sched
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 )
@@ -87,6 +91,52 @@ profiles:
       args:
         kubeconfigpath: "" # needs to be empty string`
 )
+
+func TestCleanup(t *testing.T) {
+	type testCase struct {
+		name    string
+		objects []client.Object
+	}
+
+	testCases := []testCase{
+		{
+			name: "CRB exists and is deleted",
+			objects: []client.Object{
+				&rbacv1.ClusterRoleBinding{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "secondary-scheduler",
+					},
+				},
+			},
+		},
+		{
+			name: "CRB does not exist",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			builder := fake.NewClientBuilder().WithScheme(scheme.Scheme)
+			for _, obj := range tc.objects {
+				builder = builder.WithObjects(obj)
+			}
+			cli := builder.Build()
+
+			ctx := context.Background()
+
+			cleanErr := Cleanup(ctx, cli)
+			if cleanErr != nil {
+				t.Errorf("unexpected error: %v", cleanErr)
+			}
+			crb := &rbacv1.ClusterRoleBinding{}
+			crb.Name = "secondary-scheduler"
+			getErr := cli.Get(ctx, client.ObjectKeyFromObject(crb), crb)
+			if getErr == nil {
+				t.Errorf("ClusterRoleBinding should not exist after Cleanup")
+			}
+		})
+	}
+}
 
 func TestSchedulerNameFromObject(t *testing.T) {
 	type testCase struct {

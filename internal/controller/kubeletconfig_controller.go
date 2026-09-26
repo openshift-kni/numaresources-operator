@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
@@ -71,7 +70,6 @@ const (
 type KubeletConfigReconciler struct {
 	client.Client
 	Scheme    *runtime.Scheme
-	Recorder  record.EventRecorder
 	Namespace string
 	Platform  platform.Platform
 	// garbageCollectionFor is a list of objects
@@ -88,10 +86,9 @@ type kubeletConfigHandler struct {
 }
 
 // Namespace Scoped
-
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=create;delete;update,namespace="numaresources"
 // Cluster Scoped
-//+kubebuilder:rbac:groups="",resources=configmaps,verbs=*
-//+kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch
 //+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=kubeletconfigs,verbs=get;list;watch
 //+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=kubeletconfigs/finalizers,verbs=update
 
@@ -120,17 +117,15 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err != nil {
 		var klErr *InvalidKubeletConfig
 		if errors.As(err, &klErr) {
-			r.Recorder.Event(instance, "Normal", "ProcessSkip", "ignored kubelet config "+klErr.ObjectName)
+			klog.InfoS("ignored kubelet config", "object", klErr.ObjectName)
 			return ctrl.Result{}, nil
 		}
 
 		klog.ErrorS(err, "failed to reconcile configmap", "controller", "kubeletconfig")
-
-		r.Recorder.Event(instance, "Warning", "ProcessFailed", "Failed to update RTE config from kubelet config "+req.NamespacedName.String())
 		return ctrl.Result{}, err
 	}
 
-	r.Recorder.Event(instance, "Normal", "ProcessOK", fmt.Sprintf("Updated RTE config %s/%s from kubelet config %s", cm.Namespace, cm.Name, req.NamespacedName.String()))
+	klog.InfoS("updated RTE config from kubelet config", "configmap", klog.KRef(cm.Namespace, cm.Name), "kubeletconfig", req.NamespacedName.String())
 	return ctrl.Result{}, nil
 }
 
