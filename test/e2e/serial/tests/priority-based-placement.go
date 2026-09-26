@@ -59,7 +59,9 @@ const (
 	customMediumPriorityClassName       = "e2e-preemption-medium"
 	customHighPriorityClassName         = "e2e-preemption-high"
 
-	pendingTimeout = 5 * time.Minute
+	// TODO: This is a temporary workaround to avoid flakiness because NRT-cache resources avialability updates does not trigger the rescheduling for
+	// pending pods like node-level events, see https://redhat.atlassian.net/browse/OCPBUGS-123706. Once the bug is addressed, a 5 minutes timeout should be enough.
+	pendingTimeout = 10 * time.Minute
 )
 
 var _ = Describe("[serial][disruptive][preemption] priority-based workload placement functionality", Serial, Label("disruptive", "scheduler"), Label("feature:preemption"), func() {
@@ -471,6 +473,7 @@ var _ = Describe("[serial][disruptive][preemption] priority-based workload place
 						}
 					}
 					Expect(evictedPod.Name).ToNot(BeEmpty(), "no medium-priority filler pod was evicted")
+					klog.InfoS("evicted pod", "podName", evictedPod.Name)
 
 					keptRunningPods := []*corev1.Pod{}
 					for _, pod := range fillerPods {
@@ -480,6 +483,7 @@ var _ = Describe("[serial][disruptive][preemption] priority-based workload place
 						keptRunningPods = append(keptRunningPods, pod)
 					}
 					klog.Info("verifying the rest of the filler pods continue to run")
+					// known bug here: https://redhat.atlassian.net/browse/OCPBUGS-123679. Effect: more than one medium priority filler pod may be evicted.
 					Expect(ensurePodsNotEvicted(ctx, fxt.Client, keptRunningPods, fillersNameToUID, 1*time.Minute, 10*time.Second)).
 						To(Succeed(), "failed to have the filler pods running")
 				})
