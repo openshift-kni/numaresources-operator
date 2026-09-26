@@ -38,7 +38,6 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
@@ -67,28 +66,27 @@ import (
 // tests here are not interruptible, so they should not accept contexts.
 // See: https://onsi.github.io/ginkgo/#interruptible-nodes-and-speccontext
 
-const (
-	containerNameRTE = "resource-topology-exporter"
+const containerNameRTE = "resource-topology-exporter"
 
-	// skipHyperShiftKCDetachReason documents why HyperShift durability specs are skipped.
-	// Remove once hypershift#8890 (OCPBUGS-88738) is in CI payloads and teardown passes.
-	skipHyperShiftKCDetachReason = "Skipped until OCPBUGS-88738 (hypershift#8890): HCCO does not delete mirrored kubelet ConfigMap on guest cluster after KC detach"
-)
+var _ = Describe("[Install]", Serial, Ordered, func() {
+	var deployer deploy.Deployer
+	var nroObj *nropv1.NUMAResourcesOperator
 
-var _ = Describe("[Install] continuousIntegration", Serial, func() {
-	var initialized bool
-
-	BeforeEach(func() {
-		if !initialized {
-			Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
-		}
-		initialized = true
+	BeforeAll(func() {
+		Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
+		deployer = deploy.NewForPlatform(configuration.Plat)
+		nroObj = deployer.Deploy(context.TODO(), configuration.MachineConfigPoolUpdateTimeout)
 	})
 
-	Context("with a running cluster with all the components", func() {
+	AfterAll(func() {
+		if deployer == nil {
+			return
+		}
+		deployer.Teardown(context.TODO(), 5*time.Minute)
+	})
+
+	Context("continuousIntegration with a running cluster with all the components", func() {
 		It("[test_id:47574] should perform overall deployment and verify the condition is reported as available", Label(label.Tier0), func() {
-			deployer := deploy.NewForPlatform(configuration.Plat)
-			nroObj := deployer.Deploy(context.TODO(), configuration.MachineConfigPoolUpdateTimeout)
 			nname := client.ObjectKeyFromObject(nroObj)
 			Expect(nname.Name).ToNot(BeEmpty())
 
@@ -162,37 +160,8 @@ var _ = Describe("[Install] continuousIntegration", Serial, func() {
 			Expect(rteContainer.SecurityContext.SELinuxOptions.Type).To(Equal(selinux.RTEContextType), "container %s is running with wrong selinux context", rteContainer.Name)
 		})
 	})
-})
 
-var _ = Describe("[Install] durability", Serial, func() {
-	var initialized bool
-
-	BeforeEach(func() {
-		if !initialized {
-			Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
-		}
-		initialized = true
-	})
-
-	Context("with a running cluster with all the components and overall deployment", func() {
-		var deployer deploy.Deployer
-		var nroObj *nropv1.NUMAResourcesOperator
-
-		BeforeEach(func() {
-			if configuration.Plat == platform.HyperShift {
-				Skip(skipHyperShiftKCDetachReason)
-			}
-			deployer = deploy.NewForPlatform(configuration.Plat)
-			nroObj = deployer.Deploy(context.TODO(), configuration.MachineConfigPoolUpdateTimeout)
-		})
-
-		AfterEach(func() {
-			if deployer == nil {
-				return
-			}
-			deployer.Teardown(context.TODO(), 5*time.Minute)
-		})
-
+	Context("durability with a running cluster with all the components and overall deployment", func() {
 		It("should reject custom ExporterImage and go Degraded without changing the DaemonSet", Label(label.Tier1), func(ctx context.Context) {
 			By("getting up-to-date NRO object")
 			nroKey := objects.NROObjectKey()
