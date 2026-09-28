@@ -28,7 +28,8 @@
     "packageRules": [
         {
             "matchUpdateTypes": [
-                "minor"
+                "minor",
+                "major"
             ],
             "enabled": false
         },
