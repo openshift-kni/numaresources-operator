@@ -35,13 +35,19 @@ type GitCommit struct {
 }
 
 const (
-	dependabot = "dependabot[bot]"
-	konflux    = "red-hat-konflux"
+	dependabot   = "dependabot[bot]"
+	konflux      = "red-hat-konflux"
+	chaiBot      = "Chai Bot"
+	chaiBotEmail = "<chai-bot@redhat.com>"
 )
 
 func validate(commit GitCommit) error {
-	var errs error
+	if commit.Author == chaiBot && commit.AuthorEmail == chaiBotEmail {
+		fmt.Printf("git commit authored by chai bot\n")
+		return nil
+	}
 
+	var errs error
 	if "<"+commit.Author+">" == commit.AuthorEmailLocal {
 		errs = errors.Join(errs, fmt.Errorf("missing author name - equals to email local part"))
 	}
