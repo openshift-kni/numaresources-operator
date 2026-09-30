@@ -537,6 +537,10 @@ GOLANGCI_LINT_ARTIFACT_FILE = $(GOLANGCI_LINT_NAME).tar.gz
 GOLANGCI_LINT_EXEC_NAME = golangci-lint
 GOLANGCI_LINT = $(LOCALBIN)/$(GOLANGCI_LINT_EXEC_NAME)
 
+KUSTOMIZE_VERSION ?= v5.5.0
+KUSTOMIZE_ARTIFACT_FILE = kustomize_$(KUSTOMIZE_VERSION)_$(GOOS)_$(GOARCH).tar.gz
+KUSTOMIZE ?= $(LOCALBIN)/kustomize
+
 .PHONY: operator-sdk
 operator-sdk: ## Download operator-sdk locally if necessary.
 	@if [ ! -x "$(OPERATOR_SDK)" ]; then\
@@ -574,23 +578,29 @@ golangci-lint: ## Download golangci-lint locally if necessary.
 		echo "Using golangci-lint cached at $(GOLANGCI_LINT), current version `$(GOLANGCI_LINT) --version 2>&1` expected version: $(GOLANGCI_LINT_VERSION)";\
 	fi
 
-## Tool Binaries - go-install binary
+.PHONY: kustomize
+kustomize: ## Download kustomize locally if necessary.
+	@if [ ! -x "$(KUSTOMIZE)" ] || ! "$(KUSTOMIZE)" version 2>&1 | grep -Fxq "$(KUSTOMIZE_VERSION)"; then\
+		echo "Downloading kustomize $(KUSTOMIZE_VERSION)";\
+		mkdir -p $(LOCALBIN);\
+		curl -fJL https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F$(KUSTOMIZE_VERSION)/$(KUSTOMIZE_ARTIFACT_FILE) -o $(LOCALBIN)/$(KUSTOMIZE_ARTIFACT_FILE);\
+		tar --no-same-owner -xOzf $(LOCALBIN)/$(KUSTOMIZE_ARTIFACT_FILE) kustomize > $(KUSTOMIZE);\
+		chmod +x $(KUSTOMIZE);\
+		rm -f $(LOCALBIN)/$(KUSTOMIZE_ARTIFACT_FILE);\
+	else\
+		echo "Using kustomize cached at $(KUSTOMIZE), expected version: $(KUSTOMIZE_VERSION)";\
+	fi
+
+## Tool Binaries - local build
 
 KUBECTL ?= kubectl
-KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 YQ ?= $(LOCALBIN)/yq
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.5.0
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
-
-.PHONY: kustomize
-kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
-$(KUSTOMIZE): $(LOCALBIN)
-	$(call go-install-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v5,$(KUSTOMIZE_VERSION))
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Build controller-gen from vendored sources if necessary.
@@ -609,22 +619,6 @@ setup-envtest: envtest ## Download the binaries required for ENVTEST in the loca
 envtest: $(ENVTEST) ## Build setup-envtest from vendored sources if necessary.
 $(ENVTEST): go.mod go.sum vendor/modules.txt | $(LOCALBIN)
 	go build -mod=vendor -o $@ sigs.k8s.io/controller-runtime/tools/setup-envtest
-
-# go-install-tool will 'go install' any package with custom target and name of binary, if it doesn't exist
-# $1 - target path with name of binary
-# $2 - package url which can be installed
-# $3 - specific version of package
-define go-install-tool
-@[ -f "$(1)-$(3)" ] || { \
-set -e; \
-package=$(2)@$(3) ;\
-echo "Downloading $${package}" ;\
-rm -f $(1) || true ;\
-GOBIN=$(LOCALBIN) go install $${package} ;\
-mv $(1) $(1)-$(3) ;\
-} ;\
-ln -sf $(1)-$(3) $(1)
-endef
 
 ##@ Konflux
 
