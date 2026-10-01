@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform/detect"
 )
 
 // DiscoverResult is the result of the cluster discovery process of platform and version.
