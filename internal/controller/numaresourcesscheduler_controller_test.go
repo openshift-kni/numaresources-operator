@@ -43,17 +43,16 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	depmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	depobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	schedulerapi "github.com/openshift-kni/numaresources-operator/internal/api/scheduler"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
+	depobjupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
+	schedconfig "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
@@ -636,7 +635,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
 
-			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectOnlyExclusiveResources, depmanifests.CacheInformerDedicated)
+			expectCacheParams(reconciler.Client, schedconfig.CacheResyncAutodetect, schedconfig.ForeignPodsDetectOnlyExclusiveResources, schedconfig.CacheInformerDedicated)
 		})
 
 		It("should allow to set aggressive resync detection mode in configmap", func() {
@@ -651,14 +650,14 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
 
-			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.ForeignPodsDetectAll, depmanifests.CacheInformerDedicated)
+			expectCacheParams(reconciler.Client, schedconfig.CacheResyncAutodetect, schedconfig.ForeignPodsDetectAll, schedconfig.CacheInformerDedicated)
 		})
 
 		It("should configure by default the informerMode to be Dedicated", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, depmanifests.CacheInformerDedicated)
+			expectCacheParams(reconciler.Client, schedconfig.CacheResyncAutodetect, schedconfig.CacheResyncOnlyExclusiveResources, schedconfig.CacheInformerDedicated)
 		})
 
 		It("should allow to change the informerMode to Shared", func() {
@@ -677,7 +676,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
 
-			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, depmanifests.CacheInformerShared)
+			expectCacheParams(reconciler.Client, schedconfig.CacheResyncAutodetect, schedconfig.CacheResyncOnlyExclusiveResources, schedconfig.CacheInformerShared)
 		})
 
 		It("should allow to change the informerMode to Dedicated", func() {
@@ -696,15 +695,15 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
 
-			expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, depmanifests.CacheInformerDedicated)
+			expectCacheParams(reconciler.Client, schedconfig.CacheResyncAutodetect, schedconfig.CacheResyncOnlyExclusiveResources, schedconfig.CacheInformerDedicated)
 		})
 
 		It("should configure by default the ScoringStrategy to be LeastAllocated", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			var resources []depmanifests.ResourceSpecParams
-			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyLeastAllocated, resources)
+			var resources []schedconfig.ResourceSpecParams
+			expectScoringStrategyParams(reconciler.Client, schedconfig.ScoringStrategyLeastAllocated, resources)
 
 		})
 
@@ -799,8 +798,8 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			resources := []depmanifests.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
-			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyLeastAllocated, resources)
+			resources := []schedconfig.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
+			expectScoringStrategyParams(reconciler.Client, schedconfig.ScoringStrategyLeastAllocated, resources)
 		})
 
 		It("should allow to change the ScoringStrategy to BalancedAllocation", func() {
@@ -818,8 +817,8 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			var resources []depmanifests.ResourceSpecParams
-			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyBalancedAllocation, resources)
+			var resources []schedconfig.ResourceSpecParams
+			expectScoringStrategyParams(reconciler.Client, schedconfig.ScoringStrategyBalancedAllocation, resources)
 		})
 
 		It("should allow to change the ScoringStrategy to MostAllocated", func() {
@@ -837,8 +836,8 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			var resources []depmanifests.ResourceSpecParams
-			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyMostAllocated, resources)
+			var resources []schedconfig.ResourceSpecParams
+			expectScoringStrategyParams(reconciler.Client, schedconfig.ScoringStrategyMostAllocated, resources)
 		})
 
 		It("should allow to change the ScoringStrategy to BalancedAllocation with resources", func() {
@@ -858,8 +857,8 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			resources := []depmanifests.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
-			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyBalancedAllocation, resources)
+			resources := []schedconfig.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
+			expectScoringStrategyParams(reconciler.Client, schedconfig.ScoringStrategyBalancedAllocation, resources)
 		})
 
 		It("should allow to change the ScoringStrategy to MostAllocated with resources", func() {
@@ -879,8 +878,8 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			key := client.ObjectKeyFromObject(nrs)
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 			Expect(err).ToNot(HaveOccurred())
-			resources := []depmanifests.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
-			expectScoringStrategyParams(reconciler.Client, depmanifests.ScoringStrategyMostAllocated, resources)
+			resources := []schedconfig.ResourceSpecParams{{Name: "cpu", Weight: 10}, {Name: "memory", Weight: 5}}
+			expectScoringStrategyParams(reconciler.Client, schedconfig.ScoringStrategyMostAllocated, resources)
 		})
 
 		It("should set the leader election resource parameters by default", func() {
@@ -1033,10 +1032,10 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).ToNot(HaveOccurred())
 
-				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, expectedInformer)
+				expectCacheParams(reconciler.Client, schedconfig.CacheResyncAutodetect, schedconfig.CacheResyncOnlyExclusiveResources, expectedInformer)
 
 				expectedDedicatedActiveStatus := metav1.ConditionTrue
-				if expectedInformer == depmanifests.CacheInformerShared {
+				if expectedInformer == schedconfig.CacheInformerShared {
 					expectedDedicatedActiveStatus = metav1.ConditionFalse
 				}
 
@@ -1046,15 +1045,15 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				Expect(c).ToNot(BeNil())
 				Expect(c.Status).To(Equal(expectedDedicatedActiveStatus))
 			},
-				Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, fixedVersion), depmanifests.CacheInformerShared),
-				Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, fixedVersion), depmanifests.CacheInformerShared),
-				Entry("with unfixed platform the default informer is Dedicated (unchanged)", platforminfo.New(platform.OpenShift, unfixedVersion), depmanifests.CacheInformerDedicated),
-				Entry("with unfixed platform the default informer is Dedicated (unchanged)", platforminfo.New(platform.HyperShift, unfixedVersion), depmanifests.CacheInformerDedicated),
-				Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, futureFixedVersion), depmanifests.CacheInformerShared),
-				Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, futureFixedVersion), depmanifests.CacheInformerShared),
-				Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, futureFixedVersionZstream), depmanifests.CacheInformerShared),
-				Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, futureFixedVersionZstream), depmanifests.CacheInformerShared),
-				Entry("with unknown platform the default informer is Dedicated (unchanged)", platforminfo.PlatformInfo{}, depmanifests.CacheInformerDedicated),
+				Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, fixedVersion), schedconfig.CacheInformerShared),
+				Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, fixedVersion), schedconfig.CacheInformerShared),
+				Entry("with unfixed platform the default informer is Dedicated (unchanged)", platforminfo.New(platform.OpenShift, unfixedVersion), schedconfig.CacheInformerDedicated),
+				Entry("with unfixed platform the default informer is Dedicated (unchanged)", platforminfo.New(platform.HyperShift, unfixedVersion), schedconfig.CacheInformerDedicated),
+				Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, futureFixedVersion), schedconfig.CacheInformerShared),
+				Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, futureFixedVersion), schedconfig.CacheInformerShared),
+				Entry("with fixed Openshift the default informer is Shared", platforminfo.New(platform.OpenShift, futureFixedVersionZstream), schedconfig.CacheInformerShared),
+				Entry("with fixed Hypershift the default informer is Shared", platforminfo.New(platform.HyperShift, futureFixedVersionZstream), schedconfig.CacheInformerShared),
+				Entry("with unknown platform the default informer is Dedicated (unchanged)", platforminfo.PlatformInfo{}, schedconfig.CacheInformerDedicated),
 			)
 
 			DescribeTable("should preserve informerMode value if set", func(reconcilerPlatInfo platforminfo.PlatformInfo) {
@@ -1072,7 +1071,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				key := client.ObjectKeyFromObject(nrs)
 				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).ToNot(HaveOccurred())
-				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(infMode))
+				expectCacheParams(reconciler.Client, schedconfig.CacheResyncAutodetect, schedconfig.CacheResyncOnlyExclusiveResources, string(infMode))
 			},
 				Entry("with Openshift", platforminfo.PlatformInfo{
 					Platform: platform.OpenShift,
@@ -1117,7 +1116,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 				_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: key})
 				Expect(err).ToNot(HaveOccurred())
 
-				expectCacheParams(reconciler.Client, depmanifests.CacheResyncAutodetect, depmanifests.CacheResyncOnlyExclusiveResources, string(informerMode))
+				expectCacheParams(reconciler.Client, schedconfig.CacheResyncAutodetect, schedconfig.CacheResyncOnlyExclusiveResources, string(informerMode))
 			},
 				Entry("with Openshift", platforminfo.PlatformInfo{
 					Platform: platform.OpenShift,
@@ -1442,7 +1441,7 @@ func HaveSchedulerPreemptionMode(want string) types.GomegaMatcher {
 		}
 
 		confRaw := cm.Data[sched.SchedulerConfigFileName]
-		cfgs, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(confRaw))
+		cfgs, err := schedconfig.DecodeSchedulerProfilesFromData([]byte(confRaw))
 		if err != nil {
 			return false, err
 		}
@@ -1479,11 +1478,11 @@ func pop(m map[string]string, k string) string {
 }
 
 func diffYAML(want, got string) (string, error) {
-	cfgWant, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(want))
+	cfgWant, err := schedconfig.DecodeSchedulerProfilesFromData([]byte(want))
 	if err != nil {
 		return "", err
 	}
-	cfgGot, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(got))
+	cfgGot, err := schedconfig.DecodeSchedulerProfilesFromData([]byte(got))
 	if err != nil {
 		return "", err
 	}
@@ -1502,7 +1501,7 @@ func expectCacheParams(cli client.Client, resyncMethod, foreignPodsDetect string
 	Expect(cli.Get(context.TODO(), key, &cm)).To(Succeed())
 
 	confRaw := cm.Data[sched.SchedulerConfigFileName]
-	cfgs, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(confRaw))
+	cfgs, err := schedconfig.DecodeSchedulerProfilesFromData([]byte(confRaw))
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfgs).To(HaveLen(1), "unexpected config params count: %d", len(cfgs))
 	cfg := cfgs[0]
@@ -1517,7 +1516,7 @@ func expectCacheParams(cli client.Client, resyncMethod, foreignPodsDetect string
 	Expect(*cfg.Cache.InformerMode).To(Equal(informerMode))
 }
 
-func expectScoringStrategyParams(cli client.Client, scoringStrategyType string, resources []depmanifests.ResourceSpecParams) {
+func expectScoringStrategyParams(cli client.Client, scoringStrategyType string, resources []schedconfig.ResourceSpecParams) {
 	GinkgoHelper()
 
 	key := client.ObjectKey{
@@ -1529,7 +1528,7 @@ func expectScoringStrategyParams(cli client.Client, scoringStrategyType string, 
 	Expect(cli.Get(context.TODO(), key, &cm)).To(Succeed())
 
 	confRaw := cm.Data[sched.SchedulerConfigFileName]
-	cfgs, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(confRaw))
+	cfgs, err := schedconfig.DecodeSchedulerProfilesFromData([]byte(confRaw))
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfgs).To(HaveLen(1), "unexpected config params count: %d", len(cfgs))
 	cfg := cfgs[0]
@@ -1550,7 +1549,7 @@ func expectLeaderElectParams(cli client.Client, enabled bool, resourceNamespace,
 	Expect(cli.Get(context.TODO(), key, &cm)).To(Succeed())
 
 	confRaw := cm.Data[sched.SchedulerConfigFileName]
-	cfgs, err := depmanifests.DecodeSchedulerProfilesFromData([]byte(confRaw))
+	cfgs, err := schedconfig.DecodeSchedulerProfilesFromData([]byte(confRaw))
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfgs).To(HaveLen(1), "unexpected config params count: %d", len(cfgs))
 	cfg := cfgs[0]
