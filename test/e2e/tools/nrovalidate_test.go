@@ -24,9 +24,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-
 	nrovalidator "github.com/openshift-kni/numaresources-operator/nrovalidate/validator"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

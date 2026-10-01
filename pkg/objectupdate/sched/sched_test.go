@@ -31,11 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
+	schedconfig "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
@@ -208,7 +207,7 @@ func TestUpdateSchedulerName(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			params := k8swgmanifests.ConfigParams{
+			params := schedconfig.ConfigParams{
 				ProfileName: tc.schedulerName,
 			}
 			if err := SchedulerConfig(&tc.configMap, "test-topo-aware-sched", &params); err != nil {
@@ -310,8 +309,8 @@ func TestUpdateSchedulerConfig(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			resyncPeriod := int64(tc.cacheResyncPeriod.Seconds())
-			params := k8swgmanifests.ConfigParams{
-				Cache: &k8swgmanifests.ConfigCacheParams{
+			params := schedconfig.ConfigParams{
+				Cache: &schedconfig.ConfigCacheParams{
 					ResyncPeriodSeconds: &resyncPeriod,
 				},
 			}

@@ -20,33 +20,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/yaml"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests"
 )
-
-func SchedulerConfig(cm *corev1.ConfigMap, schedulerName string, params *manifests.ConfigParams) error {
-	if cm.Data == nil {
-		return fmt.Errorf("no data found in ConfigMap: %s/%s", cm.Namespace, cm.Name)
-	}
-
-	data, ok := cm.Data[manifests.SchedulerConfigFileName]
-	if !ok {
-		return fmt.Errorf("no data key named: %s found in ConfigMap: %s/%s", manifests.SchedulerConfigFileName, cm.Namespace, cm.Name)
-	}
-
-	newData, _, err := RenderConfig([]byte(data), schedulerName, params)
-	if err != nil {
-		return err
-	}
-
-	cm.Data[manifests.SchedulerConfigFileName] = string(newData)
-	return nil
-}
 
 func RenderConfig(data []byte, schedulerName string, params *manifests.ConfigParams) ([]byte, bool, error) {
 	if schedulerName == "" || params == nil {

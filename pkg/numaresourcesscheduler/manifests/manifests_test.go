@@ -24,6 +24,12 @@ func TestLoad(t *testing.T) {
 	if obj, err := ServiceAccount(""); obj == nil || err != nil {
 		t.Errorf("ServiceAccount() failed: err=%v", err)
 	}
+	if obj, err := Role(""); obj == nil || err != nil {
+		t.Errorf("Role() failed: err=%v", err)
+	}
+	if obj, err := RoleBinding(""); obj == nil || err != nil {
+		t.Errorf("RoleBinding() failed: err=%v", err)
+	}
 	if obj, err := ClusterRole(); obj == nil || err != nil {
 		t.Errorf("ClusterRole() failed: err=%v", err)
 	}
