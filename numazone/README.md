@@ -122,6 +122,125 @@ are kept in a short-lived pending set until the kubelet `podresources` API
 confirms them or their TTL expires. The authoritative state still comes from
 `podresources`.
 
+## How it works
+
+**For single-container pods, waiting inside `Allocate(A)` synchronizes the
+health inventory for the next pod, B.** Pod A's NUMA affinity and device IDs
+have already been selected when the plugin receives the request. This wait
+cannot revise that decision.
+
+In the inspected kubelet implementation, the relevant sequence is:
+
+```text
+AddPod(A)                       [holds kubelet admission lock]
+|
++-- Topology Manager
+|   +-- collect topology hints from the resource managers
+|   +-- merge hints and choose NUMA affinity for A
+|   +-- store A's affinity
+|
++-- Device Manager
+|   +-- select device IDs consistent with A's affinity
+|   +-- reserve those IDs
+|   +-- release Device Manager lock
+|   |
+|   +-- numazone.Allocate(selected IDs)
+|       +-- account for A as a pending allocation
+|       +-- recompute winners and device health
+|       +-- signal ListAndWatch
+|       +-- WAIT until kubelet reports that health inventory
+|       +-- return success
+|   |
+|   +-- commit A's container/device assignment
+|
++-- finish admission            [release admission lock]
+
+AddPod(B)
++-- generate hints using the updated health inventory
+```
+
+The affinity-before-allocation ordering appears in Topology Manager's
+`pkg/kubelet/cm/topologymanager/scope_container.go`. The reservation, RPC, and
+subsequent assignment commit appear in Device Manager's
+`allocateContainerResources()` in `pkg/kubelet/cm/devicemanager/manager.go`.
+
+The race we are closing is between **returning from Allocate** and **processing
+the health update**. Suppose both NUMA nodes initially have zero allocations,
+and A chooses NUMA 0:
+
+```text
+Without the barrier:
+
+A chooses NUMA 0
+    |
+plugin counts become (1, 0); publishes new health
+    |
+Allocate(A) returns
+    |
+B generates hints from OLD health; may also choose NUMA 0
+    |
+kubelet finally processes the health update
+```
+
+The barrier establishes the desired ordering:
+
+```text
+Kubelet admission        Numazone                 Other kubelet handlers
+-----------------        --------                 ----------------------
+A chooses NUMA 0
+call Allocate(A) -------> record A as pending
+                         counts = (1, 0)
+                         publish new health ----> ListAndWatch receiver
+                                                  updates health cache
+                         poll inventory --------> GetAllocatableResources
+                         <----------------------- cached healthy inventory
+                         inventory matches
+receive success <------- return
+
+commit A's assignment
+finish A's admission
+
+B generates hints
+using updated health
+```
+
+This works because **the two kubelet locks have different scopes**:
+
+- The admission lock remains held across `Allocate(A)`, preventing B's
+  admission from advancing. See `AddPod()` in
+  `pkg/kubelet/allocation/allocation_manager.go`.
+- The Device Manager lock is released before calling the plugin. Its
+  `ListAndWatch` receiver and inventory query can therefore acquire that lock
+  while A's RPC is waiting.
+
+The poll provides confirmation, rather than merely allowing some time to pass.
+`GetAllocatableResources()` reaches `GetAllocatableDevices()` in
+`pkg/kubelet/cm/devicemanager/manager.go`, which reads the cached healthy
+inventory under the same lock used to update it. Numazone compares the exact
+device-ID and topology sets.
+
+There is one important distinction:
+
+```text
+GetAllocatableResources(): healthy inventory, INCLUDING allocated devices
+
+Devices available for B:  healthy inventory MINUS allocated devices
+```
+
+After A chooses NUMA 0, numazone keeps A's device Healthy, marks NUMA 0's
+remaining free devices Unhealthy, and leaves NUMA 1's free devices Healthy.
+Once kubelet observes that inventory, subtracting allocated devices leaves B
+with available devices on NUMA 1.
+
+We cannot instead wait for **A's assignment to appear in podresources `List()`**:
+kubelet commits that assignment after `Allocate(A)` returns. Waiting for it
+inside the RPC would create a circular dependency.
+
+Two qualifications apply: container scope can make another topology decision
+for a later container in the same pod, whereas pod scope chooses affinity once
+for the whole pod. Also, a soft timeout returns success through the fail-open
+path, so the ordering guarantee applies when synchronization succeeds.
+
 ## Synchronous admission synchronization
 
 Container-scope pod admission is serialized by kubelet, but kubelet does not
