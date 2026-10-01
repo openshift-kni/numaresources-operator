@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 )
 
 // This file processes the known OCP platform versions, so far nightly, konflux-nightly, CI, dev-preview, and RC
