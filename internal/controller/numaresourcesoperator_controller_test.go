@@ -47,8 +47,9 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
@@ -58,15 +59,15 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
+	apimanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/api"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/rte"
+	nroplatform "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/pkg/validation"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -76,11 +77,11 @@ const (
 
 func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion platform.Version, initObjects ...runtime.Object) (*NUMAResourcesOperatorReconciler, error) {
 	fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithStatusSubresource(&nropv1.NUMAResourcesOperator{}).WithRuntimeObjects(initObjects...).Build()
-	apiManifests, err := apimanifests.GetManifests(plat)
+	apiManifests, err := apimanifests.GetManifests(nroplatform.Platform(plat))
 	if err != nil {
 		return nil, err
 	}
-	rteManifests, err := rtemanifests.GetManifests(plat, platVersion, testNamespace, false, true)
+	rteManifests, err := rtemanifests.GetManifests(nroplatform.Platform(plat), nroplatform.Version(platVersion), testNamespace, false, true)
 	if err != nil {
 		return nil, err
 	}

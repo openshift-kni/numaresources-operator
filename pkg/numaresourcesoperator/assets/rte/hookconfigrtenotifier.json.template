@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "when": {
+    "always": true
+  },
+  "hook": {
+    "path": "{{.notifierScriptPath}}",
+    "args": ["rte-notifier.sh", "{{.notifierFilePath}}"]
+  },
+  "stages": ["poststart", "poststop"]
+}

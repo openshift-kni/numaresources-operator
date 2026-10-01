@@ -218,14 +218,9 @@ github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec
 github.com/k8stopologyawareschedwg/deployer/pkg/images
 github.com/k8stopologyawareschedwg/deployer/pkg/kubeletconfig
 github.com/k8stopologyawareschedwg/deployer/pkg/manifests
-github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api
-github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte
 github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate
-github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/ocp
 github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rbac
-github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte
 github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/sched
-github.com/k8stopologyawareschedwg/deployer/pkg/options
 github.com/k8stopologyawareschedwg/deployer/pkg/validator
 # github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2
 ## explicit; go 1.20

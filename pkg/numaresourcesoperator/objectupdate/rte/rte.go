@@ -24,13 +24,13 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 
-	selinuxassets "github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/images"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/options"
+	selinuxassets "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/assets/selinux"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/flagcodec"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/images"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/options"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 )
 
 const (
@@ -92,32 +92,6 @@ func DaemonSet(ds *appsv1.DaemonSet, plat platform.Platform, configMapName strin
 	}
 
 	daemonSetContainerConfig(podSpec, cntSpec, plat, configMapName, opts)
-}
-
-func MetricsPort(ds *appsv1.DaemonSet, portNum int) {
-	cntSpec := objectupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, manifests.ContainerNameRTE)
-	if cntSpec == nil {
-		return // should never happen
-	}
-
-	metricsPortForContainer(cntSpec, portNum)
-}
-
-func SecurityContext(ds *appsv1.DaemonSet, selinuxContextType string) {
-	cntSpec := objectupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, manifests.ContainerNameRTE)
-	if cntSpec == nil {
-		return // should never happen
-	}
-
-	// this is needed to put watches in the kubelet state dirs AND
-	// to open the podresources socket in R/W mode
-	if cntSpec.SecurityContext == nil {
-		cntSpec.SecurityContext = &corev1.SecurityContext{}
-	}
-	cntSpec.SecurityContext.SELinuxOptions = &corev1.SELinuxOptions{
-		Type:  selinuxContextType,
-		Level: selinuxassets.RTEContextLevel,
-	}
 }
 
 type SecurityContextOptions struct {

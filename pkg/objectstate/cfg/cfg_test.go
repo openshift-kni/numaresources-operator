@@ -30,10 +30,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 
 	v1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/rte"
+	nroplatform "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 )
 
 func TestFromClient(t *testing.T) {
@@ -110,7 +111,7 @@ func TestState(t *testing.T) {
 			em := FromClient(context.TODO(), fakeClient, test.nn.Namespace, test.nn.Name)
 			// intentionally don't check for errors
 
-			rte, _ := rtemanifests.GetManifests(platform.OpenShift, "v4.18", "test-ns", false, true)
+			rte, _ := rtemanifests.GetManifests(nroplatform.Platform(platform.OpenShift), nroplatform.Version("v4.18"), "test-ns", false, true)
 			mf := Manifests{
 				Config: rte.ConfigMap,
 			}

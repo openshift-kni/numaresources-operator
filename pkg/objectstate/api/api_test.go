@@ -27,7 +27,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
+
+	apimanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/api"
+	nroplatform "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 )
 
 func TestFromClient(t *testing.T) {
@@ -36,7 +38,7 @@ func TestFromClient(t *testing.T) {
 
 	plat := platform.OpenShift
 
-	mf, err := apimanifests.GetManifests(plat)
+	mf, err := apimanifests.GetManifests(nroplatform.Platform(plat))
 	if err != nil {
 		t.Fatalf("GetManifests(%v) failed", plat)
 	}
@@ -62,7 +64,7 @@ func TestState(t *testing.T) {
 
 	plat := platform.OpenShift
 
-	mf, err := apimanifests.GetManifests(plat)
+	mf, err := apimanifests.GetManifests(nroplatform.Platform(plat))
 	if err != nil {
 		t.Fatalf("GetManifests(%v) failed: %v", plat, err)
 	}

@@ -24,8 +24,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
 
+	apimanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/api"
+	nroplatform "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
@@ -50,7 +51,7 @@ func (em *ExistingManifests) State(mf apimanifests.Manifests) []objectstate.Obje
 
 func FromClient(ctx context.Context, cli client.Client, plat platform.Platform, mf apimanifests.Manifests) *ExistingManifests {
 	ret := ExistingManifests{
-		Existing: apimanifests.New(plat),
+		Existing: apimanifests.New(nroplatform.Platform(plat)),
 	}
 	crd := apiextensionv1.CustomResourceDefinition{}
 	if ret.CrdError = cli.Get(ctx, client.ObjectKeyFromObject(mf.Crd), &crd); ret.CrdError == nil {

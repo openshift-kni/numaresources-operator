@@ -1,0 +1,11 @@
+[Unit]
+Description=Install RTE SELinux policy
+Before=kubelet.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/usr/sbin/semodule -i {{.selinuxPolicyDst}}
+
+[Install]
+WantedBy=multi-user.target

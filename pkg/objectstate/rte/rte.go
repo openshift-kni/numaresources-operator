@@ -30,15 +30,16 @@ import (
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 
-	k8swgdepselinux "github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	rtemetrics "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
+	selinuxassets "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/assets/selinux"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/rte"
+	rtemanifestsupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate/rte"
+	nroplatform "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"
@@ -73,15 +74,15 @@ type Manifests struct {
 	Metrics rtemetrics.Manifests
 }
 
-func (mf Manifests) securityContextOptions(legacyMode bool) k8swgrteupdate.SecurityContextOptions {
+func (mf Manifests) securityContextOptions(legacyMode bool) rtemanifestsupdate.SecurityContextOptions {
 	if legacyMode {
-		return k8swgrteupdate.SecurityContextOptions{
-			SELinuxContextType:  k8swgdepselinux.RTEContextTypeLegacy,
+		return rtemanifestsupdate.SecurityContextOptions{
+			SELinuxContextType:  selinuxassets.RTEContextTypeLegacy,
 			SecurityContextName: mf.Core.SecurityContextConstraint.Name,
 		}
 	}
-	return k8swgrteupdate.SecurityContextOptions{
-		SELinuxContextType:  k8swgdepselinux.RTEContextType,
+	return rtemanifestsupdate.SecurityContextOptions{
+		SELinuxContextType:  selinuxassets.RTEContextType,
 		SecurityContextName: mf.Core.SecurityContextConstraintV2.Name,
 	}
 }
@@ -154,7 +155,7 @@ type GeneratedDesiredManifest struct {
 	ClusterPlatform   platform.Platform
 	MachineConfigPool *machineconfigv1.MachineConfigPool
 	NodeGroup         *nropv1.NodeGroup
-	SecOpts           k8swgrteupdate.SecurityContextOptions
+	SecOpts           rtemanifestsupdate.SecurityContextOptions
 	// generated manifests
 	DaemonSet     *appsv1.DaemonSet
 	RTEConfigHash string
@@ -268,7 +269,7 @@ func (em *ExistingManifests) WithManifestsUpdater(updater GenerateDesiredManifes
 func FromClientTreeAgnostic(ctx context.Context, cli client.Client, plat platform.Platform, mf Manifests, instance *nropv1.NUMAResourcesOperator, namespace string) *ExistingManifests {
 	ret := ExistingManifests{
 		existing: Manifests{
-			Core: rtemanifests.New(plat),
+			Core: rtemanifests.New(nroplatform.Platform(plat)),
 		},
 		daemonSets: make(map[string]daemonSetManifest),
 		plat:       plat,

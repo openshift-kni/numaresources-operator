@@ -39,8 +39,10 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
@@ -49,6 +51,9 @@ import (
 	nrowait "github.com/openshift-kni/numaresources-operator/internal/wait"
 	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/assets/selinux"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/rte"
+	nroplatform "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
@@ -58,9 +63,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
 	e2eimages "github.com/openshift-kni/numaresources-operator/test/internal/images"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
 // tests here are not interruptible, so they should not accept contexts.
@@ -388,7 +390,7 @@ var _ = Describe("[Install]", Serial, Ordered, func() {
 			By("checking there are no leftovers")
 			// by taking the ns from the ds we're avoiding the need to figure out in advanced
 			// at which ns we should look for the resources
-			mf, err := rte.GetManifests(configuration.Plat, configuration.PlatVersion, ds.Namespace, true, inthelper.IsCustomPolicyEnabled(nroObj))
+			mf, err := rte.GetManifests(nroplatform.Platform(configuration.Plat), nroplatform.Version(configuration.PlatVersion), ds.Namespace, true, inthelper.IsCustomPolicyEnabled(nroObj))
 			Expect(err).ToNot(HaveOccurred())
 
 			Eventually(func() bool {

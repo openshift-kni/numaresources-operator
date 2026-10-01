@@ -37,13 +37,17 @@ import (
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/rte"
+	nroplatform "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"
@@ -53,9 +57,6 @@ import (
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/k8simported/taints"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
-
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations support", Serial, Label("disruptive", "rtetols"), Label("feature:rtetols"), func() {
@@ -184,7 +185,7 @@ var _ = Describe("[serial][disruptive][rtetols] numaresources RTE tolerations su
 		It("[test_id:84303] should enable to change tolerations in the RTE daemonsets", Label(label.Tier3), func(ctx context.Context) {
 			By("getting RTE manifests object")
 			// TODO: this is similar but not quite what the main operator does
-			rteManifests, err := rtemanifests.GetManifests(configuration.Plat, configuration.PlatVersion, "", true, true)
+			rteManifests, err := rtemanifests.GetManifests(nroplatform.Platform(configuration.Plat), nroplatform.Version(configuration.PlatVersion), "", true, true)
 			Expect(err).ToNot(HaveOccurred(), "cannot get the RTE manifests")
 
 			expectedTolerations := rteManifests.DaemonSet.Spec.Template.Spec.Tolerations // shortcut

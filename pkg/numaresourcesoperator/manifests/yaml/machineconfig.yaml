@@ -1,0 +1,8 @@
+# To update the SELinux policy you will need to decode the source content via base64, update it and encode back
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  name: 50-resource-topology-exporter
+  labels:
+    machineconfiguration.openshift.io/role:  worker
+spec: {} # we will inject here the SELinux policy and the systemd service to install it

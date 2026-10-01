@@ -1,0 +1,14 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingress-to-rte-metrics
+spec:
+  podSelector:
+    matchLabels:
+      name: resource-topology
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 2112
+  policyTypes:
+    - Ingress

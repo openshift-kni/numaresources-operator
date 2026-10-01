@@ -21,9 +21,9 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/options"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/options"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 )
 
 type Manifests struct {

@@ -1,0 +1,16 @@
+# TODO: check if we can reduce scc capabilities
+apiVersion: security.openshift.io/v1
+kind: SecurityContextConstraints
+metadata:
+  name: resource-topology-exporter
+allowHostDirVolumePlugin: true
+fsGroup:
+  type: RunAsAny
+readOnlyRootFilesystem: false
+runAsUser:
+  type: RunAsAny
+supplementalGroups:
+  type: RunAsAny
+users: []
+volumes:
+- '*'

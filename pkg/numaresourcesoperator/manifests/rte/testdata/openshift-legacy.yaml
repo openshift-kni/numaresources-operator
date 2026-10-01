@@ -1,0 +1,354 @@
+---
+apiVersion: v1
+data:
+  config.yaml: |
+    topologyManagerPolicy: single-numa-node
+kind: ConfigMap
+metadata:
+  name: rte-config
+  namespace: test
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    pool: worker
+  name: 51-test-rte
+spec:
+  baseOSExtensionsContainerImage: ""
+  config:
+    ignition:
+      config:
+        replace:
+          verification: {}
+      proxy: {}
+      security:
+        tls: {}
+      timeouts: {}
+      version: 3.2.0
+    passwd: {}
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,ewogICJ2ZXJzaW9uIjogIjEuMC4wIiwKICAid2hlbiI6IHsKICAgICJhbHdheXMiOiB0cnVlCiAgfSwKICAiaG9vayI6IHsKICAgICJwYXRoIjogIi91c3IvbG9jYWwvYmluL3J0ZS1ub3RpZmllci5zaCIsCiAgICAiYXJncyI6IFsicnRlLW5vdGlmaWVyLnNoIiwgIi9ydW4vcnRlL25vdGlmeSJdCiAgfSwKICAic3RhZ2VzIjogWyJwb3N0c3RhcnQiLCAicG9zdHN0b3AiXQp9Cg==
+          verification: {}
+        group: {}
+        mode: 420
+        path: /etc/containers/oci/hooks.d/rte-notifier.json
+        user: {}
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,IyEvdXNyL2Jpbi9lbnYgYmFzaAoKSlE9Ii91c3IvYmluL2pxIgpOT1RJRklFUl9GSUxFPSIkezF9IgoKYnVuZGxlPSQoICR7SlF9IC1yICcuYnVuZGxlJyAvZGV2L3N0ZGluIDI+JjEgKQpwb2RfY2dyb3VwPSQoICR7SlF9IC5saW51eC5jZ3JvdXBzUGF0aCA8ICR7YnVuZGxlfS9jb25maWcuanNvbiApCgojIERvIG5vdCB0b3VjaCBmaWxlIGZvciBub24gZ3VhcmFudGVlZCBwb2RzCmlmIFtbICR7cG9kX2Nncm91cH0gPX4gIi4qYnVyc3RhYmxlLioiIF1dIHx8IFtbICR7cG9kX2Nncm91cH0gPX4gIi4qYmVzdGVmZm9ydC4qIiBdXTsgdGhlbgogICAgZXhpdCAwCmZpCgp0b3VjaCAiJHtOT1RJRklFUl9GSUxFfSIgfHwgOgo=
+          verification: {}
+        group: {}
+        mode: 493
+        path: /usr/local/bin/rte-notifier.sh
+        user: {}
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,KGJsb2NrIHJ0ZQoJKHR5cGUgcHJvY2VzcykKCShyb2xldHlwZSBzeXN0ZW1fciBwcm9jZXNzKQoJKHR5cGVhdHRyaWJ1dGVzZXQgZG9tYWluIChwcm9jZXNzKSkKCTsKCTsgR2l2aW5nIHJ0ZS5wcm9jZXNzIHRoZSBzYW1lIGF0dHJpYnV0ZXMgYXMgY29udGFpbmVyX3QKCSh0eXBlYXR0cmlidXRlc2V0IGNvbnRhaW5lcl9kb21haW4gKHByb2Nlc3MpKQoJKHR5cGVhdHRyaWJ1dGVzZXQgY29udGFpbmVyX25ldF9kb21haW4gKHByb2Nlc3MpKQoJKHR5cGVhdHRyaWJ1dGVzZXQgc3ZpcnRfc2FuZGJveF9kb21haW4gKHByb2Nlc3MpKQoJKHR5cGVhdHRyaWJ1dGVzZXQgc2FuZGJveF9uZXRfZG9tYWluIChwcm9jZXNzKSkKCTsgTUNTIGlzIGxldmVyYWdlZCBieSBjb250YWluZXJfdCBhbmQgb3RoZXJzLCBsaWtlIHVzLCB0byBwcmV2ZW50IGNyb3NzLXBvZCBjb21tdW5pY2F0aW9uLgoJKHR5cGVhdHRyaWJ1dGVzZXQgbWNzX2NvbnN0cmFpbmVkX3R5cGUgKHByb2Nlc3MpKQoJOwoJOyBBbGxvdyBhY2Nlc3MgdG8gcHJvY2ZzIChhbHNvIG5lZWRlZCBieSBsaWJyYXJpZXMpCgkoYWxsb3cgcHJvY2VzcyBwcm9jX3R5cGUgKGZpbGUgKG9wZW4gcmVhZCkpKQoJOwoJOyBBbGxvdyB0byBSVEUgcG9kIGFjY2VzcyB0byAvcnVuL3J0ZSBkaXJlY3RvcnkKCShhbGxvdyBwcm9jZXNzIGNvbnRhaW5lcl92YXJfcnVuX3QgKGRpciAoYWRkX25hbWUgd3JpdGUpKSkKCShhbGxvdyBwcm9jZXNzIGNvbnRhaW5lcl92YXJfcnVuX3QgKGZpbGUgKGNyZWF0ZSByZWFkIHdyaXRlIG9wZW4pKSkKCTsKCTsgQWxsb3cgdG8gUlRFIHBvZCBjb25uZWN0LCByZWFkIGFuZCB3cml0ZSBwZXJtaXNzaW9ucyB0byAvdmFyL2xpYi9rdWJlbGV0L3BvZC1yZXNvdXJjZS9rdWJlbGV0LnNvY2sKCShhbGxvdyBwcm9jZXNzIGNvbnRhaW5lcl92YXJfbGliX3QgKHNvY2tfZmlsZSAob3BlbiBnZXRhdHRyIHJlYWQgd3JpdGUgaW9jdGwgbG9jayBhcHBlbmQpKSkKCShhbGxvdyBwcm9jZXNzIGt1YmVsZXRfdCAodW5peF9zdHJlYW1fc29ja2V0IChjb25uZWN0dG8pKSkKKQo=
+          verification: {}
+        group: {}
+        mode: 420
+        path: /etc/selinux/rte.cil
+        user: {}
+    systemd:
+      units:
+      - contents: |
+          [Unit]
+          Description=Install RTE SELinux policy
+          Before=kubelet.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=true
+          ExecStart=/usr/sbin/semodule -i /etc/selinux/rte.cil
+
+          [Install]
+          WantedBy=multi-user.target
+        enabled: true
+        name: rte-selinux-policy-install.service
+  extensions: null
+  fips: false
+  kernelArguments: null
+  kernelType: ""
+  osImageURL: ""
+---
+allowHostDirVolumePlugin: true
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegedContainer: false
+allowedCapabilities: null
+apiVersion: security.openshift.io/v1
+defaultAddCapabilities: null
+fsGroup:
+  type: RunAsAny
+groups: null
+kind: SecurityContextConstraints
+metadata:
+  name: resource-topology-exporter
+priority: null
+readOnlyRootFilesystem: false
+requiredDropCapabilities: null
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  seLinuxOptions:
+    level: s0
+    type: rte.process
+  type: MustRunAs
+supplementalGroups:
+  type: RunAsAny
+users:
+- system:serviceaccount:test:test-rte
+volumes:
+- '*'
+---
+allowHostDirVolumePlugin: true
+allowHostIPC: false
+allowHostNetwork: false
+allowHostPID: false
+allowHostPorts: false
+allowPrivilegedContainer: false
+allowedCapabilities: null
+apiVersion: security.openshift.io/v1
+defaultAddCapabilities: null
+fsGroup:
+  type: RunAsAny
+groups: null
+kind: SecurityContextConstraints
+metadata:
+  name: resource-topology-exporter-v2
+priority: null
+readOnlyRootFilesystem: false
+requiredDropCapabilities: null
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  seLinuxOptions:
+    level: s0
+    type: container_device_plugin_t
+  type: MustRunAs
+supplementalGroups:
+  type: RunAsAny
+users:
+- system:serviceaccount:test:test-rte
+volumes:
+- configMap
+- downwardAPI
+- emptyDir
+- hostPath
+- projected
+- secret
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: test-rte
+  namespace: test
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - pods/status
+  verbs:
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: test-rte
+  namespace: test
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rte
+subjects:
+- kind: ServiceAccount
+  name: rte
+  namespace: test
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: test-rte
+rules:
+- apiGroups:
+  - topology.node.k8s.io
+  resources:
+  - noderesourcetopologies
+  verbs:
+  - create
+  - update
+  - get
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - watch
+  - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: test-rte
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: rte
+subjects:
+- kind: ServiceAccount
+  name: rte
+  namespace: test
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: test-rte
+  namespace: test
+spec:
+  selector:
+    matchLabels:
+      name: resource-topology
+  template:
+    metadata:
+      annotations:
+        openshift.io/required-scc: resource-topology-exporter
+      labels:
+        name: resource-topology
+    spec:
+      containers:
+      - args:
+        - --sleep-interval=10s
+        - --sysfs=/host-sys
+        - --podresources-socket=unix:///host-podresources/kubelet.sock
+        - -v=2
+        - --notify-file=/host-run-rte/notify
+        - --pods-fingerprint=true
+        command:
+        - /bin/resource-topology-exporter
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: REFERENCE_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: REFERENCE_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: REFERENCE_CONTAINER_NAME
+          value: shared-pool-container
+        - name: METRICS_PORT
+          value: "2112"
+        image: test/rte:copy
+        imagePullPolicy: IfNotPresent
+        name: resource-topology-exporter
+        ports:
+        - containerPort: 2112
+          name: metrics-port
+        resources: {}
+        securityContext:
+          seLinuxOptions:
+            level: s0
+            type: rte.process
+        volumeMounts:
+        - mountPath: /host-sys
+          name: host-sys
+          readOnly: true
+        - mountPath: /host-podresources
+          name: host-podresources
+        - mountPath: /etc/resource-topology-exporter/
+          name: rte-config-volume
+        - mountPath: /host-run-rte
+          name: host-run-rte
+      - image: gcr.io/google_containers/pause-amd64:3.0
+        name: shared-pool-container
+        resources: {}
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
+      priorityClassName: system-node-critical
+      readinessGates:
+      - conditionType: PodresourcesFetched
+      - conditionType: NodeTopologyUpdated
+      serviceAccountName: rte
+      volumes:
+      - hostPath:
+          path: /sys
+          type: Directory
+        name: host-sys
+      - hostPath:
+          path: /var/lib/kubelet/pod-resources
+          type: Directory
+        name: host-podresources
+      - configMap:
+          name: rte-config
+          optional: true
+        name: rte-config-volume
+      - hostPath:
+          path: /run/rte
+          type: DirectoryOrCreate
+        name: host-run-rte
+  updateStrategy: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: test-rte
+  namespace: test
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-rte
+  namespace: test
+spec:
+  podSelector:
+    matchLabels:
+      name: resource-topology
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-rte
+  namespace: test
+spec:
+  egress:
+  - ports:
+    - port: 6443
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      name: resource-topology
+  policyTypes:
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-rte
+  namespace: test
+spec:
+  ingress:
+  - ports:
+    - port: 2112
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      name: resource-topology
+  policyTypes:
+  - Ingress

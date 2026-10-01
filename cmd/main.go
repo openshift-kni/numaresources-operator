@@ -53,22 +53,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/options"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/features"
+	schedulerapi "github.com/openshift-kni/numaresources-operator/internal/api/scheduler"
 	"github.com/openshift-kni/numaresources-operator/internal/controller"
 	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	"github.com/openshift-kni/numaresources-operator/internal/platforminfo"
-
-	schedulerapi "github.com/openshift-kni/numaresources-operator/internal/api/scheduler"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests"
+	apimanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/api"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/rte"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/options"
+	nroplatform "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
@@ -279,7 +279,7 @@ func main() {
 		exitWithCancel(cancel, 0)
 	}
 
-	apiManifests, err := apimanifests.GetManifests(discoveredCluster.Platform)
+	apiManifests, err := apimanifests.GetManifests(nroplatform.Platform(discoveredCluster.Platform))
 	if err != nil {
 		klog.ErrorS(err, "unable to load the API manifests")
 		exitWithCancel(cancel, 1)
@@ -294,7 +294,7 @@ func main() {
 	}
 	klog.InfoS("namespace detected", "namespace", namespace)
 
-	rteManifests, err := rtemanifests.GetManifests(discoveredCluster.Platform, discoveredCluster.ShortVersion, namespace, false, true)
+	rteManifests, err := rtemanifests.GetManifests(nroplatform.Platform(discoveredCluster.Platform), nroplatform.Version(discoveredCluster.ShortVersion), namespace, false, true)
 	if err != nil {
 		klog.ErrorS(err, "unable to load the RTE manifests")
 		exitWithCancel(cancel, 1)

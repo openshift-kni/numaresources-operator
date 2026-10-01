@@ -17,7 +17,6 @@
 package rte
 
 import (
-	selinuxassets "github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -27,12 +26,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	ocpupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/ocp"
-	rbacupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rbac"
-	rteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/options"
+	selinuxassets "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/assets/selinux"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests"
+	ocpupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate/ocp"
+	rbacupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate/rbac"
+	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate/rte"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/options"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 )
 
 const (
@@ -216,55 +216,55 @@ func NewWithOptions(opts options.Render) (Manifests, error) {
 	mf := New(opts.Platform)
 
 	if opts.Platform == platform.OpenShift && opts.CustomSELinuxPolicy {
-		mf.MachineConfig, err = manifests.MachineConfig(manifests.ComponentResourceTopologyExporter, opts.PlatformVersion, opts.EnableCRIHooks)
+		mf.MachineConfig, err = manifests.MachineConfig(opts.PlatformVersion, opts.EnableCRIHooks)
 		if err != nil {
 			return mf, err
 		}
 	}
 	if opts.Platform != platform.Kubernetes {
-		mf.SecurityContextConstraint, err = manifests.SecurityContextConstraint(manifests.ComponentResourceTopologyExporter, opts.CustomSELinuxPolicy)
+		mf.SecurityContextConstraint, err = manifests.SecurityContextConstraint(opts.CustomSELinuxPolicy)
 		if err != nil {
 			return mf, err
 		}
-		mf.SecurityContextConstraintV2, err = manifests.SecurityContextConstraintV2(manifests.ComponentResourceTopologyExporter)
+		mf.SecurityContextConstraintV2, err = manifests.SecurityContextConstraintV2()
 		if err != nil {
 			return mf, err
 		}
 	}
 
-	mf.ServiceAccount, err = manifests.ServiceAccount(manifests.ComponentResourceTopologyExporter, "", opts.Namespace)
+	mf.ServiceAccount, err = manifests.ServiceAccount(opts.Namespace)
 	if err != nil {
 		return mf, err
 	}
-	mf.Role, err = manifests.Role(manifests.ComponentResourceTopologyExporter, "", opts.Namespace)
+	mf.Role, err = manifests.Role(opts.Namespace)
 	if err != nil {
 		return mf, err
 	}
-	mf.RoleBinding, err = manifests.RoleBinding(manifests.ComponentResourceTopologyExporter, "", "", opts.Namespace)
+	mf.RoleBinding, err = manifests.RoleBinding(opts.Namespace)
 	if err != nil {
 		return mf, err
 	}
-	mf.ClusterRole, err = manifests.ClusterRole(manifests.ComponentResourceTopologyExporter, "")
+	mf.ClusterRole, err = manifests.ClusterRole()
 	if err != nil {
 		return mf, err
 	}
-	mf.ClusterRoleBinding, err = manifests.ClusterRoleBinding(manifests.ComponentResourceTopologyExporter, "")
+	mf.ClusterRoleBinding, err = manifests.ClusterRoleBinding()
 	if err != nil {
 		return mf, err
 	}
-	mf.DaemonSet, err = manifests.DaemonSet(manifests.ComponentResourceTopologyExporter, "", opts.Namespace)
+	mf.DaemonSet, err = manifests.DaemonSet(opts.Namespace)
 	if err != nil {
 		return mf, err
 	}
-	mf.DefaultNetworkPolicy, err = manifests.NetworkPolicy(manifests.ComponentResourceTopologyExporter, "", manifests.DefaultNetworkPolicy, opts.Namespace)
+	mf.DefaultNetworkPolicy, err = manifests.NetworkPolicy(manifests.DefaultNetworkPolicy, opts.Namespace)
 	if err != nil {
 		return mf, err
 	}
-	mf.APIServerNetworkPolicy, err = manifests.NetworkPolicy(manifests.ComponentResourceTopologyExporter, "", manifests.APIServerNetworkPolicy, opts.Namespace)
+	mf.APIServerNetworkPolicy, err = manifests.NetworkPolicy(manifests.APIServerNetworkPolicy, opts.Namespace)
 	if err != nil {
 		return mf, err
 	}
-	mf.MetricsServerNetworkPolicy, err = manifests.NetworkPolicy(manifests.ComponentResourceTopologyExporter, "", manifests.MetricsServerNetworkPolicy, opts.Namespace)
+	mf.MetricsServerNetworkPolicy, err = manifests.NetworkPolicy(manifests.MetricsServerNetworkPolicy, opts.Namespace)
 	if err != nil {
 		return mf, err
 	}
