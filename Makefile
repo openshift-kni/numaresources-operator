@@ -246,7 +246,7 @@ binary-numacell: build-tools ## Build the numacell test device plugin binary.
 .PHONY: binary-numazone
 binary-numazone: build-tools ## Build the numazone device plugin binary.
 	LDFLAGS="-s -w" \
-	CGO_ENABLED=0 go build -mod=vendor -o bin/numazone -ldflags "$$LDFLAGS" numazone/main.go
+	go build -mod=vendor -o bin/numazone -ldflags "$$LDFLAGS" -tags "$$GOTAGS" numazone/main.go
 
 .PHONY: binary-getdigests
 binary-getdigests: 
@@ -254,7 +254,7 @@ binary-getdigests:
 	go build -mod=vendor -o bin/getdigests -ldflags "$$LDFLAGS" tools/getdigests/getdigests.go
 
 .PHONY: binary-all
-binary-all: goversion binary binary-rte binary-nrovalidate introspect-data ## Build all component binaries.
+binary-all: goversion binary binary-rte binary-numazone binary-nrovalidate introspect-data ## Build all component binaries.
 
 .PHONY: binary-e2e-rte-local
 binary-e2e-rte-local: generate-source ## Build RTE local e2e test binary.
@@ -334,7 +334,7 @@ build-numazone: fmt vet binary-numazone ## Build the numazone device plugin.
 build-nrovalidate: generate-source fmt vet binary-nrovalidate ## Build the nrovalidate tool.
 
 .PHONY: build-all
-build-all: generate generate-source fmt vet binary binary-rte binary-numacell binary-nrovalidate ## Build all components.
+build-all: generate generate-source fmt vet binary binary-rte binary-numazone binary-numacell binary-nrovalidate ## Build all components.
 
 .PHONY: build-e2e-rte
 build-e2e-rte: generate-source fmt vet binary-e2e-rte ## Build RTE e2e tests.

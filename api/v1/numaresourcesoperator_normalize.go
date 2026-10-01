@@ -33,6 +33,15 @@ func (nodeGroup NodeGroup) NormalizeConfig() NodeGroupConfig {
 	return conf.Merge(*nodeGroup.Config)
 }
 
+func (nodeGroup NodeGroup) NormalizeNumazoneConfig() NumazoneConfig {
+	if nodeGroup.Numazone == nil {
+		return DefaultNumazoneConfig()
+	}
+	conf := nodeGroup.Numazone.DeepCopy()
+	conf.SetDefaults()
+	return *conf
+}
+
 func (current NodeGroupConfig) Merge(updated NodeGroupConfig) NodeGroupConfig {
 	conf := NodeGroupConfig{}
 	current.DeepCopyInto(&conf)

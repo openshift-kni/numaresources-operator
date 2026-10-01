@@ -220,6 +220,44 @@ Prometheus metrics expose soft-deadline expirations and the full duration of
 completed `Allocate()` calls, labeled by outcome. Logs are emitted once per
 failed barrier rather than once per poll attempt.
 
+## Operator deployment
+
+The NUMA Resources Operator can deploy numazone alongside RTE, using the same
+node selection and tolerations for each NodeGroup. Configure the plugin through
+`spec.nodeGroups[].numazone.mode` in the `nodetopology.openshift.io/v1`
+`NUMAResourcesOperator` object:
+
+```yaml
+spec:
+  nodeGroups:
+  - poolName: worker
+    numazone:
+      mode: Enabled
+```
+
+The modes are `Disabled` (the default; no plugin DaemonSet), `Enabled`
+(`--mode=enforcing`), and `Passthrough` (`--mode=passthrough`). Omitting `numazone`
+or its `mode` disables the plugin. Changing modes updates the same DaemonSet;
+disabling the plugin or removing its NodeGroup deletes that group's plugin
+DaemonSet. Other groups keep their configured mode. For emergency degraded
+operation, switch to `Passthrough` to keep advertising the resource without
+enforcing NUMA spread. Mode changes are reconciled even while RTE is unready.
+
+The plugin binary is bundled in the operator image. Its pods run as privileged
+root with a dedicated service account and OpenShift SCC to access the kubelet
+Unix sockets. The device-plugin directory is mounted read/write; sysfs and the
+podresources directory are mounted read-only. The pods do not request the
+synthetic resource they manage. They expose the existing metrics endpoint on
+container port 8080.
+
+`status.nodeGroups[].numazoneDaemonSet` reports the plugin DaemonSet's namespace
+and name beside the RTE `daemonsets` reference, and is omitted for disabled
+groups. Plugin deployment errors and rollout progress feed the operator's
+existing conditions. The top-level `status.daemonsets` continues to list RTE
+DaemonSets.
+
+See [the multi-group example](../doc/examples/numazone.yaml).
+
 ## Prometheus metrics
 
 Numazone serves an HTTP `/metrics` endpoint on `:8080` by default. Use

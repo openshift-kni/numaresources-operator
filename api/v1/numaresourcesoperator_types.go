@@ -143,6 +143,24 @@ const (
 	NodeGroupMaxAnnotations = 8
 )
 
+// +kubebuilder:validation:Enum=Disabled;Enabled;Passthrough
+type NumazoneMode string
+
+const (
+	NumazoneDisabled    NumazoneMode = "Disabled"
+	NumazoneEnabled     NumazoneMode = "Enabled"
+	NumazonePassthrough NumazoneMode = "Passthrough"
+)
+
+// NumazoneConfig defines the numazone device plugin behavior for a node group.
+type NumazoneConfig struct {
+	// Mode controls deployment of the plugin. Disabled removes its DaemonSet,
+	// Enabled enforces NUMA spread, and Passthrough serves requests without enforcing spread.
+	// +optional
+	// +kubebuilder:default=Disabled
+	Mode *NumazoneMode `json:"mode,omitempty"`
+}
+
 // NodeGroup defines group of nodes that will run resource topology exporter daemon set
 // You can choose the group of node by MachineConfigPoolSelector or by PoolName
 type NodeGroup struct {
@@ -152,6 +170,10 @@ type NodeGroup struct {
 	// Config defines the RTE behavior for this NodeGroup
 	// +optional
 	Config *NodeGroupConfig `json:"config,omitempty"`
+	// Numazone configures the optional numazone device plugin for this NodeGroup.
+	// If omitted, the plugin is disabled.
+	// +optional
+	Numazone *NumazoneConfig `json:"numazone,omitempty"`
 	// PoolName defines the pool name to which the nodes belong that the config of this node group will be applied to
 	// +optional
 	PoolName *string `json:"poolName,omitempty"`
@@ -174,6 +196,10 @@ type NodeGroupStatus struct {
 	// DaemonSet of the configured RTEs, for this node group
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="RTE DaemonSets"
 	DaemonSet NamespacedName `json:"daemonsets"`
+	// NumazoneDaemonSet identifies the numazone DaemonSet for this node group, when enabled.
+	// +optional
+	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Numazone DaemonSet"
+	NumazoneDaemonSet *NamespacedName `json:"numazoneDaemonSet,omitempty"`
 	// NodeGroupConfig represents the latest available configuration applied to this NodeGroup
 	//+operator-sdk:csv:customresourcedefinitions:type=status,displayName="Optional configuration enforced on this NodeGroup"
 	Config NodeGroupConfig `json:"config"`

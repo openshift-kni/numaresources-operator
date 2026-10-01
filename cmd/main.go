@@ -70,6 +70,7 @@ import (
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
+	numazonemanifests "github.com/openshift-kni/numaresources-operator/pkg/numazoneresource/manifests/numazone"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
@@ -397,6 +398,11 @@ func main() {
 		exitWithCancel(cancel, 1)
 	}
 
+	numazoneManifests, err := numazonemanifests.GetManifests(discoveredCluster.Platform, namespace)
+	if err != nil {
+		klog.ErrorS(err, "unable to load numazone manifests", "controller", "NUMAResourcesOperator")
+		exitWithCancel(cancel, 1)
+	}
 	if err = (&controller.NUMAResourcesOperatorReconciler{
 		Client:       mgr.GetClient(),
 		Scheme:       mgr.GetScheme(),
@@ -405,6 +411,7 @@ func main() {
 			Core:    rteManifestsRendered,
 			Metrics: rteMetricsManifests,
 		},
+		NumazoneManifests:   numazoneManifests,
 		Platform:            discoveredCluster.Platform,
 		Images:              imgs,
 		ImagePullPolicy:     pullPolicy,

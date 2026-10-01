@@ -64,6 +64,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
+	numazonemanifests "github.com/openshift-kni/numaresources-operator/pkg/numazoneresource/manifests/numazone"
+	numazonestate "github.com/openshift-kni/numaresources-operator/pkg/numazoneresource/objectstate/numazone"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	apistate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/api"
@@ -92,6 +94,7 @@ type NUMAResourcesOperatorReconciler struct {
 	Platform            platform.Platform
 	APIManifests        apimanifests.Manifests
 	RTEManifests        rtestate.Manifests
+	NumazoneManifests   numazonemanifests.Manifests
 	Namespace           string
 	Images              images.Data
 	ImagePullPolicy     corev1.PullPolicy
@@ -111,7 +114,7 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,verbs=create;list;watch,namespace="numaresources"
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles;rolebindings,resourceNames=rte,verbs=get;update,namespace="numaresources"
 //+kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=create;list;watch,namespace="numaresources"
-//+kubebuilder:rbac:groups="",resources=serviceaccounts,resourceNames=rte,verbs=get;update,namespace="numaresources"
+//+kubebuilder:rbac:groups="",resources=serviceaccounts,resourceNames=rte;numazone,verbs=get;update,namespace="numaresources"
 
 // Cluster Scoped
 //+kubebuilder:rbac:groups=config.openshift.io,resources=apiservers,verbs=get;list;watch
@@ -121,7 +124,7 @@ type NUMAResourcesOperatorReconciler struct {
 //+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=machineconfigs,verbs=create;delete;get;list;update;watch
 //+kubebuilder:rbac:groups=machineconfiguration.openshift.io,resources=machineconfigpools,verbs=get;list;watch
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,verbs=create;list;watch
-//+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=resource-topology-exporter;resource-topology-exporter-v2,verbs=get;update
+//+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=resource-topology-exporter;resource-topology-exporter-v2;numazone,verbs=get;update
 //+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,verbs=create;list;watch
 //+kubebuilder:rbac:groups=apiextensions.k8s.io,resources=customresourcedefinitions,resourceNames=noderesourcetopologies.topology.node.k8s.io,verbs=get;update
 //+kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=clusterroles,verbs=create
@@ -251,6 +254,11 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	if err := r.applyObjects(ctx, instance, existing.TreeAgnostic(r.RTEManifests)); err != nil {
 		return intreconcile.StepFailed(fmt.Errorf("FailedSharedResourceSync: %w", err))
 	}
+	if numazoneEnabled(trees) {
+		if err := r.applyObjects(ctx, instance, numazonestate.TreeAgnostic(ctx, r.Client, r.NumazoneManifests)); err != nil {
+			return intreconcile.StepFailed(fmt.Errorf("FailedNumazoneSharedResourceSync: %w", err))
+		}
+	}
 
 	err := dangling.DeleteUnusedDaemonSets(r.Client, ctx, instance, trees)
 	if err != nil {
@@ -264,8 +272,13 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	}
 
 	var results []nodegroupv1.PerTreeResult
+	var numazoneResults []nodegroupv1.PerTreeResult
+	var numazoneDSInfo []nodegroupv1.PoolDaemonSet
 	for _, tree := range trees {
 		tree.NodeGroup.Config = ptr.To(tree.NodeGroup.NormalizeConfig())
+		numazoneResult := r.reconcilePerTreeNumazoneDaemonSet(ctx, instance, tree)
+		numazoneResults = append(numazoneResults, numazoneResult)
+		numazoneDSInfo = append(numazoneDSInfo, numazoneResult.DSInfo...)
 
 		treeExisting := existing.PerTree(ctx, r.Client, tree)
 
@@ -289,10 +302,15 @@ func (r *NUMAResourcesOperatorReconciler) reconcileResource(ctx context.Context,
 	instance.Status.MachineConfigPools = overall.NROMCPs
 	instance.Status.Conditions = updateMachineConfigPoolPausedCondition(instance.Status.Conditions, instance.Generation, overall.PausedMCPNames)
 	instance.Status.DaemonSets = dssReady
-	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, dssReady)
+	instance.Status.RelatedObjects = relatedobjects.ResourceTopologyExporter(r.Namespace, append(nodegroupv1.CollectDaemonSets(numazoneDSInfo), dssReady...))
 
 	if overall.Step.Done() {
 		instance.Status.NodeGroups = syncNodeGroupsStatus(instance, overall.DSInfo)
+	}
+	syncNodeGroupsNumazoneStatus(instance.Status.NodeGroups, numazoneDSInfo)
+	numazoneOverall := nodegroupv1.ReducePerTreeResults(numazoneResults)
+	if nodegroupv1.ShouldReplaceStep(overall.Step, numazoneOverall.Step) {
+		overall.Step = numazoneOverall.Step
 	}
 
 	return overall.Step
@@ -332,6 +350,64 @@ func syncNodeGroupsStatus(instance *nropv1.NUMAResourcesOperator, dsPerPool []no
 		}
 	}
 	return ngStatuses
+}
+
+func syncNodeGroupsNumazoneStatus(statuses []nropv1.NodeGroupStatus, dsPerPool []nodegroupv1.PoolDaemonSet) {
+	for idx := range statuses {
+		statuses[idx].NumazoneDaemonSet = nil
+		for _, info := range dsPerPool {
+			if statuses[idx].PoolName == info.PoolName {
+				statuses[idx].NumazoneDaemonSet = ptr.To(info.DaemonSet)
+				break
+			}
+		}
+	}
+}
+
+func numazoneEnabled(trees []nodegroupv1.Tree) bool {
+	for _, tree := range trees {
+		conf := tree.NodeGroup.NormalizeNumazoneConfig()
+		if *conf.Mode != nropv1.NumazoneDisabled {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *NUMAResourcesOperatorReconciler) reconcilePerTreeNumazoneDaemonSet(ctx context.Context, instance *nropv1.NUMAResourcesOperator, tree nodegroupv1.Tree) nodegroupv1.PerTreeResult {
+	result := nodegroupv1.PerTreeResult{Step: intreconcile.StepSuccess()}
+	conf := tree.NodeGroup.NormalizeNumazoneConfig()
+	if *conf.Mode == nropv1.NumazoneDisabled {
+		return result
+	}
+	// Numazone is bundled with the operator; an RTE-only image override must not select its image.
+	imgs := r.Images
+	imgs.User = ""
+	states := numazonestate.PerTree(ctx, r.Client, r.NumazoneManifests, r.Platform, instance.Name, tree, imgs.Preferred(), r.ImagePullPolicy)
+	if err := r.applyObjects(ctx, instance, states); err != nil {
+		result.Step = intreconcile.StepFailed(fmt.Errorf("FailedNumazoneSync: %w", err))
+		return result
+	}
+	poolNames := nodegroupv1.GetTreePoolsNames(tree)
+	for idx, state := range states {
+		result.DSInfo = append(result.DSInfo, nodegroupv1.PoolDaemonSet{
+			PoolName:  poolNames[idx],
+			DaemonSet: namespacedname.FromObject(state.Desired),
+		})
+	}
+	for _, info := range result.DSInfo {
+		ds := &appsv1.DaemonSet{}
+		key := client.ObjectKey{Namespace: info.DaemonSet.Namespace, Name: info.DaemonSet.Name}
+		if err := r.Get(ctx, key, ds); err != nil {
+			result.Step = intreconcile.StepFailed(err)
+			return result
+		}
+		if !isDaemonSetReady(ds) {
+			result.Step = intreconcile.StepOngoing(5 * time.Second).WithReason("NumazoneDaemonSetIsUpdating").WithMessage(key.String() + " is updating")
+			return result
+		}
+	}
+	return result
 }
 
 func (r *NUMAResourcesOperatorReconciler) syncNodeResourceTopologyAPI(ctx context.Context) (bool, error) {

@@ -127,6 +127,10 @@ spec:
       - description: DaemonSet of the configured RTEs, for this node group
         displayName: RTE DaemonSets
         path: nodeGroups[0].daemonsets
+      - description: NumazoneDaemonSet identifies the numazone DaemonSet for this
+          node group, when enabled.
+        displayName: Numazone DaemonSet
+        path: nodeGroups[0].numazoneDaemonSet
       - description: PoolName represents the pool name to which the nodes belong that
           the config of this node group is be applied to
         displayName: Pool name of nodes in this node group
