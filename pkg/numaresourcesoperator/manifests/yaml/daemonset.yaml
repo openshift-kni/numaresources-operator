@@ -46,6 +46,7 @@ spec:
             readOnly: true
           - name: host-podresources
             mountPath: "/host-podresources"
+            readOnly: true
       - name: shared-pool-container
         image: gcr.io/google_containers/pause-amd64:3.0
       volumes:
