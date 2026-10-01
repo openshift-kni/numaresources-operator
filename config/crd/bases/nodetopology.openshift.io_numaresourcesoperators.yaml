@@ -205,6 +205,34 @@ spec:
                           type: object
                       type: object
                       x-kubernetes-map-type: atomic
+                    numazone:
+                      description: |-
+                        Numazone configures the optional numazone device plugin for this NodeGroup.
+                        If omitted, the plugin is disabled.
+                      properties:
+                        logLevel:
+                          default: Normal
+                          description: |-
+                            Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+                            Defaults to "Normal" (-v=2).
+                          enum:
+                          - ""
+                          - Normal
+                          - Debug
+                          - Trace
+                          - TraceAll
+                          type: string
+                        mode:
+                          default: Disabled
+                          description: |-
+                            Mode controls deployment of the plugin. Disabled removes its DaemonSet,
+                            Enabled enforces NUMA spread, and Passthrough serves requests without enforcing spread.
+                          enum:
+                          - Disabled
+                          - Enabled
+                          - Passthrough
+                          type: string
+                      type: object
                     poolName:
                       description: PoolName defines the pool name to which the nodes
                         belong that the config of this node group will be applied
@@ -532,6 +560,15 @@ spec:
                     daemonsets:
                       description: DaemonSet of the configured RTEs, for this node
                         group
+                      properties:
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                      type: object
+                    numazoneDaemonSet:
+                      description: NumazoneDaemonSet identifies the numazone DaemonSet
+                        for this node group, when enabled.
                       properties:
                         name:
                           type: string

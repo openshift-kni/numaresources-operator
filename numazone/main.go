@@ -17,6 +17,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	intkloglevel "github.com/openshift-kni/numaresources-operator/internal/kloglevel"
 	"github.com/openshift-kni/numaresources-operator/numazone/api"
 	"github.com/openshift-kni/numaresources-operator/numazone/plugin"
 )
@@ -46,6 +47,11 @@ func main() {
 	flag.DurationVar(&admissionSyncTimeout, "admission-sync-timeout", defaultOptions.AdmissionSyncTimeout, "soft timeout for admission synchronization; the plugin enforces a hard maximum and always arms the built-in watchdog with a fixed grace period")
 	flag.StringVar(&metricsBindAddress, "metrics-bind-address", metricsserver.DefaultBindAddress, "address for the HTTP metrics endpoint; 0 disables serving metrics")
 	flag.Parse()
+	verbosity, err := intkloglevel.Get()
+	if err != nil {
+		log.Error(err, "get log verbosity")
+		os.Exit(1)
+	}
 	if mode != plugin.ModeEnforcing && mode != plugin.ModePassthrough {
 		log.Info("unsupported numazone mode", "mode", mode)
 		os.Exit(1)
@@ -74,7 +80,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	log.Info("starting device plugin", "mode", mode, "resourceName", api.QualifiedResourceName(), "sysfs", sysfsPath, "preferredSpare", preferredSpare, "poolSize", poolSize, "podresourcesEndpoint", podResourcesEndpoint, "pendingAllocationTTL", pendingAllocationTTL, "admissionSync", mode == plugin.ModeEnforcing && admissionSync, "admissionSyncTimeout", admissionSyncTimeout)
+	log.Info("starting device plugin", "verbosity", verbosity, "mode", mode, "resourceName", api.QualifiedResourceName(), "sysfs", sysfsPath, "preferredSpare", preferredSpare, "poolSize", poolSize, "podresourcesEndpoint", podResourcesEndpoint, "pendingAllocationTTL", pendingAllocationTTL, "admissionSync", mode == plugin.ModeEnforcing && admissionSync, "admissionSyncTimeout", admissionSyncTimeout)
 	ctx := logr.NewContext(ctrl.SetupSignalHandler(), log)
 	if err := run(ctx, plg, metricsBindAddress); err != nil {
 		log.Error(err, "device plugin stopped with error")

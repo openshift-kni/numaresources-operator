@@ -1,0 +1,12 @@
+apiVersion: nodetopology.openshift.io/v1
+kind: NUMAResourcesOperator
+metadata:
+  name: numaresourcesoperator
+spec:
+  nodeGroups:
+  - poolName: worker
+    numazone:
+      mode: Enabled
+  - poolName: worker-degraded
+    numazone:
+      mode: Passthrough

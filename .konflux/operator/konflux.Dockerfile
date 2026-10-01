@@ -18,6 +18,7 @@ ARG OPENSHIFT_VERSION
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/manager /bin/numaresources-operator
 # bundle the operand, and use a backward compatible name for RTE
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/exporter /bin/resource-topology-exporter
+COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/numazone /bin/numazone
 COPY --from=builder /go/src/github.com/openshift-kni/numaresources-operator/bin/buildinfo.json /usr/local/share
 
 RUN mkdir /etc/resource-topology-exporter/ && \

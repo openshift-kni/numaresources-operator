@@ -31,6 +31,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/pkg/numazoneresource"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 
@@ -120,6 +121,12 @@ func isOwnedBy(element metav1.Object, owner metav1.Object) bool {
 func buildDaemonSetNames(instance *nropv1.NUMAResourcesOperator, trees []nodegroupv1.Tree) sets.Set[string] {
 	expectedDaemonSetNames := sets.New[string]()
 	for _, tree := range trees {
+		conf := tree.NodeGroup.NormalizeNumazoneConfig()
+		if *conf.Mode != nropv1.NumazoneDisabled {
+			for _, name := range nodegroupv1.GetTreePoolsNames(tree) {
+				expectedDaemonSetNames.Insert(numazoneresource.DaemonSetName(instance.Name, name))
+			}
+		}
 		// the earlier validation step ensures that if poolName is not nil, then it's not empty either
 		poolName := tree.NodeGroup.PoolName // shortcut
 		if poolName != nil {
