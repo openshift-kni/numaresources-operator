@@ -31,8 +31,10 @@ func main() {
 	var admissionSync bool
 	var admissionSyncTimeout time.Duration
 	var metricsBindAddress string
+	var mode string
 	defaultOptions := plugin.DefaultOptions()
 
+	flag.StringVar(&mode, "mode", defaultOptions.Mode, "operating mode: enforcing steers NUMA spread; passthrough always succeeds without enforcing spread or querying podresources")
 	flag.StringVar(&sysfsPath, "sysfs", api.DefaultSysfsRoot, "mount path of sysfs")
 	flag.IntVar(&preferredSpare, "preferred-spare", 0, "cap on the number of healthy (available) devices a least-allocated NUMA node advertises; 0 (default) exposes the node's entire free pool. Non-preferred NUMA nodes always advertise zero")
 	flag.IntVar(&poolSize, "pool-size", 0, "fixed number of devices advertised per NUMA node (stable capacity); 0 (default) sizes each node to the number of logical CPUs detected on it")
@@ -42,6 +44,10 @@ func main() {
 	flag.DurationVar(&admissionSyncTimeout, "admission-sync-timeout", defaultOptions.AdmissionSyncTimeout, "soft timeout for admission synchronization; the plugin enforces a hard maximum and always arms the built-in watchdog with a fixed grace period")
 	flag.StringVar(&metricsBindAddress, "metrics-bind-address", metricsserver.DefaultBindAddress, "address for the HTTP metrics endpoint; 0 disables serving metrics")
 	flag.Parse()
+	if mode != plugin.ModeEnforcing && mode != plugin.ModePassthrough {
+		klog.ErrorS(nil, "unsupported numazone mode; expected enforcing or passthrough", "mode", mode)
+		os.Exit(1)
+	}
 
 	topoInfo, err := topology.New(option.WithPathOverrides(option.PathOverrides{
 		"/sys": sysfsPath,
@@ -52,6 +58,7 @@ func main() {
 	}
 
 	plg, err := plugin.New(topoInfo, plugin.Options{
+		Mode:                 mode,
 		PoolSize:             poolSize,
 		PreferredSpare:       preferredSpare,
 		PodResourcesEndpoint: podResourcesEndpoint,
@@ -64,7 +71,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	klog.InfoS("starting numazone device plugin", "resourceName", api.QualifiedResourceName(), "sysfs", sysfsPath, "preferredSpare", preferredSpare, "poolSize", poolSize, "podresourcesEndpoint", podResourcesEndpoint, "pendingAllocationTTL", pendingAllocationTTL, "admissionSync", admissionSync, "admissionSyncTimeout", admissionSyncTimeout)
+	klog.InfoS("starting numazone device plugin", "mode", mode, "resourceName", api.QualifiedResourceName(), "sysfs", sysfsPath, "preferredSpare", preferredSpare, "poolSize", poolSize, "podresourcesEndpoint", podResourcesEndpoint, "pendingAllocationTTL", pendingAllocationTTL, "admissionSync", mode == plugin.ModeEnforcing && admissionSync, "admissionSyncTimeout", admissionSyncTimeout)
 	if err := run(ctrl.SetupSignalHandler(), plg, metricsBindAddress); err != nil {
 		klog.ErrorS(err, "numazone device plugin stopped with error")
 		os.Exit(1)

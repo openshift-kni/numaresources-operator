@@ -27,6 +27,11 @@ import (
 )
 
 const (
+	ModeEnforcing   = "enforcing"
+	ModePassthrough = "passthrough"
+)
+
+const (
 	registerTimeout                  = 10 * time.Second
 	reconcilePeriod                  = 2 * time.Second
 	defaultAdmissionSyncTimeout      = time.Second
@@ -37,6 +42,7 @@ const (
 )
 
 type Options struct {
+	Mode         string
 	ResourceName string
 	SocketName   string
 	// PoolSize is the fixed number of devices advertised per NUMA node. When
@@ -56,6 +62,7 @@ type Options struct {
 
 func DefaultOptions() Options {
 	return Options{
+		Mode:                 ModeEnforcing,
 		ResourceName:         api.QualifiedResourceName(),
 		SocketName:           api.DefaultSocketName,
 		PoolSize:             0, // 0 == derive per NUMA node from detected logical CPUs
@@ -109,6 +116,12 @@ func New(topoInfo *topology.Info, opts Options) (*Plugin, error) {
 	}
 
 	defaults := DefaultOptions()
+	if opts.Mode == "" {
+		opts.Mode = defaults.Mode
+	}
+	if opts.Mode != ModeEnforcing && opts.Mode != ModePassthrough {
+		return nil, fmt.Errorf("unsupported mode %q: expected %q or %q", opts.Mode, ModeEnforcing, ModePassthrough)
+	}
 	if opts.ResourceName == "" {
 		opts.ResourceName = defaults.ResourceName
 	}
@@ -127,7 +140,7 @@ func New(topoInfo *topology.Info, opts Options) (*Plugin, error) {
 	if opts.AdmissionSyncTimeout == 0 {
 		opts.AdmissionSyncTimeout = defaults.AdmissionSyncTimeout
 	}
-	if opts.AdmissionSyncTimeout < 0 || opts.AdmissionSyncTimeout > maximumAdmissionSyncTimeout {
+	if opts.Mode == ModeEnforcing && (opts.AdmissionSyncTimeout < 0 || opts.AdmissionSyncTimeout > maximumAdmissionSyncTimeout) {
 		return nil, fmt.Errorf("admission synchronization timeout must be greater than zero and at most %s", maximumAdmissionSyncTimeout)
 	}
 
@@ -173,21 +186,24 @@ func New(topoInfo *topology.Info, opts Options) (*Plugin, error) {
 			p.addDeviceLocked(numaID)
 		}
 	}
-	// set the initial device health so that every node advertises the empty-node
-	// spare target, then materialize the device list.
-	p.applyAllocationStateLocked(make(map[int]map[string]struct{}))
+	if opts.Mode == ModeEnforcing {
+		// Apply the empty-node spare policy only when enforcing spread.
+		p.applyAllocationStateLocked(make(map[int]map[string]struct{}))
+		p.allocationMetrics.RecordAllocations(p.numaIDs(), nil)
+	}
 	p.rebuildDeviceListLocked()
-	p.allocationMetrics.RecordAllocations(p.numaIDs(), nil)
 	return p, nil
 }
 
 func (p *Plugin) Run(ctx context.Context) error {
-	podResourcesClient, cleanupPodResourcesClient, err := podres.GetClient(p.options.PodResourcesEndpoint)
-	if err != nil {
-		return fmt.Errorf("create podresources client: %w", err)
+	if p.options.Mode == ModeEnforcing {
+		podResourcesClient, cleanupPodResourcesClient, err := podres.GetClient(p.options.PodResourcesEndpoint)
+		if err != nil {
+			return fmt.Errorf("create podresources client: %w", err)
+		}
+		defer cleanupPodResourcesClient() //nolint:errcheck
+		p.podResourcesClient = podResourcesClient
 	}
-	defer cleanupPodResourcesClient() //nolint:errcheck
-	p.podResourcesClient = podResourcesClient
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -195,14 +211,17 @@ func (p *Plugin) Run(ctx context.Context) error {
 	}
 	defer watcher.Close() //nolint:errcheck
 
-	if err := watcher.Add(pluginapi.DevicePluginPath); err != nil {
-		return fmt.Errorf("watch %q: %w", pluginapi.DevicePluginPath, err)
+	devicePluginPath := filepath.Dir(p.socketPath)
+	if err := watcher.Add(devicePluginPath); err != nil {
+		return fmt.Errorf("watch %q: %w", devicePluginPath, err)
 	}
 	p.watcher = watcher
 
-	go p.reconcileLoop(ctx)
-	if err := p.reconcileDevicePool(ctx); err != nil {
-		klog.ErrorS(err, "initial numazone reconcile failed, continuing with default inventory")
+	if p.options.Mode == ModeEnforcing {
+		go p.reconcileLoop(ctx)
+		if err := p.reconcileDevicePool(ctx); err != nil {
+			klog.ErrorS(err, "initial numazone reconcile failed, continuing with default inventory")
+		}
 	}
 
 	if err := p.restartAndRegister(ctx); err != nil {
@@ -217,8 +236,8 @@ func (p *Plugin) Run(ctx context.Context) error {
 			if !ok {
 				return nil
 			}
-			if event.Name == pluginapi.KubeletSocket && event.Op&fsnotify.Create == fsnotify.Create {
-				klog.InfoS("kubelet socket recreated, restarting device plugin", "socket", pluginapi.KubeletSocket)
+			if event.Name == filepath.Join(devicePluginPath, filepath.Base(pluginapi.KubeletSocket)) && event.Op&fsnotify.Create == fsnotify.Create {
+				klog.InfoS("kubelet socket recreated, restarting device plugin", "socket", event.Name)
 				if err := p.restartAndRegister(ctx); err != nil {
 					klog.ErrorS(err, "failed to restart and re-register device plugin")
 				}
@@ -250,6 +269,9 @@ func (p *Plugin) ListAndWatch(_ *pluginapi.Empty, stream pluginapi.DevicePlugin_
 }
 
 func (p *Plugin) Allocate(ctx context.Context, req *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
+	if p.options.Mode == ModePassthrough {
+		return allocateResponse(req), nil
+	}
 	startedAt := time.Now()
 	if !p.options.DisableAdmissionSync {
 		watchdog := newAdmissionWatchdog(
@@ -316,16 +338,22 @@ func (p *Plugin) Allocate(ctx context.Context, req *pluginapi.AllocateRequest) (
 	return response, nil
 }
 
-func (p *Plugin) validateAllocateRequest(req *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, map[string]struct{}, error) {
+func allocateResponse(req *pluginapi.AllocateRequest) *pluginapi.AllocateResponse {
 	response := &pluginapi.AllocateResponse{
 		ContainerResponses: make([]*pluginapi.ContainerAllocateResponse, 0, len(req.GetContainerRequests())),
 	}
 
+	for range req.GetContainerRequests() {
+		response.ContainerResponses = append(response.ContainerResponses, &pluginapi.ContainerAllocateResponse{})
+	}
+	return response
+}
+
+func (p *Plugin) validateAllocateRequest(req *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, map[string]struct{}, error) {
 	for _, containerReq := range req.GetContainerRequests() {
 		if _, err := p.countRequestedDevices(containerReq.GetDevicesIds()); err != nil {
 			return nil, nil, err
 		}
-		response.ContainerResponses = append(response.ContainerResponses, &pluginapi.ContainerAllocateResponse{})
 	}
 
 	requestedIDs := make(map[string]struct{})
@@ -334,7 +362,7 @@ func (p *Plugin) validateAllocateRequest(req *pluginapi.AllocateRequest) (*plugi
 			requestedIDs[deviceID] = struct{}{}
 		}
 	}
-	return response, requestedIDs, nil
+	return allocateResponse(req), requestedIDs, nil
 }
 
 func (p *Plugin) applyRequestedAllocation(requestedIDs map[string]struct{}) allocatableInventory {
@@ -474,11 +502,13 @@ func (p *Plugin) addNamedDeviceLocked(deviceID string, numaID int) {
 	device := &pluginapi.Device{
 		ID:     deviceID,
 		Health: pluginapi.Healthy,
-		Topology: &pluginapi.TopologyInfo{
+	}
+	if p.options.Mode == ModeEnforcing {
+		device.Topology = &pluginapi.TopologyInfo{
 			Nodes: []*pluginapi.NUMANode{
 				{ID: int64(numaID)},
 			},
-		},
+		}
 	}
 
 	p.devices[deviceID] = deviceRecord{
@@ -620,6 +650,9 @@ func (p *Plugin) numaIDs() []int {
 }
 
 func (p *Plugin) reconcileDevicePool(ctx context.Context) error {
+	if p.options.Mode == ModePassthrough {
+		return nil
+	}
 	allocatedByNode, err := p.loadAllocationState(ctx)
 	if err != nil {
 		return err

@@ -7,6 +7,33 @@ This plugin steers kubelet NUMA placement through the classic device plugin API.
 It does not represent real hardware and it does not provide a hard placement
 guarantee on its own.
 
+## Operating modes
+
+`-mode=enforcing` is the default and enables the placement, synchronization,
+reconciliation, metrics, and error logging described below.
+
+Use `-mode=passthrough` as an emergency fallback when NUMA spread enforcement
+must be bypassed. Workloads keep their existing numazone requests and limits.
+The plugin continues registering with kubelet and serving a fixed inventory
+with the same device IDs and pool sizing, but every device is healthy and has no
+NUMA topology. Kubelet can allocate these devices without a numazone topology
+constraint, allowing workloads to operate with degraded NUMA placement.
+
+In passthrough mode, `Allocate()` immediately returns an empty successful
+response for each requested container. It does not validate device IDs, acquire
+state or synchronization locks, record speculative allocations or admission
+metrics, poll podresources, or arm the watchdog. The plugin never creates a
+podresources client and runs no allocation reconcile loop, spread diagnostics,
+or observed-allocation metrics. The `--preferred-spare`, admission synchronization,
+and pending-allocation settings have no effect in this mode.
+
+Changing `-mode` takes effect when the plugin process restarts. Keep the existing
+pool-size configuration to preserve the device inventory. The advertised pool
+still bounds resource availability; passthrough guarantees success in the plugin
+allocation handler, while kubelet still owns scheduling and admission. Kubelet
+device-plugin registration and sysfs discovery remain necessary to serve that
+inventory. The HTTP metrics endpoint still follows `--metrics-bind-address`.
+
 ## Operating model
 
 The plugin advertises a **fixed** pool of synthetic devices per NUMA node and
