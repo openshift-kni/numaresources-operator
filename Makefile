@@ -147,6 +147,14 @@ test-unit-pkgs-cover: generate-source ## Run unit tests for packages with covera
 test-numazone-race: ## Run numazone tests uncached, in randomized order, with the race detector.
 	go test -mod=vendor -race -vet=all -count=1 -shuffle=on -timeout=2m ./numazone/...
 
+.PHONY: test-unit-numazone-e2e
+test-unit-numazone-e2e: generate-source ## Run unit tests for the numazone e2e helpers without a cluster.
+	go test -mod=vendor -vet=all ./test/e2e/numazone/config ./test/internal/numazone
+
+.PHONY: test-numazone-e2e
+test-numazone-e2e: binary-e2e-numazone ## Run numazone e2e tests against an already configured cluster.
+	hack/run-test-numazone-e2e.sh
+
 test-controllers: envtest generate-source ## Run controller tests using envtest.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./internal/controller/...
 
@@ -284,6 +292,10 @@ binary-e2e-sched: generate-source ## Build scheduler e2e test binary.
 binary-e2e-serial: generate-source ## Build serial e2e test binary.
 	CGO_ENABLED=0 go test -c -v -o bin/e2e-nrop-serial.test -ldflags "$$LDFLAGS" ./test/e2e/serial
 
+.PHONY: binary-e2e-numazone
+binary-e2e-numazone: generate-source ## Build numazone e2e test binary.
+	CGO_ENABLED=0 go test -c -v -o bin/e2e-nrop-numazone.test -ldflags "$$LDFLAGS" ./test/e2e/numazone
+
 .PHONY: binary-e2e-tools
 binary-e2e-tools: generate-source ## Build tools e2e test binary.
 	go test -c -v -o bin/e2e-nrop-tools.test ./test/e2e/tools
@@ -300,7 +312,7 @@ binary-e2e-tls: generate-source ## Build TLS e2e test binary.
 binary-must-gather-e2e: binary-e2e-must-gather
 
 .PHONY: binary-e2e-all
-binary-e2e-all: goversion binary-e2e-install binary-e2e-upgrade binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial binary-e2e-tools binary-e2e-must-gather binary-e2e-tls runner-e2e-serial build-pause introspect-data ## Build all e2e test binaries.
+binary-e2e-all: goversion binary-e2e-install binary-e2e-upgrade binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial binary-e2e-numazone binary-e2e-tools binary-e2e-must-gather binary-e2e-tls runner-e2e-serial build-pause introspect-data ## Build all e2e test binaries.
 
 .PHONY: runner-e2e-serial
 runner-e2e-serial: bin/envsubst ## Render and validate the serial e2e runner script.
