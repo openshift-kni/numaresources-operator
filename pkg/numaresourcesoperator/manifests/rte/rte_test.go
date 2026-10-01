@@ -94,7 +94,7 @@ func TestRenderManifests(t *testing.T) {
 				t.Fatal(err)
 			}
 			if got := serializeObjects(t, rendered.ToObjects()); !bytes.Equal(got, want) {
-				t.Fatalf("rendered manifests differ from the deployer v0.24.2 baseline:\n%s", got)
+				t.Fatalf("rendered manifests differ from the expected fixture:\n%s", got)
 			}
 			rendered.DaemonSet.Spec.Template.Spec.Containers[0].Args[0] = "changed"
 			if rendered.MachineConfig != nil {

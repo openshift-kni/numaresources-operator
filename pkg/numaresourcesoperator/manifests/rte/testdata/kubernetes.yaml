@@ -131,6 +131,7 @@ spec:
           readOnly: true
         - mountPath: /host-podresources
           name: host-podresources
+          readOnly: true
         - mountPath: /etc/resource-topology-exporter/
           name: rte-config-volume
         - mountPath: /host-run-rte
