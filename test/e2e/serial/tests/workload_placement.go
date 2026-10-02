@@ -38,7 +38,6 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 
@@ -48,6 +47,7 @@ import (
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/flagcodec"
 	numacellapi "github.com/openshift-kni/numaresources-operator/test/deviceplugin/pkg/numacell/api"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"

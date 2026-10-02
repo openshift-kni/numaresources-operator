@@ -24,8 +24,6 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests"
 )
 
@@ -93,11 +91,11 @@ func GetManifests(namespace string) (Manifests, error) {
 		return mf, err
 	}
 
-	mf.Role, err = k8swgmanifests.Role(k8swgmanifests.ComponentSchedulerPlugin, k8swgmanifests.SubComponentSchedulerPluginScheduler, namespace)
+	mf.Role, err = manifests.Role(namespace)
 	if err != nil {
 		return mf, err
 	}
-	mf.RoleBinding, err = k8swgmanifests.RoleBinding(k8swgmanifests.ComponentSchedulerPlugin, k8swgmanifests.SubComponentSchedulerPluginScheduler, k8swgmanifests.RoleNameLeaderElect, namespace)
+	mf.RoleBinding, err = manifests.RoleBinding(namespace)
 	if err != nil {
 		return mf, err
 	}
