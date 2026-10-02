@@ -72,3 +72,16 @@ func defaultNUMAPlacement() *NUMAPlacementMode {
 	v := NUMAPlacementContainer
 	return &v
 }
+
+func DefaultNumazoneConfig() NumazoneConfig {
+	conf := NumazoneConfig{}
+	conf.SetDefaults()
+	return conf
+}
+
+func (conf *NumazoneConfig) SetDefaults() {
+	if conf.Mode == nil {
+		mode := NumazoneDisabled
+		conf.Mode = &mode
+	}
+}
