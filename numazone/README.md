@@ -7,6 +7,12 @@ This plugin steers kubelet NUMA placement through the classic device plugin API.
 It does not represent real hardware and it does not provide a hard placement
 guarantee on its own.
 
+**only topologymanager scope=container is supported**.
+The plugin does not have visibility of pod-level aggregate allocations,
+therefore it can't work in with topology manager scope=pod.
+Each container placement is steered independently. This is an inherited
+API limitation we can't workaround.
+
 ## Operating modes
 
 `-mode=enforcing` is the default and enables the placement, synchronization,
