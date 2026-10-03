@@ -2,7 +2,7 @@
 
 # compare the CSV file against the latest revision
 # but ignore the createdAt field which is always changing.
-if [[ "$(git diff --quiet -I'^    createdAt: ' bundle)" -eq 0 ]]; then
+if git diff --quiet -I'^    createdAt: ' bundle; then
   git checkout --quiet bundle
 fi
 
