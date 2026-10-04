@@ -78,13 +78,6 @@ var _ = Describe("[Install]", Serial, Ordered, func() {
 		nroObj = deployer.Deploy(context.TODO(), configuration.MachineConfigPoolUpdateTimeout)
 	})
 
-	AfterAll(func() {
-		if deployer == nil {
-			return
-		}
-		deployer.Teardown(context.TODO(), 5*time.Minute)
-	})
-
 	Context("continuousIntegration with a running cluster with all the components", func() {
 		It("[test_id:47574] should perform overall deployment and verify the condition is reported as available", Label(label.Tier0), func() {
 			nname := client.ObjectKeyFromObject(nroObj)
