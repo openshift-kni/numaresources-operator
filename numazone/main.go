@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/jaypipes/ghw/pkg/option"
 	"github.com/jaypipes/ghw/pkg/topology"
 	"golang.org/x/sync/errgroup"
@@ -22,6 +23,7 @@ import (
 
 func main() {
 	klog.InitFlags(nil)
+	log := klog.Background().WithName("numazone")
 
 	var sysfsPath string
 	var preferredSpare int
@@ -45,7 +47,7 @@ func main() {
 	flag.StringVar(&metricsBindAddress, "metrics-bind-address", metricsserver.DefaultBindAddress, "address for the HTTP metrics endpoint; 0 disables serving metrics")
 	flag.Parse()
 	if mode != plugin.ModeEnforcing && mode != plugin.ModePassthrough {
-		klog.ErrorS(nil, "unsupported numazone mode; expected enforcing or passthrough", "mode", mode)
+		log.Info("unsupported numazone mode", "mode", mode)
 		os.Exit(1)
 	}
 
@@ -53,11 +55,12 @@ func main() {
 		"/sys": sysfsPath,
 	}))
 	if err != nil {
-		klog.ErrorS(err, "error getting topology info from sysfs", "mountPath", sysfsPath)
+		log.Error(err, "get topology info from sysfs", "mountPath", sysfsPath)
 		os.Exit(1)
 	}
 
 	plg, err := plugin.New(topoInfo, plugin.Options{
+		Log:                  log,
 		Mode:                 mode,
 		PoolSize:             poolSize,
 		PreferredSpare:       preferredSpare,
@@ -67,13 +70,14 @@ func main() {
 		AdmissionSyncTimeout: admissionSyncTimeout,
 	})
 	if err != nil {
-		klog.ErrorS(err, "cannot initialize numazone device plugin")
+		log.Error(err, "initialize device plugin")
 		os.Exit(1)
 	}
 
-	klog.InfoS("starting numazone device plugin", "mode", mode, "resourceName", api.QualifiedResourceName(), "sysfs", sysfsPath, "preferredSpare", preferredSpare, "poolSize", poolSize, "podresourcesEndpoint", podResourcesEndpoint, "pendingAllocationTTL", pendingAllocationTTL, "admissionSync", mode == plugin.ModeEnforcing && admissionSync, "admissionSyncTimeout", admissionSyncTimeout)
-	if err := run(ctrl.SetupSignalHandler(), plg, metricsBindAddress); err != nil {
-		klog.ErrorS(err, "numazone device plugin stopped with error")
+	log.Info("starting device plugin", "mode", mode, "resourceName", api.QualifiedResourceName(), "sysfs", sysfsPath, "preferredSpare", preferredSpare, "poolSize", poolSize, "podresourcesEndpoint", podResourcesEndpoint, "pendingAllocationTTL", pendingAllocationTTL, "admissionSync", mode == plugin.ModeEnforcing && admissionSync, "admissionSyncTimeout", admissionSyncTimeout)
+	ctx := logr.NewContext(ctrl.SetupSignalHandler(), log)
+	if err := run(ctx, plg, metricsBindAddress); err != nil {
+		log.Error(err, "device plugin stopped with error")
 		os.Exit(1)
 	}
 }

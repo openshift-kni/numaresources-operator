@@ -15,14 +15,24 @@ import (
 	"github.com/openshift-kni/numaresources-operator/numazone/api"
 )
 
+func captureInfoLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	return captureLogs(t, "INFO")
+}
+
 func captureErrorLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	return captureLogs(t, "ERROR")
+}
+
+func captureLogs(t *testing.T, severity string) *bytes.Buffer {
 	t.Helper()
 	state := klog.CaptureState()
 	t.Cleanup(state.Restore)
 	output := &bytes.Buffer{}
 	klog.LogToStderr(false)
 	klog.SetOutput(io.Discard)
-	klog.SetOutputBySeverity("ERROR", output)
+	klog.SetOutputBySeverity(severity, output)
 	return output
 }
 
@@ -33,15 +43,15 @@ func TestReconcileLogsUnexpectedNUMASpread(t *testing.T) {
 		counts     map[int]int
 		pending    bool
 		queryError bool
-		wantError  bool
+		wantLog    bool
 	}{
 		{name: "empty", numaIDs: []int{0, 3, 7}},
 		{name: "balanced", numaIDs: []int{0, 3, 7}, counts: map[int]int{0: 2, 3: 2, 7: 2}},
 		{name: "one device difference", numaIDs: []int{0, 3, 7}, counts: map[int]int{0: 3, 3: 2, 7: 2}},
 		{name: "one NUMA node", numaIDs: []int{3}, counts: map[int]int{3: 4}},
 		{name: "pending allocations excluded", numaIDs: []int{0, 3, 7}, counts: map[int]int{0: 1}, pending: true},
-		{name: "unexpected spread", numaIDs: []int{0, 3, 7}, counts: map[int]int{0: 3, 3: 2, 7: 1}, wantError: true},
-		{name: "zero allocated node included", numaIDs: []int{0, 3, 7}, counts: map[int]int{0: 2, 3: 2}, wantError: true},
+		{name: "unexpected spread", numaIDs: []int{0, 3, 7}, counts: map[int]int{0: 3, 3: 2, 7: 1}, wantLog: true},
+		{name: "zero allocated node included", numaIDs: []int{0, 3, 7}, counts: map[int]int{0: 2, 3: 2}, wantLog: true},
 		{name: "failed query excluded", numaIDs: []int{0, 3, 7}, counts: map[int]int{0: 2, 3: 2}, queryError: true},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -50,7 +60,7 @@ func TestReconcileLogsUnexpectedNUMASpread(t *testing.T) {
 				t.Fatalf("create plugin: %v", err)
 			}
 			if testCase.pending {
-				plg.applyRequestedAllocation(map[string]struct{}{api.MakeDeviceID(0, 1): {}})
+				plg.applyRequestedAllocation(t.Context(), map[string]struct{}{api.MakeDeviceID(0, 1): {}})
 			}
 			var devices []*podresourcesapi.ContainerDevices
 			for numaID, count := range testCase.counts {
@@ -72,19 +82,19 @@ func TestReconcileLogsUnexpectedNUMASpread(t *testing.T) {
 					}, nil
 				},
 			}
-			errorLogs := captureErrorLogs(t)
+			infoLogs := captureInfoLogs(t)
 			if err := plg.reconcileDevicePool(t.Context()); (err != nil) != testCase.queryError {
 				t.Fatalf("unexpected reconcile error: %v", err)
 			}
-			output := errorLogs.String()
-			if !testCase.wantError {
+			output := infoLogs.String()
+			if !testCase.wantLog {
 				if output != "" {
-					t.Fatalf("unexpected error log: %s", output)
+					t.Fatalf("unexpected info log: %s", output)
 				}
 				return
 			}
-			if !strings.HasPrefix(output, "E") || strings.Count(output, "numazone unexpected NUMA spread") != 1 {
-				t.Fatalf("expected one spread log at error severity: %s", output)
+			if !strings.HasPrefix(output, "I") || strings.Count(output, "numazone unexpected NUMA spread") != 1 {
+				t.Fatalf("expected one spread log at info severity: %s", output)
 			}
 			for _, field := range []string{"allocatedDevicesByNUMANode=", "minAllocated=", "maxAllocated=", "spread=2", "maxAllowedSpread=1"} {
 				if !strings.Contains(output, field) {
@@ -93,7 +103,7 @@ func TestReconcileLogsUnexpectedNUMASpread(t *testing.T) {
 			}
 			for _, numaID := range testCase.numaIDs {
 				if !strings.Contains(output, fmt.Sprintf("\"%d\":%d", numaID, testCase.counts[numaID])) {
-					t.Fatalf("node %d count missing from error log: %s", numaID, output)
+					t.Fatalf("node %d count missing from info log: %s", numaID, output)
 				}
 			}
 		})

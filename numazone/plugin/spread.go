@@ -1,10 +1,10 @@
 package plugin
 
-import "k8s.io/klog/v2"
+import "context"
 
 const maximumExpectedNUMASpread = 1
 
-func (p *Plugin) logUnexpectedNUMASpread(allocatedByNode map[int]map[string]struct{}) {
+func (p *Plugin) logUnexpectedNUMASpread(ctx context.Context, allocatedByNode map[int]map[string]struct{}) {
 	counts := make(map[int]int)
 	minAllocated, maxAllocated := -1, 0
 	for _, numaID := range p.numaIDs() {
@@ -19,7 +19,7 @@ func (p *Plugin) logUnexpectedNUMASpread(allocatedByNode map[int]map[string]stru
 	}
 	spread := maxAllocated - minAllocated
 	if spread > maximumExpectedNUMASpread {
-		klog.ErrorS(nil, "numazone unexpected NUMA spread",
+		p.logger(ctx).Info("numazone unexpected NUMA spread",
 			"resourceName", p.options.ResourceName,
 			"allocatedDevicesByNUMANode", counts,
 			"minAllocated", minAllocated,

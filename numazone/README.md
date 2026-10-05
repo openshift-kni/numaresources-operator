@@ -234,7 +234,7 @@ disable the endpoint.
 - `numazone_allocate_duration_seconds` is a histogram of the full duration of
   each completed `Allocate()` call in seconds, including gate waiting,
   synchronization, and failure handling. Its `outcome` label is one of `success`,
-  `deadline`, `observation_error`, `caller_cancelled`, `request_error`, or
+  `deadline`, `observation_error`, `caller_canceled`, `request_error`, or
   `disabled`. Buckets span 1 millisecond through 6 seconds, covering the polling
   interval, default soft deadline, and maximum soft deadline plus watchdog grace.
 - `numazone_allocated_devices{numa_node="…"}` is a gauge of the number of
@@ -250,7 +250,7 @@ disable the endpoint.
 
 Hard-watchdog expirations are not recorded because the process exits immediately.
 
-## Error logging
+## Diagnostic logging
 
 Soft-deadline expirations emit one error log explicitly identifying the soft
 timeout and fail-open behavior, with the elapsed duration, configured timeout,
@@ -258,8 +258,9 @@ and synchronization outcome. Hard-watchdog expiry writes an `ERROR` diagnostic
 directly to standard error announcing that self-kill is in progress and giving
 the exit status; it does not use the normal logger or its locks.
 
-Every successful reconcile logs an error when the difference between the largest
-and smallest kubelet-reported NUMA allocation counts exceeds one device. The log
+Every successful reconcile logs at info severity when the difference between
+the largest and smallest kubelet-reported NUMA allocation counts exceeds one
+device. The log
 includes every discovered NUMA node's count, including zero allocations, the
 minimum and maximum, and the allowed difference. Pending speculative allocations
 are excluded. This diagnoses the observed imbalance; uneven releases, requests

@@ -525,6 +525,64 @@ func TestApplyAllocationStateLockedBiasesLeastLoadedNodes(t *testing.T) {
 	}
 }
 
+func TestApplyAllocationStateLockedExcludesExhaustedPools(t *testing.T) {
+	for _, testCase := range []struct {
+		name            string
+		allocatedCounts map[int]int
+		extraAllocation bool
+		releaseDevice   bool
+		wantAvailable   map[int]int
+	}{
+		{name: "full pool with fewer allocations", allocatedCounts: map[int]int{0: 2, 1: 3}, releaseDevice: true, wantAvailable: map[int]int{0: 0, 1: 1}},
+		{name: "full pool tied with eligible pool", allocatedCounts: map[int]int{0: 2, 1: 2}, wantAvailable: map[int]int{0: 0, 1: 2}},
+		{name: "all pools full", allocatedCounts: map[int]int{0: 2, 1: 4}, wantAvailable: map[int]int{0: 0, 1: 0}},
+		{name: "adopted allocation does not exhaust pool", allocatedCounts: map[int]int{0: 1, 1: 3}, extraAllocation: true, wantAvailable: map[int]int{0: 1, 1: 0}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			plg, err := New(newTestTopologyWithCPUs(map[int]int{0: 2, 1: 4}), Options{})
+			if err != nil {
+				t.Fatalf("create plugin: %v", err)
+			}
+			allocated := map[int]map[string]struct{}{0: {}, 1: {}}
+			for nodeID, count := range testCase.allocatedCounts {
+				for serial := 0; serial < count; serial++ {
+					allocated[nodeID][api.MakeDeviceID(nodeID, serial)] = struct{}{}
+				}
+			}
+			if testCase.extraAllocation {
+				allocated[0][api.MakeDeviceID(0, 9)] = struct{}{}
+			}
+			plg.applyAllocationStateLocked(cloneAllocationState(allocated))
+			capacity, available := nodeInventoryCounts(plg, allocated)
+			for nodeID, want := range testCase.wantAvailable {
+				if got := available[nodeID]; got != want {
+					t.Fatalf("unexpected available count on node %d: got %d want %d", nodeID, got, want)
+				}
+				wantCapacity := plg.poolSize[nodeID]
+				if nodeID == 0 && testCase.extraAllocation {
+					wantCapacity++
+				}
+				if got := capacity[nodeID]; got != wantCapacity {
+					t.Fatalf("unexpected capacity on node %d: got %d want %d", nodeID, got, wantCapacity)
+				}
+				for deviceID := range allocated[nodeID] {
+					if got := plg.devices[deviceID].device.Health; got != pluginapi.Healthy {
+						t.Fatalf("allocated device %q is not healthy: %q", deviceID, got)
+					}
+				}
+			}
+			if testCase.releaseDevice {
+				delete(allocated[0], api.MakeDeviceID(0, 1))
+				plg.applyAllocationStateLocked(cloneAllocationState(allocated))
+				_, available = nodeInventoryCounts(plg, allocated)
+				if available[0] != 1 || available[1] != 0 {
+					t.Fatalf("released pool did not reenter the winner set: %v", available)
+				}
+			}
+		})
+	}
+}
+
 func TestApplyAllocationStateLockedAdoptsAndPrunesOutOfPoolDevices(t *testing.T) {
 	const pool = 4
 

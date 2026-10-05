@@ -9,13 +9,16 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"github.com/go-logr/logr"
 	"github.com/jaypipes/ghw/pkg/topology"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
@@ -42,6 +45,7 @@ const (
 )
 
 type Options struct {
+	Log          logr.Logger
 	Mode         string
 	ResourceName string
 	SocketName   string
@@ -82,6 +86,7 @@ type Plugin struct {
 	pluginapi.UnimplementedDevicePluginServer
 
 	options    Options
+	log        logr.Logger
 	topology   *topology.Info
 	socketPath string
 
@@ -97,6 +102,7 @@ type Plugin struct {
 	updateTrigger chan struct{}
 	reconcileKick chan struct{}
 	admissionGate chan struct{}
+	flowSequence  atomic.Uint64
 
 	pendingAllocated  map[string]time.Time
 	observedAllocated map[int]map[string]struct{}
@@ -118,6 +124,9 @@ func New(topoInfo *topology.Info, opts Options) (*Plugin, error) {
 	defaults := DefaultOptions()
 	if opts.Mode == "" {
 		opts.Mode = defaults.Mode
+	}
+	if opts.Log.GetSink() == nil {
+		opts.Log = klog.Background().WithName("numazone")
 	}
 	if opts.Mode != ModeEnforcing && opts.Mode != ModePassthrough {
 		return nil, fmt.Errorf("unsupported mode %q: expected %q or %q", opts.Mode, ModeEnforcing, ModePassthrough)
@@ -149,6 +158,7 @@ func New(topoInfo *topology.Info, opts Options) (*Plugin, error) {
 
 	p := &Plugin{
 		options:           opts,
+		log:               opts.Log,
 		topology:          topoInfo,
 		socketPath:        filepath.Join(pluginapi.DevicePluginPath, opts.SocketName),
 		devices:           make(map[string]deviceRecord),
@@ -175,7 +185,7 @@ func New(topoInfo *topology.Info, opts Options) (*Plugin, error) {
 		if size <= 0 {
 			// topology reported no CPU for this node; fall back to a sane default
 			// so the node can still advertise devices and take part in steering.
-			klog.InfoS("no logical CPU detected for NUMA node, falling back to default pool size", "numaID", numaID, "poolSize", api.DefaultPoolSize)
+			p.log.V(2).Info("no logical CPU detected; using default pool size", "numaID", numaID, "poolSize", api.DefaultPoolSize)
 			size = api.DefaultPoolSize
 		}
 		p.poolSize[numaID] = size
@@ -192,17 +202,23 @@ func New(topoInfo *topology.Info, opts Options) (*Plugin, error) {
 		p.allocationMetrics.RecordAllocations(p.numaIDs(), nil)
 	}
 	p.rebuildDeviceListLocked()
+	p.log.V(3).Info("initialized device inventory", "mode", opts.Mode, "resourceName", opts.ResourceName, "numaNodes", p.numaIDs(), "poolSizeByNUMANode", p.poolSize, "devices", len(p.devices))
 	return p, nil
 }
 
 func (p *Plugin) Run(ctx context.Context) error {
+	ctx = logr.NewContext(ctx, p.logger(ctx))
+	log := p.logger(ctx)
+	log.V(3).Info("starting device plugin")
 	if p.options.Mode == ModeEnforcing {
+		log.V(4).Info("creating podresources client", "endpoint", p.options.PodResourcesEndpoint)
 		podResourcesClient, cleanupPodResourcesClient, err := podres.GetClient(p.options.PodResourcesEndpoint)
 		if err != nil {
 			return fmt.Errorf("create podresources client: %w", err)
 		}
 		defer cleanupPodResourcesClient() //nolint:errcheck
 		p.podResourcesClient = podResourcesClient
+		log.V(4).Info("created podresources client", "endpoint", p.options.PodResourcesEndpoint)
 	}
 
 	watcher, err := fsnotify.NewWatcher()
@@ -216,11 +232,12 @@ func (p *Plugin) Run(ctx context.Context) error {
 		return fmt.Errorf("watch %q: %w", devicePluginPath, err)
 	}
 	p.watcher = watcher
+	log.V(4).Info("watching kubelet device-plugin directory", "path", devicePluginPath)
 
 	if p.options.Mode == ModeEnforcing {
 		go p.reconcileLoop(ctx)
 		if err := p.reconcileDevicePool(ctx); err != nil {
-			klog.ErrorS(err, "initial numazone reconcile failed, continuing with default inventory")
+			log.Error(err, "initial inventory reconcile failed; continuing with default inventory")
 		}
 	}
 
@@ -237,31 +254,37 @@ func (p *Plugin) Run(ctx context.Context) error {
 				return nil
 			}
 			if event.Name == filepath.Join(devicePluginPath, filepath.Base(pluginapi.KubeletSocket)) && event.Op&fsnotify.Create == fsnotify.Create {
-				klog.InfoS("kubelet socket recreated, restarting device plugin", "socket", event.Name)
+				log.V(2).Info("kubelet socket recreated; restarting device plugin", "socket", event.Name)
 				if err := p.restartAndRegister(ctx); err != nil {
-					klog.ErrorS(err, "failed to restart and re-register device plugin")
+					log.Error(err, "restart and re-register device plugin")
 				}
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
 				return nil
 			}
-			klog.ErrorS(err, "device plugin filesystem watcher error")
+			log.Error(err, "device plugin filesystem watcher error")
 		}
 	}
 }
 
 func (p *Plugin) ListAndWatch(_ *pluginapi.Empty, stream pluginapi.DevicePlugin_ListAndWatchServer) error {
+	log := p.logger(stream.Context())
+	log.V(4).Info("ListAndWatch stream started")
 	if err := stream.Send(&pluginapi.ListAndWatchResponse{Devices: p.snapshotDevices()}); err != nil {
+		log.Error(err, "send initial device inventory")
 		return err
 	}
 
 	for {
 		select {
 		case <-stream.Context().Done():
+			log.V(4).Info("ListAndWatch stream stopped", "reason", stream.Context().Err())
 			return nil
 		case <-p.updateTrigger:
+			log.V(5).Info("sending updated device inventory")
 			if err := stream.Send(&pluginapi.ListAndWatchResponse{Devices: p.snapshotDevices()}); err != nil {
+				log.Error(err, "send updated device inventory")
 				return err
 			}
 		}
@@ -269,7 +292,12 @@ func (p *Plugin) ListAndWatch(_ *pluginapi.Empty, stream pluginapi.DevicePlugin_
 }
 
 func (p *Plugin) Allocate(ctx context.Context, req *pluginapi.AllocateRequest) (*pluginapi.AllocateResponse, error) {
+	flowID := fmt.Sprintf("allocate-%012d", p.flowSequence.Add(1))
+	log := p.logger(ctx).WithValues("flowID", flowID)
+	ctx = logr.NewContext(ctx, log)
+	log.V(4).Info("Allocate request received", "containerRequests", len(req.GetContainerRequests()), "requestedDeviceIDs", requestedDeviceIDs(req))
 	if p.options.Mode == ModePassthrough {
+		log.V(4).Info("Allocate request completed in passthrough mode")
 		return allocateResponse(req), nil
 	}
 	startedAt := time.Now()
@@ -284,14 +312,17 @@ func (p *Plugin) Allocate(ctx context.Context, req *pluginapi.AllocateRequest) (
 	outcome := admissionSyncRequestError
 	defer func() {
 		p.admissionMetrics.RecordResult(outcome, time.Since(startedAt))
+		log.V(4).Info("Allocate request completed", "outcome", outcome, "duration", time.Since(startedAt))
 	}()
 
 	if p.options.DisableAdmissionSync {
 		response, requestedIDs, err := p.validateAllocateRequest(req)
 		if err != nil {
+			log.Error(err, "validate Allocate request")
 			return nil, err
 		}
-		p.applyRequestedAllocation(requestedIDs)
+		log.V(5).Info("admission synchronization disabled; applying speculative allocation", "requestedDeviceIDs", sortedDeviceIDs(requestedIDs))
+		p.applyRequestedAllocation(ctx, requestedIDs)
 		outcome = admissionSyncDisabled
 		return response, nil
 	}
@@ -301,13 +332,15 @@ func (p *Plugin) Allocate(ctx context.Context, req *pluginapi.AllocateRequest) (
 
 	response, requestedIDs, err := p.validateAllocateRequest(req)
 	if err != nil {
+		log.Error(err, "validate Allocate request")
 		return nil, err
 	}
 
 	if !p.acquireAdmissionGate(syncCtx) {
 		// Preserve the pre-synchronization, fail-open behavior even when the gate
 		// cannot be acquired before the soft deadline.
-		p.applyRequestedAllocation(requestedIDs)
+		log.V(4).Info("admission synchronization gate was not acquired; failing open", "error", syncCtx.Err())
+		p.applyRequestedAllocation(ctx, requestedIDs)
 		outcome = admissionSyncDeadline
 		softTimeout := false
 		if ctx.Err() != nil {
@@ -316,12 +349,14 @@ func (p *Plugin) Allocate(ctx context.Context, req *pluginapi.AllocateRequest) (
 			softTimeout = true
 			p.admissionMetrics.RecordSoftTimeout()
 		}
-		p.recordAdmissionSyncFailure(outcome, time.Since(startedAt), softTimeout, syncCtx.Err())
+		p.recordAdmissionSyncFailure(ctx, outcome, time.Since(startedAt), softTimeout, syncCtx.Err())
 		return response, nil
 	}
 	defer p.releaseAdmissionGate()
+	log.V(5).Info("admission synchronization gate acquired")
 
-	expected := p.applyRequestedAllocation(requestedIDs)
+	expected := p.applyRequestedAllocation(ctx, requestedIDs)
+	log.V(6).Info("waiting for kubelet allocatable inventory", "expectedInventory", sortedInventory(expected))
 	var waitErr error
 	outcome, waitErr = p.waitForAllocatableInventory(syncCtx, expected)
 	if ctx.Err() != nil {
@@ -332,9 +367,10 @@ func (p *Plugin) Allocate(ctx context.Context, req *pluginapi.AllocateRequest) (
 		if softTimeout {
 			p.admissionMetrics.RecordSoftTimeout()
 		}
-		p.recordAdmissionSyncFailure(outcome, time.Since(startedAt), softTimeout, waitErr)
+		p.recordAdmissionSyncFailure(ctx, outcome, time.Since(startedAt), softTimeout, waitErr)
 		return response, nil
 	}
+	log.V(5).Info("kubelet observed updated allocatable inventory")
 	return response, nil
 }
 
@@ -365,7 +401,7 @@ func (p *Plugin) validateAllocateRequest(req *pluginapi.AllocateRequest) (*plugi
 	return allocateResponse(req), requestedIDs, nil
 }
 
-func (p *Plugin) applyRequestedAllocation(requestedIDs map[string]struct{}) allocatableInventory {
+func (p *Plugin) applyRequestedAllocation(ctx context.Context, requestedIDs map[string]struct{}) allocatableInventory {
 	now := time.Now()
 	p.mu.Lock()
 	for deviceID := range requestedIDs {
@@ -376,6 +412,7 @@ func (p *Plugin) applyRequestedAllocation(requestedIDs map[string]struct{}) allo
 	expected := p.healthyInventoryLocked()
 	p.mu.Unlock()
 
+	p.logger(ctx).V(6).Info("applied speculative allocation", "requestedDeviceIDs", sortedDeviceIDs(requestedIDs), "inventoryChanged", changed, "expectedInventory", sortedInventory(expected))
 	if changed {
 		p.signalUpdate()
 	}
@@ -407,7 +444,7 @@ func (p *Plugin) restartAndRegister(ctx context.Context) error {
 	if err := p.stopServerLocked(); err != nil {
 		return err
 	}
-	if err := p.startServerLocked(); err != nil {
+	if err := p.startServerLocked(ctx); err != nil {
 		return err
 	}
 	if err := p.register(ctx); err != nil {
@@ -417,7 +454,7 @@ func (p *Plugin) restartAndRegister(ctx context.Context) error {
 	return nil
 }
 
-func (p *Plugin) startServerLocked() error {
+func (p *Plugin) startServerLocked(ctx context.Context) error {
 	if err := os.Remove(p.socketPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("cleanup plugin socket %q: %w", p.socketPath, err)
 	}
@@ -432,7 +469,7 @@ func (p *Plugin) startServerLocked() error {
 
 	go func() {
 		if err := server.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-			klog.ErrorS(err, "device plugin gRPC server stopped")
+			p.logger(ctx).Error(err, "device plugin gRPC server stopped")
 		}
 	}()
 	p.server = server
@@ -450,12 +487,12 @@ func (p *Plugin) register(ctx context.Context) error {
 
 	for {
 		if err := p.registerOnce(ctx, options); err == nil {
-			klog.InfoS("registered device plugin", "resourceName", p.options.ResourceName, "socket", p.socketPath)
+			p.logger(ctx).V(2).Info("registered device plugin", "resourceName", p.options.ResourceName, "socket", p.socketPath)
 			return nil
 		} else if ctx.Err() != nil {
 			return err
 		} else {
-			klog.ErrorS(err, "retrying kubelet device-plugin registration", "resourceName", p.options.ResourceName)
+			p.logger(ctx).Error(err, "retrying kubelet device-plugin registration", "resourceName", p.options.ResourceName)
 		}
 
 		select {
@@ -606,6 +643,9 @@ func (p *Plugin) countRequestedDevices(deviceIDs []string) (map[int]int, error) 
 }
 
 func (p *Plugin) reconcileLoop(ctx context.Context) {
+	log := p.logger(ctx)
+	log.V(4).Info("starting inventory reconcile loop", "period", reconcilePeriod)
+	defer log.V(4).Info("stopped inventory reconcile loop")
 	ticker := time.NewTicker(reconcilePeriod)
 	defer ticker.Stop()
 
@@ -618,7 +658,7 @@ func (p *Plugin) reconcileLoop(ctx context.Context) {
 		}
 
 		if err := p.reconcileDevicePool(ctx); err != nil {
-			klog.ErrorS(err, "failed to reconcile numazone device inventory")
+			log.Error(err, "reconcile device inventory")
 		}
 	}
 }
@@ -653,6 +693,8 @@ func (p *Plugin) reconcileDevicePool(ctx context.Context) error {
 	if p.options.Mode == ModePassthrough {
 		return nil
 	}
+	log := p.logger(ctx)
+	log.V(5).Info("reconciling device inventory")
 	allocatedByNode, err := p.loadAllocationState(ctx)
 	if err != nil {
 		return err
@@ -672,10 +714,11 @@ func (p *Plugin) reconcileDevicePool(ctx context.Context) error {
 	changed := p.applyAllocationStateLocked(effectiveAllocatedByNode)
 	p.mu.Unlock()
 
+	log.V(6).Info("reconciled allocation state", "observedAllocationsByNUMANode", allocationCounts(allocatedByNode), "effectiveAllocationsByNUMANode", allocationCounts(effectiveAllocatedByNode), "inventoryChanged", changed)
 	if changed {
 		p.signalUpdate()
 	}
-	p.logUnexpectedNUMASpread(allocatedByNode)
+	p.logUnexpectedNUMASpread(ctx, allocatedByNode)
 	return nil
 }
 
@@ -719,6 +762,42 @@ func (p *Plugin) mergeAllocationStateLocked(authoritative map[int]map[string]str
 		merged[nodeID][deviceID] = struct{}{}
 	}
 	return merged
+}
+
+func (p *Plugin) logger(ctx context.Context) logr.Logger {
+	if log, err := logr.FromContext(ctx); err == nil {
+		return log
+	}
+	return p.log
+}
+
+func requestedDeviceIDs(req *pluginapi.AllocateRequest) []string {
+	if req == nil {
+		return nil
+	}
+	deviceIDs := make([]string, 0)
+	for _, containerReq := range req.GetContainerRequests() {
+		deviceIDs = append(deviceIDs, containerReq.GetDevicesIds()...)
+	}
+	sort.Strings(deviceIDs)
+	return deviceIDs
+}
+
+func sortedDeviceIDs(deviceIDs map[string]struct{}) []string {
+	ids := make([]string, 0, len(deviceIDs))
+	for deviceID := range deviceIDs {
+		ids = append(ids, deviceID)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func allocationCounts(allocatedByNode map[int]map[string]struct{}) map[int]int {
+	counts := make(map[int]int, len(allocatedByNode))
+	for numaID, deviceIDs := range allocatedByNode {
+		counts[numaID] = len(deviceIDs)
+	}
+	return counts
 }
 
 // applyAllocationStateLocked recomputes per-device health so that only the
@@ -778,8 +857,18 @@ func (p *Plugin) applyAllocationStateLocked(allocatedByNode map[int]map[string]s
 		}
 	}
 
+	eligibleNodes := sets.New[int]()
+	for deviceID, record := range p.devices {
+		if _, allocated := allocatedByNode[record.numaID][deviceID]; !allocated {
+			eligibleNodes.Insert(record.numaID)
+		}
+	}
+
 	minAllocated := -1
 	for _, nodeID := range nodeIDs {
+		if !eligibleNodes.Has(nodeID) {
+			continue
+		}
 		count := len(allocatedByNode[nodeID])
 		if minAllocated == -1 || count < minAllocated {
 			minAllocated = count
@@ -787,7 +876,7 @@ func (p *Plugin) applyAllocationStateLocked(allocatedByNode map[int]map[string]s
 	}
 
 	for _, nodeID := range nodeIDs {
-		isWinner := len(allocatedByNode[nodeID]) == minAllocated
+		isWinner := eligibleNodes.Has(nodeID) && len(allocatedByNode[nodeID]) == minAllocated
 
 		spareIDs := make([]string, 0)
 		for deviceID, record := range p.devices {

@@ -10,7 +10,6 @@ import (
 
 	"google.golang.org/grpc"
 
-	"k8s.io/klog/v2"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
@@ -58,6 +57,7 @@ func (p *Plugin) healthyInventoryLocked() allocatableInventory {
 }
 
 func (p *Plugin) waitForAllocatableInventory(ctx context.Context, expected allocatableInventory) (admissionSyncOutcome, error) {
+	log := p.logger(ctx)
 	if p.podResourcesClient == nil {
 		return admissionSyncObservationError, fmt.Errorf("podresources client is not initialized")
 	}
@@ -74,11 +74,15 @@ func (p *Plugin) waitForAllocatableInventory(ctx context.Context, expected alloc
 		)
 		if err == nil {
 			lastObservationErr = nil
-			if inventoriesEqual(expected, allocatableInventoryFromPodResources(response.GetDevices(), p.options.ResourceName)) {
+			observed := allocatableInventoryFromPodResources(response.GetDevices(), p.options.ResourceName)
+			if inventoriesEqual(expected, observed) {
+				// intentionally not logging in the happy path to reduce log spam
 				return admissionSyncSuccess, nil
 			}
+			log.V(6).Info("kubelet allocatable inventory does not match expected inventory", "expectedInventory", sortedInventory(expected), "observedInventory", sortedInventory(observed))
 		} else {
 			lastObservationErr = err
+			log.V(6).Info("get kubelet allocatable inventory failed", "error", err)
 		}
 
 		select {
@@ -92,12 +96,12 @@ func (p *Plugin) waitForAllocatableInventory(ctx context.Context, expected alloc
 	}
 }
 
-func (p *Plugin) recordAdmissionSyncFailure(outcome admissionSyncOutcome, duration time.Duration, softTimeout bool, err error) {
+func (p *Plugin) recordAdmissionSyncFailure(ctx context.Context, outcome admissionSyncOutcome, duration time.Duration, softTimeout bool, err error) {
 	message := "numazone admission synchronization failed open"
 	if softTimeout {
 		message = "numazone admission synchronization soft timeout; failing open"
 	}
-	klog.ErrorS(err, message, "outcome", outcome, "duration", duration, "timeout", p.options.AdmissionSyncTimeout)
+	p.logger(ctx).Error(err, message, "outcome", outcome, "duration", duration, "timeout", p.options.AdmissionSyncTimeout)
 }
 
 func allocatableInventoryFromPodResources(devices []*podresourcesapi.ContainerDevices, resourceName string) allocatableInventory {
@@ -128,6 +132,15 @@ func inventoriesEqual(left, right allocatableInventory) bool {
 
 func inventoryEntry(deviceID, topologyKey string) string {
 	return deviceID + "\x00" + topologyKey
+}
+
+func sortedInventory(inventory allocatableInventory) []string {
+	entries := make([]string, 0, len(inventory))
+	for entry := range inventory {
+		entries = append(entries, strings.ReplaceAll(entry, "\x00", "@"))
+	}
+	sort.Strings(entries)
+	return entries
 }
 
 func pluginTopologyKey(topology *pluginapi.TopologyInfo) string {
