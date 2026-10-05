@@ -19,6 +19,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -33,13 +34,29 @@ type GitCommit struct {
 	DCOCoauthorTag   string `json:"dcoCoauthorTag"`
 }
 
-func validate(commit GitCommit) []error {
-	var errors []error
+const (
+	dependabot   = "dependabot[bot]"
+	konflux      = "red-hat-konflux"
+	chaiBot      = "Chai Bot"
+	chaiBotEmail = "<chai-bot@redhat.com>"
+)
+
+func validate(commit GitCommit) error {
+	if commit.Author == chaiBot && commit.AuthorEmail == chaiBotEmail {
+		fmt.Printf("git commit authored by chai bot\n")
+		return nil
+	}
+
+	var errs error
 	if "<"+commit.Author+">" == commit.AuthorEmailLocal {
-		errors = append(errors, fmt.Errorf("missing author name - equals to email local part"))
+		errs = errors.Join(errs, fmt.Errorf("missing author name - equals to email local part"))
+	}
+	if strings.Contains(commit.Author, konflux) {
+		fmt.Printf("git commit authored by konflux bot\n")
+		return nil
 	}
 	if commit.DCOSignTag == "" {
-		errors = append(errors, fmt.Errorf("DCO signoff trailer missing"))
+		errs = errors.Join(errs, fmt.Errorf("DCO signoff trailer missing"))
 	} else {
 		expectedDCO := expectedDCOSignTag(commit)
 		if strings.Contains(commit.DCOSignTag, expectedDCO) {
@@ -49,14 +66,17 @@ func validate(commit GitCommit) []error {
 			if strings.Contains(commit.DCOCoauthorTag, expectedDCOAuth) {
 				fmt.Printf("git commit email not in sign off list, but found in co-author list\n")
 			} else {
-				errors = append(errors, fmt.Errorf("DCO signoff malformed: %q does not contain expected %q", commit.DCOSignTag, expectedDCO))
+				errs = errors.Join(errs, fmt.Errorf("DCO signoff malformed: %q does not contain expected %q", commit.DCOSignTag, expectedDCO))
 			}
 		}
 	}
-	return errors
+	return errs
 }
 
 func expectedDCOSignTag(commit GitCommit) string {
+	if commit.Author == dependabot {
+		return fmt.Sprintf("Signed-off-by: %s", commit.Author)
+	}
 	return fmt.Sprintf("Signed-off-by: %s %s", commit.Author, commit.AuthorEmail)
 }
 
@@ -87,11 +107,9 @@ func main() {
 	fmt.Printf("read: %d commits\n", len(commits))
 
 	for _, commit := range commits {
-		errs := validate(commit)
-		if len(errs) > 0 {
-			for _, err := range errs {
-				fmt.Fprintf(os.Stderr, "invalid commit: %v\n", err)
-			}
+		err := validate(commit)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "invalid commit: %v\n", err)
 			os.Exit(2)
 		}
 	}
