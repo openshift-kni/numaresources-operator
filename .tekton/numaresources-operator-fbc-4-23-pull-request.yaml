@@ -10,23 +10,23 @@ metadata:
     pipelinesascode.tekton.dev/max-keep-runs: "3"
     pipelinesascode.tekton.dev/on-cel-expression: |
       event == "pull_request" &&
-      target_branch == "release-5.0" &&
+      target_branch == "release-4.23" &&
       (
         '.konflux/catalog/5.0/***'.pathChanged() ||
         '.konflux/catalog/fbc-images-resolvable-integration-test-idms.yaml'.pathChanged() ||
         '.konflux/Dockerfile.catalog'.pathChanged() ||
         '.tekton/fbc-pipeline.yaml'.pathChanged() ||
         '.tekton/images-mirror-set.yaml'.pathChanged() ||
-        '.tekton/numaresources-operator-fbc-5-0-pull-request.yaml'.pathChanged() ||
+        '.tekton/numaresources-operator-fbc-4-23-pull-request.yaml'.pathChanged() ||
         'telco5g-konflux'.pathChanged() ||
         'telco5g-konflux/***'.pathChanged()
       )
   creationTimestamp: null
   labels:
-    appstudio.openshift.io/application: numaresources-operator-fbc-5-0
-    appstudio.openshift.io/component: numaresources-operator-fbc-5-0
+    appstudio.openshift.io/application: numaresources-operator-fbc-4-23
+    appstudio.openshift.io/component: numaresources-operator-fbc-4-23
     pipelines.appstudio.openshift.io/type: build
-  name: numaresources-operator-fbc-5-0-on-pull-request
+  name: numaresources-operator-fbc-4-23-on-pull-request
   namespace: telco-5g-tenant
 spec:
   params:
@@ -35,7 +35,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-fbc-5-0:on-pr-{{revision}}
+    value: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-fbc-4-23:on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: build-platforms
@@ -60,7 +60,7 @@ spec:
   pipelineRef:
     name: fbc-pipeline    
   taskRunTemplate:
-    serviceAccountName: build-pipeline-numaresources-operator-fbc-5-0
+    serviceAccountName: build-pipeline-numaresources-operator-fbc-4-23
   workspaces:
   - name: git-auth
     secret:
