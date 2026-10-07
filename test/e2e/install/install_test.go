@@ -38,7 +38,6 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
@@ -69,10 +68,6 @@ import (
 
 const (
 	containerNameRTE = "resource-topology-exporter"
-
-	// skipHyperShiftKCDetachReason documents why HyperShift durability specs are skipped.
-	// Remove once hypershift#8890 (OCPBUGS-88738) is in CI payloads and teardown passes.
-	skipHyperShiftKCDetachReason = "Skipped until OCPBUGS-88738 (hypershift#8890): HCCO does not delete mirrored kubelet ConfigMap on guest cluster after KC detach"
 )
 
 var _ = Describe("[Install] continuousIntegration", Serial, func() {
@@ -179,9 +174,6 @@ var _ = Describe("[Install] durability", Serial, func() {
 		var nroObj *nropv1.NUMAResourcesOperator
 
 		BeforeEach(func() {
-			if configuration.Plat == platform.HyperShift {
-				Skip(skipHyperShiftKCDetachReason)
-			}
 			deployer = deploy.NewForPlatform(configuration.Plat)
 			nroObj = deployer.Deploy(context.TODO(), configuration.MachineConfigPoolUpdateTimeout)
 		})
