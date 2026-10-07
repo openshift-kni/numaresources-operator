@@ -3,6 +3,7 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1"
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 )
@@ -30,7 +32,20 @@ type admissionSyncMetrics interface {
 	RecordResult(outcome admissionSyncOutcome, duration time.Duration)
 }
 
-type allocatableInventory map[string]struct{}
+// Inventories are sorted, deduplicated snapshots used for comparison and logging.
+type allocatableInventory []string
+
+func (inventory allocatableInventory) Len() int {
+	return len(inventory)
+}
+
+func (inventory allocatableInventory) Clone() allocatableInventory {
+	return slices.Clone(inventory)
+}
+
+func (inventory allocatableInventory) Equal(other allocatableInventory) bool {
+	return slices.Equal(inventory, other)
+}
 
 func (p *Plugin) acquireAdmissionGate(ctx context.Context) bool {
 	select {
@@ -46,14 +61,14 @@ func (p *Plugin) releaseAdmissionGate() {
 }
 
 func (p *Plugin) healthyInventoryLocked() allocatableInventory {
-	inventory := make(allocatableInventory)
+	entries := sets.New[string]()
 	for _, record := range p.devices {
 		if record.device.GetHealth() != pluginapi.Healthy {
 			continue
 		}
-		inventory[inventoryEntry(record.device.GetID(), pluginTopologyKey(record.device.GetTopology()))] = struct{}{}
+		entries.Insert(inventoryEntry(record.device.GetID(), pluginTopologyKey(record.device.GetTopology())))
 	}
-	return inventory
+	return sets.List(entries)
 }
 
 func (p *Plugin) waitForAllocatableInventory(ctx context.Context, expected allocatableInventory) (admissionSyncOutcome, error) {
@@ -75,11 +90,11 @@ func (p *Plugin) waitForAllocatableInventory(ctx context.Context, expected alloc
 		if err == nil {
 			lastObservationErr = nil
 			observed := allocatableInventoryFromPodResources(response.GetDevices(), p.options.ResourceName)
-			if inventoriesEqual(expected, observed) {
+			if expected.Equal(observed) {
 				// intentionally not logging in the happy path to reduce log spam
 				return admissionSyncSuccess, nil
 			}
-			log.V(6).Info("kubelet allocatable inventory does not match expected inventory", "expectedInventory", sortedInventory(expected), "observedInventory", sortedInventory(observed))
+			log.V(6).Info("kubelet allocatable inventory does not match expected inventory", "expectedInventory", expected, "observedInventory", observed)
 		} else {
 			lastObservationErr = err
 			log.V(6).Info("get kubelet allocatable inventory failed", "error", err)
@@ -105,42 +120,21 @@ func (p *Plugin) recordAdmissionSyncFailure(ctx context.Context, outcome admissi
 }
 
 func allocatableInventoryFromPodResources(devices []*podresourcesapi.ContainerDevices, resourceName string) allocatableInventory {
-	inventory := make(allocatableInventory)
+	entries := sets.New[string]()
 	for _, device := range devices {
 		if device.GetResourceName() != resourceName {
 			continue
 		}
 		topologyKey := podResourcesTopologyKey(device.GetTopology())
 		for _, deviceID := range device.GetDeviceIds() {
-			inventory[inventoryEntry(deviceID, topologyKey)] = struct{}{}
+			entries.Insert(inventoryEntry(deviceID, topologyKey))
 		}
 	}
-	return inventory
-}
-
-func inventoriesEqual(left, right allocatableInventory) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	for entry := range left {
-		if _, found := right[entry]; !found {
-			return false
-		}
-	}
-	return true
+	return sets.List(entries)
 }
 
 func inventoryEntry(deviceID, topologyKey string) string {
-	return deviceID + "\x00" + topologyKey
-}
-
-func sortedInventory(inventory allocatableInventory) []string {
-	entries := make([]string, 0, len(inventory))
-	for entry := range inventory {
-		entries = append(entries, strings.ReplaceAll(entry, "\x00", "@"))
-	}
-	sort.Strings(entries)
-	return entries
+	return deviceID + "@" + topologyKey
 }
 
 func pluginTopologyKey(topology *pluginapi.TopologyInfo) string {

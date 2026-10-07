@@ -356,7 +356,7 @@ func (p *Plugin) Allocate(ctx context.Context, req *pluginapi.AllocateRequest) (
 	log.V(5).Info("admission synchronization gate acquired")
 
 	expected := p.applyRequestedAllocation(ctx, requestedIDs)
-	log.V(6).Info("waiting for kubelet allocatable inventory", "expectedInventory", sortedInventory(expected))
+	log.V(6).Info("waiting for kubelet allocatable inventory", "expectedInventory", expected)
 	var waitErr error
 	outcome, waitErr = p.waitForAllocatableInventory(syncCtx, expected)
 	if ctx.Err() != nil {
@@ -412,7 +412,7 @@ func (p *Plugin) applyRequestedAllocation(ctx context.Context, requestedIDs map[
 	expected := p.healthyInventoryLocked()
 	p.mu.Unlock()
 
-	p.logger(ctx).V(6).Info("applied speculative allocation", "requestedDeviceIDs", sortedDeviceIDs(requestedIDs), "inventoryChanged", changed, "expectedInventory", sortedInventory(expected))
+	p.logger(ctx).V(6).Info("applied speculative allocation", "requestedDeviceIDs", sortedDeviceIDs(requestedIDs), "inventoryChanged", changed, "expectedInventory", expected)
 	if changed {
 		p.signalUpdate()
 	}

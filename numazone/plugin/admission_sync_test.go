@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/logr"
+
 	podresourcesapi "k8s.io/kubelet/pkg/apis/podresources/v1"
 
 	"github.com/openshift-kni/numaresources-operator/numazone/api"
@@ -13,10 +15,10 @@ import (
 
 func TestAllocatableInventoryComparison(t *testing.T) {
 	resourceName := api.QualifiedResourceName()
-	expected := allocatableInventory{
-		inventoryEntry("device-a", "0"): {},
-		inventoryEntry("device-b", "1"): {},
-	}
+	expected := allocatableInventoryFromPodResources([]*podresourcesapi.ContainerDevices{
+		makePodResourceDevice(resourceName, 0, "device-a"),
+		makePodResourceDevice(resourceName, 1, "device-b"),
+	}, resourceName)
 
 	testCases := []struct {
 		name    string
@@ -35,6 +37,15 @@ func TestAllocatableInventoryComparison(t *testing.T) {
 		{
 			name: "multiple IDs in one response entry",
 			devices: []*podresourcesapi.ContainerDevices{
+				makePodResourceDevice(resourceName, 0, "device-a"),
+				makePodResourceDevice(resourceName, 1, "device-b"),
+			},
+			match: true,
+		},
+		{
+			name: "duplicate entries",
+			devices: []*podresourcesapi.ContainerDevices{
+				makePodResourceDevice(resourceName, 0, "device-a", "device-a"),
 				makePodResourceDevice(resourceName, 0, "device-a"),
 				makePodResourceDevice(resourceName, 1, "device-b"),
 			},
@@ -71,7 +82,7 @@ func TestAllocatableInventoryComparison(t *testing.T) {
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
 			observed := allocatableInventoryFromPodResources(testCase.devices, resourceName)
-			if got := inventoriesEqual(expected, observed); got != testCase.match {
+			if got := expected.Equal(observed); got != testCase.match {
 				t.Fatalf("unexpected comparison result: got %t want %t; observed=%v", got, testCase.match, observed)
 			}
 		})
@@ -86,12 +97,33 @@ func TestTopologyKeyIsOrderIndependent(t *testing.T) {
 	}
 }
 
+func TestInventoryIsSortedAndDeduplicated(t *testing.T) {
+	resourceName := api.QualifiedResourceName()
+	inventory := allocatableInventoryFromPodResources([]*podresourcesapi.ContainerDevices{
+		makePodResourceDevice(resourceName, 1, "device-b"),
+		makePodResourceDevice(resourceName, 0, "device-a", "device-a"),
+	}, resourceName)
+	if want := (allocatableInventory{"device-a@0", "device-b@1"}); !inventory.Equal(want) {
+		t.Fatalf("unexpected sorted inventory: got %v want %v", inventory, want)
+	}
+	empty := allocatableInventoryFromPodResources(nil, resourceName)
+	if empty.Len() != 0 {
+		t.Fatalf("unexpected empty inventory: %v", empty)
+	}
+}
+
 func TestWaitForAllocatableInventoryRetriesMismatch(t *testing.T) {
 	plg, err := New(newTestTopology(0), Options{PoolSize: 1})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	expected := plg.healthyInventoryForTest()
+	ctx, cancel := context.WithTimeout(logr.NewContext(context.Background(), logr.Discard()), time.Second)
+	defer cancel()
+	expected := plg.applyRequestedAllocation(ctx, nil)
+	if expected.Len() != 1 {
+		t.Fatalf("unexpected inventory with logging disabled: %v", expected)
+	}
+	entries := expected.Clone()
 	client := &testPodResourcesClient{}
 	client.getAllocatable = func(context.Context) (*podresourcesapi.AllocatableResourcesResponse, error) {
 		if client.allocatableCalls() == 1 {
@@ -101,8 +133,6 @@ func TestWaitForAllocatableInventoryRetriesMismatch(t *testing.T) {
 	}
 	plg.podResourcesClient = client
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
 	outcome, err := plg.waitForAllocatableInventory(ctx, expected)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -112,6 +142,9 @@ func TestWaitForAllocatableInventoryRetriesMismatch(t *testing.T) {
 	}
 	if got := client.allocatableCalls(); got != 2 {
 		t.Fatalf("unexpected poll count: got %d want 2", got)
+	}
+	if !expected.Equal(entries) {
+		t.Fatal("admission polling changed the expected inventory")
 	}
 }
 
