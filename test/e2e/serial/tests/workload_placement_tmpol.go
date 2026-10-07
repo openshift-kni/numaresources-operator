@@ -660,7 +660,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[test_id:85000] should make a pod with three gu cnt land on a node with enough resources, containers should be spread on a different zone",
+		// Retained for comparison with workload_placement_tmpol_admit.go.
+		PEntry("[test_id:85000] should make a pod with three gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			Label(label.Tier1, "tmscope:cnt", "testtype4"),
 			newContainerScopeSingleNUMANodeFuncs(),
 			podResourcesRequest{
@@ -961,7 +962,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[test_id:85005] should make a pod with one init cnt and three gu cnt land on a node with enough resources, containers should be spread on a different zone",
+		// Retained for comparison with workload_placement_tmpol_admit.go.
+		PEntry("[test_id:85005] should make a pod with one init cnt and three gu cnt land on a node with enough resources, containers should be spread on a different zone",
 			Label(label.Tier1, "tmscope:container", "testtype11"),
 			newContainerScopeSingleNUMANodeFuncs(),
 			podResourcesRequest{
@@ -1011,7 +1013,8 @@ var _ = Describe("[serial][disruptive][scheduler] numaresources workload placeme
 				},
 			},
 		),
-		Entry("[test_id:85006] should make a pod with 3 gu cnt and 3 init cnt land on a node with enough resources, when sum of init and app cnt resources are more than node resources",
+		// Retained for comparison with workload_placement_tmpol_admit.go.
+		PEntry("[test_id:85006] should make a pod with 3 gu cnt and 3 init cnt land on a node with enough resources, when sum of init and app cnt resources are more than node resources",
 			Label(label.Tier1, "tmscope:container", "testtype29"),
 			newContainerScopeSingleNUMANodeFuncs(),
 			podResourcesRequest{

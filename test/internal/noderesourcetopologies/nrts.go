@@ -496,7 +496,6 @@ func FindFromList(nrts []nrtv1alpha2.NodeResourceTopology, name string) (*nrtv1a
 // AvailableFromZone returns a ResourceList of all available resources under the zone
 func AvailableFromZone(z nrtv1alpha2.Zone) corev1.ResourceList {
 	rl := corev1.ResourceList{}
-
 	for _, ri := range z.Resources {
 		rl[corev1.ResourceName(ri.Name)] = ri.Available
 	}
