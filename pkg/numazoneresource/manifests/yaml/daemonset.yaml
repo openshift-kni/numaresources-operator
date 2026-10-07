@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: numazone
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: numazone
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  template:
+    metadata:
+      labels:
+        app: numazone
+    spec:
+      serviceAccountName: numazone
+      serviceAccount: numazone
+      priorityClassName: system-node-critical
+      restartPolicy: Always
+      dnsPolicy: ClusterFirst
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 30
+      securityContext: {}
+      containers:
+      - name: numazone
+        image: ${IMAGE}
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/numazone
+        args:
+        - --mode=enforcing
+        - --sysfs=/host-sys
+        - --podresources-socket=unix:///host-podresources/kubelet.sock
+        securityContext:
+          privileged: true
+          runAsUser: 0
+          runAsGroup: 0
+        terminationMessagePolicy: FallbackToLogsOnError
+        terminationMessagePath: /dev/termination-log
+        ports:
+        - name: metrics
+          containerPort: 8080
+          protocol: TCP
+        volumeMounts:
+        - name: host-sys
+          mountPath: /host-sys
+          readOnly: true
+        - name: host-podresources
+          mountPath: /host-podresources
+          readOnly: true
+        - name: device-plugins
+          mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+      - name: host-sys
+        hostPath:
+          path: /sys
+          type: Directory
+      - name: host-podresources
+        hostPath:
+          path: /var/lib/kubelet/pod-resources
+          type: Directory
+      - name: device-plugins
+        hostPath:
+          path: /var/lib/kubelet/device-plugins
+          type: Directory

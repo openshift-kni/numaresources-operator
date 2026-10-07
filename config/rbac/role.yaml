@@ -264,6 +264,7 @@ rules:
 - apiGroups:
   - security.openshift.io
   resourceNames:
+  - numazone
   - resource-topology-exporter
   - resource-topology-exporter-v2
   resources:
@@ -329,6 +330,7 @@ rules:
 - apiGroups:
   - ""
   resourceNames:
+  - numazone
   - rte
   resources:
   - serviceaccounts
