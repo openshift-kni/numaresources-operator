@@ -35,15 +35,21 @@ type GitCommit struct {
 }
 
 const (
-	dependabot   = "dependabot[bot]"
-	konflux      = "red-hat-konflux"
-	chaiBot      = "Chai Bot"
-	chaiBotEmail = "<chai-bot@redhat.com>"
+	dependabot         = "dependabot[bot]"
+	konflux            = "red-hat-konflux"
+	chaiBot            = "Chai Bot"
+	chaiBotEmail       = "<chai-bot@redhat.com>"
+	telcoGitlabCI      = "ocp-telco-ci-gitlab-ci"
+	telcoGitlabCIEmail = "<ocp-telco-ci-gitlab-ci@redhat.com>"
 )
 
 func validate(commit GitCommit) error {
 	if commit.Author == chaiBot && commit.AuthorEmail == chaiBotEmail {
 		fmt.Printf("git commit authored by chai bot\n")
+		return nil
+	}
+	if commit.Author == telcoGitlabCI && commit.AuthorEmail == telcoGitlabCIEmail {
+		fmt.Printf("git commit authored by ocp-telco-ci-gitlab-ci\n")
 		return nil
 	}
 
