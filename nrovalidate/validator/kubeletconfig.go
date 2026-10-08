@@ -127,13 +127,17 @@ func CollectKubeletConfigForOpenShift(ctx context.Context, cli client.Client, da
 
 func CollectKubeletConfig(ctx context.Context, cli client.Client, data *ValidatorData) error {
 	plat, err := detect.Platform(ctx)
+	klog.InfoS("Collecting kubelet config", "platform", plat)
 	if err != nil {
 		return err
 	}
 	if plat == platform.HyperShift {
 		return CollectKubeletConfigForHyperShift(ctx, cli, data)
 	}
-	return CollectKubeletConfigForOpenShift(ctx, cli, data)
+	if plat == platform.OpenShift {
+		return CollectKubeletConfigForOpenShift(ctx, cli, data)
+	}
+	return ErrUnsupported
 }
 
 func ValidateKubeletConfig(data ValidatorData) ([]deployervalidator.ValidationResult, error) {
