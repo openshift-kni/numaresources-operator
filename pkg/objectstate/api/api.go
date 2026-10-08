@@ -23,9 +23,9 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 
+	apimanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/api"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/merge"

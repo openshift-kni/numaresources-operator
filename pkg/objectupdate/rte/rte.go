@@ -28,15 +28,15 @@ import (
 
 	securityv1 "github.com/openshift/api/security/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
-	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
-	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/assets/selinux"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/flagcodec"
+	nroobjupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate"
+	rtemanifestsupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
@@ -51,41 +51,39 @@ const (
 )
 
 func DaemonSetUserImageSettings(ds *appsv1.DaemonSet, userImageSpec, builtinImageSpec string, builtinPullPolicy corev1.PullPolicy) error {
-	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
+	cnt := nroobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
 	if cnt == nil {
 		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
 
 	currentImageSpec := cnt.Image
 	if userImageSpec != "" {
-		// we don't really know what's out there, so we minimize the changes.
 		cnt.Image = userImageSpec
 		klog.V(2).InfoS("Exporter image", "reason", "user-provided", "pullSpec", userImageSpec, "previousSpec", currentImageSpec)
-		return nil
+	} else {
+		if builtinImageSpec == "" {
+			return fmt.Errorf("missing built-in image spec, no user image provided")
+		}
+
+		cnt.Image = builtinImageSpec
+		cnt.ImagePullPolicy = builtinPullPolicy
+		klog.V(2).InfoS("Exporter image", "reason", "builtin", "pullSpec", builtinImageSpec, "pullPolicy", builtinPullPolicy, "previousSpec", currentImageSpec)
 	}
 
-	if builtinImageSpec == "" {
-		return fmt.Errorf("missing built-in image spec, no user image provided")
-	}
-
-	cnt.Image = builtinImageSpec
-	cnt.ImagePullPolicy = builtinPullPolicy
-	klog.V(2).InfoS("Exporter image", "reason", "builtin", "pullSpec", builtinImageSpec, "pullPolicy", builtinPullPolicy, "previousSpec", currentImageSpec)
-	// if we run with operator-as-operand, we know we NEED this.
-	err := DaemonSetRunAsIDs(ds)
+	err := DaemonSetSecurityContext(ds)
 	if err != nil {
-		return fmt.Errorf("error while changing container priviledges %w", err)
+		return fmt.Errorf("error while changing container security context: %w", err)
 	}
 
 	return nil
 }
 
 func DaemonSetPauseContainerSettings(ds *appsv1.DaemonSet) error {
-	rteCnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
+	rteCnt := nroobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
 	if rteCnt == nil {
 		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
-	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, HelperContainerName)
+	cnt := nroobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, HelperContainerName)
 	if cnt == nil {
 		return fmt.Errorf("cannot find container data for %q", HelperContainerName)
 	}
@@ -138,14 +136,11 @@ func DaemonSetRolloutSettings(ds *appsv1.DaemonSet) {
 	}
 }
 
-// UpdateDaemonSetRunAsIDs bump the ds container privileges to 0/0.
-// We need this in the operator-as-operand flow because the operator image itself
-// is built to run with non-root user/group, and we should keep it like this.
-// OTOH, the rte image needs to have access to the files using *both* DAC and MAC;
-// the SCC/SELinux context take cares of the MAC (when needed, e.g. on OCP), while
-// we take care of DAC here.
-func DaemonSetRunAsIDs(ds *appsv1.DaemonSet) error {
-	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
+// DaemonSetSecurityContext keeps UID/GID 0 for access to the root-owned
+// podresources socket, while dropping capabilities and preventing privilege
+// escalation for every exporter image. SCC/SELinux settings handle MAC separately.
+func DaemonSetSecurityContext(ds *appsv1.DaemonSet) error {
+	cnt := nroobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
 	if cnt == nil {
 		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
@@ -153,9 +148,15 @@ func DaemonSetRunAsIDs(ds *appsv1.DaemonSet) error {
 		cnt.SecurityContext = &corev1.SecurityContext{}
 	}
 	var rootID int64 = 0
+	var disabled bool
 	cnt.SecurityContext.RunAsUser = &rootID
 	cnt.SecurityContext.RunAsGroup = &rootID
-	klog.InfoS("RTE container elevated privileges", "container", cnt.Name, "user", rootID, "group", rootID)
+	cnt.SecurityContext.Privileged = &disabled
+	cnt.SecurityContext.AllowPrivilegeEscalation = &disabled
+	cnt.SecurityContext.Capabilities = &corev1.Capabilities{
+		Drop: []corev1.Capability{"ALL"},
+	}
+	klog.InfoS("RTE container security context", "container", cnt.Name, "user", rootID, "group", rootID, "privileged", disabled, "allowPrivilegeEscalation", disabled, "dropCapabilities", cnt.SecurityContext.Capabilities.Drop)
 	return nil
 }
 
@@ -171,7 +172,7 @@ func DaemonSetHashAnnotation(ds *appsv1.DaemonSet, cmHash string) {
 const _MiB = 1024 * 1024
 
 func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig, metricsTLS objtls.Settings) error {
-	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
+	cnt := nroobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
 	if cnt == nil {
 		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
@@ -252,11 +253,11 @@ func DaemonSetTolerations(ds *appsv1.DaemonSet, userTolerations []corev1.Tolerat
 }
 
 func ContainerConfig(ds *appsv1.DaemonSet, name string) error {
-	cnt := k8swgobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
+	cnt := nroobjupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, MainContainerName)
 	if cnt == nil {
 		return fmt.Errorf("cannot find container data for %q", MainContainerName)
 	}
-	k8swgrteupdate.ContainerConfig(&ds.Spec.Template.Spec, cnt, name)
+	rtemanifestsupdate.ContainerConfig(&ds.Spec.Template.Spec, cnt, name)
 	return nil
 }
 

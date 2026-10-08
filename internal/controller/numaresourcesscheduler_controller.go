@@ -41,10 +41,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	k8swgrbacupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rbac"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	schedulerapi "github.com/openshift-kni/numaresources-operator/internal/api/scheduler"
@@ -54,7 +50,10 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
+	k8swgrbacupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate/rbac"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
+	schedconfig "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
@@ -454,20 +453,20 @@ func unpackAPIResyncPeriod(reconcilePeriod *metav1.Duration) time.Duration {
 	return period
 }
 
-func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cacheResyncPeriod time.Duration, namespace string) k8swgmanifests.ConfigParams {
+func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cacheResyncPeriod time.Duration, namespace string) schedconfig.ConfigParams {
 	resyncPeriod := int64(cacheResyncPeriod.Seconds())
 	// if no actual replicas are required, leader election is unnecessary, so
 	// we force it to off to reduce the background noise.
 	// note: the api validation/normalization layer must ensure this value is != nil
 	leaderElect := (*schedSpec.Replicas > 1)
 
-	params := k8swgmanifests.ConfigParams{
+	params := schedconfig.ConfigParams{
 		ProfileName: schedSpec.SchedulerName,
-		Cache: &k8swgmanifests.ConfigCacheParams{
+		Cache: &schedconfig.ConfigCacheParams{
 			ResyncPeriodSeconds: &resyncPeriod,
 		},
-		ScoringStrategy: &k8swgmanifests.ScoringStrategyParams{},
-		LeaderElection: &k8swgmanifests.LeaderElectionParams{
+		ScoringStrategy: &schedconfig.ScoringStrategyParams{},
+		LeaderElection: &schedconfig.LeaderElectionParams{
 			// Make sure to always set explicitly the value and override the configmap defaults.
 			LeaderElect: leaderElect,
 			// unconditionally set those to make sure
@@ -480,35 +479,35 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 	klog.V(2).InfoS("setting leader election parameters", dumpLeaderElectionParams(params.LeaderElection)...)
 
 	var foreignPodsDetect string
-	var resyncMethod string = k8swgmanifests.CacheResyncAutodetect
+	var resyncMethod string = schedconfig.CacheResyncAutodetect
 	var informerMode string
 	var scoringStrategyType string
 	if *schedSpec.CacheResyncDetection == nropv1.CacheResyncDetectionRelaxed {
-		foreignPodsDetect = k8swgmanifests.ForeignPodsDetectOnlyExclusiveResources
+		foreignPodsDetect = schedconfig.ForeignPodsDetectOnlyExclusiveResources
 	} else {
-		foreignPodsDetect = k8swgmanifests.ForeignPodsDetectAll
+		foreignPodsDetect = schedconfig.ForeignPodsDetectAll
 	}
-	if *schedSpec.SchedulerInformer == k8swgmanifests.CacheInformerDedicated {
-		informerMode = k8swgmanifests.CacheInformerDedicated
+	if *schedSpec.SchedulerInformer == schedconfig.CacheInformerDedicated {
+		informerMode = schedconfig.CacheInformerDedicated
 	} else {
-		informerMode = k8swgmanifests.CacheInformerShared
+		informerMode = schedconfig.CacheInformerShared
 	}
 
 	switch sst := schedSpec.ScoringStrategy.Type; sst {
 	case nropv1.LeastAllocated:
-		scoringStrategyType = k8swgmanifests.ScoringStrategyLeastAllocated
+		scoringStrategyType = schedconfig.ScoringStrategyLeastAllocated
 	case nropv1.BalancedAllocation:
-		scoringStrategyType = k8swgmanifests.ScoringStrategyBalancedAllocation
+		scoringStrategyType = schedconfig.ScoringStrategyBalancedAllocation
 	case nropv1.MostAllocated:
-		scoringStrategyType = k8swgmanifests.ScoringStrategyMostAllocated
+		scoringStrategyType = schedconfig.ScoringStrategyMostAllocated
 	default:
-		scoringStrategyType = k8swgmanifests.ScoringStrategyLeastAllocated
+		scoringStrategyType = schedconfig.ScoringStrategyLeastAllocated
 	}
 	params.ScoringStrategy.Type = scoringStrategyType
 
-	var resources []k8swgmanifests.ResourceSpecParams
+	var resources []schedconfig.ResourceSpecParams
 	for _, resource := range schedSpec.ScoringStrategy.Resources {
-		resources = append(resources, k8swgmanifests.ResourceSpecParams{
+		resources = append(resources, schedconfig.ResourceSpecParams{
 			Name:   resource.Name,
 			Weight: resource.Weight,
 		})
@@ -516,7 +515,7 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 	params.ScoringStrategy.Resources = resources
 
 	if schedSpec.PreemptionMode != nil && *schedSpec.PreemptionMode == nropv1.PreemptionEnabled {
-		params.PreemptionMode = ptr.To(k8swgmanifests.PreemptionEnabled)
+		params.PreemptionMode = ptr.To(schedconfig.PreemptionEnabled)
 	} else {
 		params.PreemptionMode = nil
 	}
@@ -529,7 +528,7 @@ func configParamsFromSchedSpec(schedSpec nropv1.NUMAResourcesSchedulerSpec, cach
 	return params
 }
 
-func dumpConfigCacheParams(ccp *k8swgmanifests.ConfigCacheParams) []interface{} {
+func dumpConfigCacheParams(ccp *schedconfig.ConfigCacheParams) []interface{} {
 	return []interface{}{
 		"resyncPeriod", strInt64Ptr(ccp.ResyncPeriodSeconds),
 		"resyncMethod", strStringPtr(ccp.ResyncMethod),
@@ -538,7 +537,7 @@ func dumpConfigCacheParams(ccp *k8swgmanifests.ConfigCacheParams) []interface{} 
 	}
 }
 
-func dumpLeaderElectionParams(lep *k8swgmanifests.LeaderElectionParams) []interface{} {
+func dumpLeaderElectionParams(lep *schedconfig.LeaderElectionParams) []interface{} {
 	return []interface{}{
 		"leaderElect", lep.LeaderElect,
 		"resourceNamespace", lep.ResourceNamespace,

@@ -9,8 +9,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
 )
 
