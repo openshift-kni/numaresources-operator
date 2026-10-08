@@ -360,9 +360,7 @@ func (r *KubeletConfigReconciler) numaResourcesOperatorToKubeletConfig(ctx conte
 			klog.ErrorS(err, "failed to list KubeletConfig ConfigMaps")
 		}
 		for _, cm := range cmList.Items {
-			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKey{
-				Name: cm.Name,
-			}})
+			requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&cm)})
 		}
 	}
 	return requests
