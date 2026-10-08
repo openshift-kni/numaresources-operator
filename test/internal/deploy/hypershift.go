@@ -20,6 +20,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/hypershift"
 	"github.com/openshift-kni/numaresources-operator/test/internal/nodepools"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
@@ -82,46 +83,81 @@ func (h *HyperShiftNRO) Deploy(ctx context.Context, _ time.Duration) *nropv1.NUM
 func (h *HyperShiftNRO) Teardown(ctx context.Context, timeout time.Duration) {
 	GinkgoHelper()
 	if h.KcConfigMapObj != nil {
-		hostedClusterName, err := hypershift.GetHostedClusterName()
-		Expect(err).To(Not(HaveOccurred()))
-		np, err := nodepools.GetByClusterName(ctx, e2eclient.MNGClient, hostedClusterName)
-		Expect(err).To(Not(HaveOccurred()))
-
-		By(fmt.Sprintf("deataching KubeletConfig ConfigMap from nodepool %s", np.Name))
-		Expect(nodepools.DeAttachConfigObject(ctx, e2eclient.MNGClient, h.KcConfigMapObj)).To(Succeed())
-
-		By(fmt.Sprintf("waiting for nodepool %s transition to updating config", np.Name))
-		Expect(wait.ForUpdatingConfig(ctx, e2eclient.MNGClient, np.Name, np.Namespace)).To(Succeed())
-		By(fmt.Sprintf("waiting for nodepool %s transition to config ready", np.Name))
-		Expect(wait.ForConfigToBeReady(ctx, e2eclient.MNGClient, np.Name, np.Namespace)).To(Succeed())
-
-		Expect(e2eclient.MNGClient.Delete(ctx, h.KcConfigMapObj)).To(Succeed())
-
-		By("checking that generated configmap has been deleted")
-		Eventually(func() bool {
-			Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(h.NroObj), h.NroObj)).To(Succeed())
-			nodeGroups := h.NroObj.Status.NodeGroups
-			return len(nodeGroups) != 0 && nodeGroups[0].DaemonSet.Name != ""
-		}).WithTimeout(time.Minute*3).WithPolling(10*time.Second).Should(BeTrue(), "NRO object does not have any DaemonSets status reported")
-
-		cm := &corev1.ConfigMap{}
-		key := client.ObjectKey{
-			Name:      objectnames.GetComponentName(h.NroObj.Name, np.Name),
-			Namespace: h.NroObj.Status.NodeGroups[0].DaemonSet.Namespace,
-		}
-		Eventually(func() bool {
-			if err := e2eclient.Client.Get(ctx, key, cm); !errors.IsNotFound(err) {
-				if err == nil {
-					klog.Warningf("configmap %s still exists", key.String())
-				} else {
-					klog.Warningf("configmap %s return with error: %v", key.String(), err)
-				}
-				return false
-			}
-			return true
-		}).WithTimeout(timeout).WithPolling(10 * time.Second).Should(BeTrue())
+		TeardownHyperShiftKubeletConfig(ctx, h.KcConfigMapObj, h.NroObj, timeout)
 	}
 	Expect(e2eclient.Client.Delete(ctx, h.NroObj)).To(Succeed())
+}
+
+// TeardownHyperShiftKubeletConfigAfterInstall removes the management-cluster kubelet
+// ConfigMap created by HyperShiftNRO.Deploy.
+func TeardownHyperShiftKubeletConfigAfterInstall(ctx context.Context, nroObj *nropv1.NUMAResourcesOperator, timeout time.Duration) {
+	GinkgoHelper()
+	if _, ok := os.LookupEnv("E2E_NROP_INSTALL_SKIP_KC"); ok {
+		return
+	}
+
+	kcObj, err := objects.TestKC(objects.EmptyMatchLabels())
+	Expect(err).To(Not(HaveOccurred()))
+
+	kcConfigMap := &corev1.ConfigMap{}
+	err = e2eclient.MNGClient.Get(ctx, client.ObjectKey{Name: kcObj.GetName(), Namespace: HostedClustersNamespaceName}, kcConfigMap)
+	if errors.IsNotFound(err) {
+		klog.InfoS("kubelet config configmap not found on management cluster, skipping KC teardown")
+		return
+	}
+	Expect(err).To(Not(HaveOccurred()))
+
+	TeardownHyperShiftKubeletConfig(ctx, kcConfigMap, nroObj, timeout)
+}
+
+// TeardownHyperShiftKubeletConfig detaches and deletes the management-cluster kubelet ConfigMap.
+// When nroObj is non-nil, waits for the per-nodegroup RTE ConfigMap to be removed while the
+// operator is still reconciling the NRO CR.
+func TeardownHyperShiftKubeletConfig(ctx context.Context, kcConfigMap *corev1.ConfigMap, nroObj *nropv1.NUMAResourcesOperator, timeout time.Duration) {
+	GinkgoHelper()
+	if kcConfigMap == nil {
+		return
+	}
+
+	hostedClusterName, err := hypershift.GetHostedClusterName()
+	Expect(err).To(Not(HaveOccurred()))
+	np, err := nodepools.GetByClusterName(ctx, e2eclient.MNGClient, hostedClusterName)
+	Expect(err).To(Not(HaveOccurred()))
+
+	e2efixture.By("detaching KubeletConfig ConfigMap from nodepool %s", np.Name)
+	Expect(nodepools.DeAttachConfigObject(ctx, e2eclient.MNGClient, kcConfigMap)).To(Succeed())
+
+	e2efixture.By("waiting for nodepool %s transition to updating config", np.Name)
+	Expect(wait.ForUpdatingConfig(ctx, e2eclient.MNGClient, np.Name, np.Namespace)).To(Succeed())
+	e2efixture.By("waiting for nodepool %s transition to config ready", np.Name)
+	Expect(wait.ForConfigToBeReady(ctx, e2eclient.MNGClient, np.Name, np.Namespace)).To(Succeed())
+
+	Expect(e2eclient.MNGClient.Delete(ctx, kcConfigMap)).To(Succeed())
+
+	e2efixture.By("checking that generated configmap has been deleted")
+	Eventually(func(g Gomega) {
+		g.Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(nroObj), nroObj)).To(Succeed())
+		nodeGroups := nroObj.Status.NodeGroups
+		g.Expect(nodeGroups).To(Not(BeEmpty()))
+		g.Expect(nodeGroups[0].DaemonSet.Name).To(Not(BeEmpty()))
+	}).WithTimeout(time.Minute*3).WithPolling(10*time.Second).Should(Succeed(), "NRO object does not have any DaemonSets status reported")
+
+	cm := &corev1.ConfigMap{}
+	key := client.ObjectKey{
+		Name:      objectnames.GetComponentName(nroObj.Name, np.Name),
+		Namespace: nroObj.Status.NodeGroups[0].DaemonSet.Namespace,
+	}
+	Eventually(func() bool {
+		if err := e2eclient.Client.Get(ctx, key, cm); !errors.IsNotFound(err) {
+			if err == nil {
+				klog.Warningf("configmap %s still exists", key.String())
+			} else {
+				klog.Warningf("configmap %s return with error: %v", key.String(), err)
+			}
+			return false
+		}
+		return true
+	}).WithTimeout(timeout).WithPolling(10 * time.Second).Should(BeTrue())
 }
 
 func encodeManifest(obj runtime.Object, scheme *runtime.Scheme) ([]byte, error) {

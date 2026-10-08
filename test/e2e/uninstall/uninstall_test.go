@@ -34,6 +34,7 @@ import (
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
 	"github.com/openshift-kni/numaresources-operator/test/internal/configuration"
+	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 	e2epause "github.com/openshift-kni/numaresources-operator/test/internal/objects/pause"
 
@@ -55,16 +56,12 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 	})
 
 	Context("with a running cluster with all the components", func() {
-		It("should delete all components after NRO deletion", func() {
-			By("deleting the NRO object")
+		It("should delete all components after NRO deletion", func(ctx context.Context) {
+			By("getting the NRO object")
 			// since we are getting an existing object, we don't need the real labels here
 			nroObj := objects.TestNRO(objects.NROWithMCPSelector(objects.EmptyMatchLabels()))
-			By("deleting the KC object")
-			kcObj, err := objects.TestKC(objects.EmptyMatchLabels())
-			Expect(err).To(Not(HaveOccurred()))
-
 			// failed to get the NRO object, nothing else we can do
-			if err := e2eclient.Client.Get(context.TODO(), client.ObjectKeyFromObject(nroObj), nroObj); err != nil {
+			if err := e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(nroObj), nroObj); err != nil {
 				if !errors.IsNotFound(err) {
 					klog.ErrorS(err, "failed to get the NUMA resource operator", "name", nroObj.Name)
 				}
@@ -72,17 +69,24 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 				return
 			}
 
-			unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups)
-			Expect(err).NotTo(HaveOccurred())
-
-			if err := e2eclient.Client.Delete(context.TODO(), nroObj); err != nil {
-				klog.InfoS("failed to delete the numaresourcesoperators", "name", nroObj.Name)
+			if configuration.Plat == platform.HyperShift {
+				By("tearing down the HyperShift kubelet config")
+				deploy.TeardownHyperShiftKubeletConfigAfterInstall(ctx, nroObj, configuration.MachineConfigPoolUpdateTimeout)
+				By("deleting the NRO object")
+				Expect(e2eclient.Client.Delete(ctx, nroObj)).To(Succeed(), "failed to delete the numareosurcesoperator CR")
 				return
 			}
 
-			if err := e2eclient.Client.Delete(context.TODO(), kcObj); err != nil && !errors.IsNotFound(err) {
-				klog.InfoS("failed to delete the kubeletconfigs", "name", kcObj.Name)
-			}
+			By("deleting the NRO object")
+			Expect(e2eclient.Client.Delete(ctx, nroObj)).To(Succeed(), "failed to delete the numareosurcesoperator CR")
+
+			By("deleting the KC object")
+			kcObj, err := objects.TestKC(objects.EmptyMatchLabels())
+			Expect(err).To(Not(HaveOccurred()))
+			Expect(e2eclient.Client.Delete(ctx, kcObj)).To(Succeed(), "failed to delete the kubeletconfig CR")
+
+			unpause, err := e2epause.MachineConfigPoolsByNodeGroups(nroObj.Spec.NodeGroups)
+			Expect(err).NotTo(HaveOccurred())
 
 			timeout := configuration.MachineConfigPoolUpdateTimeout   // shortcut
 			interval := configuration.MachineConfigPoolUpdateInterval // shortcut
@@ -90,14 +94,14 @@ var _ = Describe("[Uninstall] clusterCleanup", Serial, func() {
 
 			if configuration.Plat == platform.Kubernetes {
 				mcpObj := objects.TestMCP()
-				if err := e2eclient.Client.Delete(context.TODO(), mcpObj); err != nil {
+				if err := e2eclient.Client.Delete(ctx, mcpObj); err != nil {
 					klog.InfoS("failed to delete the machine config pool", "name", mcpObj.Name)
 				}
 			}
 
 			if configuration.Plat == platform.OpenShift {
 				Eventually(func() bool {
-					mcps, err := nropmcp.GetListByNodeGroupsV1(context.TODO(), e2eclient.Client, nroObj.Spec.NodeGroups)
+					mcps, err := nropmcp.GetListByNodeGroupsV1(ctx, e2eclient.Client, nroObj.Spec.NodeGroups)
 					if err != nil {
 						klog.ErrorS(err, "failed to get machine config pools")
 						return false
