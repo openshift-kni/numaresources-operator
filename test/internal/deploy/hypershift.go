@@ -94,7 +94,6 @@ func (h *HyperShiftNRO) Teardown(ctx context.Context, timeout time.Duration) {
 func (h *HyperShiftNRO) teardownKcConfigMap(ctx context.Context, timeout time.Duration) {
 	GinkgoHelper()
 	if h.KcConfigMapObj == nil {
-		klog.Infof("KubeletConfig ConfigMap does not exist, skipping teardown of KubeletConfig ConfigMap")
 		return
 	}
 
@@ -103,7 +102,7 @@ func (h *HyperShiftNRO) teardownKcConfigMap(ctx context.Context, timeout time.Du
 	np, err := nodepools.GetByClusterName(ctx, e2eclient.MNGClient, hostedClusterName)
 	Expect(err).To(Not(HaveOccurred()))
 
-	e2efixture.By("deataching KubeletConfig ConfigMap from nodepool %s", np.Name)
+	e2efixture.By("detaching KubeletConfig ConfigMap from nodepool %s", np.Name)
 	detached, err := nodepools.DeAttachConfigObject(ctx, e2eclient.MNGClient, h.KcConfigMapObj)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -113,20 +112,22 @@ func (h *HyperShiftNRO) teardownKcConfigMap(ctx context.Context, timeout time.Du
 		e2efixture.By("waiting for nodepool %s transition to config ready", np.Name)
 		Expect(wait.ForConfigToBeReady(ctx, e2eclient.MNGClient, np.Name, np.Namespace)).To(Succeed())
 	}
+
 	_, err = deleteIfNeeded(ctx, e2eclient.MNGClient, h.KcConfigMapObj)
 	Expect(err).ToNot(HaveOccurred())
 
 	if h.NroObj == nil || errors.IsNotFound(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(h.NroObj), h.NroObj)) {
-		klog.Infof("NRO object does not exist, skipping deletion of generated configmap")
+		klog.Infof("NRO object does not exist, skipping verification of generated configmap deletion")
 		return
 	}
 
 	By("checking that generated configmap has been deleted")
-	Eventually(func() bool {
-		Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(h.NroObj), h.NroObj)).To(Succeed())
+	Eventually(func(g Gomega) {
+		g.Expect(e2eclient.Client.Get(ctx, client.ObjectKeyFromObject(h.NroObj), h.NroObj)).To(Succeed())
 		nodeGroups := h.NroObj.Status.NodeGroups
-		return len(nodeGroups) != 0 && nodeGroups[0].DaemonSet.Name != ""
-	}).WithTimeout(time.Minute*3).WithPolling(10*time.Second).Should(BeTrue(), "NRO object does not have any DaemonSets status reported")
+		g.Expect(nodeGroups).ToNot(BeEmpty())
+		g.Expect(nodeGroups[0].DaemonSet.Name).ToNot(BeEmpty())
+	}).WithTimeout(time.Minute*3).WithPolling(10*time.Second).Should(Succeed(), "NRO object does not have any DaemonSets status reported")
 
 	generatedCM := &corev1.ConfigMap{}
 	key := client.ObjectKey{

@@ -13,6 +13,8 @@ import (
 
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
+	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
@@ -106,6 +108,21 @@ func (o *OpenShiftNRO) Teardown(ctx context.Context, timeout time.Duration) {
 		}
 	}
 
+	var unpause func() error
+	if o.NroObj != nil && configuration.Plat == platform.OpenShift {
+		By("pausing target MCPs to batch teardown rollout")
+		var err error
+		unpause, err = e2epause.MachineConfigPoolsByNodeGroups(o.NroObj.Spec.NodeGroups)
+		Expect(err).ToNot(HaveOccurred(), "failed to pause target MCPs")
+	}
+	unpaused := false
+	defer func() {
+		if unpause != nil && !unpaused {
+			By("unpausing target MCPs (deferred)")
+			Eventually(unpause).WithTimeout(timeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(Succeed())
+		}
+	}()
+
 	if o.KcObj != nil {
 		deleted, err := deleteIfNeeded(ctx, e2eclient.Client, o.KcObj)
 		Expect(err).ToNot(HaveOccurred())
@@ -137,6 +154,12 @@ func (o *OpenShiftNRO) Teardown(ctx context.Context, timeout time.Duration) {
 	}
 
 	wg.Wait()
+
+	if unpause != nil {
+		By("unpausing target MCPs")
+		Eventually(unpause).WithTimeout(timeout).WithPolling(configuration.MachineConfigPoolUpdateInterval).Should(Succeed())
+		unpaused = true
+	}
 
 	if o.NroObj != nil {
 		WaitForMCPUpdatedAfterNRODeleted(o.NroObj)
