@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - "release-5.0"
       - "release-4.22"
       - "release-4.21"
       - "release-4.20"
@@ -35,8 +36,8 @@ jobs:
       - name: Show current working directory
         run: pwd
 
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+
       - name: Run govulncheck
-        uses: golang/govulncheck-action@v1
-        with:
-          go-package: "./..."
-          go-version-input: ${{ env.GOLANG_VERSION }}
+        run: govulncheck ./...
