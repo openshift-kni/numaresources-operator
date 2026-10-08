@@ -25,6 +25,7 @@ echo "Deploying sample devices for RTE tests"
 rte/hack/deploy-devices.sh
 
 rte/hack/check-ds.sh oc sampledevices device-plugin-a-ds
+rte/hack/check-ds.sh oc sampledevices device-plugin-hostlevel-a-ds
 
 echo "Running RTE tests"
 export E2E_TOPOLOGY_MANAGER_POLICY="${E2E_TOPOLOGY_MANAGER_POLICY}"

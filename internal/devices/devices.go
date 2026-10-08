@@ -17,7 +17,8 @@
 package devices
 
 const (
-	DevType1EnvVar = "E2E_NROP_DEVICE_TYPE_1"
-	DevType2EnvVar = "E2E_NROP_DEVICE_TYPE_2"
-	DevType3EnvVar = "E2E_NROP_DEVICE_TYPE_3"
+	DevType1EnvVar         = "E2E_NROP_DEVICE_TYPE_1"
+	DevType2EnvVar         = "E2E_NROP_DEVICE_TYPE_2"
+	DevType3EnvVar         = "E2E_NROP_DEVICE_TYPE_3"
+	DevTypeHostLevelEnvVar = "E2E_NROP_DEVICE_TYPE_HOSTLEVEL"
 )
