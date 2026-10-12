@@ -22,12 +22,12 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	resourcehelper "k8s.io/component-helpers/resource"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
-	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 )
 
 type Load struct {
@@ -49,15 +49,10 @@ func FromPods(nodeName string, pods []corev1.Pod) Load {
 		Resources: corev1.ResourceList{},
 	}
 
-	for _, pod := range pods {
-		// TODO: we assume a steady state - aka we ignore InitContainers
-		for cnt := range nroiter.OnContainers(&pod.Spec, nroiter.Containers) {
-			for resName, resQty := range cnt.Resources.Requests {
-				qty := nl.Resources[resName]
-				qty.Add(resQty)
-				nl.Resources[resName] = qty
-			}
-		}
+	for i := range pods {
+		// Scheduler pod requests from the spec: app containers plus sidecars
+		// (init restartPolicy Always). A regular init container is not added on top.
+		resourcelist.AddInPlace(nl.Resources, resourcehelper.PodRequests(&pods[i], resourcehelper.PodResourcesOptions{}))
 	}
 
 	return nl.Round()
