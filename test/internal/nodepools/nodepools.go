@@ -32,24 +32,29 @@ func GetByClusterName(ctx context.Context, c client.Client, hostedClusterName st
 	return np, nil
 }
 
-// AttachConfigObject is attaches a tuning object into the nodepool associated with the hosted-cluster
-// The function is idempotent
-func AttachConfigObject(ctx context.Context, cli client.Client, object client.Object) error {
+// AttachConfigObject attaches a tuning object into the nodepool associated with the hosted-cluster.
+// Returns true if the object was actually added, false if it was already referenced.
+func AttachConfigObject(ctx context.Context, cli client.Client, object client.Object) (bool, error) {
 	hostedClusterName, err := hypershift.GetHostedClusterName()
 	if err != nil {
-		return err
+		return false, err
 	}
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	var changed bool
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		np, err := GetByClusterName(ctx, cli, hostedClusterName)
 		if err != nil {
 			return err
 		}
-		np.Spec.Config = addObjectRef(object, np.Spec.Config)
+		np.Spec.Config, changed = addObjectRef(object, np.Spec.Config)
+		if !changed {
+			return nil
+		}
 		return cli.Update(ctx, np)
 	})
+	return changed, err
 }
 
-func addObjectRef(object client.Object, config []corev1.LocalObjectReference) []corev1.LocalObjectReference {
+func addObjectRef(object client.Object, config []corev1.LocalObjectReference) ([]corev1.LocalObjectReference, bool) {
 	updatedConfig := []corev1.LocalObjectReference{{Name: object.GetName()}}
 	for i := range config {
 		config := config[i]
@@ -57,30 +62,37 @@ func addObjectRef(object client.Object, config []corev1.LocalObjectReference) []
 			updatedConfig = append(updatedConfig, config)
 		}
 	}
-	return updatedConfig
+	return updatedConfig, len(updatedConfig) != len(config)
 }
 
-func removeObjectRef(object client.Object, config []corev1.LocalObjectReference) []corev1.LocalObjectReference {
+func removeObjectRef(object client.Object, config []corev1.LocalObjectReference) ([]corev1.LocalObjectReference, bool) {
 	var updatedConfig []corev1.LocalObjectReference
 	for i := range config {
 		if config[i].Name != object.GetName() {
 			updatedConfig = append(updatedConfig, config[i])
 		}
 	}
-	return updatedConfig
+	return updatedConfig, len(updatedConfig) != len(config)
 }
 
-func DeAttachConfigObject(ctx context.Context, cli client.Client, object client.Object) error {
+// DeAttachConfigObject removes a tuning object from the nodepool associated with the hosted-cluster.
+// Returns true if the object was actually removed, false if it was not referenced.
+func DeAttachConfigObject(ctx context.Context, cli client.Client, object client.Object) (bool, error) {
 	hostedClusterName, err := hypershift.GetHostedClusterName()
 	if err != nil {
-		return err
+		return false, err
 	}
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	var changed bool
+	err = retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		np, err := GetByClusterName(ctx, cli, hostedClusterName)
 		if err != nil {
 			return err
 		}
-		np.Spec.Config = removeObjectRef(object, np.Spec.Config)
+		np.Spec.Config, changed = removeObjectRef(object, np.Spec.Config)
+		if !changed {
+			return nil
+		}
 		return cli.Update(ctx, np)
 	})
+	return changed, err
 }
