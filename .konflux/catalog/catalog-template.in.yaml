@@ -39,6 +39,9 @@ entries:
       - name: numaresources-operator.v4.16.9
         replaces: numaresources-operator.v4.16.8
         skipRange: '>=4.14.0 <4.16.9'
+      - name: numaresources-operator.v4.16.10
+        replaces: numaresources-operator.v4.16.9
+        skipRange: '>=4.14.0 <4.16.10'
     name: "4.16"
     package: numaresources-operator
     schema: olm.channel
@@ -72,6 +75,9 @@ entries:
       - name: numaresources-operator.v4.16.9
         replaces: numaresources-operator.v4.16.8
         skipRange: '>=4.14.0 <4.16.9'
+      - name: numaresources-operator.v4.16.10
+        replaces: numaresources-operator.v4.16.9
+        skipRange: '>=4.14.0 <4.16.10'
     name: stable
     package: numaresources-operator
     schema: olm.channel
@@ -103,6 +109,9 @@ entries:
   - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:f4c2dc80a0ebc4291de2ac5a5d4e1195be7d366cf5fa3f7aede0bf145cca66d9
     schema: olm.bundle
   # v4.16.9 bundle
+  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:9cd96b1c19b500eeabce303f124e4326ad21e3bd1d8b5404807dd088aa52d3e4
+    schema: olm.bundle
+  # v4.16.10 bundle
     # The url for this last entry is updated by telco5g-konflux/scripts/catalog/update-catalog-template.sh automatically
   - image: placeholder.will.be.updated.by.telco5g-konflux.scripts.catalog.update-catalog-template.sh
     schema: olm.bundle
