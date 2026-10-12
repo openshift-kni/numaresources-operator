@@ -75,6 +75,7 @@ var _ = Describe("[Install]", Serial, Ordered, func() {
 	BeforeAll(func() {
 		Expect(e2eclient.ClientsEnabled).To(BeTrue(), "failed to create runtime-controller client")
 		deployer = deploy.NewForPlatform(configuration.Plat)
+		Expect(deployer).ToNot(BeNil(), "unsupported platform %q", configuration.Plat)
 		nroObj = deployer.Deploy(context.TODO(), configuration.MachineConfigPoolUpdateTimeout)
 	})
 
