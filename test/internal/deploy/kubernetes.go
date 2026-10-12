@@ -26,8 +26,7 @@ func (k *KubernetesNRO) Deploy(ctx context.Context, timeout time.Duration) *v1.N
 
 	mcpObj := objects.TestMCP()
 	By(fmt.Sprintf("creating the machine config pool object: %s", mcpObj.Name))
-	err := e2eclient.Client.Create(ctx, mcpObj)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(createOrUpdate(ctx, e2eclient.Client, mcpObj)).To(Succeed())
 	k.McpObj = mcpObj
 	matchLabels := map[string]string{"test": "test"}
 
