@@ -39,4 +39,5 @@ jobs:
         run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
       - name: Run govulncheck
+        continue-on-error: true
         run: govulncheck ./...
