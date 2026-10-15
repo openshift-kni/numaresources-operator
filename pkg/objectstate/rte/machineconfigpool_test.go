@@ -24,11 +24,10 @@ import (
 
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 

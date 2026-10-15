@@ -37,10 +37,6 @@ import (
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
@@ -50,6 +46,10 @@ import (
 	nrowait "github.com/openshift-kni/numaresources-operator/internal/wait"
 	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 	"github.com/openshift-kni/numaresources-operator/pkg/loglevel"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/assets/selinux"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/flagcodec"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/rte"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"

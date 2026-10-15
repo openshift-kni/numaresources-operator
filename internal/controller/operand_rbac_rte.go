@@ -17,7 +17,7 @@
 // RTE operand RBAC escalation permissions.
 //
 // The operator creates and updates the "rte" ClusterRole (sourced from
-// vendor/github.com/k8stopologyawareschedwg/deployer/pkg/manifests/yaml/rte/clusterrole.yaml).
+// pkg/numaresourcesoperator/manifests/yaml/clusterrole.yaml).
 // Kubernetes RBAC prevents a subject from granting permissions it does not
 // already hold, so the operator's own ClusterRole must include every
 // permission present in the RTE operand's ClusterRole.

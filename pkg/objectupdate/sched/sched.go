@@ -25,16 +25,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
-	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
-	k8swgschedupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/sched"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	intreslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/flagcodec"
+	k8swgobjupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate"
+	schedconfig "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
+	schedmanifestsupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectupdate/sched"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
@@ -125,7 +124,7 @@ func DeploymentTopologySpreadConstraints(dp *appsv1.Deployment) error {
 	klog.V(3).InfoS("scheduler deployment topology spread constraints", "constraints", schedConstr.String())
 	return nil
 }
-func SchedulerConfig(cm *corev1.ConfigMap, name string, params *k8swgmanifests.ConfigParams) error {
+func SchedulerConfig(cm *corev1.ConfigMap, name string, params *schedconfig.ConfigParams) error {
 	if cm.Data == nil {
 		return fmt.Errorf("no data found in ConfigMap: %s/%s", cm.Namespace, cm.Name)
 	}
@@ -135,7 +134,7 @@ func SchedulerConfig(cm *corev1.ConfigMap, name string, params *k8swgmanifests.C
 		return fmt.Errorf("no data key named: %s found in ConfigMap: %s/%s", schedstate.SchedulerConfigFileName, cm.Namespace, cm.Name)
 	}
 
-	newData, ok, err := k8swgschedupdate.RenderConfig([]byte(data), name, params)
+	newData, ok, err := schedmanifestsupdate.RenderConfig([]byte(data), name, params)
 	if err != nil {
 		return err
 	}

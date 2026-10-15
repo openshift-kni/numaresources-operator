@@ -46,10 +46,6 @@ import (
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
@@ -58,6 +54,9 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
+	apimanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/api"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/rte"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"

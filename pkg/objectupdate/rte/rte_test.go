@@ -69,6 +69,80 @@ var testDs = &appsv1.DaemonSet{
 	},
 }
 
+func TestDaemonSetUserImageSettings(t *testing.T) {
+	existingContext := &corev1.SecurityContext{
+		RunAsUser:                ptr.To[int64](1000),
+		RunAsGroup:               ptr.To[int64](1000),
+		Privileged:               ptr.To(true),
+		AllowPrivilegeEscalation: ptr.To(true),
+		Capabilities: &corev1.Capabilities{
+			Add: []corev1.Capability{"SYS_ADMIN"},
+		},
+		SELinuxOptions:         &corev1.SELinuxOptions{Type: "rte_t"},
+		ReadOnlyRootFilesystem: ptr.To(true),
+	}
+	testCases := []struct {
+		name               string
+		userImage          string
+		builtinImage       string
+		expectedImage      string
+		expectedPullPolicy corev1.PullPolicy
+	}{
+		{
+			name:               "builtin",
+			builtinImage:       "test/rte:builtin",
+			expectedImage:      "test/rte:builtin",
+			expectedPullPolicy: corev1.PullAlways,
+		},
+		{
+			name:               "custom",
+			userImage:          "test/rte:custom",
+			expectedImage:      "test/rte:custom",
+			expectedPullPolicy: corev1.PullIfNotPresent,
+		},
+	}
+	contexts := []struct {
+		name  string
+		value *corev1.SecurityContext
+	}{
+		{name: "without security context"},
+		{name: "with existing privileges", value: existingContext},
+	}
+	for _, tc := range testCases {
+		for _, context := range contexts {
+			t.Run(tc.name+"/"+context.name, func(t *testing.T) {
+				ds := testDs.DeepCopy()
+				cnt := &ds.Spec.Template.Spec.Containers[0]
+				cnt.ImagePullPolicy = corev1.PullIfNotPresent
+				cnt.SecurityContext = context.value.DeepCopy()
+				otherContainer := ds.Spec.Template.Spec.Containers[1].DeepCopy()
+
+				if err := DaemonSetUserImageSettings(ds, tc.userImage, tc.builtinImage, corev1.PullAlways); err != nil {
+					t.Fatal(err)
+				}
+				if cnt.Image != tc.expectedImage || cnt.ImagePullPolicy != tc.expectedPullPolicy {
+					t.Fatalf("unexpected image settings: %q, %q", cnt.Image, cnt.ImagePullPolicy)
+				}
+				want := context.value.DeepCopy()
+				if want == nil {
+					want = &corev1.SecurityContext{}
+				}
+				want.RunAsUser = ptr.To[int64](0)
+				want.RunAsGroup = ptr.To[int64](0)
+				want.Privileged = ptr.To(false)
+				want.AllowPrivilegeEscalation = ptr.To(false)
+				want.Capabilities = &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}}
+				if !reflect.DeepEqual(cnt.SecurityContext, want) {
+					t.Fatalf("unexpected security context: got %#v, want %#v", cnt.SecurityContext, want)
+				}
+				if !reflect.DeepEqual(&ds.Spec.Template.Spec.Containers[1], otherContainer) {
+					t.Fatal("image settings changed another container")
+				}
+			})
+		}
+	}
+}
+
 func TestUpdateDaemonSetArgs(t *testing.T) {
 	type testCase struct {
 		name         string

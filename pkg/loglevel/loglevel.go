@@ -24,8 +24,8 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
-	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/flagcodec"
+	nroobjupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate"
 )
 
 // ToKlog converts LogLevel value into klog verboseness level according to operator/v1.LogLevel documentation
@@ -51,7 +51,7 @@ func ToKlog(level operatorv1.LogLevel) klog.Level {
 func UpdatePodSpec(podSpec *corev1.PodSpec, cntName string, level operatorv1.LogLevel) error {
 	cnt := &podSpec.Containers[0]
 	if cntName != "" {
-		cnt = k8swgobjupdate.FindContainerByName(podSpec.Containers, cntName)
+		cnt = nroobjupdate.FindContainerByName(podSpec.Containers, cntName)
 		if cnt == nil {
 			return fmt.Errorf("cannot find container data for %q", cntName)
 		}

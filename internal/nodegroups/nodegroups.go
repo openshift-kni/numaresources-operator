@@ -27,12 +27,11 @@ import (
 
 	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/hypershift/consts"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform/detect"
 )
 
 func GetNodesFrom(ctx context.Context, cli client.Client, nodeGroups []nropv1.NodeGroup) ([]corev1.Node, error) {
