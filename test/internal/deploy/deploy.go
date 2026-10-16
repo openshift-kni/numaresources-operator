@@ -22,6 +22,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
@@ -52,10 +53,43 @@ const (
 type Deployer interface {
 	// Deploy deploys NUMAResourcesOperator object create other dependencies
 	// per the platform that implements it
+	// make sure to keep this method idempotent
 	Deploy(ctx context.Context, timeout time.Duration) *nropv1.NUMAResourcesOperator
 	// Teardown Teardowns NUMAResourcesOperator object delete other dependencies
 	// per the platform that implements it
+	// make sure to keep this method idempotent
 	Teardown(ctx context.Context, timeout time.Duration)
+}
+
+// createOrUpdate tries to create the object; if it already exists, it grabs
+// the current ResourceVersion and updates it instead.
+func createOrUpdate(ctx context.Context, cli client.Client, obj client.Object) error {
+	err := cli.Create(ctx, obj)
+	if err == nil {
+		return nil
+	}
+	if !errors.IsAlreadyExists(err) {
+		return err
+	}
+	existing := obj.DeepCopyObject().(client.Object)
+	if err := cli.Get(ctx, client.ObjectKeyFromObject(obj), existing); err != nil {
+		return err
+	}
+	obj.SetResourceVersion(existing.GetResourceVersion())
+	return cli.Update(ctx, obj)
+}
+
+// deleteIfNeeded gets the object first, and deletes it only if it exists.
+// Returns true if a delete was issued, false if the object was already gone.
+func deleteIfNeeded(ctx context.Context, cli client.Client, obj client.Object) (bool, error) {
+	err := cli.Get(ctx, client.ObjectKeyFromObject(obj), obj)
+	if errors.IsNotFound(err) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, cli.Delete(ctx, obj)
 }
 
 func NewForPlatform(plat platform.Platform) Deployer {
