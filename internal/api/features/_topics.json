@@ -3,6 +3,7 @@
     "config",
     "nonreg",
     "hostlevel",
+    "pfphostlevel",
     "resacct",
     "cache",
     "stall",

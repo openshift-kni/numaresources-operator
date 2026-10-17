@@ -10,3 +10,6 @@ oc create -f ${DIRNAME}/manifests/sample-devices/role.yaml
 oc create -f ${DIRNAME}/manifests/sample-devices/rolebinding.yaml
 oc create -f ${DIRNAME}/manifests/sample-devices/configmap-dpa.yaml
 oc create -f ${DIRNAME}/manifests/sample-devices/daemonset-dpa.yaml
+# Host-level device (numanode: -1): allocatable but absent from NRT — OCPBUGS-90597 sim
+oc create -f ${DIRNAME}/manifests/sample-devices/configmap-hostlevel-a.yaml
+oc create -f ${DIRNAME}/manifests/sample-devices/daemonset-hostlevel-a.yaml
