@@ -93,6 +93,11 @@ spec:
         path: nodeGroups[0].config.tolerations
         x-descriptors:
         - urn:alm:descriptor:com.tectonic.ui:text
+      - description: |-
+          Valid values are: "Normal", "Debug", "Trace", "TraceAll".
+          Defaults to "Normal" (-v=2).
+        displayName: Numazone log verbosity
+        path: nodeGroups[0].numazone.logLevel
       - description: Optional Namespace/Name glob patterns of pod to ignore at node
           level
         displayName: Optional ignore pod namespace/name glob patterns
@@ -127,6 +132,10 @@ spec:
       - description: DaemonSet of the configured RTEs, for this node group
         displayName: RTE DaemonSets
         path: nodeGroups[0].daemonsets
+      - description: NumazoneDaemonSet identifies the numazone DaemonSet for this
+          node group, when enabled.
+        displayName: Numazone DaemonSet
+        path: nodeGroups[0].numazoneDaemonSet
       - description: PoolName represents the pool name to which the nodes belong that
           the config of this node group is be applied to
         displayName: Pool name of nodes in this node group

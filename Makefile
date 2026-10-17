@@ -143,6 +143,18 @@ test-unit-pkgs: generate-source ## Run unit tests for packages only.
 test-unit-pkgs-cover: generate-source ## Run unit tests for packages with coverage.
 	go test $$(go list ./... | grep -vE 'controller|test|tools|cmd') -coverprofile coverage.out
 
+.PHONY: test-numazone-race
+test-numazone-race: ## Run numazone tests uncached, in randomized order, with the race detector.
+	go test -mod=vendor -race -vet=all -count=1 -shuffle=on -timeout=2m ./numazone/...
+
+.PHONY: test-unit-numazone-e2e
+test-unit-numazone-e2e: generate-source ## Run unit tests for the numazone e2e helpers without a cluster.
+	go test -mod=vendor -vet=all ./test/e2e/numazone/config ./test/internal/numazone
+
+.PHONY: test-numazone-e2e
+test-numazone-e2e: binary-e2e-numazone ## Run numazone e2e tests against an already configured cluster.
+	hack/run-test-numazone-e2e.sh
+
 test-controllers: envtest generate-source ## Run controller tests using envtest.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./internal/controller/...
 
@@ -239,13 +251,18 @@ binary-numacell: build-tools ## Build the numacell test device plugin binary.
 	LDFLAGS="-s -w" \
 	CGO_ENABLED=0 go build -mod=vendor -o bin/numacell -ldflags "$$LDFLAGS" test/deviceplugin/cmd/numacell/main.go
 
+.PHONY: binary-numazone
+binary-numazone: build-tools ## Build the numazone device plugin binary.
+	LDFLAGS="-s -w" \
+	go build -mod=vendor -o bin/numazone -ldflags "$$LDFLAGS" -tags "$$GOTAGS" numazone/main.go
+
 .PHONY: binary-getdigests
 binary-getdigests: 
 	LDFLAGS="-s -w"; \
 	go build -mod=vendor -o bin/getdigests -ldflags "$$LDFLAGS" tools/getdigests/getdigests.go
 
 .PHONY: binary-all
-binary-all: goversion binary binary-rte binary-nrovalidate introspect-data ## Build all component binaries.
+binary-all: goversion binary binary-rte binary-numazone binary-nrovalidate introspect-data ## Build all component binaries.
 
 .PHONY: binary-e2e-rte-local
 binary-e2e-rte-local: generate-source ## Build RTE local e2e test binary.
@@ -275,6 +292,10 @@ binary-e2e-sched: generate-source ## Build scheduler e2e test binary.
 binary-e2e-serial: generate-source ## Build serial e2e test binary.
 	CGO_ENABLED=0 go test -c -v -o bin/e2e-nrop-serial.test -ldflags "$$LDFLAGS" ./test/e2e/serial
 
+.PHONY: binary-e2e-numazone
+binary-e2e-numazone: generate-source ## Build numazone e2e test binary.
+	CGO_ENABLED=0 go test -c -v -o bin/e2e-nrop-numazone.test -ldflags "$$LDFLAGS" ./test/e2e/numazone
+
 .PHONY: binary-e2e-tools
 binary-e2e-tools: generate-source ## Build tools e2e test binary.
 	go test -c -v -o bin/e2e-nrop-tools.test ./test/e2e/tools
@@ -291,7 +312,7 @@ binary-e2e-tls: generate-source ## Build TLS e2e test binary.
 binary-must-gather-e2e: binary-e2e-must-gather
 
 .PHONY: binary-e2e-all
-binary-e2e-all: goversion binary-e2e-install binary-e2e-upgrade binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial binary-e2e-tools binary-e2e-must-gather binary-e2e-tls runner-e2e-serial build-pause introspect-data ## Build all e2e test binaries.
+binary-e2e-all: goversion binary-e2e-install binary-e2e-upgrade binary-e2e-rte binary-e2e-sched binary-e2e-uninstall binary-e2e-serial binary-e2e-numazone binary-e2e-tools binary-e2e-must-gather binary-e2e-tls runner-e2e-serial build-pause introspect-data ## Build all e2e test binaries.
 
 .PHONY: runner-e2e-serial
 runner-e2e-serial: bin/envsubst ## Render and validate the serial e2e runner script.
@@ -318,11 +339,14 @@ build-rte: generate-source fmt vet binary-rte introspect-data ## Build the RTE c
 .PHONY: build-numacell
 build-numacell: fmt vet binary-numacell ## Build the numacell test device plugin.
 
+.PHONY: build-numazone
+build-numazone: fmt vet binary-numazone ## Build the numazone device plugin.
+
 .PHONY: build-nrovalidate
 build-nrovalidate: generate-source fmt vet binary-nrovalidate ## Build the nrovalidate tool.
 
 .PHONY: build-all
-build-all: generate generate-source fmt vet binary binary-rte binary-numacell binary-nrovalidate ## Build all components.
+build-all: generate generate-source fmt vet binary binary-rte binary-numazone binary-numacell binary-nrovalidate ## Build all components.
 
 .PHONY: build-e2e-rte
 build-e2e-rte: generate-source fmt vet binary-e2e-rte ## Build RTE e2e tests.

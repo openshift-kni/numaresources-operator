@@ -20,6 +20,8 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	operatorv1 "github.com/openshift/api/operator/v1"
 )
 
 func DefaultNodeGroupConfig() NodeGroupConfig {
@@ -71,4 +73,20 @@ func defaultInfoRefreshPause() *InfoRefreshPauseMode {
 func defaultNUMAPlacement() *NUMAPlacementMode {
 	v := NUMAPlacementContainer
 	return &v
+}
+
+func DefaultNumazoneConfig() NumazoneConfig {
+	conf := NumazoneConfig{}
+	conf.SetDefaults()
+	return conf
+}
+
+func (conf *NumazoneConfig) SetDefaults() {
+	if conf.Mode == nil {
+		mode := NumazoneDisabled
+		conf.Mode = &mode
+	}
+	if conf.LogLevel == "" {
+		conf.LogLevel = operatorv1.Normal
+	}
 }

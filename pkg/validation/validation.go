@@ -91,6 +91,7 @@ func NodeGroups(nodeGroups []nropv1.NodeGroup, platf platform.Platform) error {
 		nodeGroupsValidPoolName,
 		nodeGroupsDuplicatesByPoolName,
 		nodeGroupsAnnotations,
+		nodeGroupsNumazone,
 	}
 
 	// platform-specific validations
@@ -104,6 +105,18 @@ func NodeGroups(nodeGroups []nropv1.NodeGroup, platf platform.Platform) error {
 	for _, validatorFunc := range validatorFuncs {
 		if err := validatorFunc(nodeGroups); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+func nodeGroupsNumazone(nodeGroups []nropv1.NodeGroup) error {
+	for idx, group := range nodeGroups {
+		conf := group.NormalizeNumazoneConfig()
+		switch *conf.Mode {
+		case nropv1.NumazoneDisabled, nropv1.NumazoneEnabled, nropv1.NumazonePassthrough:
+		default:
+			return fmt.Errorf("node group %d specifies unsupported numazone mode %q", idx, *conf.Mode)
 		}
 	}
 	return nil

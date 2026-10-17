@@ -59,6 +59,7 @@ import (
 	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	nrosched "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler"
+	numazonemanifests "github.com/openshift-kni/numaresources-operator/pkg/numazoneresource/manifests/numazone"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
@@ -88,6 +89,10 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 	if err != nil {
 		return nil, err
 	}
+	numazoneManifests, err := numazonemanifests.GetManifests(plat, testNamespace)
+	if err != nil {
+		return nil, err
+	}
 	return &NUMAResourcesOperatorReconciler{
 		Client:       fakeClient,
 		Scheme:       scheme.Scheme,
@@ -97,7 +102,8 @@ func NewFakeNUMAResourcesOperatorReconciler(plat platform.Platform, platVersion 
 			Core:    rteManifests,
 			Metrics: rtemetricsmanifests,
 		},
-		Namespace: testNamespace,
+		NumazoneManifests: numazoneManifests,
+		Namespace:         testNamespace,
 		Images: images.Data{
 			Builtin: testImageSpec,
 		},

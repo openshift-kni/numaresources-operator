@@ -25,6 +25,7 @@ metadata:
         'internal/***'.pathChanged() ||
         'must-gather/***'.pathChanged() ||
         'nrovalidate/***'.pathChanged() ||
+        'numazone/***'.pathChanged() ||
         'pkg/***'.pathChanged() ||
         'rte/***'.pathChanged() ||
         'telco5g-konflux'.pathChanged() ||
