@@ -17,6 +17,7 @@ limitations under the License.
 package rte
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -328,4 +329,92 @@ func getSetFromStringList(args []string) map[string]struct{} {
 		argsSet[keyVal[0]] = struct{}{}
 	}
 	return argsSet
+}
+
+func TestDaemonSetAffinitySettings(t *testing.T) {
+	tests := []struct {
+		name        string
+		ds          *appsv1.DaemonSet
+		labels      map[string]string
+		expectedErr error
+	}{
+		{
+			name: "no labels",
+			ds: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ds1",
+				},
+			},
+			expectedErr: fmt.Errorf("no labels provided for PodAffinity"),
+		},
+		{
+			name: "override affinity",
+			ds: &appsv1.DaemonSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "ds1",
+				},
+				Spec: appsv1.DaemonSetSpec{
+					Template: corev1.PodTemplateSpec{
+						Spec: corev1.PodSpec{
+							Affinity: &corev1.Affinity{
+								PodAntiAffinity: &corev1.PodAntiAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+										{
+											LabelSelector: &metav1.LabelSelector{
+												MatchLabels: map[string]string{
+													"test1": "test1",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			labels: map[string]string{
+				"test2": "test2",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dsCopy := tt.ds.DeepCopy()
+
+			expectedAffinity := &corev1.Affinity{
+				PodAntiAffinity: &corev1.PodAntiAffinity{
+					RequiredDuringSchedulingIgnoredDuringExecution: []corev1.PodAffinityTerm{
+						{
+							LabelSelector: &metav1.LabelSelector{
+								MatchLabels: tt.labels,
+							},
+							TopologyKey: "kubernetes.io/hostname",
+						},
+					},
+				},
+			}
+
+			err := DaemonSetAffinitySettings(tt.ds, tt.labels)
+
+			if err == nil && tt.expectedErr != nil {
+				t.Fatalf("expected error %v but received nil", tt.expectedErr)
+			}
+
+			if err != nil && tt.expectedErr == nil {
+				t.Fatalf("unexpected error %v", tt.expectedErr)
+			}
+
+			if tt.expectedErr != nil {
+				expectedAffinity = dsCopy.Spec.Template.Spec.Affinity
+				if err.Error() != tt.expectedErr.Error() {
+					t.Fatalf("mismatching errors: expected %v got %v", tt.expectedErr, err)
+				}
+			}
+
+			if !reflect.DeepEqual(expectedAffinity, tt.ds.Spec.Template.Spec.Affinity) {
+				t.Errorf("expected affinity %+v, got %+v", expectedAffinity, tt.ds.Spec.Template.Spec.Affinity)
+			}
+		})
+	}
 }
