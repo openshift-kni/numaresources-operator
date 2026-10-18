@@ -37,6 +37,7 @@ import (
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 	ctrltls "github.com/openshift/controller-runtime-common/pkg/tls"
+	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -343,17 +344,27 @@ func main() {
 
 	webhookTLSOpts := append(webhookTLSOpts(params.enableHTTP2), tlsConfig)
 
-	cacheNamespaces := map[string]cache.Config{
-		namespace: {},
+	cacheOpts := cache.Options{
+		DefaultNamespaces: map[string]cache.Config{
+			namespace: {},
+		},
 	}
+	// On HyperShift, kubelet configs are mirrored as ConfigMaps in openshift-config-managed.
+	// Scope that namespace to ConfigMap watches only: adding it to DefaultNamespaces would
+	// make the manager cache every watched type there and fail cache sync on missing RBAC.
 	if discoveredCluster.Platform == platform.HyperShift {
-		cacheNamespaces[controller.HyperShiftKubeletConfigConfigMapNamespace] = cache.Config{}
+		cacheOpts.ByObject = map[client.Object]cache.ByObject{
+			&corev1.ConfigMap{}: {
+				Namespaces: map[string]cache.Config{
+					namespace: {},
+					controller.HyperShiftKubeletConfigConfigMapNamespace: {},
+				},
+			},
+		}
 	}
 
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
-		Cache: cache.Options{
-			DefaultNamespaces: cacheNamespaces,
-		},
+		Cache:  cacheOpts,
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
 			BindAddress:   params.metricsAddr,

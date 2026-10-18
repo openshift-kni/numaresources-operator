@@ -95,9 +95,10 @@ func TestAddObjectRef(t *testing.T) {
 	mockObject.SetName("object1")
 
 	testCases := []struct {
-		name          string
-		initialConfig []corev1.LocalObjectReference
-		expected      []corev1.LocalObjectReference
+		name            string
+		initialConfig   []corev1.LocalObjectReference
+		expected        []corev1.LocalObjectReference
+		expectedChanged bool
 	}{
 		{
 			name: "Add new object reference",
@@ -110,6 +111,7 @@ func TestAddObjectRef(t *testing.T) {
 				{Name: "object2"},
 				{Name: "object3"},
 			},
+			expectedChanged: true,
 		},
 		{
 			name: "Replace existing object reference",
@@ -121,17 +123,22 @@ func TestAddObjectRef(t *testing.T) {
 				{Name: "object1"},
 				{Name: "object3"},
 			},
+			expectedChanged: false,
 		},
 		{
-			name:     "Add to empty configuration",
-			expected: []corev1.LocalObjectReference{{Name: "object1"}},
+			name:            "Add to empty configuration",
+			expected:        []corev1.LocalObjectReference{{Name: "object1"}},
+			expectedChanged: true,
 		},
 	}
 
 	// Run test cases
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := addObjectRef(mockObject, tc.initialConfig)
+			result, changed := addObjectRef(mockObject, tc.initialConfig)
+			if changed != tc.expectedChanged {
+				t.Errorf("Test %q failed: expected changed %v, got %v", tc.name, tc.expectedChanged, changed)
+			}
 			if len(result) != len(tc.expected) {
 				t.Errorf("Test %q failed: expected length %d, got %d", tc.name, len(tc.expected), len(result))
 			}
@@ -150,9 +157,10 @@ func TestRemoveObjectRef(t *testing.T) {
 	mockObject.SetName("object1")
 
 	testCases := []struct {
-		name          string
-		initialConfig []corev1.LocalObjectReference
-		expected      []corev1.LocalObjectReference
+		name            string
+		initialConfig   []corev1.LocalObjectReference
+		expected        []corev1.LocalObjectReference
+		expectedChanged bool
 	}{
 		{
 			name: "Remove existing object reference",
@@ -163,6 +171,7 @@ func TestRemoveObjectRef(t *testing.T) {
 			expected: []corev1.LocalObjectReference{
 				{Name: "object2"},
 			},
+			expectedChanged: true,
 		},
 		{
 			name: "Do nothing if object reference does not exist",
@@ -174,17 +183,22 @@ func TestRemoveObjectRef(t *testing.T) {
 				{Name: "object2"},
 				{Name: "object3"},
 			},
+			expectedChanged: false,
 		},
 		{
-			name:     "Handle empty configuration",
-			expected: []corev1.LocalObjectReference{},
+			name:            "Handle empty configuration",
+			expected:        []corev1.LocalObjectReference{},
+			expectedChanged: false,
 		},
 	}
 
 	// Run test cases
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := removeObjectRef(mockObject, tc.initialConfig)
+			result, changed := removeObjectRef(mockObject, tc.initialConfig)
+			if changed != tc.expectedChanged {
+				t.Errorf("Test %q failed: expected changed %v, got %v", tc.name, tc.expectedChanged, changed)
+			}
 			if len(result) != len(tc.expected) {
 				t.Errorf("Test %q failed: expected length %d, got %d", tc.name, len(tc.expected), len(result))
 			}
