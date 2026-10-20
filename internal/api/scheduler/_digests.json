@@ -1,6 +1,8 @@
 {
     "current_channel": [
+        "sha256:66794a042735d9d23ed7183f305517293557935ccb90d1b973b296517902005e",
+        "sha256:efd08eef2b1e76244fa08adb23e656b63afac5b6b6a3ff92882dc8bad8fbda7b",
         "sha256:55d3fe347f35c257b6f828ec0da1aeef057f723bbcec1576d4d0f9018fb74fe7"
     ],
-    "prev_channel_last": "sha256:fe33777a6227cfc85949982b9b01c56abc03eab6fad7104132b54d7c940feb8c"
+    "prev_channel_last": "sha256:172ca71565288fe60a3ad8405d41a660df8b321c086d6eb9213f1047f057cd75"
 }
