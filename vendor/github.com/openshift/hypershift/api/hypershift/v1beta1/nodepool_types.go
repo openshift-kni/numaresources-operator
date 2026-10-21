@@ -25,6 +25,24 @@ const (
 	// IgnitionServerTokenExpirationTimestampAnnotation holds the time that a ignition token expires and should be
 	// removed from the cluster.
 	IgnitionServerTokenExpirationTimestampAnnotation = "hypershift.openshift.io/ignition-token-expiration-timestamp"
+
+	// NodePoolReleaseVersionAnnotation is set on userdata Secrets (Replace strategy) and on Machines (InPlace strategy)
+	// to track the OCP release version associated with each machine.
+	NodePoolReleaseVersionAnnotation = "hypershift.openshift.io/release-version"
+)
+
+// ImageType specifies the type of image to use for node instances.
+type ImageType string
+
+const (
+	// ImageTypeLinux represents the default image type (Linux/RHCOS).
+	// This is used when ImageType is empty or unspecified.
+	ImageTypeLinux ImageType = "Linux"
+
+	// ImageTypeWindows represents a Windows-based image type.
+	// When set, the controller will automatically populate the AMI field
+	// with a Windows-compatible AMI based on the region and OpenShift version.
+	ImageTypeWindows ImageType = "Windows"
 )
 
 var (
@@ -50,7 +68,7 @@ func init() {
 
 // NodePool is a scalable set of worker nodes attached to a HostedCluster.
 // NodePool machine architectures are uniform within a given pool, and are
-// independent of the control plane’s underlying machine architecture.
+// independent of the control plane's underlying machine architecture.
 //
 // +kubebuilder:resource:path=nodepools,shortName=np;nps,scope=Namespaced
 // +kubebuilder:storageversion
@@ -67,20 +85,29 @@ func init() {
 // +kubebuilder:printcolumn:name="UpdatingConfig",type="string",JSONPath=".status.conditions[?(@.type==\"UpdatingConfig\")].status",description="UpdatingConfig in progress"
 // +kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.conditions[?(@.type==\"Ready\")].message",description="Message"
 type NodePool struct {
-	metav1.TypeMeta   `json:",inline"`
+	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the metadata for the NodePool.
+	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	// Spec is the desired behavior of the NodePool.
+	// spec is the desired behavior of the NodePool.
+	// +optional
 	Spec NodePoolSpec `json:"spec,omitempty"`
 
-	// Status is the latest observed status of the NodePool.
+	// status is the latest observed status of the NodePool.
+	// +optional
 	Status NodePoolStatus `json:"status,omitempty"`
 }
 
 // NodePoolSpec is the desired behavior of a NodePool.
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=OSStreams,rule="!has(oldSelf.osImageStream) || has(self.osImageStream)",message="osImageStream cannot be removed once set; create a new NodePool instead"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.arch) || has(self.arch)", message="Arch is required once set"
-// +kubebuilder:validation:XValidation:rule="self.arch != 'arm64' || has(self.platform.aws) || has(self.platform.azure)", message="Setting Arch to arm64 is only supported for AWS and Azure"
+// +kubebuilder:validation:XValidation:rule="self.arch != 'arm64' || has(self.platform.aws) || has(self.platform.azure) || has(self.platform.agent) || self.platform.type == 'GCP' || self.platform.type == 'None'", message="Setting Arch to arm64 is only supported for AWS, Azure, Agent, GCP and None"
 // +kubebuilder:validation:XValidation:rule="!has(self.replicas) || !has(self.autoScaling)", message="Both replicas or autoScaling should not be set"
+// +kubebuilder:validation:XValidation:rule="self.arch != 's390x' || has(self.platform.kubevirt)", message="s390x is only supported on KubeVirt platform"
+// +kubebuilder:validation:XValidation:rule="!has(self.platform.aws) || !has(self.platform.aws.imageType) || self.platform.aws.imageType != 'Windows' || self.arch == 'amd64'", message="ImageType 'Windows' requires arch 'amd64' (AWS only)"
+// +kubebuilder:validation:XValidation:rule="!has(self.autoScaling) || self.autoScaling.min > 0 || self.platform.type == 'AWS' || self.platform.type == 'Azure'", message="Scale-from-zero (autoScaling.min=0) is currently only supported for AWS and Azure platforms"
 type NodePoolSpec struct {
 	// clusterName is the name of the HostedCluster this NodePool belongs to.
 	// If a HostedCluster with this name doesn't exist, the controller will no-op until it exists.
@@ -92,14 +119,19 @@ type NodePoolSpec struct {
 	// +kubebuilder:validation:XValidation:rule="self.matches('^[a-z0-9]([-a-z0-9]*[a-z0-9])?$')",message="clusterName must consist of lowercase alphanumeric characters or '-', start and end with an alphanumeric character, and be between 1 and 253 characters"
 	ClusterName string `json:"clusterName"`
 
-	// release specifies the OCP release used for the NodePool. This informs the
-	// ignition configuration for machines which includes the kubelet version, as well as other platform specific
-	// machine properties (e.g. an AMI on the AWS platform).
-	// It's not supported to use a release in a NodePool which minor version skew against the Control Plane release is bigger than N-2. Although there's no enforcement that prevents this from happening.
-	// Attempting to use a release with a bigger skew might result in unpredictable behaviour.
-	// Attempting to use a release higher than the HosterCluster one will result in the NodePool being degraded and the ValidReleaseImage condition being false.
-	// Attempting to use a release lower than the current NodePool y-stream will result in the NodePool being degraded and the ValidReleaseImage condition being false.
-	// Changing this field will trigger a NodePool rollout.
+	// release specifies the OCP release used for this NodePool. It drives the machine ignition configuration (including
+	// the kubelet version) and other platform-specific properties (e.g. an AMI on AWS).
+	//
+	// Version-skew rules and effects:
+	//   - The minor-version skew relative to the control-plane release must be <= N-2.
+	//     This is not currently enforced, but exceeding this limit is unsupported and
+	//     may lead to unpredictable behavior.
+	//   - If the specified release is higher than the HostedCluster's release, the
+	//     NodePool will be degraded and the ValidReleaseImage condition will be false.
+	//   - If the specified release is lower than the NodePool's current y-stream,
+	//     the NodePool will be degraded and the ValidReleaseImage condition will be false.
+	//
+	// Changing this field triggers a NodePool rollout.
 	// +rollout
 	// +required
 	Release Release `json:"release"`
@@ -119,8 +151,8 @@ type NodePoolSpec struct {
 	// +required
 	Management NodePoolManagement `json:"management"`
 
-	// autoscaling specifies auto-scaling behavior for the NodePool.
-	// autoscaling is mutually exclusive with replicas. If replicas is set, this field must be ommited.
+	// autoScaling specifies auto-scaling behavior for the NodePool.
+	// autoScaling is mutually exclusive with replicas. If replicas is set, this field must be omitted.
 	//
 	// +optional
 	AutoScaling *NodePoolAutoScaling `json:"autoScaling,omitempty"`
@@ -144,7 +176,8 @@ type NodePoolSpec struct {
 	// This is validated in the backend and signaled back via validMachineConfig condition.
 	// Changing this field will trigger a NodePool rollout.
 	// +rollout
-	// +kubebuilder:validation:Optional
+	// +optional
+	// +kubebuilder:validation:MaxItems=10
 	Config []corev1.LocalObjectReference `json:"config,omitempty"`
 
 	// nodeDrainTimeout is the maximum amount of time that the controller will spend on retrying to drain a node until it succeeds.
@@ -193,49 +226,154 @@ type NodePoolSpec struct {
 	// Each ConfigMap must have a single key named "tuning" whose value is the
 	// JSON or YAML of a serialized Tuned or PerformanceProfile.
 	// Changing this field will trigger a NodePool rollout.
-	// +kubebuilder:validation:Optional
+	// +optional
+	// +kubebuilder:validation:MaxItems=10
 	TuningConfig []corev1.LocalObjectReference `json:"tuningConfig,omitempty"`
 
 	// arch is the preferred processor architecture for the NodePool. Different platforms might have different supported architectures.
 	// TODO: This is set as optional to prevent validation from failing due to a limitation on client side validation with open API machinery:
 	//	https://github.com/kubernetes/kubernetes/issues/108768#issuecomment-1253912215
-	// TODO Add s390x to enum validation once the architecture is supported
 	//
 	// +kubebuilder:default:=amd64
-	// +kubebuilder:validation:Enum=arm64;amd64;ppc64le
+	// +kubebuilder:validation:Enum=arm64;amd64;ppc64le;s390x
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="Arch is immutable"
 	// +optional
 	Arch string `json:"arch,omitempty"`
+
+	// osImageStream specifies an OS stream to be used for nodes in this pool.
+	//
+	// This field can be optionally set to a known OSImageStream name to change
+	// the OS and Extension images with a well-known, tested, release-provided
+	// set of images. This enables a streamlined way of switching the pool's
+	// node OS to a different version than the cluster default, such as
+	// transitioning to a major RHEL version.
+	//
+	// When set, the referenced stream overrides the default OS images for the
+	// pool. When omitted, the pool uses the release version's default stream
+	// (rhel-9 for OCP < 5.0, rhel-10 for OCP >= 5.0).
+	// Changing this field triggers a rollout. Forward transitions
+	// (rhel-9 -> rhel-10) are allowed; backward transitions
+	// (rhel-10 -> rhel-9) are rejected by CEL validation because
+	// in-place OS downgrades are not supported.
+	//
+	// +openshift:enable:FeatureGate=OSStreams
+	// +kubebuilder:validation:XValidation:rule="!has(oldSelf.name) || oldSelf.name != 'rhel-10' || (has(self.name) && self.name != 'rhel-9')",message="OS stream downgrade from rhel-10 to rhel-9 is not allowed; create a new NodePool instead"
+	// +optional
+	OSImageStream OSImageStreamReference `json:"osImageStream,omitzero"`
+}
+
+const (
+	// OSImageStreamRHEL9 is the OS image stream name for RHEL 9.
+	// This value must match support/releaseinfo.StreamRHEL9.
+	OSImageStreamRHEL9 = "rhel-9"
+	// OSImageStreamRHEL10 is the OS image stream name for RHEL 10.
+	// This value must match support/releaseinfo.StreamRHEL10.
+	OSImageStreamRHEL10 = "rhel-10"
+)
+
+// OSImageStreamReference references an OSImageStream by name.
+type OSImageStreamReference struct {
+	// name is a required reference to an OSImageStream to be used for the pool.
+	//
+	// +required
+	// +kubebuilder:validation:Enum=rhel-9;rhel-10
+	Name string `json:"name,omitempty"`
 }
 
 // NodePoolStatus is the latest observed status of a NodePool.
 type NodePoolStatus struct {
-	// Replicas is the latest observed number of nodes in the pool.
+	// replicas is the latest observed number of nodes in the pool.
 	//
 	// +optional
 	Replicas int32 `json:"replicas"`
 
-	// Version is the semantic version of the latest applied release specified by
+	// version is the semantic version of the latest applied release specified by
 	// the NodePool.
 	//
-	// +kubebuilder:validation:Optional
+	// +optional
+	// +kubebuilder:validation:MaxLength=64
 	Version string `json:"version,omitempty"`
 
-	// Platform hols the specific statuses
+	// nodesInfo contains aggregated information observed from nodes belonging
+	// to this NodePool.
+	// +optional
+	NodesInfo NodePoolNodesInfo `json:"nodesInfo,omitzero"`
+
+	// platform holds the specific statuses
+	// +optional
 	Platform *NodePoolPlatformStatus `json:"platform,omitempty"`
 
-	// Conditions represents the latest available observations of the node pool's
+	// osImageStream reports the OS stream observed on the nodes in this pool.
+	//
+	// When omitted, the pool is using the release version's default OS images.
+	// +openshift:enable:FeatureGate=OSStreams
+	// +optional
+	OSImageStream OSImageStreamReference `json:"osImageStream,omitzero"`
+
+	// conditions represents the latest available observations of the node pool's
 	// current state.
+	// +kubebuilder:validation:MaxItems=100
 	// +optional
 	Conditions []NodePoolCondition `json:"conditions,omitempty"`
+}
+
+// NodePoolNodesInfo aggregates observed information about nodes belonging to this NodePool.
+type NodePoolNodesInfo struct {
+	// nodeVersions summarizes the versions and health of nodes belonging
+	// to this NodePool. Each entry represents a distinct version combination
+	// and the number of ready/unready nodes running it.
+	// +kubebuilder:validation:MaxItems=100
+	// +kubebuilder:validation:MinItems=1
+	// +listType=atomic
+	// +required
+	NodeVersions []NodeVersion `json:"nodeVersions,omitempty"`
+}
+
+// NodeVersion represents a version combination and the count of ready and unready nodes running it.
+type NodeVersion struct {
+	// ocpVersion is the OpenShift release version this node was provisioned
+	// or upgraded with.
+	// +kubebuilder:validation:XValidation:rule=`self.matches('^\\d+\\.\\d+\\.\\d+.*$')`,message="ocpVersion must start with semantic version prefix x.y.z"
+	// +kubebuilder:validation:MaxLength=64
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	OCPVersion string `json:"ocpVersion,omitempty"`
+
+	// kubeletVersion is the kubelet version reported by the node, as observed
+	// from Machine.Status.NodeInfo.KubeletVersion.
+	// +kubebuilder:validation:XValidation:rule=`self.matches('^v?\\d+\\.\\d+\\.\\d+.*$')`,message="kubeletVersion must start with semantic version prefix x.y.z (optional leading 'v')"
+	// +kubebuilder:validation:MaxLength=64
+	// +kubebuilder:validation:MinLength=1
+	// +required
+	KubeletVersion string `json:"kubeletVersion,omitempty"`
+
+	// readyNodeCount is the number of nodes running this version where the
+	// CAPI NodeHealthy condition is True.
+	// +kubebuilder:validation:Minimum=0
+	// +required
+	ReadyNodeCount *int32 `json:"readyNodeCount,omitempty"`
+
+	// unreadyNodeCount is the number of nodes running this version where the
+	// CAPI NodeHealthy condition is not True. Useful for tracking upgrade
+	// progress and detecting stuck nodes.
+	// +kubebuilder:validation:Minimum=0
+	// +required
+	UnreadyNodeCount *int32 `json:"unreadyNodeCount,omitempty"`
 }
 
 // NodePoolList contains a list of NodePools.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type NodePoolList struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// metadata is the metadata for the NodePoolList.
+	// +optional
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []NodePool `json:"items"`
+
+	// items is a list of NodePools.
+	// +kubebuilder:validation:MaxItems=100
+	// +optional
+	Items []NodePool `json:"items"`
 }
 
 // UpgradeType is a type of high-level upgrade behavior nodes in a NodePool.
@@ -290,14 +428,14 @@ type ReplaceUpgrade struct {
 	// strategy is the node replacement strategy for nodes in the pool.
 	// In can be either "RollingUpdate" or "OnDelete". RollingUpdate will rollout Nodes honoring maxSurge and maxUnavailable.
 	// OnDelete provide more granular control and will replace nodes as the old ones are manually deleted.
-	// +kubebuilder:validation:Optional
+	// +optional
 	// +kubebuilder:validation:Enum=RollingUpdate;OnDelete
-	Strategy UpgradeStrategy `json:"strategy"`
+	Strategy UpgradeStrategy `json:"strategy,omitempty"`
 
 	// rollingUpdate specifies a rolling update strategy which upgrades nodes by
 	// creating new nodes and deleting the old ones.
 	//
-	// +kubebuilder:validation:Optional
+	// +optional
 	RollingUpdate *RollingUpdate `json:"rollingUpdate,omitempty"`
 }
 
@@ -387,13 +525,13 @@ type NodePoolManagement struct {
 	// replace is the configuration for rolling upgrades.
 	// It defaults to a RollingUpdate strategy with maxSurge of 1 and maxUnavailable of 0.
 	//
-	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={strategy: "RollingUpdate", rollingUpdate: {maxSurge: 1, maxUnavailable: 0 }}
+	// +optional
 	Replace *ReplaceUpgrade `json:"replace,omitempty"`
 
 	// inPlace is the configuration for in-place upgrades.
 	//
-	// +kubebuilder:validation:Optional
+	// +optional
 	InPlace *InPlaceUpgrade `json:"inPlace,omitempty"`
 
 	// autoRepair specifies whether health checks should be enabled for machines in the NodePool. The default is false.
@@ -409,95 +547,119 @@ type NodePoolManagement struct {
 // NodePoolAutoScaling specifies auto-scaling behavior for a NodePool.
 // +kubebuilder:validation:XValidation:rule="self.max >= self.min", message="max must be equal or greater than min"
 type NodePoolAutoScaling struct {
-	// Min is the minimum number of nodes to maintain in the pool. Must be >= 1 and <= .Max.
+	// min is the minimum number of nodes to maintain in the pool.
+	// Can be set to 0 for scale-from-zero for AWS and Azure platforms.
+	// Must be >= 0 and <= .Max.
 	//
-	// +kubebuilder:validation:Minimum=1
-	Min int32 `json:"min"`
+	// +kubebuilder:validation:Minimum=0
+	// +required
+	Min *int32 `json:"min,omitempty"`
 
-	// Max is the maximum number of nodes allowed in the pool. Must be >= 1 and >= Min.
+	// max is the maximum number of nodes allowed in the pool. Must be >= 1 and >= Min.
 	//
 	// +kubebuilder:validation:Minimum=1
+	// +required
 	Max int32 `json:"max"`
 }
 
 // NodePoolPlatform specifies the underlying infrastructure provider for the
 // NodePool and is used to configure platform specific behavior.
 type NodePoolPlatform struct {
-	// Type specifies the platform name.
+	// type specifies the platform name.
 	//
 	// +unionDiscriminator
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf", message="Type is immutable"
 	// +immutable
 	// +openshift:validation:FeatureGateAwareEnum:featureGate="",enum=AWS;Azure;IBMCloud;KubeVirt;Agent;PowerVS;None
-	// +openshift:validation:FeatureGateAwareEnum:featureGate=OpenStack,enum=AWS;Azure;IBMCloud;KubeVirt;Agent;PowerVS;None;OpenStack
+	// +openshift:validation:FeatureGateAwareEnum:featureGate=OpenStack;GCPPlatform,enum=AWS;Azure;IBMCloud;KubeVirt;Agent;PowerVS;None;OpenStack;GCP
+	// +required
 	Type PlatformType `json:"type"`
 
-	// AWS specifies the configuration used when operating on AWS.
+	// aws specifies the configuration used when operating on AWS.
 	//
 	// +optional
 	AWS *AWSNodePoolPlatform `json:"aws,omitempty"`
 
-	// IBMCloud defines IBMCloud specific settings for components
+	// ibmcloud defines IBMCloud specific settings for components
+	//
+	// +optional
 	IBMCloud *IBMCloudPlatformSpec `json:"ibmcloud,omitempty"`
 
-	// Kubevirt specifies the configuration used when operating on KubeVirt platform.
+	// kubevirt specifies the configuration used when operating on KubeVirt platform.
 	//
 	// +optional
 	Kubevirt *KubevirtNodePoolPlatform `json:"kubevirt,omitempty"`
 
-	// Agent specifies the configuration used when using Agent platform.
+	// agent specifies the configuration used when using Agent platform.
 	//
 	// +optional
 	Agent *AgentNodePoolPlatform `json:"agent,omitempty"`
 
+	// azure specifies the configuration used when using Azure platform.
+	//
+	// +optional
 	Azure *AzureNodePoolPlatform `json:"azure,omitempty"`
 
-	// PowerVS specifies the configuration used when using IBMCloud PowerVS platform.
+	// powervs specifies the configuration used when using IBMCloud PowerVS platform.
 	//
 	// +optional
 	PowerVS *PowerVSNodePoolPlatform `json:"powervs,omitempty"`
 
-	// OpenStack specifies the configuration used when using OpenStack platform.
+	// openstack specifies the configuration used when using OpenStack platform.
 	// +optional
 	// +openshift:enable:FeatureGate=OpenStack
 	OpenStack *OpenStackNodePoolPlatform `json:"openstack,omitempty"`
+
+	// gcp specifies the configuration used when operating on GCP.
+	// +optional
+	// +openshift:enable:FeatureGate=GCPPlatform
+	GCP *GCPNodePoolPlatform `json:"gcp,omitempty"`
 }
 
 // We define our own condition type since metav1.Condition has validation
 // for Reason that might be broken by what we bubble up from CAPI.
 // NodePoolCondition defines an observation of NodePool resource operational state.
 type NodePoolCondition struct {
-	// Type of condition in CamelCase or in foo.example.com/CamelCase.
+	// type of condition in CamelCase or in foo.example.com/CamelCase.
 	// Many .condition.type values are consistent across resources like Available, but because arbitrary conditions
 	// can be useful (see .node.status.conditions), the ability to deconflict is important.
+	// +kubebuilder:validation:MaxLength=316
+	// +required
 	Type string `json:"type"`
 
-	// Status of the condition, one of True, False, Unknown.
+	// status of the condition, one of True, False, Unknown.
+	// +required
 	Status corev1.ConditionStatus `json:"status"`
 
-	// Severity provides an explicit classification of Reason code, so the users or machines can immediately
+	// severity provides an explicit classification of Reason code, so the users or machines can immediately
 	// understand the current situation and act accordingly.
 	// The Severity field MUST be set only when Status=False.
+	// +kubebuilder:validation:MaxLength=1024
 	// +optional
 	Severity string `json:"severity,omitempty"`
 
-	// Last time the condition transitioned from one status to another.
+	// lastTransitionTime is the last time the condition transitioned from one status to another.
 	// This should be when the underlying condition changed. If that is not known, then using the time when
 	// the API field changed is acceptable.
+	// +required
 	LastTransitionTime metav1.Time `json:"lastTransitionTime"`
 
-	// The reason for the condition's last transition in CamelCase.
+	// reason for the condition's last transition in CamelCase.
 	// The specific API may choose whether or not this field is considered a guaranteed API.
 	// This field may not be empty.
+	// +kubebuilder:validation:MaxLength=1024
 	// +optional
 	Reason string `json:"reason,omitempty"`
 
-	// A human readable message indicating details about the transition.
+	// message is a human readable message indicating details about the transition.
 	// This field may be empty.
+	// +kubebuilder:validation:MaxLength=32768
 	// +optional
 	Message string `json:"message,omitempty"`
 
+	// observedGeneration represents the .metadata.generation that the condition was set based upon.
 	// +kubebuilder:validation:Minimum=0
+	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
@@ -518,17 +680,18 @@ type Taint struct {
 	// +kubebuilder:validation:XValidation:rule=`self.matches('^(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])?$')`,message="Value must start and end with alphanumeric characters and can only contain '-', '_', '.' in the middle"
 	// +kubebuilder:validation:MaxLength=253
 	Value string `json:"value,omitempty"`
-	// +required
+
 	// effect is the effect of the taint on pods
+	// +required
 	// that do not tolerate the taint.
 	// Valid effects are NoSchedule, PreferNoSchedule and NoExecute.
 	// +kubebuilder:validation:Enum=NoSchedule;PreferNoSchedule;NoExecute
 	Effect corev1.TaintEffect `json:"effect"`
 }
 
-// NodePoolPlatformStatus contains specific platform statuses
+// NodePoolPlatformStatus struct contains platform-specific status information.
 type NodePoolPlatformStatus struct {
-	// KubeVirt contains the KubeVirt platform statuses
+	// kubeVirt contains the KubeVirt platform statuses
 	// +optional
 	KubeVirt *KubeVirtNodePoolStatus `json:"kubeVirt,omitempty"`
 }
