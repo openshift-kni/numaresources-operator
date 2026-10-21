@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
-	resourcehelper "k8s.io/kubectl/pkg/util/resource"
 
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -36,7 +36,13 @@ func WaitForPaddingPodsRunning(ctx context.Context, fxt *Fixture, paddingPods []
 	for _, failedPod := range failedPods {
 		_ = objects.LogEventsForPod(fxt.K8sClient, failedPod.Namespace, failedPod.Name)
 		//note that this test does not use podOverhead thus pod req and lim would be the pod's resources as set upon creating
-		req, lim := resourcehelper.PodRequestsAndLimits(failedPod)
+		req := resourcehelper.PodRequests(failedPod, resourcehelper.PodResourcesOptions{
+			UseStatusResources:    true,
+			SkipPodLevelResources: true,
+		})
+		lim := resourcehelper.PodLimits(failedPod, resourcehelper.PodResourcesOptions{
+			SkipPodLevelResources: true,
+		})
 		klog.Infof("Resources for pod %s/%s: requests: %s ; limits: %s", failedPod.Namespace, failedPod.Name, e2ereslist.ToString(req), e2ereslist.ToString(lim))
 
 		failedPodIds = append(failedPodIds, fmt.Sprintf("%s/%s", failedPod.Namespace, failedPod.Name))
