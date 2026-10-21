@@ -113,6 +113,19 @@ type ControllerConfigSpec struct {
 	// +required
 	Images map[string]string `json:"images"`
 
+	// bgpVIPPeersJSON carries the BGP VIP peer configuration (the config.json
+	// payload of the bgp-vip-config ConfigMap) for rendering the frr-k8s
+	// static pod peer file on control plane nodes. Only set when BGP-based
+	// VIP management is enabled.
+	// When omitted, BGP-based VIP management is not configured and no
+	// frr-k8s peer file is rendered.
+	// When set, the value must be between 1 and 65536 characters long.
+	// +openshift:enable:FeatureGate=BGPBasedVIPManagement
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=65536
+	// +optional
+	BGPVIPPeersJSON string `json:"bgpVIPPeersJSON,omitempty"`
+
 	// baseOSContainerImage is the new-format container image for operating system updates.
 	// +required
 	BaseOSContainerImage string `json:"baseOSContainerImage"`
@@ -732,29 +745,57 @@ type KubeletConfig struct {
 	Status KubeletConfigStatus `json:"status"`
 }
 
-// KubeletConfigSpec defines the desired state of KubeletConfig
+// KubeletConfigSpec configures the kubelet running on cluster nodes.
 type KubeletConfigSpec struct {
+	// autoSizingReserved controls whether system-reserved CPU and memory are automatically
+	// calculated based on each node's installed capacity. When set to true, this prevents node failure
+	// from resource starvation of system components (kubelet, CRI-O) without manual configuration.
+	// When omitted, this means the user has no opinion and the platform is left to choose a reasonable default,
+	// which is subject to change over time. The current default is true for worker nodes and false for control plane nodes.
+	// When set to false, automatic resource reservation is disabled and manual settings must be configured.
 	// +optional
 	AutoSizingReserved *bool `json:"autoSizingReserved,omitempty"`
+	// logLevel sets the kubelet log verbosity, controlling the amount of detail in kubelet logs.
+	// Valid values range from 0 (minimal logging) to 10 (maximum verbosity with trace-level detail).
+	// Higher log levels may impact node performance. When omitted, the platform chooses a reasonable default,
+	// which is subject to change over time. The current default is 2 (standard informational logging).
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=10
 	// +optional
 	LogLevel *int32 `json:"logLevel,omitempty"`
 
-	// machineConfigPoolSelector selects which pools the KubeletConfig shoud apply to.
-	// A nil selector will result in no pools being selected.
+	// machineConfigPoolSelector selects which pools the KubeletConfig should apply to.
+	// When omitted or set to an empty selector {}, no pools are selected, which is equivalent
+	// to not matching any MachineConfigPool.
 	// +optional
 	MachineConfigPoolSelector *metav1.LabelSelector `json:"machineConfigPoolSelector,omitempty"`
-	// kubeletConfig fields are defined in kubernetes upstream. Please refer to the types defined in the version/commit used by
-	// OpenShift of the upstream kubernetes. It's important to note that, since the fields of the kubelet configuration are directly fetched from
-	// upstream the validation of those values is handled directly by the kubelet. Please refer to the upstream version of the relevant kubernetes
-	// for the valid values of these fields. Invalid values of the kubelet configuration fields may render cluster nodes unusable.
+	// kubeletConfig contains upstream Kubernetes kubelet configuration fields.
+	// Values are validated by the kubelet itself. Invalid values may render nodes unusable.
+	// Refer to OpenShift documentation for the Kubernetes version corresponding to your
+	// OpenShift release to find valid kubelet configuration options.
 	// +optional
 	KubeletConfig *runtime.RawExtension `json:"kubeletConfig,omitempty"`
 
-	// If unset, the default is based on the apiservers.config.openshift.io/cluster resource.
-	// Note that only Old and Intermediate profiles are currently supported, and
-	// the maximum available minTLSVersion is VersionTLS12.
+	// tlsSecurityProfile configures TLS settings for the kubelet.
+	// When omitted, the TLS configuration defaults to the value from apiservers.config.openshift.io/cluster.
+	// When specified, the type field can be set to either "Old", "Intermediate", "Modern", "Custom" or omitted for backward compatibility.
 	// +optional
 	TLSSecurityProfile *configv1.TLSSecurityProfile `json:"tlsSecurityProfile,omitempty"`
+
+	// systemGomaxprocsBehavior controls whether the kubelet-auto-node-size service automatically configures
+	// GOMAXPROCS for kubelet and CRI-O system services based on the system reserved CPU allocation.
+	// Valid values are "Autosize" and "Disabled".
+	// When set to "Autosize", the GOMAXPROCS environment variable for kubelet and CRI-O is set to
+	// max(ceil(system_reserved_cpu), 1). This optimizes the runtime parallelism of these Go-based system
+	// services based on their CPU allocation rather than total node capacity.
+	// When set to "Disabled", automatic GOMAXPROCS configuration is disabled and the system services
+	// use Go's default GOMAXPROCS behavior.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.
+	// The current default is "Disabled".
+	//
+	// +openshift:enable:FeatureGate=GomaxprocsInjection
+	// +optional
+	SystemGomaxprocsBehavior GomaxprocsBehaviorType `json:"systemGomaxprocsBehavior,omitempty"`
 }
 
 // KubeletConfigStatus defines the observed state of a KubeletConfig
@@ -798,10 +839,17 @@ type KubeletConfigCondition struct {
 type KubeletConfigStatusConditionType string
 
 const (
+	// KubeletConfigAccepted designates whether a KubeletConfig CR has been accepted.
+	// When the condition status is True, the KubeletConfig has been accepted successfully.
+	// When the condition status is False, the KubeletConfig has not been accepted.
+	KubeletConfigAccepted KubeletConfigStatusConditionType = "Accepted"
+
 	// KubeletConfigSuccess designates a successful application of a KubeletConfig CR.
+	// Deprecated: Use KubeletConfigAccepted instead. KubeletConfigSuccess will be removed in a future release.
 	KubeletConfigSuccess KubeletConfigStatusConditionType = "Success"
 
 	// KubeletConfigFailure designates a failure applying a KubeletConfig CR.
+	// Deprecated: Use KubeletConfigAccepted with status False instead. KubeletConfigFailure will be removed in a future release.
 	KubeletConfigFailure KubeletConfigStatusConditionType = "Failure"
 )
 
@@ -942,6 +990,26 @@ type ContainerRuntimeConfiguration struct {
 	// +kubebuilder:validation:MaxItems=10
 	// +kubebuilder:validation:XValidation:rule="self.all(x, self.exists_one(y, x.path == y.path))",message="additionalArtifactStores must not contain duplicate paths"
 	AdditionalArtifactStores []AdditionalArtifactStore `json:"additionalArtifactStores,omitempty"`
+
+	// containerGomaxprocsBehavior controls whether CRI-O automatically injects the GOMAXPROCS environment variable into containers
+	// based on their CPU resource requests.
+	// Valid values are "Autosize" and "Disabled".
+	// When set to "Autosize", CRI-O will automatically set GOMAXPROCS proportional to the container's CPU request,
+	// calculated as max(ceil(cpu_request_in_cores * 2), 1). This helps Go applications optimize their runtime parallelism
+	// based on the allocated CPU resources rather than the total node capacity.
+	// When set to "Disabled", GOMAXPROCS injection is disabled and containers will use Go's default GOMAXPROCS behavior.
+	// When omitted, this means no opinion and the platform is left to choose a reasonable default, which is subject to change over time.
+	// The current default is "Disabled".
+	//
+	// Containers can override the injected GOMAXPROCS value by:
+	// - Setting GOMAXPROCS in the container image Dockerfile (ENV GOMAXPROCS=...)
+	// - Setting GOMAXPROCS in the pod spec (env or envFrom)
+	// - Calling runtime.GOMAXPROCS() programmatically in Go code
+	// - Adding the skip-gomaxprocs.crio.io annotation to the pod
+	//
+	// +openshift:enable:FeatureGate=GomaxprocsInjection
+	// +optional
+	ContainerGomaxprocsBehavior GomaxprocsBehaviorType `json:"containerGomaxprocsBehavior,omitempty"`
 }
 
 type ContainerRuntimeDefaultRuntime string
@@ -954,13 +1022,26 @@ const (
 	ContainerRuntimeDefaultRuntimeDefault = ContainerRuntimeDefaultRuntimeCrun
 )
 
+// GomaxprocsBehaviorType specifies the GOMAXPROCS auto-sizing behavior
+// +kubebuilder:validation:Enum=Autosize;Disabled
+type GomaxprocsBehaviorType string
+
+const (
+	// GomaxprocsBehaviorAutosize enables automatic GOMAXPROCS configuration
+	GomaxprocsBehaviorAutosize GomaxprocsBehaviorType = "Autosize"
+	// GomaxprocsBehaviorDisabled disables automatic GOMAXPROCS configuration
+	GomaxprocsBehaviorDisabled GomaxprocsBehaviorType = "Disabled"
+)
+
 // StorePath is an absolute filesystem path used by additional container storage configurations.
 // The path must be between 1 and 256 characters long, begin with a forward slash, and only contain
-// the characters a-z, A-Z, 0-9, '/', '.', '_', and '-'. Consecutive forward slashes are not permitted.
+// the characters a-z, A-Z, 0-9, '/', '.', '_', and '-'. Consecutive forward slashes and '..'
+// directory traversal components are not permitted.
 // +kubebuilder:validation:MinLength=1
 // +kubebuilder:validation:MaxLength=256
 // +kubebuilder:validation:XValidation:rule="self.matches('^/[a-zA-Z0-9/._-]+$')",message="path must be absolute and contain only alphanumeric characters, '/', '.', '_', and '-'"
 // +kubebuilder:validation:XValidation:rule="!self.contains('//')",message="path must not contain consecutive forward slashes"
+// +kubebuilder:validation:XValidation:rule="self.split('/').filter(s, s == '..').size() == 0",message="path must not contain '..' components"
 type StorePath string
 
 // AdditionalLayerStore defines a read-only storage location for Open Container Initiative (OCI) container image layers.
@@ -971,7 +1052,7 @@ type AdditionalLayerStore struct {
 	// retrieving from the registry.
 	// The path is required and must be between 1 and 256 characters long, begin with a forward slash,
 	// and only contain the characters a-z, A-Z, 0-9, '/', '.', '_', and '-'.
-	// Consecutive forward slashes are not permitted.
+	// Consecutive forward slashes and '..' directory traversal components are not permitted.
 	// +required
 	Path StorePath `json:"path,omitempty"`
 }
@@ -984,7 +1065,7 @@ type AdditionalImageStore struct {
 	// retrieving from the registry.
 	// The path is required and must be between 1 and 256 characters long, begin with a forward slash,
 	// and only contain the characters a-z, A-Z, 0-9, '/', '.', '_', and '-'.
-	// Consecutive forward slashes are not permitted.
+	// Consecutive forward slashes and '..' directory traversal components are not permitted.
 	// +required
 	Path StorePath `json:"path,omitempty"`
 }
@@ -997,7 +1078,7 @@ type AdditionalArtifactStore struct {
 	// retrieving from the registry.
 	// The path is required and must be between 1 and 256 characters long, begin with a forward slash,
 	// and only contain the characters a-z, A-Z, 0-9, '/', '.', '_', and '-'.
-	// Consecutive forward slashes are not permitted.
+	// Consecutive forward slashes and '..' directory traversal components are not permitted.
 	// +required
 	Path StorePath `json:"path,omitempty"`
 }
