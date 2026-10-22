@@ -48,7 +48,7 @@ import (
 const schedulerSecurePort = "10259"
 
 var _ = Describe("TLS", func() {
-	It("should reject TLS connections that are not compatible with the profile - negative test", func(ctx context.Context) {
+	It("[test_id:90743] should reject TLS connections that are not compatible with the profile - negative test", func(ctx context.Context) {
 		By("getting the current OCP TLS profile")
 		minVersion, tlsProfileSpec, err := intls.GetClusterTLSProfile(ctx, e2eclient.Client)
 		Expect(err).ToNot(HaveOccurred(), "unable to get TLS profile from APIServer")
@@ -92,7 +92,7 @@ var _ = Describe("TLS", func() {
 		Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(), "expected TLS handshake rejection for cipher %s, got: %v", disallowedCipher, err)
 	})
 
-	It("should adhere to openshift TLS profile - positive test", func(ctx context.Context) {
+	It("[test_id:90744] should adhere to openshift TLS profile - positive test", func(ctx context.Context) {
 		By("getting the current OCP TLS profile")
 		minVersion, tlsProfileSpec, err := intls.GetClusterTLSProfile(ctx, e2eclient.Client)
 		Expect(err).ToNot(HaveOccurred(), "unable to get TLS profile from APIServer")
