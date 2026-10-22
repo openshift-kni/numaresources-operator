@@ -66,7 +66,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2026-08-24T14:02:44Z"
+    createdAt: "2026-10-21T12:08:07Z"
     features.operators.openshift.io/cnf: "true"
     features.operators.openshift.io/cni: "false"
     features.operators.openshift.io/csi: "false"
@@ -87,7 +87,7 @@ metadata:
       ]
     operators.operatorframework.io/builder: operator-sdk-v1.40.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
-  name: numaresources-operator.v5.0.999-snapshot
+  name: numaresources-operator.v4.23.999-snapshot
   namespace: placeholder
 spec:
   apiservicedefinitions: {}
@@ -724,7 +724,7 @@ spec:
                   valueFrom:
                     fieldRef:
                       fieldPath: metadata.namespace
-                image: quay.io/openshift-kni/numaresources-operator:5.0.999-snapshot
+                image: quay.io/openshift-kni/numaresources-operator:4.23.999-snapshot
                 lifecycle:
                   postStart:
                     exec:
@@ -991,4 +991,4 @@ spec:
   provider:
     name: Red Hat
   replaces: numaresources-operator.v4.22.999-snapshot
-  version: 5.0.999-snapshot
+  version: 4.23.999-snapshot
