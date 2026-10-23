@@ -156,7 +156,7 @@ var _ = Describe("[Install]", Serial, Ordered, func() {
 	})
 
 	Context("durability with a running cluster with all the components and overall deployment", func() {
-		It("should reject custom ExporterImage and go Degraded without changing the DaemonSet", Label(label.Tier1), func(ctx context.Context) {
+		It("[test_id:90745] should reject custom ExporterImage and go Degraded without changing the DaemonSet", Label(label.Tier1), func(ctx context.Context) {
 			By("getting up-to-date NRO object")
 			nroKey := objects.NROObjectKey()
 
@@ -365,7 +365,7 @@ var _ = Describe("[Install]", Serial, Ordered, func() {
 			Expect(rteContainer.Image).To(BeIdenticalTo(e2eimages.RTETestImageCI))
 		})
 
-		It("should be able to delete NUMAResourceOperator CR and redeploy without polluting cluster state", func(ctx context.Context) {
+		It("[test_id:90746] should be able to delete NUMAResourceOperator CR and redeploy without polluting cluster state", func(ctx context.Context) {
 			nname := client.ObjectKeyFromObject(nroObj)
 			Expect(nname.Name).NotTo(BeEmpty())
 
@@ -454,7 +454,7 @@ var _ = Describe("[Install]", Serial, Ordered, func() {
 			}).WithTimeout(5 * time.Minute).WithPolling(10 * time.Second).Should(Succeed())
 		})
 
-		It("should have the desired topology manager configuration under the NRT object", func() {
+		It("[test_id:90747] should have the desired topology manager configuration under the NRT object", func() {
 			rteConfigMap := &corev1.ConfigMap{}
 			Eventually(func() bool {
 				updatedConfigMaps := &corev1.ConfigMapList{}
