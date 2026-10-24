@@ -4,9 +4,10 @@ FROM registry.redhat.io/openshift/golang-builder:golang-builder-v1.26-rhel9@sha2
 WORKDIR /go/src/github.com/openshift-kni/numaresources-operator
 COPY . .
 
+ENV GOFIPS140=v1.26.0
 ENV GOEXPERIMENT=strictfipsruntime
-ENV CGO_ENABLED=1
-ENV GOTAGS="strictfipsruntime"
+ENV CGO_ENABLED=0
+ENV GOTAGS="strictfipsruntime,no_openssl"
 
 # Build
 RUN make binary-all
