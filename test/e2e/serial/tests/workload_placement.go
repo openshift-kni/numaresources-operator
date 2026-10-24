@@ -29,9 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes"
+	resourcehelper "k8s.io/component-helpers/resource"
 	"k8s.io/klog/v2"
 	corev1qos "k8s.io/kubectl/pkg/util/qos"
-	resourcehelper "k8s.io/kubectl/pkg/util/resource"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
@@ -1049,7 +1049,10 @@ func schedulerAllocatedCPUAndMemory(ctx context.Context, cli client.Client, node
 		if pods[i].Status.Phase == corev1.PodSucceeded || pods[i].Status.Phase == corev1.PodFailed {
 			continue
 		}
-		req, _ := resourcehelper.PodRequestsAndLimits(&pods[i])
+		req := resourcehelper.PodRequests(&pods[i], resourcehelper.PodResourcesOptions{
+			UseStatusResources:    true,
+			SkipPodLevelResources: true,
+		})
 		for _, resName := range []corev1.ResourceName{corev1.ResourceCPU, corev1.ResourceMemory} {
 			qty := req[resName]
 			allocatedQty := allocated[resName]
