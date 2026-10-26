@@ -13,7 +13,6 @@
 #   - renovate.json                (Renovate config)
 #   - .konflux/                    (Konflux config)
 #   - bundle/                      (operator bundle metadata)
-#   - catalog/                     (FBC catalog entries)
 #   - Dockerfile*                  (container build files)
 #   - telco5g-konflux              (submodule — updated independently via Mintmaker)
 #
@@ -85,7 +84,6 @@ jobs:
             //   - renovate.json                     (Renovate config)
             //   - anything under .konflux/           (Konflux config)
             //   - anything under bundle/             (operator bundle metadata)
-            //   - anything under catalog/            (FBC catalog entries)
             //   - Dockerfile* at any directory level (container build files)
             //   - telco5g-konflux               (submodule — Mintmaker per-branch)
             // ---------------------------------------------------------------
@@ -96,7 +94,6 @@ jobs:
               /^renovate\.json$/,
               /^\.konflux\//,
               /^bundle\//,
-              /^catalog\//,
               // Match Dockerfile, Dockerfile.something, or dir/Dockerfile*
               /(^|\/)Dockerfile([^/]*)?$/,
               // Submodule pointer — updated independently via Mintmaker on each branch
