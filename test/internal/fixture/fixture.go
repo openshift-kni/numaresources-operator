@@ -38,9 +38,9 @@ import (
 
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/objects"
 	intwait "github.com/openshift-kni/numaresources-operator/internal/wait"

@@ -23,10 +23,10 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
-	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/clientutil"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/clientutil/nodes"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer"
+	deployervalidator "github.com/openshift-kni/numaresources-operator/internal/deployer/validator"
 
 	"github.com/openshift-kni/numaresources-operator/internal/schedcache"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"

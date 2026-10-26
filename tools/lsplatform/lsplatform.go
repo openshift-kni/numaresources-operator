@@ -23,8 +23,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform/detect"
 )
 
 func main() {

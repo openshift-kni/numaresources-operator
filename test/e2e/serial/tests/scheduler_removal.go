@@ -26,9 +26,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	depwait "github.com/k8stopologyawareschedwg/deployer/pkg/deployer/wait"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	depwait "github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/wait"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"

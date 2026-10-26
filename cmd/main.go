@@ -52,11 +52,11 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/options"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/manifests"
+	apimanifests "github.com/openshift-kni/numaresources-operator/internal/deployer/manifests/api"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/internal/deployer/manifests/rte"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/options"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"

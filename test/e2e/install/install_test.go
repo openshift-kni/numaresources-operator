@@ -37,13 +37,13 @@ import (
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/assets/selinux"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/flagcodec"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/manifests/rte"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/podlogs"
 	nrowait "github.com/openshift-kni/numaresources-operator/internal/wait"

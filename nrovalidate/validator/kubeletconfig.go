@@ -29,9 +29,9 @@ import (
 
 	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
-	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform/detect"
+	deployervalidator "github.com/openshift-kni/numaresources-operator/internal/deployer/validator"
 
 	hypershiftconsts "github.com/openshift-kni/numaresources-operator/internal/hypershift/consts"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"

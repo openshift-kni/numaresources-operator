@@ -29,11 +29,10 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-
 	v1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/internal/deployer/manifests/rte"
 )
 
 func TestFromClient(t *testing.T) {

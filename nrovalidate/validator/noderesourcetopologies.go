@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
+	deployervalidator "github.com/openshift-kni/numaresources-operator/internal/deployer/validator"
 	topologyclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
 )
 

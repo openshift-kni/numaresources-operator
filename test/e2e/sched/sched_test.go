@@ -34,10 +34,9 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/manifests"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"

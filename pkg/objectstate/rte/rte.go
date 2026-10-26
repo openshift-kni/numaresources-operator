@@ -30,13 +30,12 @@ import (
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 
-	k8swgdepselinux "github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
-	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
+	k8swgdepselinux "github.com/openshift-kni/numaresources-operator/internal/deployer/assets/selinux"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/internal/deployer/manifests/rte"
+	k8swgrteupdate "github.com/openshift-kni/numaresources-operator/internal/deployer/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	rtemetrics "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"

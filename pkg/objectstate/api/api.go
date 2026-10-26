@@ -23,8 +23,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
+	apimanifests "github.com/openshift-kni/numaresources-operator/internal/deployer/manifests/api"
 
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectstate/compare"

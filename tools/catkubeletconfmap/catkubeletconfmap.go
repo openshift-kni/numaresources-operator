@@ -29,8 +29,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
-
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/clientutil"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 )
 

@@ -25,7 +25,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
+	deployervalidator "github.com/openshift-kni/numaresources-operator/internal/deployer/validator"
 )
 
 const (

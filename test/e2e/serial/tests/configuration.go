@@ -57,8 +57,6 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 	ctrltls "github.com/openshift/controller-runtime-common/pkg/tls"
 
-	depnodes "github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/test/e2e/utils/nodes"
 
@@ -66,6 +64,8 @@ import (
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	inthelper "github.com/openshift-kni/numaresources-operator/internal/api/annotations/helper"
+	depnodes "github.com/openshift-kni/numaresources-operator/internal/deployer/clientutil/nodes"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"

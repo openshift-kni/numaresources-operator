@@ -24,8 +24,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-
+	k8swgmanifests "github.com/openshift-kni/numaresources-operator/internal/deployer/manifests"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests"
 )
 

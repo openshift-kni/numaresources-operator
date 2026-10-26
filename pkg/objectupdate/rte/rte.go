@@ -28,13 +28,13 @@ import (
 
 	securityv1 "github.com/openshift/api/security/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/assets/selinux"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
-	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
-	k8swgrteupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/rte"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/assets/selinux"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/flagcodec"
+	k8swgobjupdate "github.com/openshift-kni/numaresources-operator/internal/deployer/objectupdate"
+	k8swgrteupdate "github.com/openshift-kni/numaresources-operator/internal/deployer/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"

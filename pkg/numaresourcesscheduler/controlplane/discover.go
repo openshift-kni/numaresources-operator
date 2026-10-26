@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform/detect"
 )
 
 func Defaults() detect.ControlPlaneInfo {
