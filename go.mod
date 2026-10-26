@@ -21,7 +21,7 @@ require (
 	github.com/onsi/gomega v1.39.1
 	github.com/openshift-kni/debug-tools v0.2.5
 	github.com/openshift/api v0.0.0-20261017003925-24b2699a9b32 // release-5.1
-	github.com/openshift/controller-runtime-common v0.0.0-20260213175913-767fef058eca
+	github.com/openshift/controller-runtime-common v0.0.0-20261026124434-bdfc411d93cd
 	github.com/openshift/hypershift/api v0.0.0-20241115183703-d41904871380 // release-4.18
 	github.com/sergi/go-diff v1.1.0
 	github.com/stretchr/testify v1.11.1
@@ -38,7 +38,7 @@ require (
 	k8s.io/kubectl v0.35.3
 	k8s.io/kubelet v0.35.3
 	k8s.io/utils v0.0.0-20260707023825-cf1189d6abe3
-	sigs.k8s.io/controller-runtime v0.23.3
+	sigs.k8s.io/controller-runtime v0.25.1
 	sigs.k8s.io/controller-runtime/tools/setup-envtest v0.0.0-20260305142021-f9589b9f2b9d
 	sigs.k8s.io/controller-tools v0.17.3
 	sigs.k8s.io/yaml v1.6.0
@@ -86,7 +86,6 @@ require (
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/gobuffalo/flect v1.0.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20260115054156-294ebfa9ad83 // indirect
 	github.com/google/uuid v1.6.0 // indirect

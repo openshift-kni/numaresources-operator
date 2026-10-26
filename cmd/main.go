@@ -330,7 +330,11 @@ func main() {
 		exitWithCancel(cancel, 1)
 	}
 
-	tlsConfig, unsupportedCiphers := ctrltls.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
+	tlsConfig, unsupportedCiphers, err := ctrltls.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
+	if err != nil {
+		klog.ErrorS(err, "unable to create TLS config from profile")
+		exitWithCancel(cancel, 1)
+	}
 	if len(unsupportedCiphers) > 0 {
 		klog.InfoS("TLS profile configuration contains unsupported ciphers that will be ignored", "unsupported", unsupportedCiphers)
 	}
