@@ -1,9 +1,8 @@
 # Selectively request cherry-picks from release-5.0 to release-4.23.
 #
-# Prow cherry-picks the merged PR's commits as a whole. Therefore, skip the
-# entire PR if it changes any branch-specific or dependency-management files;
-# otherwise those files would be carried along with the code change.
-# Mixed PRs can still be backported manually after reviewing their contents.
+# PRs that only change dependency-management or branch-specific files are
+# skipped. If a PR also changes other files, it is cherry-picked as a whole,
+# including any excluded paths in that mixed PR.
 
 name: Cherry-pick to release-4.23
 
@@ -42,9 +41,9 @@ jobs:
 
             console.log(`PR #${prNumber} changed ${files.length} file(s)`);
 
-            // These files are generated, branch-specific, or dependency inputs.
-            // The Prow command cherry-picks the complete PR, so do not trigger
-            // automatically when any of these paths occur, even in a mixed PR.
+            // PRs that only touch these paths are skipped. If other files are
+            // also changed, Prow cherry-picks the complete PR, including these
+            // paths, matching the selective-backport policy used upstream.
             const excludedPatterns = [
               /^go\.(mod|sum)$/,
               /^vendor\//,
@@ -62,24 +61,25 @@ jobs:
               return excludedPatterns.some((pattern) => pattern.test(filePath));
             }
 
-            const excludedFiles = files.filter((file) =>
-              [file.filename, file.previous_filename]
-                .filter(Boolean)
-                .some(isExcluded)
-            );
-
             if (files.length === 0) {
               console.log('No changed files were returned. Skipping cherry-pick.');
               return;
             }
 
-            if (excludedFiles.length > 0) {
-              console.log('Found branch-specific or dependency-management changes; skipping the whole PR:');
-              excludedFiles.forEach((file) => {
-                console.log(`  ✗ ${file.filename}`);
-              });
+            const backportableFiles = files.filter((file) =>
+              [file.filename, file.previous_filename]
+                .filter(Boolean)
+                .some((filePath) => !isExcluded(filePath))
+            );
+
+            if (backportableFiles.length === 0) {
+              console.log('All changed files are excluded (dependency or branch-specific only). Skipping cherry-pick.');
+              files.forEach((file) => console.log(`  ✗ ${file.filename}`));
               return;
             }
+
+            console.log(`Found ${backportableFiles.length} non-excluded file(s):`);
+            backportableFiles.forEach((file) => console.log(`  ✓ ${file.filename}`));
 
             const cherryPickCommand = '/cherry-pick release-4.23';
             const comments = await github.paginate(github.rest.issues.listComments, {
