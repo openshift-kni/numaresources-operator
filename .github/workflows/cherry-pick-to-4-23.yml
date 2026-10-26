@@ -10,7 +10,7 @@
 #   - go.mod / go.sum              (dependency bumps)
 #   - vendor/                      (vendored dependencies)
 #   - .tekton/                     (Tekton / Konflux pipeline definitions)
-#   - .mintmaker/ / renovate.json  (Mintmaker / Renovate config)
+#   - renovate.json                (Renovate config)
 #   - .konflux/                    (Konflux config)
 #   - bundle/                      (operator bundle metadata)
 #   - catalog/                     (FBC catalog entries)
@@ -82,7 +82,6 @@ jobs:
             //   - go.mod or go.sum                  (dependency management)
             //   - anything under vendor/            (vendored dependencies)
             //   - anything under .tekton/           (Tekton pipelines)
-            //   - anything under .mintmaker/         (Mintmaker config)
             //   - renovate.json                     (Renovate config)
             //   - anything under .konflux/           (Konflux config)
             //   - anything under bundle/             (operator bundle metadata)
@@ -94,7 +93,6 @@ jobs:
               /^go\.(mod|sum)$/,
               /^vendor\//,
               /^\.tekton\//,
-              /^\.mintmaker\//,
               /^renovate\.json$/,
               /^\.konflux\//,
               /^bundle\//,
