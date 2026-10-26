@@ -2,7 +2,7 @@
 #
 # This workflow triggers on every merged PR to release-5.0 and evaluates the
 # changed files. If the PR contains actual code changes (not just dependency
-# bumps, pipeline definitions, or operator bundle/catalog metadata), it posts
+# bumps, pipeline definitions, or Konflux metadata), it posts
 # a `/cherry-pick release-4.23` comment so the Prow cherry-pick bot can open
 # a backport PR against release-4.23.
 #
@@ -13,7 +13,6 @@
 #   - renovate.json                (Renovate config)
 #   - .konflux/                    (Konflux config)
 #   - bundle/                      (operator bundle metadata)
-#   - Dockerfile*                  (container build files)
 #   - telco5g-konflux              (submodule — updated independently via Mintmaker)
 #
 # If a PR touches BOTH excluded and non-excluded files, the cherry-pick
@@ -84,7 +83,6 @@ jobs:
             //   - renovate.json                     (Renovate config)
             //   - anything under .konflux/           (Konflux config)
             //   - anything under bundle/             (operator bundle metadata)
-            //   - Dockerfile* at any directory level (container build files)
             //   - telco5g-konflux               (submodule — Mintmaker per-branch)
             // ---------------------------------------------------------------
             const excludedPatterns = [
@@ -94,8 +92,6 @@ jobs:
               /^renovate\.json$/,
               /^\.konflux\//,
               /^bundle\//,
-              // Match Dockerfile, Dockerfile.something, or dir/Dockerfile*
-              /(^|\/)Dockerfile([^/]*)?$/,
               // Submodule pointer — updated independently via Mintmaker on each branch
               /^telco5g-konflux$/,
             ];
