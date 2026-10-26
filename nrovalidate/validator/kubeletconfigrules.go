@@ -44,10 +44,6 @@ const (
 	ExpectedTopologyManagerPolicy = kubeletconfigv1beta1.SingleNumaNodeTopologyManagerPolicy
 )
 
-const (
-	kubeMinVersionGetAllocatable = "1.23"
-)
-
 func ValidateClusterNodeKubeletConfig(nodeName string, nodeVersion *version.Info, kubeletConf *kubeletconfigv1beta1.KubeletConfiguration) []ValidationResult {
 	vrs := []ValidationResult{}
 

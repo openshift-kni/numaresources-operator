@@ -26,8 +26,6 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/deployer/clientutil"
 	"github.com/openshift-kni/numaresources-operator/internal/deployer/clientutil/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer"
-	deployervalidator "github.com/openshift-kni/numaresources-operator/internal/deployer/validator"
-
 	"github.com/openshift-kni/numaresources-operator/internal/schedcache"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
@@ -64,11 +62,11 @@ func CollectSchedCache(ctx context.Context, cli client.Client, data *ValidatorDa
 	return nil
 }
 
-func ValidateSchedCache(data ValidatorData) ([]deployervalidator.ValidationResult, error) {
-	var ret []deployervalidator.ValidationResult
+func ValidateSchedCache(data ValidatorData) ([]ValidationResult, error) {
+	var ret []ValidationResult
 	for nodeName := range data.unsynchedCaches {
-		ret = append(ret, deployervalidator.ValidationResult{
-			Area:      deployervalidator.AreaCluster,
+		ret = append(ret, ValidationResult{
+			Area:      AreaCluster,
 			Component: "scheduler",
 			Node:      nodeName,
 			Setting:   "cache",

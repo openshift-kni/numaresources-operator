@@ -31,18 +31,17 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/openshift-kni/numaresources-operator/internal/deployer/clientutil"
-	deployervalidator "github.com/openshift-kni/numaresources-operator/internal/deployer/validator"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/clientutil"
 	"github.com/openshift-kni/numaresources-operator/internal/nodegroups"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 
 type Report struct {
-	Succeeded bool                                 `json:"succeeded"`
-	Errors    []deployervalidator.ValidationResult `json:"errors,omitempty"`
+	Succeeded bool               `json:"succeeded"`
+	Errors    []ValidationResult `json:"errors,omitempty"`
 }
 
 func Requested(what string) (sets.Set[string], error) {
@@ -184,7 +183,7 @@ func GetNodesByNRO(ctx context.Context, cli client.Client) (sets.Set[string], er
 	return enabledNodeNames, nil
 }
 
-type ValidateFunc func(data ValidatorData) ([]deployervalidator.ValidationResult, error)
+type ValidateFunc func(data ValidatorData) ([]ValidationResult, error)
 
 func Validators() map[string]ValidateFunc {
 	return map[string]ValidateFunc{
@@ -206,7 +205,7 @@ func Validate(data ValidatorData) (Report, error) {
 		valFns = append(valFns, fn)
 	}
 
-	var ret []deployervalidator.ValidationResult
+	var ret []ValidationResult
 	for _, helper := range valFns {
 		res, err := helper(data)
 		if err != nil {

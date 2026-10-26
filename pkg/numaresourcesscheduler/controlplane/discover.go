@@ -17,10 +17,6 @@
 package controlplane
 
 import (
-	"context"
-
-	"k8s.io/klog/v2"
-
 	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform/detect"
 )
 
@@ -28,15 +24,4 @@ func Defaults() detect.ControlPlaneInfo {
 	return detect.ControlPlaneInfo{
 		NodeCount: 1, // TODO
 	}
-}
-
-func Discover(ctx context.Context) detect.ControlPlaneInfo {
-	info, err := detect.ControlPlane(ctx)
-	if err != nil {
-		klog.InfoS("cannot autodetect control plane and scheduler replica count", "err", err)
-		return Defaults()
-	}
-
-	klog.InfoS("autodetected control plane nodes", "suggestedSchedulerReplicas", info.NodeCount)
-	return info
 }

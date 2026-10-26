@@ -25,22 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	ocpconfigv1 "github.com/openshift/api/config/v1"
 
 	"github.com/openshift-kni/numaresources-operator/internal/deployer/clientutil"
-	"github.com/openshift-kni/numaresources-operator/internal/deployer/clientutil/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer"
 	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
-	ocpconfigv1 "github.com/openshift/api/config/v1"
 )
-
-func ControlPlane(ctx context.Context) (ControlPlaneInfo, error) {
-	cli, err := clientutil.New()
-	if err != nil {
-		return ControlPlaneInfo{}, err
-	}
-	return ControlPlaneFromLister(ctx, cli)
-}
 
 func Platform(ctx context.Context) (platform.Platform, error) {
 	ocpCli, err := clientutil.NewOCPClientSet()
@@ -48,26 +38,6 @@ func Platform(ctx context.Context) (platform.Platform, error) {
 		return platform.Unknown, err
 	}
 	return PlatformFromClients(ctx, ocpCli.ConfigV1.ClusterVersions(), ocpCli.ConfigV1.Infrastructures())
-}
-
-// ControlPlaneFromLister is deprecated, use ControlPlaneFromEnv instead
-func ControlPlaneFromLister(ctx context.Context, cli client.Client) (ControlPlaneInfo, error) {
-	env := deployer.Environment{
-		Ctx: ctx,
-		Cli: cli,
-		Log: logr.Discard(), // TODO
-	}
-	return ControlPlaneFromEnv(&env)
-}
-
-func ControlPlaneFromEnv(env *deployer.Environment) (ControlPlaneInfo, error) {
-	info := ControlPlaneInfo{}
-	nodes, err := nodes.GetControlPlane(env)
-	if err != nil {
-		return info, err
-	}
-	info.NodeCount = len(nodes)
-	return info, nil
 }
 
 // PlatformFromClients is deprecated, use PlatformFromEnv instead
@@ -102,7 +72,6 @@ func PlatformFromEnv(env *platform.Environment) (platform.Platform, error) {
 		return platform.OpenShift, nil
 	}
 	return platform.Kubernetes, nil
-
 }
 
 func VersionFromEnv(env *platform.Environment, plat platform.Platform) (platform.Version, error) {

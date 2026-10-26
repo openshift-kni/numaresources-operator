@@ -24,8 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	deployervalidator "github.com/openshift-kni/numaresources-operator/internal/deployer/validator"
 )
 
 const (
@@ -63,12 +61,12 @@ func CollectPodStatus(ctx context.Context, cli client.Client, data *ValidatorDat
 	return nil
 }
 
-func ValidatePodStatus(data ValidatorData) ([]deployervalidator.ValidationResult, error) {
-	var ret []deployervalidator.ValidationResult
+func ValidatePodStatus(data ValidatorData) ([]ValidationResult, error) {
+	var ret []ValidationResult
 	for nodeName, pods := range data.nonRunningPodsByNode {
 		for nname, phase := range pods {
-			ret = append(ret, deployervalidator.ValidationResult{
-				Area:      deployervalidator.AreaKubelet, // TODO use AreaNode when available
+			ret = append(ret, ValidationResult{
+				Area:      AreaKubelet, // TODO use AreaNode when available
 				Component: "pod",
 				Node:      nodeName,
 				Setting:   nname,

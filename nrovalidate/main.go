@@ -36,8 +36,6 @@ import (
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 
-	deployervalidator "github.com/openshift-kni/numaresources-operator/internal/deployer/validator"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nrovalidator "github.com/openshift-kni/numaresources-operator/nrovalidate/validator"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
@@ -146,7 +144,7 @@ func validateCluster(ctx context.Context, args ProgArgs) error {
 	return json.NewEncoder(os.Stdout).Encode(rep)
 }
 
-func printValidationResults(items []deployervalidator.ValidationResult, verbose bool) {
+func printValidationResults(items []nrovalidator.ValidationResult, verbose bool) {
 	if len(items) == 0 {
 		fmt.Printf("PASSED>>: cluster configuration looks ok!\n")
 		return

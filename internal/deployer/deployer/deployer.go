@@ -43,31 +43,3 @@ func (env *Environment) EnsureClient() error {
 	env.Cli = cli
 	return nil
 }
-
-func (env *Environment) WithName(name string) *Environment {
-	return &Environment{
-		Ctx: env.Ctx,
-		Cli: env.Cli,
-		Log: env.Log.WithName(name),
-	}
-}
-
-func (env Environment) CreateObject(obj client.Object) error {
-	objKind := obj.GetObjectKind().GroupVersionKind().Kind // shortcut
-	if err := env.Cli.Create(env.Ctx, obj); err != nil {
-		env.Log.Info("error creating", "kind", objKind, "name", obj.GetName(), "error", err)
-		return err
-	}
-	env.Log.Info("created", "kind", objKind, "name", obj.GetName())
-	return nil
-}
-
-func (env Environment) DeleteObject(obj client.Object) error {
-	objKind := obj.GetObjectKind().GroupVersionKind().Kind // shortcut
-	if err := env.Cli.Delete(env.Ctx, obj); err != nil {
-		env.Log.Info("error deleting", "kind", objKind, "name", obj.GetName(), "error", err)
-		return err
-	}
-	env.Log.Info("deleted", "kind", objKind, "name", obj.GetName())
-	return nil
-}
