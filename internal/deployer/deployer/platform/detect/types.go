@@ -17,9 +17,6 @@
 package detect
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
 )
 
@@ -35,37 +32,8 @@ type VersionInfo struct {
 	Discovered   platform.Version `json:"discovered"`
 }
 
-type ClusterInfo struct {
-	Platform PlatformInfo `json:"platform"`
-	Version  VersionInfo  `json:"version"`
-}
-
-func (ci ClusterInfo) String() string {
-	return fmt.Sprintf("%s:%s", ci.Platform.Discovered, ci.Version.Discovered)
-}
-
-func (ci ClusterInfo) ToJSON() string {
-	data, err := json.Marshal(ci)
-	if err != nil {
-		return `{"error":` + fmt.Sprintf("%q", err) + `}`
-	}
-	return string(data)
-}
-
 type ControlPlaneInfo struct {
 	NodeCount int `json:"nodeCount"`
-}
-
-func (cpi ControlPlaneInfo) String() string {
-	return fmt.Sprintf("nodes=%d", cpi.NodeCount)
-}
-
-func (cpi ControlPlaneInfo) ToJSON() string {
-	data, err := json.Marshal(cpi)
-	if err != nil {
-		return `{"error":` + fmt.Sprintf("%q", err) + `}`
-	}
-	return string(data)
 }
 
 const (

@@ -17,19 +17,15 @@
 package wait
 
 import (
-	"context"
 	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	k8swait "k8s.io/apimachinery/pkg/util/wait"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -43,18 +39,9 @@ var (
 	basePollTimeout  = DefaultPollTimeout
 )
 
-func SetBaseValues(interval, timeout time.Duration) {
-	basePollInterval = interval
-	basePollTimeout = timeout
-}
-
 type ObjectKey struct {
 	Namespace string
 	Name      string
-}
-
-func ObjectKeyFromObject(obj metav1.Object) ObjectKey {
-	return ObjectKey{Namespace: obj.GetNamespace(), Name: obj.GetName()}
 }
 
 func (ok ObjectKey) AsKey() types.NamespacedName {
@@ -84,10 +71,6 @@ func With(cli client.Client, log logr.Logger) *Waiter {
 	}
 }
 
-func (wt *Waiter) String() string {
-	return fmt.Sprintf("wait every %v up to %v", wt.PollInterval, wt.PollTimeout)
-}
-
 func (wt *Waiter) Timeout(tt time.Duration) *Waiter {
 	wt.PollTimeout = tt
 	return wt
@@ -96,17 +79,6 @@ func (wt *Waiter) Timeout(tt time.Duration) *Waiter {
 func (wt *Waiter) Interval(iv time.Duration) *Waiter {
 	wt.PollInterval = iv
 	return wt
-}
-
-func (wt Waiter) ForNamespaceDeleted(ctx context.Context, namespace string) error {
-	log := wt.Log.WithValues("namespace", namespace)
-	log.Info("wait for the namespace to be gone")
-	return k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, true, func(fctx context.Context) (bool, error) {
-		nsKey := ObjectKey{Name: namespace}
-		ns := corev1.Namespace{} // unused
-		err := wt.Cli.Get(fctx, nsKey.AsKey(), &ns)
-		return deletionStatusFromError(wt.Log, "Namespace", nsKey, err)
-	})
 }
 
 func deletionStatusFromError(logger logr.Logger, kind string, key ObjectKey, err error) (bool, error) {

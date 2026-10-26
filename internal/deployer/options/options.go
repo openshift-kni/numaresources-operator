@@ -31,10 +31,6 @@ const (
 	SCCV2 SCCVersion = "v2"
 )
 
-func IsValidSCCVersion(ver string) bool {
-	return ver == string(SCCV1) || ver == string(SCCV2)
-}
-
 type Options struct {
 	UserPlatform                platform.Platform
 	UserPlatformVersion         platform.Version
@@ -117,15 +113,4 @@ type Render struct {
 	Namespace           string
 	EnableCRIHooks      bool
 	CustomSELinuxPolicy bool
-}
-
-func ForDaemonSet(commonOpts *Options) DaemonSet {
-	return DaemonSet{
-		PullIfNotPresent:   commonOpts.PullIfNotPresent,
-		PFPEnable:          commonOpts.UpdaterPFPEnable,
-		NotificationEnable: commonOpts.UpdaterNotifEnable,
-		UpdateInterval:     commonOpts.UpdaterSyncPeriod,
-		SCCVersion:         commonOpts.UpdaterSCCVersion,
-		Verbose:            commonOpts.UpdaterVerbose,
-	}
 }

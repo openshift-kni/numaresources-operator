@@ -17,17 +17,13 @@
 package manifests
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
 	"io"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8sjson "k8s.io/apimachinery/pkg/runtime/serializer/json"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func SerializeObject(obj runtime.Object, out io.Writer) error {
@@ -51,12 +47,6 @@ func SerializeObject(obj runtime.Object, out io.Writer) error {
 	return srz.Encode(&r, out)
 }
 
-func SerializeObjectToData(obj runtime.Object) ([]byte, error) {
-	var buf bytes.Buffer
-	err := SerializeObject(obj, &buf)
-	return buf.Bytes(), err
-}
-
 func DeserializeObjectFromData(data []byte) (runtime.Object, error) {
 	decode := k8sscheme.Codecs.UniversalDeserializer().Decode
 	obj, _, err := decode(data, nil, nil)
@@ -72,15 +62,4 @@ func loadObject(path string) (runtime.Object, error) {
 		return nil, err
 	}
 	return DeserializeObjectFromData(data)
-}
-
-func RenderObjects(objs []client.Object, w io.Writer) error {
-	for _, obj := range objs {
-		fmt.Fprintf(w, "---\n")
-		if err := SerializeObject(obj, w); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

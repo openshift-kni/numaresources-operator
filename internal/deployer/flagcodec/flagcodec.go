@@ -72,20 +72,6 @@ func ParseArgvKeyValue(args []string, opts ...Option) *Flags {
 	return ret
 }
 
-// ParseArgvKeyValueWithCommand parses a clean (trimmed) argv whose components
-// are either toggles or key=value pairs. IOW, this is a restricted and easier
-// to parse flavor of argv on which option and value are guaranteed to
-// be in the same item.
-// IOW, we expect
-// "--opt=foo"
-// AND NOT
-// "--opt", "foo"
-// The command is supplied explicitly as parameter.
-// DEPRECATED: use ParseArgvValue and WithCommand option
-func ParseArgvKeyValueWithCommand(command string, args []string) *Flags {
-	return ParseArgvKeyValue(args, WithCommand(command))
-}
-
 type Option func(*Flags) *Flags
 
 func normalizeFlagName(v string) string {
@@ -110,13 +96,6 @@ func normalizeFlagName(v string) string {
 func WithFlagNormalization(fl *Flags) *Flags {
 	fl.processFlagName = normalizeFlagName
 	return fl
-}
-
-func WithCommand(command string) Option {
-	return func(fl *Flags) *Flags {
-		fl.command = command
-		return fl
-	}
 }
 
 func (fl *Flags) recordFlag(name string) {

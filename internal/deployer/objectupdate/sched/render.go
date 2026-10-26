@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
 
@@ -28,25 +27,6 @@ import (
 
 	"github.com/openshift-kni/numaresources-operator/internal/deployer/manifests"
 )
-
-func SchedulerConfig(cm *corev1.ConfigMap, schedulerName string, params *manifests.ConfigParams) error {
-	if cm.Data == nil {
-		return fmt.Errorf("no data found in ConfigMap: %s/%s", cm.Namespace, cm.Name)
-	}
-
-	data, ok := cm.Data[manifests.SchedulerConfigFileName]
-	if !ok {
-		return fmt.Errorf("no data key named: %s found in ConfigMap: %s/%s", manifests.SchedulerConfigFileName, cm.Namespace, cm.Name)
-	}
-
-	newData, _, err := RenderConfig([]byte(data), schedulerName, params)
-	if err != nil {
-		return err
-	}
-
-	cm.Data[manifests.SchedulerConfigFileName] = string(newData)
-	return nil
-}
 
 func RenderConfig(data []byte, schedulerName string, params *manifests.ConfigParams) ([]byte, bool, error) {
 	if schedulerName == "" || params == nil {
@@ -82,7 +62,6 @@ func RenderConfig(data []byte, schedulerName string, params *manifests.ConfigPar
 			klog.ErrorS(err, "failed to override unstructured data", "data", "leaderElection")
 			return data, false, err
 		}
-
 	}
 
 	profiles, ok, err := unstructured.NestedSlice(r.Object, "profiles")
@@ -199,7 +178,6 @@ func updateLeaderElection(lead map[string]interface{}, params *manifests.ConfigP
 	updated++
 
 	return updated > 0, nil
-
 }
 
 func updateArgs(args map[string]interface{}, params *manifests.ConfigParams) (bool, error) {

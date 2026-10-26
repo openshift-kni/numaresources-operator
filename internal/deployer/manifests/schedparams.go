@@ -18,12 +18,11 @@ package manifests
 
 import (
 	"fmt"
-	"time"
-
-	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/klog/v2"
+
+	"sigs.k8s.io/yaml"
 )
 
 const (
@@ -108,19 +107,6 @@ type ConfigCacheParams struct {
 	InformerMode          *string `json:"informerMode,omitempty"`
 }
 
-func SetDefaultsConfigCacheParams(params *ConfigCacheParams) {
-	params.ResyncPeriodSeconds = newInt64(int64(5 * time.Second))
-	params.ResyncMethod = newString(CacheResyncAutodetect)
-	params.ForeignPodsDetectMode = newString(ForeignPodsDetectOnlyExclusiveResources)
-	// InformerMode support intentionally left unspecified
-}
-
-func NewConfigCacheParams() *ConfigCacheParams {
-	params := ConfigCacheParams{}
-	SetDefaultsConfigCacheParams(&params)
-	return &params
-}
-
 type ResourceSpecParams struct {
 	// Name of the resource.
 	Name string `json:"name"`
@@ -161,15 +147,6 @@ type LeaderElectionParams struct {
 	LeaderElect       bool   `json:"leaderElect"`
 	ResourceNamespace string `json:"resourceNamespace,omitempty"`
 	ResourceName      string `json:"resourceName,omitempty"`
-}
-
-func SetDefaultsLeaderElection(lep *LeaderElectionParams) {
-	if lep.ResourceName == "" {
-		lep.ResourceName = LeaderElectionDefaultName
-	}
-	if lep.ResourceNamespace == "" {
-		lep.ResourceNamespace = LeaderElectionDefaultNamespace
-	}
 }
 
 type ConfigParams struct {
@@ -418,12 +395,4 @@ func extractLeaderElectionParams(lead map[string]interface{}) (*LeaderElectionPa
 	}
 
 	return &params, nil
-}
-
-func newInt64(v int64) *int64 {
-	return &v
-}
-
-func newString(v string) *string {
-	return &v
 }

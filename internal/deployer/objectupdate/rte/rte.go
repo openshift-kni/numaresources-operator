@@ -94,32 +94,6 @@ func DaemonSet(ds *appsv1.DaemonSet, plat platform.Platform, configMapName strin
 	daemonSetContainerConfig(podSpec, cntSpec, plat, configMapName, opts)
 }
 
-func MetricsPort(ds *appsv1.DaemonSet, portNum int) {
-	cntSpec := objectupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, manifests.ContainerNameRTE)
-	if cntSpec == nil {
-		return // should never happen
-	}
-
-	metricsPortForContainer(cntSpec, portNum)
-}
-
-func SecurityContext(ds *appsv1.DaemonSet, selinuxContextType string) {
-	cntSpec := objectupdate.FindContainerByName(ds.Spec.Template.Spec.Containers, manifests.ContainerNameRTE)
-	if cntSpec == nil {
-		return // should never happen
-	}
-
-	// this is needed to put watches in the kubelet state dirs AND
-	// to open the podresources socket in R/W mode
-	if cntSpec.SecurityContext == nil {
-		cntSpec.SecurityContext = &corev1.SecurityContext{}
-	}
-	cntSpec.SecurityContext.SELinuxOptions = &corev1.SELinuxOptions{
-		Type:  selinuxContextType,
-		Level: selinuxassets.RTEContextLevel,
-	}
-}
-
 type SecurityContextOptions struct {
 	SELinuxContextType  string
 	SecurityContextName string

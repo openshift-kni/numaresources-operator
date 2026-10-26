@@ -27,16 +27,19 @@ import (
 	"time"
 
 	igntypes "github.com/coreos/ignition/v2/config/v3_2/types"
-	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
-	securityv1 "github.com/openshift/api/security/v1"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/utils/pointer"
+
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
+	securityv1 "github.com/openshift/api/security/v1"
 
 	rteassets "github.com/openshift-kni/numaresources-operator/internal/deployer/assets/rte"
 	selinuxassets "github.com/openshift-kni/numaresources-operator/internal/deployer/assets/selinux"
@@ -90,26 +93,9 @@ const (
 var src embed.FS
 
 func init() {
-	apiextensionv1.AddToScheme(scheme.Scheme)
-	machineconfigv1.Install(scheme.Scheme)
-	securityv1.Install(scheme.Scheme)
-}
-
-func Namespace(component string) (*corev1.Namespace, error) {
-	if err := validateComponent(component); err != nil {
-		return nil, err
-	}
-
-	obj, err := loadObject(filepath.Join("yaml", component, "namespace.yaml"))
-	if err != nil {
-		return nil, err
-	}
-
-	ns, ok := obj.(*corev1.Namespace)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type, got %t", obj)
-	}
-	return ns, nil
+	utilruntime.Must(apiextensionv1.AddToScheme(scheme.Scheme))
+	utilruntime.Must(machineconfigv1.Install(scheme.Scheme))
+	utilruntime.Must(securityv1.Install(scheme.Scheme))
 }
 
 func ServiceAccount(component, subComponent, namespace string) (*corev1.ServiceAccount, error) {
@@ -243,61 +229,6 @@ func APICRD() (*apiextensionv1.CustomResourceDefinition, error) {
 		return nil, fmt.Errorf("unexpected type, got %t", obj)
 	}
 	return crd, nil
-}
-
-func SchedulerCRD() (*apiextensionv1.CustomResourceDefinition, error) {
-	obj, err := loadObject("yaml/sched/podgroup.crd.yaml")
-	if err != nil {
-		return nil, err
-	}
-
-	crd, ok := obj.(*apiextensionv1.CustomResourceDefinition)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type, got %t", obj)
-	}
-	return crd, nil
-}
-
-func ConfigMap(component, subComponent string) (*corev1.ConfigMap, error) {
-	if err := validateComponent(component); err != nil {
-		return nil, err
-	}
-	if err := validateSubComponent(component, subComponent); err != nil {
-		return nil, err
-	}
-	obj, err := loadObject(filepath.Join("yaml", component, subComponent, "configmap.yaml"))
-	if err != nil {
-		return nil, err
-	}
-
-	crd, ok := obj.(*corev1.ConfigMap)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type, got %t", obj)
-	}
-	return crd, nil
-}
-
-func Deployment(component, subComponent, namespace string) (*appsv1.Deployment, error) {
-	if err := validateComponent(component); err != nil {
-		return nil, err
-	}
-	if err := validateSubComponent(component, subComponent); err != nil {
-		return nil, err
-	}
-	obj, err := loadObject(filepath.Join("yaml", component, subComponent, "deployment.yaml"))
-	if err != nil {
-		return nil, err
-	}
-
-	dp, ok := obj.(*appsv1.Deployment)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type, got %t", obj)
-	}
-
-	if namespace != "" {
-		dp.Namespace = namespace
-	}
-	return dp, nil
 }
 
 func DaemonSet(component, subComponent string, namespace string) (*appsv1.DaemonSet, error) {
@@ -539,28 +470,4 @@ func validateRoleName(roleName string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown roleName %q", roleName)
-}
-
-func Service(component, subComponent, namespace string) (*corev1.Service, error) {
-	if err := validateComponent(component); err != nil {
-		return nil, err
-	}
-	if err := validateSubComponent(component, subComponent); err != nil {
-		return nil, err
-	}
-
-	obj, err := loadObject(filepath.Join("yaml", component, subComponent, "service.yaml"))
-	if err != nil {
-		return nil, err
-	}
-
-	sv, ok := obj.(*corev1.Service)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type, got %t", obj)
-	}
-
-	if namespace != "" {
-		sv.Namespace = namespace
-	}
-	return sv, nil
 }

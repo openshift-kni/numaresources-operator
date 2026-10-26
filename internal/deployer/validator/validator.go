@@ -18,48 +18,12 @@ package validator
 
 import (
 	"fmt"
-
-	"k8s.io/apimachinery/pkg/version"
-	"k8s.io/client-go/discovery"
-
-	"github.com/go-logr/logr"
-	"github.com/openshift-kni/numaresources-operator/internal/deployer/clientutil"
 )
 
 const (
 	AreaCluster = "cluster"
 	AreaKubelet = "kubelet"
 )
-
-type Validator struct {
-	Log logr.Logger
-
-	results       []ValidationResult
-	serverVersion *version.Info
-}
-
-func NewValidatorWithDiscoveryClient(logger logr.Logger, cli *discovery.DiscoveryClient) (*Validator, error) {
-	vd := &Validator{
-		Log: logger,
-	}
-	_, err := vd.ValidateClusterVersion(cli)
-	if err != nil {
-		return nil, err
-	}
-	return vd, nil
-}
-
-func NewValidator(logger logr.Logger) (*Validator, error) {
-	cli, err := clientutil.NewDiscoveryClient()
-	if err != nil {
-		return nil, err
-	}
-	return NewValidatorWithDiscoveryClient(logger, cli)
-}
-
-func (vd *Validator) Results() []ValidationResult {
-	return vd.results
-}
 
 type ValidationResult struct {
 	Node      string `json:"node"`
