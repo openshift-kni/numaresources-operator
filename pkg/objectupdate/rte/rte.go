@@ -190,6 +190,13 @@ func DaemonSetArgs(ds *appsv1.DaemonSet, conf nropv1.NodeGroupConfig, metricsTLS
 	} else {
 		flags.Delete("--metrics-tls-cipher-suites")
 	}
+	// Delete curve preferences when empty to allow RTE to use Go defaults.
+	// This handles TLS profile changes from configured groups to Legacy (empty groups).
+	if metricsTLS.CurvePreferences != "" {
+		flags.SetOption("--metrics-tls-curve-preferences", metricsTLS.CurvePreferences)
+	} else {
+		flags.Delete("--metrics-tls-curve-preferences")
+	}
 
 	infoRefreshPauseEnabled := isInfoRefreshPauseEnabled(&conf)
 	klog.V(2).InfoS("DaemonSet update: InfoRefreshPause status", "daemonset", ds.Name, "enabled", infoRefreshPauseEnabled)

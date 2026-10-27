@@ -583,6 +583,35 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 					Expect(args).To(ContainElement(ContainSubstring("--metrics-tls-cipher-suites=" + tlsMetrics.CipherSuites)))
 				})
 
+				It("should apply RTEMetricsTLS with curve preferences to RTE DaemonSet", func(ctx context.Context) {
+					tlsMetrics := objtls.Settings{
+						MinVersion:       "VersionTLS12",
+						CipherSuites:     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+						CurvePreferences: "29,23,24",
+					}
+					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, nil)
+
+					var reconciler *NUMAResourcesOperatorReconciler
+					if platf == platform.HyperShift {
+						reconciler = reconcileObjectsHypershiftWithMetricsTLS(nro, tlsMetrics)
+					} else {
+						reconciler = reconcileObjectsOpenshiftWithMetricsTLS(nro, mcp, tlsMetrics)
+					}
+
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+						Namespace: testNamespace,
+					}
+					ds := &appsv1.DaemonSet{}
+					Expect(reconciler.Client.Get(ctx, dsKey, ds)).To(Succeed())
+
+					args := ds.Spec.Template.Spec.Containers[0].Args
+					Expect(args).To(ContainElement(ContainSubstring("--metrics-mode=httptls")))
+					Expect(args).To(ContainElement(ContainSubstring("--metrics-tls-min-version=" + tlsMetrics.MinVersion)))
+					Expect(args).To(ContainElement(ContainSubstring("--metrics-tls-cipher-suites=" + tlsMetrics.CipherSuites)))
+					Expect(args).To(ContainElement(ContainSubstring("--metrics-tls-curve-preferences=" + tlsMetrics.CurvePreferences)))
+				})
+
 				It("should not set metrics TLS min version or ciphers when RTEMetricsTLS is empty", func() {
 					nro := testobjs.NewNUMAResourcesOperatorWithNodeGroupConfig(objectnames.DefaultNUMAResourcesOperatorCrName, pn, nil)
 
