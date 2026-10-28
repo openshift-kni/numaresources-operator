@@ -1063,6 +1063,26 @@ func schedulerAllocatedCPUAndMemory(ctx context.Context, cli client.Client, node
 	return allocated, nil
 }
 
+func schedulerAllocatedEphemeralStorage(ctx context.Context, cli client.Client, nodeName string) (resource.Quantity, error) {
+	pods, err := podlist.With(cli).OnNode(ctx, nodeName)
+	if err != nil {
+		return resource.Quantity{}, err
+	}
+	allocated := resource.MustParse("0")
+	for i := range pods {
+		if pods[i].Status.Phase == corev1.PodSucceeded || pods[i].Status.Phase == corev1.PodFailed {
+			continue
+		}
+		req := resourcehelper.PodRequests(&pods[i], resourcehelper.PodResourcesOptions{
+			UseStatusResources:    true,
+			SkipPodLevelResources: true,
+		})
+		qty := req[corev1.ResourceEphemeralStorage]
+		allocated.Add(qty)
+	}
+	return allocated, nil
+}
+
 func makePaddingPod(fxt *e2efixture.Fixture, namespace, nodeName string, zone nrtv1alpha2.Zone, podReqs corev1.ResourceList) (*corev1.Pod, error) {
 	fxt.Dump.Infof(fmt.Sprintf("zone: %s\nallocatable: %s", zone.Name, e2ereslist.ToString(podReqs)), "want to have zone with allocatable")
 
