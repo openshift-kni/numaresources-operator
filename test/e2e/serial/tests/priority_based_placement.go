@@ -256,13 +256,17 @@ var _ = Describe("[serial][disruptive][preemption] priority-based workload place
 
 						By("verifying one filler pod is evicted")
 						evicted := sets.New[string]()
-						for _, fp := range fillerPods {
-							pod := &corev1.Pod{}
-							err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(fp), pod)
-							if apierrors.IsNotFound(err) {
-								evicted.Insert(fp.Name)
+						Eventually(func(g Gomega) {
+							for _, fp := range fillerPods {
+								pod := &corev1.Pod{}
+								err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(fp), pod)
+								if apierrors.IsNotFound(err) {
+									evicted.Insert(fp.Name)
+									continue
+								}
+								g.Expect(err).ToNot(HaveOccurred(), "failed to get filler pod %q", fp.Name)
 							}
-						}
+						}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "expected exactly one filler pod to be evicted")
 						Expect(evicted.Len()).To(Equal(1), "expected one filler pod to be evicted, got %d", evicted.Len())
 
 						By("verifying the rest of the filler pods continue to run")
@@ -463,14 +467,18 @@ var _ = Describe("[serial][disruptive][preemption] priority-based workload place
 					// only sufficient option. which also means we need to ensure that the rest of the filler pods are not evicted.
 					klog.Info("verifying one of the medium-priority filler pod is evicted and the rest are still running")
 					evictedPod := &corev1.Pod{}
-					for _, medPod := range mediumPriorityPods {
-						pod := &corev1.Pod{}
-						err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(medPod), pod)
-						if apierrors.IsNotFound(err) {
-							evictedPod = medPod
-							break
+					Eventually(func(g Gomega) {
+						for _, medPod := range mediumPriorityPods {
+							pod := &corev1.Pod{}
+							err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(medPod), pod)
+							if apierrors.IsNotFound(err) {
+								evictedPod = medPod
+								break
+							}
+							g.Expect(err).ToNot(HaveOccurred(), "failed to get medium-priority filler pod %q", medPod.Name)
 						}
-					}
+					}).WithTimeout(5*time.Minute).WithPolling(10*time.Second).Should(Succeed(), "no medium-priority filler pod was evicted")
+
 					Expect(evictedPod.Name).ToNot(BeEmpty(), "no medium-priority filler pod was evicted")
 					klog.InfoS("evicted pod", "podName", evictedPod.Name)
 
