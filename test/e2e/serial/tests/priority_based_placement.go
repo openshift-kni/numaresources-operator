@@ -247,24 +247,23 @@ var _ = Describe("[serial][disruptive][preemption] priority-based workload place
 					Expect(fxt.Client.Create(ctx, testPod)).To(Succeed(), "cannot create test workload pod")
 
 					if tc.evictionExpected {
-						By("verifying one filler pod is preempted and evicted")
-						evicted := sets.New[string]()
-						Eventually(func(g Gomega) {
-							for _, fp := range fillerPods {
-								pod := &corev1.Pod{}
-								err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(fp), pod)
-								if apierrors.IsNotFound(err) {
-									evicted.Insert(fp.Name)
-								}
-							}
-							g.Expect(evicted.Len()).To(Equal(1), "expected one filler pod to be evicted, got %d", evicted.Len())
-						}).WithTimeout(pendingTimeout).WithPolling(10*time.Second).Should(Succeed(), "failed to have the pod running")
 						By("verifying test pod becomes running after preemption")
 						updatedPod, err := wait.With(fxt.Client).Timeout(pendingTimeout).ForPodPhase(ctx, testPod.Namespace, testPod.Name, corev1.PodRunning)
 						if err != nil {
 							_ = objects.LogEventsForPod(fxt.K8sClient, updatedPod.Namespace, updatedPod.Name)
 						}
 						Expect(err).ToNot(HaveOccurred(), "test pod did not become Running after preemption")
+
+						By("verifying one filler pod is evicted")
+						evicted := sets.New[string]()
+						for _, fp := range fillerPods {
+							pod := &corev1.Pod{}
+							err := fxt.Client.Get(ctx, client.ObjectKeyFromObject(fp), pod)
+							if apierrors.IsNotFound(err) {
+								evicted.Insert(fp.Name)
+							}
+						}
+						Expect(evicted.Len()).To(Equal(1), "expected one filler pod to be evicted, got %d", evicted.Len())
 
 						By("verifying the rest of the filler pods continue to run")
 						Consistently(func(g Gomega) {
