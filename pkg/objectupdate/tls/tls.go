@@ -19,6 +19,7 @@ package tls
 import (
 	"crypto/tls"
 	"fmt"
+	"strconv"
 	"strings"
 
 	libgocrypto "github.com/openshift/library-go/pkg/crypto"
@@ -26,23 +27,48 @@ import (
 
 // Settings holds pre-computed string representations of TLS configuration.
 type Settings struct {
-	MinVersion   string
-	CipherSuites string
+	MinVersion       string
+	CipherSuites     string
+	CurvePreferences string // Comma-separated numeric IDs (e.g., "29,23,24")
 }
 
 func (s Settings) String() string {
-	return fmt.Sprintf("MinVersion: %s, CipherSuites: %s", s.MinVersion, s.CipherSuites)
+	ret := fmt.Sprintf("MinVersion: %s, CipherSuites: %s", s.MinVersion, s.CipherSuites)
+	if s.CurvePreferences != "" {
+		return ret + fmt.Sprintf(", CurvePreferences: %s", s.CurvePreferences)
+	}
+	return ret
 }
 
-// NewSettings creates Settings from a tls.Config by converting the
-// numeric TLS version and cipher suite IDs to their string names.
+// NewSettings creates Settings from a tls.Config.
+// NewTLSConfigFromProfile automatically applies Groups to CurvePreferences,
+// so we just need to format the already-populated curve preferences as a string.
 func NewSettings(cfg *tls.Config) Settings {
 	cipherNames := make([]string, 0, len(cfg.CipherSuites))
 	for _, id := range cfg.CipherSuites {
 		cipherNames = append(cipherNames, tls.CipherSuiteName(id))
 	}
-	return Settings{
+
+	settings := Settings{
 		MinVersion:   libgocrypto.TLSVersionToNameOrDie(cfg.MinVersion),
 		CipherSuites: strings.Join(cipherNames, ","),
 	}
+
+	// cfg.CurvePreferences is already populated by NewTLSConfigFromProfile
+	if len(cfg.CurvePreferences) > 0 {
+		settings.CurvePreferences = curveIDsToString(cfg.CurvePreferences)
+	}
+
+	return settings
+}
+
+func curveIDsToString(ids []tls.CurveID) string {
+	var sb strings.Builder
+	for i, id := range ids {
+		if i > 0 {
+			sb.WriteString(",")
+		}
+		sb.WriteString(strconv.Itoa(int(id)))
+	}
+	return sb.String()
 }

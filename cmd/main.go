@@ -330,6 +330,8 @@ func main() {
 		exitWithCancel(cancel, 1)
 	}
 
+	// NewTLSConfigFromProfile automatically applies Groups to CurvePreferences
+	// (from controller-runtime-common#22)
 	tlsConfig, unsupportedCiphers := ctrltls.NewTLSConfigFromProfile(tlsSecurityProfileSpec)
 	if len(unsupportedCiphers) > 0 {
 		klog.InfoS("TLS profile configuration contains unsupported ciphers that will be ignored", "unsupported", unsupportedCiphers)
@@ -339,6 +341,7 @@ func main() {
 	// TLS config is immutable for the operator's lifetime: if it changes, the operator restarts.
 	tlsCfg := &tls.Config{}
 	tlsConfig(tlsCfg)
+	// NewTLSConfigFromProfile already applied Groups to CurvePreferences, just format them
 	tlsSettings := objtls.NewSettings(tlsCfg)
 	klog.InfoS("found TLS settings from APIServer", "settings", tlsSettings.String())
 

@@ -104,6 +104,15 @@ func TestUpdateDaemonSetArgs(t *testing.T) {
 			},
 		},
 		{
+			name:       "TLS with curve preferences",
+			conf:       nropv1.DefaultNodeGroupConfig(),
+			metricsTLS: objtls.Settings{MinVersion: "VersionTLS12", CipherSuites: "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", CurvePreferences: "29,23,24"},
+			expectedArgs: []string{
+				"--pods-fingerprint", "--pods-fingerprint-method=with-exclusive-resources", "--refresh-node-resources", "--add-nrt-owner=false", "--sleep-interval=10s", "--metrics-mode=httptls", "--numa-placement=container",
+				"--metrics-tls-min-version=VersionTLS12", "--metrics-tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256", "--metrics-tls-curve-preferences=29,23,24",
+			},
+		},
+		{
 			name: "override interval",
 			conf: nropv1.NodeGroupConfig{
 				InfoRefreshPeriod: &metav1.Duration{
