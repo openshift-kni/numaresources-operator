@@ -70,6 +70,14 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 		DescribeTable("a pod should be placed and aligned on the node", Label("hostlevel"),
 			func(tmPolicy string, requiredRes []corev1.ResourceList, expectedQOS corev1.PodQOSClass) {
 				ctx := context.TODO()
+				for _, rl := range requiredRes {
+					for resName := range rl {
+						if resName == "" {
+							e2efixture.Skipf(fxt, "sample device plugin resource names are not configured")
+						}
+					}
+				}
+				skipIfRequestedHugepagesMissingFromNRT(fxt, nrtList.Items, requiredRes, 2, 2)
 				nrtCandidates := filterNodes(fxt, desiredNodesState{
 					NRTList:           nrtList,
 					RequiredNodes:     2,
@@ -246,7 +254,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				},
 				corev1.PodQOSBurstable,
 			),
-			Entry("[test_id:74252][qos:be] with ephemeral storage, multi-container", //TODO test with devices and hugepages requests and fix automation
+			Entry("[test_id:74252][qos:be] with ephemeral storage, multi-container",
 				Label(label.Tier1, "qos:be"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
@@ -259,6 +267,27 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 					},
 				},
 				corev1.PodQOSBestEffort,
+			),
+			Entry("[qos:gu] with ephemeral storage, devices, hugepages, multi-container",
+				Label(label.Tier1, "qos:gu", "devices", "hugepages", "hostlevel"),
+				intnrt.SingleNUMANode,
+				[]corev1.ResourceList{
+					{
+						corev1.ResourceCPU:                                   resource.MustParse("2"),
+						corev1.ResourceMemory:                                resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage:                      resource.MustParse("256Mi"),
+						corev1.ResourceName("hugepages-2Mi"):                 resource.MustParse("32Mi"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					},
+					{
+						corev1.ResourceCPU:                                   resource.MustParse("2"),
+						corev1.ResourceMemory:                                resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage:                      resource.MustParse("16777216"),
+						corev1.ResourceName("hugepages-2Mi"):                 resource.MustParse("16Mi"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+					},
+				},
+				corev1.PodQOSGuaranteed,
 			),
 		)
 	})
@@ -301,7 +330,8 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 
 					fxt.Dump.Infof(fmt.Sprintf("node: %s\nresources: %s", nodeName, intreslist.ToString(paddingResources)), "pad node with")
 					pod := newPaddingPod(nodeName, "all", fxt.Namespace.Name, paddingResources)
-					pod.Spec.NodeName = nodeName // TODO: pinPodToNode?
+					pod, err = pinPodToNode(pod, nodeName)
+					Expect(err).NotTo(HaveOccurred(), "unable to pin padding pod to node %q", nodeName)
 
 					err = fxt.Client.Create(ctx, pod)
 					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
@@ -407,6 +437,45 @@ type desiredNodesState struct {
 	RequiredNodes     int
 	RequiredNUMAZones int
 	RequiredResources corev1.ResourceList // per node
+}
+
+// skipIfRequestedHugepagesMissingFromNRT skips the spec when hugepages are requested but the cluster
+// cannot run the test. Hugepages are NUMA-local in NRT (unlike ephemeral-storage); the suite does not
+// provision them in BeforeSuite—workers must reserve them via kubelet/MachineConfig/PerformanceProfile.
+//
+// This is a coarse gate only: it checks that each requested hugepage *type* appears with non-zero
+// available on at least one zone per node. It does not verify that a single zone can fit the summed
+// pod request; filterNodes and TAS handle that afterward.
+func skipIfRequestedHugepagesMissingFromNRT(fxt *e2efixture.Fixture, nrts []nrtv1alpha2.NodeResourceTopology, requiredRes []corev1.ResourceList, requiredNUMAZones, minNodes int) {
+	requested := intreslist.Accumulate(requiredRes, func(resName corev1.ResourceName, resQty resource.Quantity) bool {
+		return isHugePageResourceName(resName) && !resQty.IsZero()
+	})
+	if len(requested) == 0 {
+		return
+	}
+
+	eligible := 0
+	for _, nrt := range e2enrt.FilterZoneCountEqual(nrts, requiredNUMAZones) {
+		for _, zone := range nrt.Zones {
+			avail := e2enrt.AvailableFromZone(zone)
+			zoneOK := true
+			for resName := range requested {
+				qty, ok := avail[resName]
+				if !ok || qty.IsZero() {
+					zoneOK = false
+					break
+				}
+			}
+			if zoneOK {
+				eligible++
+				break // one qualifying zone is enough for this node
+			}
+		}
+	}
+	if eligible < minNodes {
+		e2efixture.Skipf(fxt, "hugepages requested (%s) but only %d node(s) with %d NUMA zones expose them in NRT (need %d)",
+			intreslist.ToString(requested), eligible, requiredNUMAZones, minNodes)
+	}
 }
 
 func filterNodes(fxt *e2efixture.Fixture, nodesState desiredNodesState) []nrtv1alpha2.NodeResourceTopology {
