@@ -12,7 +12,7 @@ ENV GOTAGS="strictfipsruntime,no_openssl"
 # Build
 RUN make binary-all
 
-FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:e7f7720259142a68a8087fb4df9d21a91189863aa083e9b27c2c2801878ef5c4
+FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:58d09489b1d9123e24d691e47af6c390fe5e08f50c7f4f2967bb64df7ab72aa0
 
 ARG OPENSHIFT_VERSION
 
