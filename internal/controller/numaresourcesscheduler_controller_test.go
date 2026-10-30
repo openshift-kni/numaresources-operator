@@ -924,6 +924,30 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
 			Expect(*dp.Spec.Replicas).To(Equal(int32(numOfMasters)), "number of replicas is different than number of control-planes nodes; want=%d got=%d", numOfMasters, *dp.Spec.Replicas)
 		})
+
+		It("should set the TopologySpreadConstraints in the deployment by default", func(ctx context.Context) {
+			nrsKey := client.ObjectKeyFromObject(nrs)
+
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: nrsKey})
+			Expect(err).ToNot(HaveOccurred())
+
+			Expect(reconciler.Client.Get(ctx, nrsKey, nrs)).To(Succeed())
+			dpKey := client.ObjectKey{Namespace: nrs.Status.Deployment.Namespace, Name: nrs.Status.Deployment.Name}
+			dp := &appsv1.Deployment{}
+			Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
+			Expect(dp.Spec.Template.Spec.TopologySpreadConstraints).To(HaveLen(1))
+
+			expectedConstraint := corev1.TopologySpreadConstraint{
+				MaxSkew:           1,
+				TopologyKey:       "kubernetes.io/hostname",
+				WhenUnsatisfiable: corev1.DoNotSchedule,
+				MatchLabelKeys:    []string{"pod-template-hash"},
+				LabelSelector: &metav1.LabelSelector{
+					MatchLabels: dp.Spec.Template.Labels,
+				},
+			}
+			Expect(dp.Spec.Template.Spec.TopologySpreadConstraints[0]).To(Equal(expectedConstraint))
+		})
 	})
 
 	When("setting the scheduler pod resource requests", func() {
@@ -1146,7 +1170,7 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 		})
 
-		It("should set the TLS arguments in the deployment by default and reflect updates", func() {
+		It("should set the TLS arguments in the deployment by default and reflect updates", func(ctx context.Context) {
 			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nrsKey})
 			Expect(err).ToNot(HaveOccurred())
 
@@ -1154,40 +1178,21 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
 			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-min-version=" + reconciler.TLSSettings.MinVersion))
 			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-cipher-suites=" + reconciler.TLSSettings.CipherSuites))
+			Expect(dp.Spec.Template.Spec.Containers[0].Args).ToNot(ContainElement("--tls-curve-preferences="))
 
 			updatedSettings := objtls.NewSettings(&tls.Config{
-				MinVersion:   tls.VersionTLS13,
-				CipherSuites: []uint16{tls.TLS_AES_128_GCM_SHA256, tls.TLS_AES_256_GCM_SHA384},
+				MinVersion:       tls.VersionTLS13,
+				CipherSuites:     []uint16{tls.TLS_AES_128_GCM_SHA256, tls.TLS_AES_256_GCM_SHA384},
+				CurvePreferences: []tls.CurveID{tls.CurveP384},
 			})
 			reconciler.TLSSettings = updatedSettings
-			_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nrsKey})
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: nrsKey})
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
+			Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
 			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-min-version=" + updatedSettings.MinVersion))
 			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-cipher-suites=" + updatedSettings.CipherSuites))
-		})
-
-		It("should set the TopologySpreadConstraints in the deployment by default", func(ctx context.Context) {
-			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: nrsKey})
-			Expect(err).ToNot(HaveOccurred())
-
-			Expect(reconciler.Client.Get(ctx, nrsKey, nrs)).To(Succeed())
-			dpKey := client.ObjectKey{Namespace: nrs.Status.Deployment.Namespace, Name: nrs.Status.Deployment.Name}
-			dp := &appsv1.Deployment{}
-			Expect(reconciler.Client.Get(ctx, dpKey, dp)).To(Succeed())
-			Expect(dp.Spec.Template.Spec.TopologySpreadConstraints).To(HaveLen(1))
-
-			expectedConstraint := corev1.TopologySpreadConstraint{
-				MaxSkew:           1,
-				TopologyKey:       "kubernetes.io/hostname",
-				WhenUnsatisfiable: corev1.DoNotSchedule,
-				MatchLabelKeys:    []string{"pod-template-hash"},
-				LabelSelector: &metav1.LabelSelector{
-					MatchLabels: dp.Spec.Template.Labels,
-				},
-			}
-			Expect(dp.Spec.Template.Spec.TopologySpreadConstraints[0]).To(Equal(expectedConstraint))
+			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-curve-preferences=" + updatedSettings.CurvePreferences))
 		})
 	})
 })
