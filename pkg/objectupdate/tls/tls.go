@@ -40,9 +40,7 @@ func (s Settings) String() string {
 	return ret
 }
 
-// NewSettings creates Settings from a tls.Config.
-// NewTLSConfigFromProfile automatically applies Groups to CurvePreferences,
-// so we just need to format the already-populated curve preferences as a string.
+// NewSettings creates Settings from an initialized tls.Config.
 func NewSettings(cfg *tls.Config) Settings {
 	cipherNames := make([]string, 0, len(cfg.CipherSuites))
 	for _, id := range cfg.CipherSuites {
@@ -54,7 +52,6 @@ func NewSettings(cfg *tls.Config) Settings {
 		CipherSuites: strings.Join(cipherNames, ","),
 	}
 
-	// cfg.CurvePreferences is already populated by NewTLSConfigFromProfile
 	if len(cfg.CurvePreferences) > 0 {
 		settings.CurvePreferences = curveIDsToString(cfg.CurvePreferences)
 	}
