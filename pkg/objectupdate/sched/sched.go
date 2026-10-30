@@ -93,9 +93,21 @@ func DeploymentTLSSettings(dp *appsv1.Deployment, tlsSettings objtls.Settings) e
 	if flags == nil {
 		return fmt.Errorf("cannot modify the arguments for container %s", cnt.Name)
 	}
-	flags.SetOption("--tls-min-version", tlsSettings.MinVersion)
-	flags.SetOption("--tls-cipher-suites", tlsSettings.CipherSuites)
-	flags.SetOption("--tls-curve-preferences", tlsSettings.CurvePreferences)
+	if tlsSettings.MinVersion != "" {
+		flags.SetOption("--tls-min-version", tlsSettings.MinVersion)
+	} else {
+		flags.Delete("--tls-min-version")
+	}
+	if tlsSettings.CipherSuites != "" {
+		flags.SetOption("--tls-cipher-suites", tlsSettings.CipherSuites)
+	} else {
+		flags.Delete("--tls-cipher-suites")
+	}
+	if tlsSettings.CurvePreferences != "" {
+		flags.SetOption("--tls-curve-preferences", tlsSettings.CurvePreferences)
+	} else {
+		flags.Delete("--tls-curve-preferences")
+	}
 	cnt.Args = flags.Argv()
 
 	klog.V(3).InfoS("Scheduler TLS settings",
