@@ -37,8 +37,6 @@ var _ = Describe("[tools][validation] nrovalidate tools", func() {
 	var crdPath string
 
 	BeforeEach(func() {
-		Skip("depends on MCO CRD")
-
 		sink, err := os.CreateTemp("", "test-crd")
 		Expect(err).ToNot(HaveOccurred())
 
