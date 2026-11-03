@@ -10,7 +10,7 @@ ENV GOTAGS="strictfipsruntime"
 # Build
 RUN make binary-all
 
-FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:e7f7720259142a68a8087fb4df9d21a91189863aa083e9b27c2c2801878ef5c4
+FROM registry.redhat.io/ubi9/ubi-minimal-pqc:latest@sha256:c7fdcf2617a608d07f95fa01d8936fc8bf898096a60e5ebc432aae8ead50ea6c
 
 ARG OPENSHIFT_VERSION
 
