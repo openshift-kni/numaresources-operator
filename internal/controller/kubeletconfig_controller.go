@@ -110,8 +110,6 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		return ctrl.Result{}, err
 	}
 
-	// KubeletConfig changes are expected to be sporadic, yet are important enough
-	// to be made visible at kubernetes level. So we generate events to handle them
 	cm, err := r.reconcileConfigMap(ctx, instance, req.NamespacedName)
 	if err != nil {
 		var klErr *InvalidKubeletConfig
