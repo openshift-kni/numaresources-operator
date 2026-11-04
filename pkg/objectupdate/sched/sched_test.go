@@ -581,6 +581,18 @@ func TestDeploymentTLSSettings(t *testing.T) {
 				"--tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
 			},
 		},
+		{
+			name: "removes empty TLS options",
+			initialArgs: []string{
+				"--config=/etc/kubernetes/config.yaml",
+				"--tls-min-version=VersionTLS13",
+				"--tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+			},
+			tlsSettings: objtls.Settings{},
+			expectedArgs: []string{
+				"--config=/etc/kubernetes/config.yaml",
+			},
+		},
 	}
 
 	for _, tc := range testCases {
