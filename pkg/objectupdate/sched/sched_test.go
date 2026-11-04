@@ -565,20 +565,38 @@ func TestDeploymentTLSSettings(t *testing.T) {
 			},
 		},
 		{
+			name:        "with CurvePreferences",
+			initialArgs: baseArgs,
+			tlsSettings: objtls.NewSettings(&tls.Config{
+				MinVersion:       tls.VersionTLS12,
+				CipherSuites:     []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
+				CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256, tls.CurveP384},
+			}),
+			expectedArgs: []string{
+				"--config=/etc/kubernetes/config.yaml",
+				"--tls-min-version=VersionTLS12",
+				"--tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+				"--tls-curve-preferences=29,23,24",
+			},
+		},
+		{
 			name: "replaces existing TLS args",
 			initialArgs: []string{
 				"--config=/etc/kubernetes/config.yaml",
 				"--tls-min-version=VersionTLS10",
 				"--tls-cipher-suites=TLS_RSA_WITH_AES_128_CBC_SHA",
+				"--tls-curve-preferences=23",
 			},
 			tlsSettings: objtls.NewSettings(&tls.Config{
-				MinVersion:   tls.VersionTLS13,
-				CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
+				MinVersion:       tls.VersionTLS13,
+				CipherSuites:     []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256},
+				CurvePreferences: []tls.CurveID{tls.CurveP384},
 			}),
 			expectedArgs: []string{
 				"--config=/etc/kubernetes/config.yaml",
 				"--tls-min-version=VersionTLS13",
 				"--tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+				"--tls-curve-preferences=24",
 			},
 		},
 		{
@@ -587,6 +605,7 @@ func TestDeploymentTLSSettings(t *testing.T) {
 				"--config=/etc/kubernetes/config.yaml",
 				"--tls-min-version=VersionTLS13",
 				"--tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+				"--tls-curve-preferences=23",
 			},
 			tlsSettings: objtls.Settings{},
 			expectedArgs: []string{

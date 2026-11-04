@@ -103,11 +103,17 @@ func DeploymentTLSSettings(dp *appsv1.Deployment, tlsSettings objtls.Settings) e
 	} else {
 		flags.Delete("--tls-cipher-suites")
 	}
+	if tlsSettings.CurvePreferences != "" {
+		flags.SetOption("--tls-curve-preferences", tlsSettings.CurvePreferences)
+	} else {
+		flags.Delete("--tls-curve-preferences")
+	}
 	cnt.Args = flags.Argv()
 
 	klog.V(3).InfoS("Scheduler TLS settings",
 		"minVersion", tlsSettings.MinVersion,
-		"cipherSuites", tlsSettings.CipherSuites)
+		"cipherSuites", tlsSettings.CipherSuites,
+		"curvePreferences", tlsSettings.CurvePreferences)
 	return nil
 }
 

@@ -1146,26 +1146,29 @@ var _ = Describe("Test NUMAResourcesScheduler Reconcile", func() {
 
 		})
 
-		It("should set the TLS arguments in the deployment by default and reflect updates", func() {
-			_, err := reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nrsKey})
+		It("should set the TLS arguments in the deployment by default and reflect updates", func(ctx context.Context) {
+			_, err := reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: nrsKey})
 			Expect(err).ToNot(HaveOccurred())
 
 			dp := &appsv1.Deployment{}
-			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
+			Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
 			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-min-version=" + reconciler.TLSSettings.MinVersion))
 			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-cipher-suites=" + reconciler.TLSSettings.CipherSuites))
+			Expect(dp.Spec.Template.Spec.Containers[0].Args).ToNot(ContainElement("--tls-curve-preferences="))
 
 			updatedSettings := objtls.NewSettings(&tls.Config{
-				MinVersion:   tls.VersionTLS13,
-				CipherSuites: []uint16{tls.TLS_AES_128_GCM_SHA256, tls.TLS_AES_256_GCM_SHA384},
+				MinVersion:       tls.VersionTLS13,
+				CipherSuites:     []uint16{tls.TLS_AES_128_GCM_SHA256, tls.TLS_AES_256_GCM_SHA384},
+				CurvePreferences: []tls.CurveID{tls.CurveP384},
 			})
 			reconciler.TLSSettings = updatedSettings
-			_, err = reconciler.Reconcile(context.TODO(), reconcile.Request{NamespacedName: nrsKey})
+			_, err = reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: nrsKey})
 			Expect(err).ToNot(HaveOccurred())
 
-			Expect(reconciler.Client.Get(context.TODO(), client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
+			Expect(reconciler.Client.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: "secondary-scheduler"}, dp)).To(Succeed())
 			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-min-version=" + updatedSettings.MinVersion))
 			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-cipher-suites=" + updatedSettings.CipherSuites))
+			Expect(dp.Spec.Template.Spec.Containers[0].Args).To(ContainElement("--tls-curve-preferences=" + updatedSettings.CurvePreferences))
 		})
 
 		It("should set the TopologySpreadConstraints in the deployment by default", func(ctx context.Context) {
