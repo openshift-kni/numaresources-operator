@@ -25,13 +25,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
-	k8swgmanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests"
-	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
-	k8swgschedupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate/sched"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/flagcodec"
+	k8swgmanifests "github.com/openshift-kni/numaresources-operator/internal/deployer/manifests"
+	k8swgobjupdate "github.com/openshift-kni/numaresources-operator/internal/deployer/objectupdate"
+	k8swgschedupdate "github.com/openshift-kni/numaresources-operator/internal/deployer/objectupdate/sched"
 	intreslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"

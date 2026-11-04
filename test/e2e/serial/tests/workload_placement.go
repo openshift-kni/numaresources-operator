@@ -38,11 +38,11 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 
 	intbaseload "github.com/openshift-kni/numaresources-operator/internal/baseload"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/flagcodec"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"

@@ -35,12 +35,12 @@ import (
 
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	rtemanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/rte"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/clientutil/nodes"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/internal/deployer/manifests/rte"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"

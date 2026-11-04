@@ -39,13 +39,13 @@ import (
 	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/flagcodec"
-	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/flagcodec"
+	k8swgobjupdate "github.com/openshift-kni/numaresources-operator/internal/deployer/objectupdate"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"

@@ -27,10 +27,9 @@ import (
 
 	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform/detect"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform/detect"
 	"github.com/openshift-kni/numaresources-operator/internal/hypershift/consts"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 )

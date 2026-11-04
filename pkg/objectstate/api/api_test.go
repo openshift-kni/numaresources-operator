@@ -26,8 +26,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
-	apimanifests "github.com/k8stopologyawareschedwg/deployer/pkg/manifests/api"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
+	apimanifests "github.com/openshift-kni/numaresources-operator/internal/deployer/manifests/api"
 )
 
 func TestFromClient(t *testing.T) {

@@ -30,9 +30,9 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/clientutil/nodes"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"

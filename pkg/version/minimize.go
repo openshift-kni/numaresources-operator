@@ -19,7 +19,7 @@ package version
 import (
 	"strings"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
 )
 
 func Minimize(ver platform.Version) platform.Version {

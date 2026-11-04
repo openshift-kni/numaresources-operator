@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
 )
 
 func TestNewWithDiscover(t *testing.T) {

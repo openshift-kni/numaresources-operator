@@ -17,7 +17,7 @@
 package platforminfo
 
 import (
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/deployer/deployer/platform"
 )
 
 // PlatformProperties represents the platform capabilities we have to infer and which are not explicitly
