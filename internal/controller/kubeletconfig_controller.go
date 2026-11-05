@@ -45,6 +45,7 @@ import (
 	mcov1 "github.com/openshift/api/machineconfiguration/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	intkubeletconfig "github.com/openshift-kni/numaresources-operator/internal/kubeletconfig"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
 	"github.com/openshift-kni/numaresources-operator/pkg/apply"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
@@ -121,8 +122,9 @@ func (r *KubeletConfigReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		klog.ErrorS(err, "failed to reconcile configmap", "controller", "kubeletconfig")
 		return ctrl.Result{}, err
 	}
-
-	klog.InfoS("updated RTE config from kubelet config", "configmap", klog.KRef(cm.Namespace, cm.Name), "kubeletconfig", req.NamespacedName.String())
+	if cm != nil {
+		klog.InfoS("updated RTE config from kubelet config", "configmap", klog.KRef(cm.Namespace, cm.Name), "kubeletconfig", req.NamespacedName.String())
+	}
 	return ctrl.Result{}, nil
 }
 
@@ -213,6 +215,10 @@ func (r *KubeletConfigReconciler) reconcileConfigMap(ctx context.Context, instan
 	if err != nil {
 		return nil, err
 	}
+	if kcHandler == nil {
+		// case of paused MCPs where ConfigMap already exists, nothing to do
+		return nil, nil
+	}
 	kubeletConfig, err := kubeletconfig.MCOKubeletConfToKubeletConf(kcHandler.mcoKc)
 	if err != nil {
 		klog.ErrorS(err, "cannot extract KubeletConfiguration from MCO KubeletConfig", "name", kcKey.Name)
@@ -281,6 +287,62 @@ func (r *KubeletConfigReconciler) makeKCHandlerForPlatform(ctx context.Context, 
 			klog.InfoS("detected KubeletConfig with empty payload, ignoring", "name", kcKey.Name)
 			return nil, &InvalidKubeletConfig{ObjectName: kcKey.Name}
 		}
+
+		if mcp.Spec.Paused {
+			klog.V(4).InfoS("detected paused MCP", "name", mcp.Name)
+			// while paused, RTE config must track the active MachineConfig on the nodes
+			currentConfigName := mcp.Status.Configuration.Name
+			currentConfigObj := &mcov1.MachineConfig{}
+			if err := r.Client.Get(ctx, client.ObjectKey{Name: currentConfigName}, currentConfigObj); err != nil {
+				return nil, fmt.Errorf("cannot find the machineConfig %s: %v", currentConfigName, err)
+			}
+
+			activeConfig, err := intkubeletconfig.ParseKubeletConfigFromMachineConfigRawData(currentConfigObj.Spec.Config.Raw)
+			if err != nil {
+				return nil, &InvalidKubeletConfig{
+					ObjectName: kcKey.Name,
+					Err:        fmt.Errorf("failed to parse the kubeletConfig from MachineConfig %s: %v", currentConfigName, err),
+				}
+			}
+			klog.V(4).InfoS("decoded machine config", "pausedMCP", mcp.Name, "machineConfig", currentConfigName, "decodedData", string(activeConfig))
+
+			decodedActiveKc, err := intkubeletconfig.BuildKubeletConfigObject(activeConfig)
+			if err != nil {
+				return nil, &InvalidKubeletConfig{
+					ObjectName: kcKey.Name,
+					Err:        fmt.Errorf("failed to decode the KubeletConfig data from MachineConfig %s: %v", currentConfigName, err),
+				}
+			}
+
+			expectedCMName := objectnames.GetComponentName(instance.Name, mcp.Name)
+			existingCM := &corev1.ConfigMap{}
+			err = r.Client.Get(ctx, client.ObjectKey{Namespace: r.Namespace, Name: expectedCMName}, existingCM)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("failed to get the configMap %s: %v", expectedCMName, err)
+			}
+
+			if err == nil {
+				klog.V(6).InfoS("paused MCP ConfigMap exists, checking if it matches the active MachineConfig", "kubeletconfig", kcKey.Name, "configmap", existingCM.Name, "machineConfig", currentConfigName)
+				matches, matchErr := configMapMatchesActiveKubeletConfig(existingCM, decodedActiveKc, instance.Spec.PodExcludes)
+				if matchErr != nil {
+					return nil, matchErr
+				}
+				if matches {
+					klog.V(6).InfoS("paused MCP ConfigMap already matches active MachineConfig", "kubeletconfig", kcKey.Name, "configmap", existingCM.Name, "machineConfig", currentConfigName)
+					return nil, nil
+				}
+				klog.V(4).InfoS("paused MCP ConfigMap does not match active MachineConfig, updating", "kubeletconfig", kcKey.Name, "configmap", existingCM.Name, "machineConfig", currentConfigName)
+			}
+			return &kubeletConfigHandler{
+				// decodeKc is built from the active MachineConfig and has no API identity,
+				// however the live KubeletConfig should stays the owner so the ConfigMap is garbage-collected with it.
+				ownerObject: mcoKc,
+				mcoKc:       decodedActiveKc,
+				poolName:    mcp.Name,
+				setCtrlRef:  controllerutil.SetControllerReference,
+			}, nil
+		}
+
 		return &kubeletConfigHandler{
 			ownerObject: mcoKc,
 			mcoKc:       mcoKc,
@@ -392,6 +454,22 @@ func removeDeletedOwner(kcKey client.ObjectKey, ownerConfigMaps []*corev1.Config
 		}
 	}
 	return ownerConfigMaps
+}
+
+func configMapMatchesActiveKubeletConfig(cm *corev1.ConfigMap, mcoKc *mcov1.KubeletConfig, podExcludes []nropv1.NamespacedName) (bool, error) {
+	existingData, err := rteconfig.UnpackConfigMap(cm)
+	if err != nil {
+		return false, nil
+	}
+	kubeletConfig, err := kubeletconfig.MCOKubeletConfToKubeletConf(mcoKc)
+	if err != nil {
+		return false, err
+	}
+	expectedData, err := rteconfig.Render(kubeletConfig, podExcludes)
+	if err != nil {
+		return false, err
+	}
+	return existingData == expectedData, nil
 }
 
 func (r *KubeletConfigReconciler) nodeGroupToMachineConfigPool(ctx context.Context, _ client.Object) []reconcile.Request {
