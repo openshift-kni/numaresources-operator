@@ -168,12 +168,24 @@ func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return equality.Semantic.DeepEqual(oldNodeGroups, newNodeGroups)
 		},
 	}
-	return ctrl.NewControllerManagedBy(mgr).
+
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(o, builder.WithPredicates(p)).
 		Owns(&corev1.ConfigMap{}).
 		Watches(&nropv1.NUMAResourcesOperator{}, handler.EnqueueRequestsFromMapFunc(r.numaResourcesOperatorToKubeletConfig),
-			builder.WithPredicates(numaResourcesOperatorPredicate)).
-		Complete(r)
+			builder.WithPredicates(numaResourcesOperatorPredicate))
+	if r.Platform == platform.OpenShift {
+		machineConfigPoolPredicate := predicate.Funcs{
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				mcpOld := e.ObjectOld.(*mcov1.MachineConfigPool)
+				mcpNew := e.ObjectNew.(*mcov1.MachineConfigPool)
+				return mcpOld.Spec.Paused != mcpNew.Spec.Paused
+			},
+		}
+		b = b.Watches(&mcov1.MachineConfigPool{}, handler.EnqueueRequestsFromMapFunc(r.MachineConfigPoolToKubeletConfig),
+			builder.WithPredicates(machineConfigPoolPredicate))
+	}
+	return b.Complete(r)
 }
 
 type InvalidKubeletConfig struct {
@@ -334,7 +346,7 @@ func (r *KubeletConfigReconciler) deleteConfigMap(ctx context.Context, instance 
 	return cm, true, nil
 }
 
-func (r *KubeletConfigReconciler) numaResourcesOperatorToKubeletConfig(ctx context.Context, object client.Object) []reconcile.Request {
+func (r *KubeletConfigReconciler) numaResourcesOperatorToKubeletConfig(ctx context.Context, _ client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 	if r.Platform == platform.OpenShift {
 		kcList := &mcov1.KubeletConfigList{}
@@ -380,4 +392,54 @@ func removeDeletedOwner(kcKey client.ObjectKey, ownerConfigMaps []*corev1.Config
 		}
 	}
 	return ownerConfigMaps
+}
+
+
+func (r *KubeletConfigReconciler) MachineConfigPoolToKubeletConfig(ctx context.Context, object client.Object) []reconcile.Request {
+	if r.Platform != platform.OpenShift {
+		return nil
+	}
+
+	changedMCP, ok := object.(*mcov1.MachineConfigPool)
+	if !ok || changedMCP == nil {
+		return nil
+	}
+
+	nro := &nropv1.NUMAResourcesOperator{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nro); err != nil {
+		klog.ErrorS(err, "failed to get NUMAResourcesOperator")
+		return nil
+	}
+
+	mcpsBynodeGroups, err := machineconfigpools.GetListByNodeGroupsV1(ctx, r.Client, nro.Spec.NodeGroups)
+	if err != nil {
+		klog.ErrorS(err, "failed to list MachineConfigPools for node groups")
+		return nil
+	}
+	belongsToNodeGroup := false
+	for _, mcp := range mcpsBynodeGroups {
+		if mcp.Name == changedMCP.Name {
+			belongsToNodeGroup = true
+			break
+		}
+	}
+	if !belongsToNodeGroup {
+		return nil
+	}
+
+	kcList := &mcov1.KubeletConfigList{}
+	if err := r.Client.List(ctx, kcList); err != nil {
+		klog.ErrorS(err, "failed to list KubeletConfigs")
+		return nil
+	}
+	for _, kc := range kcList.Items {
+		if _, err := machineconfigpools.FindBySelector([]*mcov1.MachineConfigPool{changedMCP}, kc.Spec.MachineConfigPoolSelector); err != nil {
+			if client.IgnoreNotFound(err) != nil {
+				klog.ErrorS(err, "failed to parse MachineConfigPoolSelector", "kubeletconfig", kc.Name)
+			}
+			continue
+		}
+		return []reconcile.Request{{NamespacedName: client.ObjectKey{Name: kc.Name}}}
+	}
+	return nil
 }
