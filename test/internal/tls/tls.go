@@ -41,9 +41,11 @@ import (
 	k8swgobjupdate "github.com/k8stopologyawareschedwg/deployer/pkg/objectupdate"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	namespacedname "github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
+	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
 
@@ -259,6 +261,35 @@ func CheckRTEDaemonSetTLSFlags(ctx context.Context, cli client.Client, expected 
 		if err := matchTLSFlag(rteFlags, "--metrics-tls-cipher-suites", expected.CipherSuites, ds.Name); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func CheckSchedulerTLSFlags(ctx context.Context, cli client.Client, expected objtls.Settings) error {
+	nroSched := &nropv1.NUMAResourcesScheduler{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesSchedulerCrName}, nroSched); err != nil {
+		return fmt.Errorf("failed to get NUMAResourcesScheduler: %w", err)
+	}
+	if nroSched.Status.Deployment.Name == "" || nroSched.Status.Deployment.Namespace == "" {
+		return fmt.Errorf("NUMAResourcesScheduler %q has no deployment in status", nroSched.Name)
+	}
+
+	dp := &appsv1.Deployment{}
+	dpkey := namespacedname.AsObjectKey(nroSched.Status.Deployment)
+	if err := cli.Get(ctx, dpkey, dp); err != nil {
+		return fmt.Errorf("failed to get Deployment %s: %w", dpkey.String(), err)
+	}
+	// it's only one container anyway but we use the helper for consistency
+	schedCnt := k8swgobjupdate.FindContainerByName(dp.Spec.Template.Spec.Containers, schedupdate.MainContainerName)
+	if schedCnt == nil {
+		return fmt.Errorf("main container not found deploymentName=%q", dp.Name)
+	}
+	schedFlags := flagcodec.ParseArgvKeyValue(schedCnt.Args, flagcodec.WithFlagNormalization)
+	if err := matchTLSFlag(schedFlags, "--tls-min-version", expected.MinVersion, dp.Name); err != nil {
+		return err
+	}
+	if err := matchTLSFlag(schedFlags, "--tls-cipher-suites", expected.CipherSuites, dp.Name); err != nil {
+		return err
 	}
 	return nil
 }
