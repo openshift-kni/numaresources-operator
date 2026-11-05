@@ -168,12 +168,24 @@ func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			return equality.Semantic.DeepEqual(oldNodeGroups, newNodeGroups)
 		},
 	}
-	return ctrl.NewControllerManagedBy(mgr).
+
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(o, builder.WithPredicates(p)).
 		Owns(&corev1.ConfigMap{}).
 		Watches(&nropv1.NUMAResourcesOperator{}, handler.EnqueueRequestsFromMapFunc(r.numaResourcesOperatorToKubeletConfig),
-			builder.WithPredicates(numaResourcesOperatorPredicate)).
-		Complete(r)
+			builder.WithPredicates(numaResourcesOperatorPredicate))
+	if r.Platform == platform.OpenShift {
+		machineConfigPoolPredicate := predicate.Funcs{
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				mcpOld := e.ObjectOld.(*mcov1.MachineConfigPool)
+				mcpNew := e.ObjectNew.(*mcov1.MachineConfigPool)
+				return mcpOld.Spec.Paused != mcpNew.Spec.Paused
+			},
+		}
+		b = b.Watches(&mcov1.MachineConfigPool{}, handler.EnqueueRequestsFromMapFunc(r.nodeGroupToMachineConfigPool),
+			builder.WithPredicates(machineConfigPoolPredicate))
+	}
+	return b.Complete(r)
 }
 
 type InvalidKubeletConfig struct {
@@ -334,7 +346,7 @@ func (r *KubeletConfigReconciler) deleteConfigMap(ctx context.Context, instance 
 	return cm, true, nil
 }
 
-func (r *KubeletConfigReconciler) numaResourcesOperatorToKubeletConfig(ctx context.Context, object client.Object) []reconcile.Request {
+func (r *KubeletConfigReconciler) numaResourcesOperatorToKubeletConfig(ctx context.Context, _ client.Object) []reconcile.Request {
 	var requests []reconcile.Request
 	if r.Platform == platform.OpenShift {
 		kcList := &mcov1.KubeletConfigList{}
@@ -380,4 +392,70 @@ func removeDeletedOwner(kcKey client.ObjectKey, ownerConfigMaps []*corev1.Config
 		}
 	}
 	return ownerConfigMaps
+}
+
+func (r *KubeletConfigReconciler) nodeGroupToMachineConfigPool(ctx context.Context, _ client.Object) []reconcile.Request {
+	var requests []reconcile.Request
+	if r.Platform != platform.OpenShift {
+		return requests
+	}
+
+	kcList := &mcov1.KubeletConfigList{}
+	if err := r.Client.List(ctx, kcList); err != nil {
+		klog.ErrorS(err, "failed to list KubeletConfigs %v")
+		return requests
+	}
+
+	nro := &nropv1.NUMAResourcesOperator{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: objectnames.DefaultNUMAResourcesOperatorCrName}, nro); err != nil {
+		klog.ErrorS(err, "failed to get NUMAResourcesOperator %v")
+		return requests
+	}
+	mcpList := &mcov1.MachineConfigPoolList{}
+	if err := r.Client.List(ctx, mcpList); err != nil {
+		klog.ErrorS(err, "failed to list MachineConfigPools %v")
+		return requests
+	}
+	mcpByName := make(map[string]*mcov1.MachineConfigPool, len(mcpList.Items))
+	mcpsForNGSelectorLookup := make([]*mcov1.MachineConfigPool, len(mcpList.Items))
+
+	for i := range mcpList.Items {
+		mcp := &mcpList.Items[i]
+		mcpByName[mcp.Name] = mcp
+		mcpsForNGSelectorLookup[i] = mcp
+	}
+	mcps := make([]*mcov1.MachineConfigPool, 0, len(nro.Spec.NodeGroups))
+	for _, ng := range nro.Spec.NodeGroups {
+		if ng.PoolName != nil {
+			if mcp, ok := mcpByName[*ng.PoolName]; ok {
+				mcps = append(mcps, mcp)
+			}
+			continue
+		}
+
+		// as long as we support node-groups by selector, we need to lookup the matching MachineConfigPool by selectors
+		if ng.MachineConfigPoolSelector != nil {
+			// node-groups by selector
+			matchingMCP, err := machineconfigpools.FindBySelector(mcpsForNGSelectorLookup, ng.MachineConfigPoolSelector)
+			if err != nil {
+				var notFound *machineconfigpools.NotFound
+				if !errors.As(err, &notFound) {
+					klog.ErrorS(err, "failed to find matching MachineConfigPool for node group by selector", "selector", ng.MachineConfigPoolSelector)
+				}
+				continue
+			}
+			mcps = append(mcps, matchingMCP)
+		}
+	}
+	for _, kc := range kcList.Items {
+		if _, err := machineconfigpools.FindBySelector(mcps, kc.Spec.MachineConfigPoolSelector); err != nil {
+			var notFound *machineconfigpools.NotFound
+			if !errors.As(err, &notFound) {
+				klog.ErrorS(err, "failed to parse MachineConfigPoolSelector", "kubeletconfig", kc.Name)
+			}
+			continue
+		}
+		requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKey{Name: kc.Name}})
+	}
+	return requests
 }
