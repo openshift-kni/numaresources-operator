@@ -49,6 +49,36 @@ func ServiceAccount(namespace string) (*corev1.ServiceAccount, error) {
 	return sa, nil
 }
 
+func Role(namespace string) (*rbacv1.Role, error) {
+	obj, err := loadObject(filepath.Join("yaml", "role.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	role, ok := obj.(*rbacv1.Role)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type, got %t", obj)
+	}
+	if namespace != "" {
+		role.Namespace = namespace
+	}
+	return role, nil
+}
+
+func RoleBinding(namespace string) (*rbacv1.RoleBinding, error) {
+	obj, err := loadObject(filepath.Join("yaml", "rolebinding.yaml"))
+	if err != nil {
+		return nil, err
+	}
+	rb, ok := obj.(*rbacv1.RoleBinding)
+	if !ok {
+		return nil, fmt.Errorf("unexpected type, got %t", obj)
+	}
+	if namespace != "" {
+		rb.Namespace = namespace
+	}
+	return rb, nil
+}
+
 func ClusterRole() (*rbacv1.ClusterRole, error) {
 	obj, err := loadObject(filepath.Join("yaml", "clusterrole.nrt.yaml"))
 	if err != nil {

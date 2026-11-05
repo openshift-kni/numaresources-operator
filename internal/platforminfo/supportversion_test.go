@@ -19,7 +19,7 @@ package platforminfo
 import (
 	"testing"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer/platform"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 )
 
 func TestDecodeMinimumVersion(t *testing.T) {
