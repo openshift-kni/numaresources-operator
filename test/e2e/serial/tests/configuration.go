@@ -1818,14 +1818,14 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 		})
 	})
 
-	Context("[tlscompliance][rte] rte complies with TLS Profile modifications", Label("feature:tlscompliance"), func() {
+	Context("[tlscompliance][rte][scheduler] RTE and scheduler complies with TLS Profile modifications", Label("feature:tlscompliance"), func() {
 		const (
-			rteDaemonSetCheckTimeout  = 30 * time.Second
-			rteDaemonSetCheckInterval = 5 * time.Second
+			CheckTimeout  = 30 * time.Second
+			CheckInterval = 5 * time.Second
 			apiServerUpdateTimeout    = 10 * time.Minute
 			apiServerUpdateInterval   = 10 * time.Second
 		)
-		It("[test_id:88383] should update RTE daemonset TLS args to adhere to modified TLS profile", Label(label.Reboot, label.Slow, label.Tier2), func(ctx context.Context) {
+		It("[test_id:88383] should update TLS args for dependant deployments to adhere to modified TLS profile", func(ctx context.Context) {
 			fxt.IsRebootTest = true
 			mcpUpdateTimeout := 40 * time.Minute
 			mcpUpdatePolling := 20 * time.Second
@@ -1909,7 +1909,12 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 			e2efixture.By("verifying RTE DaemonSet TLS flags match the updated profile: %v", expectedTLSSettings)
 			Eventually(func(g Gomega) {
 				g.Expect(intls.CheckRTEDaemonSetTLSFlags(ctx, e2eclient.Client, expectedTLSSettings)).To(Succeed())
-			}).WithTimeout(rteDaemonSetCheckTimeout).WithPolling(rteDaemonSetCheckInterval).Should(Succeed())
+			}).WithTimeout(CheckTimeout).WithPolling(CheckInterval).Should(Succeed())
+
+			e2efixture.By("verifying Scheduler TLS flags match the updated profile: %v", expectedTLSSettings)
+			Eventually(func(g Gomega) {
+				g.Expect(intls.CheckSchedulerTLSFlags(ctx, e2eclient.Client, expectedTLSSettings)).To(Succeed())
+			}).WithTimeout(CheckTimeout).WithPolling(CheckInterval).Should(Succeed())
 		})
 	})
 })
