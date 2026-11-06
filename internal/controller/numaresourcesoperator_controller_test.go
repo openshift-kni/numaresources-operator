@@ -2408,6 +2408,56 @@ var _ = Describe("Test NUMAResourcesOperator Reconcile", func() {
 				pausedCond := getConditionByType(nro.Status.Conditions, status.ConditionMachineConfigPoolPaused)
 				Expect(pausedCond).ToNot(BeNil())
 				Expect(pausedCond.Status).To(Equal(metav1.ConditionTrue))
+
+				By("Verify a paused pool does not keep the operator Progressing")
+				progressingCond := getConditionByType(nro.Status.Conditions, status.ConditionProgressing)
+				Expect(progressingCond).ToNot(BeNil())
+				Expect(progressingCond.Status).To(Equal(metav1.ConditionFalse))
+
+				By("Verify DaemonSets exist for the active pool and the paused pool")
+				ds := &appsv1.DaemonSet{}
+				for _, mcp := range []*machineconfigv1.MachineConfigPool{mcp1, mcp2} {
+					dsKey := client.ObjectKey{
+						Name:      objectnames.GetComponentName(nro.Name, mcp.Name),
+						Namespace: testNamespace,
+					}
+					Expect(reconciler.Client.Get(ctx, dsKey, ds)).To(Succeed())
+				}
+			})
+
+			It("should stay Progressing when a paused pool requires custom SELinux policy", func(ctx context.Context) {
+				// pool2 uses custom policy and is paused: MachineConfig cannot roll out, so stop early.
+				nro.Spec.NodeGroups[1].Annotations[annotations.SELinuxPolicyConfigAnnotation] = annotations.SELinuxPolicyCustom
+				mcp2.Spec.Paused = true
+
+				var err error
+				reconciler, err = NewFakeNUMAResourcesOperatorReconciler(platform.OpenShift, defaultOCPVersion, nro, mcp1, mcp2)
+				Expect(err).ToNot(HaveOccurred())
+
+				key := client.ObjectKeyFromObject(nro)
+				Expect(reconciler.Reconcile(ctx, reconcile.Request{NamespacedName: key})).ToNot(CauseRequeue())
+
+				Expect(reconciler.Client.Get(ctx, client.ObjectKeyFromObject(nro), nro)).To(Succeed())
+				pausedCond := getConditionByType(nro.Status.Conditions, status.ConditionMachineConfigPoolPaused)
+				Expect(pausedCond).ToNot(BeNil())
+				Expect(pausedCond.Status).To(Equal(metav1.ConditionTrue))
+				progressingCond := getConditionByType(nro.Status.Conditions, status.ConditionProgressing)
+				Expect(progressingCond).ToNot(BeNil())
+				Expect(progressingCond.Status).To(Equal(metav1.ConditionTrue))
+
+				ds := &appsv1.DaemonSet{}
+				mcp1DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp1.Name),
+					Namespace: testNamespace,
+				}
+				Expect(reconciler.Client.Get(ctx, mcp1DSKey, ds)).To(Succeed())
+
+				mcp2DSKey := client.ObjectKey{
+					Name:      objectnames.GetComponentName(nro.Name, mcp2.Name),
+					Namespace: testNamespace,
+				}
+				err = reconciler.Client.Get(ctx, mcp2DSKey, ds)
+				Expect(apierrors.IsNotFound(err)).To(BeTrue(), "DaemonSet for paused custom-policy pool should not be created yet")
 			})
 
 			It("should create DaemonSet for ready tree while another tree is still pending", func(ctx context.Context) {
