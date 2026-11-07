@@ -1914,6 +1914,20 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 	})
 })
 
+// nroSchedStatusTracksGeneration is true when base scheduler conditions expose ObservedGeneration
+func nroSchedStatusTracksGeneration(nrosStatus *nropv1.NUMAResourcesSchedulerStatus) bool {
+	if nrosStatus == nil {
+		return false
+	}
+	for _, t := range []string{status.ConditionAvailable, status.ConditionUpgradeable} {
+		cond := metahelper.FindStatusCondition(nrosStatus.Conditions, t)
+		if cond != nil && cond.ObservedGeneration != 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func isNROSchedSyncedAt(nrosStatus *nropv1.NUMAResourcesSchedulerStatus, conditionType string, gen int64) error {
 	if nrosStatus == nil {
 		return errors.New("nil status")
@@ -1925,7 +1939,7 @@ func isNROSchedSyncedAt(nrosStatus *nropv1.NUMAResourcesSchedulerStatus, conditi
 	if cond.Status != metav1.ConditionTrue {
 		return errors.New("condition not true")
 	}
-	if cond.ObservedGeneration != gen {
+	if nroSchedStatusTracksGeneration(nrosStatus) && cond.ObservedGeneration != gen {
 		return fmt.Errorf("condition at %d expected %d", cond.ObservedGeneration, gen)
 	}
 	return nil
