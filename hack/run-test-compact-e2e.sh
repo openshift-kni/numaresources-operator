@@ -25,6 +25,12 @@ ${BIN_DIR}/e2e-nrop-sched-install.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5
 echo "Deploying sample devices for RTE tests"
 rte/hack/deploy-devices.sh
 rte/hack/check-ds.sh oc sampledevices device-plugin-a-ds
+rte/hack/check-ds.sh oc sampledevices device-plugin-hostlevel-a-ds
+
+# OCPBUGS-90597: host-level device is present; run the gated serial coverage
+export E2E_NROP_PFP_HOSTLEVEL_SIM="${E2E_NROP_PFP_HOSTLEVEL_SIM:-1}"
+echo "Running OCPBUGS-90597 serial coverage (feature:pfphostlevel)"
+hack/run-test-serial-e2e.sh --focus 'should schedule a Guaranteed TAS pod when host-level extended resources are held' --report-file "${REPORT_DIR}/e2e-serial-pfphostlevel.xml" --verbose
 
 echo "Running Functional Tests: ${GINKGO_SUITS}"
 ${BIN_DIR}/e2e-nrop-sched.test ${NO_COLOR} --ginkgo.v --ginkgo.timeout=5h --ginkgo.flake-attempts=2 --ginkgo.junit-report=${REPORT_DIR}/e2e-sched.xml
