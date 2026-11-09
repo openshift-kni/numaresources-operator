@@ -25,6 +25,7 @@
     "introspection",
     "mgselinuxcollect",
     "tlscompliance",
-    "preemption"
+    "preemption",
+    "pausedmcp"
   ]
 }

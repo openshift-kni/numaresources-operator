@@ -169,6 +169,12 @@ func WithTMScope(scope string) func(*kubeletconfigv1beta1.KubeletConfiguration) 
 	}
 }
 
+func WithTMPolicy(policy string) func(*kubeletconfigv1beta1.KubeletConfiguration) {
+	return func(configuration *kubeletconfigv1beta1.KubeletConfiguration) {
+		configuration.TopologyManagerPolicy = policy
+	}
+}
+
 func IsOwnedBy(obj metav1.ObjectMeta, owner metav1.ObjectMeta) bool {
 	ors := obj.GetOwnerReferences()
 
