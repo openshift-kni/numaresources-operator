@@ -167,7 +167,7 @@ func (r *KubeletConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			newNodeGroups := nroNew.Spec.NodeGroups
 			// if nodeGroups has changed,
 			// it means that we should iterate and create/delete ConfigMap data for RTE pods
-			return equality.Semantic.DeepEqual(oldNodeGroups, newNodeGroups)
+			return !equality.Semantic.DeepEqual(oldNodeGroups, newNodeGroups)
 		},
 	}
 
