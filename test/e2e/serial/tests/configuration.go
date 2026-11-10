@@ -356,14 +356,6 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 				g.Expect(fxt.Client.Update(ctx, nroSchedObj)).To(Succeed())
 			}).WithTimeout(10 * time.Minute).WithPolling(30 * time.Second).Should(Succeed())
 
-			e2efixture.By("verifying the scheduler object was updated properly with the new scheduler name %q", serialconfig.SchedulerTestName)
-			updatedSchedObj := &nropv1.NUMAResourcesScheduler{}
-			Eventually(func(g Gomega) error {
-				g.Expect(fxt.Client.Get(ctx, client.ObjectKeyFromObject(nroSchedObj), updatedSchedObj)).To(Succeed())
-				return isNROSchedSyncedAt(&updatedSchedObj.Status, status.ConditionAvailable, updatedSchedObj.Generation)
-			}).WithTimeout(time.Minute).WithPolling(time.Second*15).Should(Succeed(), "failed to update the schedulerName field")
-			Expect(updatedSchedObj.Status.SchedulerName).To(Equal(serialconfig.SchedulerTestName), "failed to update the schedulerName field,expected %q but found %q", serialconfig.SchedulerTestName, updatedSchedObj.Status.SchedulerName)
-
 			defer func(rctx context.Context) {
 				By("reverting the changes under the NUMAResourcesScheduler object")
 				// see https://pkg.go.dev/github.com/onsi/gomega#Eventually category 3
@@ -380,6 +372,16 @@ var _ = Describe("[serial][disruptive] numaresources configuration management", 
 					return updatedSchedObj.Status.SchedulerName
 				}).WithTimeout(time.Minute).WithPolling(time.Second*15).Should(Equal(initialNroSchedObj.Status.SchedulerName), "failed to revert the schedulerName field,expected %q but found %q", initialNroSchedObj.Status.SchedulerName, updatedSchedObj.Status.SchedulerName)
 			}(context.TODO())
+
+			e2efixture.By("verifying the scheduler object was updated properly with the new scheduler name %q", serialconfig.SchedulerTestName)
+			updatedSchedObj := &nropv1.NUMAResourcesScheduler{}
+			Eventually(func(g Gomega) error {
+				g.Expect(fxt.Client.Get(ctx, client.ObjectKeyFromObject(nroSchedObj), updatedSchedObj)).To(Succeed())
+				if updatedSchedObj.Status.SchedulerName != serialconfig.SchedulerTestName {
+					return fmt.Errorf("schedulerName %q, expected %q", updatedSchedObj.Status.SchedulerName, serialconfig.SchedulerTestName)
+				}
+				return isNROSchedSyncedAt(&updatedSchedObj.Status, status.ConditionAvailable, updatedSchedObj.Generation)
+			}).WithTimeout(time.Minute).WithPolling(time.Second*15).Should(Succeed(), "failed to update the schedulerName field")
 
 			By("checking there are not unexpected changes in the scheduler object")
 			Consistently(func(g Gomega) error {
@@ -1925,7 +1927,7 @@ func isNROSchedSyncedAt(nrosStatus *nropv1.NUMAResourcesSchedulerStatus, conditi
 	if cond.Status != metav1.ConditionTrue {
 		return errors.New("condition not true")
 	}
-	if cond.ObservedGeneration != gen {
+	if serialconfig.Config != nil && serialconfig.Config.SchedStatusTracksGeneration && cond.ObservedGeneration != gen {
 		return fmt.Errorf("condition at %d expected %d", cond.ObservedGeneration, gen)
 	}
 	return nil

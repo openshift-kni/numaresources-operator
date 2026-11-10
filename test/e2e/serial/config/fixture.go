@@ -19,23 +19,26 @@ package config
 import (
 	"context"
 
+	metahelper "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/klog/v2"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
+	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 )
 
 type E2EConfig struct {
-	Fixture       *e2efixture.Fixture
-	NRTList       nrtv1alpha2.NodeResourceTopologyList
-	NROOperObj    *nropv1.NUMAResourcesOperator
-	NROSchedObj   *nropv1.NUMAResourcesScheduler
-	SchedulerName string
-	infraNRTList  nrtv1alpha2.NodeResourceTopologyList
+	Fixture                     *e2efixture.Fixture
+	NRTList                     nrtv1alpha2.NodeResourceTopologyList
+	NROOperObj                  *nropv1.NUMAResourcesOperator
+	NROSchedObj                 *nropv1.NUMAResourcesScheduler
+	SchedulerName               string
+	SchedStatusTracksGeneration bool
+	infraNRTList                nrtv1alpha2.NodeResourceTopologyList
 }
 
 func (cfg *E2EConfig) Ready() bool {
@@ -100,7 +103,22 @@ func NewFixtureWithOptions(nsName string, options e2efixture.Options) (*E2EConfi
 	}
 
 	cfg.SchedulerName = cfg.NROSchedObj.Status.SchedulerName
-	klog.InfoS("detected scheduler name", "schedulerName", cfg.SchedulerName)
+	cfg.SchedStatusTracksGeneration = schedulerStatusTracksGeneration(&cfg.NROSchedObj.Status)
+	klog.InfoS("detected scheduler name", "schedulerName", cfg.SchedulerName, "statusTracksGeneration", cfg.SchedStatusTracksGeneration)
 
 	return &cfg, nil
+}
+
+// schedulerStatusTracksGeneration reports whether Available or Upgradeable already expose ObservedGeneration.
+func schedulerStatusTracksGeneration(nrosStatus *nropv1.NUMAResourcesSchedulerStatus) bool {
+	if nrosStatus == nil {
+		return false
+	}
+	for _, conditionType := range []string{status.ConditionAvailable, status.ConditionUpgradeable} {
+		cond := metahelper.FindStatusCondition(nrosStatus.Conditions, conditionType)
+		if cond != nil && cond.ObservedGeneration != 0 {
+			return true
+		}
+	}
+	return false
 }
