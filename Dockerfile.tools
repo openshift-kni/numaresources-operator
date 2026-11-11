@@ -35,8 +35,8 @@ RUN mkdir -p $HOME && \
     go clean -cache -modcache && \
     rm -rf ${GOPATH}/src/* && \
     rm -rf ${GOPATH}/pkg/* && \
-    export latest_oc_client_version=$(curl https://mirror.openshift.com/pub/openshift-v5/clients/ocp/latest/ 2>/dev/null | grep -o \"openshift-client-linux-5.*tar.gz\" | tr -d \") && \
-    curl -JL https://mirror.openshift.com/pub/openshift-v5/clients/ocp/latest/${latest_oc_client_version} -o oc.tar.gz && \
+    export latest_oc_client_version=$(curl https://mirror.openshift.com/pub/openshift-v5/clients/ocp/latest-5.0/ 2>/dev/null | grep -o \"openshift-client-linux-5.*tar.gz\" | tr -d \") && \
+    curl -JL https://mirror.openshift.com/pub/openshift-v5/clients/ocp/latest-5.0/${latest_oc_client_version} -o oc.tar.gz && \
     tar -xzvf oc.tar.gz && \
     mv oc /usr/local/bin/oc && \
     rm -f oc.tar.gz && \
