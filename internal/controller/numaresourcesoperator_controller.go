@@ -754,11 +754,14 @@ func (r *NUMAResourcesOperatorReconciler) reconcilePerTreeMachineConfig(ctx cont
 	}
 	result.NROMCPs = syncMachineConfigPoolNodeGroupConfigStatuses(result.NROMCPs, tree)
 
-	if result.PausedMCPNames.Len() > 0 {
+	// Paused pools are skipped by MachineConfigsState, so WaitForUpdated cannot gate them.
+	// Custom SELinux policy still needs the MachineConfig rolled out; stop early until the pool is resumed.
+	if result.PausedMCPNames.Len() > 0 && annotations.IsCustomPolicyEnabled(tree.NodeGroup.Annotations) {
 		result.Step = intreconcile.StepOngoing(0)
-	} else {
-		result.Step = intreconcile.StepSuccess()
+		return result
 	}
+
+	result.Step = intreconcile.StepSuccess()
 	return result
 }
 
