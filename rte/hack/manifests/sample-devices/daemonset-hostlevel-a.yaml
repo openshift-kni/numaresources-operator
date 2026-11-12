@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  namespace: sampledevices
+  name: device-plugin-hostlevel-a-ds
+spec:
+  selector:
+    matchLabels:
+      name: device-plugin-hostlevel-a
+  template:
+    metadata:
+      labels:
+        name: device-plugin-hostlevel-a
+    spec:
+      serviceAccountName: sampledevices-sa
+      containers:
+        - name: device-plugin-hostlevel-a-container
+          securityContext:
+            privileged: true
+          image: quay.io/k8stopologyawareschedwg/sample-device-plugin:v0.2.2
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DEVICE_RESOURCE_NAME
+              value: "example.com/hostlevelA"
+          command:
+            - /bin/deviceplugin
+          args:
+            - --alsologtostderr
+            - --config-dir=/etc/devices
+          volumeMounts:
+            - name: kubeletsockets
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: device-hostlevel-a-config-vol
+              mountPath: /etc/devices
+      volumes:
+        - name: kubeletsockets
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+            type: Directory
+        - configMap:
+            name: device-hostlevel-a-configmap
+          name: device-hostlevel-a-config-vol
