@@ -4,12 +4,12 @@ lockfileVendor: redhat
 arches:
 - arch: x86_64
   packages:
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/h/hwdata-0.348-9.22.el9.noarch.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/h/hwdata-0.348-9.24.el9.noarch.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 1773961
-    checksum: sha256:c037e4b4e6168eff309f75b1c3b96359734f887528d0d9bb4a6b0dc8e7bcc0e2
+    size: 1809165
+    checksum: sha256:c505f93ff15782e605329773a69912d258b7ce5a0865e83876f3ae5d93932881
     name: hwdata
-    evr: 0.348-9.22.el9
-    sourcerpm: hwdata-0.348-9.22.el9.src.rpm
+    evr: 0.348-9.24.el9
+    sourcerpm: hwdata-0.348-9.24.el9.src.rpm
   source: []
   module_metadata: []
