@@ -4,13 +4,13 @@ lockfileVendor: redhat
 arches:
 - arch: x86_64
   packages:
-  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/p/procps-ng-3.3.17-14.el9.x86_64.rpm
+  - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/p/procps-ng-3.3.17-15.el9.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
-    size: 361526
-    checksum: sha256:506ad778f63821e8d9647ca8e0a3ff21b8af9c1666060d5200f9b26ee718333c
+    size: 360004
+    checksum: sha256:37909df8f645eb2df481b7b5d7fee63617917a70811780a298746a4b681c87f9
     name: procps-ng
-    evr: 3.3.17-14.el9
-    sourcerpm: procps-ng-3.3.17-14.el9.src.rpm
+    evr: 3.3.17-15.el9
+    sourcerpm: procps-ng-3.3.17-15.el9.src.rpm
   - url: https://cdn-ubi.redhat.com/content/public/ubi/dist/ubi9/9/x86_64/baseos/os/Packages/r/rsync-3.2.7-1.el9_8.x86_64.rpm
     repoid: ubi-9-for-x86_64-baseos-rpms
     size: 471331
