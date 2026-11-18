@@ -24,8 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
-
-	deployervalidator "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/validator"
 )
 
 func TestValidateCRDMissing(t *testing.T) {
@@ -42,8 +40,8 @@ func TestValidateCRDMissing(t *testing.T) {
 	}
 
 	got := res[0]
-	expected := deployervalidator.ValidationResult{
-		Area:      deployervalidator.AreaCluster,
+	expected := ValidationResult{
+		Area:      AreaCluster,
 		Component: "NodeResourceTopology",
 		Setting:   "installed",
 		Expected:  "true",
@@ -68,8 +66,8 @@ func TestValidateCRDMissingData(t *testing.T) {
 	}
 
 	got := res[0]
-	expected := deployervalidator.ValidationResult{
-		Area:      deployervalidator.AreaCluster,
+	expected := ValidationResult{
+		Area:      AreaCluster,
 		Component: "NodeResourceTopology",
 		Setting:   "items",
 		Expected:  "> 0",
@@ -104,8 +102,8 @@ func TestValidateCRDInconsistentData(t *testing.T) {
 	}
 
 	got := res[0]
-	expected := deployervalidator.ValidationResult{
-		Area:      deployervalidator.AreaCluster,
+	expected := ValidationResult{
+		Area:      AreaCluster,
 		Component: "NodeResourceTopology",
 		Setting:   "items",
 		Expected:  "2",
