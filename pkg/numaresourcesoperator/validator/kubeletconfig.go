@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/kubeletconfig"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/kubeletconfig"
 )
 
 const (
@@ -45,10 +45,6 @@ const (
 	ExpectedCPUManagerPolicy      = "static"
 	ExpectedMemoryManagerPolicy   = kubeletconfigv1beta1.StaticMemoryManagerPolicy
 	ExpectedTopologyManagerPolicy = kubeletconfigv1beta1.SingleNumaNodeTopologyManagerPolicy
-)
-
-const (
-	kubeMinVersionGetAllocatable = "1.23"
 )
 
 func (vd *Validator) ValidateClusterConfig(nodes []corev1.Node) ([]ValidationResult, error) {

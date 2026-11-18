@@ -17,6 +17,9 @@
 package clientutil
 
 import (
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextension "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -24,16 +27,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextension "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
 
 	topologyclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
 )
 
 func init() {
-	apiextensionsv1.AddToScheme(scheme.Scheme)
+	utilruntime.Must(apiextensionsv1.AddToScheme(scheme.Scheme))
 }
 
 // New returns a controller-runtime client.

@@ -21,8 +21,7 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
-
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/deployer"
 	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 )
 

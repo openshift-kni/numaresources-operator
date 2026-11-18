@@ -19,11 +19,12 @@ package validator
 import (
 	"fmt"
 
+	"github.com/go-logr/logr"
+
 	"k8s.io/apimachinery/pkg/version"
 	"k8s.io/client-go/discovery"
 
-	"github.com/go-logr/logr"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/clientutil"
 )
 
 const (

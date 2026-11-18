@@ -23,13 +23,13 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	k8swait "k8s.io/apimachinery/pkg/util/wait"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (

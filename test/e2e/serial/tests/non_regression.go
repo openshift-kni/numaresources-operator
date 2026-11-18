@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2/helper/attribute"
 
@@ -39,6 +38,7 @@ import (
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	e2ereslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/clientutil/nodes"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	serialconfig "github.com/openshift-kni/numaresources-operator/test/e2e/serial/config"

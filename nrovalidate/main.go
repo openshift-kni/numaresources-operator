@@ -36,10 +36,9 @@ import (
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 	securityv1 "github.com/openshift/api/security/v1"
 
-	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nrovalidator "github.com/openshift-kni/numaresources-operator/nrovalidate/validator"
+	deployervalidator "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/validator"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 )
 

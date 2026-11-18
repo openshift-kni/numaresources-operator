@@ -23,8 +23,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 
-	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
+
+	deployervalidator "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/validator"
 )
 
 func TestValidateCRDMissing(t *testing.T) {

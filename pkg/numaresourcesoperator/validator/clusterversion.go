@@ -17,9 +17,9 @@
 package validator
 
 import (
-	"k8s.io/client-go/discovery"
-
 	goversion "github.com/aquasecurity/go-version/pkg/version"
+
+	"k8s.io/client-go/discovery"
 )
 
 const (

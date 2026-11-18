@@ -37,8 +37,8 @@ func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger logr.Logge
 	if err != nil {
 		return nil, err
 	}
-	defer stdout.Close()
-	defer stderr.Close()
+	defer func() { _ = stdout.Close() }()
+	defer func() { _ = stderr.Close() }()
 	defer func() { err = cmd.Process.Kill() }()
 
 	port, err := FindProxyPort(stdout)
@@ -68,7 +68,7 @@ func GetKubeletConfigForNodes(kc *Kubectl, nodeNames []string, logger logr.Logge
 			logger.Info("request creation failed - skipped", "endpoint", endpoint, "error", err)
 			continue
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode != http.StatusOK {
 			logger.Info("unexpected response status code - skipped", "endpoint", endpoint, "statusCode", resp.StatusCode)
 			continue
@@ -92,10 +92,7 @@ func FindProxyPort(r io.Reader) (int, error) {
 		return -1, err
 	}
 	output := string(buf[:n])
-	proxyRegexp, err := regexp.Compile("Starting to serve on 127.0.0.1:([0-9]+)")
-	if err != nil {
-		return -1, err
-	}
+	proxyRegexp := regexp.MustCompile("Starting to serve on 127.0.0.1:([0-9]+)")
 	match := proxyRegexp.FindStringSubmatch(output)
 	if match == nil {
 		return -1, fmt.Errorf("cannot find port announcement")
