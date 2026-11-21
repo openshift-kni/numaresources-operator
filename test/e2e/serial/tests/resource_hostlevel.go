@@ -246,7 +246,7 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 				},
 				corev1.PodQOSBurstable,
 			),
-			Entry("[test_id:74252][qos:be] with ephemeral storage, multi-container", //TODO test with devices and hugepages requests and fix automation
+			Entry("[test_id:74252][qos:be] with ephemeral storage, multi-container",
 				Label(label.Tier1, "qos:be"),
 				intnrt.SingleNUMANode,
 				// required resources for the test pod
@@ -259,6 +259,44 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 					},
 				},
 				corev1.PodQOSBestEffort,
+			),
+			Entry("[qos:gu] with ephemeral storage, devices, multi-container",
+				Label(label.Tier2, "qos:gu", "devices", "hostlevel"),
+				intnrt.SingleNUMANode,
+				[]corev1.ResourceList{
+					{
+						corev1.ResourceCPU:                                   resource.MustParse("2"),
+						corev1.ResourceMemory:                                resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage:                      resource.MustParse("256Mi"),
+						corev1.ResourceName(e2efixture.GetDeviceType1Name()): resource.MustParse("1"),
+					},
+					{
+						corev1.ResourceCPU:                                   resource.MustParse("2"),
+						corev1.ResourceMemory:                                resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage:                      resource.MustParse("16777216"),
+						corev1.ResourceName(e2efixture.GetDeviceType2Name()): resource.MustParse("1"),
+					},
+				},
+				corev1.PodQOSGuaranteed,
+			),
+			Entry("[qos:gu] with ephemeral storage, hugepages, multi-container",
+				Label(label.Tier2, "qos:gu", "hugepages", "hostlevel"),
+				intnrt.SingleNUMANode,
+				[]corev1.ResourceList{
+					{
+						corev1.ResourceCPU:                   resource.MustParse("2"),
+						corev1.ResourceMemory:                resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage:      resource.MustParse("256Mi"),
+						corev1.ResourceName("hugepages-2Mi"): resource.MustParse("32Mi"),
+					},
+					{
+						corev1.ResourceCPU:                   resource.MustParse("2"),
+						corev1.ResourceMemory:                resource.MustParse("256Mi"),
+						corev1.ResourceEphemeralStorage:      resource.MustParse("16777216"),
+						corev1.ResourceName("hugepages-2Mi"): resource.MustParse("16Mi"),
+					},
+				},
+				corev1.PodQOSGuaranteed,
 			),
 		)
 	})
@@ -288,20 +326,32 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 					err := fxt.Client.Get(ctx, client.ObjectKey{Name: nodeName}, &node)
 					Expect(err).ToNot(HaveOccurred())
 
-					storageEphemeralQty := node.Status.Allocatable.StorageEphemeral()
+					storageEphemeralQty := node.Status.Allocatable.StorageEphemeral().DeepCopy()
+
+					allocatedEphemeral, err := schedulerAllocatedEphemeralStorage(ctx, fxt.Client, nodeName)
+					Expect(err).NotTo(HaveOccurred(), "unable to compute allocated ephemeral-storage on node %q", nodeName)
+					if allocatedEphemeral.Cmp(storageEphemeralQty) > 0 {
+						storageEphemeralQty = resource.MustParse("0")
+					} else {
+						storageEphemeralQty.Sub(allocatedEphemeral)
+					}
 
 					qtyToKeep := rl.StorageEphemeral()
 					// we reduce additional small amount to ensure there is no place for both containers
 					qtyToKeep.Sub(resource.MustParse("1Mi"))
 
+					if qtyToKeep.Cmp(storageEphemeralQty) >= 0 {
+						e2efixture.Skipf(fxt, "node %q has insufficient free ephemeral-storage for padding after existing pod requests", nodeName)
+					}
 					storageEphemeralQty.Sub(*qtyToKeep)
 					paddingResources := corev1.ResourceList{
-						corev1.ResourceEphemeralStorage: *storageEphemeralQty,
+						corev1.ResourceEphemeralStorage: storageEphemeralQty,
 					}
 
 					fxt.Dump.Infof(fmt.Sprintf("node: %s\nresources: %s", nodeName, intreslist.ToString(paddingResources)), "pad node with")
 					pod := newPaddingPod(nodeName, "all", fxt.Namespace.Name, paddingResources)
-					pod.Spec.NodeName = nodeName // TODO: pinPodToNode?
+					pod, err = pinPodToNode(pod, nodeName)
+					Expect(err).NotTo(HaveOccurred(), "unable to pin padding pod to node %q", nodeName)
 
 					err = fxt.Client.Create(ctx, pod)
 					Expect(err).NotTo(HaveOccurred(), "unable to create pod %q", pod.Name)
