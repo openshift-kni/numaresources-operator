@@ -23,7 +23,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/clientutil"
 )
 
 type Environment struct {

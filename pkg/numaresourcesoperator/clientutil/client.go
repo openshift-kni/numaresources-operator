@@ -17,6 +17,8 @@
 package clientutil
 
 import (
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -24,16 +26,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-	apiextension "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-
 	configv1 "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
-
-	topologyclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
 )
 
 func init() {
-	apiextensionsv1.AddToScheme(scheme.Scheme)
+	utilruntime.Must(apiextensionsv1.AddToScheme(scheme.Scheme))
 }
 
 // New returns a controller-runtime client.
@@ -61,19 +58,6 @@ func NewK8s() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func NewK8sExt() (*apiextension.Clientset, error) {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	clientset, err := apiextension.NewForConfig(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return clientset, nil
-}
-
 func NewDiscoveryClient() (*discovery.DiscoveryClient, error) {
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -85,19 +69,6 @@ func NewDiscoveryClient() (*discovery.DiscoveryClient, error) {
 		return nil, err
 	}
 	return cli, nil
-}
-
-func NewTopologyClient() (*topologyclientset.Clientset, error) {
-	cfg, err := config.GetConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	topologyClient, err := topologyclientset.NewForConfig(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return topologyClient, nil
 }
 
 type OCPClientSet struct {

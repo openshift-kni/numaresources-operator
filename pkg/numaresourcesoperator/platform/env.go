@@ -24,8 +24,8 @@ import (
 
 	ocpconfigv1 "github.com/openshift/api/config/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/clientutil"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/deployer"
 )
 
 type ClusterOperatorsGetter interface {

@@ -24,9 +24,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
-
 	"github.com/openshift-kni/numaresources-operator/pkg/iter"
+	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/clientutil"
 )
 
 const (
