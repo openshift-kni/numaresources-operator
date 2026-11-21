@@ -25,9 +25,10 @@ import (
 )
 
 var (
-	devType1 = ""
-	devType2 = ""
-	devType3 = ""
+	devType1         = ""
+	devType2         = ""
+	devType3         = ""
+	devTypeHostLevel = ""
 )
 
 func init() {
@@ -44,6 +45,7 @@ func init() {
 	if !ok {
 		klog.Errorf("%q environment variable is not set", devices.DevType3EnvVar)
 	}
+	devTypeHostLevel, _ = os.LookupEnv(devices.DevTypeHostLevelEnvVar)
 }
 
 func GetDeviceType1Name() string {
@@ -56,4 +58,8 @@ func GetDeviceType2Name() string {
 
 func GetDeviceType3Name() string {
 	return devType3
+}
+
+func GetDeviceTypeHostLevelName() string {
+	return devTypeHostLevel
 }
