@@ -1,7 +1,7 @@
 # FBC catalog
 
 This branch builds the 4.23 FBC (`numaresources-operator-fbc-4-23`) from this directory.
-The catalog contains the `stable` and `4.23` channels, starting with `numaresources-operator.v4.23.0`.
+The catalog contains the `4.23` and `stable` channels, with `4.23` as the default, starting with `numaresources-operator.v4.23.0`.
 The first entry has no `replaces` field and allows upgrades from 4.22 through `skipRange`.
 
 Konflux fills the bundle image placeholder in `catalog-template.in.yaml` from `bundle.builds.in.yaml`.
