@@ -11,8 +11,7 @@ metadata:
       event == "push" &&
       target_branch == "release-4.23" &&
       (
-        '.konflux/bundle/bundle.konflux.Dockerfile'.pathChanged() ||
-        '.konflux/bundle/overlay/***'.pathChanged() ||
+        '.konflux/bundle/***'.pathChanged() ||
         '.konflux/container-build.args'.pathChanged() ||
         '.tekton/build-pipeline.yaml'.pathChanged() ||
         '.tekton/numaresources-operator-bundle-4-23-push.yaml'.pathChanged() ||
