@@ -10,31 +10,18 @@ entries:
     schema: olm.package
   # Channel entries for 'stable' channel
   - entries:
-      # v4.22.0
-      - name: numaresources-operator.v4.22.0
-        skipRange: '>=4.20.0 <4.22.0'
-      # v4.22.1
-      - name: numaresources-operator.v4.22.1
-        replaces: numaresources-operator.v4.22.0
-        skipRange: '>=4.20.0 <4.22.1'
+      - name: numaresources-operator.v4.23.0
+        skipRange: '>=4.22.0 <4.23.0'
     name: stable
     package: numaresources-operator
     schema: olm.channel
-  # Channel entries for '4.22' channel
+  # Channel entries for '4.23' channel
   - entries:
-      # v4.22.0
-      - name: numaresources-operator.v4.22.0
-        skipRange: '>=4.20.0 <4.22.0'
-      # v4.22.1
-      - name: numaresources-operator.v4.22.1
-        replaces: numaresources-operator.v4.22.0
-        skipRange: '>=4.20.0 <4.22.1'
-    name: "4.22"
+      - name: numaresources-operator.v4.23.0
+        skipRange: '>=4.22.0 <4.23.0'
+    name: "4.23"
     package: numaresources-operator
     schema: olm.channel
-  # v4.22.0 bundle
-  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:1a2b6307e0c3a3a1939ff8b52b28486e2694d284c83c572f6bf66d1102d55d51
-    schema: olm.bundle
-  # v4.22.1 bundle
-  - image: registry.redhat.io/openshift4/numaresources-operator-bundle@sha256:fabf68cf18714965e6fd1356551d4206c93081910eedaf35731acd3eb52c4d0d
+  # The bundle image is updated by the Konflux catalog update script.
+  - image: placeholder.will.be.updated.by.telco5g-konflux.scripts.catalog.update-catalog-template.sh
     schema: olm.bundle

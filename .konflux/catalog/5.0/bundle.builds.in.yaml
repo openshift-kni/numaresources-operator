@@ -1,3 +1,0 @@
----
-# When we are ready to ship the first Konflux release, replace this with the nudge to the quay build
-quay: quay.io/redhat-user-workloads/telco-5g-tenant/numaresources-operator-bundle-5-0@sha256:ec2cefdb89d559e6ae36ec40b50bc081be8d65eba0c3cabcca3e80ddd818f8f3

@@ -11,6 +11,7 @@ metadata:
       event == "push" &&
       target_branch == "release-4.23" &&
       (".konflux/must-gather/***".pathChanged() ||
+      ".konflux/container-build.args".pathChanged() ||
       ".tekton/numaresources-must-gather-4-23-push.yaml".pathChanged() ||
       "must-gather/***".pathChanged())
   creationTimestamp: null
@@ -41,6 +42,8 @@ spec:
     value: '[{"type": "rpm", "path": ".konflux/must-gather/"}]'
   - name: skip-sast-coverity
     value: "true"
+  - name: build-args-file
+    value: .konflux/container-build.args
   pipelineRef:
     name: build-pipeline-must-gather
   taskRunTemplate:

@@ -36,7 +36,7 @@ FROM scratch
 ARG OPENSHIFT_VERSION
 
 LABEL com.redhat.component="numaresources-operator-bundle-container"
-LABEL name="openshift5/numaresources-operator-bundle"
+LABEL name="openshift4/numaresources-operator-bundle"
 LABEL summary="NUMA resources operator for OpenShift"
 LABEL io.k8s.display-name="numaresources-operator"
 LABEL io.k8s.description="NUMA resurces support for OpenShift"
@@ -47,7 +47,7 @@ LABEL distribution-scope="public"
 LABEL release="${OPENSHIFT_VERSION}"
 LABEL url="https://github.com/openshift-kni/numaresources-operator"
 LABEL vendor="Red Hat, Inc."
-LABEL cpe="cpe:/a:redhat:openshift:5.0::el9"
+LABEL cpe="cpe:/a:redhat:openshift:4.23::el9"
 
 LABEL io.openshift.expose-services=""
 LABEL io.openshift.tags="numa,topology,node"
@@ -58,8 +58,8 @@ LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
 LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
 LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
 LABEL operators.operatorframework.io.bundle.package.v1=numaresources-operator
-LABEL operators.operatorframework.io.bundle.channels.v1="${OPENSHIFT_VERSION},stable"
-LABEL operators.operatorframework.io.bundle.channel.default.v1="${OPENSHIFT_VERSION}"
+LABEL operators.operatorframework.io.bundle.channels.v1="stable,${OPENSHIFT_VERSION}"
+LABEL operators.operatorframework.io.bundle.channel.default.v1="stable"
 
 # Labels for metrics.
 LABEL operators.operatorframework.io.metrics.builder=operator-sdk-v1.40.0
