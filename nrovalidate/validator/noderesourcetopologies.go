@@ -28,8 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	topologyclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
-
-	deployervalidator "github.com/openshift-kni/numaresources-operator/internal/validator"
 )
 
 const (
@@ -55,11 +53,11 @@ func CollectNodeResourceTopologies(ctx context.Context, _ client.Client, data *V
 	return nil
 }
 
-func ValidateNodeResourceTopologies(data ValidatorData) ([]deployervalidator.ValidationResult, error) {
-	var ret []deployervalidator.ValidationResult
+func ValidateNodeResourceTopologies(data ValidatorData) ([]ValidationResult, error) {
+	var ret []ValidationResult
 	if data.nrtCrdMissing {
-		ret = append(ret, deployervalidator.ValidationResult{
-			Area:      deployervalidator.AreaCluster,
+		ret = append(ret, ValidationResult{
+			Area:      AreaCluster,
 			Component: "NodeResourceTopology",
 			Setting:   "installed",
 			Expected:  "true",
@@ -68,8 +66,8 @@ func ValidateNodeResourceTopologies(data ValidatorData) ([]deployervalidator.Val
 		return ret, nil
 	}
 	if len(data.nrtList.Items) == 0 {
-		ret = append(ret, deployervalidator.ValidationResult{
-			Area:      deployervalidator.AreaCluster,
+		ret = append(ret, ValidationResult{
+			Area:      AreaCluster,
 			Component: "NodeResourceTopology",
 			Setting:   "items",
 			Expected:  "> 0",
@@ -78,8 +76,8 @@ func ValidateNodeResourceTopologies(data ValidatorData) ([]deployervalidator.Val
 		return ret, nil
 	}
 	if len(data.nrtList.Items) != data.tasEnabledNodeNames.Len() {
-		ret = append(ret, deployervalidator.ValidationResult{
-			Area:      deployervalidator.AreaCluster,
+		ret = append(ret, ValidationResult{
+			Area:      AreaCluster,
 			Component: "NodeResourceTopology",
 			Setting:   "items",
 			Expected:  fmt.Sprintf("%d", data.tasEnabledNodeNames.Len()),
