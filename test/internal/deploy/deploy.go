@@ -33,8 +33,8 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nropmcp "github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
+	"github.com/openshift-kni/numaresources-operator/internal/platform"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"

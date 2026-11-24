@@ -31,7 +31,7 @@ import (
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 	"github.com/k8stopologyawareschedwg/resource-topology-exporter/pkg/podres/middleware/podexclude"
 
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/platform"
 	"github.com/openshift-kni/numaresources-operator/pkg/version"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 )

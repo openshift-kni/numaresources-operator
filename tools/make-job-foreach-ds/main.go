@@ -42,8 +42,8 @@ import (
 	securityv1 "github.com/openshift/api/security/v1"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
-	k8swgobjupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	k8swgobjupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 )
 

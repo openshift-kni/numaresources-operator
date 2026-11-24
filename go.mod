@@ -12,7 +12,6 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/google/go-cmp v0.7.0
 	github.com/jaypipes/ghw v0.21.3-0.20260109185716-ee0aed93f45d
-	github.com/k8stopologyawareschedwg/deployer v0.24.2
 	github.com/k8stopologyawareschedwg/noderesourcetopology-api v0.1.2
 	github.com/k8stopologyawareschedwg/podfingerprint v0.2.3
 	github.com/k8stopologyawareschedwg/resource-topology-exporter v0.25.4
@@ -22,6 +21,7 @@ require (
 	github.com/opencontainers/selinux v1.13.1
 	github.com/openshift-kni/debug-tools v0.2.5
 	github.com/openshift/api v0.0.0-20261017003925-24b2699a9b32 // release-5.1
+	github.com/openshift/client-go v0.0.0-20261006222332-348fc1ca8bb1
 	github.com/openshift/controller-runtime-common v0.0.0-20260813135806-e1187ec555fc // release-5.0
 	github.com/openshift/hypershift/api v0.0.0-20261015235729-b9d6ae1c6345 // release-5.0
 	github.com/openshift/library-go v0.0.0-20260807194649-ee0a87843dda
@@ -99,7 +99,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/openshift/client-go v0.0.0-20261006222332-348fc1ca8bb1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.24.0 // indirect

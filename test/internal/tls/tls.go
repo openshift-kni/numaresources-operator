@@ -38,10 +38,10 @@ import (
 	libgocrypto "github.com/openshift/library-go/pkg/crypto"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/flagcodec"
 	"github.com/openshift-kni/numaresources-operator/internal/remoteexec"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/flagcodec"
-	k8swgobjupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
+	k8swgobjupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )

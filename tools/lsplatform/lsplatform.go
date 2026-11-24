@@ -23,8 +23,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform/detect"
+	"github.com/openshift-kni/numaresources-operator/internal/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/platform/detect"
 )
 
 func main() {

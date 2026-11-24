@@ -35,7 +35,7 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/platform"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	rteconfig "github.com/openshift-kni/numaresources-operator/rte/pkg/config"
 

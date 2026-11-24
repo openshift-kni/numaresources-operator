@@ -24,8 +24,8 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/flagcodec"
-	nroobjupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate"
+	"github.com/openshift-kni/numaresources-operator/internal/flagcodec"
+	nroobjupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate"
 )
 
 // ToKlog converts LogLevel value into klog verboseness level according to operator/v1.LogLevel documentation

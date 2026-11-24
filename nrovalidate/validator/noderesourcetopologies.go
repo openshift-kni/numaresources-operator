@@ -27,8 +27,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
-	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
 	topologyclientset "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/generated/clientset/versioned"
+
+	deployervalidator "github.com/openshift-kni/numaresources-operator/internal/validator"
 )
 
 const (

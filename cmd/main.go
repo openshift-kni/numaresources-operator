@@ -52,7 +52,7 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/platform"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nropv1alpha1 "github.com/openshift-kni/numaresources-operator/api/v1alpha1"
@@ -64,10 +64,10 @@ import (
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	"github.com/openshift-kni/numaresources-operator/pkg/images"
 	rtemetricsmanifests "github.com/openshift-kni/numaresources-operator/pkg/metrics/manifests/monitor"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests"
-	apimanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/api"
-	rtemanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/rte"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/options"
+	"github.com/openshift-kni/numaresources-operator/internal/manifests"
+	apimanifests "github.com/openshift-kni/numaresources-operator/internal/manifests/api"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/internal/manifests/rte"
+	"github.com/openshift-kni/numaresources-operator/internal/options"
 	schedmanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests/sched"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	rtestate "github.com/openshift-kni/numaresources-operator/pkg/objectstate/rte"

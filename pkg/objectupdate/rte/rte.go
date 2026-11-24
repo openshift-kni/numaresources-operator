@@ -31,12 +31,12 @@ import (
 	"github.com/k8stopologyawareschedwg/podfingerprint"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/assets/selinux"
+	"github.com/openshift-kni/numaresources-operator/internal/flagcodec"
+	rtemanifestsupdate "github.com/openshift-kni/numaresources-operator/internal/objectupdate/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
 	nroiter "github.com/openshift-kni/numaresources-operator/pkg/iter"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/assets/selinux"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/flagcodec"
-	nroobjupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate"
-	rtemanifestsupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate/rte"
+	nroobjupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )

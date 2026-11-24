@@ -32,10 +32,9 @@ import (
 
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
-	depnodes "github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
+	depnodes "github.com/openshift-kni/numaresources-operator/internal/clientutil/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
 	"github.com/openshift-kni/numaresources-operator/pkg/kubeletconfig"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"

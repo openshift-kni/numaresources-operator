@@ -30,8 +30,8 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/hypershift/consts"
 	"github.com/openshift-kni/numaresources-operator/internal/machineconfigpools"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform/detect"
+	"github.com/openshift-kni/numaresources-operator/internal/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/platform/detect"
 )
 
 func GetNodesFrom(ctx context.Context, cli client.Client, nodeGroups []nropv1.NodeGroup) ([]corev1.Node, error) {

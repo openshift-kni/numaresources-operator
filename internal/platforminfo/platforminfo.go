@@ -17,7 +17,7 @@
 package platforminfo
 
 import (
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/platform"
 )
 
 // PlatformProperties represents the platform capabilities we have to infer and which are not explicitly

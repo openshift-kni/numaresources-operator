@@ -29,7 +29,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/openshift-kni/numaresources-operator/internal/api/features"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/platform"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"

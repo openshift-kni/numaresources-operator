@@ -28,10 +28,9 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
-
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/clientutil"
+	"github.com/openshift-kni/numaresources-operator/internal/clientutil/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	"github.com/openshift-kni/numaresources-operator/pkg/status"
@@ -94,7 +93,7 @@ var _ = Describe("[Scheduler] install", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(podList).ToNot(BeEmpty(), "cannot find any pods for DP %s/%s", deployment.Namespace, deployment.Name)
 
-			nodeList, err := nodes.GetControlPlane(&deployer.Environment{Cli: e2eclient.Client, Ctx: context.TODO()})
+			nodeList, err := nodes.GetControlPlane(&clientutil.Environment{Cli: e2eclient.Client, Ctx: context.TODO()})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(nodeList).ToNot(BeEmpty())
 
