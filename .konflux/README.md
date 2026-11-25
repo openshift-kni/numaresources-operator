@@ -43,5 +43,12 @@ The push/pull tekton yaml files in `.tekton` have been configured to setup a her
      value: "true"
 ```
 
+### Multi-architecture builds
+
+Images are built for `linux/x86_64` and `linux/arm64`, except the OLM bundle which must stay single-arch (`linux/x86_64`) to satisfy the `olm.olm_bundle_multi_arch` Conforma policy. When adding a new component or architecture, keep the arch list in sync in both places, otherwise the hermetic build fails to resolve RPMs for the missing arch:
+
+1. `build-platforms` in the component's `.tekton` pull-request and push PipelineRuns.
+2. `arches` in the component's `rpms.in.yaml` (only for components that prefetch RPMs), followed by regenerating `rpms.lock.yaml` via `make konflux-update-rpm-lock-operator` or `make konflux-update-rpm-lock-must-gather`.
+
 ### Update  rpms
 Konflux provides a mechanism (Mintmaker) to automatically file PRs to update RPM versions and generate the updated lockfile. At time of writing, this is limited to a `rpm.locks.yaml` file present in the project root, which in the case of numaresources operator is not viable so we will have to re-generate the `rpm.locks.yaml` using our own tools in the interim (scripts/automation)

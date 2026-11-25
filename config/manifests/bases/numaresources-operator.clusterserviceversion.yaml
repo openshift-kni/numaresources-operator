@@ -22,6 +22,10 @@ metadata:
         "OpenShift Container Platform",
         "OpenShift Platform Plus"
       ]
+  labels:
+    operatorframework.io/arch.amd64: supported
+    operatorframework.io/arch.arm64: supported
+    operatorframework.io/os.linux: supported
   name: numaresources-operator.v0.0.0
   namespace: placeholder
 spec:
