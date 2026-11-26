@@ -66,7 +66,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2026-10-23T13:22:58Z"
+    createdAt: "2026-11-25T12:51:03Z"
     features.operators.openshift.io/cnf: "true"
     features.operators.openshift.io/cni: "false"
     features.operators.openshift.io/csi: "false"
@@ -87,6 +87,10 @@ metadata:
       ]
     operators.operatorframework.io/builder: operator-sdk-v1.40.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
+  labels:
+    operatorframework.io/arch.amd64: supported
+    operatorframework.io/arch.arm64: supported
+    operatorframework.io/os.linux: supported
   name: numaresources-operator.v5.1.999-snapshot
   namespace: placeholder
 spec:

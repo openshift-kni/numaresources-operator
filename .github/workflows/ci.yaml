@@ -65,7 +65,11 @@ jobs:
         run: UPSTREAM_COMMIT=origin/${{ github.base_ref }} TRIGGER_BRANCH=${{ env.BRANCH_NAME }} ./hack/verify-commits.sh
 
   test-units:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.os }}
     steps:
     - name: Check out code
       uses: actions/checkout@v4

@@ -4,6 +4,12 @@ Operator to allow to expose the per-NUMA-zone compute resources, using the [RTE 
 The operator also takes care of deploying the [Node Resource Topology API](https://github.com/k8stopologyawareschedwg/noderesourcetopology-api) on which the resource topology exporter depends to provide the data.
 The operator provides minimal support to deploy [secondary schedulers](https://github.com/openshift-kni/scheduler-plugins).
 
+## supported architectures
+
+The operator and its related images (operator, catalog/FBC, and must-gather) are built for both `linux/amd64` and `linux/arm64`. The OLM bundle image is built for `linux/amd64` only, as required by the OLM bundle policy (bundle images must be single-architecture).
+
+Running the NUMA-aware secondary scheduler on `arm64` additionally requires the [scheduler-plugins](https://github.com/openshift-kni/scheduler-plugins) operand image to be available for `arm64`.
+
 ## deploying using OLM
 
 The currently recommended way of deploying the operator in your cluster is using [OLM](https://github.com/operator-framework/operator-lifecycle-manager/). OLM greatly simplifies webhook management, which the operator requires.

@@ -21,6 +21,7 @@ packages:
 
 arches:
   - x86_64
+  - aarch64
 
 context:
   # Alternative to setting command line options. Usually you will only want
