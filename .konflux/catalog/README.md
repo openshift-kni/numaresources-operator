@@ -1,12 +1,11 @@
-# FBC catalogs
+# FBC catalog
+
+This branch builds the 4.23 FBC (`numaresources-operator-fbc-4-23`) from this directory.
+The catalog contains the `4.23` and `stable` channels, with `4.23` as the default, starting with `numaresources-operator.v4.23.0`.
+The first entry has no `replaces` field and allows upgrades from 4.22 through `skipRange`.
+
+Konflux fills the bundle image placeholder in `catalog-template.in.yaml` from `bundle.builds.in.yaml`.
+When a new 4.23 version is released, update the entries in both channels.
 
 Catalogs are generated at Konflux build time and must not be committed.
-
-There are two catalogs on this branch:
-
-- `5.0/` — 5.0 FBC (`numaresources-operator-fbc-5-0`). Includes the released 4.22 bundles plus the 5.0 placeholder last bundle; Konflux fills that placeholder from `bundle.builds.in.yaml`.
-- `4.22/` — same 5.0 FBC component (`numaresources-operator-fbc-5-0`), built from this directory so 4.22 z-streams can be released into the 5.0 catalog without the 5.0 placeholder. Released 4.22.0 and 4.22.1 are static (no placeholder). Static 5.0 bundles will be added here over time.
-
-When a new 4.22 version is released, add it to **both** `catalog-template.in.yaml` files (`4.22/` and `5.0/`).
-
 Generated files (`catalog-template.out.yaml`, `numaresources-operator/catalog.json`) are listed in `.gitignore`.

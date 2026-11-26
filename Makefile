@@ -30,12 +30,12 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 
 # Konflux catalog configuration
 PACKAGE_NAME_KONFLUX = numaresources-operator
-CATALOG_TEMPLATE_KONFLUX = .konflux/catalog/5.0/catalog-template.in.yaml
+CATALOG_TEMPLATE_KONFLUX = .konflux/catalog/catalog-template.in.yaml
 # Telco5g-konflux uses distinct input/output paths when updating the catalog template
-CATALOG_TEMPLATE_KONFLUX_INPUT = .konflux/catalog/5.0/catalog-template.in.yaml
-CATALOG_TEMPLATE_KONFLUX_OUTPUT = .konflux/catalog/5.0/catalog-template.out.yaml
+CATALOG_TEMPLATE_KONFLUX_INPUT = .konflux/catalog/catalog-template.in.yaml
+CATALOG_TEMPLATE_KONFLUX_OUTPUT = .konflux/catalog/catalog-template.out.yaml
 CATALOG_OUTPUT_FORMAT = json
-CATALOG_KONFLUX = .konflux/catalog/5.0/$(PACKAGE_NAME_KONFLUX)/catalog.$(CATALOG_OUTPUT_FORMAT)
+CATALOG_KONFLUX = .konflux/catalog/$(PACKAGE_NAME_KONFLUX)/catalog.$(CATALOG_OUTPUT_FORMAT)
 
 # IMAGE_TAG_BASE defines the docker.io namespace and part of the image name for remote images.
 # This variable is used to construct full image tags for bundle and catalog images.
@@ -71,7 +71,7 @@ CONTAINER_ENGINE ?= podman
 
 # Konflux-related variables
 YQ_VERSION ?= 4.45.4
-BUNDLE_NAME_SUFFIX = bundle-5-0
+BUNDLE_NAME_SUFFIX = bundle-4-23
 PRODUCTION_BUNDLE_NAME = bundle
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
@@ -689,7 +689,7 @@ konflux-generate-catalog: sync-git-submodules yq opm ## generate a quay.io catal
 		CATALOG_KONFLUX=$(PROJECT_DIR)/$(CATALOG_KONFLUX) \
 		CATALOG_OUTPUT_FORMAT=$(CATALOG_OUTPUT_FORMAT) \
 		PACKAGE_NAME_KONFLUX=$(PACKAGE_NAME_KONFLUX) \
-		BUNDLE_BUILDS_FILE=$(PROJECT_DIR)/.konflux/catalog/5.0/bundle.builds.in.yaml \
+		BUNDLE_BUILDS_FILE=$(PROJECT_DIR)/.konflux/catalog/bundle.builds.in.yaml \
 		OPM=$(OPM) \
 		YQ=$(YQ)
 	$(MAKE) konflux-validate-catalog
@@ -704,7 +704,7 @@ konflux-generate-catalog-production: sync-git-submodules yq opm ## generate a re
 		PACKAGE_NAME_KONFLUX=$(PACKAGE_NAME_KONFLUX) \
 		BUNDLE_NAME_SUFFIX=$(BUNDLE_NAME_SUFFIX) \
 		PRODUCTION_BUNDLE_NAME=$(PRODUCTION_BUNDLE_NAME) \
-		BUNDLE_BUILDS_FILE=$(PROJECT_DIR)/.konflux/catalog/5.0/bundle.builds.in.yaml \
+		BUNDLE_BUILDS_FILE=$(PROJECT_DIR)/.konflux/catalog/bundle.builds.in.yaml \
 		OPM=$(OPM) \
 		YQ=$(YQ)
 	$(MAKE) konflux-validate-catalog
@@ -749,7 +749,7 @@ konflux-compare-catalog: sync-git-submodules ## Compare generated catalog with u
 	$(MAKE) -C $(PROJECT_DIR)/telco5g-konflux/scripts/catalog konflux-compare-catalog \
 		CATALOG_KONFLUX=$(PROJECT_DIR)/$(CATALOG_KONFLUX) \
 		PACKAGE_NAME_KONFLUX=$(PACKAGE_NAME_KONFLUX) \
-		UPSTREAM_FBC_IMAGE=quay.io/redhat-user-workloads/telco-5g-tenant/$(PACKAGE_NAME_KONFLUX)-fbc-5-0:latest
+		UPSTREAM_FBC_IMAGE=quay.io/redhat-user-workloads/telco-5g-tenant/$(PACKAGE_NAME_KONFLUX)-fbc-4-23:latest
 
 .PHONY: konflux-all
 konflux-all: konflux-update-tekton-task-refs konflux-generate-catalog-production konflux-validate-catalog ## Run all Konflux-related targets
