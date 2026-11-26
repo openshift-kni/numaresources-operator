@@ -34,5 +34,5 @@
 
 package controller
 
-//+kubebuilder:rbac:groups=topology.node.k8s.io,resources=noderesourcetopologies,verbs=get;list;create;update
+//+kubebuilder:rbac:groups=topology.node.k8s.io,resources=noderesourcetopologies,verbs=get;list;create;update;patch
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=watch;list
