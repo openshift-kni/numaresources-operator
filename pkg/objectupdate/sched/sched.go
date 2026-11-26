@@ -27,13 +27,13 @@ import (
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
+	"github.com/openshift-kni/numaresources-operator/internal/flagcodec"
 	intreslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/pkg/hash"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/flagcodec"
-	k8swgobjupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate"
 	schedconfig "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/manifests"
 	schedstate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectstate/sched"
 	schedmanifestsupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesscheduler/objectupdate/sched"
+	k8swgobjupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectupdate/envvar"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )

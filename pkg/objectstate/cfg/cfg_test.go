@@ -31,8 +31,8 @@ import (
 
 	v1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/api/v1/helper/namespacedname"
-	rtemanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/rte"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/internal/manifests/rte"
+	"github.com/openshift-kni/numaresources-operator/internal/platform"
 )
 
 func TestFromClient(t *testing.T) {

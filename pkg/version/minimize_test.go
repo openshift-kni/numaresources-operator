@@ -19,7 +19,7 @@ package version
 import (
 	"testing"
 
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/platform"
 )
 
 func TestMinimize(t *testing.T) {

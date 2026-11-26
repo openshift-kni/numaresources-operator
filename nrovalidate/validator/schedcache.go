@@ -23,11 +23,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/clientutil/nodes"
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
-	deployervalidator "github.com/k8stopologyawareschedwg/deployer/pkg/validator"
-
+	"github.com/openshift-kni/numaresources-operator/internal/clientutil"
+	"github.com/openshift-kni/numaresources-operator/internal/clientutil/nodes"
 	"github.com/openshift-kni/numaresources-operator/internal/schedcache"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
@@ -42,7 +39,7 @@ func CollectSchedCache(ctx context.Context, cli client.Client, data *ValidatorDa
 		return err
 	}
 
-	workers, err := nodes.GetWorkers(&deployer.Environment{Cli: cli, Ctx: ctx})
+	workers, err := nodes.GetWorkers(&clientutil.Environment{Cli: cli, Ctx: ctx})
 	if err != nil {
 		return err
 	}
@@ -64,11 +61,11 @@ func CollectSchedCache(ctx context.Context, cli client.Client, data *ValidatorDa
 	return nil
 }
 
-func ValidateSchedCache(data ValidatorData) ([]deployervalidator.ValidationResult, error) {
-	var ret []deployervalidator.ValidationResult
+func ValidateSchedCache(data ValidatorData) ([]ValidationResult, error) {
+	var ret []ValidationResult
 	for nodeName := range data.unsynchedCaches {
-		ret = append(ret, deployervalidator.ValidationResult{
-			Area:      deployervalidator.AreaCluster,
+		ret = append(ret, ValidationResult{
+			Area:      AreaCluster,
 			Component: "scheduler",
 			Node:      nodeName,
 			Setting:   "cache",

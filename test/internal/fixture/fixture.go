@@ -38,9 +38,9 @@ import (
 
 	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
 
-	"github.com/k8stopologyawareschedwg/deployer/pkg/deployer"
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
+	"github.com/openshift-kni/numaresources-operator/internal/clientutil"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	"github.com/openshift-kni/numaresources-operator/internal/objects"
 	intwait "github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -252,12 +252,12 @@ func Cooldown(ft *Fixture) {
 	time.Sleep(cooldownTime)
 }
 
-func (fxt *Fixture) DEnv() *deployer.Environment {
+func (fxt *Fixture) DEnv() *clientutil.Environment {
 	return fxt.DEnvWithContext(context.TODO())
 }
 
-func (fxt *Fixture) DEnvWithContext(ctx context.Context) *deployer.Environment {
-	return &deployer.Environment{
+func (fxt *Fixture) DEnvWithContext(ctx context.Context) *clientutil.Environment {
+	return &clientutil.Environment{
 		Cli: fxt.Client,
 		Ctx: ctx,
 		Log: logr.Discard(),

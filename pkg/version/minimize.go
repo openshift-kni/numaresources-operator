@@ -19,7 +19,7 @@ package version
 import (
 	"strings"
 
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/platform"
 )
 
 func Minimize(ver platform.Version) platform.Version {

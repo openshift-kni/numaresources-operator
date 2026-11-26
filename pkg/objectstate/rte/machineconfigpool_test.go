@@ -27,7 +27,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
-	rtemanifests "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/manifests/rte"
+	rtemanifests "github.com/openshift-kni/numaresources-operator/internal/manifests/rte"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 )
 

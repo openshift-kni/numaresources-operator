@@ -29,7 +29,7 @@ import (
 	nodegroupv1 "github.com/openshift-kni/numaresources-operator/api/v1/helper/nodegroup"
 	"github.com/openshift-kni/numaresources-operator/internal/api/annotations"
 	testobjs "github.com/openshift-kni/numaresources-operator/internal/objects"
-	"github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/platform"
+	"github.com/openshift-kni/numaresources-operator/internal/platform"
 )
 
 func TestMachineConfigPoolDuplicates(t *testing.T) {

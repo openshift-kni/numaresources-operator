@@ -122,3 +122,13 @@ func (wt Waiter) ForDeploymentReplicasReadiness(ctx context.Context, dp *appsv1.
 	})
 	return updatedDp, err
 }
+
+func (wt Waiter) ForDeploymentDeleted(ctx context.Context, namespace, name string) error {
+	immediate := true
+	return k8swait.PollUntilContextTimeout(ctx, wt.PollInterval, wt.PollTimeout, immediate, func(ctx context.Context) (bool, error) {
+		dp := &appsv1.Deployment{}
+		key := ObjectKey{Namespace: namespace, Name: name}
+		err := wt.Cli.Get(ctx, key.AsKey(), dp)
+		return deletionStatusFromError("Deployment", key, err)
+	})
+}
