@@ -21,7 +21,86 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/ptr"
+
+	"github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 )
+
+func TestFromPods(t *testing.T) {
+	const device = corev1.ResourceName("example.com/device")
+
+	app := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("1500m"),
+		corev1.ResourceMemory: resource.MustParse("900Mi"),
+		device:                resource.MustParse("2"),
+	}
+	init := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("600m"),
+		corev1.ResourceMemory: resource.MustParse("256Mi"),
+		device:                resource.MustParse("1"),
+	}
+	largeInit := corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("2500m"),
+		corev1.ResourceMemory: resource.MustParse("2G"),
+		device:                resource.MustParse("3"),
+	}
+	podWith := func(policy corev1.ContainerRestartPolicy, initRequests corev1.ResourceList) corev1.Pod {
+		return corev1.Pod{
+			Spec: corev1.PodSpec{
+				Containers: []corev1.Container{{
+					Resources: corev1.ResourceRequirements{Requests: app},
+				}},
+				InitContainers: []corev1.Container{{
+					RestartPolicy: ptr.To(policy),
+					Resources:     corev1.ResourceRequirements{Requests: initRequests},
+				}},
+			},
+		}
+	}
+
+	testCases := []struct {
+		name             string
+		pods             []corev1.Pod
+		expectedBaseload corev1.ResourceList
+	}{
+		{
+			name: "sidecar init container is added",
+			pods: []corev1.Pod{podWith(corev1.ContainerRestartPolicyAlways, init)},
+			expectedBaseload: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceMemory: resource.MustParse("2G"),
+				device:                resource.MustParse("3"),
+			},
+		},
+		{
+			name: "regular init container is not added",
+			pods: []corev1.Pod{podWith(corev1.ContainerRestartPolicyNever, init)},
+			expectedBaseload: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("1G"),
+				device:                resource.MustParse("2"),
+			},
+		},
+		{
+			name: "larger regular init request raises the total",
+			pods: []corev1.Pod{podWith(corev1.ContainerRestartPolicyNever, largeInit)},
+			expectedBaseload: corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("4"),
+				corev1.ResourceMemory: resource.MustParse("2G"),
+				device:                resource.MustParse("3"),
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := FromPods("worker0", tc.pods).Resources
+			if !resourcelist.Equal(got, tc.expectedBaseload) {
+				t.Fatalf("baseload %s, want %s", resourcelist.ToString(got), resourcelist.ToString(tc.expectedBaseload))
+			}
+		})
+	}
+}
 
 func TestRound(t *testing.T) {
 	type testCase struct {
