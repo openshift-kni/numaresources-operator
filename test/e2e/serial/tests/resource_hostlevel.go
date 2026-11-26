@@ -23,11 +23,18 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	machineconfigv1 "github.com/openshift/api/machineconfiguration/v1"
+
 	nrtv1alpha2 "github.com/k8stopologyawareschedwg/noderesourcetopology-api/pkg/apis/topology/v1alpha2"
 
+	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
+	"github.com/openshift-kni/numaresources-operator/internal/devices"
 	intnrt "github.com/openshift-kni/numaresources-operator/internal/noderesourcetopology"
 	intreslist "github.com/openshift-kni/numaresources-operator/internal/resourcelist"
 	"github.com/openshift-kni/numaresources-operator/internal/wait"
@@ -450,7 +457,148 @@ var _ = Describe("[serial][hostlevel] numaresources host-level resources", Seria
 		)
 	})
 
+	// OCPBUGS-90597: host-level extended resources held by fillers must not break
+	// Guaranteed TAS scheduling under EnabledExclusiveResources PFP.
+	Context("[pfp] with host-level extended resources not listed in NRT", func() {
+		It("should schedule a Guaranteed TAS pod when host-level extended resources are held", Label(label.Tier1, "feature:pfphostlevel"), func(ctx context.Context) {
+			nroOperObj := serialconfig.Config.NROOperObj
+			Expect(nroOperObj).ToNot(BeNil(), "NUMAResourcesOperator not available from serial suite config")
+
+			resNameStr := e2efixture.GetDeviceTypeHostLevelName()
+			if resNameStr == "" {
+				e2efixture.Skipf(fxt, "missing required host-level device name (set %s)", devices.DevTypeHostLevelEnvVar)
+			}
+			resName := corev1.ResourceName(resNameStr)
+
+			By("selecting a worker node")
+			nodeNames := e2enrt.AccumulateNames(nrtList.Items)
+			targetNodeName, ok := e2efixture.PopNodeName(nodeNames)
+			Expect(ok).To(BeTrue(), "cannot select a worker node")
+
+			By(fmt.Sprintf("checking host-level resource %q is allocatable on node %q and absent from NRT", resName, targetNodeName))
+			var node corev1.Node
+			err := fxt.Client.Get(ctx, client.ObjectKey{Name: targetNodeName}, &node)
+			Expect(err).ToNot(HaveOccurred(), "cannot get node %q", targetNodeName)
+			qty, found := node.Status.Allocatable[resName]
+			Expect(found && !qty.IsZero()).To(BeTrue(), "host-level resource %q missing from allocatable on node %q", resName, targetNodeName)
+
+			nrtInfo, err := e2enrt.FindFromList(nrtList.Items, targetNodeName)
+			Expect(err).ToNot(HaveOccurred(), "NRT not found for node %q", targetNodeName)
+			Expect(resourceInNRTZones(*nrtInfo, resName)).To(BeFalse(), "host-level resource %q unexpectedly listed in NRT for node %q", resName, targetNodeName)
+
+			By(fmt.Sprintf("checking node %q has podsFingerprinting=%q", targetNodeName, nropv1.PodsFingerprintingEnabledExclusiveResources))
+			exclusivePFP, err := nodeHasExclusiveResourcesPFP(ctx, fxt.Client, *nroOperObj, targetNodeName)
+			Expect(err).ToNot(HaveOccurred(), "cannot resolve PFP mode for node %q", targetNodeName)
+			Expect(exclusivePFP).To(BeTrue(), "node %q does not have podsFingerprinting=%q", targetNodeName, nropv1.PodsFingerprintingEnabledExclusiveResources)
+
+			By(fmt.Sprintf("creating a non-guaranteed filler pod holding the host-level resource on node %q", targetNodeName))
+			fillerRes := corev1.ResourceList{
+				resName: resource.MustParse("1"),
+			}
+			filler := objects.NewTestPodPause(fxt.Namespace.Name, "filler-hostlevel")
+			filler.Spec.Containers[0].Resources.Limits = fillerRes
+			_, err = pinPodToNode(filler, targetNodeName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(fxt.Client.Create(ctx, filler)).To(Succeed())
+
+			fillerRunning, err := wait.With(fxt.Client).Timeout(2*time.Minute).ForPodPhase(ctx, filler.Namespace, filler.Name, corev1.PodRunning)
+			if err != nil {
+				_ = objects.LogEventsForPod(fxt.K8sClient, filler.Namespace, filler.Name)
+			}
+			Expect(err).ToNot(HaveOccurred(), "filler pod %s/%s did not reach Running", filler.Namespace, filler.Name)
+			Expect(fillerRunning.Spec.NodeName).To(Equal(targetNodeName), "filler must run on the selected host-level candidate")
+
+			By("waiting for NRT data to settle after filler")
+			e2efixture.MustSettleNRT(fxt)
+
+			By(fmt.Sprintf("scheduling a Guaranteed TAS pod on node %q that does not request the host-level resource", targetNodeName))
+			schedulerName := serialconfig.Config.SchedulerName
+			Expect(schedulerName).ToNot(BeEmpty())
+			guRes := corev1.ResourceList{
+				corev1.ResourceCPU:    resource.MustParse("2"),
+				corev1.ResourceMemory: resource.MustParse("256Mi"),
+			}
+			testPod := objects.NewTestPodPause(fxt.Namespace.Name, "gu-tas-hostlevel")
+			testPod.Spec.SchedulerName = schedulerName
+			testPod.Spec.Containers[0].Resources.Requests = guRes
+			testPod.Spec.Containers[0].Resources.Limits = guRes.DeepCopy()
+			_, err = pinPodToNode(testPod, targetNodeName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(fxt.Client.Create(ctx, testPod)).To(Succeed())
+
+			podRunningTimeout := 5 * time.Minute
+			updatedPod, err := wait.With(fxt.Client).Timeout(podRunningTimeout).ForPodPhase(ctx, testPod.Namespace, testPod.Name, corev1.PodRunning)
+			if err != nil {
+				_ = objects.LogEventsForPod(fxt.K8sClient, testPod.Namespace, testPod.Name)
+				if updatedPod != nil {
+					for _, cond := range updatedPod.Status.Conditions {
+						klog.InfoS("TAS pod condition", "namespace", updatedPod.Namespace, "name", updatedPod.Name, "type", cond.Type, "status", cond.Status, "reason", cond.Reason, "message", cond.Message)
+					}
+				}
+			}
+			Expect(err).ToNot(HaveOccurred(), "pod %s/%s did not reach Running within %v", testPod.Namespace, testPod.Name, podRunningTimeout)
+
+			schedOK, err := nrosched.CheckPODWasScheduledWith(ctx, fxt.K8sClient, updatedPod.Namespace, updatedPod.Name, schedulerName)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(schedOK).To(BeTrue(), "pod %s/%s not scheduled with expected scheduler %s", updatedPod.Namespace, updatedPod.Name, schedulerName)
+			Expect(updatedPod.Spec.NodeName).To(Equal(targetNodeName), "TAS pod must run on the same node holding the host-level resource")
+		})
+	})
+
 })
+
+// nodeHasExclusiveResourcesPFP reports whether the NodeGroup covering nodeName
+// has podsFingerprinting=EnabledExclusiveResources in the NRO status.
+func nodeHasExclusiveResourcesPFP(ctx context.Context, cli client.Client, nro nropv1.NUMAResourcesOperator, nodeName string) (bool, error) {
+	node := &corev1.Node{}
+	if err := cli.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
+		return false, err
+	}
+
+	mcpList := &machineconfigv1.MachineConfigPoolList{}
+	if err := cli.List(ctx, mcpList); err != nil {
+		return false, err
+	}
+
+	nodeLabels := labels.Set(node.Labels)
+	for i := range mcpList.Items {
+		mcp := &mcpList.Items[i]
+		if mcp.Spec.NodeSelector == nil {
+			continue
+		}
+		sel, err := metav1.LabelSelectorAsSelector(mcp.Spec.NodeSelector)
+		if err != nil || !sel.Matches(nodeLabels) {
+			continue
+		}
+
+		for _, ng := range nro.Status.NodeGroups {
+			if ng.PoolName != mcp.Name {
+				continue
+			}
+			if ok, mode := isPFPEnabledInConfig(&ng.Config); ok && mode == nropv1.PodsFingerprintingEnabledExclusiveResources {
+				return true, nil
+			}
+		}
+		for _, statusMCP := range nro.Status.MachineConfigPools {
+			if statusMCP.Name != mcp.Name {
+				continue
+			}
+			if ok, mode := isPFPEnabledInConfig(statusMCP.Config); ok && mode == nropv1.PodsFingerprintingEnabledExclusiveResources {
+				return true, nil
+			}
+		}
+	}
+	return false, nil
+}
+
+func resourceInNRTZones(nrtInfo nrtv1alpha2.NodeResourceTopology, resName corev1.ResourceName) bool {
+	for _, zone := range nrtInfo.Zones {
+		if _, ok := e2enrt.FindResourceAvailableByName(zone.Resources, string(resName)); ok {
+			return true
+		}
+	}
+	return false
+}
 
 type desiredNodesState struct {
 	NRTList           nrtv1alpha2.NodeResourceTopologyList
