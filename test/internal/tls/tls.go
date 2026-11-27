@@ -28,6 +28,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
 
@@ -43,6 +44,7 @@ import (
 	k8swgobjupdate "github.com/openshift-kni/numaresources-operator/pkg/numaresourcesoperator/objectupdate"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
+	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
 
@@ -57,6 +59,10 @@ var ErrTLSServerRejected = fmt.Errorf("%w: server sent TLS alert", ErrTLSHandsha
 // even attempt the connection because the configured parameters are
 // incompatible (e.g. MinVersion > MaxVersion, or no matching cipher suites).
 var ErrTLSClientConfigIncompatible = fmt.Errorf("%w: Go client TLS config incompatible", ErrTLSHandshakeRejected)
+
+// ErrSchedulerNotDeployed reports that NUMAResourcesScheduler is absent
+// so there is no scheduler operand whose TLS settings can be verified
+var ErrSchedulerNotDeployed = errors.New("scheduler is not deployed")
 
 // tlsConfigOpt transforms client tls.Config
 type tlsConfigOpt func(*tls.Config)
@@ -295,6 +301,50 @@ func FetchMetrics(cli kubernetes.Interface, pod *corev1.Pod, podPort string) ([]
 		return nil, err
 	}
 	return body, nil
+}
+
+// CheckSchedulerDeploymentTLSFlags Resolves the scheduler Deployment from the
+// NUMAResourcesScheduler status and compares --tls-min-version, --tls-cipher-suites, --tls-curve-preferences
+func CheckSchedulerDeploymentTLSFlags(ctx context.Context, cli client.Client, expected objtls.Settings) error {
+	nroSched := &nropv1.NUMAResourcesScheduler{}
+	schedKey := client.ObjectKey{Name: objectnames.DefaultNUMAResourcesSchedulerCrName}
+	// fetch CR from cluster
+	if err := cli.Get(ctx, schedKey, nroSched); err != nil {
+		if apierrors.IsNotFound(err) {
+			return fmt.Errorf("%w: NUMAResourcesScheduler %q not found", ErrSchedulerNotDeployed, schedKey.Name)
+		}
+		return fmt.Errorf("failed to get NUMAResourcesScheduler: %w", err)
+	}
+
+	// Read the deployment reference that NROP scheduler controller publishes in status
+	depRef := nroSched.Status.Deployment
+	if depRef.Namespace == "" || depRef.Name == "" {
+		return fmt.Errorf("Scheduler deployment is not reported in NUMAResourcesScheduler Status %q status", schedKey.Name)
+	}
+	// fetch scheduler deployer
+	dp := &appsv1.Deployment{}
+	if err := cli.Get(ctx, client.ObjectKey{Namespace: depRef.Namespace, Name: depRef.Name}, dp); err != nil {
+		return fmt.Errorf("failed to get scheduler Deployment %s/%s: %w", depRef.Namespace, depRef.Name, err)
+	}
+	// searches Deployments pod template for the scheduler container
+	cnt := k8swgobjupdate.FindContainerByName(dp.Spec.Template.Spec.Containers, schedupdate.MainContainerName)
+
+	if cnt == nil {
+		return fmt.Errorf("main container not found deploymentName: %q", dp.Name)
+	}
+	// parse arguments of the form --flag=value
+	flags := flagcodec.ParseArgvKeyValue(cnt.Args, flagcodec.WithFlagNormalization)
+	if err := matchTLSFlag(flags, "--tls-min-version", expected.MinVersion, dp.Name); err != nil {
+		return err
+	}
+	if err := matchTLSFlag(flags, "--tls-cipher-suites", expected.CipherSuites, dp.Name); err != nil {
+		return err
+	}
+
+	if err := matchTLSFlag(flags, "--tls-curve-preferences", expected.CurvePreferences, dp.Name); err != nil {
+		return err
+	}
+	return nil
 }
 
 // CurveIDsFromProfile returns the curve IDs the profile allows, plus the groups this build of Go cannot map

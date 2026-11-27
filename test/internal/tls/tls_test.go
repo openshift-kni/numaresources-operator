@@ -39,6 +39,7 @@ import (
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/pkg/objectnames"
 	rteupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/rte"
+	schedupdate "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/sched"
 	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 )
 
@@ -627,6 +628,342 @@ func TestCheckRTEDaemonSetTLSFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newSchedulerCR(deployment nropv1.NamespacedName) *nropv1.NUMAResourcesScheduler {
+	return &nropv1.NUMAResourcesScheduler{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: objectnames.DefaultNUMAResourcesSchedulerCrName,
+		},
+		Status: nropv1.NUMAResourcesSchedulerStatus{
+			Deployment: deployment,
+		},
+	}
+}
+
+func newSchedulerDeployment(namespace, name string, containers ...corev1.Container) *appsv1.Deployment {
+	if len(containers) == 0 {
+		containers = []corev1.Container{
+			{
+				Name: schedupdate.MainContainerName,
+			},
+		}
+	}
+	return &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      name,
+		},
+		Spec: appsv1.DeploymentSpec{
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{"app": "scheduler"},
+			},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"app": "scheduler"},
+				},
+				Spec: corev1.PodSpec{
+					Containers: containers,
+				},
+			},
+		},
+	}
+}
+
+func newSchedulerDeploymentWithMainContainerArgs(namespace, name string, args ...string) *appsv1.Deployment {
+	return newSchedulerDeployment(namespace, name, corev1.Container{
+		Name: schedupdate.MainContainerName,
+		Args: args,
+	})
+}
+
+func TestCheckSchedulerDeploymentTLSFlags(t *testing.T) {
+	deploymentRef := nropv1.NamespacedName{Namespace: "numaresources-operator", Name: schedupdate.MainContainerName}
+	testCases := []struct {
+		name               string
+		nroSched           *nropv1.NUMAResourcesScheduler
+		objects            []client.Object
+		expectedTLSSetting objtls.Settings
+		expectedError      string
+		notDeployed        bool
+	}{
+		{
+			name:          "scheduler CR not found",
+			nroSched:      nil,
+			objects:       nil,
+			expectedError: "scheduler is not deployed",
+			notDeployed:   true,
+		},
+		{
+			name:          "status deployment not reported",
+			nroSched:      newSchedulerCR(nropv1.NamespacedName{}),
+			expectedError: "is not reported",
+		},
+		{
+			name:          "deployment not found",
+			nroSched:      newSchedulerCR(deploymentRef),
+			expectedError: "failed to get scheduler Deployment",
+		},
+		{
+			name:     "scheduler container not found",
+			nroSched: newSchedulerCR(deploymentRef),
+			objects: []client.Object{
+				newSchedulerDeployment(deploymentRef.Namespace, deploymentRef.Name,
+					corev1.Container{Name: "kube-rbac-proxy"}),
+			},
+			expectedError: "main container not found",
+		},
+		{
+			name:     "flags match intermediate profile",
+			nroSched: newSchedulerCR(deploymentRef),
+			objects: []client.Object{
+				newSchedulerDeploymentWithMainContainerArgs(
+					deploymentRef.Namespace,
+					deploymentRef.Name,
+					"--tls-min-version=VersionTLS12",
+					"--tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+					"--tls-curve-preferences=4588,29,23,24",
+				),
+			},
+			expectedTLSSetting: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+				CurvePreferences: "4588,29,23,24",
+			},
+			expectedError: "",
+		},
+		{
+			name:     "curve preferences order matters",
+			nroSched: newSchedulerCR(deploymentRef),
+			objects: []client.Object{
+				newSchedulerDeploymentWithMainContainerArgs(
+					deploymentRef.Namespace,
+					deploymentRef.Name,
+					"--tls-min-version=VersionTLS12",
+					"--tls-cipher-suites=TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+					"--tls-curve-preferences=29,24,23",
+				),
+			},
+			expectedTLSSetting: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+				CurvePreferences: "29,23,24",
+			},
+			expectedError: `--tls-curve-preferences mismatch object="secondary-scheduler" expected="29,23,24" got="29,24,23"`,
+		},
+		{
+			name:     "min version mismatch",
+			nroSched: newSchedulerCR(deploymentRef),
+			objects: []client.Object{
+				newSchedulerDeploymentWithMainContainerArgs(
+					deploymentRef.Namespace,
+					deploymentRef.Name,
+					"--tls-min-version=VersionTLS13",
+					"--tls-curve-preferences=4588,29,23,24",
+				),
+			},
+			expectedTLSSetting: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "",
+				CurvePreferences: "4588,29,23,24",
+			},
+			expectedError: "mismatch",
+		},
+		{
+			name:     "cipher suites mismatch",
+			nroSched: newSchedulerCR(deploymentRef),
+			objects: []client.Object{
+				newSchedulerDeploymentWithMainContainerArgs(
+					deploymentRef.Namespace,
+					deploymentRef.Name,
+					"--tls-min-version=VersionTLS12",
+					"--tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+					"--tls-curve-preferences=4588,29,23,24",
+				),
+			},
+			expectedTLSSetting: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				CurvePreferences: "4588,29,23,24",
+			},
+			expectedError: "mismatch",
+		},
+		{
+			name:     "curves expected but flag absent",
+			nroSched: newSchedulerCR(deploymentRef),
+			objects: []client.Object{
+				newSchedulerDeploymentWithMainContainerArgs(
+					deploymentRef.Namespace,
+					deploymentRef.Name,
+					"--tls-min-version=VersionTLS12",
+					"--tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				),
+			},
+			expectedTLSSetting: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				CurvePreferences: "29,23",
+			},
+			expectedError: `--tls-curve-preferences mismatch object="secondary-scheduler" expected="29,23" got=""`,
+		},
+		{
+			name:     "curves expected but flag empty",
+			nroSched: newSchedulerCR(deploymentRef),
+			objects: []client.Object{
+				newSchedulerDeploymentWithMainContainerArgs(
+					deploymentRef.Namespace,
+					deploymentRef.Name,
+					"--tls-min-version=VersionTLS12",
+					"--tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+					"--tls-curve-preferences=",
+				),
+			},
+			expectedTLSSetting: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				CurvePreferences: "29,23",
+			},
+			expectedError: `--tls-curve-preferences mismatch object="secondary-scheduler" expected="29,23" got=""`,
+		},
+		{
+			name:     "stale curve flag when empty expected",
+			nroSched: newSchedulerCR(deploymentRef),
+			objects: []client.Object{
+				newSchedulerDeploymentWithMainContainerArgs(
+					deploymentRef.Namespace,
+					deploymentRef.Name,
+					"--tls-min-version=VersionTLS12",
+					"--tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+					"--tls-curve-preferences=29,23",
+				),
+			},
+			expectedTLSSetting: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				CurvePreferences: "",
+			},
+			expectedError: "--tls-curve-preferences should be absent",
+		},
+		{
+			name:     "no curve flag and empty expectation",
+			nroSched: newSchedulerCR(deploymentRef),
+			objects: []client.Object{
+				newSchedulerDeploymentWithMainContainerArgs(
+					deploymentRef.Namespace,
+					deploymentRef.Name,
+					"--tls-min-version=VersionTLS12",
+					"--tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				),
+			},
+			expectedTLSSetting: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				CurvePreferences: "",
+			},
+			expectedError: "",
+		},
+		{
+			name:     "TLS 1.3 profile with fixed ciphers and curves",
+			nroSched: newSchedulerCR(deploymentRef),
+			objects: []client.Object{
+				newSchedulerDeploymentWithMainContainerArgs(
+					deploymentRef.Namespace,
+					deploymentRef.Name,
+					"--tls-min-version=VersionTLS13",
+					"--tls-curve-preferences=4588,29,23,24",
+				),
+			},
+			expectedTLSSetting: objtls.Settings{
+				MinVersion:       "VersionTLS13",
+				CipherSuites:     "",
+				CurvePreferences: "4588,29,23,24",
+			},
+			expectedError: "",
+		},
+		{
+			name:     "stale cipher flag on TLS 1.3 profile",
+			nroSched: newSchedulerCR(deploymentRef),
+			objects: []client.Object{
+				newSchedulerDeploymentWithMainContainerArgs(
+					deploymentRef.Namespace,
+					deploymentRef.Name,
+					"--tls-min-version=VersionTLS13",
+					"--tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+					"--tls-curve-preferences=4588,29,23,24",
+				),
+			},
+			expectedTLSSetting: objtls.Settings{
+				MinVersion:       "VersionTLS13",
+				CipherSuites:     "",
+				CurvePreferences: "4588,29,23,24",
+			},
+			expectedError: "--tls-cipher-suites should be absent",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			objects := make([]client.Object, 0, len(tc.objects)+1)
+			if tc.nroSched != nil {
+				objects = append(objects, tc.nroSched)
+			}
+			objects = append(objects, tc.objects...)
+			fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(objects...).Build()
+
+			err := CheckSchedulerDeploymentTLSFlags(context.Background(), fakeClient, tc.expectedTLSSetting)
+
+			if tc.notDeployed {
+				if !errors.Is(err, ErrSchedulerNotDeployed) {
+					t.Fatalf("expected ErrSchedulerNotDeployed, got %v", err)
+				}
+				return
+			}
+			if errors.Is(err, ErrSchedulerNotDeployed) {
+				t.Fatalf("only a missing CR may report ErrSchedulerNotDeployed, got %v", err)
+			}
+			if tc.expectedError == "" {
+				if err != nil {
+					t.Errorf("no error expected to be returned; got %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected error %q, got nil", tc.expectedError)
+			}
+			if !strings.Contains(err.Error(), tc.expectedError) {
+				t.Errorf("expected error %v, got %v", tc.expectedError, err)
+			}
+		})
+	}
+}
+
+func TestCheckSchedulerDeploymentTLSFlagsNotDeployed(t *testing.T) {
+	t.Run("missing CR reports ErrSchedulerNotDeployed", func(t *testing.T) {
+		fakeClient := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+
+		err := CheckSchedulerDeploymentTLSFlags(context.Background(), fakeClient, objtls.Settings{})
+		if !errors.Is(err, ErrSchedulerNotDeployed) {
+			t.Fatalf("expected ErrSchedulerNotDeployed, got %v", err)
+		}
+		if !strings.Contains(err.Error(), objectnames.DefaultNUMAResourcesSchedulerCrName) {
+			t.Errorf("error should name the missing CR, got %v", err)
+		}
+	})
+
+	t.Run("empty status stays retryable", func(t *testing.T) {
+		fakeClient := fake.NewClientBuilder().
+			WithScheme(scheme.Scheme).
+			WithObjects(newSchedulerCR(nropv1.NamespacedName{})).
+			Build()
+
+		err := CheckSchedulerDeploymentTLSFlags(context.Background(), fakeClient, objtls.Settings{})
+		if err == nil {
+			t.Fatal("expected an error for an unreconciled scheduler CR, got nil")
+		}
+		if errors.Is(err, ErrSchedulerNotDeployed) {
+			t.Fatalf("an empty status must stay retryable, got ErrSchedulerNotDeployed: %v", err)
+		}
+	})
 }
 
 func TestFindDisallowedCurve(t *testing.T) {
