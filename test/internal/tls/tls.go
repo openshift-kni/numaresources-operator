@@ -61,6 +61,14 @@ var ErrTLSClientConfigIncompatible = fmt.Errorf("%w: Go client TLS config incomp
 // tlsConfigOpt transforms client tls.Config
 type tlsConfigOpt func(*tls.Config)
 
+var goClientCurves = []tls.CurveID{
+	tls.CurveP521,      // 25 - absent from every built-in profile
+	tls.CurveP256,      // 23
+	tls.CurveP384,      // 24
+	tls.X25519,         // 29
+	tls.X25519MLKEM768, // 4588 - listed by the built-in profiles since 5.1
+}
+
 func wrapTLSHandshakeError(err error) error {
 	if err == nil {
 		return nil
@@ -267,6 +275,9 @@ func CheckRTEDaemonSetTLSFlags(ctx context.Context, cli client.Client, expected 
 		if err := matchTLSFlag(rteFlags, "--metrics-tls-cipher-suites", expected.CipherSuites, ds.Name); err != nil {
 			return err
 		}
+		if err := matchTLSFlag(rteFlags, "--metrics-tls-curve-preferences", expected.CurvePreferences, ds.Name); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -284,6 +295,25 @@ func FetchMetrics(cli kubernetes.Interface, pod *corev1.Pod, podPort string) ([]
 		return nil, err
 	}
 	return body, nil
+}
+
+// CurveIDsFromProfile returns the curve IDs the profile allows, plus the groups this build of Go cannot map
+func CurveIDsFromProfile(profileSpec configv1.TLSProfileSpec) ([]tls.CurveID, []configv1.TLSGroup) {
+	return libgocrypto.TLSGroupsToCurveIDs(profileSpec.Groups)
+}
+
+// FindDisallowedCurve return disallowed CurveID not supported by openshift
+func FindDisallowedCurve(allowed []tls.CurveID) (tls.CurveID, error) {
+	allowedSet := make(map[tls.CurveID]bool, len(allowed))
+	for _, id := range allowed {
+		allowedSet[id] = true
+	}
+	for _, id := range goClientCurves {
+		if !allowedSet[id] {
+			return id, nil
+		}
+	}
+	return 0, fmt.Errorf("every curve the Go client can offer is allowed: %v", allowed)
 }
 
 // withCurve pins the client to offer only the specified key-exchange curve
@@ -379,11 +409,13 @@ func executeMetricsRequest(httpCli *http.Client, podPort string) ([]byte, error)
 	return responseBody, nil
 }
 
-func matchTLSFlag(rteFlags *flagcodec.Flags, flagName, expected, dsName string) error {
-	val, found := rteFlags.GetFlag(flagName)
+// matchTLSFlag compares TLS Flags rendered value on a workload against the expected value,
+// and fails if flag is missing, stale or different
+func matchTLSFlag(flags *flagcodec.Flags, flagName, expected, objectRef string) error {
+	val, found := flags.GetFlag(flagName)
 	if expected == "" {
 		if found && val.Data != "" {
-			return fmt.Errorf("%s should be absent or empty for this TLS profile daemonsetName=%q got=%q", flagName, dsName, val.Data)
+			return fmt.Errorf("%s should be absent or empty for this TLS profile object=%q got=%q", flagName, objectRef, val.Data)
 		}
 		return nil
 	}
@@ -392,15 +424,17 @@ func matchTLSFlag(rteFlags *flagcodec.Flags, flagName, expected, dsName string) 
 		if found {
 			got = val.Data
 		}
-		return fmt.Errorf("%s mismatch daemonsetName=%q expected=%q got=%q", flagName, dsName, expected, got)
+		return fmt.Errorf("%s mismatch object=%q expected=%q got=%q", flagName, objectRef, expected, got)
 	}
 	return nil
 }
 
 func tlsConfigFromProfileSpec(profileSpec configv1.TLSProfileSpec) *tls.Config {
-	tlsConfigFn, unsupportedCiphers := ctrltls.NewTLSConfigFromProfile(profileSpec)
-	if len(unsupportedCiphers) > 0 {
-		klog.InfoS("TLS profile has unsupported ciphers", "ciphers", unsupportedCiphers)
+	// unsupported holds cipher names and group names the shared library could not
+	// translate; the operands drop the same entries, so this is informational.
+	tlsConfigFn, unsupported := ctrltls.NewTLSConfigFromProfile(profileSpec)
+	if len(unsupported) > 0 {
+		klog.InfoS("TLS profile has unsupported entries", "ciphers", unsupported)
 	}
 	cfg := &tls.Config{}
 	tlsConfigFn(cfg)

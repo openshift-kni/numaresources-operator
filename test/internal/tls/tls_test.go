@@ -409,25 +409,7 @@ func TestCheckRTEDaemonSetTLSFlags(t *testing.T) {
 			expectedError: "mismatch",
 		},
 		{
-			name: "flags match modern (TLS 1.3) profile",
-			nrop: newNROP(nropv1.NodeGroupStatus{
-				DaemonSet: nropv1.NamespacedName{Namespace: "test-ns", Name: "rte-ds"},
-			}),
-			daemonSets: []client.Object{
-				newRTEDaemonSetWithMainContainerArgs(
-					"test-ns",
-					"rte-ds",
-					"--metrics-tls-min-version=VersionTLS13",
-				),
-			},
-			expectedTLSSettings: objtls.Settings{
-				MinVersion:   "VersionTLS13",
-				CipherSuites: "",
-			},
-			expectedError: "",
-		},
-		{
-			name: "cipher suites set for TLS 1.3 profile",
+			name: "stale cipher flag on TLS 1.3 profile",
 			nrop: newNROP(nropv1.NodeGroupStatus{
 				DaemonSet: nropv1.NamespacedName{Namespace: "test-ns", Name: "rte-ds"},
 			}),
@@ -443,7 +425,184 @@ func TestCheckRTEDaemonSetTLSFlags(t *testing.T) {
 				MinVersion:   "VersionTLS13",
 				CipherSuites: "",
 			},
-			expectedError: "should be absent or empty",
+			expectedError: "--metrics-tls-cipher-suites should be absent",
+		},
+		{
+			name: "flags match modern (TLS 1.3) profile",
+			nrop: newNROP(nropv1.NodeGroupStatus{
+				DaemonSet: nropv1.NamespacedName{Namespace: "test-ns", Name: "rte-ds"},
+			}),
+			daemonSets: []client.Object{
+				newRTEDaemonSetWithMainContainerArgs(
+					"test-ns",
+					"rte-ds",
+					"--metrics-tls-min-version=VersionTLS13",
+					"--metrics-tls-curve-preferences=4588,29,23,24",
+				),
+			},
+			expectedTLSSettings: objtls.Settings{
+				MinVersion:       "VersionTLS13",
+				CipherSuites:     "",
+				CurvePreferences: "4588,29,23,24",
+			},
+			expectedError: "",
+		},
+		{
+			name: "multiple NodeGroups second has wrong curve flag",
+			nrop: newNROP(
+				nropv1.NodeGroupStatus{
+					DaemonSet: nropv1.NamespacedName{Namespace: "test-ns1", Name: "rte-ds1"},
+				},
+				nropv1.NodeGroupStatus{
+					DaemonSet: nropv1.NamespacedName{Namespace: "test-ns2", Name: "rte-ds2"},
+				},
+			),
+			daemonSets: []client.Object{
+				newRTEDaemonSetWithMainContainerArgs(
+					"test-ns1",
+					"rte-ds1",
+					"--metrics-tls-min-version=VersionTLS12",
+					"--metrics-tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+					"--metrics-tls-curve-preferences=29,23,24",
+				),
+				newRTEDaemonSetWithMainContainerArgs(
+					"test-ns2",
+					"rte-ds2",
+					"--metrics-tls-min-version=VersionTLS12",
+					"--metrics-tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+					"--metrics-tls-curve-preferences=29,24,23",
+				),
+			},
+			expectedTLSSettings: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				CurvePreferences: "29,23,24",
+			},
+			expectedError: `--metrics-tls-curve-preferences mismatch object="rte-ds2" expected="29,23,24" got="29,24,23"`,
+		},
+		{
+			name: "CurvePreferences mismatch",
+			nrop: newNROP(nropv1.NodeGroupStatus{
+				DaemonSet: nropv1.NamespacedName{Namespace: "test-ns", Name: "rte-ds"},
+			}),
+			daemonSets: []client.Object{
+				newRTEDaemonSetWithMainContainerArgs(
+					"test-ns",
+					"rte-ds",
+					"--metrics-tls-min-version=VersionTLS12",
+					"--metrics-tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+					"--metrics-tls-curve-preferences=29,24,23",
+				),
+			},
+			expectedTLSSettings: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				CurvePreferences: "29,23,24",
+			},
+			expectedError: `--metrics-tls-curve-preferences mismatch object="rte-ds" expected="29,23,24" got="29,24,23"`,
+		},
+		{
+			name: "no curves expected but stale curve flag present",
+			nrop: newNROP(nropv1.NodeGroupStatus{
+				DaemonSet: nropv1.NamespacedName{Namespace: "test-ns", Name: "rte-ds"},
+			}),
+			daemonSets: []client.Object{
+				newRTEDaemonSetWithMainContainerArgs(
+					"test-ns",
+					"rte-ds",
+					"--metrics-tls-min-version=VersionTLS12",
+					"--metrics-tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+					"--metrics-tls-curve-preferences=29,23,24",
+				),
+			},
+			expectedTLSSettings: objtls.Settings{
+				MinVersion:   "VersionTLS12",
+				CipherSuites: "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+			},
+			expectedError: "--metrics-tls-curve-preferences should be absent",
+		},
+		{
+			name: "curves expected but flag absent",
+			nrop: newNROP(nropv1.NodeGroupStatus{
+				DaemonSet: nropv1.NamespacedName{Namespace: "test-ns", Name: "rte-ds"},
+			}),
+			daemonSets: []client.Object{
+				newRTEDaemonSetWithMainContainerArgs(
+					"test-ns",
+					"rte-ds",
+					"--metrics-tls-min-version=VersionTLS12",
+					"--metrics-tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				),
+			},
+			expectedTLSSettings: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				CurvePreferences: "4588,29,23,24",
+			},
+			expectedError: `--metrics-tls-curve-preferences mismatch object="rte-ds" expected="4588,29,23,24" got=""`,
+		},
+		{
+			name: "curves expected but flag empty",
+			nrop: newNROP(nropv1.NodeGroupStatus{
+				DaemonSet: nropv1.NamespacedName{Namespace: "test-ns", Name: "rte-ds"},
+			}),
+			daemonSets: []client.Object{
+				newRTEDaemonSetWithMainContainerArgs(
+					"test-ns",
+					"rte-ds",
+					"--metrics-tls-min-version=VersionTLS12",
+					"--metrics-tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+					"--metrics-tls-curve-preferences=",
+				),
+			},
+			expectedTLSSettings: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				CurvePreferences: "29,23",
+			},
+			expectedError: `--metrics-tls-curve-preferences mismatch object="rte-ds" expected="29,23" got=""`,
+		},
+		{
+			name: "empty curve flag matches empty expectation",
+			nrop: newNROP(nropv1.NodeGroupStatus{
+				DaemonSet: nropv1.NamespacedName{Namespace: "test-ns", Name: "rte-ds"},
+			}),
+			daemonSets: []client.Object{
+				newRTEDaemonSetWithMainContainerArgs(
+					"test-ns",
+					"rte-ds",
+					"--metrics-tls-min-version=VersionTLS12",
+					"--metrics-tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+					"--metrics-tls-curve-preferences=",
+				),
+			},
+			expectedTLSSettings: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				CurvePreferences: "",
+			},
+			expectedError: "",
+		},
+		{
+			name: "single PQ curve 4588",
+			nrop: newNROP(nropv1.NodeGroupStatus{
+				DaemonSet: nropv1.NamespacedName{Namespace: "test-ns", Name: "rte-ds"},
+			}),
+			daemonSets: []client.Object{
+				newRTEDaemonSetWithMainContainerArgs(
+					"test-ns",
+					"rte-ds",
+					"--metrics-tls-min-version=VersionTLS12",
+					"--metrics-tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+					"--metrics-tls-curve-preferences=4588",
+				),
+			},
+			expectedTLSSettings: objtls.Settings{
+				MinVersion:       "VersionTLS12",
+				CipherSuites:     "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+				CurvePreferences: "4588",
+			},
+			expectedError: "",
 		},
 	}
 	for _, tc := range testCases {
@@ -468,6 +627,69 @@ func TestCheckRTEDaemonSetTLSFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFindDisallowedCurve(t *testing.T) {
+	intermediate := configv1.TLSProfiles[configv1.TLSProfileIntermediateType]
+
+	t.Run("built-in profile returns the first curve the client can offer that is not allowed", func(t *testing.T) {
+		allowed, unrecognized := CurveIDsFromProfile(*intermediate)
+		if len(unrecognized) != 0 {
+			t.Fatalf("built-in profile has unrecognized groups: %v", unrecognized)
+		}
+		got, err := FindDisallowedCurve(allowed)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != tls.CurveP521 {
+			t.Errorf("expected CurveP521, got %v", got)
+		}
+	})
+	t.Run("prefers CurveP521 over a post-quantum group", func(t *testing.T) {
+		got, err := FindDisallowedCurve([]tls.CurveID{tls.X25519, tls.X25519MLKEM768})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != tls.CurveP521 {
+			t.Errorf("expected CurveP521, got %v", got)
+		}
+	})
+	t.Run("errors when every curve the client can offer is allowed", func(t *testing.T) {
+		if _, err := FindDisallowedCurve(goClientCurves); err == nil {
+			t.Errorf("expected an error, got nil")
+		}
+	})
+}
+
+func TestCurveIDsFromProfilee(t *testing.T) {
+	t.Run("built-in intermediate profile maps every group in order", func(t *testing.T) {
+		got, unrecognized := CurveIDsFromProfile(*configv1.TLSProfiles[configv1.TLSProfileIntermediateType])
+		if len(unrecognized) != 0 {
+			t.Fatalf("unexpected unrecognized groups: %v", unrecognized)
+		}
+		want := []tls.CurveID{tls.X25519MLKEM768, tls.X25519, tls.CurveP256, tls.CurveP384}
+		if len(got) != len(want) {
+			t.Fatalf("expected %v, got %v", want, got)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("unexpected %v, got %v", want, got)
+				break
+			}
+		}
+	})
+	t.Run("unknown group is reported and the known ones are kept", func(t *testing.T) {
+		const unknown = configv1.TLSGroup("secp256k9")
+		got, unrecognized := CurveIDsFromProfile(configv1.TLSProfileSpec{
+			Groups: []configv1.TLSGroup{configv1.TLSGroupX25519, unknown},
+		})
+		if len(unrecognized) != 1 || unrecognized[0] != unknown {
+			t.Errorf("expected [%q] as unrecognized, got %v", unknown, unrecognized)
+		}
+		if len(got) != 1 || got[0] != tls.X25519 {
+			t.Errorf("expected [X25519] as mapped ids, got %v", got)
+		}
+	})
 }
 
 func TestTLSConfigOpts(t *testing.T) {
