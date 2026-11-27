@@ -31,12 +31,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	configv1 "github.com/openshift/api/config/v1"
+	ctrltls "github.com/openshift/controller-runtime-common/pkg/tls"
 	libgocrypto "github.com/openshift/library-go/pkg/crypto"
 
 	nropv1 "github.com/openshift-kni/numaresources-operator/api/v1"
 	"github.com/openshift-kni/numaresources-operator/internal/podlist"
+	objtls "github.com/openshift-kni/numaresources-operator/pkg/objectupdate/tls"
 	"github.com/openshift-kni/numaresources-operator/test/e2e/label"
 	e2eclient "github.com/openshift-kni/numaresources-operator/test/internal/clients"
+	"github.com/openshift-kni/numaresources-operator/test/internal/deploy"
 	e2efixture "github.com/openshift-kni/numaresources-operator/test/internal/fixture"
 	"github.com/openshift-kni/numaresources-operator/test/internal/objects"
 	intls "github.com/openshift-kni/numaresources-operator/test/internal/tls"
@@ -113,6 +116,19 @@ var _ = Describe("TLS", func() {
 				}
 			})
 
+			It("[test_id:91140] should have the scheduler Deployment TLS args aligned with the cluster profile", func(ctx context.Context) {
+				apply, unsupported := ctrltls.NewTLSConfigFromProfile(tlsProfileSpec)
+				if len(unsupported) > 0 {
+					klog.InfoS("the profile contains ciphers or groups this build does not support; they are ignored", "unsupported", unsupported)
+				}
+				cfg := &tls.Config{}
+				apply(cfg)
+				expected := objtls.NewSettings(cfg)
+				e2efixture.By("verifying the scheduler Deployment TLS args: %s", expected.String())
+				Eventually(func(g Gomega) {
+					g.Expect(intls.CheckSchedulerDeploymentTLSFlags(ctx, e2eclient.Client, expected)).To(Succeed())
+				}).WithTimeout(tlsArgsCheckTimeout).WithPolling(tlsArgsCheckPolling).Should(Succeed())
+			})
 		})
 
 	Context("[tlscompliance][rte] rte complies with TLS Profile modifications",
@@ -175,6 +191,33 @@ var _ = Describe("TLS", func() {
 			})
 		})
 
+	Context("[tlscompliance][operator] operator metrics complies with TLS Profile modifications",
+		Label(label.Tier0, "feature:tlscompliance"), func() {
+			var operatorPod corev1.Pod
+
+			BeforeEach(func(ctx context.Context) {
+				operatorPod = waitForReadyPods(ctx, resolveOperatorPods)[0]
+			})
+
+			It("[test_id:91143] should accept TLS connections negotiated within the cluster profile", func() {
+				e2efixture.By("probing the operator metrics endpoint on port %s", operatorMetricsPort)
+				state, err := intls.ProbeTLSState(e2eclient.K8sClient, &operatorPod, operatorMetricsPort)
+				Expect(err).ToNot(HaveOccurred(), "operator pod %q: TLS handshake failed", operatorPod.Name)
+				klog.InfoS("negotiated TLS settings", "pod", operatorPod.Name,
+					"version", tls.VersionName(state.Version), "cipher", tls.CipherSuiteName(state.CipherSuite),
+					"curve", state.CurveID.String())
+
+				Expect(state.Version).To(BeNumerically(">=", minVersion),
+					"operator negotiated %s, below the cluster minimum %s",
+					tls.VersionName(state.Version), tls.VersionName(minVersion))
+				if state.Version < tls.VersionTLS13 {
+					cipherName := tls.CipherSuiteName(state.CipherSuite)
+					Expect(allowedCiphers).To(ContainElement(cipherName),
+						"operator negotiated cipher %s, outside the profile ciphers %v", cipherName, tlsProfileSpec.Ciphers)
+				}
+			})
+
+		})
 })
 
 func waitForReadyPods(ctx context.Context, resolve func(context.Context) ([]corev1.Pod, error)) []corev1.Pod {
@@ -226,6 +269,21 @@ func resolveSchedulerPods(ctx context.Context) ([]corev1.Pod, error) {
 		return nil, errors.New("scheduler Deployment has not been created yet")
 	}
 	return podlist.With(e2eclient.Client).ByDeployment(ctx, *deployment)
+}
+
+func resolveOperatorPods(ctx context.Context) ([]corev1.Pod, error) {
+	nropObj := &nropv1.NUMAResourcesOperator{}
+	if err := e2eclient.Client.Get(ctx, objects.NROObjectKey(), nropObj); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("NUMAResourcesOperator: %w", errNotDeployed)
+		}
+		return nil, err
+	}
+	pod, err := deploy.FindNUMAResourcesOperatorPod(ctx, e2eclient.Client, nropObj)
+	if err != nil {
+		return nil, err
+	}
+	return []corev1.Pod{*pod}, nil
 }
 
 func resolveRTEPods(ctx context.Context) ([]corev1.Pod, error) {
