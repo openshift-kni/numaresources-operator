@@ -156,12 +156,16 @@ func TestFindDisallowedCipher(t *testing.T) {
 		}
 	})
 
-	t.Run("returns empty when allowed is nil but old profile has no TLS 1.2 ciphers", func(t *testing.T) {
-		// This case can't actually happen with real profiles, but tests
-		// the logic: if we pass all old ciphers as allowed, nothing is disallowed.
-		got := FindDisallowedCipher(oldProfile.Ciphers)
-		if got != "" {
-			t.Errorf("expected empty, got %q", got)
+	t.Run("finds the one cipher missing from an otherwise complete profile", func(t *testing.T) {
+		const missing = "ECDHE-ECDSA-AES256-SHA384"
+		allowed := make([]string, 0, len(oldProfile.Ciphers))
+		for _, c := range oldProfile.Ciphers {
+			if c != missing {
+				allowed = append(allowed, c)
+			}
+		}
+		if got := FindDisallowedCipher(allowed); got != missing {
+			t.Errorf("expected %q, got %q", missing, got)
 		}
 	})
 }

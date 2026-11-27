@@ -18,6 +18,9 @@ package tls
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/ed25519"
+	"crypto/rsa"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -193,10 +196,22 @@ func OpenSSLCipherToGoID(opensslName string) (uint16, error) {
 	return 0, fmt.Errorf("no Go cipher suite for IANA name %q (from OpenSSL %q)", ianaName, opensslName)
 }
 
-// findDisallowedCipher returns the first TLS 1.2 cipher (OpenSSL name)
+// FindDisallowedCipher returns the first TLS 1.2 cipher (OpenSSL name)
 // from the broadest upstream profile (Old) that is not in the allowed set.
 // TLS 1.3 ciphers are skipped because they are not individually configurable.
+// allowed must hold the profile's cipher names verbatim, that is in OpenSSL
+// form; IANA names never match and would make every cipher look disallowed
 func FindDisallowedCipher(allowed []string) string {
+	return FindDisallowedCipherForKey(allowed, "")
+}
+
+// FindDisallowedCipherForKey is FindDisallowedCipher restricted to the ciphers a
+// server presenting a certificate of the given key type ("RSA", "ECDSA",
+// "Ed25519") could actually select. A suite whose key exchange or signature
+// algorithm does not match the certificate is rejected before the profile is
+// consulted, so probing it would prove nothing about the profile. An empty
+// keyType disables the filter.
+func FindDisallowedCipherForKey(allowed []string, keyType string) string {
 	allowedSet := make(map[string]bool, len(allowed))
 	for _, c := range allowed {
 		allowedSet[c] = true
@@ -206,9 +221,31 @@ func FindDisallowedCipher(allowed []string) string {
 		if strings.HasPrefix(cipher, "TLS_") {
 			continue
 		}
-		if !allowedSet[cipher] {
-			return cipher
+		if allowedSet[cipher] {
+			continue
 		}
+		if keyType != "" && !strings.Contains(cipher, "-"+keyType+"-") {
+			continue
+		}
+		return cipher
+	}
+	return ""
+}
+
+// ServerCertificateKeyType returns the public key algorithm of the certificate
+// the endpoint presented. ProbeTLSState records the peer certificates even
+// though the probe skips verification, so this costs no extra handshake.
+func ServerCertificateKeyType(state tls.ConnectionState) string {
+	if len(state.PeerCertificates) == 0 {
+		return ""
+	}
+	switch state.PeerCertificates[0].PublicKey.(type) {
+	case *rsa.PublicKey:
+		return "RSA"
+	case *ecdsa.PublicKey:
+		return "ECDSA"
+	case ed25519.PublicKey:
+		return "Ed25519"
 	}
 	return ""
 }
