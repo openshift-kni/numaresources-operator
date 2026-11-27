@@ -109,6 +109,16 @@ func TestWrapTLSHandshakeError(t *testing.T) {
 			t.Errorf("expected original error %q, got %q", err, got)
 		}
 	})
+	t.Run("no supported elliptic curves for ECDHE", func(t *testing.T) {
+		err := fmt.Errorf("tls: no supported elliptic curves for ECDHE")
+		got := wrapTLSHandshakeError(err)
+		if !errors.Is(got, ErrTLSClientConfigIncompatible) {
+			t.Errorf("expected ErrTLSClientConfigIncompatible, got %v", got)
+		}
+		if !errors.Is(got, ErrTLSHandshakeRejected) {
+			t.Errorf("expected ErrTLSHandshakeRejected in chain, got %v", got)
+		}
+	})
 }
 
 func TestFindDisallowedCipher(t *testing.T) {
@@ -458,4 +468,25 @@ func TestCheckRTEDaemonSetTLSFlags(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTLSConfigOpts(t *testing.T) {
+	t.Run("withCurve pins exactly one curve", func(t *testing.T) {
+		cfg := &tls.Config{}
+		withCurve(tls.CurveP384)(cfg)
+		if len(cfg.CurvePreferences) != 1 || cfg.CurvePreferences[0] != tls.CurveP384 {
+			t.Errorf("expected [CurveP384], got %v", cfg.CurvePreferences)
+		}
+	})
+
+	t.Run("withCipher pins one suite and caps the version at TLS 1.2", func(t *testing.T) {
+		cfg := &tls.Config{}
+		withCipher(tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256)(cfg)
+		if len(cfg.CipherSuites) != 1 || cfg.CipherSuites[0] != tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 {
+			t.Errorf("expected the single ECDHE-RSA-GCM suite, got %v", cfg.CipherSuites)
+		}
+		if cfg.MaxVersion != tls.VersionTLS12 {
+			t.Errorf("expected MaxVersion TLS 1.2, got %s", tls.VersionName(cfg.MaxVersion))
+		}
+	})
 }

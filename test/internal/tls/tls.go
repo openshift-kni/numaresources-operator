@@ -58,6 +58,9 @@ var ErrTLSServerRejected = fmt.Errorf("%w: server sent TLS alert", ErrTLSHandsha
 // incompatible (e.g. MinVersion > MaxVersion, or no matching cipher suites).
 var ErrTLSClientConfigIncompatible = fmt.Errorf("%w: Go client TLS config incompatible", ErrTLSHandshakeRejected)
 
+// tlsConfigOpt transforms client tls.Config
+type tlsConfigOpt func(*tls.Config)
+
 func wrapTLSHandshakeError(err error) error {
 	if err == nil {
 		return nil
@@ -71,7 +74,8 @@ func wrapTLSHandshakeError(err error) error {
 		return fmt.Errorf("%w: %w", ErrTLSServerRejected, err)
 	}
 	if strings.Contains(err.Error(), "no supported versions") ||
-		strings.Contains(err.Error(), "no ciphers available") {
+		strings.Contains(err.Error(), "no ciphers available") ||
+		strings.Contains(err.Error(), "no supported elliptic curves") {
 		return fmt.Errorf("%w: %w", ErrTLSClientConfigIncompatible, err)
 	}
 	return err
@@ -107,6 +111,16 @@ func ProbeMaxTLSVersion(cli kubernetes.Interface, pod *corev1.Pod, podPort strin
 	})
 }
 
+// ProbeTLSState performs unconstrained handshake and returns full connection state
+func ProbeTLSState(cli kubernetes.Interface, pod *corev1.Pod, port string) (tls.ConnectionState, error) {
+	return probeTLSWithConfig(cli, pod, port)
+}
+
+// ProbeTLSCurve pins the handshake to a single curve (for positive or negative tests).
+func ProbeTLSCurve(cli kubernetes.Interface, pod *corev1.Pod, port string, curve tls.CurveID) (tls.ConnectionState, error) {
+	return probeTLSWithConfig(cli, pod, port, withCurve(curve))
+}
+
 // ProbeTLSCipher checks whether the pod's server rejects
 // TLS connections when the client only offers the given cipher (OpenSSL name).
 // Since this is dedicated to invalidating ciphers, it is assumed that it is
@@ -118,15 +132,8 @@ func ProbeTLSCipher(cli kubernetes.Interface, pod *corev1.Pod, podPort string, c
 	}
 	key := client.ObjectKeyFromObject(pod)
 	klog.InfoS("probe with TLS cipher", "pod", key.String(), "port", podPort, "cipher", cipher, "cipherID", cipherID)
-
-	return remoteexec.PortForwardToPod(cli, pod, podPort, func(conn net.Conn) error {
-		_, err := tlsHandshake(conn, &tls.Config{
-			InsecureSkipVerify: true, // we care about the version/cipher not the cert chain so skip cert validation
-			MaxVersion:         tls.VersionTLS12,
-			CipherSuites:       []uint16{cipherID},
-		})
-		return wrapTLSHandshakeError(err)
-	})
+	_, err = probeTLSWithConfig(cli, pod, podPort, withCipher(cipherID))
+	return err
 }
 
 // ProbeTLSSettings opens a TLS connection to the pod and returns the negotiated
@@ -151,6 +158,8 @@ func ProbeTLSSettings(cli kubernetes.Interface, pod *corev1.Pod, podPort string)
 
 // OpenSSLCipherToGoID converts an OpenSSL cipher name to a Go crypto/tls
 // cipher suite ID by going through the IANA name as an intermediate form.
+// Both the secure and the insecure suite lists are searched, because a probe
+// needs the ID of suites the profile deliberately excludes.
 func OpenSSLCipherToGoID(opensslName string) (uint16, error) {
 	ianaNames := libgocrypto.OpenSSLToIANACipherSuites([]string{opensslName})
 	if len(ianaNames) == 0 {
@@ -275,6 +284,44 @@ func FetchMetrics(cli kubernetes.Interface, pod *corev1.Pod, podPort string) ([]
 		return nil, err
 	}
 	return body, nil
+}
+
+// withCurve pins the client to offer only the specified key-exchange curve
+func withCurve(curve tls.CurveID) tlsConfigOpt {
+	return func(cfg *tls.Config) {
+		cfg.CurvePreferences = []tls.CurveID{curve}
+	}
+}
+
+// withCipher pins the client to offer only a specific cipher suite
+func withCipher(cipher uint16) tlsConfigOpt {
+	return func(cfg *tls.Config) {
+		cfg.MaxVersion = tls.VersionTLS12
+		cfg.CipherSuites = []uint16{cipher}
+	}
+}
+
+// ProbeTLSWithConfig handles TLS handshake over port-forwarded connection
+func probeTLSWithConfig(cli kubernetes.Interface, pod *corev1.Pod, port string, opts ...tlsConfigOpt) (tls.ConnectionState, error) {
+	var state *tls.ConnectionState
+	// Default baseline client configuration
+	cfg := &tls.Config{
+		InsecureSkipVerify: true, // Probing protocol policy, not certificate authority
+	}
+
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	err := remoteexec.PortForwardToPod(cli, pod, port, func(conn net.Conn) error {
+		var handshakeErr error
+		state, handshakeErr = tlsHandshake(conn, cfg)
+		return wrapTLSHandshakeError(handshakeErr)
+	})
+
+	if state == nil {
+		return tls.ConnectionState{}, err
+	}
+	return *state, err
 }
 
 func doMetricsRequestOverConnection(conn net.Conn, podPort string) ([]byte, error) {
