@@ -21,6 +21,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -114,6 +115,9 @@ var _ = Describe("TLS", func() {
 			})
 
 			It("[test_id:90743] should reject TLS connections below the minimum profile version", func() {
+				if minVersion == tls.VersionTLS10 {
+					Skip("cluster minimum is TLS 1.0: there is no lower TLS version to probe with, so the version probe does not apply")
+				}
 				belowMinVersion, err := intls.TLSVersionBelow(minVersion)
 				Expect(err).ToNot(HaveOccurred(), "cannot determine a TLS version below %s", tls.VersionName(minVersion))
 				for i := range schedulerPods {
@@ -129,15 +133,19 @@ var _ = Describe("TLS", func() {
 				if minVersion == tls.VersionTLS13 {
 					Skip(fmt.Sprintf("cluster minimum is %s: TLS 1.3 cipher suites are not individually configurable, so the cipher probe does not apply", tls.VersionName(minVersion)))
 				}
-				disallowedCipher := intls.FindDisallowedCipher(tlsProfileSpec.Ciphers)
-				if disallowedCipher == "" {
-					Skip(fmt.Sprintf("every TLS 1.2 cipher in profile %v is allowed, so the cipher probe does not apply", tlsProfileSpec.Ciphers))
-				}
-
 				for i := range schedulerPods {
 					schedulerPod := &schedulerPods[i]
-					e2efixture.By("verifying the scheduler rejects cipher %s", disallowedCipher)
-					err := intls.ProbeTLSCipher(e2eclient.K8sClient, schedulerPod, schedulerSecurePort, disallowedCipher)
+					e2efixture.By("probing the scheduler to learn its certificate key type")
+					state, err := intls.ProbeTLSState(e2eclient.K8sClient, schedulerPod, schedulerSecurePort)
+					Expect(err).ToNot(HaveOccurred(), "scheduler pod %q: TLS handshake failed", schedulerPod.Name)
+					keyType := intls.ServerCertificateKeyType(state)
+					disallowedCipher := intls.FindDisallowedCipherForKey(tlsProfileSpec.Ciphers, keyType)
+					if disallowedCipher == "" {
+						Skip(fmt.Sprintf("no cipher excluded by profile %v can be selected by a %q certificate", tlsProfileSpec.Ciphers, keyType))
+					}
+
+					e2efixture.By("verifying the scheduler rejects cipher %s for a %q certificate", disallowedCipher, keyType)
+					err = intls.ProbeTLSCipher(e2eclient.K8sClient, schedulerPod, schedulerSecurePort, disallowedCipher)
 					Expect(err).To(HaveOccurred(), "%s pod %q accepted %s, which the profile does not allow", "scheduler", schedulerPod.Name, disallowedCipher)
 					Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
 						"%s pod %q: %s: expected a TLS handshake rejection, got: %v", "scheduler", schedulerPod.Name, disallowedCipher, err)
@@ -180,8 +188,8 @@ var _ = Describe("TLS", func() {
 					_, err = intls.ProbeTLSCurve(e2eclient.K8sClient, schedulerPod, schedulerSecurePort, disallowed)
 					Expect(err).To(HaveOccurred(), "scheduler accepted curve %s (id %d), which the profile groups %v do not allow",
 						disallowed, uint16(disallowed), allowedCurves)
-					Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
-						"curve %s: expected a TLS handshake rejection, got: %v", disallowed, err)
+					Expect(errors.Is(err, intls.ErrTLSServerRejected)).To(BeTrue(),
+						"curve %s: expected a server-side TLS alert, got: %v", disallowed, err)
 					logRejectionSide("scheduler", schedulerPod.Name, err)
 				}
 			})
@@ -214,7 +222,7 @@ var _ = Describe("TLS", func() {
 				var rtePods []corev1.Pod
 
 				BeforeEach(func(ctx context.Context) {
-					rtePods = waitForReadyPods(ctx, resolveRTEPods)
+					rtePods = waitForReadyPodsByOwner(ctx, resolveRTEPods)
 				})
 
 				It("[test_id:88381] should serve metrics over TLS negotiated within the cluster profile", func() {
@@ -246,6 +254,9 @@ var _ = Describe("TLS", func() {
 				})
 
 				It("[test_id:88382] should reject TLS connections below the minimum profile version", func() {
+					if minVersion == tls.VersionTLS10 {
+						Skip("cluster minimum is TLS 1.0: there is no lower TLS version to probe with, so the version probe does not apply")
+					}
 					belowMinVersion, err := intls.TLSVersionBelow(minVersion)
 					Expect(err).ToNot(HaveOccurred(), "cannot determine a TLS version below %s", tls.VersionName(minVersion))
 					for i := range rtePods {
@@ -262,18 +273,30 @@ var _ = Describe("TLS", func() {
 					if minVersion == tls.VersionTLS13 {
 						Skip(fmt.Sprintf("cluster minimum is %s: TLS 1.3 cipher suites are not individually configurable, so the cipher probe does not apply", tls.VersionName(minVersion)))
 					}
-					disallowedCipher := intls.FindDisallowedCipher(tlsProfileSpec.Ciphers)
-					if disallowedCipher == "" {
-						Skip(fmt.Sprintf("every TLS 1.2 cipher in profile %v is allowed, so the cipher probe does not apply", tlsProfileSpec.Ciphers))
-					}
+					probed := 0
 					for i := range rtePods {
 						rtePod := &rtePods[i]
-						e2efixture.By("verifying RTE pod %s/%s rejects cipher %s", rtePod.Namespace, rtePod.Name, disallowedCipher)
-						err := intls.ProbeTLSCipher(e2eclient.K8sClient, rtePod, rteMetricsPort, disallowedCipher)
+						e2efixture.By("probing RTE pod %s/%s to learn its certificate key type", rtePod.Namespace, rtePod.Name)
+						state, err := intls.ProbeTLSState(e2eclient.K8sClient, rtePod, rteMetricsPort)
+						Expect(err).ToNot(HaveOccurred(), "RTE pod %q: TLS handshake failed", rtePod.Name)
+						keyType := intls.ServerCertificateKeyType(state)
+						disallowedCipher := intls.FindDisallowedCipherForKey(tlsProfileSpec.Ciphers, keyType)
+						if disallowedCipher == "" {
+							klog.InfoS("no cipher excluded by the profile can be selected by this pod's certificate",
+								"pod", rtePod.Name, "keyType", keyType, "profileCiphers", tlsProfileSpec.Ciphers)
+							continue
+						}
+						probed++
+
+						e2efixture.By("verifying RTE pod %s/%s rejects cipher %s for a %q certificate", rtePod.Namespace, rtePod.Name, disallowedCipher, keyType)
+						err = intls.ProbeTLSCipher(e2eclient.K8sClient, rtePod, rteMetricsPort, disallowedCipher)
 						Expect(err).To(HaveOccurred(), "RTE pod %q accepted cipher %s, which the profile does not allow", rtePod.Name, disallowedCipher)
 						Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
 							"RTE pod %q, cipher %s: expected a TLS handshake rejection, got: %v", rtePod.Name, disallowedCipher, err)
 						logRejectionSide("rte", rtePod.Name, err)
+					}
+					if probed == 0 {
+						Skip(fmt.Sprintf("no cipher excluded by profile %v can be selected by any RTE certificate", tlsProfileSpec.Ciphers))
 					}
 				})
 
@@ -314,8 +337,8 @@ var _ = Describe("TLS", func() {
 						_, err := intls.ProbeTLSCurve(e2eclient.K8sClient, rtePod, rteMetricsPort, disallowed)
 						Expect(err).To(HaveOccurred(), "RTE pod %q accepted curve %s (id %d), which the profile groups %v do not allow",
 							rtePod.Name, disallowed, uint16(disallowed), allowedCurves)
-						Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
-							"RTE pod %q curve %s: expected a TLS handshake rejection, got: %v", rtePod.Name, disallowed, err)
+						Expect(errors.Is(err, intls.ErrTLSServerRejected)).To(BeTrue(),
+							"RTE pod %q curve %s: expected a server-side TLS alert, got: %v", rtePod.Name, disallowed, err)
 						logRejectionSide("RTE", rtePod.Name, err)
 					}
 				})
@@ -349,6 +372,9 @@ var _ = Describe("TLS", func() {
 			})
 
 			It("[test_id:91144] should reject TLS connections below the minimum profile version", func() {
+				if minVersion == tls.VersionTLS10 {
+					Skip("cluster minimum is TLS 1.0: there is no lower TLS version to probe with, so the version probe does not apply")
+				}
 				belowMinVersion, err := intls.TLSVersionBelow(minVersion)
 				Expect(err).ToNot(HaveOccurred(), "cannot determine a TLS version below %s", tls.VersionName(minVersion))
 
@@ -356,20 +382,23 @@ var _ = Describe("TLS", func() {
 				err = intls.ProbeMaxTLSVersion(e2eclient.K8sClient, &operatorPod, operatorMetricsPort, belowMinVersion)
 				Expect(err).To(HaveOccurred(), "operator accepted a connection capped at %s", tls.VersionName(belowMinVersion))
 				Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(), "expected a TLS handshake rejection, got: %v", err)
-
 			})
 
 			It("[test_id:91176] should reject a cipher the profile does not allow", func() {
 				if minVersion == tls.VersionTLS13 {
 					Skip(fmt.Sprintf("cluster minimum is %s: TLS 1.3 cipher suites are not individually configurable, so the cipher probe does not apply", tls.VersionName(minVersion)))
 				}
-				disallowedCipher := intls.FindDisallowedCipher(tlsProfileSpec.Ciphers)
+				e2efixture.By("probing the operator to learn its certificate key type")
+				state, err := intls.ProbeTLSState(e2eclient.K8sClient, &operatorPod, operatorMetricsPort)
+				Expect(err).ToNot(HaveOccurred(), "operator pod %q: TLS handshake failed", operatorPod.Name)
+				keyType := intls.ServerCertificateKeyType(state)
+				disallowedCipher := intls.FindDisallowedCipherForKey(tlsProfileSpec.Ciphers, keyType)
 				if disallowedCipher == "" {
-					Skip(fmt.Sprintf("every TLS 1.2 cipher in profile %v is allowed, so the cipher probe does not apply", tlsProfileSpec.Ciphers))
+					Skip(fmt.Sprintf("no cipher excluded by profile %v can be selected by a %q certificate", tlsProfileSpec.Ciphers, keyType))
 				}
 
-				e2efixture.By("verifying the operator rejects cipher %s", disallowedCipher)
-				err := intls.ProbeTLSCipher(e2eclient.K8sClient, &operatorPod, operatorMetricsPort, disallowedCipher)
+				e2efixture.By("verifying the operator rejects cipher %s for a %q certificate", disallowedCipher, keyType)
+				err = intls.ProbeTLSCipher(e2eclient.K8sClient, &operatorPod, operatorMetricsPort, disallowedCipher)
 				Expect(err).To(HaveOccurred(), "operator accepted cipher %s, which the profile does not allow", disallowedCipher)
 				Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
 					"cipher %s: expected a TLS handshake rejection, got: %v", disallowedCipher, err)
@@ -408,14 +437,31 @@ var _ = Describe("TLS", func() {
 				_, err = intls.ProbeTLSCurve(e2eclient.K8sClient, &operatorPod, operatorMetricsPort, disallowed)
 				Expect(err).To(HaveOccurred(), "operator accepted curve %s (id %d), which the profile groups %v do not allow",
 					disallowed, uint16(disallowed), allowedCurves)
-				Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
-					"curve %s: expected a TLS handshake rejection, got: %v", disallowed, err)
+				Expect(errors.Is(err, intls.ErrTLSServerRejected)).To(BeTrue(),
+					"curve %s: expected a server-side TLS alert, got: %v", disallowed, err)
 				logRejectionSide("operator", operatorPod.Name, err)
 			})
 		})
 })
 
+// waitForReadyPods waits for at least one Running and Ready pod for a single
+// owner. It skips when the operand is not deployed at all.
 func waitForReadyPods(ctx context.Context, resolve func(context.Context) ([]corev1.Pod, error)) []corev1.Pod {
+	GinkgoHelper()
+	return waitForReadyPodsByOwner(ctx, func(ctx context.Context) (map[string][]corev1.Pod, error) {
+		pods, err := resolve(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return map[string][]corev1.Pod{"operand": pods}, nil
+	})
+}
+
+// waitForReadyPodsByOwner waits until every owner listed by resolve has at least
+// one Running and Ready pod. Requiring one ready pod per owner is what keeps a
+// node group whose DaemonSet has no pods yet from being silently dropped from the
+// returned list.
+func waitForReadyPodsByOwner(ctx context.Context, resolve func(context.Context) (map[string][]corev1.Pod, error)) []corev1.Pod {
 	GinkgoHelper()
 
 	if _, err := resolve(ctx); errors.Is(err, errNotDeployed) {
@@ -424,28 +470,40 @@ func waitForReadyPods(ctx context.Context, resolve func(context.Context) ([]core
 
 	var ready []corev1.Pod
 	Eventually(func() error {
-		pods, err := resolve(ctx)
+		podsByOwner, err := resolve(ctx)
 		if err != nil {
 			return err
 		}
 		ready = ready[:0]
-		for i := range pods {
-			if pods[i].Status.Phase != corev1.PodRunning || pods[i].DeletionTimestamp != nil {
-				continue
-			}
-			for _, cond := range pods[i].Status.Conditions {
-				if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
-					ready = append(ready, pods[i])
-					break
+		for owner, pods := range podsByOwner {
+			ownerReady := 0
+			for i := range pods {
+				if !podIsReady(&pods[i]) {
+					continue
 				}
+				ready = append(ready, pods[i])
+				ownerReady++
+			}
+			if ownerReady == 0 {
+				return fmt.Errorf("%s: no Running and Ready pod yet", owner)
 			}
 		}
-		if len(ready) == 0 {
-			return fmt.Errorf("no Running and Ready pod yet")
-		}
+		sort.Slice(ready, func(i, j int) bool { return ready[i].Name < ready[j].Name })
 		return nil
 	}).WithTimeout(podDiscoveryTimeout).WithPolling(podDiscoveryPolling).Should(Succeed())
 	return ready
+}
+
+func podIsReady(pod *corev1.Pod) bool {
+	if pod.Status.Phase != corev1.PodRunning || pod.DeletionTimestamp != nil {
+		return false
+	}
+	for _, cond := range pod.Status.Conditions {
+		if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
 
 func resolveSchedulerPods(ctx context.Context) ([]corev1.Pod, error) {
@@ -481,7 +539,7 @@ func resolveOperatorPods(ctx context.Context) ([]corev1.Pod, error) {
 	return []corev1.Pod{*pod}, nil
 }
 
-func resolveRTEPods(ctx context.Context) ([]corev1.Pod, error) {
+func resolveRTEPods(ctx context.Context) (map[string][]corev1.Pod, error) {
 	nropObj := &nropv1.NUMAResourcesOperator{}
 	if err := e2eclient.Client.Get(ctx, objects.NROObjectKey(), nropObj); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -492,8 +550,7 @@ func resolveRTEPods(ctx context.Context) ([]corev1.Pod, error) {
 	if len(nropObj.Status.NodeGroups) == 0 {
 		return nil, errors.New("NUMAResourcesOperator reports no node groups yet")
 	}
-
-	var pods []corev1.Pod
+	podsByDaemonSet := make(map[string][]corev1.Pod, len(nropObj.Status.NodeGroups))
 	for _, nodeGroup := range nropObj.Status.NodeGroups {
 		dsKey := client.ObjectKey{Namespace: nodeGroup.DaemonSet.Namespace, Name: nodeGroup.DaemonSet.Name}
 		ds := &appsv1.DaemonSet{}
@@ -504,9 +561,9 @@ func resolveRTEPods(ctx context.Context) ([]corev1.Pod, error) {
 		if err != nil {
 			return nil, err
 		}
-		pods = append(pods, dsPods...)
+		podsByDaemonSet[dsKey.String()] = dsPods
 	}
-	return pods, nil
+	return podsByDaemonSet, nil
 }
 
 func logRejectionSide(component, podName string, err error) {
