@@ -153,26 +153,6 @@ func ProbeTLSCipher(cli kubernetes.Interface, pod *corev1.Pod, podPort string, c
 	return err
 }
 
-// ProbeTLSSettings opens a TLS connection to the pod and returns the negotiated
-// TLS version and cipher suite.
-func ProbeTLSSettings(cli kubernetes.Interface, pod *corev1.Pod, podPort string) (version uint16, cipherSuite uint16, err error) {
-	key := client.ObjectKeyFromObject(pod)
-
-	err = remoteexec.PortForwardToPod(cli, pod, podPort, func(conn net.Conn) error {
-		state, tlsErr := tlsHandshake(conn, &tls.Config{
-			InsecureSkipVerify: true, // we care about the version/cipher not the cert chain so skip cert validation
-		})
-		if tlsErr != nil {
-			return tlsErr
-		}
-		version = state.Version
-		cipherSuite = state.CipherSuite
-		klog.InfoS("probe TLS settings", "pod", key.String(), "version", tls.VersionName(version), "cipher", tls.CipherSuiteName(cipherSuite))
-		return nil
-	})
-	return version, cipherSuite, err
-}
-
 // OpenSSLCipherToGoID converts an OpenSSL cipher name to a Go crypto/tls
 // cipher suite ID by going through the IANA name as an intermediate form.
 // Both the secure and the insecure suite lists are searched, because a probe
