@@ -63,9 +63,11 @@ var errNotDeployed = errors.New("operand is not deployed on this cluster")
 
 var _ = Describe("TLS", func() {
 	var (
-		minVersion     uint16
-		tlsProfileSpec configv1.TLSProfileSpec
-		allowedCiphers []string
+		minVersion       uint16
+		tlsProfileSpec   configv1.TLSProfileSpec
+		allowedCiphers   []string
+		allowedCurves    []tls.CurveID
+		unrecognizedGrps []configv1.TLSGroup
 	)
 
 	BeforeEach(func(ctx context.Context) {
@@ -73,6 +75,13 @@ var _ = Describe("TLS", func() {
 		minVersion, tlsProfileSpec, err = intls.GetClusterTLSProfile(ctx, e2eclient.Client)
 		Expect(err).ToNot(HaveOccurred(), "failed to read the cluster TLS profile")
 		allowedCiphers = libgocrypto.OpenSSLToIANACipherSuites(tlsProfileSpec.Ciphers)
+		allowedCurves, unrecognizedGrps = intls.CurveIDsFromProfile(tlsProfileSpec)
+		// A group this build cannot map is dropped from the operand flags as well,
+		// so the mapped subset stays a sound expectation; only log it here.
+		if len(unrecognizedGrps) > 0 {
+			klog.InfoS("the cluster profile lists TLS groups this build cannot map; curve assertions use the mapped subset",
+				"groups", tlsProfileSpec.Groups, "unrecognized", unrecognizedGrps)
+		}
 	})
 
 	Context("[tlscompliance][scheduler] scheduler complies with TLS Profile modifications",
@@ -132,6 +141,47 @@ var _ = Describe("TLS", func() {
 					Expect(err).To(HaveOccurred(), "%s pod %q accepted %s, which the profile does not allow", "scheduler", schedulerPod.Name, disallowedCipher)
 					Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
 						"%s pod %q: %s: expected a TLS handshake rejection, got: %v", "scheduler", schedulerPod.Name, disallowedCipher, err)
+					logRejectionSide("scheduler", schedulerPod.Name, err)
+				}
+			})
+
+			It("[test_id:91138] should negotiate a curve allowed by the cluster TLS profile", func() {
+				if len(allowedCurves) == 0 {
+					Skip(fmt.Sprintf("no recognized Go curves in %v (unrecognized: %v)", tlsProfileSpec.Groups, unrecognizedGrps))
+				}
+				for i := range schedulerPods {
+					schedulerPod := &schedulerPods[i]
+					e2efixture.By("reading the negotiated curve from the scheduler")
+					state, err := intls.ProbeTLSState(e2eclient.K8sClient, schedulerPod, schedulerSecurePort)
+					Expect(err).ToNot(HaveOccurred(), "scheduler pod %q: TLS handshake failed", schedulerPod.Name)
+					klog.InfoS("negotiated TLS settings", "pod", schedulerPod.Name,
+						"version", tls.VersionName(state.Version), "cipher", tls.CipherSuiteName(state.CipherSuite),
+						"curve", state.CurveID.String())
+
+					Expect(state.CurveID).ToNot(BeZero(),
+						"scheduler negotiated no ECDHE curve; TLS 1.3 and the TLS 1.2 profiles in use always use (EC)DHE, so this is a probe or server defect")
+					Expect(allowedCurves).To(ContainElement(state.CurveID),
+						"scheduler negotiated curve %s (id %d), outside the profile groups %v; check --tls-curve-preferences on the scheduler Deployment",
+						state.CurveID.String(), uint16(state.CurveID), tlsProfileSpec.Groups)
+				}
+			})
+
+			It("[test_id:91139] should reject a handshake that offers only a curve disallowed by the cluster TLS profile", func() {
+				if len(allowedCurves) == 0 {
+					Skip(fmt.Sprintf("no recognized Go curves in %v (unrecognized: %v)", tlsProfileSpec.Groups, unrecognizedGrps))
+				}
+				disallowed, err := intls.FindDisallowedCurve(allowedCurves)
+				if err != nil {
+					Skip(fmt.Sprintf("no curve outside the profile groups is available to probe with; reason: %v, allowed: %v", err, allowedCurves))
+				}
+				for i := range schedulerPods {
+					schedulerPod := &schedulerPods[i]
+					e2efixture.By("probing the scheduler with curve %s", disallowed)
+					_, err = intls.ProbeTLSCurve(e2eclient.K8sClient, schedulerPod, schedulerSecurePort, disallowed)
+					Expect(err).To(HaveOccurred(), "scheduler accepted curve %s (id %d), which the profile groups %v do not allow",
+						disallowed, uint16(disallowed), allowedCurves)
+					Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
+						"curve %s: expected a TLS handshake rejection, got: %v", disallowed, err)
 					logRejectionSide("scheduler", schedulerPod.Name, err)
 				}
 			})
@@ -227,6 +277,48 @@ var _ = Describe("TLS", func() {
 					}
 				})
 
+				It("[test_id:91141] should negotiate a curve allowed by the cluster profile on every RTE pod", func() {
+					if len(allowedCurves) == 0 {
+						Skip(fmt.Sprintf("no recognized Go curves in %v (unrecognized: %v)", tlsProfileSpec.Groups, unrecognizedGrps))
+					}
+
+					for i := range rtePods {
+						rtePod := &rtePods[i]
+						e2efixture.By("reading the negotiated curve from RTE pod %s/%s", rtePod.Namespace, rtePod.Name)
+						state, err := intls.ProbeTLSState(e2eclient.K8sClient, rtePod, rteMetricsPort)
+						Expect(err).ToNot(HaveOccurred(), "RTE pod %q: TLS handshake failed", rtePod.Name)
+						klog.InfoS("negotiated TLS settings", "pod", rtePod.Name,
+							"version", tls.VersionName(state.Version), "cipher", tls.CipherSuiteName(state.CipherSuite),
+							"curve", state.CurveID.String())
+
+						Expect(state.CurveID).ToNot(BeZero(),
+							"RTE pod %q negotiated no ECDHE curve; TLS 1.3 and the TLS 1.2 profiles in use always use (EC)DHE, so this is a probe or server defect", rtePod.Name)
+						Expect(allowedCurves).To(ContainElement(state.CurveID),
+							"RTE pod %q negotiated curve %s (id %d), outside the profile groups %v; check --metrics-tls-curve-preferences on the RTE DaemonSet",
+							rtePod.Name, state.CurveID.String(), uint16(state.CurveID), tlsProfileSpec.Groups)
+					}
+				})
+
+				It("[test_id:91142] should reject a curve disallowed by the cluster profile on every RTE pod", func(ctx context.Context) {
+					if len(allowedCurves) == 0 {
+						Skip(fmt.Sprintf("no recognized Go curves in %v (unrecognized: %v)", tlsProfileSpec.Groups, unrecognizedGrps))
+					}
+					disallowed, err := intls.FindDisallowedCurve(allowedCurves)
+					if err != nil {
+						Skip(fmt.Sprintf("no curve outside the profile groups is available to probe with; reason: %v, allowed: %v", err, allowedCurves))
+					}
+
+					for i := range rtePods {
+						rtePod := &rtePods[i]
+						e2efixture.By("probing RTE pod %s/%s with curve %s", rtePod.Namespace, rtePod.Name, disallowed)
+						_, err := intls.ProbeTLSCurve(e2eclient.K8sClient, rtePod, rteMetricsPort, disallowed)
+						Expect(err).To(HaveOccurred(), "RTE pod %q accepted curve %s (id %d), which the profile groups %v do not allow",
+							rtePod.Name, disallowed, uint16(disallowed), allowedCurves)
+						Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
+							"RTE pod %q curve %s: expected a TLS handshake rejection, got: %v", rtePod.Name, disallowed, err)
+						logRejectionSide("RTE", rtePod.Name, err)
+					}
+				})
 			})
 		})
 
@@ -284,6 +376,42 @@ var _ = Describe("TLS", func() {
 				logRejectionSide("operator", operatorPod.Name, err)
 			})
 
+			It("[test_id:91145] should negotiate a curve allowed by the cluster TLS profile", func() {
+				if len(allowedCurves) == 0 {
+					Skip(fmt.Sprintf("no recognized Go curves in %v (unrecognized: %v)", tlsProfileSpec.Groups, unrecognizedGrps))
+				}
+
+				e2efixture.By("reading the negotiated curve from the operator")
+				state, err := intls.ProbeTLSState(e2eclient.K8sClient, &operatorPod, operatorMetricsPort)
+				Expect(err).ToNot(HaveOccurred(), "operator pod %q: TLS handshake failed", operatorPod.Name)
+				klog.InfoS("negotiated TLS settings", "pod", operatorPod.Name,
+					"version", tls.VersionName(state.Version), "cipher", tls.CipherSuiteName(state.CipherSuite),
+					"curve", state.CurveID.String())
+
+				Expect(state.CurveID).ToNot(BeZero(),
+					"operator negotiated no ECDHE curve; TLS 1.3 and the TLS 1.2 profiles in use always use (EC)DHE, so this is a probe or server defect")
+				Expect(allowedCurves).To(ContainElement(state.CurveID),
+					"operator negotiated curve %s (id %d), outside the profile groups %v; the operator applies the cluster groups at startup",
+					state.CurveID.String(), uint16(state.CurveID), tlsProfileSpec.Groups)
+			})
+
+			It("[test_id:91146] should reject a handshake that offers only a curve disallowed by the cluster TLS profile", func() {
+				if len(allowedCurves) == 0 {
+					Skip(fmt.Sprintf("no recognized Go curves in %v (unrecognized: %v)", tlsProfileSpec.Groups, unrecognizedGrps))
+				}
+				disallowed, err := intls.FindDisallowedCurve(allowedCurves)
+				if err != nil {
+					Skip(fmt.Sprintf("no curve outside the profile groups is available to probe with; reason: %v, allowed: %v", err, allowedCurves))
+				}
+
+				e2efixture.By("probing the operator with curve %s", disallowed)
+				_, err = intls.ProbeTLSCurve(e2eclient.K8sClient, &operatorPod, operatorMetricsPort, disallowed)
+				Expect(err).To(HaveOccurred(), "operator accepted curve %s (id %d), which the profile groups %v do not allow",
+					disallowed, uint16(disallowed), allowedCurves)
+				Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
+					"curve %s: expected a TLS handshake rejection, got: %v", disallowed, err)
+				logRejectionSide("operator", operatorPod.Name, err)
+			})
 		})
 })
 
