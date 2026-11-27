@@ -116,6 +116,26 @@ var _ = Describe("TLS", func() {
 				}
 			})
 
+			It("[test_id:91174] should reject a cipher the profile does not allow", func() {
+				if minVersion == tls.VersionTLS13 {
+					Skip(fmt.Sprintf("cluster minimum is %s: TLS 1.3 cipher suites are not individually configurable, so the cipher probe does not apply", tls.VersionName(minVersion)))
+				}
+				disallowedCipher := intls.FindDisallowedCipher(tlsProfileSpec.Ciphers)
+				if disallowedCipher == "" {
+					Skip(fmt.Sprintf("every TLS 1.2 cipher in profile %v is allowed, so the cipher probe does not apply", tlsProfileSpec.Ciphers))
+				}
+
+				for i := range schedulerPods {
+					schedulerPod := &schedulerPods[i]
+					e2efixture.By("verifying the scheduler rejects cipher %s", disallowedCipher)
+					err := intls.ProbeTLSCipher(e2eclient.K8sClient, schedulerPod, schedulerSecurePort, disallowedCipher)
+					Expect(err).To(HaveOccurred(), "%s pod %q accepted %s, which the profile does not allow", "scheduler", schedulerPod.Name, disallowedCipher)
+					Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
+						"%s pod %q: %s: expected a TLS handshake rejection, got: %v", "scheduler", schedulerPod.Name, disallowedCipher, err)
+					logRejectionSide("scheduler", schedulerPod.Name, err)
+				}
+			})
+
 			It("[test_id:91140] should have the scheduler Deployment TLS args aligned with the cluster profile", func(ctx context.Context) {
 				apply, unsupported := ctrltls.NewTLSConfigFromProfile(tlsProfileSpec)
 				if len(unsupported) > 0 {
@@ -188,6 +208,25 @@ var _ = Describe("TLS", func() {
 					}
 				})
 
+				It("[test_id:91175] should reject a cipher the profile does not allow", func() {
+					if minVersion == tls.VersionTLS13 {
+						Skip(fmt.Sprintf("cluster minimum is %s: TLS 1.3 cipher suites are not individually configurable, so the cipher probe does not apply", tls.VersionName(minVersion)))
+					}
+					disallowedCipher := intls.FindDisallowedCipher(tlsProfileSpec.Ciphers)
+					if disallowedCipher == "" {
+						Skip(fmt.Sprintf("every TLS 1.2 cipher in profile %v is allowed, so the cipher probe does not apply", tlsProfileSpec.Ciphers))
+					}
+					for i := range rtePods {
+						rtePod := &rtePods[i]
+						e2efixture.By("verifying RTE pod %s/%s rejects cipher %s", rtePod.Namespace, rtePod.Name, disallowedCipher)
+						err := intls.ProbeTLSCipher(e2eclient.K8sClient, rtePod, rteMetricsPort, disallowedCipher)
+						Expect(err).To(HaveOccurred(), "RTE pod %q accepted cipher %s, which the profile does not allow", rtePod.Name, disallowedCipher)
+						Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
+							"RTE pod %q, cipher %s: expected a TLS handshake rejection, got: %v", rtePod.Name, disallowedCipher, err)
+						logRejectionSide("rte", rtePod.Name, err)
+					}
+				})
+
 			})
 		})
 
@@ -215,6 +254,34 @@ var _ = Describe("TLS", func() {
 					Expect(allowedCiphers).To(ContainElement(cipherName),
 						"operator negotiated cipher %s, outside the profile ciphers %v", cipherName, tlsProfileSpec.Ciphers)
 				}
+			})
+
+			It("[test_id:91144] should reject TLS connections below the minimum profile version", func() {
+				belowMinVersion, err := intls.TLSVersionBelow(minVersion)
+				Expect(err).ToNot(HaveOccurred(), "cannot determine a TLS version below %s", tls.VersionName(minVersion))
+
+				e2efixture.By("verifying the operator rejects TLS %s", tls.VersionName(belowMinVersion))
+				err = intls.ProbeMaxTLSVersion(e2eclient.K8sClient, &operatorPod, operatorMetricsPort, belowMinVersion)
+				Expect(err).To(HaveOccurred(), "operator accepted a connection capped at %s", tls.VersionName(belowMinVersion))
+				Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(), "expected a TLS handshake rejection, got: %v", err)
+
+			})
+
+			It("[test_id:91176] should reject a cipher the profile does not allow", func() {
+				if minVersion == tls.VersionTLS13 {
+					Skip(fmt.Sprintf("cluster minimum is %s: TLS 1.3 cipher suites are not individually configurable, so the cipher probe does not apply", tls.VersionName(minVersion)))
+				}
+				disallowedCipher := intls.FindDisallowedCipher(tlsProfileSpec.Ciphers)
+				if disallowedCipher == "" {
+					Skip(fmt.Sprintf("every TLS 1.2 cipher in profile %v is allowed, so the cipher probe does not apply", tlsProfileSpec.Ciphers))
+				}
+
+				e2efixture.By("verifying the operator rejects cipher %s", disallowedCipher)
+				err := intls.ProbeTLSCipher(e2eclient.K8sClient, &operatorPod, operatorMetricsPort, disallowedCipher)
+				Expect(err).To(HaveOccurred(), "operator accepted cipher %s, which the profile does not allow", disallowedCipher)
+				Expect(errors.Is(err, intls.ErrTLSHandshakeRejected)).To(BeTrue(),
+					"cipher %s: expected a TLS handshake rejection, got: %v", disallowedCipher, err)
+				logRejectionSide("operator", operatorPod.Name, err)
 			})
 
 		})
@@ -312,4 +379,16 @@ func resolveRTEPods(ctx context.Context) ([]corev1.Pod, error) {
 		pods = append(pods, dsPods...)
 	}
 	return pods, nil
+}
+
+func logRejectionSide(component, podName string, err error) {
+	switch {
+	case errors.Is(err, intls.ErrTLSServerRejected):
+		klog.InfoS("the endpoint rejected the probe with a TLS alert", "component", component, "pod", podName)
+	case errors.Is(err, intls.ErrTLSClientConfigIncompatible):
+		klog.InfoS("the Go client refused the handshake before the server answered; the endpoint did not accept the probe, but this is not server-side proof",
+			"component", component, "pod", podName)
+	default:
+		klog.InfoS("probe failed without a TLS classification", "component", component, "pod", podName, "err", err)
+	}
 }
